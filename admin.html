@@ -167,9 +167,14 @@ async function setStatus(shopId, status){
   const extra = { status, updatedAt: fbNow() };
   if(status === "active"){
     extra.blockedReason = firebase.firestore.FieldValue.delete();
-    await db.collection("loginAttempts").get().then(snap=>{
-      // ঐচ্ছিক: চাইলে সংশ্লিষ্ট ইমেইলের ফেইলড কাউন্ট রিসেট করা যায়
-    });
+    // এই দোকানের সব ইউজার/সাব-ইউজারের ভুল-পাসওয়ার্ড গণনা রিসেট করা হচ্ছে,
+    // নাহলে আনব্লক করার পরেও একটা ভুল চাপেই আবার ব্লক হয়ে যাবে
+    const membersSnap = await db.collection("shops").doc(shopId).collection("members").get();
+    const clears = membersSnap.docs
+      .map(d => d.data().email)
+      .filter(Boolean)
+      .map(email => db.collection("loginAttempts").doc(email).delete().catch(()=>{}));
+    await Promise.all(clears);
   }
   await db.collection("shops").doc(shopId).set(extra, { merge: true });
   loadShops();
