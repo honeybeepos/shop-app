@@ -49,6 +49,9 @@
     <label>পাসওয়ার্ড</label>
     <input type="password" id="loginPass" placeholder="••••••••">
     <button class="btn" id="loginBtn">লগইন করুন</button>
+    <p style="text-align:center;margin:10px 0 0;">
+      <a href="#" id="forgotLink" style="color:#1f4a48;font-size:12.5px;text-decoration:underline;">পাসওয়ার্ড ভুলে গেছেন?</a>
+    </p>
     <div class="msg" id="loginMsg"></div>
   </div>
 
@@ -131,6 +134,21 @@ document.getElementById("loginBtn").addEventListener("click", async ()=>{
     }
   }
   btn.disabled = false; btn.textContent = "লগইন করুন";
+});
+
+document.getElementById("forgotLink").addEventListener("click", async (e)=>{
+  e.preventDefault();
+  let email = document.getElementById("loginEmail").value.trim();
+  if(!email){
+    email = prompt("আপনার ইমেইল লিখুন, পাসওয়ার্ড রিসেট লিংক পাঠানো হবে:");
+  }
+  if(!email) return;
+  try{
+    await auth.sendPasswordResetEmail(email);
+    showMsg("loginMsg", "রিসেট লিংক " + email + " এই ইমেইলে পাঠানো হয়েছে। ইনবক্স (ও স্প্যাম ফোল্ডার) চেক করুন।", true);
+  }catch(e){
+    showMsg("loginMsg", "এই ইমেইলে পাঠানো যায়নি: " + (e.message || "চেষ্টা করুন আবার"), false);
+  }
 });
 
 document.getElementById("signupBtn").addEventListener("click", async ()=>{
