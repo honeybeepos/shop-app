@@ -17,6 +17,14 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+/* অফলাইন-ফার্স্ট: ইন্টারনেট না থাকলেও অ্যাপ যেন সেল/এন্ট্রি বন্ধ না করে।
+   এটা চালু থাকলে Firestore ডেটা ও পেন্ডিং রাইট মোবাইলের IndexedDB-তে
+   জমা থাকে, এবং ইন্টারনেট ফিরলে নিজে থেকেই সার্ভারের সাথে সিঙ্ক হয়ে যায় —
+   কোনো ম্যানুয়াল কাজ লাগে না। */
+db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
+  console.warn("অফলাইন মোড চালু করা যায়নি:", err.code);
+});
+
 /* সাব-ইউজার তৈরি করার সময় বর্তমান লগইন সেশন যেন নষ্ট না হয়,
    সেজন্য একটা আলাদা (secondary) firebase app ব্যবহার করা হয় */
 const secondaryApp = firebase.initializeApp(firebaseConfig, "Secondary");
