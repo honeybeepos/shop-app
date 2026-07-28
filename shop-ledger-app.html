@@ -3508,6 +3508,14 @@ function bccFindProductByName(prods, itemName){
   return candidates.length === 1 ? candidates[0] : null;
 }
 
+// প্রোডাক্ট এড করার সময় ডুপ্লিকেট আটকাতে — শুধু হুবহু (এক্সাক্ট, কেস-ইনসেনসিটিভ) নাম মিল
+// দেখা হয় (fuzzy/আংশিক মিল না, যাতে ভিন্ন প্রোডাক্ট ভুলবশত এক হয়ে না যায়)।
+function bccFindExactProductByName(prods, itemName, excludeId){
+  const name = (itemName||'').trim().toLowerCase();
+  if(!name) return null;
+  return prods.find(pr => pr.id !== excludeId && (pr.name||'').trim().toLowerCase() === name) || null;
+}
+
 // কাস্টমারের প্রিন্ট করা হিসাব/কেস মেমোতে প্রতিটা মালের ক্যাটাগরি/সাব-ক্যাটাগরি দেখানোর জন্য —
 // যাতে কাস্টমার বুঝতে পারেন ঠিক কোন প্রোডাক্ট (যেমনঃ Samsung battery, Samsung display) কিনেছেন।
 function getItemCategoryLabel(itemName, productId){
@@ -3818,15 +3826,33 @@ function bccRenderProducts(){
         <div class="qty ${low?'low':''}">${low?'⚠️ ':''}স্টক: ${p.qty||0}</div>
       </div>
       <div class="actions">
+        <button data-restock="${p.id}" title="স্টক যোগ করুন">🔄</button>
         <button data-edit="${p.id}">✏️</button>
         <button data-del="${p.id}">🗑️</button>
       </div>
     </div>`;
   }).join('');
+  listEl.querySelectorAll('[data-restock]').forEach(b=> b.addEventListener('click', ()=> bccQuickRestock(b.dataset.restock)));
   listEl.querySelectorAll('[data-edit]').forEach(b=> b.addEventListener('click', ()=> bccOpenProductModal(b.dataset.edit)));
   listEl.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', ()=> bccDeleteProduct(b.dataset.del)));
 }
 document.getElementById('bccProductSearch').addEventListener('input', ()=> bccRenderProducts());
+
+// শেষ হয়ে যাওয়া মাল দ্রুত আবার স্টকে যোগ করার জন্য — ফুল এডিট ফর্ম না খুলেই এক-ট্যাপে
+// পরিমাণ যোগ করা যায়, নতুন কোনো ডুপ্লিকেট প্রোডাক্ট তৈরি হয় না
+function bccQuickRestock(id){
+  const prods = bccLoadProducts();
+  const p = prods.find(x=>x.id===id);
+  if(!p) return;
+  const input = prompt(`"${p.name}" — বর্তমান স্টক: ${p.qty||0} পিস।\nকত পিস নতুন করে যোগ করবেন?`, '');
+  if(input === null) return;
+  const addQty = Number(input);
+  if(!addQty || addQty <= 0){ toast('সঠিক পরিমাণ দিন'); return; }
+  p.qty = (Number(p.qty)||0) + addQty;
+  bccSaveProducts(prods);
+  bccRenderProducts(); bccRenderOverview();
+  toast(`✅ ${addQty} পিস যোগ হলো — নতুন স্টক: ${p.qty} পিস`);
+}
 
 // --- product modal ---
 let bccEditingProductId = null;
@@ -3867,15 +3893,45 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
   const catId = document.getElementById('bccPCat').value;
   if(!catId){ toast('ক্যাটাগরি সিলেক্ট করা বাধ্যতামূলক'); return; }
   const prods = bccLoadProducts();
+  const enteredQty = Number(document.getElementById('bccPQty').value)||0;
+  const enteredBuy = Number(document.getElementById('bccPBuy').value)||0;
+  const enteredSell = Number(document.getElementById('bccPSell').value)||0;
+
+  // একই নামের প্রোডাক্ট আগে থেকেই আছে কিনা চেক করা হচ্ছে (নতুন প্রোডাক্ট এড করার সময়ই,
+  // এডিট করার সময় নিজের সাথে নিজের মিল ধরা হবে না)
+  const dup = bccFindExactProductByName(prods, name, bccEditingProductId);
+  if(dup){
+    const ok = confirm(
+      `"${dup.name}" নামের প্রোডাক্ট আগে থেকেই আছে (বর্তমান স্টক: ${dup.qty||0} পিস)।\n` +
+      `নতুন এন্ট্রি তৈরি না করে বর্তমান স্টকে ${enteredQty} পিস যোগ করা হবে। এগিয়ে যেতে চান?`
+    );
+    if(!ok) return;
+    dup.qty = (Number(dup.qty)||0) + enteredQty;
+    if(enteredBuy) dup.buy = enteredBuy;
+    if(enteredSell) dup.sell = enteredSell;
+    const enteredMin = Number(document.getElementById('bccPMin').value)||0;
+    if(enteredMin) dup.min = enteredMin;
+    const enteredCode = document.getElementById('bccPCode').value.trim();
+    if(enteredCode) dup.code = enteredCode;
+    if(bccPendingImage) dup.image = bccPendingImage;
+    const enteredNote = document.getElementById('bccPNote').value.trim();
+    if(enteredNote) dup.note = enteredNote;
+    bccSaveProducts(prods);
+    document.getElementById('bccProductModalOverlay').classList.remove('show');
+    toast('একই প্রোডাক্ট পাওয়া গেছে — ডুপ্লিকেট না করে স্টক আপডেট করা হলো ✅');
+    bccRenderProducts(); bccRenderOverview();
+    return;
+  }
+
   const data = {
     id: bccEditingProductId || bccUid(),
     name,
     code: document.getElementById('bccPCode').value.trim(),
     catId,
     subId: document.getElementById('bccPSub').value,
-    buy: Number(document.getElementById('bccPBuy').value)||0,
-    sell: Number(document.getElementById('bccPSell').value)||0,
-    qty: Number(document.getElementById('bccPQty').value)||0,
+    buy: enteredBuy,
+    sell: enteredSell,
+    qty: enteredQty,
     min: Number(document.getElementById('bccPMin').value)||0,
     image: bccPendingImage,
     note: document.getElementById('bccPNote').value.trim(),
@@ -3917,6 +3973,29 @@ document.getElementById('bccQuickSaveBtn').addEventListener('click', ()=>{
   const name = document.getElementById('bccQName').value.trim();
   if(!name){ toast('প্রোডাক্টের নাম দিন'); return; }
   const prods = bccLoadProducts();
+  const enteredQty = Number(document.getElementById('bccQQty').value)||0;
+
+  const dup = bccFindExactProductByName(prods, name, null);
+  if(dup){
+    const ok = confirm(
+      `"${dup.name}" নামের প্রোডাক্ট আগে থেকেই আছে (বর্তমান স্টক: ${dup.qty||0} পিস)।\n` +
+      `নতুন এন্ট্রি তৈরি না করে বর্তমান স্টকে ${enteredQty} পিস যোগ করা হবে। এগিয়ে যেতে চান?`
+    );
+    if(!ok) return;
+    dup.qty = (Number(dup.qty)||0) + enteredQty;
+    const enteredBuy = Number(document.getElementById('bccQBuy').value)||0;
+    const enteredSell = Number(document.getElementById('bccQSell').value)||0;
+    if(enteredBuy) dup.buy = enteredBuy;
+    if(enteredSell) dup.sell = enteredSell;
+    const enteredCode = document.getElementById('bccQCode').value.trim();
+    if(enteredCode) dup.code = enteredCode;
+    bccSaveProducts(prods);
+    document.getElementById('bccQuickModalOverlay').classList.remove('show');
+    toast('একই প্রোডাক্ট পাওয়া গেছে — ডুপ্লিকেট না করে স্টক আপডেট করা হলো ✅');
+    bccRenderProducts(); bccRenderOverview();
+    return;
+  }
+
   prods.push({
     id: bccUid(), name,
     code: document.getElementById('bccQCode').value.trim(),
@@ -3924,7 +4003,7 @@ document.getElementById('bccQuickSaveBtn').addEventListener('click', ()=>{
     subId: document.getElementById('bccQSub').value,
     buy: Number(document.getElementById('bccQBuy').value)||0,
     sell: Number(document.getElementById('bccQSell').value)||0,
-    qty: Number(document.getElementById('bccQQty').value)||0,
+    qty: enteredQty,
     min: 0, image:'', note:''
   });
   bccSaveProducts(prods);
@@ -6243,8 +6322,13 @@ function eiRenderAll(){
    ক্লাউড বুটস্ট্র্যাপ — লগইন চেক, ডেটা সিঙ্ক, রোল/ফিচার নিয়ন্ত্রণ
    ============================================================ */
 const ALLOWED_TABS_FOR_SUBUSER = ["dash", "add", "list", "print"];
+// সাব-ইউজার (স্টাফ) কে Business Management হাব + Business Control Center (প্রোডাক্ট/স্টক
+// ম্যানেজমেন্ট) দেখানো হয় — কারণ মালামাল যোগ/আপডেট করার দায়িত্ব স্টাফের। কিন্তু Monitoring,
+// Extra Income, আর Shop Operations Center (সাপ্লায়ার/স্টাফ পেমেন্ট/খরচ) — এগুলো আর্থিক ও
+// সংবেদনশীল বলে শুধু এডমিনের জন্য রাখা হয়েছে।
+const BIZ_CARDS_HIDDEN_FOR_SUBUSER = ["bizMonitorCard", "bizExtraIncomeCard", "bizOpsCard"];
 const FEATURE_CARD_MAP = {
-  ops: "bizMgmtCard", extraIncome: "bizExtraIncomeCard",
+  ops: "bizOpsCard", extraIncome: "bizExtraIncomeCard",
   monitor: "bizMonitorCard", reports: null, whatsapp: null
 };
 
@@ -6253,8 +6337,8 @@ function applyRoleRestrictions(role){
   document.querySelectorAll(".tab-btn").forEach(btn=>{
     if(!ALLOWED_TABS_FOR_SUBUSER.includes(btn.dataset.tab)) btn.classList.add("subuser-hide");
   });
-  document.querySelectorAll(".bizNavCard").forEach(card=>{
-    if(card.id) card.classList.add("subuser-hide");
+  document.querySelectorAll(".stat.bizNavCard").forEach(card=>{
+    if(BIZ_CARDS_HIDDEN_FOR_SUBUSER.includes(card.id)) card.classList.add("subuser-hide");
   });
 }
 
