@@ -404,6 +404,8 @@
     #opsSupplierHistoryPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #opsAllSupplierPrintArea.printing, #opsAllSupplierPrintArea.printing *{visibility:visible;}
     #opsAllSupplierPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
+    #empSalesPrintArea.printing, #empSalesPrintArea.printing *{visibility:visible;}
+    #empSalesPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     .no-print{display:none !important;}
   }
 </style>
@@ -959,6 +961,27 @@
   </div>
 </div>
 <div id="empDetailPrintArea"></div>
+
+<!-- Employee Sales (Monitoring) — একজন এমপ্লয়ীর সেল বিস্তারিত -->
+<div class="modal-overlay" id="empSalesDetailModal">
+  <div class="modal-box" style="max-width:420px; text-align:left; max-height:85vh; display:flex; flex-direction:column;">
+    <h3 id="empSalesDetailName" style="margin:0 0 4px;">👨‍💼 এমপ্লয়ী সেল বিস্তারিত</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px; font-size:12px;">
+      <div style="background:var(--paper-2); border-radius:8px; padding:8px;"><div style="color:#8a7f6c; font-size:10.5px;">আজকের সেল</div><div id="empSalesDaily" style="font-weight:800; font-family:'Space Mono',monospace;">-</div></div>
+      <div style="background:var(--paper-2); border-radius:8px; padding:8px;"><div style="color:#8a7f6c; font-size:10.5px;">সাপ্তাহিক সেল</div><div id="empSalesWeekly" style="font-weight:800; font-family:'Space Mono',monospace;">-</div></div>
+      <div style="background:var(--paper-2); border-radius:8px; padding:8px;"><div style="color:#8a7f6c; font-size:10.5px;">মাসিক সেল</div><div id="empSalesMonthly" style="font-weight:800; font-family:'Space Mono',monospace;">-</div></div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px;">
+      <button class="mini-btn" id="empSalesPrintBtn">🖨️ Print</button>
+      <button class="mini-btn" id="empSalesDownloadBtn">⬇️ Download</button>
+      <button class="mini-btn" id="empSalesWaBtn">💬 WhatsApp</button>
+    </div>
+    <div style="font-size:13px; font-weight:800; color:var(--ink); margin:6px 0;">🧾 বিক্রির তালিকা (মনিটরিং)</div>
+    <div id="empSalesHistory" style="overflow-y:auto; flex:1; min-height:60px; border-top:1px solid var(--line);"></div>
+    <button class="mini-btn" id="empSalesDetailCloseBtn" style="width:100%; margin-top:12px;">বন্ধ করুন</button>
+  </div>
+</div>
+<div id="empSalesPrintArea"></div>
 
 <!-- সকল স্টাফের সম্পূর্ণ লিস্ট ও রিপোর্ট -->
 <div class="modal-overlay" id="allStaffModal">
@@ -1714,7 +1737,11 @@
       <div class="monSectionTitle">📉 Slow Moving Product</div>
       <div class="glassList" id="monSlowMoving"></div>
       <div class="monSectionTitle">👨‍💼 Employee Sales</div>
-      <div class="glassList" id="monEmployeeSales"></div>
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="text" id="empSalesSearchInput" placeholder="🔍 Employee খুঁজুন..." style="flex:1; padding:9px 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.08); color:#fff; font-family:inherit; font-size:12.5px;">
+        <button id="empSalesToggleBtn" title="তালিকা দেখান/লুকান" style="width:40px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.1); color:#fff; font-size:14px; cursor:pointer;">▼</button>
+      </div>
+      <div class="glassList" id="monEmployeeSales" style="display:none;"></div>
       <div class="monSectionTitle">🧾 Transaction History</div>
       <div class="glassList" id="monTransactionHistory"></div>
       <div class="monSectionTitle">🧾 Invoice History</div>
@@ -4346,15 +4373,15 @@ document.querySelectorAll('#statusGroup .status-chip').forEach(chip=>{
   });
 });
 
-/* ফেরত করার সময় এই কাস্টমারের বর্তমান বাকি কত সেটা নোটের পাশে দেখানো হয়,
-   যাতে বাকির থেকে কত টাকা কাটা যাবে তা সহজে বোঝা যায়। */
+/* ফেরত করার সময় এবং জমা নেওয়ার সময় এই কাস্টমারের বর্তমান বাকি কত সেটা দেখানো হয়,
+   যাতে বাকি দেখে সঠিক পরিমাণ জমা নেওয়া যায় বা বাকির থেকে কত টাকা কাটা যাবে তা বোঝা যায়। */
 function updateCustDueInfo(){
   const row = document.getElementById('custDueInfoRow');
   const text = document.getElementById('custDueInfoText');
   if(!row || !text) return;
   const activeChip = document.querySelector('#statusGroup .status-chip.active');
   const status = activeChip ? activeChip.dataset.s : null;
-  if(status !== 'ফেরত'){ row.style.display = 'none'; return; }
+  if(status !== 'ফেরত' && status !== 'নগদ'){ row.style.display = 'none'; return; }
   const name = document.getElementById('fName').value.trim();
   const phone = document.getElementById('fPhone').value.trim();
   if(!name && !phone){ row.style.display = 'none'; return; }
@@ -4803,6 +4830,14 @@ setupGlobalSearchDropdown({inputId:'printName', boxId:'printGlobalBox', context:
 
 /* ---- Cart system: add multiple items one-by-one, then save the whole bill at once ---- */
 function genLineId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+// লগইন করা এডমিন/সাব-ইউজারের নাম — কে সেল/এন্ট্রি করলো তা "Employee Sales" মনিটরিং-এ
+// দেখানোর জন্য প্রতিটা এন্ট্রির সাথে জুড়ে দেওয়া হয়
+function currentSalesPersonName(){
+  try{
+    const s = (typeof getSession === 'function') ? getSession() : null;
+    return (s && s.name) ? s.name : 'এডমিন';
+  }catch(e){ return 'এডমিন'; }
+}
 
 let creditCart = []; // items for নতুন এন্ট্রি (বাকি / নগদ-বিক্রি)
 let qsCart = [];      // items for কুইক সেল
@@ -4959,7 +4994,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
         itemPaid = Math.max(0, Math.min(it.price, remainingPaid));
         remainingPaid -= itemPaid;
       }
-      return { id: genLineId(), name, item: it.item, productId: it.productId || '', phone, cost: it.cost, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, note, status, billId, date: new Date().toISOString() };
+      return { id: genLineId(), name, item: it.item, productId: it.productId || '', phone, cost: it.cost, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, note, status, billId, date: new Date().toISOString(), soldBy: currentSalesPersonName() };
     });
     retailEntries.unshift(...newEntries);
     bccAdjustStockForSale(billItems);
@@ -4989,7 +5024,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     let extraNote = (cashBack==='yes' ? `Cash return: SAR ${value}` : `SAR ${value} deducted from balance.`) + (condition==='bad' ? ' [খারাপ/নষ্ট মাল — স্টকে যোগ হয়নি]' : ' [ভালো মাল — স্টকে যোগ হয়েছে]');
     if(cashBack === 'no' && value>0){ allocateDuePayment(name, phone, value); }
 
-    retailEntries.unshift({ id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, note: (note ? note+' — ' : '')+extraNote, status, condition, date: new Date().toISOString() });
+    retailEntries.unshift({ id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, note: (note ? note+' — ' : '')+extraNote, status, condition, date: new Date().toISOString(), soldBy: currentSalesPersonName() });
     // ফেরত দেওয়া মাল "ভালো" হলে স্টকে ফেরত যোগ হবে, "খারাপ/নষ্ট" হলে স্টকে যোগ হবে না
     if(condition === 'bad'){
       toast(`"${item}" খারাপ/নষ্ট হিসেবে চিহ্নিত হয়েছে, তাই স্টকে যোগ হয়নি`);
@@ -5013,7 +5048,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     if(amount<=0){ toast('কত টাকা জমা দিচ্ছে লিখুন'); return; }
     allocateDuePayment(name, phone, amount);
     
-    retailEntries.unshift({ id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, date: new Date().toISOString() });
+    retailEntries.unshift({ id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, date: new Date().toISOString(), soldBy: currentSalesPersonName() });
     
     const isCleared = isCustomerFullyPaid(name, phone);
     let msg = "";
@@ -5061,7 +5096,7 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
 
   const billId = genLineId();
   const newEntries = qsCart.map(it => ({
-    id: genLineId(), name:custName, item: it.item, productId: it.productId || '', phone:custPhone, cost: it.cost, price: it.price, paid: qsType==='বাকি' ? 0 : it.price, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, note:'', status:qsType, billId, date: new Date().toISOString()
+    id: genLineId(), name:custName, item: it.item, productId: it.productId || '', phone:custPhone, cost: it.cost, price: it.price, paid: qsType==='বাকি' ? 0 : it.price, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, note:'', status:qsType, billId, date: new Date().toISOString(), soldBy: currentSalesPersonName()
   }));
   retailEntries.unshift(...newEntries);
   bccAdjustStockForSale(qsCart);
@@ -5113,7 +5148,7 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
       itemPaid = Math.max(0, Math.min(it.price, remainingPaid));
       remainingPaid -= itemPaid;
     }
-    return { id: genLineId(), name: esName, item: it.item, productId: it.productId || '', phone: esPhone, cost: it.cost||0, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost||0, unitPrice: it.unitPrice, note: 'এক্সট্রা সেল', status: esType, billId, date: new Date().toISOString() };
+    return { id: genLineId(), name: esName, item: it.item, productId: it.productId || '', phone: esPhone, cost: it.cost||0, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost||0, unitPrice: it.unitPrice, note: 'এক্সট্রা সেল', status: esType, billId, date: new Date().toISOString(), soldBy: currentSalesPersonName() };
   });
   retailEntries.unshift(...newEntries);
 
@@ -6167,7 +6202,7 @@ function monRenderAll(){
     <div class="glassRow"><span class="nm">${escapeHtml(s.name)}</span><span class="amt ${s.sold===0?'red':''}">${s.sold} pcs sold</span></div>
   `).join('') : `<div class="glassEmpty">কোনো প্রোডাক্ট নেই</div>`;
 
-  document.getElementById('monEmployeeSales').innerHTML = `<div class="glassEmpty">এমপ্লয়ী ডেটা এখনো যোগ করা হয়নি — পরে এই ফিচার যোগ করা যাবে</div>`;
+  monRenderEmployeeSales();
 
   const recentTx = retailEntries.slice().sort((a,b)=> new Date(b.date)-new Date(a.date)).slice(0,10);
   document.getElementById('monTransactionHistory').innerHTML = recentTx.length ? recentTx.map(e=>`
@@ -6190,6 +6225,154 @@ function monRenderAll(){
   const oosCard = document.getElementById('monOutOfStock').closest('.glassCard');
   if(oosCard) oosCard.classList.toggle('pulseAlert', outOfStock.length > 0);
 }
+
+/* ---------------- Employee Sales (Monitoring) ----------------
+   কে (এডমিন/সাব-ইউজার) কোন সেলটা করেছে তা প্রতিটা এন্ট্রির সাথে soldBy হিসেবে
+   জোড়া থাকে (currentSalesPersonName() ফাংশন দেখুন)। এখানে সেটা এমপ্লয়ী অনুযায়ী
+   গ্রুপ করে দৈনিক/সাপ্তাহিক/মাসিক সেল এবং পূর্ণ বিক্রির তালিকা দেখানো হচ্ছে। */
+let empSalesListVisible = false;
+let empSalesCurrentName = null;
+
+function monGetEmployeeSalesStats(){
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate()-6); weekAgo.setHours(0,0,0,0);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const byEmp = {};
+  retailEntries.forEach(e=>{
+    if(!SALE_STATUSES.includes(e.status)) return;
+    const emp = e.soldBy || 'এডমিন';
+    if(!byEmp[emp]) byEmp[emp] = { name: emp, daily:0, weekly:0, monthly:0, allTime:0, count:0, entries:[] };
+    const d = new Date(e.date);
+    byEmp[emp].allTime += (e.price||0);
+    byEmp[emp].count += 1;
+    byEmp[emp].entries.push(e);
+    if(d.toDateString() === todayStr) byEmp[emp].daily += (e.price||0);
+    if(d >= weekAgo) byEmp[emp].weekly += (e.price||0);
+    if(d >= monthStart) byEmp[emp].monthly += (e.price||0);
+  });
+  return Object.values(byEmp).sort((a,b)=> b.allTime - a.allTime);
+}
+
+function monRenderEmployeeSales(){
+  const listEl = document.getElementById('monEmployeeSales');
+  const searchInput = document.getElementById('empSalesSearchInput');
+  const query = (searchInput.value||'').trim().toLowerCase();
+  let stats = monGetEmployeeSalesStats();
+  if(query) stats = stats.filter(s=> s.name.toLowerCase().includes(query));
+  listEl.innerHTML = stats.length ? stats.map(s=>`
+    <div class="glassRow" data-emp="${escapeHtml(s.name)}" style="cursor:pointer;">
+      <span class="nm">🧑‍💼 ${escapeHtml(s.name)}</span>
+      <span class="meta">${s.count} সেল</span>
+      <span class="amt">${fmt(s.allTime)}</span>
+    </div>
+  `).join('') : `<div class="glassEmpty">${query ? 'এই নামে কোনো এমপ্লয়ী পাওয়া যায়নি' : 'এখনো কোনো সেল হয়নি'}</div>`;
+  listEl.querySelectorAll('[data-emp]').forEach(row=>{
+    row.addEventListener('click', ()=> openEmpSalesDetail(row.dataset.emp));
+  });
+}
+
+document.getElementById('empSalesToggleBtn').addEventListener('click', ()=>{
+  empSalesListVisible = !empSalesListVisible;
+  document.getElementById('monEmployeeSales').style.display = empSalesListVisible ? 'block' : 'none';
+  document.getElementById('empSalesToggleBtn').textContent = empSalesListVisible ? '▲' : '▼';
+});
+document.getElementById('empSalesSearchInput').addEventListener('input', ()=>{
+  // সার্চ শুরু করলে লিস্ট এমনিতেই খুলে দেওয়া হচ্ছে, নাহলে ফলাফল কোথায় গেল বোঝা যাবে না
+  if(!empSalesListVisible){
+    empSalesListVisible = true;
+    document.getElementById('monEmployeeSales').style.display = 'block';
+    document.getElementById('empSalesToggleBtn').textContent = '▲';
+  }
+  monRenderEmployeeSales();
+});
+
+function buildEmpSalesText(name, stats, entries){
+  const dateStr = new Date().toLocaleDateString('bn-BD', {day:'numeric', month:'long', year:'numeric'});
+  let text = `🧑‍💼 ${name} - সেল রিপোর্ট\nতারিখ: ${dateStr}\n\nআজকের সেল: ${fmt(stats.daily)}\nসাপ্তাহিক সেল: ${fmt(stats.weekly)}\nমাসিক সেল: ${fmt(stats.monthly)}\nসর্বমোট সেল: ${fmt(stats.allTime)} (${stats.count} টি)\n\n`;
+  entries.slice(0,20).forEach((e,i)=>{
+    const d = new Date(e.date).toLocaleDateString('en-GB');
+    text += `${i+1}. ${e.item} — ${fmt(e.price)} (${e.name}, ${d})\n`;
+  });
+  return text;
+}
+
+function openEmpSalesDetail(name){
+  const stats = monGetEmployeeSalesStats().find(s=> s.name === name);
+  if(!stats) return;
+  empSalesCurrentName = name;
+  document.getElementById('empSalesDetailName').textContent = `👨‍💼 ${name} — সেল বিস্তারিত`;
+  document.getElementById('empSalesDaily').textContent = fmt(stats.daily);
+  document.getElementById('empSalesWeekly').textContent = fmt(stats.weekly);
+  document.getElementById('empSalesMonthly').textContent = fmt(stats.monthly);
+
+  const sortedEntries = stats.entries.slice().sort((a,b)=> new Date(b.date)-new Date(a.date));
+  document.getElementById('empSalesHistory').innerHTML = sortedEntries.length ? sortedEntries.map(e=>{
+    const d = new Date(e.date).toLocaleDateString('en-GB');
+    return `<div class="glassRow" style="color:var(--ink);"><span class="nm" style="color:var(--ink);">${escapeHtml(e.item)} — ${escapeHtml(e.name)}</span><span class="meta" style="color:#8a7f6c;">${d}</span><span class="amt" style="color:var(--paid);">${fmt(e.price)}</span></div>`;
+  }).join('') : `<div class="glassEmpty">কোনো বিক্রি পাওয়া যায়নি</div>`;
+
+  document.getElementById('empSalesDetailModal').classList.add('show');
+}
+
+document.getElementById('empSalesDetailCloseBtn').addEventListener('click', ()=> document.getElementById('empSalesDetailModal').classList.remove('show'));
+document.getElementById('empSalesDetailModal').addEventListener('click', (ev)=>{
+  if(ev.target === document.getElementById('empSalesDetailModal')) document.getElementById('empSalesDetailModal').classList.remove('show');
+});
+
+document.getElementById('empSalesPrintBtn').addEventListener('click', ()=>{
+  if(!empSalesCurrentName) return;
+  const stats = monGetEmployeeSalesStats().find(s=> s.name === empSalesCurrentName);
+  if(!stats) return;
+  const sortedEntries = stats.entries.slice().sort((a,b)=> new Date(b.date)-new Date(a.date));
+  const dateStr = new Date().toLocaleDateString('bn-BD', {day:'numeric', month:'long', year:'numeric'});
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  const rows = sortedEntries.map((e,i)=>{
+    const d = new Date(e.date).toLocaleDateString('bn-BD', {day:'numeric', month:'short', year:'numeric'});
+    return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(e.item)}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(e.name)}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(e.price)}</td><td style="border:1px solid #ccc; padding:8px;">${d}</td></tr>`;
+  }).join('');
+  const printArea = document.getElementById('empSalesPrintArea');
+  printArea.innerHTML = `
+    <div style="padding:24px; font-family:sans-serif; color:#111;">
+      <h2 style="margin:0 0 4px;">👨‍💼 ${escapeHtml(empSalesCurrentName)} - সেল রিপোর্ট</h2>
+      ${shopName ? `<p style="margin:0 0 2px; color:#555;">${escapeHtml(shopName)}</p>` : ''}
+      <p style="margin:0 0 16px; color:#555;">তারিখ: ${dateStr}</p>
+      <p style="margin:0 0 16px;">আজকের সেলঃ ${fmt(stats.daily)} · সাপ্তাহিক সেলঃ ${fmt(stats.weekly)} · মাসিক সেলঃ ${fmt(stats.monthly)} · সর্বমোটঃ ${fmt(stats.allTime)}</p>
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ccc; padding:8px; text-align:left;">#</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">প্রোডাক্ট</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">কাস্টমার</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">টাকা</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">তারিখ</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" style="border:1px solid #ccc; padding:8px;">কোনো বিক্রি নেই</td></tr>'}</tbody>
+      </table>
+    </div>`;
+  printArea.classList.add('printing');
+  window.print();
+  setTimeout(()=> printArea.classList.remove('printing'), 500);
+});
+
+document.getElementById('empSalesDownloadBtn').addEventListener('click', ()=>{
+  if(!empSalesCurrentName) return;
+  const stats = monGetEmployeeSalesStats().find(s=> s.name === empSalesCurrentName);
+  if(!stats) return;
+  const sortedEntries = stats.entries.slice().sort((a,b)=> new Date(b.date)-new Date(a.date));
+  let csv = 'Product,Customer,Amount,Date\n';
+  sortedEntries.forEach(e=>{
+    const d = new Date(e.date).toISOString().slice(0,10);
+    csv += `"${(e.item||'').replace(/"/g,'""')}","${(e.name||'').replace(/"/g,'""')}",${e.price||0},${d}\n`;
+  });
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${empSalesCurrentName}-sales-report.csv`;
+  a.click();
+});
+
+document.getElementById('empSalesWaBtn').addEventListener('click', ()=>{
+  if(!empSalesCurrentName) return;
+  const stats = monGetEmployeeSalesStats().find(s=> s.name === empSalesCurrentName);
+  if(!stats) return;
+  const sortedEntries = stats.entries.slice().sort((a,b)=> new Date(b.date)-new Date(a.date));
+  const text = buildEmpSalesText(empSalesCurrentName, stats, sortedEntries);
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+});
 
 let weeklyChartInstance = null;
 function renderWeeklySalesChart(){
