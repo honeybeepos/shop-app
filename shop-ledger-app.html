@@ -5018,6 +5018,54 @@ document.getElementById('esAddItemBtn').addEventListener('click', ()=>{
    দেখায় (৪০ টাকার মাল কিনে ১০০ টাকা দিলে ৬০ টাকা ফেরত), আর জমা নেওয়ার সময় পূর্বের বাকি +
    জমা মিলিয়ে ফেরত/নতুন বাকি — দুটোতেই একই মডাল ব্যবহার হয়। Promise resolve করে input-এর
    মান (বা confirmed হলে prefill-টাই) নিয়ে, বাতিল করলে null। */
+/* ============================================================
+   মোবাইলের ব্যাক বাটন হ্যান্ডলিং
+   ============================================================
+   আগে ব্যাক চাপলেই সফটওয়্যার সরাসরি বন্ধ হয়ে যেত। এখন থেকে:
+   1) কোনো মডাল/পপআপ খোলা থাকলে — প্রথম ব্যাকে শুধু সেটা বন্ধ হবে
+   2) হোম (ড্যাশবোর্ড) ছাড়া অন্য ট্যাবে থাকলে — ব্যাক চাপলে হোম ট্যাবে ফিরে আসবে
+   3) হোম ট্যাবে থাকা অবস্থায় ব্যাক চাপলে — "আবার ব্যাক চাপুন বের হতে" দেখাবে,
+      ২ সেকেন্ডের মধ্যে আবার চাপলেই কেবল অ্যাপ বন্ধ/মিনিমাইজ হবে
+   (শেষ ধাপে ঠিক "বন্ধ" নাকি "মিনিমাইজ" হবে সেটা অ্যান্ড্রয়েডের নিজস্ব আচরণ —
+   এটা ওয়েব কোড থেকে নিয়ন্ত্রণ করার কোনো উপায় নেই, তবে এই পরিবর্তনের ফলে ভুলবশত
+   একবার ব্যাক চেপে সাথে সাথে অ্যাপ বন্ধ হয়ে যাওয়ার সমস্যাটা আর হবে না।) */
+let __backConfirmPending = false;
+let __backConfirmTimer = null;
+
+function initBackButtonHandling(){
+  history.pushState({ bccView: 'home' }, '', location.href);
+
+  window.addEventListener('popstate', ()=>{
+    const openModal = document.querySelector('.modal-overlay.show');
+    if(openModal){
+      openModal.classList.remove('show');
+      history.pushState({ bccView: 'home' }, '', location.href);
+      return;
+    }
+
+    const activeTabBtn = document.querySelector('.tab-btn.active');
+    const currentTab = activeTabBtn ? activeTabBtn.dataset.tab : 'dash';
+
+    if(currentTab !== 'dash'){
+      const dashBtn = document.querySelector('.tab-btn[data-tab="dash"]');
+      if(dashBtn) dashBtn.click();
+      history.pushState({ bccView: 'home' }, '', location.href);
+      return;
+    }
+
+    if(!__backConfirmPending){
+      __backConfirmPending = true;
+      toast('আবার ব্যাক বাটনে চাপুন অ্যাপ থেকে বের হতে');
+      history.pushState({ bccView: 'home' }, '', location.href);
+      clearTimeout(__backConfirmTimer);
+      __backConfirmTimer = setTimeout(()=>{ __backConfirmPending = false; }, 2000);
+      return;
+    }
+    // এখানে ইচ্ছাকৃতভাবে নতুন state পুশ করা হচ্ছে না — তাই এই দ্বিতীয় ব্যাক-চাপে
+    // অ্যান্ড্রয়েডের স্বাভাবিক আচরণ (বন্ধ/মিনিমাইজ) ঘটবে।
+  });
+}
+
 function showMoneyCalcModal({title, summaryHtml, showInput, prefill, computeResult}){
   return new Promise((resolve)=>{
     const modal = document.getElementById('moneyCalcModal');
@@ -6864,6 +6912,7 @@ auth.onAuthStateChanged(async (user)=>{
   watchShopStatus(session.shopId);
   watchAnnouncement();
   applyRoleRestrictions(session.role);
+  initBackButtonHandling();
 
   document.getElementById("authGate").style.display = "none";
   loadSystemData();
