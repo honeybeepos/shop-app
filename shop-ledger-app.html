@@ -189,7 +189,7 @@
   .dueDetailRow .ddAmt{ font-family:'Space Mono',monospace; font-weight:700; color:var(--due); }
   .dueDetailTotal{ text-align:right; font-size:12px; font-weight:800; padding:4px 8px; color:var(--due); }
   .dueListPanel{ max-height:0; overflow:hidden; transition: max-height 0.35s ease; }
-  .dueListPanel.open{ max-height:3000px; }
+  .dueListPanel.open{ max-height:56vh; overflow-y:auto; }
   
   .report-line{ display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px dashed var(--line); font-size:13.5px; }
   .report-line:last-child{border-bottom:none;}
@@ -551,6 +551,8 @@
             <input id="oldCustSearch" type="text" placeholder="যেমনঃ রহিম অথবা 01xxxxxxxxx" autocomplete="off">
           </div>
         </div>
+        <button class="btn secondary" id="fpScanBtn" type="button" style="margin:8px 0;">🖐️ ফিঙ্গারপ্রিন্ট স্ক্যান করে খুঁজুন</button>
+        <p id="fpScanStatus" style="font-size:12px; color:#8a7f6c; margin:0 0 8px; display:none;"></p>
         <p class="old-cust-hint">টিপ্‌সঃ নাম/নাম্বারে চেপে ধরুন (লং প্রেস) — এডিট বা ডিলিট করতে পারবেন।</p>
         <div id="oldCustResults"></div>
         <div id="selectedCustTag" style="display:none;"></div>
@@ -574,6 +576,8 @@
             <input id="acPhone" type="text" placeholder="0 ছাড়া নাম্বার লিখুন">
           </div>
         </div>
+        <button class="btn secondary" id="acFpScanBtn" type="button" style="margin-bottom:8px;">🖐️ ফিঙ্গারপ্রিন্ট এনরোল করুন (ঐচ্ছিক)</button>
+        <p id="acFpStatus" style="font-size:12px; color:#8a7f6c; margin:0 0 8px; display:none;"></p>
         <button class="btn" id="addCustomerOnlyBtn">কাস্টমার সেভ করুন</button>
       </div>
 
@@ -1323,7 +1327,7 @@
     #program-ops .opsSearchInput::placeholder{ color:#b9c9c2; }
 
     #program-ops .glassList{
-      border-radius:18px; padding:6px; margin-bottom:14px; overflow:hidden;
+      border-radius:18px; padding:6px; margin-bottom:14px; max-height:50vh; overflow-y:auto;
       background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
       backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
     }
@@ -1678,7 +1682,7 @@
     @keyframes monFloat{ 0%,100%{ transform:translateY(0) rotateX(0deg); } 50%{ transform:translateY(-6px) rotateX(4deg); } }
 
     #program-monitor .glassList{
-      border-radius:16px; padding:4px; margin-bottom:14px; overflow:hidden;
+      border-radius:16px; padding:4px; margin-bottom:14px; max-height:50vh; overflow-y:auto;
       background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
       backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
     }
@@ -4877,6 +4881,76 @@ function currentSalesPersonName(){
   }catch(e){ return 'এডমিন'; }
 }
 
+/* ============================================================
+   ফিঙ্গারপ্রিন্ট স্ক্যানার ব্রিজ (DigitalPersona U.are.U 4500)
+   ============================================================
+   এই ওয়েব-অ্যাপ নিজে থেকে USB ফিঙ্গারপ্রিন্ট হার্ডওয়্যার অ্যাক্সেস করতে পারে না —
+   এর জন্য একটা নেটিভ Android লেয়ার লাগবে যেটা HID/DigitalPersona-র Android SDK
+   দিয়ে স্ক্যানারের সাথে কথা বলবে, তারপর নিচের 'window.NativeFingerprint' ব্রিজের
+   মাধ্যমে ফলাফলটা এই ওয়েবপেজে পাঠাবে (Android-এর addJavascriptInterface দিয়ে)।
+
+   নেটিভ ডেভেলপার যা বানাবে তার জন্য এক্সপেক্টেড কন্ট্রাক্ট:
+   - window.NativeFingerprint.scan() কল করলে স্ক্যানার চালু হবে
+   - স্ক্যান শেষে window.onFingerprintResult(idStringOrNull) কল করে ফলাফল ফেরত পাঠাবে
+     (এনরোল করা কাস্টমারের সাথে ম্যাচ করলে SDK-এর Identify() ফাংশন যেই এনরোলমেন্ট
+     আইডি রিটার্ন করে সেটাই idString হবে; না মিললে null)
+   - নিচের scanFingerprint() ফাংশনটা Promise-ভিত্তিক wrapper, যেটা UI থেকে
+     await scanFingerprint() দিয়ে ব্যবহার করা হয়
+
+   যতক্ষণ না নেটিভ ব্রিজ যোগ হচ্ছে, ততক্ষণ এই ফাংশন শুধু জানিয়ে দেবে যে স্ক্যানার
+   এখনো যুক্ত করা হয়নি — তখন ম্যানুয়াল নাম/নাম্বার সার্চই একমাত্র উপায় (ফলব্যাক,
+   যেটা এমনিতেই অ্যাপে আছে)। */
+function scanFingerprint(){
+  return new Promise((resolve)=>{
+    if(!window.NativeFingerprint || typeof window.NativeFingerprint.scan !== 'function'){
+      toast('⚠️ ফিঙ্গারপ্রিন্ট স্ক্যানার এখনো এই ডিভাইসে যুক্ত করা হয়নি — নাম/নাম্বার দিয়ে খুঁজুন');
+      resolve(null);
+      return;
+    }
+    window.onFingerprintResult = (idOrNull)=>{ resolve(idOrNull || null); };
+    window.NativeFingerprint.scan();
+  });
+}
+
+document.getElementById('fpScanBtn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('fpScanStatus');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '👆 আঙুল স্ক্যানারে রাখুন...';
+  const fpId = await scanFingerprint();
+  if(!fpId){
+    statusEl.textContent = 'কোনো মিল পাওয়া যায়নি — নাম/নাম্বার দিয়ে খুঁজুন (নিচে)';
+    return;
+  }
+  const match = shopCustomers.find(c=> c.fingerprintId === fpId);
+  if(!match){
+    statusEl.textContent = 'এই ফিঙ্গারপ্রিন্টে কোনো কাস্টমার পাওয়া যায়নি — নাম/নাম্বার দিয়ে খুঁজুন';
+    toast('⚠️ কোনো কাস্টমার ম্যাচ হয়নি, ম্যানুয়ালি খুঁজুন');
+    return;
+  }
+  statusEl.textContent = `✅ পাওয়া গেছে: ${match.name}`;
+  selectOldCustomer(match.name, match.phone || '');
+  toast(`✅ ${match.name} সনাক্ত হয়েছে — ফর্ম অটো-ফিল হয়েছে`);
+});
+
+let acPendingFingerprintId = null;
+document.getElementById('acFpScanBtn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('acFpStatus');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '👆 আঙুল স্ক্যানারে রাখুন...';
+  const fpId = await scanFingerprint();
+  if(!fpId){ statusEl.textContent = 'এনরোল করা যায়নি (স্ক্যানার যুক্ত নেই বা বাতিল হয়েছে)'; return; }
+  // ডুপ্লিকেট চেক — এই ফিঙ্গারপ্রিন্ট আইডি অন্য কোনো কাস্টমারের সাথে আগে থেকেই যুক্ত কিনা
+  const dup = shopCustomers.find(c=> c.fingerprintId === fpId);
+  if(dup){
+    statusEl.textContent = `⚠️ এই ফিঙ্গারপ্রিন্ট ইতিমধ্যে "${dup.name}"-এর নামে এনরোল করা আছে`;
+    toast('⚠️ এই আঙুলের ছাপ অন্য কাস্টমারের নামে আগে থেকেই আছে');
+    acPendingFingerprintId = null;
+    return;
+  }
+  acPendingFingerprintId = fpId;
+  statusEl.textContent = '✅ ফিঙ্গারপ্রিন্ট নেওয়া হয়েছে — এখন "কাস্টমার সেভ করুন" চাপুন';
+});
+
 let creditCart = []; // items for নতুন এন্ট্রি (বাকি / নগদ-বিক্রি)
 let qsCart = [];      // items for কুইক সেল
 let esCart = [];      // items for এক্সট্রা সেল
@@ -5188,11 +5262,17 @@ document.getElementById('addCustomerOnlyBtn').addEventListener('click', async ()
   const name = document.getElementById('acName').value.trim();
   const phone = getPhoneWithCode('acPhoneCC','acPhone');
   if(!name){ toast('নাম দিতে হবে'); return; }
+  if(acPendingFingerprintId && shopCustomers.some(c=> c.fingerprintId === acPendingFingerprintId)){
+    toast('⚠️ এই ফিঙ্গারপ্রিন্ট ইতিমধ্যে অন্য কাস্টমারের নামে সেভ করা আছে');
+    return;
+  }
   if(!shopCustomers.some(c => (phone && c.phone === phone) || (!phone && c.name === name))) {
-    shopCustomers.push({name, phone: phone || ''});
+    shopCustomers.push({name, phone: phone || '', fingerprintId: acPendingFingerprintId || ''});
     await persistData();
-    document.getElementById('acName').value=''; 
+    document.getElementById('acName').value='';
     document.getElementById('acPhone').value='';
+    document.getElementById('acFpStatus').style.display = 'none';
+    acPendingFingerprintId = null;
     toast('কাস্টমার সফলভাবে সেভ হয়েছে');
   } else {
     toast('এই কাস্টমার ইতিমধ্যে সংরক্ষিত আছে');
