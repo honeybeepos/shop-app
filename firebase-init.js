@@ -81,6 +81,20 @@ async function clearFailedLogin(email) {
   await db.collection("loginAttempts").doc(email).delete().catch(() => {});
 }
 
+/* ---------- ডিভাইস আইডি ----------
+   প্রতিটা ব্রাউজার ট্যাব/ডিভাইসকে একটা এলোমেলো আইডি দেওয়া হয়। যখন এই ডিভাইস
+   নিজেই ডেটা push করে, তখন সেই সাথে এই আইডিটাও পাঠানো হয়। পরে realtime listener
+   যখন পরিবর্তন দেখে, তখন এই আইডি মিলিয়ে বুঝতে পারে এটা নিজেরই পাঠানো পরিবর্তন
+   নাকি অন্য কারো (যেমন সাব-ইউজারের) — নিজেরটা হলে আবার টেনে/রিফ্রেশ করার দরকার নেই। */
+const __deviceId = (() => {
+  let id = sessionStorage.getItem("bcc-device-id");
+  if (!id) {
+    id = "dev-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+    sessionStorage.setItem("bcc-device-id", id);
+  }
+  return id;
+})();
+
 /* ---------- session storage (এই ডিভাইসে কে লগইন আছে) ----------
    sessionStorage-এর বদলে localStorage ব্যবহার করা হচ্ছে — অ্যাপ মিনিমাইজ/ব্যাকগ্রাউন্ডে
    গেলে Android মাঝে মাঝে সাথে সাথে ব্যবহার করা WebView প্রসেস বন্ধ করে দেয়, তখন
@@ -136,6 +150,7 @@ function disableAutoSync() {
   Storage.prototype.clear = __origClear;
   __syncShopId = null;
   if (__syncTimer) clearTimeout(__syncTimer);
+  stopWatchingAppDataChanges();
 }
 
 function scheduleCloudSync() {
@@ -155,7 +170,7 @@ async function pushLocalStorageToCloud() {
   try {
     await db.collection("shops").doc(__syncShopId)
       .collection("appdata").doc("main")
-      .set({ blob: JSON.stringify(blob), updatedAt: fbNow() }, { merge: true });
+      .set({ blob: JSON.stringify(blob), updatedAt: fbNow(), updatedBy: __deviceId }, { merge: true });
     setSyncIndicator("ok");
   } catch (e) {
     console.error("Cloud sync failed:", e);
@@ -176,6 +191,51 @@ async function pullCloudToLocalStorage(shopId) {
   Object.keys(blob).forEach(k => __origSetItem.call(localStorage, k, blob[k]));
   if (savedSession) __origSetItem.call(localStorage, "bcc-session", savedSession);
   return true;
+}
+
+/* ============================================================
+   রিয়েলটাইম "ওয়ার্কার" — সাব-ইউজার ডেটা পাঠালে এডমিন অটোমেটিক পাবে
+   ============================================================
+   এটা মিলিসেকেন্ড ধরে বার বার সার্ভার চেক (polling) করে না — তার বদলে Firestore-এর
+   নিজস্ব onSnapshot ব্যবহার করে, যেটা সার্ভারের সাথে একটা লাইভ কানেকশন খুলে রাখে।
+   শপের appdata/main ডকুমেন্টে যেই মুহূর্তে কেউ (সাব-ইউজার/এডমিন, যেকোনো ডিভাইস থেকে)
+   পরিবর্তন করে, এই ফাংশনটা সাথে সাথেই (সাধারণত < ১ সেকেন্ডে) নোটিফাই পায়, নিজে থেকেই
+   নতুন ডেটা টেনে এনে localStorage আপডেট করে দেয় — কোনো ম্যানুয়াল রিফ্রেশ/রিলগইন লাগে না। */
+let __appDataUnsubscribe = null;
+
+function watchAppDataChanges(shopId, onRemoteChange) {
+  stopWatchingAppDataChanges(); // আগে চালু কোনো লিসেনার থাকলে বন্ধ করে নতুন করে বসানো
+
+  __appDataUnsubscribe = db.collection("shops").doc(shopId)
+    .collection("appdata").doc("main")
+    .onSnapshot((snap) => {
+      if (!snap.exists) return;
+
+      // এই ডিভাইস নিজে যে পরিবর্তনটা করেছে কিন্তু এখনো সার্ভার কনফার্ম করেনি —
+      // সেটার জন্য সাথে সাথে একটা লোকাল ইকো আসে, ওটা স্কিপ করে দাও
+      if (snap.metadata.hasPendingWrites) return;
+
+      const data = snap.data();
+      if (!data) return;
+
+      // এটা যদি এই ডিভাইস নিজেই পাঠানো সর্বশেষ পরিবর্তন হয়, তাহলে আবার
+      // টেনে এনে UI রিফ্রেশ করার দরকার নেই (নিজের ডেটা নিজের কাছেই আছে)
+      if (data.updatedBy === __deviceId) return;
+
+      // অন্য কোনো ডিভাইস (যেমন সাব-ইউজার) নতুন কিছু পাঠিয়েছে — টেনে আনো
+      pullCloudToLocalStorage(shopId).then((ok) => {
+        if (ok && typeof onRemoteChange === "function") onRemoteChange(data);
+      }).catch((e) => console.error("Remote pull failed:", e));
+    }, (err) => {
+      console.error("appdata realtime listener error:", err);
+    });
+}
+
+function stopWatchingAppDataChanges() {
+  if (__appDataUnsubscribe) {
+    __appDataUnsubscribe();
+    __appDataUnsubscribe = null;
+  }
 }
 
 function setSyncIndicator(state) {

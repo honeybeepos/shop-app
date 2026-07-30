@@ -6929,7 +6929,7 @@ async function createSubUser(shopId){
 
 document.getElementById("cloudLogoutBtn").addEventListener("click", async ()=>{
   if(!confirm("লগআউট করতে চান? এই ডিভাইস থেকে লোকাল ডেটা মুছে যাবে (সার্ভারে সেভ করা আছে)।")) return;
-  disableAutoSync();
+  disableAutoSync(); // এটা stopWatchingAppDataChanges()-ও ডেকে দেয়
   __origClear.call(localStorage);
   clearSession();
   await auth.signOut();
@@ -6983,6 +6983,13 @@ auth.onAuthStateChanged(async (user)=>{
   enableAutoSync(session.shopId);
   watchShopStatus(session.shopId);
   watchAnnouncement();
+  watchAppDataChanges(session.shopId, ()=>{
+    // অন্য কোনো ডিভাইস (যেমন সাব-ইউজার) নতুন সেল/এন্ট্রি পাঠিয়েছে —
+    // localStorage আপডেট হয়ে গেছে, এখন স্ক্রিন রিফ্রেশ করে দেখাও
+    loadSystemData();
+    showSavingOverlay('🔄 নতুন এন্ট্রি এসেছে — সিঙ্ক হলো', false);
+    setTimeout(hideSavingOverlay, 1600);
+  });
   applyRoleRestrictions(session.role);
   initBackButtonHandling();
 
