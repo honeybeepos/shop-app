@@ -5021,16 +5021,17 @@ document.getElementById('esAddItemBtn').addEventListener('click', ()=>{
 /* ============================================================
    মোবাইলের ব্যাক বাটন হ্যান্ডলিং
    ============================================================
-   আগে ব্যাক চাপলেই সফটওয়্যার সরাসরি বন্ধ হয়ে যেত। এখন থেকে:
-   1) কোনো মডাল/পপআপ খোলা থাকলে — প্রথম ব্যাকে শুধু সেটা বন্ধ হবে
-   2) হোম (ড্যাশবোর্ড) ছাড়া অন্য ট্যাবে থাকলে — ব্যাক চাপলে হোম ট্যাবে ফিরে আসবে
-   3) হোম ট্যাবে থাকা অবস্থায় ব্যাক চাপলে — "আবার ব্যাক চাপুন বের হতে" দেখাবে,
-      ২ সেকেন্ডের মধ্যে আবার চাপলেই কেবল অ্যাপ বন্ধ/মিনিমাইজ হবে
-   (শেষ ধাপে ঠিক "বন্ধ" নাকি "মিনিমাইজ" হবে সেটা অ্যান্ড্রয়েডের নিজস্ব আচরণ —
-   এটা ওয়েব কোড থেকে নিয়ন্ত্রণ করার কোনো উপায় নেই, তবে এই পরিবর্তনের ফলে ভুলবশত
-   একবার ব্যাক চেপে সাথে সাথে অ্যাপ বন্ধ হয়ে যাওয়ার সমস্যাটা আর হবে না।) */
-let __backConfirmPending = false;
-let __backConfirmTimer = null;
+   ব্যাক বাটন চাপলে ধাপে ধাপে বাইরে বের করে আনবে:
+   1) মডাল/পপআপ খোলা থাকলে — শুধু সেটা বন্ধ হবে
+   2) Business Management-এর সাব-স্ক্রিন (Business Control Center / Monitoring /
+      Extra Income / Shop Operations) খোলা থাকলে — এক ধাপ পেছনে Business
+      Management হাবে ফিরে আসবে
+   3) Business Management হাব খোলা থাকলে — বন্ধ হয়ে মূল অ্যাপে ফিরে আসবে
+   4) হোম (ড্যাশবোর্ড) ছাড়া অন্য ট্যাবে থাকলে — হোম ট্যাবে ফিরে আসবে
+   5) হোম ট্যাবে থাকলে — এখানেই থেমে থাকবে, ব্যাক বাটনে অ্যাপ কখনো বন্ধ হবে না
+      (বিক্রি করার মাঝখানে ভুলবশত ব্যাক চেপে অ্যাপ থেকে বের হয়ে গেলে ডেটা হারানোর
+      ঝুঁকি থাকে — তাই ইচ্ছা করেই এখানে এক্সিট করার কোনো পথ রাখা হয়নি) */
+const __BIZ_SUB_PROGRAMS = ['program-bcc', 'program-monitor', 'program-extraincome', 'program-ops'];
 
 function initBackButtonHandling(){
   history.pushState({ bccView: 'home' }, '', location.href);
@@ -5043,26 +5044,32 @@ function initBackButtonHandling(){
       return;
     }
 
+    const openSub = __BIZ_SUB_PROGRAMS.find(id=>{
+      const el = document.getElementById(id);
+      return el && el.style.display !== 'none';
+    });
+    if(openSub){
+      switchProgram(openSub, 'program-bizmgmt');
+      history.pushState({ bccView: 'home' }, '', location.href);
+      return;
+    }
+
+    const bizMgmtEl = document.getElementById('program-bizmgmt');
+    if(bizMgmtEl && bizMgmtEl.style.display !== 'none'){
+      closeMiniProgram('program-bizmgmt');
+      history.pushState({ bccView: 'home' }, '', location.href);
+      return;
+    }
+
     const activeTabBtn = document.querySelector('.tab-btn.active');
     const currentTab = activeTabBtn ? activeTabBtn.dataset.tab : 'dash';
-
     if(currentTab !== 'dash'){
       const dashBtn = document.querySelector('.tab-btn[data-tab="dash"]');
       if(dashBtn) dashBtn.click();
-      history.pushState({ bccView: 'home' }, '', location.href);
-      return;
     }
 
-    if(!__backConfirmPending){
-      __backConfirmPending = true;
-      toast('আবার ব্যাক বাটনে চাপুন অ্যাপ থেকে বের হতে');
-      history.pushState({ bccView: 'home' }, '', location.href);
-      clearTimeout(__backConfirmTimer);
-      __backConfirmTimer = setTimeout(()=>{ __backConfirmPending = false; }, 2000);
-      return;
-    }
-    // এখানে ইচ্ছাকৃতভাবে নতুন state পুশ করা হচ্ছে না — তাই এই দ্বিতীয় ব্যাক-চাপে
-    // অ্যান্ড্রয়েডের স্বাভাবিক আচরণ (বন্ধ/মিনিমাইজ) ঘটবে।
+    // হোম পেইজ — এখানেই থেমে থাকবে
+    history.pushState({ bccView: 'home' }, '', location.href);
   });
 }
 

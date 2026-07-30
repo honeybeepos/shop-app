@@ -183,3 +183,13 @@ function setSyncIndicator(state) {
   el.style.background = state === "ok" ? "#27633f" : state === "error" ? "#a3372c" : "#c9a96a";
   el.title = state === "ok" ? "সার্ভারের সাথে সিঙ্ক করা আছে" : state === "error" ? "সিঙ্ক ব্যর্থ — ইন্টারনেট চেক করুন" : "সিঙ্ক হচ্ছে...";
 }
+
+/* নিরাপত্তা স্তর: অ্যাপ মিনিমাইজ/ব্যাকগ্রাউন্ডে চলে গেলে (হোম বাটন চাপা, অন্য অ্যাপে
+   যাওয়া, স্ক্রিন বন্ধ করা ইত্যাদি) সাথে সাথেই বাকি থাকা ডেটা সার্ভারে পাঠানোর চেষ্টা
+   হয় — স্বাভাবিক ২.৫ সেকেন্ডের অপেক্ষা (debounce) এর জন্য বসে থাকে না। এতে সেল করার
+   পরপরই অ্যাপ থেকে বের হয়ে গেলেও ডেটা হারানোর ঝুঁকি অনেক কমে যায়। */
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && __syncShopId) {
+    pushLocalStorageToCloud();
+  }
+});
