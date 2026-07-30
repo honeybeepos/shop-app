@@ -421,6 +421,21 @@
   #cloudTopBar button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:#fff;padding:5px 10px;border-radius:6px;font-size:11.5px;cursor:pointer;font-family:inherit;}
   #announceBar{display:none;background:#fff3e8;color:#8f4c1f;padding:9px 14px;font-size:13px;text-align:center;border-bottom:1px solid #d8cbb0;}
   .subuser-hide{display:none !important;}
+
+  #syncToast{
+    position:fixed; top:10px; left:50%; z-index:100000;
+    transform:translateX(-50%) translateY(-70px);
+    opacity:0;
+    background:#1f4a48; color:#fff; border:1px solid #2c625f;
+    padding:9px 16px; border-radius:24px; font-size:12.5px; font-weight:600;
+    display:flex; align-items:center; gap:8px; max-width:88vw;
+    box-shadow:0 6px 16px rgba(28,26,23,0.25);
+    transition:transform 0.28s ease, opacity 0.28s ease;
+    pointer-events:none;
+  }
+  #syncToast.show{ transform:translateX(-50%) translateY(0); opacity:1; }
+  #syncToast .dot{ width:8px; height:8px; border-radius:50%; background:#8fd9b8; flex-shrink:0; animation:syncPulse 1s ease-in-out infinite; }
+  @keyframes syncPulse{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
 </style>
 </head>
 <body>
@@ -2370,6 +2385,26 @@ function showSavingOverlay(text, isSpinning){
 function hideSavingOverlay(){
   const el = document.getElementById('savingOverlay');
   if(el) el.style.display = 'none';
+}
+
+/* ছোট টোস্ট — উপরে, লগআউট বাটনের কাছে, নতুন এন্ট্রি/রিমোট সিঙ্ক নোটিফিকেশনের জন্য */
+let __syncToastTimer = null;
+function showSyncToast(text){
+  let el = document.getElementById('syncToast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'syncToast';
+    el.innerHTML = '<span class="dot"></span><span id="syncToastText"></span>';
+    document.body.appendChild(el);
+  }
+  document.getElementById('syncToastText').textContent = text;
+  el.classList.add('show');
+  if(__syncToastTimer) clearTimeout(__syncToastTimer);
+  __syncToastTimer = setTimeout(hideSyncToast, 2200);
+}
+function hideSyncToast(){
+  const el = document.getElementById('syncToast');
+  if(el) el.classList.remove('show');
 }
 
 async function confirmCloudSave(){
@@ -6987,8 +7022,7 @@ auth.onAuthStateChanged(async (user)=>{
     // অন্য কোনো ডিভাইস (যেমন সাব-ইউজার) নতুন সেল/এন্ট্রি পাঠিয়েছে —
     // localStorage আপডেট হয়ে গেছে, এখন স্ক্রিন রিফ্রেশ করে দেখাও
     loadSystemData();
-    showSavingOverlay('🔄 নতুন এন্ট্রি এসেছে — সিঙ্ক হলো', false);
-    setTimeout(hideSavingOverlay, 1600);
+    showSyncToast('🔄 নতুন এন্ট্রি এসেছে — সিঙ্ক হলো');
   });
   applyRoleRestrictions(session.role);
   initBackButtonHandling();
