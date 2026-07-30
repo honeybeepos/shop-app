@@ -551,6 +551,8 @@
             <input id="oldCustSearch" type="text" placeholder="যেমনঃ রহিম অথবা 01xxxxxxxxx" autocomplete="off">
           </div>
         </div>
+        <button class="btn secondary" id="fpScanBtn" type="button" style="margin:8px 0;">🖐️ ফিঙ্গারপ্রিন্ট স্ক্যান করে খুঁজুন</button>
+        <p id="fpScanStatus" style="font-size:12px; color:#8a7f6c; margin:0 0 8px; display:none;"></p>
         <p class="old-cust-hint">টিপ্‌সঃ নাম/নাম্বারে চেপে ধরুন (লং প্রেস) — এডিট বা ডিলিট করতে পারবেন।</p>
         <div id="oldCustResults"></div>
         <div id="selectedCustTag" style="display:none;"></div>
@@ -574,6 +576,8 @@
             <input id="acPhone" type="text" placeholder="0 ছাড়া নাম্বার লিখুন">
           </div>
         </div>
+        <button class="btn secondary" id="acFpScanBtn" type="button" style="margin-bottom:8px;">🖐️ ফিঙ্গারপ্রিন্ট এনরোল করুন (ঐচ্ছিক)</button>
+        <p id="acFpStatus" style="font-size:12px; color:#8a7f6c; margin:0 0 8px; display:none;"></p>
         <button class="btn" id="addCustomerOnlyBtn">কাস্টমার সেভ করুন</button>
       </div>
 
@@ -982,6 +986,23 @@
   </div>
 </div>
 <div id="empSalesPrintArea"></div>
+
+<!-- নগদ বিক্রি / জমা নেওয়ার সময় টাকার হিসাব (ফেরত/নতুন বাকি) দেখানোর জন্য -->
+<div class="modal-overlay" id="moneyCalcModal">
+  <div class="modal-box" style="max-width:380px; text-align:left;">
+    <h3 id="moneyCalcTitle" style="margin:0 0 10px;">💰 হিসাব</h3>
+    <div id="moneyCalcSummaryTop" style="font-size:13px; color:#6b6153; margin-bottom:10px; line-height:1.7;"></div>
+    <div id="moneyCalcInputRow">
+      <label style="font-size:12px; font-weight:700; color:#6b6153;">গ্রাহক কত টাকা দিয়েছেন?</label>
+      <input type="number" id="moneyCalcInput" inputmode="numeric" style="width:100%; padding:11px; border:1px solid var(--line); border-radius:8px; font-size:16px; margin:6px 0 12px; font-family:'Space Mono',monospace;">
+    </div>
+    <div id="moneyCalcResult" style="border-radius:8px; padding:10px; font-weight:800; text-align:center; margin-bottom:14px;"></div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <button class="mini-btn" id="moneyCalcCancelBtn">বাতিল</button>
+      <button class="mini-btn" id="moneyCalcConfirmBtn" style="background:var(--teal); color:#fff;">নিশ্চিত করুন ✅</button>
+    </div>
+  </div>
+</div>
 
 <!-- সকল স্টাফের সম্পূর্ণ লিস্ট ও রিপোর্ট -->
 <div class="modal-overlay" id="allStaffModal">
@@ -4369,18 +4390,20 @@ document.querySelectorAll('#statusGroup .status-chip').forEach(chip=>{
     const isCartFlow = (status === 'বাকি' || status === 'নগদ-বিক্রি');
     document.getElementById('addBtn').textContent = isCartFlow ? 'সম্পূর্ণ হিসাব যোগ করুন' : 'যোগ করুন';
     if(!isCartFlow && creditCart.length){ creditCart = []; renderCreditCart(); }
-    updateCustDueInfo();
+    updateCustDueInfo(status);
   });
 });
 
 /* ফেরত করার সময় এবং জমা নেওয়ার সময় এই কাস্টমারের বর্তমান বাকি কত সেটা দেখানো হয়,
-   যাতে বাকি দেখে সঠিক পরিমাণ জমা নেওয়া যায় বা বাকির থেকে কত টাকা কাটা যাবে তা বোঝা যায়। */
-function updateCustDueInfo(){
+   যাতে বাকি দেখে সঠিক পরিমাণ জমা নেওয়া যায় বা বাকির থেকে কত টাকা কাটা যাবে তা বোঝা যায়।
+   NOTE: explicitStatus প্যারামিটার দেওয়া হয়েছে কারণ চিপ ক্লিক করার সাথে সাথেই এই ফাংশন
+   চলে, তখনো DOM-এ 'active' ক্লাস বসেনি — তাই DOM থেকে পুরনো/ভুল স্ট্যাটাস পড়ার বাগ হতো। */
+function updateCustDueInfo(explicitStatus){
   const row = document.getElementById('custDueInfoRow');
   const text = document.getElementById('custDueInfoText');
   if(!row || !text) return;
   const activeChip = document.querySelector('#statusGroup .status-chip.active');
-  const status = activeChip ? activeChip.dataset.s : null;
+  const status = explicitStatus || (activeChip ? activeChip.dataset.s : null);
   if(status !== 'ফেরত' && status !== 'নগদ'){ row.style.display = 'none'; return; }
   const name = document.getElementById('fName').value.trim();
   const phone = document.getElementById('fPhone').value.trim();
@@ -4604,6 +4627,25 @@ function clearAddForm(){
 
 /* Reads a quantity field; returns null (and shows a toast) if it's missing/invalid,
    since a sale must not be allowed to proceed without a valid quantity. */
+/* স্টকে যত আছে তার বেশি বিক্রি আটকাতে — প্রোডাক্ট ইনভেন্টরি থেকে বাছাই করা হলেই এই চেক
+   হয় (ফ্রি-টাইপ করা আইটেম, যেটা ইনভেন্টরিতে লিংক করা নেই, তার জন্য চেক করা সম্ভব না)। */
+function checkStockAvailable(productId, itemName, requestedQty, cartArray){
+  if(!productId) return true;
+  const product = bccLoadProducts().find(p=>p.id===productId);
+  if(!product) return true;
+  const available = Number(product.qty)||0;
+  const alreadyInCart = (cartArray||[]).filter(l=>l.productId===productId).reduce((s,l)=>s+(l.qty||0),0);
+  if(available <= 0){
+    toast(`⚠️ "${product.name}" স্টকে নেই — সেল করা যাবে না`);
+    return false;
+  }
+  if(alreadyInCart + requestedQty > available){
+    toast(`⚠️ "${product.name}" স্টকে আছে মাত্র ${available} টি (তালিকায় ইতিমধ্যে ${alreadyInCart} টি আছে)`);
+    return false;
+  }
+  return true;
+}
+
 function readRequiredQty(fieldId){
   const raw = document.getElementById(fieldId).value.trim();
   const qty = parseInt(raw, 10);
@@ -4839,6 +4881,76 @@ function currentSalesPersonName(){
   }catch(e){ return 'এডমিন'; }
 }
 
+/* ============================================================
+   ফিঙ্গারপ্রিন্ট স্ক্যানার ব্রিজ (DigitalPersona U.are.U 4500)
+   ============================================================
+   এই ওয়েব-অ্যাপ নিজে থেকে USB ফিঙ্গারপ্রিন্ট হার্ডওয়্যার অ্যাক্সেস করতে পারে না —
+   এর জন্য একটা নেটিভ Android লেয়ার লাগবে যেটা HID/DigitalPersona-র Android SDK
+   দিয়ে স্ক্যানারের সাথে কথা বলবে, তারপর নিচের 'window.NativeFingerprint' ব্রিজের
+   মাধ্যমে ফলাফলটা এই ওয়েবপেজে পাঠাবে (Android-এর addJavascriptInterface দিয়ে)।
+
+   নেটিভ ডেভেলপার যা বানাবে তার জন্য এক্সপেক্টেড কন্ট্রাক্ট:
+   - window.NativeFingerprint.scan() কল করলে স্ক্যানার চালু হবে
+   - স্ক্যান শেষে window.onFingerprintResult(idStringOrNull) কল করে ফলাফল ফেরত পাঠাবে
+     (এনরোল করা কাস্টমারের সাথে ম্যাচ করলে SDK-এর Identify() ফাংশন যেই এনরোলমেন্ট
+     আইডি রিটার্ন করে সেটাই idString হবে; না মিললে null)
+   - নিচের scanFingerprint() ফাংশনটা Promise-ভিত্তিক wrapper, যেটা UI থেকে
+     await scanFingerprint() দিয়ে ব্যবহার করা হয়
+
+   যতক্ষণ না নেটিভ ব্রিজ যোগ হচ্ছে, ততক্ষণ এই ফাংশন শুধু জানিয়ে দেবে যে স্ক্যানার
+   এখনো যুক্ত করা হয়নি — তখন ম্যানুয়াল নাম/নাম্বার সার্চই একমাত্র উপায় (ফলব্যাক,
+   যেটা এমনিতেই অ্যাপে আছে)। */
+function scanFingerprint(){
+  return new Promise((resolve)=>{
+    if(!window.NativeFingerprint || typeof window.NativeFingerprint.scan !== 'function'){
+      toast('⚠️ ফিঙ্গারপ্রিন্ট স্ক্যানার এখনো এই ডিভাইসে যুক্ত করা হয়নি — নাম/নাম্বার দিয়ে খুঁজুন');
+      resolve(null);
+      return;
+    }
+    window.onFingerprintResult = (idOrNull)=>{ resolve(idOrNull || null); };
+    window.NativeFingerprint.scan();
+  });
+}
+
+document.getElementById('fpScanBtn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('fpScanStatus');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '👆 আঙুল স্ক্যানারে রাখুন...';
+  const fpId = await scanFingerprint();
+  if(!fpId){
+    statusEl.textContent = 'কোনো মিল পাওয়া যায়নি — নাম/নাম্বার দিয়ে খুঁজুন (নিচে)';
+    return;
+  }
+  const match = shopCustomers.find(c=> c.fingerprintId === fpId);
+  if(!match){
+    statusEl.textContent = 'এই ফিঙ্গারপ্রিন্টে কোনো কাস্টমার পাওয়া যায়নি — নাম/নাম্বার দিয়ে খুঁজুন';
+    toast('⚠️ কোনো কাস্টমার ম্যাচ হয়নি, ম্যানুয়ালি খুঁজুন');
+    return;
+  }
+  statusEl.textContent = `✅ পাওয়া গেছে: ${match.name}`;
+  selectOldCustomer(match.name, match.phone || '');
+  toast(`✅ ${match.name} সনাক্ত হয়েছে — ফর্ম অটো-ফিল হয়েছে`);
+});
+
+let acPendingFingerprintId = null;
+document.getElementById('acFpScanBtn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('acFpStatus');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '👆 আঙুল স্ক্যানারে রাখুন...';
+  const fpId = await scanFingerprint();
+  if(!fpId){ statusEl.textContent = 'এনরোল করা যায়নি (স্ক্যানার যুক্ত নেই বা বাতিল হয়েছে)'; return; }
+  // ডুপ্লিকেট চেক — এই ফিঙ্গারপ্রিন্ট আইডি অন্য কোনো কাস্টমারের সাথে আগে থেকেই যুক্ত কিনা
+  const dup = shopCustomers.find(c=> c.fingerprintId === fpId);
+  if(dup){
+    statusEl.textContent = `⚠️ এই ফিঙ্গারপ্রিন্ট ইতিমধ্যে "${dup.name}"-এর নামে এনরোল করা আছে`;
+    toast('⚠️ এই আঙুলের ছাপ অন্য কাস্টমারের নামে আগে থেকেই আছে');
+    acPendingFingerprintId = null;
+    return;
+  }
+  acPendingFingerprintId = fpId;
+  statusEl.textContent = '✅ ফিঙ্গারপ্রিন্ট নেওয়া হয়েছে — এখন "কাস্টমার সেভ করুন" চাপুন';
+});
+
 let creditCart = []; // items for নতুন এন্ট্রি (বাকি / নগদ-বিক্রি)
 let qsCart = [];      // items for কুইক সেল
 let esCart = [];      // items for এক্সট্রা সেল
@@ -4901,6 +5013,7 @@ function resetLineFields(itemId, qtyId, costId, priceId, previewId){
 document.getElementById('fAddItemBtn').addEventListener('click', ()=>{
   const line = readCartLineFromFields('fItem','fQty','fCost','fPrice');
   if(!line) return;
+  if(!checkStockAvailable(line.productId, line.item, line.qty, creditCart)) return;
   creditCart.push(line);
   renderCreditCart();
   resetLineFields('fItem','fQty','fCost','fPrice','fTotalPreview');
@@ -4910,6 +5023,7 @@ document.getElementById('fAddItemBtn').addEventListener('click', ()=>{
 document.getElementById('qsAddItemBtn').addEventListener('click', ()=>{
   const line = readCartLineFromFields('qsItem','qsQty','qsCost','qsPrice');
   if(!line) return;
+  if(!checkStockAvailable(line.productId, line.item, line.qty, qsCart)) return;
   qsCart.push(line);
   renderQsCart();
   resetLineFields('qsItem','qsQty','qsCost','qsPrice','qsTotalPreview');
@@ -4919,6 +5033,7 @@ document.getElementById('qsAddItemBtn').addEventListener('click', ()=>{
 document.getElementById('esAddItemBtn').addEventListener('click', ()=>{
   const line = readEsCartLine();
   if(!line) return;
+  if(!checkStockAvailable(line.productId, line.item, line.qty, esCart)) return;
   esCart.push(line);
   renderEsCart();
   const esItemEl = document.getElementById('esItem');
@@ -4931,6 +5046,54 @@ document.getElementById('esAddItemBtn').addEventListener('click', ()=>{
   esItemEl.focus();
   toast('আইটেম তালিকায় যোগ হয়েছে');
 });
+
+/* নগদ বিক্রি করার সময় গ্রাহক কত টাকা দিলেন সেটা জিজ্ঞেস করে ফেরত কত দিতে হবে হিসাব করে
+   দেখায় (৪০ টাকার মাল কিনে ১০০ টাকা দিলে ৬০ টাকা ফেরত), আর জমা নেওয়ার সময় পূর্বের বাকি +
+   জমা মিলিয়ে ফেরত/নতুন বাকি — দুটোতেই একই মডাল ব্যবহার হয়। Promise resolve করে input-এর
+   মান (বা confirmed হলে prefill-টাই) নিয়ে, বাতিল করলে null। */
+function showMoneyCalcModal({title, summaryHtml, showInput, prefill, computeResult}){
+  return new Promise((resolve)=>{
+    const modal = document.getElementById('moneyCalcModal');
+    document.getElementById('moneyCalcTitle').textContent = title;
+    document.getElementById('moneyCalcSummaryTop').innerHTML = summaryHtml || '';
+    const inputRow = document.getElementById('moneyCalcInputRow');
+    const input = document.getElementById('moneyCalcInput');
+    const resultEl = document.getElementById('moneyCalcResult');
+    inputRow.style.display = showInput ? 'block' : 'none';
+    input.value = (prefill != null) ? prefill : '';
+
+    function update(){
+      const val = showInput ? (Number(input.value)||0) : (Number(prefill)||0);
+      const r = computeResult(val);
+      resultEl.textContent = r.text;
+      resultEl.style.background = r.warn ? '#fbebeb' : '#eef7f1';
+      resultEl.style.color = r.warn ? 'var(--due)' : 'var(--paid)';
+    }
+    input.oninput = showInput ? update : null;
+    update();
+
+    modal.classList.add('show');
+    if(showInput) setTimeout(()=>input.focus(), 50);
+
+    const confirmBtn = document.getElementById('moneyCalcConfirmBtn');
+    const cancelBtn = document.getElementById('moneyCalcCancelBtn');
+    function cleanup(){
+      modal.classList.remove('show');
+      input.oninput = null;
+      confirmBtn.onclick = null;
+      cancelBtn.onclick = null;
+    }
+    confirmBtn.onclick = ()=>{
+      const val = showInput ? (Number(input.value)||0) : (Number(prefill)||0);
+      cleanup();
+      resolve(val);
+    };
+    cancelBtn.onclick = ()=>{
+      cleanup();
+      resolve(null);
+    };
+  });
+}
 
 async function finishAndMaybeShare(name, phone, message){
   clearAddForm();
@@ -4982,7 +5145,26 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
 
     const billItems = creditCart.slice();
     const billTotalPrice = billItems.reduce((s,it)=>s+it.price,0);
-    const paid = status === 'নগদ-বিক্রি' ? billTotalPrice : (Number(document.getElementById('fPaid').value)||0);
+
+    let paid;
+    if(status === 'নগদ-বিক্রি'){
+      const received = await showMoneyCalcModal({
+        title: '💵 নগদ বিক্রি — টাকার হিসাব',
+        summaryHtml: `মোট কেনাকাটা: <b>${fmt(billTotalPrice)}</b>`,
+        showInput: true,
+        prefill: billTotalPrice,
+        computeResult: (val)=>{
+          if(val < billTotalPrice) return { text: `⚠️ ঘাটতি ${fmt(billTotalPrice-val)} — কম হলে "বাকি" অপশন ব্যবহার করুন`, warn:true };
+          const change = val - billTotalPrice;
+          return change>0 ? { text: `✅ গ্রাহককে ফেরত দিন: ${fmt(change)}`, warn:false } : { text: `✅ সঠিক টাকা দেওয়া হয়েছে`, warn:false };
+        }
+      });
+      if(received === null) return;
+      if(received < billTotalPrice){ toast('মোট বিলের চেয়ে কম টাকা — "বাকি" অপশন ব্যবহার করুন'); return; }
+      paid = billTotalPrice;
+    } else {
+      paid = Number(document.getElementById('fPaid').value)||0;
+    }
 
     const billId = genLineId();
     let remainingPaid = paid;
@@ -5046,6 +5228,20 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
   }else if(status === 'নগদ'){
     const amount = Number(document.getElementById('dpAmount').value)||0;
     if(amount<=0){ toast('কত টাকা জমা দিচ্ছে লিখুন'); return; }
+
+    const confirmed = await showMoneyCalcModal({
+      title: '🧾 জমা নেওয়ার হিসাব',
+      summaryHtml: `পূর্বের বাকি: <b>${fmt(previousDue)}</b><br>জমা নেওয়া হচ্ছে: <b>${fmt(amount)}</b>`,
+      showInput: false,
+      prefill: amount,
+      computeResult: ()=>{
+        if(amount > previousDue) return { text: `✅ বাকি শোধ — গ্রাহককে ফেরত দিন: ${fmt(amount-previousDue)}`, warn:false };
+        const remain = previousDue - amount;
+        return { text: remain>0 ? `নতুন বাকি থাকবে: ${fmt(remain)}` : `✅ বাকি পুরোপুরি শোধ`, warn: remain>0 };
+      }
+    });
+    if(confirmed === null) return;
+
     allocateDuePayment(name, phone, amount);
     
     retailEntries.unshift({ id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, date: new Date().toISOString(), soldBy: currentSalesPersonName() });
@@ -5066,11 +5262,17 @@ document.getElementById('addCustomerOnlyBtn').addEventListener('click', async ()
   const name = document.getElementById('acName').value.trim();
   const phone = getPhoneWithCode('acPhoneCC','acPhone');
   if(!name){ toast('নাম দিতে হবে'); return; }
+  if(acPendingFingerprintId && shopCustomers.some(c=> c.fingerprintId === acPendingFingerprintId)){
+    toast('⚠️ এই ফিঙ্গারপ্রিন্ট ইতিমধ্যে অন্য কাস্টমারের নামে সেভ করা আছে');
+    return;
+  }
   if(!shopCustomers.some(c => (phone && c.phone === phone) || (!phone && c.name === name))) {
-    shopCustomers.push({name, phone: phone || ''});
+    shopCustomers.push({name, phone: phone || '', fingerprintId: acPendingFingerprintId || ''});
     await persistData();
-    document.getElementById('acName').value=''; 
+    document.getElementById('acName').value='';
     document.getElementById('acPhone').value='';
+    document.getElementById('acFpStatus').style.display = 'none';
+    acPendingFingerprintId = null;
     toast('কাস্টমার সফলভাবে সেভ হয়েছে');
   } else {
     toast('এই কাস্টমার ইতিমধ্যে সংরক্ষিত আছে');
