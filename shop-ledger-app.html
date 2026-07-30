@@ -5032,15 +5032,24 @@ document.getElementById('esAddItemBtn').addEventListener('click', ()=>{
       (বিক্রি করার মাঝখানে ভুলবশত ব্যাক চেপে অ্যাপ থেকে বের হয়ে গেলে ডেটা হারানোর
       ঝুঁকি থাকে — তাই ইচ্ছা করেই এখানে এক্সিট করার কোনো পথ রাখা হয়নি) */
 const __BIZ_SUB_PROGRAMS = ['program-bcc', 'program-monitor', 'program-extraincome', 'program-ops'];
+let __backStateCounter = 0;
+
+// প্রতিবার আলাদা hash দিয়ে state পুশ করা হয় — একই URL বারবার পুশ করলে কিছু
+// ব্রাউজার/WebView সেটাকে নতুন হিস্ট্রি এন্ট্রি হিসেবে গণ্য নাও করতে পারে, তাতে
+// ব্যাক-ট্র্যাপ কাজ না করে অ্যাপ এক্সিট হয়ে যাওয়ার ঝুঁকি থাকে।
+function pushBackTrap(){
+  __backStateCounter++;
+  history.pushState({ bccNav: __backStateCounter }, '', '#nav' + __backStateCounter);
+}
 
 function initBackButtonHandling(){
-  history.pushState({ bccView: 'home' }, '', location.href);
+  pushBackTrap();
 
   window.addEventListener('popstate', ()=>{
     const openModal = document.querySelector('.modal-overlay.show');
     if(openModal){
       openModal.classList.remove('show');
-      history.pushState({ bccView: 'home' }, '', location.href);
+      pushBackTrap();
       return;
     }
 
@@ -5050,29 +5059,33 @@ function initBackButtonHandling(){
     });
     if(openSub){
       switchProgram(openSub, 'program-bizmgmt');
-      history.pushState({ bccView: 'home' }, '', location.href);
+      pushBackTrap();
       return;
     }
 
     const bizMgmtEl = document.getElementById('program-bizmgmt');
     if(bizMgmtEl && bizMgmtEl.style.display !== 'none'){
       closeMiniProgram('program-bizmgmt');
-      history.pushState({ bccView: 'home' }, '', location.href);
+      pushBackTrap();
       return;
     }
 
     const activeTabBtn = document.querySelector('.tab-btn.active');
     const currentTab = activeTabBtn ? activeTabBtn.dataset.tab : 'dash';
-    if(currentTab !== 'dash'){
+
+    if(currentTab !== 'dash' && currentTab !== 'print'){
       const dashBtn = document.querySelector('.tab-btn[data-tab="dash"]');
       if(dashBtn) dashBtn.click();
-      history.pushState({ bccView: 'home' }, '', location.href);
+      pushBackTrap();
       return;
     }
 
-    // হোম পেইজ — এখানেই থেমে থাকবে, শুধু জানিয়ে দেওয়া হবে
-    toast('🏠 আপনি হোম পেইজে আছেন');
-    history.pushState({ bccView: 'home' }, '', location.href);
+    // ড্যাশবোর্ড আর প্রিন্ট — এই দুইয়ের মধ্যে ঘুরতে থাকবে, কখনো এক্সিট হবে না
+    const nextTab = currentTab === 'dash' ? 'print' : 'dash';
+    const nextBtn = document.querySelector('.tab-btn[data-tab="'+nextTab+'"]');
+    if(nextBtn) nextBtn.click();
+    toast(nextTab === 'dash' ? '🏠 হোম পেইজ' : '🖨️ প্রিন্ট পেইজ');
+    pushBackTrap();
   });
 }
 
