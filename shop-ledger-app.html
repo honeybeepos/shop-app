@@ -2340,9 +2340,58 @@ async function loadSystemData(){
   render();
 }
 
+/* ============================================================
+   সেভ-কনফার্মেশন ইন্ডিকেটর
+   ============================================================
+   ডেটা এন্ট্রি করার পর সেটা সার্ভারে সত্যিই পৌঁছেছে কিনা — এটা বোঝার জন্য একটা
+   ছোট লোডিং/কনফার্মেশন বার্তা দেখানো হয়। মোবাইল/নেট স্লো থাকলেও এখন আর
+   অনিশ্চয়তায় থাকতে হবে না। */
+function showSavingOverlay(text, isSpinning){
+  let el = document.getElementById('savingOverlay');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'savingOverlay';
+    el.style.cssText = 'position:fixed; bottom:78px; left:50%; transform:translateX(-50%); background:#1c1a17; color:#fff; padding:10px 18px; border-radius:24px; font-size:12.5px; z-index:99999; display:flex; align-items:center; gap:8px; box-shadow:0 4px 14px rgba(0,0,0,0.3); max-width:88vw;';
+    el.innerHTML = '<span id="savingOverlaySpin" style="width:13px;height:13px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;flex-shrink:0;"></span><span id="savingOverlayText"></span>';
+    document.body.appendChild(el);
+    if(!document.getElementById('savingSpinKeyframe')){
+      const style = document.createElement('style');
+      style.id = 'savingSpinKeyframe';
+      style.textContent = '@keyframes savingSpin{to{transform:rotate(360deg);}}';
+      document.head.appendChild(style);
+    }
+  }
+  const spinEl = document.getElementById('savingOverlaySpin');
+  spinEl.style.display = isSpinning ? 'inline-block' : 'none';
+  spinEl.style.animation = isSpinning ? 'savingSpin 0.7s linear infinite' : 'none';
+  document.getElementById('savingOverlayText').textContent = text;
+  el.style.display = 'flex';
+}
+function hideSavingOverlay(){
+  const el = document.getElementById('savingOverlay');
+  if(el) el.style.display = 'none';
+}
+
+async function confirmCloudSave(){
+  if(typeof __syncShopId === 'undefined' || !__syncShopId) return;
+  showSavingOverlay('⏳ সার্ভারে পাঠানো হচ্ছে...', true);
+  try{
+    await Promise.race([
+      pushLocalStorageToCloud(),
+      new Promise((_, reject)=> setTimeout(()=> reject(new Error('timeout')), 15000))
+    ]);
+    showSavingOverlay('✅ সার্ভারে সফলভাবে সেভ হয়েছে', false);
+    setTimeout(hideSavingOverlay, 1300);
+  }catch(e){
+    showSavingOverlay('⚠️ এই ডিভাইসে সেভ আছে — ইন্টারনেট আসলে অটো পাঠানো হবে', false);
+    setTimeout(hideSavingOverlay, 2800);
+  }
+}
+
 async function persistData(){
   localStorage.setItem('phone-shop-customers', JSON.stringify(shopCustomers));
   localStorage.setItem('phone-shop-entries', JSON.stringify(retailEntries));
+  await confirmCloudSave();
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn=>{

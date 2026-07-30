@@ -141,7 +141,7 @@ function disableAutoSync() {
 function scheduleCloudSync() {
   if (!__syncShopId) return;
   if (__syncTimer) clearTimeout(__syncTimer);
-  __syncTimer = setTimeout(pushLocalStorageToCloud, SYNC_DEBOUNCE_MS);
+  __syncTimer = setTimeout(()=> pushLocalStorageToCloud().catch(()=>{}), SYNC_DEBOUNCE_MS);
 }
 
 async function pushLocalStorageToCloud() {
@@ -160,6 +160,7 @@ async function pushLocalStorageToCloud() {
   } catch (e) {
     console.error("Cloud sync failed:", e);
     setSyncIndicator("error");
+    throw e; // await করা কলার (যেমন সেভ-কনফার্মেশন ইন্ডিকেটর) যেন ব্যর্থতা বুঝতে পারে
   }
 }
 
@@ -190,6 +191,6 @@ function setSyncIndicator(state) {
    পরপরই অ্যাপ থেকে বের হয়ে গেলেও ডেটা হারানোর ঝুঁকি অনেক কমে যায়। */
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden" && __syncShopId) {
-    pushLocalStorageToCloud();
+    pushLocalStorageToCloud().catch(()=>{});
   }
 });
