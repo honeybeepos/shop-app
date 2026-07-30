@@ -15,6 +15,8 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+// লগইন যেন ডিভাইসেই স্থায়ীভাবে থেকে যায় (অ্যাপ মিনিমাইজ/বন্ধ করে আবার খুললেও লগইন থাকবে)
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
 const db = firebase.firestore();
 
 /* অফলাইন-ফার্স্ট: ইন্টারনেট না থাকলেও অ্যাপ যেন সেল/এন্ট্রি বন্ধ না করে।
@@ -79,16 +81,20 @@ async function clearFailedLogin(email) {
   await db.collection("loginAttempts").doc(email).delete().catch(() => {});
 }
 
-/* ---------- session storage (এই ট্যাবে কে লগইন আছে) ---------- */
+/* ---------- session storage (এই ডিভাইসে কে লগইন আছে) ----------
+   sessionStorage-এর বদলে localStorage ব্যবহার করা হচ্ছে — অ্যাপ মিনিমাইজ/ব্যাকগ্রাউন্ডে
+   গেলে Android মাঝে মাঝে সাথে সাথে ব্যবহার করা WebView প্রসেস বন্ধ করে দেয়, তখন
+   sessionStorage মুছে যায় এবং লগইন সেশন হারিয়ে ফেলে (অটো-লগআউটের মতো মনে হয়)।
+   localStorage ডিভাইসেই থেকে যায়, তাই মিনিমাইজ করলেও লগইন অবস্থা বজায় থাকবে। */
 function saveSession(data) {
-  sessionStorage.setItem("bcc-session", JSON.stringify(data));
+  localStorage.setItem("bcc-session", JSON.stringify(data));
 }
 function getSession() {
-  try { return JSON.parse(sessionStorage.getItem("bcc-session") || "null"); }
+  try { return JSON.parse(localStorage.getItem("bcc-session") || "null"); }
   catch (e) { return null; }
 }
 function clearSession() {
-  sessionStorage.removeItem("bcc-session");
+  localStorage.removeItem("bcc-session");
 }
 
 /* ============================================================
@@ -103,6 +109,7 @@ const SYNC_DEBOUNCE_MS = 2500;
 
 // আসল localStorage ফাংশনগুলো ব্যাকআপ রাখা
 const __origSetItem = Storage.prototype.setItem;
+const __origGetItem = Storage.prototype.getItem;
 const __origRemoveItem = Storage.prototype.removeItem;
 const __origClear = Storage.prototype.clear;
 
@@ -142,6 +149,7 @@ async function pushLocalStorageToCloud() {
   const blob = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
+    if (k === "bcc-session") continue; // এটা এই ডিভাইসের লগইন সেশন, দোকানের ডেটা না — সিঙ্ক হবে না
     blob[k] = localStorage.getItem(k);
   }
   try {
@@ -160,8 +168,12 @@ async function pullCloudToLocalStorage(shopId) {
     .collection("appdata").doc("main").get();
   if (!snap.exists || !snap.data().blob) return false;
   const blob = JSON.parse(snap.data().blob);
+  // bcc-session এখন localStorage-এ থাকে (মিনিমাইজ করলে যেন লগইন না হারায়), কিন্তু নিচের
+  // clear() পুরো localStorage মুছে দেয় — তাই সাময়িক ব্যাকআপ রেখে পরে আবার বসানো হচ্ছে
+  const savedSession = __origGetItem.call(localStorage, "bcc-session");
   __origClear.call(localStorage);
   Object.keys(blob).forEach(k => __origSetItem.call(localStorage, k, blob[k]));
+  if (savedSession) __origSetItem.call(localStorage, "bcc-session", savedSession);
   return true;
 }
 
