@@ -189,7 +189,7 @@
   .dueDetailRow .ddAmt{ font-family:'Space Mono',monospace; font-weight:700; color:var(--due); }
   .dueDetailTotal{ text-align:right; font-size:12px; font-weight:800; padding:4px 8px; color:var(--due); }
   .dueListPanel{ max-height:0; overflow:hidden; transition: max-height 0.35s ease; }
-  .dueListPanel.open{ max-height:3000px; }
+  .dueListPanel.open{ max-height:56vh; overflow-y:auto; }
   
   .report-line{ display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px dashed var(--line); font-size:13.5px; }
   .report-line:last-child{border-bottom:none;}
@@ -551,8 +551,6 @@
             <input id="oldCustSearch" type="text" placeholder="যেমনঃ রহিম অথবা 01xxxxxxxxx" autocomplete="off">
           </div>
         </div>
-        <button class="btn secondary" id="fpScanBtn" type="button" style="margin:8px 0;">🖐️ ফিঙ্গারপ্রিন্ট স্ক্যান করে খুঁজুন</button>
-        <p id="fpScanStatus" style="font-size:12px; color:#8a7f6c; margin:0 0 8px; display:none;"></p>
         <p class="old-cust-hint">টিপ্‌সঃ নাম/নাম্বারে চেপে ধরুন (লং প্রেস) — এডিট বা ডিলিট করতে পারবেন।</p>
         <div id="oldCustResults"></div>
         <div id="selectedCustTag" style="display:none;"></div>
@@ -576,8 +574,6 @@
             <input id="acPhone" type="text" placeholder="0 ছাড়া নাম্বার লিখুন">
           </div>
         </div>
-        <button class="btn secondary" id="acFpScanBtn" type="button" style="margin-bottom:8px;">🖐️ ফিঙ্গারপ্রিন্ট এনরোল করুন (ঐচ্ছিক)</button>
-        <p id="acFpStatus" style="font-size:12px; color:#8a7f6c; margin:0 0 8px; display:none;"></p>
         <button class="btn" id="addCustomerOnlyBtn">কাস্টমার সেভ করুন</button>
       </div>
 
@@ -1327,7 +1323,7 @@
     #program-ops .opsSearchInput::placeholder{ color:#b9c9c2; }
 
     #program-ops .glassList{
-      border-radius:18px; padding:6px; margin-bottom:14px; overflow:hidden;
+      border-radius:18px; padding:6px; margin-bottom:14px; max-height:50vh; overflow-y:auto;
       background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
       backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
     }
@@ -1682,7 +1678,7 @@
     @keyframes monFloat{ 0%,100%{ transform:translateY(0) rotateX(0deg); } 50%{ transform:translateY(-6px) rotateX(4deg); } }
 
     #program-monitor .glassList{
-      border-radius:16px; padding:4px; margin-bottom:14px; overflow:hidden;
+      border-radius:16px; padding:4px; margin-bottom:14px; max-height:50vh; overflow-y:auto;
       background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
       backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
     }
@@ -3667,13 +3663,15 @@ function nextInvoiceNumber(){
 }
 
 // একটা প্রফেশনাল "🧾 SALES INVOICE" স্টাইলের WhatsApp Case Memo বানায়:
-// - প্রতিটা প্রোডাক্ট আলাদা "Item N" ব্লকে — Product (ফুল নাম) / Brand / Model / Quantity / Unit Price / Amount সহ
+// - প্রতিটা প্রোডাক্ট আলাদা "Item N" ব্লকে — Product (ফুল নাম) / Brand / Model / Quantity / Unit Price / Amount / Time সহ
+//   (Time AM/PM ফরম্যাটে দেখানো হয়, যাতে দরকার হলে ঐ সময়ের সিসি ক্যামেরা ফুটেজ মিলিয়ে দেখা যায়)
 // - কাস্টমারের আগের প্রতিটা বাকি প্রোডাক্ট আলাদা লাইনে "Previous Due Details"-এ লিস্ট হয়
 // - সবসময় Product Master Database-এর ফুল নাম ব্যবহার হয় — শর্ট নেম কখনো দেখানো হয় না
-function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared}){
+// - invoiceNo বিল তৈরি হওয়ার সময়েই একবার জেনারেট হয়ে এন্ট্রির সাথে সেভ থাকে (প্রিন্ট/শেয়ার
+//   যতবারই করা হোক, একই ইনভয়েস নাম্বার থাকবে) — সেটাই এখানে parameter হিসেবে আসে
+function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared, invoiceNo, saleTime}){
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || 'Mumen Electronics';
-  const invoiceNo = nextInvoiceNumber();
-  const now = new Date();
+  const now = saleTime ? new Date(saleTime) : new Date();
   const dateStr = formatInvoiceDate(now);
   const timeStr = formatInvoiceTime(now);
   const DIVIDER = '----------------------------------';
@@ -3686,10 +3684,11 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
     lines.push(`Quantity: ${it.qty}`);
     lines.push(`Unit Price: SAR ${it.unitPrice}`);
     lines.push(`Amount: SAR ${it.price}`);
+    lines.push(`Time: ${formatInvoiceTime(it.date || now)} (${formatInvoiceDate(it.date || now)})`);
     return lines.join('\n');
   }).join(`\n\n${DIVIDER}\n\n`);
 
-  let msg = `🧾 SALES INVOICE\n\n${shopName}\n\nInvoice No: ${invoiceNo}\nDate: ${dateStr}\nTime: ${timeStr}\n\nCustomer Name: ${name}\nPhone: ${phone || '-'}\n\n${DIVIDER}\n\n${itemBlocks}\n\n${DIVIDER}\n\nTotal Bill : SAR ${billTotalPrice}\nReceived   : SAR ${paid}`;
+  let msg = `🧾 SALES INVOICE\n\n${shopName}\n\nInvoice No: ${invoiceNo || nextInvoiceNumber()}\nDate: ${dateStr}\nTime: ${timeStr}\n\nCustomer Name: ${name}\nPhone: ${phone || '-'}\n\n${DIVIDER}\n\n${itemBlocks}\n\n${DIVIDER}\n\nTotal Bill : SAR ${billTotalPrice}\nReceived   : SAR ${paid}`;
 
   if(previousDueItems && previousDueItems.length){
     const dueLines = previousDueItems.map(d => `${formatInvoiceDate(d.date)} — ${d.label} — SAR ${d.due}`).join('\n');
@@ -4205,9 +4204,30 @@ function renderOldCustList(query){
     oldCustResults.innerHTML = '';
     return;
   }
-  const list = shopCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q))).slice(0, 30);
+  let list = shopCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
+
+  // ইনভয়েস নাম্বার/কোড দিয়েও কাস্টমার খোঁজা যায় — পুরো নাম্বার (যেমন INV-000123) অথবা
+  // শুধু শেষ ৪ সংখ্যা (যেমন 0123) লিখলেও মিলিয়ে দেখাবে
+  const digitsOnly = q.replace(/[^0-9]/g, '');
+  if(digitsOnly.length >= 4){
+    const matchedEntries = retailEntries.filter(e=>{
+      if(!e.invoiceNo) return false;
+      const invDigits = e.invoiceNo.replace(/[^0-9]/g, '');
+      return invDigits === digitsOnly || invDigits.endsWith(digitsOnly);
+    });
+    const seen = new Set(list.map(c=> c.name+'|'+(c.phone||'')));
+    matchedEntries.forEach(e=>{
+      const key = e.name+'|'+(e.phone||'');
+      if(!seen.has(key)){
+        seen.add(key);
+        list.push({ name: e.name, phone: e.phone||'', matchedInvoice: e.invoiceNo });
+      }
+    });
+  }
+
+  list = list.slice(0, 30);
   oldCustResults.innerHTML = list.length
-    ? list.map(c => `<div class="old-cust-item" data-name="${escapeHtml(c.name)}" data-phone="${escapeHtml(c.phone||'')}"><span class="snm">${escapeHtml(c.name)}</span><span class="sph">${escapeHtml(c.phone||'')}</span></div>`).join('')
+    ? list.map(c => `<div class="old-cust-item" data-name="${escapeHtml(c.name)}" data-phone="${escapeHtml(c.phone||'')}"><span class="snm">${escapeHtml(c.name)}${c.matchedInvoice ? ' <small style="color:#8a7f6c;">('+escapeHtml(c.matchedInvoice)+')</small>' : ''}</span><span class="sph">${escapeHtml(c.phone||'')}</span></div>`).join('')
     : '<div class="empty">কোনো কাস্টমার পাওয়া যায়নি</div>';
 }
 
@@ -4339,9 +4359,26 @@ function setupCustPicker(searchId, resultsId, tagId){
   function renderList(query){
     const q = query.trim().toLowerCase();
     if(!q){ resultsEl.innerHTML = ''; return; }
-    const list = shopCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q))).slice(0, 20);
+    let list = shopCustomers.filter(c => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
+
+    // ইনভয়েস নাম্বার (পুরো বা শেষ ৪ সংখ্যা) দিয়েও কাস্টমার খোঁজা যায়
+    const digitsOnly = q.replace(/[^0-9]/g, '');
+    if(digitsOnly.length >= 4){
+      const matchedEntries = retailEntries.filter(e=>{
+        if(!e.invoiceNo) return false;
+        const invDigits = e.invoiceNo.replace(/[^0-9]/g, '');
+        return invDigits === digitsOnly || invDigits.endsWith(digitsOnly);
+      });
+      const seen = new Set(list.map(c=> c.name+'|'+(c.phone||'')));
+      matchedEntries.forEach(e=>{
+        const key = e.name+'|'+(e.phone||'');
+        if(!seen.has(key)){ seen.add(key); list.push({ name: e.name, phone: e.phone||'', matchedInvoice: e.invoiceNo }); }
+      });
+    }
+
+    list = list.slice(0, 20);
     resultsEl.innerHTML = list.length
-      ? list.map(c => `<div class="old-cust-item" data-name="${escapeHtml(c.name)}" data-phone="${escapeHtml(c.phone||'')}"><span class="snm">${escapeHtml(c.name)}</span><span class="sph">${escapeHtml(c.phone||'')}</span></div>`).join('')
+      ? list.map(c => `<div class="old-cust-item" data-name="${escapeHtml(c.name)}" data-phone="${escapeHtml(c.phone||'')}"><span class="snm">${escapeHtml(c.name)}${c.matchedInvoice ? ' <small style="color:#8a7f6c;">('+escapeHtml(c.matchedInvoice)+')</small>' : ''}</span><span class="sph">${escapeHtml(c.phone||'')}</span></div>`).join('')
       : '<div class="empty">কোনো কাস্টমার পাওয়া যায়নি</div>';
   }
 
@@ -4881,76 +4918,6 @@ function currentSalesPersonName(){
   }catch(e){ return 'এডমিন'; }
 }
 
-/* ============================================================
-   ফিঙ্গারপ্রিন্ট স্ক্যানার ব্রিজ (DigitalPersona U.are.U 4500)
-   ============================================================
-   এই ওয়েব-অ্যাপ নিজে থেকে USB ফিঙ্গারপ্রিন্ট হার্ডওয়্যার অ্যাক্সেস করতে পারে না —
-   এর জন্য একটা নেটিভ Android লেয়ার লাগবে যেটা HID/DigitalPersona-র Android SDK
-   দিয়ে স্ক্যানারের সাথে কথা বলবে, তারপর নিচের 'window.NativeFingerprint' ব্রিজের
-   মাধ্যমে ফলাফলটা এই ওয়েবপেজে পাঠাবে (Android-এর addJavascriptInterface দিয়ে)।
-
-   নেটিভ ডেভেলপার যা বানাবে তার জন্য এক্সপেক্টেড কন্ট্রাক্ট:
-   - window.NativeFingerprint.scan() কল করলে স্ক্যানার চালু হবে
-   - স্ক্যান শেষে window.onFingerprintResult(idStringOrNull) কল করে ফলাফল ফেরত পাঠাবে
-     (এনরোল করা কাস্টমারের সাথে ম্যাচ করলে SDK-এর Identify() ফাংশন যেই এনরোলমেন্ট
-     আইডি রিটার্ন করে সেটাই idString হবে; না মিললে null)
-   - নিচের scanFingerprint() ফাংশনটা Promise-ভিত্তিক wrapper, যেটা UI থেকে
-     await scanFingerprint() দিয়ে ব্যবহার করা হয়
-
-   যতক্ষণ না নেটিভ ব্রিজ যোগ হচ্ছে, ততক্ষণ এই ফাংশন শুধু জানিয়ে দেবে যে স্ক্যানার
-   এখনো যুক্ত করা হয়নি — তখন ম্যানুয়াল নাম/নাম্বার সার্চই একমাত্র উপায় (ফলব্যাক,
-   যেটা এমনিতেই অ্যাপে আছে)। */
-function scanFingerprint(){
-  return new Promise((resolve)=>{
-    if(!window.NativeFingerprint || typeof window.NativeFingerprint.scan !== 'function'){
-      toast('⚠️ ফিঙ্গারপ্রিন্ট স্ক্যানার এখনো এই ডিভাইসে যুক্ত করা হয়নি — নাম/নাম্বার দিয়ে খুঁজুন');
-      resolve(null);
-      return;
-    }
-    window.onFingerprintResult = (idOrNull)=>{ resolve(idOrNull || null); };
-    window.NativeFingerprint.scan();
-  });
-}
-
-document.getElementById('fpScanBtn').addEventListener('click', async ()=>{
-  const statusEl = document.getElementById('fpScanStatus');
-  statusEl.style.display = 'block';
-  statusEl.textContent = '👆 আঙুল স্ক্যানারে রাখুন...';
-  const fpId = await scanFingerprint();
-  if(!fpId){
-    statusEl.textContent = 'কোনো মিল পাওয়া যায়নি — নাম/নাম্বার দিয়ে খুঁজুন (নিচে)';
-    return;
-  }
-  const match = shopCustomers.find(c=> c.fingerprintId === fpId);
-  if(!match){
-    statusEl.textContent = 'এই ফিঙ্গারপ্রিন্টে কোনো কাস্টমার পাওয়া যায়নি — নাম/নাম্বার দিয়ে খুঁজুন';
-    toast('⚠️ কোনো কাস্টমার ম্যাচ হয়নি, ম্যানুয়ালি খুঁজুন');
-    return;
-  }
-  statusEl.textContent = `✅ পাওয়া গেছে: ${match.name}`;
-  selectOldCustomer(match.name, match.phone || '');
-  toast(`✅ ${match.name} সনাক্ত হয়েছে — ফর্ম অটো-ফিল হয়েছে`);
-});
-
-let acPendingFingerprintId = null;
-document.getElementById('acFpScanBtn').addEventListener('click', async ()=>{
-  const statusEl = document.getElementById('acFpStatus');
-  statusEl.style.display = 'block';
-  statusEl.textContent = '👆 আঙুল স্ক্যানারে রাখুন...';
-  const fpId = await scanFingerprint();
-  if(!fpId){ statusEl.textContent = 'এনরোল করা যায়নি (স্ক্যানার যুক্ত নেই বা বাতিল হয়েছে)'; return; }
-  // ডুপ্লিকেট চেক — এই ফিঙ্গারপ্রিন্ট আইডি অন্য কোনো কাস্টমারের সাথে আগে থেকেই যুক্ত কিনা
-  const dup = shopCustomers.find(c=> c.fingerprintId === fpId);
-  if(dup){
-    statusEl.textContent = `⚠️ এই ফিঙ্গারপ্রিন্ট ইতিমধ্যে "${dup.name}"-এর নামে এনরোল করা আছে`;
-    toast('⚠️ এই আঙুলের ছাপ অন্য কাস্টমারের নামে আগে থেকেই আছে');
-    acPendingFingerprintId = null;
-    return;
-  }
-  acPendingFingerprintId = fpId;
-  statusEl.textContent = '✅ ফিঙ্গারপ্রিন্ট নেওয়া হয়েছে — এখন "কাস্টমার সেভ করুন" চাপুন';
-});
-
 let creditCart = []; // items for নতুন এন্ট্রি (বাকি / নগদ-বিক্রি)
 let qsCart = [];      // items for কুইক সেল
 let esCart = [];      // items for এক্সট্রা সেল
@@ -5167,6 +5134,8 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     }
 
     const billId = genLineId();
+    const invoiceNo = nextInvoiceNumber();
+    const saleTime = new Date().toISOString();
     let remainingPaid = paid;
     const newEntries = billItems.map(it=>{
       let itemPaid;
@@ -5176,7 +5145,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
         itemPaid = Math.max(0, Math.min(it.price, remainingPaid));
         remainingPaid -= itemPaid;
       }
-      return { id: genLineId(), name, item: it.item, productId: it.productId || '', phone, cost: it.cost, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, note, status, billId, date: new Date().toISOString(), soldBy: currentSalesPersonName() };
+      return { id: genLineId(), name, item: it.item, productId: it.productId || '', phone, cost: it.cost, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, note, status, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName() };
     });
     retailEntries.unshift(...newEntries);
     bccAdjustStockForSale(billItems);
@@ -5186,7 +5155,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
 
     const isCleared = isCustomerFullyPaid(name, phone);
     const currentDue = isCleared ? 0 : getCustomerTotalDue(name, phone);
-    const msg = buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared});
+    const msg = buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared, invoiceNo, saleTime});
     await finishAndMaybeShare(name, phone, msg);
 
   }else if(status === 'ফেরত'){
@@ -5262,17 +5231,11 @@ document.getElementById('addCustomerOnlyBtn').addEventListener('click', async ()
   const name = document.getElementById('acName').value.trim();
   const phone = getPhoneWithCode('acPhoneCC','acPhone');
   if(!name){ toast('নাম দিতে হবে'); return; }
-  if(acPendingFingerprintId && shopCustomers.some(c=> c.fingerprintId === acPendingFingerprintId)){
-    toast('⚠️ এই ফিঙ্গারপ্রিন্ট ইতিমধ্যে অন্য কাস্টমারের নামে সেভ করা আছে');
-    return;
-  }
   if(!shopCustomers.some(c => (phone && c.phone === phone) || (!phone && c.name === name))) {
-    shopCustomers.push({name, phone: phone || '', fingerprintId: acPendingFingerprintId || ''});
+    shopCustomers.push({name, phone: phone || ''});
     await persistData();
     document.getElementById('acName').value='';
     document.getElementById('acPhone').value='';
-    document.getElementById('acFpStatus').style.display = 'none';
-    acPendingFingerprintId = null;
     toast('কাস্টমার সফলভাবে সেভ হয়েছে');
   } else {
     toast('এই কাস্টমার ইতিমধ্যে সংরক্ষিত আছে');
@@ -5284,6 +5247,7 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
   if(pendingItem){
     const line = readCartLineFromFields('qsItem','qsQty','qsCost','qsPrice');
     if(!line) return;
+    if(!checkStockAvailable(line.productId, line.item, line.qty, qsCart)) return;
     qsCart.push(line);
   }
 
@@ -5295,10 +5259,35 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
 
   const custName = qsCust ? qsCust.name : 'ওয়াক-ইন কাস্টমার';
   const custPhone = qsCust ? qsCust.phone : '';
+  const billTotalPrice = qsCart.reduce((s,it)=>s+it.price,0);
+
+  // নগদ বিক্রির সময় গ্রাহক কত টাকা দিলো এবং ফেরত (এক্সচেঞ্জ) কত দিতে হবে সেটা হিসাব করে দেখানো
+  let paid = billTotalPrice;
+  if(qsType !== 'বাকি'){
+    const received = await showMoneyCalcModal({
+      title: '💵 এক্সচেঞ্জ — টাকার হিসাব',
+      summaryHtml: `মোট কেনাকাটা: <b>${fmt(billTotalPrice)}</b>`,
+      showInput: true,
+      prefill: billTotalPrice,
+      computeResult: (val)=>{
+        if(val < billTotalPrice) return { text: `⚠️ ঘাটতি ${fmt(billTotalPrice-val)} — কম হলে "বাকি" অপশন ব্যবহার করুন`, warn:true };
+        const change = val - billTotalPrice;
+        return change>0 ? { text: `✅ গ্রাহককে ফেরত দিন: ${fmt(change)}`, warn:false } : { text: `✅ সঠিক টাকা দেওয়া হয়েছে`, warn:false };
+      }
+    });
+    if(received === null) return;
+    if(received < billTotalPrice){ toast('মোট বিলের চেয়ে কম টাকা — "বাকি" অপশন ব্যবহার করুন'); return; }
+    paid = billTotalPrice;
+  } else {
+    paid = 0;
+  }
 
   const billId = genLineId();
-  const newEntries = qsCart.map(it => ({
-    id: genLineId(), name:custName, item: it.item, productId: it.productId || '', phone:custPhone, cost: it.cost, price: it.price, paid: qsType==='বাকি' ? 0 : it.price, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, note:'', status:qsType, billId, date: new Date().toISOString(), soldBy: currentSalesPersonName()
+  const invoiceNo = nextInvoiceNumber();
+  const saleTime = new Date().toISOString();
+  const billItems = qsCart.slice();
+  const newEntries = billItems.map(it => ({
+    id: genLineId(), name:custName, item: it.item, productId: it.productId || '', phone:custPhone, cost: it.cost, price: it.price, paid: qsType==='বাকি' ? 0 : it.price, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, note:'', status:qsType, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName()
   }));
   retailEntries.unshift(...newEntries);
   bccAdjustStockForSale(qsCart);
@@ -5313,6 +5302,14 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
   await persistData();
   render();
   toast(`কুইক সেল সেভ হয়েছে (${itemCount}টি আইটেম)${qsType==='বাকি' ? ' — বাকি হিসেবে যোগ হয়েছে' : ''}`);
+
+  // SALES INVOICE বানিয়ে Print/SMS/WhatsApp/Download-এর জন্য শেয়ার-মোডাল দেখানো
+  const isCleared = qsCust ? isCustomerFullyPaid(custName, custPhone) : true;
+  const currentDue = isCleared ? 0 : getCustomerTotalDue(custName, custPhone);
+  const previousDue = qsCust ? getCustomerTotalDue(custName, custPhone) : 0;
+  const previousDueItems = qsCust ? getCustomerDueItems(custName, custPhone) : [];
+  const msg = buildSalesInvoiceMessage({name: custName, phone: custPhone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared, invoiceNo, saleTime});
+  openShareModal(custName, custPhone, msg);
 });
 
 document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
@@ -5320,6 +5317,7 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
   if(pendingItem){
     const line = readEsCartLine();
     if(!line) return;
+    if(!checkStockAvailable(line.productId, line.item, line.qty, esCart)) return;
     esCart.push(line);
   }
 
@@ -5337,10 +5335,30 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
 
   const billItems = esCart.slice();
   const billTotalPrice = billItems.reduce((s,it)=>s+it.price,0);
-  const paid = isDue ? 0 : billTotalPrice;
+  let paid = isDue ? 0 : billTotalPrice;
+
+  // নগদ বিক্রির সময় গ্রাহক কত টাকা দিলো এবং ফেরত (এক্সচেঞ্জ) কত দিতে হবে সেটা হিসাব করে দেখানো
+  if(!isDue){
+    const received = await showMoneyCalcModal({
+      title: '💵 এক্সচেঞ্জ — টাকার হিসাব',
+      summaryHtml: `মোট কেনাকাটা: <b>${fmt(billTotalPrice)}</b>`,
+      showInput: true,
+      prefill: billTotalPrice,
+      computeResult: (val)=>{
+        if(val < billTotalPrice) return { text: `⚠️ ঘাটতি ${fmt(billTotalPrice-val)} — কম হলে "বাকি" অপশন ব্যবহার করুন`, warn:true };
+        const change = val - billTotalPrice;
+        return change>0 ? { text: `✅ গ্রাহককে ফেরত দিন: ${fmt(change)}`, warn:false } : { text: `✅ সঠিক টাকা দেওয়া হয়েছে`, warn:false };
+      }
+    });
+    if(received === null) return;
+    if(received < billTotalPrice){ toast('মোট বিলের চেয়ে কম টাকা — "বাকি" অপশন ব্যবহার করুন'); return; }
+    paid = billTotalPrice;
+  }
 
   // সব হিসাবে (মূল লেজারে) যোগ করা হচ্ছে, যেন এটি "সব হিসাব" লিস্টে দেখা যায়, বাকি ট্র্যাক হয়, এবং সম্পূর্ণ জমা/এডিট/মুছুন কাজ করে — আগের মতো।
   const billId = genLineId();
+  const invoiceNo = nextInvoiceNumber();
+  const saleTime = new Date().toISOString();
   let remainingPaid = paid;
   const newEntries = billItems.map(it=>{
     let itemPaid;
@@ -5350,7 +5368,7 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
       itemPaid = Math.max(0, Math.min(it.price, remainingPaid));
       remainingPaid -= itemPaid;
     }
-    return { id: genLineId(), name: esName, item: it.item, productId: it.productId || '', phone: esPhone, cost: it.cost||0, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost||0, unitPrice: it.unitPrice, note: 'এক্সট্রা সেল', status: esType, billId, date: new Date().toISOString(), soldBy: currentSalesPersonName() };
+    return { id: genLineId(), name: esName, item: it.item, productId: it.productId || '', phone: esPhone, cost: it.cost||0, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost||0, unitPrice: it.unitPrice, note: 'এক্সট্রা সেল', status: esType, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName() };
   });
   retailEntries.unshift(...newEntries);
 
@@ -5365,7 +5383,7 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
       customerName: esCust ? esName : '',
       customerPhone: esPhone,
       paid: it.price,
-      date: new Date().toISOString()
+      date: saleTime
     });
   });
   eiSave(eiList);
@@ -5386,12 +5404,10 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
   if(typeof eiRenderAll === 'function') eiRenderAll();
   toast(`এক্সট্রা সেল সেভ হয়েছে (${itemCount}টি আইটেম)${isDue ? ' — বাকি হিসেবে যোগ হয়েছে' : ''}`);
 
-  if(esCust && esPhone){
-    const isCleared = isCustomerFullyPaid(esName, esPhone);
-    const currentDue = isCleared ? 0 : getCustomerTotalDue(esName, esPhone);
-    const msg = buildSalesInvoiceMessage({name: esName, phone: esPhone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared});
-    openShareModal(esName, esPhone, msg);
-  }
+  const isCleared = esCust ? isCustomerFullyPaid(esName, esPhone) : true;
+  const currentDue = isCleared ? 0 : getCustomerTotalDue(esName, esPhone);
+  const msg = buildSalesInvoiceMessage({name: esName, phone: esPhone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared, invoiceNo, saleTime});
+  openShareModal(esName, esPhone, msg);
 });
 
 document.getElementById('searchBox').addEventListener('input', render);
