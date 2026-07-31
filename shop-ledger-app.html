@@ -6461,7 +6461,7 @@ function openCustDetail(name, phone, mode){
     list = list.filter(e => SALE_STATUSES.includes(e.status));
   } else if(mode === 'today'){
     const todayStr = new Date().toDateString();
-    list = list.filter(e => SALE_STATUSES.includes(e.status) && new Date(e.date).toDateString() === todayStr);
+    list = list.filter(e => new Date(e.date).toDateString() === todayStr);
   }
   list = list.slice().sort((a,b)=> new Date(b.date) - new Date(a.date));
 
@@ -6483,10 +6483,13 @@ function openCustDetail(name, phone, mode){
       const catLabel = getItemCategoryLabel(e.item, e.productId);
       const catLine = catLabel ? `<div class="meta">📂 ${escapeHtml(catLabel)}</div>` : '';
       const dateStr = new Date(e.date).toLocaleDateString('bn-BD', {day:'numeric', month:'short', year:'numeric'});
+      const isNonSale = !SALE_STATUSES.includes(e.status);
+      const noteLine = (isNonSale && e.note) ? `<div class="meta">📝 ${escapeHtml(e.note)}</div>` : '';
       const shareQtyLine = e.qty && e.qty>1 ? `\n${e.qty} pcs × ${fmt(getUnitPrice(e))} = ${fmt(e.price)}` : '';
       const shareCatLine = catLabel ? `\n📂 ${catLabel}` : '';
-      shareLines.push(`${e.item} — ${fmt(e.price)}${shareCatLine}${shareQtyLine}\n${e.status} · ${dateStr}\nReceived: ${fmt(e.paid)}`);
-      return `<div class="stmt-row"><div><div>${escapeHtml(e.item)}</div>${catLine}${qtyLine}<div class="meta">${e.status} · ${dateStr}</div></div><div style="text-align:right;"><div>${fmt(e.price)}</div><div class="meta">Received: ${fmt(e.paid)}</div></div></div>`;
+      const shareNoteLine = (isNonSale && e.note) ? `\n📝 ${e.note}` : '';
+      shareLines.push(`${e.item} — ${fmt(e.price)}${shareCatLine}${shareQtyLine}\n${e.status} · ${dateStr}\nReceived: ${fmt(e.paid)}${shareNoteLine}`);
+      return `<div class="stmt-row"><div><div>${escapeHtml(e.item)}</div>${catLine}${qtyLine}<div class="meta">${e.status} · ${dateStr}</div>${noteLine}</div><div style="text-align:right;"><div>${fmt(e.price)}</div><div class="meta">Received: ${fmt(e.paid)}</div></div></div>`;
     }).join('');
 
     document.getElementById('cdTotals').innerHTML = `<div><span>Total Price</span><span>${fmt(totalPrice)}</span></div><div><span>Total Received</span><span>${fmt(totalPaid)}</span></div><div class="grand"><span>Total Due</span><span>${fmt(totalDue)}</span></div>` + (mode==='sales' ? '<p class="pin-desc" style="margin-top:8px;">* শুধু বিক্রি/বদলি এন্ট্রি দেখানো হচ্ছে। ফেরত/জমা সহ সম্পূর্ণ হিসাবের জন্য Full Account দেখুন।</p>' : '');
@@ -6540,7 +6543,9 @@ document.getElementById('cdPrint').addEventListener('click', ()=>{
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
   const rows = (list||[]).map((e,i)=>{
     const d = new Date(e.date).toLocaleDateString('bn-BD', {day:'numeric', month:'short', year:'numeric'});
-    return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(e.item)}</td><td style="border:1px solid #ccc; padding:8px;">${e.status}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(e.price)}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(e.paid)}</td><td style="border:1px solid #ccc; padding:8px;">${d}</td></tr>`;
+    const isNonSale = !SALE_STATUSES.includes(e.status);
+    const noteText = (isNonSale && e.note) ? e.note : '';
+    return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(e.item)}</td><td style="border:1px solid #ccc; padding:8px;">${e.status}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(e.price)}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(e.paid)}</td><td style="border:1px solid #ccc; padding:8px;">${d}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(noteText)}</td></tr>`;
   }).join('');
   const printArea = document.getElementById('cdPrintArea');
   printArea.innerHTML = `
@@ -6550,8 +6555,8 @@ document.getElementById('cdPrint').addEventListener('click', ()=>{
       <p style="margin:0 0 4px; color:#555;">তারিখ: ${dateStr}</p>
       ${phone ? `<p style="margin:0 0 16px; color:#555;">📞 ${escapeHtml(phone)}</p>` : ''}
       <table style="width:100%; border-collapse:collapse; font-size:14px;">
-        <thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ccc; padding:8px; text-align:left;">#</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">আইটেম</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">স্ট্যাটাস</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">দাম</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">জমা</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">তারিখ</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="6" style="border:1px solid #ccc; padding:8px;">কোনো হিসাব পাওয়া যায়নি</td></tr>'}</tbody>
+        <thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ccc; padding:8px; text-align:left;">#</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">আইটেম</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">স্ট্যাটাস</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">দাম</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">জমা</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">তারিখ</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">নোট</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="7" style="border:1px solid #ccc; padding:8px;">কোনো হিসাব পাওয়া যায়নি</td></tr>'}</tbody>
       </table>
       <p style="margin-top:16px; font-weight:bold;">Total Price: ${fmt(totalPrice)} · Total Received: ${fmt(totalPaid)} · Total Due: ${fmt(totalDue)}</p>
     </div>`;
@@ -6563,11 +6568,13 @@ document.getElementById('cdPrint').addEventListener('click', ()=>{
 document.getElementById('cdDownload').addEventListener('click', ()=>{
   if(!detailCtx) return;
   const { name, list } = detailCtx;
-  let csv = 'Item,Status,Price,Received,Due,Date\n';
+  let csv = 'Item,Status,Price,Received,Due,Date,Note\n';
   (list||[]).forEach(e=>{
     const d = new Date(e.date).toISOString().slice(0,10);
     const due = Math.max((e.price||0)-(e.paid||0),0);
-    csv += `"${(e.item||'').replace(/"/g,'""')}","${e.status||''}",${e.price||0},${e.paid||0},${due},${d}\n`;
+    const isNonSale = !SALE_STATUSES.includes(e.status);
+    const noteText = (isNonSale && e.note) ? e.note : '';
+    csv += `"${(e.item||'').replace(/"/g,'""')}","${e.status||''}",${e.price||0},${e.paid||0},${due},${d},"${noteText.replace(/"/g,'""')}"\n`;
   });
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
   const a = document.createElement('a');
