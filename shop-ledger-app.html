@@ -4526,16 +4526,16 @@ function updateCustDueInfo(explicitStatus){
   const row = document.getElementById('custDueInfoRow');
   const text = document.getElementById('custDueInfoText');
   if(!row || !text) return;
-  const activeChip = document.querySelector('#statusGroup .status-chip.active');
-  const status = explicitStatus || (activeChip ? activeChip.dataset.s : null);
-  if(status !== 'ফেরত' && status !== 'নগদ'){ row.style.display = 'none'; return; }
   const name = document.getElementById('fName').value.trim();
   const phone = document.getElementById('fPhone').value.trim();
   if(!name && !phone){ row.style.display = 'none'; return; }
   const due = getCustomerTotalDue(name, phone);
-  text.textContent = due > 0 ? `⚠️ ${name || 'এই কাস্টমারের'} বর্তমান বাকি: ${fmt(due)}` : `✅ ${name || 'এই কাস্টমারের'} কোনো বাকি নেই`;
+  text.textContent = due > 0 ? `⚠️ ${name || 'এই কাস্টমারের'} আগে থেকেই বাকি আছে: ${fmt(due)}` : `✅ ${name || 'এই কাস্টমারের'} কোনো বাকি নেই`;
   row.style.display = 'block';
 }
+
+document.getElementById('fName').addEventListener('input', ()=> updateCustDueInfo());
+document.getElementById('fPhone').addEventListener('input', ()=> updateCustDueInfo());
 
 document.querySelectorAll('.status-chip').forEach(chip=>{
   if(chip.dataset.m) return; 
@@ -4747,6 +4747,7 @@ function clearAddForm(){
   creditCart = [];
   renderCreditCart();
   phoneSuggestBox.classList.remove('show');
+  updateCustDueInfo();
 }
 
 /* Reads a quantity field; returns null (and shows a toast) if it's missing/invalid,
