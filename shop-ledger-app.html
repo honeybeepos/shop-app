@@ -205,12 +205,12 @@
   .smartFilterRow{ display:flex; gap:6px; padding:8px 8px 4px; overflow-x:auto; position:sticky; top:0; background:#fff; }
   .smartFilterChip{ padding:5px 10px; border-radius:14px; background:#f1ece0; font-size:11px; font-weight:700; color:#6b5f4a; white-space:nowrap; cursor:pointer; }
   .smartFilterChip.active{ background:var(--teal); color:#fff; }
-  .smartSuggestItem{ display:flex; align-items:center; gap:8px; padding:9px 10px; border-top:1px solid #f0ece0; cursor:pointer; }
+  .smartSuggestItem{ display:flex; flex-wrap:wrap; align-items:center; gap:3px 8px; padding:9px 10px; border-top:1px solid #f0ece0; cursor:pointer; }
   .smartSuggestItem:first-child{ border-top:none; }
   .smartSuggestItem:hover, .smartSuggestItem:active{ background:#faf5ea; }
-  .smartSuggestItem .badge{ font-size:10px; font-weight:700; padding:3px 7px; border-radius:8px; background:#e7f0ee; color:#1f6f6b; white-space:nowrap; flex-shrink:0; }
-  .smartSuggestItem .nm{ flex:1; font-size:13px; color:#2b2620; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .smartSuggestItem .stk{ font-size:11px; color:#8a7f6c; font-family:'Space Mono',monospace; white-space:nowrap; flex-shrink:0; }
+  .smartSuggestItem .badge{ order:1; font-size:10px; font-weight:700; padding:3px 7px; border-radius:8px; background:#e7f0ee; color:#1f6f6b; white-space:nowrap; flex-shrink:0; }
+  .smartSuggestItem .stk{ order:2; margin-left:auto; font-size:11px; color:#8a7f6c; font-family:'Space Mono',monospace; white-space:nowrap; flex-shrink:0; }
+  .smartSuggestItem .nm{ order:3; flex:1 1 100%; font-size:13px; color:#2b2620; white-space:normal; overflow-wrap:break-word; word-break:break-word; }
   .smartSuggestItem .stk.low{ color:#c0392b; font-weight:700; }
   .smartSuggestEmpty{ padding:14px; text-align:center; color:#8a7f6c; font-size:12.5px; }
 
@@ -3699,20 +3699,21 @@ function getProductDetails(itemName, productId){
   const prods = bccLoadProducts();
   const p = bccResolveProduct(prods, itemName, productId);
   const model = (p && p.name && p.name.trim()) ? p.name.trim() : (itemName || '');
-  let brand = '', product = '';
+  let brand = '', product = '', category = '', subcategory = '';
 
   if(p && p.catId){
     const cats = bccLoadCategories();
     const cat = cats.find(c => c.id === p.catId);
     if(cat){
       brand = cat.name || '';
+      category = cat.name || '';
       const sub = cat.subs ? cat.subs.find(s => s.id === p.subId) : null;
-      if(sub) product = sub.name || '';
+      if(sub){ product = sub.name || ''; subcategory = sub.name || ''; }
     }
   }
   if(!product) product = model;
 
-  return { product, brand, model };
+  return { product, brand, model, category, subcategory };
 }
 
 // কাস্টমারের এই মুহূর্ত পর্যন্ত বাকি থাকা প্রতিটা প্রোডাক্ট, কোন তারিখে বিক্রি হয়ে কত টাকা বাকি
@@ -3766,10 +3767,10 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
   const DIVIDER = '----------------------------------';
 
   const itemBlocks = billItems.map((it, idx) => {
-    const { product, brand, model } = getProductDetails(it.item, it.productId);
-    const lines = [`Item ${idx + 1}`, `Product : ${product}`];
-    if(brand) lines.push(`Brand   : ${brand}`);
-    if(model) lines.push(`Model   : ${model}`);
+    const { model, category, subcategory } = getProductDetails(it.item, it.productId);
+    const lines = [`Item ${idx + 1}`, `Product : ${model}`];
+    if(category) lines.push(`Category: ${category}`);
+    if(subcategory) lines.push(`Sub-category: ${subcategory}`);
     lines.push(`Quantity: ${it.qty}`);
     lines.push(`Unit Price: SAR ${it.unitPrice}`);
     lines.push(`Amount: SAR ${it.price}`);
