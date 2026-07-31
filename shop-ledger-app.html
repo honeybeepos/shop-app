@@ -1049,6 +1049,7 @@
     <h3 id="pcaName" style="margin:0 0 4px;">কাস্টমার</h3>
     <p class="pin-desc" id="pcaPhone" style="margin:0 0 14px;"></p>
     <button class="btn secondary" id="pcaEditBtn" style="width:100%;">✏️ নাম/নাম্বার এডিট করুন</button>
+    <button class="btn secondary" id="pcaTodaySalesBtn" style="width:100%; margin-top:10px;">📅 আজকের সব সেল লিস্ট (WhatsApp/SMS)</button>
     <button class="mini-btn danger" id="pcaDeleteBtn" style="width:100%; margin-top:10px;">🗑️ সম্পূর্ণ ডিলেট (সব হিসাব মুছে যাবে)</button>
     <button class="mini-btn" id="pcaCancelBtn" style="width:100%; margin-top:8px;">বাতিল</button>
   </div>
@@ -6213,6 +6214,13 @@ document.getElementById('pcaEditBtn').addEventListener('click', ()=>{
   openCustomerEditor(permCustActionTarget.name, permCustActionTarget.phone);
 });
 
+document.getElementById('pcaTodaySalesBtn').addEventListener('click', ()=>{
+  if(!permCustActionTarget) return;
+  permCustActionModal.classList.remove('show');
+  custDetailReturnTo = 'permCustList';
+  openCustDetail(permCustActionTarget.name, permCustActionTarget.phone, 'today');
+});
+
 document.getElementById('pcaDeleteBtn').addEventListener('click', async ()=>{
   if(!permCustActionTarget) return;
   const target = permCustActionTarget;
@@ -6445,13 +6453,18 @@ function openCustDetail(name, phone, mode){
   let list = retailEntries.filter(e => phone ? e.phone === phone : e.name === name);
   if(mode === 'sales'){
     list = list.filter(e => SALE_STATUSES.includes(e.status));
+  } else if(mode === 'today'){
+    const todayStr = new Date().toDateString();
+    list = list.filter(e => SALE_STATUSES.includes(e.status) && new Date(e.date).toDateString() === todayStr);
   }
   list = list.slice().sort((a,b)=> new Date(b.date) - new Date(a.date));
 
-  document.getElementById('cdTitle').textContent = (mode === 'sales' ? '📦 Sales — ' : '📋 Full Account — ') + name;
+  const titleMap = { sales: '📦 Sales — ', today: '📅 আজকের সব সেল — ' };
+  document.getElementById('cdTitle').textContent = (titleMap[mode] || '📋 Full Account — ') + name;
   document.getElementById('cdSub').textContent = phone ? phone : '';
 
   let totalPrice=0, totalPaid=0, totalDue=0;
+  const shareLines = [];
 
   if(!list.length){
     document.getElementById('cdRows').innerHTML = '<div class="empty">কোনো হিসাব পাওয়া যায়নি</div>';
@@ -6464,13 +6477,16 @@ function openCustDetail(name, phone, mode){
       const catLabel = getItemCategoryLabel(e.item, e.productId);
       const catLine = catLabel ? `<div class="meta">📂 ${escapeHtml(catLabel)}</div>` : '';
       const dateStr = new Date(e.date).toLocaleDateString('bn-BD', {day:'numeric', month:'short', year:'numeric'});
+      const shareQtyLine = e.qty && e.qty>1 ? `\n${e.qty} pcs × ${fmt(getUnitPrice(e))} = ${fmt(e.price)}` : '';
+      const shareCatLine = catLabel ? `\n📂 ${catLabel}` : '';
+      shareLines.push(`${e.item} — ${fmt(e.price)}${shareCatLine}${shareQtyLine}\n${e.status} · ${dateStr}\nReceived: ${fmt(e.paid)}`);
       return `<div class="stmt-row"><div><div>${escapeHtml(e.item)}</div>${catLine}${qtyLine}<div class="meta">${e.status} · ${dateStr}</div></div><div style="text-align:right;"><div>${fmt(e.price)}</div><div class="meta">Received: ${fmt(e.paid)}</div></div></div>`;
     }).join('');
 
     document.getElementById('cdTotals').innerHTML = `<div><span>Total Price</span><span>${fmt(totalPrice)}</span></div><div><span>Total Received</span><span>${fmt(totalPaid)}</span></div><div class="grand"><span>Total Due</span><span>${fmt(totalDue)}</span></div>` + (mode==='sales' ? '<p class="pin-desc" style="margin-top:8px;">* শুধু বিক্রি/বদলি এন্ট্রি দেখানো হচ্ছে। ফেরত/জমা সহ সম্পূর্ণ হিসাবের জন্য Full Account দেখুন।</p>' : '');
   }
 
-  detailCtx = { name, phone, mode, totalPrice, totalPaid, totalDue };
+  detailCtx = { name, phone, mode, totalPrice, totalPaid, totalDue, shareLines };
 
   const backBtn = document.getElementById('cdBackBtn');
   backBtn.style.display = custDetailReturnTo === 'permCustList' ? 'block' : 'none';
@@ -6490,9 +6506,11 @@ function openCustDetail(name, phone, mode){
 
 function buildDetailShareMessage(){
   if(!detailCtx) return '';
-  const { name, mode, totalPrice, totalPaid, totalDue } = detailCtx;
-  const label = mode === 'sales' ? 'Sales Summary' : 'Full Account Summary';
-  return `Dear ${name},\n\n${label}\nTotal Price: SAR ${totalPrice}\nTotal Received: SAR ${totalPaid}\nTotal Due: SAR ${totalDue}\n\nPlease clear your due balance soon. Thank you — Mumen Electronics.`;
+  const { name, mode, totalPrice, totalPaid, totalDue, shareLines } = detailCtx;
+  const labelMap = { sales: 'Sales Summary', today: "Today's Sales List" };
+  const label = labelMap[mode] || 'Full Account Summary';
+  const itemsBlock = (shareLines && shareLines.length) ? shareLines.join('\n\n') + '\n\n' : '';
+  return `Dear ${name},\n\n${label}\n\n${itemsBlock}Total Price: SAR ${totalPrice}\nTotal Received: SAR ${totalPaid}\nTotal Due: SAR ${totalDue}\n\nPlease clear your due balance soon. Thank you — Mumen Electronics.`;
 }
 
 document.getElementById('cdWhatsapp').addEventListener('click', ()=>{
