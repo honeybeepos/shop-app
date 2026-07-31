@@ -824,7 +824,7 @@
             <textarea id="fNote" rows="2" placeholder="বাড়তি কিছু লিখতে চাইলে"></textarea>
           </div>
         </div>
-        <button class="btn" id="addBtn">সম্পূর্ণ হিসাব যোগ করুন</button>
+        <button class="btn" id="addBtn" style="display:none;">সম্পূর্ণ হিসাব যোগ করুন</button>
       </div>
     </div>
   </div>
@@ -4520,9 +4520,22 @@ document.querySelectorAll('#statusGroup .status-chip').forEach(chip=>{
     const isCartFlow = (status === 'বাকি' || status === 'নগদ-বিক্রি');
     document.getElementById('addBtn').textContent = isCartFlow ? 'সম্পূর্ণ হিসাব যোগ করুন' : 'যোগ করুন';
     if(!isCartFlow && creditCart.length){ creditCart = []; renderCreditCart(); }
+    updateAddBtnVisibility();
     updateCustDueInfo(status);
   });
 });
+
+/* 'বাকি'/'নগদ-বিক্রি' মোডে "সম্পূর্ণ হিসাব যোগ করুন" বাটনটা প্রথমে লুকানো থাকবে —
+   যতক্ষণ না অন্তত একটা আইটেম "তালিকায় যোগ করুন" দিয়ে যোগ করা হয়, ততক্ষণ এই বাটন
+   দেখানোর দরকার নেই (খালি তালিকা নিয়ে সাবমিট করলে এমনিতেও এরর দেখাত)। অন্য
+   স্ট্যাটাসে (ফেরত/নগদ) বাটন সবসময় দেখাবে। */
+function updateAddBtnVisibility(){
+  const activeChip = document.querySelector('#statusGroup .status-chip.active');
+  const status = activeChip ? activeChip.dataset.s : null;
+  const isCartFlow = (status === 'বাকি' || status === 'নগদ-বিক্রি');
+  const addBtn = document.getElementById('addBtn');
+  addBtn.style.display = (isCartFlow && !creditCart.length) ? 'none' : 'block';
+}
 
 /* ফেরত করার সময় এবং জমা নেওয়ার সময় এই কাস্টমারের বর্তমান বাকি কত সেটা দেখানো হয়,
    যাতে বাকি দেখে সঠিক পরিমাণ জমা নেওয়া যায় বা বাকির থেকে কত টাকা কাটা যাবে তা বোঝা যায়।
@@ -5030,7 +5043,7 @@ function renderCartInto(cart, listElId, summaryElId, removeFn){
   summary.textContent = `তালিকায় ${cart.length}টি আইটেম — মোট বিক্রি মূল্য: ${fmt(totalPrice)}`;
 }
 
-function renderCreditCart(){ renderCartInto(creditCart, 'fCartList', 'fCartSummary', 'removeCreditCartItem'); }
+function renderCreditCart(){ renderCartInto(creditCart, 'fCartList', 'fCartSummary', 'removeCreditCartItem'); updateAddBtnVisibility(); }
 function renderQsCart(){ renderCartInto(qsCart, 'qsCartList', 'qsCartSummary', 'removeQsCartItem'); }
 function renderEsCart(){ renderCartInto(esCart, 'esCartList', 'esCartSummary', 'removeEsCartItem'); }
 
