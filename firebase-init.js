@@ -115,11 +115,23 @@ function clearSession() {
    localStorage  <->  Firestore  সিঙ্ক ইঞ্জিন
    (মূল অ্যাপের ৬০০০+ লাইন কোড অপরিবর্তিত রেখে, এই লেয়ারটা
    লোকালস্টোরেজকে সার্ভারের সাথে সিঙ্ক করে রাখে)
+
+   ⚠️ একাধিক ডিভাইস/সাব-ইউজার একইসাথে অফলাইনে সেল করতে পারে — তাই এখানে
+   পুরো localStorage-কে একটা ব্লব হিসেবে ওভাররাইট করা হয় না। প্রতিটা কী
+   (যেমন phone-shop-entries, bcc-products) আলাদাভাবে merge হয়:
+   - যেসব কী array-of-records (id সহ) — সেগুলোতে দুই ডিভাইসের নতুন
+     রেকর্ড কখনোই একে অপরকে মুছে দেয় না, id দিয়ে union করা হয়।
+   - একই id দুই ডিভাইসেই আলাদাভাবে বদলে গেলে (সত্যিকারের conflict),
+     যেই ডিভাইস সেই key-টা সর্বশেষ বদলেছে তার ভার্সন রাখা হয়।
+   - shop-invoice-counter সবসময় বড় সংখ্যাটা রাখে, যাতে ইনভয়েস নাম্বার
+     কখনো রিপিট না হয়।
    ============================================================ */
 
 let __syncShopId = null;
 let __syncTimer = null;
 const SYNC_DEBOUNCE_MS = 2500;
+const SESSION_KEY = "bcc-session";
+const SYNC_META_KEY = "__syncMeta"; // প্রতিটা key শেষ কখন লোকালি বদলেছে, তার টাইমস্ট্যাম্প
 
 // আসল localStorage ফাংশনগুলো ব্যাকআপ রাখা
 const __origSetItem = Storage.prototype.setItem;
@@ -127,16 +139,53 @@ const __origGetItem = Storage.prototype.getItem;
 const __origRemoveItem = Storage.prototype.removeItem;
 const __origClear = Storage.prototype.clear;
 
+// যেসব key একটা array-of-records রাখে, সেগুলো id মিলিয়ে merge হবে (whole-blob
+// ওভাররাইটের বদলে) — যাতে দুই ডিভাইসের নতুন এন্ট্রি একে অপরকে মুছে না দেয়।
+const ARRAY_MERGE_CONFIG = {
+  "phone-shop-entries": { idFn: e => e.id },
+  "bcc-products":       { idFn: p => p.id },
+  "shop-expenses":      { idFn: x => x.id },
+  "shop-supplier-txns": { idFn: x => x.id },
+  "shop-employee-txns": { idFn: x => x.id },
+  "shop-suppliers":     { idFn: x => x.id },
+  "shop-employees":     { idFn: x => x.id },
+  "bcc-extra-income":   { idFn: x => x.id },
+  "bcc-due-log":        { idFn: x => (x.date || "") + "|" + (x.name || "") + "|" + (x.amount || "") },
+  "phone-shop-customers": { idFn: c => (c.name || "").toLowerCase() + "|" + (c.phone || "") },
+  // ক্যাটাগরি একটু আলাদা — এর ভেতরে subs[] নেস্টেড অ্যারে, সেটাও id মিলিয়ে merge হবে
+  "bcc-categories":     { idFn: c => c.id, subKey: "subs", subIdFn: s => s.id }
+};
+
+// এই key-গুলোর মান সংখ্যা — merge-এর সময় সবসময় বড়টা রাখা হবে (যাতে
+// ইনভয়েস নাম্বার কখনো ডুপ্লিকেট/রিপিট না হয়)
+const NUMERIC_MAX_KEYS = ["shop-invoice-counter"];
+
+function getSyncMeta() {
+  try { return JSON.parse(__origGetItem.call(localStorage, SYNC_META_KEY) || "{}"); }
+  catch (e) { return {}; }
+}
+function touchSyncMeta(key) {
+  const meta = getSyncMeta();
+  meta[key] = Date.now();
+  __origSetItem.call(localStorage, SYNC_META_KEY, JSON.stringify(meta));
+}
+
 function enableAutoSync(shopId) {
   __syncShopId = shopId;
 
   Storage.prototype.setItem = function (key, value) {
     __origSetItem.call(this, key, value);
-    if (this === window.localStorage) scheduleCloudSync();
+    if (this === window.localStorage) {
+      if (key !== SESSION_KEY && key !== SYNC_META_KEY) touchSyncMeta(key);
+      scheduleCloudSync();
+    }
   };
   Storage.prototype.removeItem = function (key) {
     __origRemoveItem.call(this, key);
-    if (this === window.localStorage) scheduleCloudSync();
+    if (this === window.localStorage) {
+      if (key !== SESSION_KEY && key !== SYNC_META_KEY) touchSyncMeta(key);
+      scheduleCloudSync();
+    }
   };
   Storage.prototype.clear = function () {
     __origClear.call(this);
@@ -159,18 +208,89 @@ function scheduleCloudSync() {
   __syncTimer = setTimeout(()=> pushLocalStorageToCloud().catch(()=>{}), SYNC_DEBOUNCE_MS);
 }
 
+// একই id দুই ডিভাইসেই থাকলে (সত্যিকারের conflict) — subKey (যেমন ক্যাটাগরির
+// subs) থাকলে সেটাও আলাদাভাবে id মিলিয়ে merge করে, বাকিটা key-লেভেল
+// টাইমস্ট্যাম্প দিয়ে সিদ্ধান্ত নেয় কোন ডিভাইসের ভার্সন রাখা হবে।
+function mergeArraysById(localArr, remoteArr, localTs, remoteTs, cfg) {
+  const idFn = cfg.idFn;
+  const map = new Map();
+  remoteArr.forEach(item => map.set(idFn(item), item));
+  localArr.forEach(item => {
+    const key = idFn(item);
+    if (!map.has(key)) { map.set(key, item); return; } // নতুন লোকাল রেকর্ড — এটা কখনো হারাবে না
+    const remoteItem = map.get(key);
+    if (JSON.stringify(remoteItem) === JSON.stringify(item)) return; // দুই দিকেই একই, কিছু করার নেই
+    let winner = (localTs >= remoteTs) ? item : remoteItem;
+    if (cfg.subKey && Array.isArray(item[cfg.subKey]) && Array.isArray(remoteItem[cfg.subKey])) {
+      winner = Object.assign({}, winner);
+      winner[cfg.subKey] = mergeArraysById(item[cfg.subKey], remoteItem[cfg.subKey], localTs, remoteTs, { idFn: cfg.subIdFn });
+    }
+    map.set(key, winner);
+  });
+  return Array.from(map.values());
+}
+
+function mergeKeyValue(key, localVal, localTs, remoteVal, remoteTs) {
+  if (localVal == null) return remoteVal;
+  if (remoteVal == null) return localVal;
+  if (localVal === remoteVal) return localVal;
+
+  if (NUMERIC_MAX_KEYS.indexOf(key) !== -1) {
+    return String(Math.max(Number(localVal) || 0, Number(remoteVal) || 0));
+  }
+
+  if (ARRAY_MERGE_CONFIG[key]) {
+    try {
+      const localArr = JSON.parse(localVal);
+      const remoteArr = JSON.parse(remoteVal);
+      if (Array.isArray(localArr) && Array.isArray(remoteArr)) {
+        return JSON.stringify(mergeArraysById(localArr, remoteArr, localTs, remoteTs, ARRAY_MERGE_CONFIG[key]));
+      }
+    } catch (e) { /* পার্স না হলে নিচের last-write-wins ফলব্যাকে যাবে */ }
+  }
+
+  // সাধারণ সেটিংস (shop-title, bcc-password ইত্যাদি) — যেই ডিভাইস সবশেষে বদলেছে সেটাই থাকবে
+  return remoteTs >= localTs ? remoteVal : localVal;
+}
+
 async function pushLocalStorageToCloud() {
   if (!__syncShopId) return;
-  const blob = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k === "bcc-session") continue; // এটা এই ডিভাইসের লগইন সেশন, দোকানের ডেটা না — সিঙ্ক হবে না
-    blob[k] = localStorage.getItem(k);
-  }
   try {
+    // প্রথমে সার্ভারের বর্তমান অবস্থাটা টেনে এনে লোকালের সাথে merge করা হয়, যাতে
+    // এই ডিভাইস অফলাইনে থাকার সময় অন্য কোনো ডিভাইস যা যোগ করেছে সেটা হারিয়ে না যায়
+    const snap = await db.collection("shops").doc(__syncShopId)
+      .collection("appdata").doc("main").get();
+    const remoteBlob = (snap.exists && snap.data().blob) ? JSON.parse(snap.data().blob) : {};
+    const meta = getSyncMeta();
+
+    const localKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k === SESSION_KEY || k === SYNC_META_KEY) continue;
+      localKeys.push(k);
+    }
+    const allKeys = new Set([...Object.keys(remoteBlob), ...localKeys]);
+
+    const mergedBlob = {};
+    allKeys.forEach(key => {
+      const remoteEntry = remoteBlob[key];
+      const remoteVal = remoteEntry && typeof remoteEntry === "object" ? remoteEntry.v : remoteEntry;
+      const remoteTs   = remoteEntry && typeof remoteEntry === "object" ? (remoteEntry.t || 0) : 0;
+      const localVal = __origGetItem.call(localStorage, key);
+      const localTs  = meta[key] || 0;
+      const mergedVal = mergeKeyValue(key, localVal, localTs, remoteVal, remoteTs);
+      if (mergedVal != null) mergedBlob[key] = { v: mergedVal, t: Math.max(localTs, remoteTs) };
+    });
+
+    // merge হওয়া ফলাফলটা এই ডিভাইসের নিজের localStorage-এও বসিয়ে দেওয়া হয়, যাতে
+    // এই ডিভাইসও অন্য ডিভাইসের সংযোজন সাথে সাথে দেখতে পায়
+    const savedSession = __origGetItem.call(localStorage, SESSION_KEY);
+    Object.keys(mergedBlob).forEach(k => __origSetItem.call(localStorage, k, mergedBlob[k].v));
+    if (savedSession) __origSetItem.call(localStorage, SESSION_KEY, savedSession);
+
     await db.collection("shops").doc(__syncShopId)
       .collection("appdata").doc("main")
-      .set({ blob: JSON.stringify(blob), updatedAt: fbNow(), updatedBy: __deviceId }, { merge: true });
+      .set({ blob: JSON.stringify(mergedBlob), updatedAt: fbNow(), updatedBy: __deviceId }, { merge: true });
     setSyncIndicator("ok");
   } catch (e) {
     console.error("Cloud sync failed:", e);
@@ -183,13 +303,33 @@ async function pullCloudToLocalStorage(shopId) {
   const snap = await db.collection("shops").doc(shopId)
     .collection("appdata").doc("main").get();
   if (!snap.exists || !snap.data().blob) return false;
-  const blob = JSON.parse(snap.data().blob);
+  const remoteBlob = JSON.parse(snap.data().blob);
+  const meta = getSyncMeta();
+
+  const localKeys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k === SESSION_KEY || k === SYNC_META_KEY) continue;
+    localKeys.push(k);
+  }
+  const allKeys = new Set([...Object.keys(remoteBlob), ...localKeys]);
+
+  const mergedBlob = {};
+  allKeys.forEach(key => {
+    const remoteEntry = remoteBlob[key];
+    const remoteVal = remoteEntry && typeof remoteEntry === "object" ? remoteEntry.v : remoteEntry;
+    const remoteTs   = remoteEntry && typeof remoteEntry === "object" ? (remoteEntry.t || 0) : 0;
+    const localVal = __origGetItem.call(localStorage, key);
+    const localTs  = meta[key] || 0;
+    mergedBlob[key] = mergeKeyValue(key, localVal, localTs, remoteVal, remoteTs);
+  });
+
   // bcc-session এখন localStorage-এ থাকে (মিনিমাইজ করলে যেন লগইন না হারায়), কিন্তু নিচের
   // clear() পুরো localStorage মুছে দেয় — তাই সাময়িক ব্যাকআপ রেখে পরে আবার বসানো হচ্ছে
-  const savedSession = __origGetItem.call(localStorage, "bcc-session");
+  const savedSession = __origGetItem.call(localStorage, SESSION_KEY);
   __origClear.call(localStorage);
-  Object.keys(blob).forEach(k => __origSetItem.call(localStorage, k, blob[k]));
-  if (savedSession) __origSetItem.call(localStorage, "bcc-session", savedSession);
+  Object.keys(mergedBlob).forEach(k => { if (mergedBlob[k] != null) __origSetItem.call(localStorage, k, mergedBlob[k]); });
+  if (savedSession) __origSetItem.call(localStorage, SESSION_KEY, savedSession);
   return true;
 }
 
