@@ -1277,9 +1277,6 @@
       <div class="eiCard"><div class="ic">🧑‍🤝‍🧑</div><div class="lbl">আজ যতজন কাস্টমার এসেছে</div><div class="val" id="eiStatTodayCustomers">0</div></div>
       <div class="eiCard"><div class="ic">🔁</div><div class="lbl">আজ কতবার বিক্রি হয়েছে</div><div class="val" id="eiStatTodaySales">0</div></div>
     </div>
-
-    <div class="eiSectionTitle">🧾 ইনকাম হিস্টোরি</div>
-    <div class="eiList" id="eiHistoryList"></div>
   </div>
 </div>
 
@@ -6865,22 +6862,24 @@ function eiRenderAll(){
   document.getElementById('eiStatTodaySales').textContent = eiTodaySaleCount;
 
   const historyEl = document.getElementById('eiHistoryList');
-  historyEl.innerHTML = list.length ? list.slice(0,50).map(x=>{
-    const isDue = x.paid !== undefined && (x.amount||0) > (x.paid||0);
-    const custLine = x.customerName ? `<span class="meta">👤 ${escapeHtml(x.customerName)}${x.customerPhone ? ' · '+escapeHtml(x.customerPhone) : ''}</span>` : '';
-    return `
-    <div class="eiRow">
-      <span class="nm">${escapeHtml(x.source)}${x.note? (' — '+escapeHtml(x.note)) : ''}${isDue ? ' <b style="color:#c0392b;">(বাকি)</b>' : ''}</span>
-      ${custLine}
-      <span class="meta">${new Date(x.date).toLocaleDateString('en-GB')}</span>
-      <span class="amt">${fmt(x.amount)}</span>
-      ${isDue ? `<button class="btn secondary" style="padding:4px 10px; font-size:12px;" data-paid="${x.id}">✅ জমা হয়েছে</button>` : ''}
-      <button class="delBtn" data-del="${x.id}">🗑️</button>
-    </div>
-  `;
-  }).join('') : `<div class="eiEmpty">এখনো কোনো এক্সট্রা ইনকাম যোগ করা হয়নি</div>`;
-  historyEl.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', ()=> eiDelete(b.dataset.del)));
-  historyEl.querySelectorAll('[data-paid]').forEach(b=> b.addEventListener('click', ()=> eiMarkPaid(b.dataset.paid)));
+  if(historyEl){
+    historyEl.innerHTML = list.length ? list.slice(0,50).map(x=>{
+      const isDue = x.paid !== undefined && (x.amount||0) > (x.paid||0);
+      const custLine = x.customerName ? `<span class="meta">👤 ${escapeHtml(x.customerName)}${x.customerPhone ? ' · '+escapeHtml(x.customerPhone) : ''}</span>` : '';
+      return `
+      <div class="eiRow">
+        <span class="nm">${escapeHtml(x.source)}${x.note? (' — '+escapeHtml(x.note)) : ''}${isDue ? ' <b style="color:#c0392b;">(বাকি)</b>' : ''}</span>
+        ${custLine}
+        <span class="meta">${new Date(x.date).toLocaleDateString('en-GB')}</span>
+        <span class="amt">${fmt(x.amount)}</span>
+        ${isDue ? `<button class="btn secondary" style="padding:4px 10px; font-size:12px;" data-paid="${x.id}">✅ জমা হয়েছে</button>` : ''}
+        <button class="delBtn" data-del="${x.id}">🗑️</button>
+      </div>
+    `;
+    }).join('') : `<div class="eiEmpty">এখনো কোনো এক্সট্রা ইনকাম যোগ করা হয়নি</div>`;
+    historyEl.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', ()=> eiDelete(b.dataset.del)));
+    historyEl.querySelectorAll('[data-paid]').forEach(b=> b.addEventListener('click', ()=> eiMarkPaid(b.dataset.paid)));
+  }
 }
 
 /* ============================================================
