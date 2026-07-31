@@ -595,6 +595,12 @@
             <input id="acPhone" type="text" placeholder="0 ছাড়া নাম্বার লিখুন">
           </div>
         </div>
+        <div class="row">
+          <div>
+            <label>পূর্বের বাকি (SAR) — থাকলে লিখুন, না থাকলে খালি রাখুন</label>
+            <input id="acOpeningDue" type="number" inputmode="numeric" placeholder="০">
+          </div>
+        </div>
         <button class="btn" id="addCustomerOnlyBtn">কাস্টমার সেভ করুন</button>
       </div>
 
@@ -5389,13 +5395,23 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
 document.getElementById('addCustomerOnlyBtn').addEventListener('click', async ()=>{
   const name = document.getElementById('acName').value.trim();
   const phone = getPhoneWithCode('acPhoneCC','acPhone');
+  const openingDue = Math.max(0, Number(document.getElementById('acOpeningDue').value)||0);
   if(!name){ toast('নাম দিতে হবে'); return; }
   if(!shopCustomers.some(c => (phone && c.phone === phone) || (!phone && c.name === name))) {
     shopCustomers.push({name, phone: phone || ''});
+    if(openingDue > 0){
+      retailEntries.unshift({
+        id: genLineId(), name, item: 'পুরাতন বাকি (হিসাব যোগ করার সময় শুরুতে যোগ করা হয়েছে)',
+        productId: '', phone, cost: 0, price: openingDue, paid: 0, qty: 1,
+        unitCost: 0, unitPrice: openingDue, note: '', status: 'বাকি',
+        billId: genLineId(), invoiceNo: '', date: new Date().toISOString(), soldBy: currentSalesPersonName()
+      });
+    }
     await persistData();
     document.getElementById('acName').value='';
     document.getElementById('acPhone').value='';
-    toast('কাস্টমার সফলভাবে সেভ হয়েছে');
+    document.getElementById('acOpeningDue').value='';
+    toast(openingDue > 0 ? `কাস্টমার সেভ হয়েছে, পূর্বের বাকি ${fmt(openingDue)} যোগ করা হয়েছে` : 'কাস্টমার সফলভাবে সেভ হয়েছে');
   } else {
     toast('এই কাস্টমার ইতিমধ্যে সংরক্ষিত আছে');
   }
