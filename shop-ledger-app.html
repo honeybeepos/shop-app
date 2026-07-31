@@ -406,6 +406,8 @@
     #opsAllSupplierPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #empSalesPrintArea.printing, #empSalesPrintArea.printing *{visibility:visible;}
     #empSalesPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
+    #cdPrintArea.printing, #cdPrintArea.printing *{visibility:visible;}
+    #cdPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     .no-print{display:none !important;}
   }
 </style>
@@ -923,12 +925,15 @@
     <div id="cdSub" class="pin-desc" style="margin-bottom:10px;"></div>
     <div id="cdRows"></div>
     <div class="stmt-total" id="cdTotals"></div>
-    <div class="modal-actions" id="cdShareRow" style="margin-top:14px;">
+    <div class="modal-actions" id="cdShareRow" style="margin-top:14px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <button class="mini-btn" id="cdPrint">🖨️ Print</button>
+      <button class="mini-btn" id="cdDownload">⬇️ Download</button>
       <button class="mini-btn" id="cdSms">💬 SMS</button>
       <a class="btn" id="cdWhatsapp" style="margin-top:0; text-decoration:none; text-align:center;" target="_blank">✅ WhatsApp</a>
     </div>
   </div>
 </div>
+<div id="cdPrintArea"></div>
 
 <div class="modal-overlay" id="permCustListModal">
   <div class="modal-box" style="max-width:400px; text-align:left; max-height:85vh; display:flex; flex-direction:column;">
@@ -1049,7 +1054,7 @@
     <h3 id="pcaName" style="margin:0 0 4px;">কাস্টমার</h3>
     <p class="pin-desc" id="pcaPhone" style="margin:0 0 14px;"></p>
     <button class="btn secondary" id="pcaEditBtn" style="width:100%;">✏️ নাম/নাম্বার এডিট করুন</button>
-    <button class="btn secondary" id="pcaTodaySalesBtn" style="width:100%; margin-top:10px;">📅 আজকের সব সেল লিস্ট (WhatsApp/SMS)</button>
+    <button class="btn secondary" id="pcaTodaySalesBtn" style="width:100%; margin-top:10px;">📅 আজকের সব সেল লিস্ট</button>
     <button class="mini-btn danger" id="pcaDeleteBtn" style="width:100%; margin-top:10px;">🗑️ সম্পূর্ণ ডিলেট (সব হিসাব মুছে যাবে)</button>
     <button class="mini-btn" id="pcaCancelBtn" style="width:100%; margin-top:8px;">বাতিল</button>
   </div>
@@ -6486,19 +6491,21 @@ function openCustDetail(name, phone, mode){
     document.getElementById('cdTotals').innerHTML = `<div><span>Total Price</span><span>${fmt(totalPrice)}</span></div><div><span>Total Received</span><span>${fmt(totalPaid)}</span></div><div class="grand"><span>Total Due</span><span>${fmt(totalDue)}</span></div>` + (mode==='sales' ? '<p class="pin-desc" style="margin-top:8px;">* শুধু বিক্রি/বদলি এন্ট্রি দেখানো হচ্ছে। ফেরত/জমা সহ সম্পূর্ণ হিসাবের জন্য Full Account দেখুন।</p>' : '');
   }
 
-  detailCtx = { name, phone, mode, totalPrice, totalPaid, totalDue, shareLines };
+  detailCtx = { name, phone, mode, totalPrice, totalPaid, totalDue, shareLines, list };
 
   const backBtn = document.getElementById('cdBackBtn');
   backBtn.style.display = custDetailReturnTo === 'permCustList' ? 'block' : 'none';
 
-  const shareRow = document.getElementById('cdShareRow');
   const waBtn = document.getElementById('cdWhatsapp');
+  const smsBtn = document.getElementById('cdSms');
   if(phone){
-    shareRow.style.display = 'flex';
+    waBtn.style.display = '';
+    smsBtn.style.display = '';
     let digits = phone.replace(/\D/g,'');
     waBtn.href = `https://wa.me/${digits}?text=${encodeURIComponent(buildDetailShareMessage())}`;
   } else {
-    shareRow.style.display = 'none';
+    waBtn.style.display = 'none';
+    smsBtn.style.display = 'none';
   }
 
   custDetailModal.classList.add('show');
@@ -6521,6 +6528,51 @@ document.getElementById('cdSms').addEventListener('click', ()=>{
   if(!detailCtx || !detailCtx.phone) return;
   window.location.href = `sms:${detailCtx.phone}?body=${encodeURIComponent(buildDetailShareMessage())}`;
   custDetailModal.classList.remove('show');
+});
+
+document.getElementById('cdPrint').addEventListener('click', ()=>{
+  if(!detailCtx) return;
+  const { name, phone, mode, totalPrice, totalPaid, totalDue, list } = detailCtx;
+  const titleMap = { sales: '📦 Sales — ', today: '📅 আজকের সব সেল — ' };
+  const title = (titleMap[mode] || '📋 Full Account — ') + name;
+  const dateStr = new Date().toLocaleDateString('bn-BD', {day:'numeric', month:'long', year:'numeric'});
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  const rows = (list||[]).map((e,i)=>{
+    const d = new Date(e.date).toLocaleDateString('bn-BD', {day:'numeric', month:'short', year:'numeric'});
+    return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(e.item)}</td><td style="border:1px solid #ccc; padding:8px;">${e.status}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(e.price)}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(e.paid)}</td><td style="border:1px solid #ccc; padding:8px;">${d}</td></tr>`;
+  }).join('');
+  const printArea = document.getElementById('cdPrintArea');
+  printArea.innerHTML = `
+    <div style="padding:24px; font-family:sans-serif; color:#111;">
+      <h2 style="margin:0 0 4px;">${title}</h2>
+      ${shopName ? `<p style="margin:0 0 2px; color:#555;">${escapeHtml(shopName)}</p>` : ''}
+      <p style="margin:0 0 4px; color:#555;">তারিখ: ${dateStr}</p>
+      ${phone ? `<p style="margin:0 0 16px; color:#555;">📞 ${escapeHtml(phone)}</p>` : ''}
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ccc; padding:8px; text-align:left;">#</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">আইটেম</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">স্ট্যাটাস</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">দাম</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">জমা</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">তারিখ</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="6" style="border:1px solid #ccc; padding:8px;">কোনো হিসাব পাওয়া যায়নি</td></tr>'}</tbody>
+      </table>
+      <p style="margin-top:16px; font-weight:bold;">Total Price: ${fmt(totalPrice)} · Total Received: ${fmt(totalPaid)} · Total Due: ${fmt(totalDue)}</p>
+    </div>`;
+  printArea.classList.add('printing');
+  window.print();
+  setTimeout(()=> printArea.classList.remove('printing'), 500);
+});
+
+document.getElementById('cdDownload').addEventListener('click', ()=>{
+  if(!detailCtx) return;
+  const { name, list } = detailCtx;
+  let csv = 'Item,Status,Price,Received,Due,Date\n';
+  (list||[]).forEach(e=>{
+    const d = new Date(e.date).toISOString().slice(0,10);
+    const due = Math.max((e.price||0)-(e.paid||0),0);
+    csv += `"${(e.item||'').replace(/"/g,'""')}","${e.status||''}",${e.price||0},${e.paid||0},${due},${d}\n`;
+  });
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}-account.csv`;
+  a.click();
 });
 
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
