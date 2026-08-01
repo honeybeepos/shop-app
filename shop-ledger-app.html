@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{
     --ink:#1c1a17;
@@ -410,6 +411,8 @@
     #empSalesPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #cdPrintArea.printing, #cdPrintArea.printing *{visibility:visible;}
     #cdPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
+    #permCustPrintArea.printing, #permCustPrintArea.printing *{visibility:visible;}
+    #permCustPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     .no-print{display:none !important;}
   }
 </style>
@@ -938,14 +941,19 @@
 <div id="cdPrintArea"></div>
 
 <div class="modal-overlay" id="permCustListModal">
-  <div class="modal-box" style="max-width:400px; text-align:left; max-height:85vh; display:flex; flex-direction:column;">
-    <h3 style="margin:0 0 4px;">👥 পার্মানেন্ট কাস্টমার লিস্ট</h3>
+  <div class="modal-box" style="max-width:400px; text-align:left; max-height:85vh; display:flex; flex-direction:column; position:relative;">
+    <button id="permCustCornerCloseBtn" style="position:absolute; top:10px; right:10px; width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:16px; line-height:1; cursor:pointer; color:#555;">✕</button>
+    <h3 style="margin:0 22px 4px 0;">👥 পার্মানেন্ট কাস্টমার লিস্ট</h3>
     <p class="pin-desc" style="margin:0 0 10px;">মোট <b id="permCustCount">0</b> জন কাস্টমার নাম-নাম্বার দিয়ে সেভ করা আছে। নামের উপর চেপে ধরলে এডিট/ডিলেট অপশন আসবে।</p>
     <input type="text" id="permCustSearch" placeholder="🔍 নাম বা নাম্বার দিয়ে খুঁজুন..." style="width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; margin-bottom:10px;">
     <div id="permCustListRows" style="overflow-y:auto; flex:1; min-height:60px;"></div>
-    <button class="mini-btn" id="permCustCloseBtn" style="width:100%; margin-top:12px;">বন্ধ করুন</button>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;">
+      <button class="mini-btn" id="permCustDownloadBtn">⬇️ Download (PDF)</button>
+      <button class="mini-btn" id="permCustPrintBtn">🖨️ Print</button>
+    </div>
   </div>
 </div>
+<div id="permCustPrintArea"></div>
 
 <div class="modal-overlay" id="inactiveCustModal">
   <div class="modal-box" style="max-width:400px; text-align:left; max-height:85vh; display:flex; flex-direction:column;">
@@ -6177,13 +6185,18 @@ custDetailModal.addEventListener('click', (ev)=>{
 /* ================= Permanent Customer List (Monitoring > Total Customer) ================= */
 const permCustListModal = document.getElementById('permCustListModal');
 
-function renderPermCustList(query){
+function getFilteredPermCustList(query){
   const q = (query||'').trim().toLowerCase();
   let list = shopCustomers.slice();
   if(q) list = list.filter(c => (c.name||'').toLowerCase().includes(q) || (c.phone||'').includes(q));
   list.sort((a,b)=> (a.name||'').localeCompare(b.name||'', 'bn'));
-  document.getElementById('permCustCount').textContent = shopCustomers.length;
+  return list;
+}
+
+function renderPermCustList(query){
   const rowsEl = document.getElementById('permCustListRows');
+  const list = getFilteredPermCustList(query);
+  document.getElementById('permCustCount').textContent = shopCustomers.length;
   rowsEl.innerHTML = list.length ? list.map(c=>{
     const due = getCustomerTotalDue(c.name, c.phone);
     return `<div class="perm-cust-row" data-name="${escapeHtml(c.name)}" data-phone="${escapeHtml(c.phone||'')}" style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 4px; border-bottom:1px solid var(--line); cursor:pointer;">
@@ -6195,6 +6208,69 @@ function renderPermCustList(query){
     </div>`;
   }).join('') : '<div class="empty">কোনো কাস্টমার পাওয়া যায়নি</div>';
 }
+
+document.getElementById('permCustPrintBtn').addEventListener('click', ()=>{
+  const list = getFilteredPermCustList(permCustLastQuery);
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  const dateStr = new Date().toLocaleDateString('bn-BD', {day:'numeric', month:'long', year:'numeric'});
+  const rows = list.map((c,i)=>{
+    const due = getCustomerTotalDue(c.name, c.phone);
+    const dueLabel = due>0 ? `বাকি ${fmt(due)}` : 'পরিশোধিত ✅';
+    return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(c.name)}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(c.phone||'-')}</td><td style="border:1px solid #ccc; padding:8px;">${dueLabel}</td></tr>`;
+  }).join('');
+  const printArea = document.getElementById('permCustPrintArea');
+  printArea.innerHTML = `
+    <div style="padding:24px; font-family:sans-serif; color:#111;">
+      <h2 style="margin:0 0 4px;">👥 পার্মানেন্ট কাস্টমার লিস্ট</h2>
+      ${shopName ? `<p style="margin:0 0 2px; color:#555;">${escapeHtml(shopName)}</p>` : ''}
+      <p style="margin:0 0 16px; color:#555;">তারিখ: ${dateStr} · মোট ${list.length} জন কাস্টমার</p>
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ccc; padding:8px; text-align:left;">#</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">নাম</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">নাম্বার</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">অবস্থা</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" style="border:1px solid #ccc; padding:8px;">কোনো কাস্টমার পাওয়া যায়নি</td></tr>'}</tbody>
+      </table>
+    </div>`;
+  printArea.classList.add('printing');
+  window.print();
+  setTimeout(()=> printArea.classList.remove('printing'), 500);
+});
+
+document.getElementById('permCustDownloadBtn').addEventListener('click', ()=>{
+  const list = getFilteredPermCustList(permCustLastQuery);
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || 'Customer List';
+  const dateStr = new Date().toLocaleDateString('en-GB');
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(shopName, 14, 16);
+    doc.setFontSize(12);
+    doc.text('Permanent Customer List', 14, 24);
+    doc.setFontSize(10);
+    doc.text(`Date: ${dateStr}  ·  Total: ${list.length}`, 14, 30);
+    let y = 40;
+    doc.setFontSize(11);
+    doc.text('#', 14, y);
+    doc.text('Name', 24, y);
+    doc.text('Phone', 100, y);
+    doc.text('Status', 155, y);
+    y += 4;
+    doc.line(14, y, 196, y);
+    y += 6;
+    list.forEach((c,i)=>{
+      if(y > 280){ doc.addPage(); y = 20; }
+      const due = getCustomerTotalDue(c.name, c.phone);
+      const statusText = due>0 ? `Due ${due}` : 'Paid';
+      doc.text(String(i+1), 14, y);
+      doc.text((c.name||'').slice(0,35), 24, y);
+      doc.text(c.phone||'-', 100, y);
+      doc.text(statusText, 155, y);
+      y += 7;
+    });
+    doc.save(`${shopName.replace(/[^a-zA-Z0-9]/g,'_')}-customer-list.pdf`);
+  }catch(err){
+    toast('PDF তৈরি করা যায়নি, আবার চেষ্টা করুন');
+  }
+});
 
 document.getElementById('monTotalCustomerCard').addEventListener('click', ()=>{
   if(monTotalCustLongPressFired){ monTotalCustLongPressFired = false; return; }
@@ -6212,7 +6288,7 @@ document.getElementById('permCustListRows').addEventListener('click', (ev)=>{
   custDetailReturnTo = 'permCustList';
   openCustDetail(row.dataset.name, row.dataset.phone, 'full');
 });
-document.getElementById('permCustCloseBtn').addEventListener('click', ()=> permCustListModal.classList.remove('show'));
+document.getElementById('permCustCornerCloseBtn').addEventListener('click', ()=> permCustListModal.classList.remove('show'));
 permCustListModal.addEventListener('click', (ev)=>{
   if(ev.target === permCustListModal) permCustListModal.classList.remove('show');
 });
