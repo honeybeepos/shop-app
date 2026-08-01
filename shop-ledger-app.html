@@ -1062,6 +1062,17 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="exitConfirmModal">
+  <div class="modal-box" style="max-width:320px; text-align:center;">
+    <h3 style="margin:0 0 10px;">🚪 অ্যাপ থেকে বের হবেন?</h3>
+    <p class="pin-desc" style="margin:0 0 18px;">আপনি কি সত্যিই অ্যাপটি বন্ধ করতে চান?</p>
+    <div style="display:flex; gap:10px;">
+      <button class="mini-btn" id="exitNoBtn" style="flex:1;">না</button>
+      <button class="btn" id="exitYesBtn" style="flex:1; margin-top:0;">হ্যাঁ</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="pinModal">
   <div class="modal-box">
     <h3 id="pinTitle">পাসওয়ার্ড দিন</h3>
@@ -2104,7 +2115,7 @@
       <div class="bccModalBody">
         <label>📝 Product Name</label><input id="bccPName" placeholder="যেমন: Samsung A32 Display">
         <label>🔤 Product Number / Code (Optional)</label><input id="bccPCode" placeholder="যেমন: F-1001">
-        <label>🏷️ Category <span style="color:#c0392b;">*</span></label><select id="bccPCat"></select>
+        <label>🏷️ Category (Optional)</label><select id="bccPCat"></select>
         <p class="pin-desc" style="margin:2px 0 10px;">ক্যাটাগরি সিলেক্ট করা বাধ্যতামূলক (এটাই Invoice-এ Brand হিসেবে দেখানো হয়)।</p>
         <label>📂 Sub-Category</label><select id="bccPSub"></select>
         <div class="bccTwoCol">
@@ -2452,6 +2463,48 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
   });
+});
+
+/* ব্যাক বাটন হ্যান্ডলিং: ড্যাশবোর্ডে থাকা অবস্থায় ব্যাক চাপলে সরাসরি বন্ধ হয়ে না গিয়ে
+   "হ্যাঁ/না" কনফার্মেশন দেখাবে। কনফার্মেশন খোলা অবস্থায় আবার ব্যাক চাপলে সেটা শুধু
+   পপআপ লুকিয়ে দেবে (অ্যাপ বন্ধ হবে না)। অন্য কোনো ট্যাবে থাকলে ব্যাক চাপলে
+   প্রথমে ড্যাশবোর্ডে ফিরিয়ে আনবে। */
+let exitModalOpen = false;
+history.pushState({appBackTrap:true}, '', location.href);
+
+window.addEventListener('popstate', ()=>{
+  const exitModal = document.getElementById('exitConfirmModal');
+  if(exitModalOpen){
+    exitModal.classList.remove('show');
+    exitModalOpen = false;
+    history.pushState({appBackTrap:true}, '', location.href);
+    return;
+  }
+  const onDash = document.querySelector('.tab-btn[data-tab="dash"]').classList.contains('active');
+  if(onDash){
+    exitModal.classList.add('show');
+    exitModalOpen = true;
+    history.pushState({appBackTrap:true}, '', location.href);
+  } else {
+    document.querySelector('.tab-btn[data-tab="dash"]').click();
+    history.pushState({appBackTrap:true}, '', location.href);
+  }
+});
+
+document.getElementById('exitNoBtn').addEventListener('click', ()=>{
+  document.getElementById('exitConfirmModal').classList.remove('show');
+  exitModalOpen = false;
+});
+
+document.getElementById('exitYesBtn').addEventListener('click', ()=>{
+  document.getElementById('exitConfirmModal').classList.remove('show');
+  exitModalOpen = false;
+  if(window.navigator && window.navigator.app && window.navigator.app.exitApp){
+    window.navigator.app.exitApp();
+  } else {
+    window.close();
+    setTimeout(()=>{ history.go(-(history.length)); }, 100);
+  }
 });
 
 function openMiniProgram(id){
@@ -4034,7 +4087,6 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
   const name = document.getElementById('bccPName').value.trim();
   if(!name){ toast('প্রোডাক্টের নাম দিন'); return; }
   const catId = document.getElementById('bccPCat').value;
-  if(!catId){ toast('ক্যাটাগরি সিলেক্ট করা বাধ্যতামূলক'); return; }
   const prods = bccLoadProducts();
   const enteredQty = Number(document.getElementById('bccPQty').value)||0;
   const enteredBuy = Number(document.getElementById('bccPBuy').value)||0;
