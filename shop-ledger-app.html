@@ -209,9 +209,9 @@
   .smartSuggestItem:first-child{ border-top:none; }
   .smartSuggestItem:hover, .smartSuggestItem:active{ background:#faf5ea; }
   .smartSuggestItem .badge{ order:1; font-size:10px; font-weight:700; padding:3px 7px; border-radius:8px; background:#e7f0ee; color:#1f6f6b; white-space:nowrap; flex-shrink:0; }
-  .smartSuggestItem .code{ order:2; font-size:10.5px; font-weight:600; color:#8a6d3b; font-family:'Space Mono',monospace; white-space:nowrap; flex-shrink:0; }
-  .smartSuggestItem .stk{ order:3; margin-left:auto; font-size:11px; color:#8a7f6c; font-family:'Space Mono',monospace; white-space:nowrap; flex-shrink:0; }
-  .smartSuggestItem .nm{ order:4; flex:1 1 100%; font-size:13px; color:#2b2620; white-space:normal; overflow-wrap:break-word; word-break:break-word; }
+  .smartSuggestItem .stk{ order:2; margin-left:auto; font-size:11px; color:#8a7f6c; font-family:'Space Mono',monospace; white-space:nowrap; flex-shrink:0; }
+  .smartSuggestItem .nm{ order:3; flex:1 1 100%; font-size:13px; color:#2b2620; white-space:normal; overflow-wrap:break-word; word-break:break-word; }
+  .smartSuggestItem .code{ order:4; flex:1 1 100%; font-size:13px; font-weight:700; color:#8a6d3b; font-family:'Space Mono',monospace; white-space:normal; overflow-wrap:break-word; word-break:break-word; }
   .smartSuggestItem .stk.low{ color:#c0392b; font-weight:700; }
   .smartSuggestEmpty{ padding:14px; text-align:center; color:#8a7f6c; font-size:12.5px; }
 
@@ -3778,10 +3778,9 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
   const DIVIDER = '----------------------------------';
 
   const itemBlocks = billItems.map((it, idx) => {
-    const { model, category, subcategory } = getProductDetails(it.item, it.productId);
+    const { model, category } = getProductDetails(it.item, it.productId);
     const lines = [`Item ${idx + 1}`, `Product : ${model}`];
     if(category) lines.push(`Category: ${category}`);
-    if(subcategory) lines.push(`Sub-category: ${subcategory}`);
     lines.push(`Quantity: ${it.qty}`);
     lines.push(`Unit Price: SAR ${it.unitPrice}`);
     lines.push(`Amount: SAR ${it.price}`);
@@ -3789,14 +3788,7 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
     return lines.join('\n');
   }).join(`\n\n${DIVIDER}\n\n`);
 
-  let msg = `🧾 SALES INVOICE\n\n${shopName}\n\nInvoice No: ${invoiceNo || nextInvoiceNumber()}\nDate: ${dateStr}\nTime: ${timeStr}\n\nCustomer Name: ${name}\nPhone: ${phone || '-'}\n\n${DIVIDER}\n\n${itemBlocks}\n\n${DIVIDER}\n\nTotal Bill : SAR ${billTotalPrice}\nReceived   : SAR ${paid}`;
-
-  if(previousDueItems && previousDueItems.length){
-    const dueLines = previousDueItems.map(d => `${formatInvoiceDate(d.date)} — ${d.label} — SAR ${d.due}`).join('\n');
-    msg += `\n\n${DIVIDER}\nPrevious Due Details\n${DIVIDER}\n${dueLines}\nPrevious Due Total: SAR ${previousDue}`;
-  } else {
-    msg += `\nPrevious Due : SAR ${previousDue}`;
-  }
+  let msg = `🧾 SALES INVOICE\n\n${shopName}\n\nInvoice No: ${invoiceNo || nextInvoiceNumber()}\nDate: ${dateStr}\nTime: ${timeStr}\n\nCustomer Name: ${name}\nPhone: ${phone || '-'}\n\n${DIVIDER}\n\n${itemBlocks}\n\n${DIVIDER}\n\nTotal Bill : SAR ${billTotalPrice}\nReceived   : SAR ${paid}\nPrevious Due : SAR ${previousDue}`;
 
   msg += `\n\n${DIVIDER}\n\nCurrent Due : SAR ${currentDue}\n\nThank you for shopping with us.\n${shopName}`;
 
