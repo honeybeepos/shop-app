@@ -5359,7 +5359,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     let extraNote = (cashBack==='yes' ? `Cash return: SAR ${value}` : `SAR ${value} deducted from balance.`) + (condition==='bad' ? ' [খারাপ/নষ্ট মাল — স্টকে যোগ হয়নি]' : ' [ভালো মাল — স্টকে যোগ হয়েছে]');
     if(cashBack === 'no' && value>0){ allocateDuePayment(name, phone, value); }
 
-    retailEntries.unshift({ id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, note: (note ? note+' — ' : '')+extraNote, status, condition, date: new Date().toISOString(), soldBy: currentSalesPersonName() });
+    retailEntries.unshift({ id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, returnValue: value, cashBack, note: (note ? note+' — ' : '')+extraNote, status, condition, date: new Date().toISOString(), soldBy: currentSalesPersonName() });
     // ফেরত দেওয়া মাল "ভালো" হলে স্টকে ফেরত যোগ হবে, "খারাপ/নষ্ট" হলে স্টকে যোগ হবে না
     if(condition === 'bad'){
       toast(`"${item}" খারাপ/নষ্ট হিসেবে চিহ্নিত হয়েছে, তাই স্টকে যোগ হয়নি`);
@@ -5397,12 +5397,13 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
 
     allocateDuePayment(name, phone, amount);
     
-    retailEntries.unshift({ id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, date: new Date().toISOString(), soldBy: currentSalesPersonName() });
+    retailEntries.unshift({ id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, depositAmount: amount, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, date: new Date().toISOString(), soldBy: currentSalesPersonName() });
     
     const isCleared = isCustomerFullyPaid(name, phone);
+    const changeBack = Math.max(amount - previousDue, 0);
     let msg = "";
     if(isCleared) {
-      msg = `Dear ${name},\n\nWe have received your payment of SAR ${amount}.\n\nYour balance has been fully paid (Previous Due: SAR ${previousDue}). Thank you so much for doing business with us. Have a great day! — Mumen Electronics.`;
+      msg = `Dear ${name},\n\nWe have received your payment of SAR ${amount}.\n\nYour balance has been fully paid (Previous Due: SAR ${previousDue}).` + (changeBack > 0 ? `\n\nExcess amount refunded/payable to you: SAR ${changeBack}` : '') + `\n\nThank you so much for doing business with us. Have a great day! — Mumen Electronics.`;
     } else {
       const currentDue = getCustomerTotalDue(name, phone);
       msg = `Dear ${name},\n\nWe have received your payment of SAR ${amount}.\n\nPrevious Due: SAR ${previousDue}\nRemaining Due: SAR ${currentDue}\n\nThank you — Mumen Electronics.`;
@@ -6488,8 +6489,28 @@ function openCustDetail(name, phone, mode){
       const shareQtyLine = e.qty && e.qty>1 ? `\n${e.qty} pcs × ${fmt(getUnitPrice(e))} = ${fmt(e.price)}` : '';
       const shareCatLine = catLabel ? `\n📂 ${catLabel}` : '';
       const shareNoteLine = (isNonSale && e.note) ? `\n📝 ${e.note}` : '';
-      shareLines.push(`${e.item} — ${fmt(e.price)}${shareCatLine}${shareQtyLine}\n${e.status} · ${dateStr}\nReceived: ${fmt(e.paid)}${shareNoteLine}`);
-      return `<div class="stmt-row"><div><div>${escapeHtml(e.item)}</div>${catLine}${qtyLine}<div class="meta">${e.status} · ${dateStr}</div>${noteLine}</div><div style="text-align:right;"><div>${fmt(e.price)}</div><div class="meta">Received: ${fmt(e.paid)}</div></div></div>`;
+
+      // নগদ (জমা) ও ফেরত এন্ট্রির নিজস্ব price/paid ফিল্ড সবসময় ০ থাকে (এগুলো বিক্রির
+      // দাম না), তাই আসল অংক দেখানোর জন্য স্ট্রাকচার্ড ফিল্ড (depositAmount/returnValue)
+      // থেকে সঠিক পরিমাণ বের করে দেখানো হচ্ছে — মূল টোটাল হিসাব (price/paid) অপরিবর্তিত থাকছে।
+      let displayAmount = fmt(e.price);
+      let displaySub = `Received: ${fmt(e.paid)}`;
+      let shareAmount = fmt(e.price);
+      let shareSub = `Received: ${fmt(e.paid)}`;
+      if(e.status === 'নগদ'){
+        displayAmount = fmt(e.depositAmount||0);
+        displaySub = 'জমা নেওয়া হয়েছে';
+        shareAmount = fmt(e.depositAmount||0);
+        shareSub = 'জমা নেওয়া হয়েছে';
+      } else if(e.status === 'ফেরত'){
+        displayAmount = fmt(e.returnValue||0);
+        displaySub = e.cashBack === 'yes' ? 'নগদ ফেরত দেওয়া হয়েছে' : 'বাকি থেকে কর্তন করা হয়েছে';
+        shareAmount = fmt(e.returnValue||0);
+        shareSub = displaySub;
+      }
+
+      shareLines.push(`${e.item} — ${shareAmount}${shareCatLine}${shareQtyLine}\n${e.status} · ${dateStr}\n${shareSub}${shareNoteLine}`);
+      return `<div class="stmt-row"><div><div>${escapeHtml(e.item)}</div>${catLine}${qtyLine}<div class="meta">${e.status} · ${dateStr}</div>${noteLine}</div><div style="text-align:right;"><div>${displayAmount}</div><div class="meta">${displaySub}</div></div></div>`;
     }).join('');
 
     document.getElementById('cdTotals').innerHTML = `<div><span>Total Price</span><span>${fmt(totalPrice)}</span></div><div><span>Total Received</span><span>${fmt(totalPaid)}</span></div><div class="grand"><span>Total Due</span><span>${fmt(totalDue)}</span></div>` + (mode==='sales' ? '<p class="pin-desc" style="margin-top:8px;">* শুধু বিক্রি/বদলি এন্ট্রি দেখানো হচ্ছে। ফেরত/জমা সহ সম্পূর্ণ হিসাবের জন্য Full Account দেখুন।</p>' : '');
@@ -6545,7 +6566,10 @@ document.getElementById('cdPrint').addEventListener('click', ()=>{
     const d = new Date(e.date).toLocaleDateString('bn-BD', {day:'numeric', month:'short', year:'numeric'});
     const isNonSale = !SALE_STATUSES.includes(e.status);
     const noteText = (isNonSale && e.note) ? e.note : '';
-    return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(e.item)}</td><td style="border:1px solid #ccc; padding:8px;">${e.status}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(e.price)}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(e.paid)}</td><td style="border:1px solid #ccc; padding:8px;">${d}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(noteText)}</td></tr>`;
+    let priceCell = fmt(e.price), paidCell = fmt(e.paid);
+    if(e.status === 'নগদ'){ priceCell = fmt(e.depositAmount||0); paidCell = 'জমা'; }
+    else if(e.status === 'ফেরত'){ priceCell = fmt(e.returnValue||0); paidCell = e.cashBack === 'yes' ? 'নগদ ফেরত' : 'বাকি কর্তন'; }
+    return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(e.item)}</td><td style="border:1px solid #ccc; padding:8px;">${e.status}</td><td style="border:1px solid #ccc; padding:8px;">${priceCell}</td><td style="border:1px solid #ccc; padding:8px;">${paidCell}</td><td style="border:1px solid #ccc; padding:8px;">${d}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(noteText)}</td></tr>`;
   }).join('');
   const printArea = document.getElementById('cdPrintArea');
   printArea.innerHTML = `
@@ -6574,7 +6598,10 @@ document.getElementById('cdDownload').addEventListener('click', ()=>{
     const due = Math.max((e.price||0)-(e.paid||0),0);
     const isNonSale = !SALE_STATUSES.includes(e.status);
     const noteText = (isNonSale && e.note) ? e.note : '';
-    csv += `"${(e.item||'').replace(/"/g,'""')}","${e.status||''}",${e.price||0},${e.paid||0},${due},${d},"${noteText.replace(/"/g,'""')}"\n`;
+    let priceVal = e.price||0, paidVal = e.paid||0;
+    if(e.status === 'নগদ'){ priceVal = e.depositAmount||0; paidVal = e.depositAmount||0; }
+    else if(e.status === 'ফেরত'){ priceVal = e.returnValue||0; paidVal = e.cashBack === 'yes' ? (e.returnValue||0) : 0; }
+    csv += `"${(e.item||'').replace(/"/g,'""')}","${e.status||''}",${priceVal},${paidVal},${due},${d},"${noteText.replace(/"/g,'""')}"\n`;
   });
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
   const a = document.createElement('a');
