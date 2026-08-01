@@ -1779,6 +1779,10 @@
       </div>
       <div class="monSectionTitle">❌ Out of Stock Products</div>
       <div class="glassList" id="monOutOfStockList"></div>
+      <div class="monSectionTitle">🗓️ আজকের প্রোডাক্ট সেল</div>
+      <div class="glassList" id="monTodayProductSale"></div>
+      <div class="monSectionTitle">📅 সাপ্তাহিক প্রোডাক্ট সেল</div>
+      <div class="glassList" id="monWeeklyProductSale"></div>
     </div>
 
     <div class="monSection" id="mtab-customer" style="display:none;">
@@ -6754,6 +6758,8 @@ function monRenderAll(){
 
   let todaySales=0, weeklySales=0, monthlySales=0, allTimeSales=0, totalProductSold=0, totalPaidAll=0, totalDueAll=0, totalProfitAll=0;
   const itemSoldMap = {};
+  const itemSoldTodayMap = {};
+  const itemSoldWeekMap = {};
   const returnsList = [];
   const billMap = {};
 
@@ -6767,6 +6773,8 @@ function monRenderAll(){
     if(SALE_STATUSES.includes(e.status)){
       totalProductSold += (e.qty||0);
       itemSoldMap[e.item] = (itemSoldMap[e.item]||0) + (e.qty||0);
+      if(d.toDateString() === todayStr) itemSoldTodayMap[e.item] = (itemSoldTodayMap[e.item]||0) + (e.qty||0);
+      if(d >= weekAgo) itemSoldWeekMap[e.item] = (itemSoldWeekMap[e.item]||0) + (e.qty||0);
       allTimeSales += (e.price||0);
       if(d.toDateString() === todayStr) todaySales += (e.price||0);
       if(d >= weekAgo) weeklySales += (e.price||0);
@@ -6796,6 +6804,16 @@ function monRenderAll(){
   const oosHtml = outOfStock.length ? outOfStock.map(p=>`<div class="glassRow"><span class="nm">${escapeHtml(p.name)}</span><span class="amt red">০ স্টক</span></div>`).join('') : `<div class="glassEmpty">সব প্রোডাক্টে স্টক আছে ✅</div>`;
   document.getElementById('monOutOfStockList').innerHTML = oosHtml;
   document.getElementById('monAlertOutOfStock').innerHTML = oosHtml;
+
+  const todayProductSale = Object.entries(itemSoldTodayMap).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('monTodayProductSale').innerHTML = todayProductSale.length ? todayProductSale.map(([nm,qty])=>`
+    <div class="glassRow"><span class="nm">${escapeHtml(nm)}</span><span class="amt">${qty} pcs</span></div>
+  `).join('') : `<div class="glassEmpty">আজকে এখনো কোনো প্রোডাক্ট বিক্রি হয়নি</div>`;
+
+  const weeklyProductSale = Object.entries(itemSoldWeekMap).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('monWeeklyProductSale').innerHTML = weeklyProductSale.length ? weeklyProductSale.map(([nm,qty])=>`
+    <div class="glassRow"><span class="nm">${escapeHtml(nm)}</span><span class="amt">${qty} pcs</span></div>
+  `).join('') : `<div class="glassEmpty">গত ৭ দিনে কোনো প্রোডাক্ট বিক্রি হয়নি</div>`;
 
   document.getElementById('monTotalCustomer').textContent = shopCustomers.length;
   document.getElementById('monTotalPaid').textContent = fmt(totalPaidAll);
