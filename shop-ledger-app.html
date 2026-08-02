@@ -2259,6 +2259,27 @@
 <script>
 let retailEntries = [];
 let shopCustomers = [];
+// "ডিলিট করা কিছু যেন ফিরে না আসে" — মাল্টি-ডিভাইস ক্লাউড সিঙ্কের কারণে মাঝে মাঝে ডিলিট করা
+// এন্ট্রি/কাস্টমার আবার ফিরে আসতে পারে (এক ডিভাইসে ডিলিট হওয়ার পর অন্য ডিভাইসের পুরনো ডেটা
+// সিঙ্ক হয়ে সেটা রিস্টোর করে ফেলে)। তাই ডিলিট হওয়া আইডি/কাস্টমার এখানে স্থায়ীভাবে (tombstone
+// হিসেবে) সেভ রাখা হয় এবং প্রতিবার ডেটা লোড/সেভ করার সময় এই লিস্টে থাকা আইটেম বাদ দেওয়া হয়,
+// যাতে সিঙ্কের কারণে সেগুলো আর কখনো ফিরে না আসে।
+function loadDeletedEntryIds(){ try{ return JSON.parse(localStorage.getItem('phone-shop-deleted-entry-ids')||'[]'); }catch(e){ return []; } }
+function saveDeletedEntryIds(ids){ localStorage.setItem('phone-shop-deleted-entry-ids', JSON.stringify(ids)); }
+function loadDeletedCustomerKeys(){ try{ return JSON.parse(localStorage.getItem('phone-shop-deleted-customer-keys')||'[]'); }catch(e){ return []; } }
+function saveDeletedCustomerKeys(keys){ localStorage.setItem('phone-shop-deleted-customer-keys', JSON.stringify(keys)); }
+function custKey(name, phone){ return (phone ? phone : '') + '|' + (name||''); }
+let deletedEntryIds = loadDeletedEntryIds();
+let deletedCustomerKeys = loadDeletedCustomerKeys();
+function stripTombstonedData(){
+  if(deletedEntryIds.length){
+    retailEntries = retailEntries.filter(e => !deletedEntryIds.includes(e.id));
+  }
+  if(deletedCustomerKeys.length){
+    retailEntries = retailEntries.filter(e => !deletedCustomerKeys.includes(custKey(e.name, e.phone)));
+    shopCustomers = shopCustomers.filter(c => !deletedCustomerKeys.includes(custKey(c.name, c.phone)));
+  }
+}
 let systemMasterPin = "12345";
 const uiToast = document.getElementById('toast');
 
@@ -2405,6 +2426,12 @@ async function loadSystemData(){
     const pRes = localStorage.getItem('phone-shop-pin');
     if(pRes) systemMasterPin = JSON.parse(pRes);
     else localStorage.setItem('phone-shop-pin', JSON.stringify(systemMasterPin));
+
+    // অন্য ডিভাইস থেকে সিঙ্ক হয়ে আসা ডেটাতেও যদি আগে ডিলিট করা কিছু চলে আসে,
+    // এখানেই সেটা আবার বাদ দিয়ে দেওয়া হচ্ছে।
+    deletedEntryIds = loadDeletedEntryIds();
+    deletedCustomerKeys = loadDeletedCustomerKeys();
+    stripTombstonedData();
   }catch(e){
     console.error(e);
   }
@@ -2479,6 +2506,7 @@ async function confirmCloudSave(){
 }
 
 async function persistData(){
+  stripTombstonedData();
   localStorage.setItem('phone-shop-customers', JSON.stringify(shopCustomers));
   localStorage.setItem('phone-shop-entries', JSON.stringify(retailEntries));
   await confirmCloudSave();
@@ -5868,6 +5896,8 @@ async function deleteEntry(id){
   if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, হিসাব মোছা হয়নি'); return; }
   
   retailEntries = retailEntries.filter(x=>x.id!==id);
+  deletedEntryIds.push(id);
+  saveDeletedEntryIds(deletedEntryIds);
   await persistData();
   render();
   toast('এন্ট্রি মুছে ফেলা হয়েছে');
@@ -6385,6 +6415,8 @@ document.getElementById('pcaDeleteBtn').addEventListener('click', async ()=>{
 
   shopCustomers = shopCustomers.filter(c => !matchC(c));
   retailEntries = retailEntries.filter(e => !matchE(e));
+  deletedCustomerKeys.push(custKey(target.name, target.phone));
+  saveDeletedCustomerKeys(deletedCustomerKeys);
 
   try{
     let eiList = JSON.parse(localStorage.getItem('bcc-extra-income')||'[]');
@@ -7408,7 +7440,23 @@ auth.onAuthStateChanged(async (user)=>{
   updateNetLabel();
 
   if("serviceWorker" in navigator){
-    navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+    navigator.serviceWorker.register("service-worker.js").then((reg)=>{
+      // প্রতি ৫ মিনিট পরপর, আর ট্যাব আবার সামনে আসলেই, নতুন ভার্সন আছে কিনা চেক করে
+      setInterval(()=> reg.update().catch(()=>{}), 5*60*1000);
+      document.addEventListener("visibilitychange", ()=>{
+        if(document.visibilityState === "visible") reg.update().catch(()=>{});
+      });
+    }).catch(()=>{});
+
+    // নতুন সার্ভিস ওয়ার্কার একটিভ হওয়া মাত্রই (মানে নতুন কোড এসে গেছে) পেজটা
+    // নিজে থেকেই একবার রিফ্রেশ হয়ে যাবে, যাতে ইউজার সাথে সাথেই নতুন ভার্সন পায়
+    // — ম্যানুয়ালি ক্যাশ ক্লিয়ার করার দরকার হবে না।
+    let __swRefreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+      if(__swRefreshing) return;
+      __swRefreshing = true;
+      window.location.reload();
+    });
   }
 
   enableAutoSync(session.shopId);
