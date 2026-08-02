@@ -177,8 +177,13 @@ async function pushLocalStorageToCloud() {
      এই কারণে push করার আগে ক্লাউডে বর্তমানে কী আছে সেটা একবার দেখে নেওয়া হয়।
      ডিলিট-লিস্ট (tombstone) সবসময় স্থানীয় + ক্লাউড দুটোর "ইউনিয়ন" রাখা হয় (কখনো
      ছোট/হারিয়ে যায় না), এবং সেই মার্জ করা লিস্ট দিয়ে এন্ট্রি/কাস্টমার লিস্ট থেকেও
-     ডিলিট হওয়া জিনিস বাদ দেওয়া হয় — এই ডিভাইসের ডেটা স্টেল (পুরনো) থাকলেও যেন
-     অন্য ডিভাইসের সাম্প্রতিক ডিলিট ভুলবশত ওভাররাইট না হয়ে যায়। */
+     ডিলিট হওয়া জিনিস বাদ দেওয়া হয়।
+
+     গুরুত্বপূর্ণ: এই ধাপটা (আগে থেকে ক্লাউড ডেটা পড়া) যদি কোনো কারণে ব্যর্থ হয়
+     (যেমন পারমিশন সমস্যা — সাব-ইউজারের জন্য এই কালেকশনে read এক্সেস না থাকতে
+     পারে, বা সাময়িক নেটওয়ার্ক সমস্যা), তাহলেও যেন আসল push (নিচের set কল)
+     আটকে না যায় — তাই এটা একদম আলাদা try/catch-এ রাখা হলো এবং ব্যর্থ হলে
+     শুধু মার্জ স্কিপ করে সরাসরি push চালিয়ে যাওয়া হয়। */
   try {
     const cloudSnap = await db.collection("shops").doc(__syncShopId)
       .collection("appdata").doc("main").get();
@@ -218,7 +223,11 @@ async function pushLocalStorageToCloud() {
       if (blob["phone-shop-entries"]) __origSetItem.call(localStorage, "phone-shop-entries", blob["phone-shop-entries"]);
       if (blob["phone-shop-customers"]) __origSetItem.call(localStorage, "phone-shop-customers", blob["phone-shop-customers"]);
     }
+  } catch (mergeErr) {
+    console.warn("ডিলিট-লিস্ট মার্জ করা যায়নি, সরাসরি push করা হচ্ছে:", mergeErr);
+  }
 
+  try {
     await db.collection("shops").doc(__syncShopId)
       .collection("appdata").doc("main")
       .set({ blob: JSON.stringify(blob), updatedAt: fbNow(), updatedBy: __deviceId }, { merge: true });
