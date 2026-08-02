@@ -6,10 +6,7 @@
    অফলাইন-কিউ দিয়ে সামলায় (firebase-init.js এ enablePersistence)।
    ============================================================ */
 
-/* গুরুত্বপূর্ণ: প্রতিবার কোড আপডেট করে সার্ভারে দেওয়ার সময় এই ভার্সন নাম্বারটা
-   বাড়িয়ে দিন (v2 → v3 → v4 ...)। এটা বাড়ালে পুরনো ক্যাশ মুছে ফেলা হয় এবং
-   ইউজার নতুন ভার্সন পায়। */
-const CACHE_VERSION = "shop-app-v2";
+const CACHE_VERSION = "shop-app-v1";
 
 const APP_SHELL = [
   "login.html",
@@ -50,32 +47,9 @@ self.addEventListener("activate", (event) => {
 // Firestore/Auth-এর নিজস্ব নেটওয়ার্ক কল (googleapis.com, firestore.googleapis.com ইত্যাদি)
 // এই সার্ভিস ওয়ার্কার স্পর্শ করে না — Firestore SDK নিজেই সেগুলো অফলাইনে সামলায়।
 self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  const url = req.url;
+  const url = event.request.url;
   if (url.includes("firestore.googleapis.com") || url.includes("googleapis.com/identitytoolkit")) {
     return; // নেটওয়ার্কেই যেতে দাও, Firestore SDK নিজে ক্যাশ/রিট্রাই সামলাবে
-  }
-
-  /* HTML/পেজ রিকোয়েস্টের জন্য "নেটওয়ার্ক-ফার্স্ট": আগে সরাসরি ইন্টারনেট থেকে
-     সর্বশেষ ভার্সন আনার চেষ্টা হয়, পাওয়া গেলে সাথে সাথেই সেটা দেখানো হয় এবং
-     ক্যাশও আপডেট হয়ে যায় — তাই কোড আপডেট করলে ইউজার অনলাইনে থাকা অবস্থায়
-     পরের বার অ্যাপ খোলা/রিফ্রেশ করা মাত্রই নতুন ভার্সন পেয়ে যাবে। ইন্টারনেট
-     না থাকলে (fetch ব্যর্থ হলে) তখনই শুধু ক্যাশ থেকে পুরনো ভার্সন দেখানো হয়,
-     যাতে অফলাইনেও অ্যাপ বন্ধ না হয়ে যায়। */
-  const isNavigation = req.mode === "navigate" || req.destination === "document" || url.endsWith(".html");
-  if (isNavigation) {
-    event.respondWith(
-      fetch(req)
-        .then((res) => {
-          if (res && res.status === 200) {
-            const clone = res.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(req, clone));
-          }
-          return res;
-        })
-        .catch(() => caches.match(req))
-    );
-    return;
   }
 
   event.respondWith(
