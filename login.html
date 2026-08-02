@@ -122,12 +122,16 @@ async function afterLoginRoute(uid){
   window.location.href = "shop-ledger-app.html";
 }
 
+let __authFlowInProgress = false; // লগইন/সাইনআপ বাটন নিজে থেকে রুট করার সময় নিচের
+                                    // পুরনো-সেশন-ভিত্তিক অটো-রিডাইরেক্ট যেন গায়ে না লাগে
+
 document.getElementById("loginBtn").addEventListener("click", async ()=>{
   const email = document.getElementById("loginEmail").value.trim();
   const pass = document.getElementById("loginPass").value;
   if(!email || !pass){ showMsg("loginMsg","ইমেইল ও পাসওয়ার্ড দিন",false); return; }
   const btn = document.getElementById("loginBtn");
   btn.disabled = true; btn.textContent = "লগইন হচ্ছে...";
+  __authFlowInProgress = true;
   try{
     const cred = await auth.signInWithEmailAndPassword(email, pass);
     await clearFailedLogin(email);
@@ -168,6 +172,7 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   }
   const btn = document.getElementById("signupBtn");
   btn.disabled = true; btn.textContent = "তৈরি হচ্ছে...";
+  __authFlowInProgress = true;
   try{
     const cred = await auth.createUserWithEmailAndPassword(email, pass);
     const uid = cred.user.uid;
@@ -192,9 +197,14 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
 });
 
 // আগে থেকে লগইন থাকলে সরাসরি অ্যাপে পাঠিয়ে দাও
+// (এই লিসেনারটা লগইন বাটন ক্লিক করলেও ট্রিগার হয় — তাই দুটো গার্ড দরকার:
+//  ১) লগইন/সাইনআপ বাটন নিজে থেকে রুট করছে এমন সময় এটা কিছু করবে না, এবং
+//  ২) localStorage-এর session সত্যিই এই মুহূর্তের auth user-এরই কিনা, সেটা মিলিয়ে দেখা —
+//  নাহলে ডিভাইসে থেকে যাওয়া কোনো পুরনো/অন্য ইউজারের session দিয়ে ভুল শপে ঢুকিয়ে দিতে পারত)
 auth.onAuthStateChanged(async (user)=>{
+  if (__authFlowInProgress) return;
   const session = getSession();
-  if (user && session) {
+  if (user && session && session.uid === user.uid) {
     if (session.role === "superadmin") window.location.href = "admin.html";
     else window.location.href = "shop-ledger-app.html";
   }
