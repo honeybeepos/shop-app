@@ -229,10 +229,26 @@ async function pushLocalStorageToCloud() {
         }
       }
 
-      // প্রোডাক্ট ও ক্যাটাগরি: cloud + local দুটো মিলিয়ে (local প্রায়োরিটি পেয়ে) রাখা হচ্ছে
-      const mergedProducts = mergeArraysById(safeParseArray(cloudBlob["bcc-products"]), safeParseArray(blob["bcc-products"]));
+      const localDelProducts = safeParseArray(blob["bcc-deleted-product-ids"]);
+      const cloudDelProducts = safeParseArray(cloudBlob["bcc-deleted-product-ids"]);
+      const mergedDelProducts = Array.from(new Set([...localDelProducts, ...cloudDelProducts]));
+
+      const localDelCategories = safeParseArray(blob["bcc-deleted-category-ids"]);
+      const cloudDelCategories = safeParseArray(cloudBlob["bcc-deleted-category-ids"]);
+      const mergedDelCategories = Array.from(new Set([...localDelCategories, ...cloudDelCategories]));
+
+      if (mergedDelProducts.length) blob["bcc-deleted-product-ids"] = JSON.stringify(mergedDelProducts);
+      if (mergedDelCategories.length) blob["bcc-deleted-category-ids"] = JSON.stringify(mergedDelCategories);
+
+      // প্রোডাক্ট ও ক্যাটাগরি: cloud + local দুটো মিলিয়ে (local প্রায়োরিটি পেয়ে) রাখা হচ্ছে,
+      // এরপর ডিলিট-লিস্টে থাকা কোনো id থাকলে সেটা মার্জ করা লিস্ট থেকে বাদ দেওয়া হচ্ছে —
+      // যাতে ডিলিট করা প্রোডাক্ট/ক্যাটাগরি merge-এর সময় আবার ফিরে আসতে না পারে
+      let mergedProducts = mergeArraysById(safeParseArray(cloudBlob["bcc-products"]), safeParseArray(blob["bcc-products"]));
+      if (mergedDelProducts.length) mergedProducts = mergedProducts.filter(p => p && !mergedDelProducts.includes(p.id));
       blob["bcc-products"] = JSON.stringify(mergedProducts);
-      const mergedCategories = mergeArraysById(safeParseArray(cloudBlob["bcc-categories"]), safeParseArray(blob["bcc-categories"]));
+
+      let mergedCategories = mergeArraysById(safeParseArray(cloudBlob["bcc-categories"]), safeParseArray(blob["bcc-categories"]));
+      if (mergedDelCategories.length) mergedCategories = mergedCategories.filter(c => c && !mergedDelCategories.includes(c.id));
       blob["bcc-categories"] = JSON.stringify(mergedCategories);
 
       // এই ডিভাইসের নিজের localStorage-ও ঠিক করে দেওয়া হচ্ছে, যাতে এটা নিজেও
@@ -242,6 +258,8 @@ async function pushLocalStorageToCloud() {
       if (blob["phone-shop-deleted-customer-keys"]) __origSetItem.call(localStorage, "phone-shop-deleted-customer-keys", blob["phone-shop-deleted-customer-keys"]);
       if (blob["phone-shop-entries"]) __origSetItem.call(localStorage, "phone-shop-entries", blob["phone-shop-entries"]);
       if (blob["phone-shop-customers"]) __origSetItem.call(localStorage, "phone-shop-customers", blob["phone-shop-customers"]);
+      if (blob["bcc-deleted-product-ids"]) __origSetItem.call(localStorage, "bcc-deleted-product-ids", blob["bcc-deleted-product-ids"]);
+      if (blob["bcc-deleted-category-ids"]) __origSetItem.call(localStorage, "bcc-deleted-category-ids", blob["bcc-deleted-category-ids"]);
       __origSetItem.call(localStorage, "bcc-products", blob["bcc-products"]);
       __origSetItem.call(localStorage, "bcc-categories", blob["bcc-categories"]);
     }
@@ -273,11 +291,23 @@ async function pullCloudToLocalStorage(shopId) {
   try {
     const localProducts = safeParseArray(__origGetItem.call(localStorage, "bcc-products"));
     const cloudProducts = safeParseArray(blob["bcc-products"]);
-    blob["bcc-products"] = JSON.stringify(mergeArraysById(localProducts, cloudProducts));
+    const localDelProducts = safeParseArray(__origGetItem.call(localStorage, "bcc-deleted-product-ids"));
+    const cloudDelProducts = safeParseArray(blob["bcc-deleted-product-ids"]);
+    const mergedDelProducts = Array.from(new Set([...localDelProducts, ...cloudDelProducts]));
+    let mergedProducts = mergeArraysById(localProducts, cloudProducts);
+    if (mergedDelProducts.length) mergedProducts = mergedProducts.filter(p => p && !mergedDelProducts.includes(p.id));
+    blob["bcc-products"] = JSON.stringify(mergedProducts);
+    if (mergedDelProducts.length) blob["bcc-deleted-product-ids"] = JSON.stringify(mergedDelProducts);
 
     const localCategories = safeParseArray(__origGetItem.call(localStorage, "bcc-categories"));
     const cloudCategories = safeParseArray(blob["bcc-categories"]);
-    blob["bcc-categories"] = JSON.stringify(mergeArraysById(localCategories, cloudCategories));
+    const localDelCategories = safeParseArray(__origGetItem.call(localStorage, "bcc-deleted-category-ids"));
+    const cloudDelCategories = safeParseArray(blob["bcc-deleted-category-ids"]);
+    const mergedDelCategories = Array.from(new Set([...localDelCategories, ...cloudDelCategories]));
+    let mergedCategories = mergeArraysById(localCategories, cloudCategories);
+    if (mergedDelCategories.length) mergedCategories = mergedCategories.filter(c => c && !mergedDelCategories.includes(c.id));
+    blob["bcc-categories"] = JSON.stringify(mergedCategories);
+    if (mergedDelCategories.length) blob["bcc-deleted-category-ids"] = JSON.stringify(mergedDelCategories);
   } catch (mergeErr) {
     console.warn("প্রোডাক্ট/ক্যাটাগরি মার্জ করা যায়নি, cloud ভার্সন দিয়েই বসানো হচ্ছে:", mergeErr);
   }

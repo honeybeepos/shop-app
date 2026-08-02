@@ -1440,6 +1440,7 @@
     <div class="opsSubtabs">
       <div class="opsSubtab bizNavCard active" data-otab="supplier">🚚 Supplier</div>
       <div class="opsSubtab bizNavCard" data-otab="employee">🧑‍🔧 Staff</div>
+      <div class="opsSubtab bizNavCard" data-otab="otherexpense">💸 অন্য খরচ</div>
       <div class="opsSubtab bizNavCard" data-otab="expense">🧾 Expense</div>
     </div>
   </div>
@@ -1466,6 +1467,14 @@
       <div class="opsSectionTitle">🧑‍🔧 স্টাফ লিস্ট <button class="opsAddBtn bizNavCard" id="opsAddEmployeeBtn">+ নতুন স্টাফ</button></div>
       <button class="opsAddBtn bizNavCard" id="opsPayStaffBtn" style="width:100%;margin:0 0 12px;">💰 স্টাফকে টাকা দিন</button>
       <div class="glassList" id="opsEmployeeList"></div>
+    </div>
+
+    <div class="opsSection" id="otab-otherexpense" style="display:none;">
+      <div class="glassGrid">
+        <div class="glassCard"><div class="ic">💸</div><div class="lbl">মোট অন্য খরচ</div><div class="val">SAR 0</div></div>
+      </div>
+      <div class="opsSectionTitle">💸 অন্য খরচ</div>
+      <div class="glassList"><div class="empty">এই সেকশনে কী কী থাকবে তা পরে যোগ করা হবে।</div></div>
     </div>
 
     <div class="opsSection" id="otab-expense" style="display:none;">
@@ -3710,9 +3719,31 @@ document.getElementById('bccForgotPwBtn').addEventListener('click', ()=>{
 
 // ================= Business Control Center: Product Management =================
 function bccUid(){ return 'id'+Date.now()+Math.floor(Math.random()*100000); }
-function bccLoadCategories(){ try{ return JSON.parse(localStorage.getItem('bcc-categories')||'[]'); }catch(e){ return []; } }
+// প্রোডাক্ট/ক্যাটাগরি সিঙ্ক এখন id মিলিয়ে "মার্জ" (union) হয় — যাতে অফলাইনে যোগ করা
+// প্রোডাক্ট হারিয়ে না যায়। কিন্তু এর ফলে ডিলিট করা প্রোডাক্ট/ক্যাটাগরিও merge-এর সময়
+// আবার ফিরে আসতে পারতো। তাই এন্ট্রি/কাস্টমারের মতোই এখানে ডিলিট-লিস্ট (tombstone)
+// রাখা হচ্ছে — ডিলিট করা id সবসময় বাদ দেওয়া হবে, কখনো ফিরে আসবে না।
+function loadDeletedProductIds(){ try{ return JSON.parse(localStorage.getItem('bcc-deleted-product-ids')||'[]'); }catch(e){ return []; } }
+function saveDeletedProductIds(ids){ localStorage.setItem('bcc-deleted-product-ids', JSON.stringify(ids)); }
+function loadDeletedCategoryIds(){ try{ return JSON.parse(localStorage.getItem('bcc-deleted-category-ids')||'[]'); }catch(e){ return []; } }
+function saveDeletedCategoryIds(ids){ localStorage.setItem('bcc-deleted-category-ids', JSON.stringify(ids)); }
+let deletedProductIds = loadDeletedProductIds();
+let deletedCategoryIds = loadDeletedCategoryIds();
+function bccLoadCategories(){
+  try{
+    deletedCategoryIds = loadDeletedCategoryIds();
+    const cats = JSON.parse(localStorage.getItem('bcc-categories')||'[]');
+    return deletedCategoryIds.length ? cats.filter(c=>!deletedCategoryIds.includes(c.id)) : cats;
+  }catch(e){ return []; }
+}
 function bccSaveCategories(cats){ localStorage.setItem('bcc-categories', JSON.stringify(cats)); }
-function bccLoadProducts(){ try{ return JSON.parse(localStorage.getItem('bcc-products')||'[]'); }catch(e){ return []; } }
+function bccLoadProducts(){
+  try{
+    deletedProductIds = loadDeletedProductIds();
+    const prods = JSON.parse(localStorage.getItem('bcc-products')||'[]');
+    return deletedProductIds.length ? prods.filter(p=>!deletedProductIds.includes(p.id)) : prods;
+  }catch(e){ return []; }
+}
 function bccSaveProducts(prods){ localStorage.setItem('bcc-products', JSON.stringify(prods)); }
 
 // Adjust product stock when items are sold (deltaQty negative) or returned (deltaQty positive).
@@ -4204,6 +4235,8 @@ async function bccDeleteProduct(id){
   if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, ডিলিট হয়নি'); return; }
   const prods = bccLoadProducts().filter(p=>p.id!==id);
   bccSaveProducts(prods);
+  deletedProductIds.push(id);
+  saveDeletedProductIds(deletedProductIds);
   bccRenderProducts(); bccRenderOverview();
 }
 
@@ -4324,6 +4357,8 @@ async function bccDeleteCategory(id){
   if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, ডিলিট হয়নি'); return; }
   const cats = bccLoadCategories().filter(c=>c.id!==id);
   bccSaveCategories(cats);
+  deletedCategoryIds.push(id);
+  saveDeletedCategoryIds(deletedCategoryIds);
   bccRenderCategories(); bccRenderOverview();
 }
 
