@@ -7463,9 +7463,18 @@ auth.onAuthStateChanged(async (user)=>{
   watchShopStatus(session.shopId);
   watchAnnouncement();
   watchAppDataChanges(session.shopId, ()=>{
-    // অন্য কোনো ডিভাইস (যেমন সাব-ইউজার) নতুন সেল/এন্ট্রি পাঠিয়েছে —
-    // localStorage আপডেট হয়ে গেছে, এখন স্ক্রিন রিফ্রেশ করে দেখাও
+    // অন্য কোনো ডিভাইস (যেমন সাব-ইউজার) নতুন সেল/এন্ট্রি/কাস্টমার/প্রোডাক্ট
+    // পাঠিয়েছে — localStorage আপডেট হয়ে গেছে, এখন স্ক্রিন রিফ্রেশ করে দেখাও।
+    // প্রোডাক্ট/ক্যাটাগরি আলাদা জায়গায় (bcc-products) সেভ থাকে এবং render()
+    // এটা ছোঁয় না, তাই এখানে আলাদাভাবে রিফ্রেশ করা হচ্ছে — নাহলে ডেটা localStorage-এ
+    // ঠিকই সিঙ্ক হতো, কিন্তু স্ক্রিনে প্রোডাক্ট লিস্ট পুরনোই দেখাতো।
     loadSystemData();
+    if(typeof bccRenderCategories === 'function'){
+      try{ bccRenderCategories(); }catch(e){}
+    }
+    if(typeof monRenderAll === 'function'){
+      try{ monRenderAll(); }catch(e){}
+    }
     showSyncToast();
   });
   applyRoleRestrictions(session.role);
