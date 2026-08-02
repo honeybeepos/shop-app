@@ -399,6 +399,8 @@
     #lowStockPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #damagedStockPrintArea.printing, #damagedStockPrintArea.printing *{visibility:visible;}
     #damagedStockPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
+    #productSalePrintArea.printing, #productSalePrintArea.printing *{visibility:visible;}
+    #productSalePrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #empDetailPrintArea.printing, #empDetailPrintArea.printing *{visibility:visible;}
     #empDetailPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #allStaffPrintArea.printing, #allStaffPrintArea.printing *{visibility:visible;}
@@ -979,6 +981,22 @@
   </div>
 </div>
 <div id="damagedStockPrintArea"></div>
+
+<div class="modal-overlay" id="productSaleModal">
+  <div class="modal-box" style="max-width:420px; text-align:left; max-height:85vh; display:flex; flex-direction:column;">
+    <h3 id="productSaleTitle" style="margin:0 0 4px;">🗓️ আজকের প্রোডাক্ট সেল</h3>
+    <p class="pin-desc" style="margin:0 0 10px;"><b id="productSaleCount">0</b> ধরনের প্রোডাক্ট বিক্রি হয়েছে।</p>
+    <div id="productSaleListRows" style="overflow-y:auto; flex:1; min-height:60px;"></div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px;">
+      <button class="mini-btn" id="productSalePrintBtn">🖨️ Print</button>
+      <button class="mini-btn" id="productSaleDownloadBtn">⬇️ Download</button>
+      <button class="mini-btn" id="productSaleWaBtn">💬 WhatsApp</button>
+      <button class="mini-btn" id="productSaleSmsBtn">📩 SMS</button>
+    </div>
+    <button class="mini-btn" id="productSaleCloseBtn" style="width:100%; margin-top:10px;">বন্ধ করুন</button>
+  </div>
+</div>
+<div id="productSalePrintArea"></div>
 
 <!-- একজন স্টাফের বিস্তারিত (বেতন হিসাব + লেনদেনের হিস্টোরি) -->
 <div class="modal-overlay" id="empDetailModal">
@@ -1776,13 +1794,11 @@
         <div class="glassCard"><div class="ic">📦</div><div class="lbl">Total Stock</div><div class="val" id="monTotalStock">0</div></div>
         <div class="glassCard alert"><div class="ic">❌</div><div class="lbl">Out of Stock</div><div class="val" id="monOutOfStock">0</div></div>
         <div class="glassCard alert" id="monDamagedStockCard" style="cursor:pointer;"><div class="ic">🗑️</div><div class="lbl">নষ্ট মাল</div><div class="val" id="monDamagedStock">0</div></div>
+        <div class="glassCard" id="monTodayProductSaleCard" style="cursor:pointer;"><div class="ic">🗓️</div><div class="lbl">আজকের প্রোডাক্ট সেল</div><div class="val" id="monTodayProductSaleCount">0</div></div>
+        <div class="glassCard" id="monWeeklyProductSaleCard" style="cursor:pointer;"><div class="ic">📅</div><div class="lbl">সাপ্তাহিক প্রোডাক্ট সেল</div><div class="val" id="monWeeklyProductSaleCount">0</div></div>
       </div>
       <div class="monSectionTitle">❌ Out of Stock Products</div>
       <div class="glassList" id="monOutOfStockList"></div>
-      <div class="monSectionTitle">🗓️ আজকের প্রোডাক্ট সেল</div>
-      <div class="glassList" id="monTodayProductSale"></div>
-      <div class="monSectionTitle">📅 সাপ্তাহিক প্রোডাক্ট সেল</div>
-      <div class="glassList" id="monWeeklyProductSale"></div>
     </div>
 
     <div class="monSection" id="mtab-customer" style="display:none;">
@@ -6580,6 +6596,109 @@ document.getElementById('damagedStockDownloadBtn').addEventListener('click', ()=
   a.click();
 });
 
+/* আজকের/সাপ্তাহিক প্রোডাক্ট সেল লিস্ট — দুটো কার্ডই একই মডাল শেয়ার করে,
+   শুধু mode ('today'/'week') অনুযায়ী ডেটা আর টাইটেল পাল্টায় */
+let productSaleMode = 'today';
+
+function getProductSaleData(mode){
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate()-6); weekAgo.setHours(0,0,0,0);
+  const map = {};
+  retailEntries.forEach(e=>{
+    if(!SALE_STATUSES.includes(e.status)) return;
+    const d = new Date(e.date);
+    const inRange = mode === 'today' ? (d.toDateString() === todayStr) : (d >= weekAgo);
+    if(inRange) map[e.item] = (map[e.item]||0) + (e.qty||0);
+  });
+  return Object.entries(map).sort((a,b)=>b[1]-a[1]);
+}
+
+function buildProductSaleText(mode, data){
+  const title = mode === 'today' ? '🗓️ আজকের প্রোডাক্ট সেল লিস্ট' : '📅 সাপ্তাহিক প্রোডাক্ট সেল লিস্ট';
+  const dateStr = new Date().toLocaleDateString('bn-BD', {day:'numeric', month:'long', year:'numeric'});
+  let text = `${title} (${dateStr})\n\n`;
+  data.forEach(([nm,qty],i)=>{ text += `${i+1}. ${nm} — ${qty} pcs\n`; });
+  text += `\nমোট প্রোডাক্ট ধরন: ${data.length}`;
+  return text;
+}
+
+function renderProductSaleList(mode){
+  const data = getProductSaleData(mode);
+  document.getElementById('productSaleTitle').textContent = mode === 'today' ? '🗓️ আজকের প্রোডাক্ট সেল' : '📅 সাপ্তাহিক প্রোডাক্ট সেল';
+  document.getElementById('productSaleCount').textContent = data.length;
+  const rowsEl = document.getElementById('productSaleListRows');
+  rowsEl.innerHTML = data.length ? data.map(([nm,qty])=>`
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 4px; border-bottom:1px solid var(--line);">
+      <div style="font-weight:700; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(nm)}</div>
+      <div style="font-size:13px; font-weight:700; color:#1f6f6b; white-space:nowrap;">${qty} pcs</div>
+    </div>`
+  ).join('') : `<div class="empty">${mode==='today' ? 'আজকে এখনো কোনো প্রোডাক্ট বিক্রি হয়নি' : 'গত ৭ দিনে কোনো প্রোডাক্ট বিক্রি হয়নি'}</div>`;
+}
+
+document.getElementById('monTodayProductSaleCard').addEventListener('click', ()=>{
+  productSaleMode = 'today';
+  renderProductSaleList('today');
+  document.getElementById('productSaleModal').classList.add('show');
+});
+document.getElementById('monWeeklyProductSaleCard').addEventListener('click', ()=>{
+  productSaleMode = 'week';
+  renderProductSaleList('week');
+  document.getElementById('productSaleModal').classList.add('show');
+});
+document.getElementById('productSaleCloseBtn').addEventListener('click', ()=> document.getElementById('productSaleModal').classList.remove('show'));
+document.getElementById('productSaleModal').addEventListener('click', (ev)=>{
+  if(ev.target === document.getElementById('productSaleModal')) document.getElementById('productSaleModal').classList.remove('show');
+});
+
+document.getElementById('productSalePrintBtn').addEventListener('click', ()=>{
+  const data = getProductSaleData(productSaleMode);
+  if(!data.length){ toast('কোনো ডেটা নেই'); return; }
+  const title = productSaleMode === 'today' ? '🗓️ আজকের প্রোডাক্ট সেল' : '📅 সাপ্তাহিক প্রোডাক্ট সেল';
+  const dateStr = new Date().toLocaleDateString('bn-BD', {day:'numeric', month:'long', year:'numeric'});
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  const rows = data.map(([nm,qty],i)=>`<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(nm)}</td><td style="border:1px solid #ccc; padding:8px;">${qty}</td></tr>`).join('');
+  const printArea = document.getElementById('productSalePrintArea');
+  printArea.innerHTML = `
+    <div style="padding:24px; font-family:sans-serif; color:#111;">
+      <h2 style="margin:0 0 4px;">${title}</h2>
+      ${shopName ? `<p style="margin:0 0 2px; color:#555;">${escapeHtml(shopName)}</p>` : ''}
+      <p style="margin:0 0 16px; color:#555;">তারিখ: ${dateStr}</p>
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead><tr style="background:#f0f0f0;"><th style="border:1px solid #ccc; padding:8px; text-align:left;">#</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">প্রোডাক্ট</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">পরিমাণ</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="margin-top:16px; font-weight:bold;">মোট প্রোডাক্ট ধরন: ${data.length}</p>
+    </div>`;
+  printArea.classList.add('printing');
+  window.print();
+  setTimeout(()=> printArea.classList.remove('printing'), 500);
+});
+
+document.getElementById('productSaleWaBtn').addEventListener('click', ()=>{
+  const data = getProductSaleData(productSaleMode);
+  if(!data.length){ toast('কোনো ডেটা নেই'); return; }
+  window.open(`https://wa.me/?text=${encodeURIComponent(buildProductSaleText(productSaleMode, data))}`, '_blank');
+});
+
+document.getElementById('productSaleSmsBtn').addEventListener('click', ()=>{
+  const data = getProductSaleData(productSaleMode);
+  if(!data.length){ toast('কোনো ডেটা নেই'); return; }
+  window.location.href = `sms:?body=${encodeURIComponent(buildProductSaleText(productSaleMode, data))}`;
+});
+
+document.getElementById('productSaleDownloadBtn').addEventListener('click', ()=>{
+  const data = getProductSaleData(productSaleMode);
+  if(!data.length){ toast('কোনো ডেটা নেই'); return; }
+  let csv = 'SL,Product,Quantity\n';
+  data.forEach(([nm,qty],i)=>{ csv += `${i+1},"${nm.replace(/"/g,'""')}",${qty}\n`; });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${productSaleMode}-product-sale-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+});
+
 let detailCtx = null;
 let custDetailReturnTo = null;
 let permCustLastQuery = '';
@@ -6805,15 +6924,10 @@ function monRenderAll(){
   document.getElementById('monOutOfStockList').innerHTML = oosHtml;
   document.getElementById('monAlertOutOfStock').innerHTML = oosHtml;
 
-  const todayProductSale = Object.entries(itemSoldTodayMap).sort((a,b)=>b[1]-a[1]);
-  document.getElementById('monTodayProductSale').innerHTML = todayProductSale.length ? todayProductSale.map(([nm,qty])=>`
-    <div class="glassRow"><span class="nm">${escapeHtml(nm)}</span><span class="amt">${qty} pcs</span></div>
-  `).join('') : `<div class="glassEmpty">আজকে এখনো কোনো প্রোডাক্ট বিক্রি হয়নি</div>`;
-
-  const weeklyProductSale = Object.entries(itemSoldWeekMap).sort((a,b)=>b[1]-a[1]);
-  document.getElementById('monWeeklyProductSale').innerHTML = weeklyProductSale.length ? weeklyProductSale.map(([nm,qty])=>`
-    <div class="glassRow"><span class="nm">${escapeHtml(nm)}</span><span class="amt">${qty} pcs</span></div>
-  `).join('') : `<div class="glassEmpty">গত ৭ দিনে কোনো প্রোডাক্ট বিক্রি হয়নি</div>`;
+  const todayProductQty = Object.values(itemSoldTodayMap).reduce((s,q)=>s+q,0);
+  document.getElementById('monTodayProductSaleCount').textContent = todayProductQty + ' pcs';
+  const weeklyProductQty = Object.values(itemSoldWeekMap).reduce((s,q)=>s+q,0);
+  document.getElementById('monWeeklyProductSaleCount').textContent = weeklyProductQty + ' pcs';
 
   document.getElementById('monTotalCustomer').textContent = shopCustomers.length;
   document.getElementById('monTotalPaid').textContent = fmt(totalPaidAll);
