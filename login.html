@@ -133,18 +133,37 @@ document.getElementById("loginBtn").addEventListener("click", async ()=>{
   btn.disabled = true; btn.textContent = "লগইন হচ্ছে...";
   __authFlowInProgress = true;
   try{
-    const cred = await auth.signInWithEmailAndPassword(email, pass);
-    await clearFailedLogin(email);
-    await afterLoginRoute(cred.user.uid);
-  }catch(e){
-    const count = await recordFailedLogin(email);
-    if (count >= MAX_FAILED_ATTEMPTS) {
-      showMsg("loginMsg", "বারবার ভুল পাসওয়ার্ড দেওয়ার কারণে একাউন্ট ব্লক হয়ে গেছে। এডমিনের সাথে যোগাযোগ করুন।", false);
-    } else {
-      showMsg("loginMsg", `ভুল ইমেইল বা পাসওয়ার্ড (${count}/${MAX_FAILED_ATTEMPTS} বার চেষ্টা)`, false);
+    let cred;
+    try{
+      cred = await auth.signInWithEmailAndPassword(email, pass);
+    }catch(authErr){
+      // এখানে সত্যিকারের ভুল ইমেইল/পাসওয়ার্ড ধরা পড়ে
+      let count = 1;
+      try{ count = await recordFailedLogin(email); }catch(_){ /* এটা ব্যর্থ হলেও যেন লগইন প্রক্রিয়া আটকে না যায় */ }
+      if (count >= MAX_FAILED_ATTEMPTS) {
+        showMsg("loginMsg", "বারবার ভুল পাসওয়ার্ড দেওয়ার কারণে একাউন্ট ব্লক হয়ে গেছে। এডমিনের সাথে যোগাযোগ করুন।", false);
+      } else {
+        showMsg("loginMsg", `ভুল ইমেইল বা পাসওয়ার্ড (${count}/${MAX_FAILED_ATTEMPTS} বার চেষ্টা)`, false);
+      }
+      return; // নিচের finally ব্লক বাটন রিসেট করে দেবে
     }
+
+    // ইমেইল/পাসওয়ার্ড সঠিক প্রমাণিত হয়ে গেছে — এখন থেকে কোনো এরর হলে সেটা আর
+    // "ভুল পাসওয়ার্ড" না (তাই failed-login count বাড়ানো হবে না); এটা দোকানের
+    // তথ্য লোড করার সময়কার সমস্যা (যেমন Firestore পারমিশন), তাই আলাদাভাবে
+    // স্পষ্ট মেসেজ দেখানো হচ্ছে।
+    try{
+      await clearFailedLogin(email).catch(()=>{});
+      await afterLoginRoute(cred.user.uid);
+    }catch(routeErr){
+      console.error("Login routing error:", routeErr);
+      showMsg("loginMsg", "লগইন সফল হয়েছে কিন্তু দোকানের তথ্য লোড করা যায়নি। আবার চেষ্টা করুন। (" + (routeErr && routeErr.message ? routeErr.message : "অজানা সমস্যা") + ")", false);
+    }
+  } finally {
+    // যেকোনো পরিস্থিতিতে (সফল/ব্যর্থ/এরর) বাটন যেন "লগইন হচ্ছে..." তে আটকে না
+    // থেকে সবসময় স্বাভাবিক অবস্থায় ফিরে আসে
+    btn.disabled = false; btn.textContent = "লগইন করুন";
   }
-  btn.disabled = false; btn.textContent = "লগইন করুন";
 });
 
 document.getElementById("forgotLink").addEventListener("click", async (e)=>{
@@ -192,8 +211,9 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
     await afterLoginRoute(uid);
   }catch(e){
     showMsg("signupMsg", e.message || "নিবন্ধন ব্যর্থ হয়েছে", false);
+  } finally {
+    btn.disabled = false; btn.textContent = "দোকান তৈরি করুন";
   }
-  btn.disabled = false; btn.textContent = "দোকান তৈরি করুন";
 });
 
 // আগে থেকে লগইন থাকলে সরাসরি অ্যাপে পাঠিয়ে দাও
