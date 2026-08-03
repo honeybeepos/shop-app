@@ -378,6 +378,49 @@
   .fullscreen-overlay .fsHead h2{ margin:0; font-size:17px; }
   .fullscreen-overlay .fsClose{ width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:16px; cursor:pointer; color:#555; }
   .fullscreen-overlay .fsBody{ flex:1; overflow-y:auto; padding:18px; }
+  #quickDashboardScreen{ background:linear-gradient(160deg,#0f2027,#203a43,#2c5364); }
+  #quickDashboardScreen .fsHead{ border-bottom:1px solid rgba(255,255,255,0.15); }
+  #quickDashboardScreen .fsHead h2{ color:#fff; }
+  #quickDashboardScreen .fsClose{ background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.25); color:#fff; }
+  .qiAddShortcutCard{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:16px; border-radius:18px; margin-bottom:18px; cursor:pointer;
+    background:rgba(255,255,255,0.10); border:1px dashed rgba(255,255,255,0.35);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    color:#fff; font-weight:700; font-size:14px;
+  }
+  .qiShortcutGrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:10px; }
+  .qiShortcutTile{
+    position:relative; border-radius:16px; padding:14px 8px; text-align:center; cursor:pointer;
+    background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.22);
+    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    box-shadow:0 8px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.25);
+    color:#fff; font-size:12px; font-weight:700; word-break:break-word; overflow-wrap:break-word;
+  }
+  .qiShortcutTile .qiIcon{ font-size:22px; margin-bottom:6px; }
+  .qiShortcutTile .qiRemove{
+    position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%;
+    background:#c0392b; color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center;
+    border:2px solid #142c34; cursor:pointer;
+  }
+  .qiDarkModal{ background:linear-gradient(160deg,#0f2027,#203a43,#2c5364) !important; color:#fff; }
+  .qiDarkModal .pin-desc{ color:rgba(255,255,255,0.7); }
+  .qiSellCard{
+    background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.22);
+    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+    border-radius:22px; padding:22px; box-shadow:0 14px 34px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .qiBigInput{
+    width:100%; box-sizing:border-box; padding:20px; font-size:26px; font-weight:800; text-align:center;
+    border-radius:18px; border:1px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.14);
+    backdrop-filter:blur(10px); color:#fff; margin-bottom:16px; outline:none;
+  }
+  .qiBigInput::placeholder{ color:rgba(255,255,255,0.55); font-size:14px; font-weight:600; }
+  .qiBigBtn{
+    width:100%; padding:20px; font-size:18px; font-weight:800; border:none; border-radius:18px; cursor:pointer;
+    color:#0d1b1e; background:linear-gradient(135deg,#34d399,#60a5fa);
+    box-shadow:0 14px 30px rgba(52,211,153,0.45), inset 0 1px 0 rgba(255,255,255,0.4);
+  }
   .modal-overlay.show{display:flex;}
   .modal-box{ background:var(--card); border-radius:14px; padding:20px; width:100%; max-width:340px; box-shadow:0 8px 0 var(--copper-dark); }
   .modal-box h3{ margin:0 0 6px; color:var(--teal); font-size:16px; }
@@ -1111,7 +1154,29 @@
     <button class="fsClose" id="quickDashboardCloseBtn">✕</button>
   </div>
   <div class="fsBody">
-    <div class="empty" style="text-align:center; color:#8b8478; padding:60px 20px; font-size:14px;">এখানে কী কী থাকবে তা পরে যোগ করা হবে।</div>
+    <div class="qiAddShortcutCard" id="qiAddShortcutBtn">➕ Quick Items যোগ করুন</div>
+    <div class="qiShortcutGrid" id="qiShortcutGrid"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="qiSearchModal">
+  <div class="modal-box qiDarkModal" style="max-width:420px; text-align:left; max-height:80vh; display:flex; flex-direction:column;">
+    <h3 style="margin:0 0 10px; color:#fff;">⚡ Quick Items যোগ করুন</h3>
+    <input type="text" id="qiSearchInput" placeholder="🔍 প্রোডাক্টের নাম বা কোড দিয়ে খুঁজুন..." style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid rgba(255,255,255,0.3); border-radius:8px; font-size:14px; margin-bottom:10px; background:rgba(255,255,255,0.12); color:#fff;">
+    <div id="qiSearchResults" style="overflow-y:auto; flex:1; min-height:60px;"></div>
+    <button class="mini-btn" id="qiSearchCloseBtn" style="width:100%; margin-top:10px;">বন্ধ করুন</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="qiSellModal">
+  <div class="modal-box qiDarkModal" style="max-width:380px;">
+    <h3 id="qiSellProductName" style="margin:0 0 4px; text-align:center; color:#fff;"></h3>
+    <p class="pin-desc" id="qiSellProductMeta" style="text-align:center; margin:0 0 16px;"></p>
+    <div class="qiSellCard">
+      <input type="number" inputmode="decimal" id="qiSellAmount" class="qiBigInput" placeholder="কত টাকায় বিক্রি করছেন">
+      <button class="qiBigBtn" id="qiSellCompleteBtn">✅ বিক্রি সম্পূর্ণ করুন</button>
+    </div>
+    <button class="mini-btn" id="qiSellCancelBtn" style="width:100%; margin-top:12px;">বাতিল</button>
   </div>
 </div>
 
@@ -4468,6 +4533,7 @@ quickModeChip.addEventListener('pointerdown', (ev)=>{
     quickChipLongPressFired = true;
     if(navigator.vibrate) navigator.vibrate(15);
     quickDashboardScreen.classList.add('show');
+    qiRenderShortcuts();
   }, 500);
 });
 quickModeChip.addEventListener('pointermove', (ev)=>{
@@ -4484,6 +4550,131 @@ quickModeChip.addEventListener('pointermove', (ev)=>{
 quickModeChip.addEventListener('contextmenu', (ev)=> ev.preventDefault());
 
 document.getElementById('quickDashboardCloseBtn').addEventListener('click', ()=> quickDashboardScreen.classList.remove('show'));
+
+/* ================= Quick Items (কুইক ড্যাশবোর্ডের শর্টকাট প্রোডাক্ট) =================
+   প্রতিটা ইউজার (Admin/সাব-এডমিন/সেলার) নিজের মতো করে শর্টকাট প্রোডাক্ট যোগ করে
+   নিতে পারবে — কারণ সবার বেশি-বিক্রি হওয়া প্রোডাক্ট এক না। তাই এই লিস্টটা প্রতিটা
+   ইউজারের নিজস্ব (session uid দিয়ে আলাদা), শেয়ার করা না। */
+function qiCurrentUid(){
+  try{
+    const s = (typeof getSession === 'function') ? getSession() : null;
+    return (s && s.uid) ? s.uid : 'local';
+  }catch(e){ return 'local'; }
+}
+function qiStorageKey(){ return 'quick-shortcuts-' + qiCurrentUid(); }
+function qiLoadShortcuts(){ try{ return JSON.parse(localStorage.getItem(qiStorageKey())||'[]'); }catch(e){ return []; } }
+function qiSaveShortcuts(ids){ localStorage.setItem(qiStorageKey(), JSON.stringify(ids)); }
+
+function qiRenderShortcuts(){
+  const ids = qiLoadShortcuts();
+  const prods = bccLoadProducts();
+  const grid = document.getElementById('qiShortcutGrid');
+  const tiles = ids.map(id => prods.find(p=>p.id===id)).filter(Boolean);
+  grid.innerHTML = tiles.length ? tiles.map(p=>`
+    <div class="qiShortcutTile" data-pid="${p.id}">
+      <div class="qiRemove" data-remove="${p.id}">✕</div>
+      <div class="qiIcon">📦</div>
+      <div>${escapeHtml(p.name)}</div>
+    </div>
+  `).join('') : '<div style="grid-column:1/-1; text-align:center; color:rgba(255,255,255,0.6); padding:30px 0; font-size:13px;">এখনো কোনো Quick Item যোগ করা হয়নি — উপরে ➕ চেপে যোগ করুন</div>';
+
+  grid.querySelectorAll('.qiRemove').forEach(btn=>{
+    btn.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      const pid = btn.dataset.remove;
+      qiSaveShortcuts(qiLoadShortcuts().filter(id=>id!==pid));
+      qiRenderShortcuts();
+    });
+  });
+  grid.querySelectorAll('.qiShortcutTile').forEach(tile=>{
+    tile.addEventListener('click', ()=> qiOpenSellModal(tile.dataset.pid));
+  });
+}
+
+document.getElementById('qiAddShortcutBtn').addEventListener('click', ()=>{
+  document.getElementById('qiSearchInput').value = '';
+  document.getElementById('qiSearchResults').innerHTML = '';
+  document.getElementById('qiSearchModal').classList.add('show');
+  setTimeout(()=> document.getElementById('qiSearchInput').focus(), 50);
+});
+document.getElementById('qiSearchCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('qiSearchModal').classList.remove('show');
+});
+
+document.getElementById('qiSearchInput').addEventListener('input', (e)=>{
+  const q = e.target.value.trim();
+  const resultsEl = document.getElementById('qiSearchResults');
+  if(!q){ resultsEl.innerHTML = ''; return; }
+  const matches = bccSearchProducts(q).slice(0,20);
+  const existing = qiLoadShortcuts();
+  resultsEl.innerHTML = matches.length ? matches.map(m=>{
+    const already = existing.includes(m.p.id);
+    const badge = m.cat ? (m.cat.name + (m.sub ? ' / '+m.sub.name : '')) : 'ক্যাটাগরি নেই';
+    return `<div data-add="${m.p.id}" style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 6px; border-bottom:1px solid rgba(255,255,255,0.15); cursor:pointer; ${already?'opacity:0.5;':''}">
+      <div style="min-width:0;">
+        <div style="font-weight:700; font-size:13.5px; color:#fff;">${escapeHtml(m.p.name)}${m.p.code?' <span style="font-weight:600; color:#e0c080; font-size:11px;">('+escapeHtml(m.p.code)+')</span>':''}</div>
+        <div style="font-size:11px; color:rgba(255,255,255,0.6);">${escapeHtml(badge)}</div>
+      </div>
+      <div style="font-size:12px; font-weight:700; color:#fff; white-space:nowrap;">${already ? '✅ যোগ করা আছে' : '➕ যোগ করুন'}</div>
+    </div>`;
+  }).join('') : '<div style="text-align:center; color:rgba(255,255,255,0.6); padding:20px 0; font-size:13px;">কোনো প্রোডাক্ট পাওয়া যায়নি</div>';
+
+  resultsEl.querySelectorAll('[data-add]').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const pid = row.dataset.add;
+      const cur = qiLoadShortcuts();
+      if(!cur.includes(pid)){
+        cur.push(pid);
+        qiSaveShortcuts(cur);
+        qiRenderShortcuts();
+        toast('Quick Item যোগ হয়েছে');
+      }
+      document.getElementById('qiSearchModal').classList.remove('show');
+    });
+  });
+});
+
+let qiSellProductId = null;
+function qiOpenSellModal(productId){
+  const prod = bccLoadProducts().find(p=>p.id===productId);
+  if(!prod){ toast('প্রোডাক্টটি খুঁজে পাওয়া যায়নি'); return; }
+  qiSellProductId = productId;
+  document.getElementById('qiSellProductName').textContent = prod.name;
+  const cats = bccLoadCategories();
+  const cat = cats.find(c=>c.id===prod.catId);
+  document.getElementById('qiSellProductMeta').textContent = cat ? cat.name : '';
+  document.getElementById('qiSellAmount').value = '';
+  document.getElementById('qiSellModal').classList.add('show');
+  setTimeout(()=> document.getElementById('qiSellAmount').focus(), 50);
+}
+document.getElementById('qiSellCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('qiSellModal').classList.remove('show');
+});
+
+document.getElementById('qiSellCompleteBtn').addEventListener('click', async ()=>{
+  const amount = Number(document.getElementById('qiSellAmount').value);
+  if(!amount || amount <= 0){ toast('বিক্রির টাকার পরিমাণ দিন'); return; }
+  const prod = bccLoadProducts().find(p=>p.id===qiSellProductId);
+  if(!prod){ toast('প্রোডাক্টটি খুঁজে পাওয়া যায়নি'); return; }
+
+  // কেনা দাম (cost) প্রোডাক্ট থেকে অটোমেটিক্যালি নেওয়া হচ্ছে — আলাদা করে
+  // দেখানো/জিজ্ঞাসা করার দরকার নেই, এটা নগদ বিক্রি হিসেবে সাথে সাথেই সম্পূর্ণ হবে
+  retailEntries.unshift({
+    id: genLineId(), name: 'নগদ কাস্টমার', item: prod.name, productId: prod.id, phone: '',
+    cost: Number(prod.buy)||0, price: amount, paid: amount, qty: 1,
+    unitCost: Number(prod.buy)||0, unitPrice: amount, note: '⚡ Quick Item দিয়ে বিক্রি', status: 'নগদ-বিক্রি',
+    billId: genLineId(), invoiceNo: '', date: new Date().toISOString(), soldBy: currentSalesPersonName()
+  });
+
+  const prods = bccLoadProducts().map(p => p.id===prod.id ? {...p, qty: Math.max((Number(p.qty)||0)-1, 0)} : p);
+  bccSaveProducts(prods);
+
+  await persistData();
+  document.getElementById('qiSellModal').classList.remove('show');
+  toast(`✅ ${prod.name} — ${fmt(amount)} বিক্রি সম্পূর্ণ হয়েছে`);
+  render();
+});
+
 
 function renderOldCustList(query){
   const q = query.trim().toLowerCase();
