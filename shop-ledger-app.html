@@ -421,6 +421,11 @@
     color:#0d1b1e; background:linear-gradient(135deg,#34d399,#60a5fa);
     box-shadow:0 14px 30px rgba(52,211,153,0.45), inset 0 1px 0 rgba(255,255,255,0.4);
   }
+  /* কুইক ড্যাশবোর্ড (fullscreen-overlay, z-index:800) খোলা অবস্থায় এর উপরে যে
+     পপআপগুলো (প্রোডাক্ট খোঁজা / বিক্রি সম্পূর্ণ করা) খোলে, সেগুলো যেন পেছনে
+     লুকিয়ে না যায় — তাই সাধারণ modal-overlay-এর (z-index:700) চেয়ে বেশি রাখা হলো */
+  #qiSearchModal, #qiSellModal{ z-index:900; }
+  #moneyCalcModal{ z-index:950; }
   .modal-overlay.show{display:flex;}
   .modal-box{ background:var(--card); border-radius:14px; padding:20px; width:100%; max-width:340px; box-shadow:0 8px 0 var(--copper-dark); }
   .modal-box h3{ margin:0 0 6px; color:var(--teal); font-size:16px; }
@@ -4657,6 +4662,22 @@ document.getElementById('qiSellCompleteBtn').addEventListener('click', async ()=
   const prod = bccLoadProducts().find(p=>p.id===qiSellProductId);
   if(!prod){ toast('প্রোডাক্টটি খুঁজে পাওয়া যায়নি'); return; }
 
+  // ঠিক আগের নগদ-বিক্রির মতোই — কাস্টমার কত টাকা দিয়েছেন সেটা জিজ্ঞেস করে,
+  // বেশি দিলে কত ফেরত দিতে হবে সেটা দেখানো হচ্ছে
+  const received = await showMoneyCalcModal({
+    title: '💵 নগদ বিক্রি — টাকার হিসাব',
+    summaryHtml: `${escapeHtml(prod.name)} — মোট: <b>${fmt(amount)}</b>`,
+    showInput: true,
+    prefill: amount,
+    computeResult: (val)=>{
+      if(val < amount) return { text: `⚠️ ঘাটতি ${fmt(amount-val)}`, warn:true };
+      const change = val - amount;
+      return change>0 ? { text: `✅ গ্রাহককে ফেরত দিন: ${fmt(change)}`, warn:false } : { text: `✅ সঠিক টাকা দেওয়া হয়েছে`, warn:false };
+    }
+  });
+  if(received === null) return;
+  if(received < amount){ toast('মোট দামের চেয়ে কম টাকা দেওয়া হয়েছে'); return; }
+
   // কেনা দাম (cost) প্রোডাক্ট থেকে অটোমেটিক্যালি নেওয়া হচ্ছে — আলাদা করে
   // দেখানো/জিজ্ঞাসা করার দরকার নেই, এটা নগদ বিক্রি হিসেবে সাথে সাথেই সম্পূর্ণ হবে
   retailEntries.unshift({
@@ -4671,7 +4692,8 @@ document.getElementById('qiSellCompleteBtn').addEventListener('click', async ()=
 
   await persistData();
   document.getElementById('qiSellModal').classList.remove('show');
-  toast(`✅ ${prod.name} — ${fmt(amount)} বিক্রি সম্পূর্ণ হয়েছে`);
+  const change = received - amount;
+  toast(change>0 ? `✅ ${prod.name} বিক্রি সম্পূর্ণ — গ্রাহককে ফেরত দিন ${fmt(change)}` : `✅ ${prod.name} — ${fmt(amount)} বিক্রি সম্পূর্ণ হয়েছে`);
   render();
 });
 
