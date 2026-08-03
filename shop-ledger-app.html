@@ -2610,8 +2610,19 @@ async function confirmCloudSave(){
     showSavingOverlay('✅ সার্ভারে সফলভাবে সেভ হয়েছে', false);
     setTimeout(hideSavingOverlay, 1300);
   }catch(e){
-    showSavingOverlay('⚠️ এই ডিভাইসে সেভ আছে — ইন্টারনেট আসলে অটো পাঠানো হবে', false);
-    setTimeout(hideSavingOverlay, 2800);
+    console.error("Cloud sync failed in confirmCloudSave:", e);
+    if(navigator.onLine){
+      // ব্রাউজার বলছে ইন্টারনেট আছে, তবুও পাঠানো যায়নি — তাহলে এটা "নেট নেই" সমস্যা না,
+      // অন্য কোনো কারণ (যেমন সার্ভার পারমিশন/ডেটা সাইজ সমস্যা)। তাই সঠিক এরর দেখানো হচ্ছে,
+      // যাতে ভুলভাবে "ইন্টারনেট নেই" মনে না হয় এবং আসল কারণ বোঝা যায়।
+      const code = (e && e.code) ? e.code : '';
+      const msg = (e && e.message) ? e.message : 'অজানা সমস্যা';
+      showSavingOverlay(`❌ সার্ভারে পাঠানো যায়নি (${code || msg})`, false);
+      setTimeout(hideSavingOverlay, 4000);
+    } else {
+      showSavingOverlay('⚠️ এই ডিভাইসে সেভ আছে — ইন্টারনেট আসলে অটো পাঠানো হবে', false);
+      setTimeout(hideSavingOverlay, 2800);
+    }
   }
 }
 

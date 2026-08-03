@@ -268,9 +268,20 @@ async function pushLocalStorageToCloud() {
   }
 
   try {
+    const blobStr = JSON.stringify(blob);
+    // Firestore-এর প্রতিটা ডকুমেন্টের সাইজ লিমিট ~1MB। ডেটা (সেল/কাস্টমার/প্রোডাক্ট)
+    // অনেক বেড়ে গেলে এই লিমিটে গিয়ে ঠেকতে পারে — তখন push ব্যর্থ হবে, কিন্তু এটা
+    // ইন্টারনেট সমস্যা না। তাই আগেভাগে চেক করে স্পষ্ট এরর দেওয়া হচ্ছে, যাতে ভুল
+    // করে মনে না হয় যে ইন্টারনেট নেই।
+    const approxSizeMb = new Blob([blobStr]).size / (1024 * 1024);
+    if (approxSizeMb > 0.9) {
+      console.error(`ডেটার সাইজ অনেক বড় হয়ে গেছে (~${approxSizeMb.toFixed(2)}MB) — Firestore-এর ১MB লিমিটের কাছাকাছি/বেশি। পুরনো ডেটা আর্কাইভ/ছাঁটাই করার দরকার হতে পারে।`);
+      setSyncIndicator("error");
+      throw Object.assign(new Error("ডেটার সাইজ সীমার (~1MB) কাছাকাছি বা বেশি হয়ে গেছে"), { code: "data-too-large" });
+    }
     await db.collection("shops").doc(__syncShopId)
       .collection("appdata").doc("main")
-      .set({ blob: JSON.stringify(blob), updatedAt: fbNow(), updatedBy: __deviceId }, { merge: true });
+      .set({ blob: blobStr, updatedAt: fbNow(), updatedBy: __deviceId }, { merge: true });
     setSyncIndicator("ok");
   } catch (e) {
     console.error("Cloud sync failed:", e);
