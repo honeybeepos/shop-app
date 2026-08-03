@@ -372,6 +372,12 @@
   #tab-add .smartSuggestItem .stk.low{ animation: pulseAlertGlow 1.6s ease-in-out infinite; border-radius:6px; padding:2px 5px; }
 
   .modal-overlay{ display:none; position:fixed; inset:0; background:rgba(28,26,23,0.55); z-index:700; align-items:center; justify-content:center; padding:20px; }
+  .fullscreen-overlay{ display:none; position:fixed; inset:0; z-index:800; background:var(--cream, #f7f2ea); flex-direction:column; }
+  .fullscreen-overlay.show{ display:flex; }
+  .fullscreen-overlay .fsHead{ display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--line); flex-shrink:0; }
+  .fullscreen-overlay .fsHead h2{ margin:0; font-size:17px; }
+  .fullscreen-overlay .fsClose{ width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:16px; cursor:pointer; color:#555; }
+  .fullscreen-overlay .fsBody{ flex:1; overflow-y:auto; padding:18px; }
   .modal-overlay.show{display:flex;}
   .modal-box{ background:var(--card); border-radius:14px; padding:20px; width:100%; max-width:340px; box-shadow:0 8px 0 var(--copper-dark); }
   .modal-box h3{ margin:0 0 6px; color:var(--teal); font-size:16px; }
@@ -1096,6 +1102,16 @@
       <button class="mini-btn" id="exitNoBtn" style="flex:1;">না</button>
       <button class="btn" id="exitYesBtn" style="flex:1; margin-top:0;">হ্যাঁ</button>
     </div>
+  </div>
+</div>
+
+<div class="fullscreen-overlay" id="quickDashboardScreen">
+  <div class="fsHead">
+    <h2>⚡ কুইক ড্যাশবোর্ড</h2>
+    <button class="fsClose" id="quickDashboardCloseBtn">✕</button>
+  </div>
+  <div class="fsBody">
+    <div class="empty" style="text-align:center; color:#8b8478; padding:60px 20px; font-size:14px;">এখানে কী কী থাকবে তা পরে যোগ করা হবে।</div>
   </div>
 </div>
 
@@ -4410,6 +4426,7 @@ const selectedCustTag = document.getElementById('selectedCustTag');
 
 document.querySelectorAll('#customerModeGroup .status-chip').forEach(chip=>{
   chip.addEventListener('click', ()=>{
+    if(chip.dataset.m === 'quick' && quickChipLongPressFired){ quickChipLongPressFired = false; return; }
     document.querySelectorAll('#customerModeGroup .status-chip').forEach(c=>c.classList.remove('active'));
     chip.classList.add('active');
     const mode = chip.dataset.m;
@@ -4436,6 +4453,37 @@ document.querySelectorAll('#customerModeGroup .status-chip').forEach(chip=>{
     updateCustDueInfo();
   });
 });
+
+/* "⚡ কুইক" অপশনে হোল্ড (লং-প্রেস) করলে একটা নতুন ফুল-স্ক্রিন ড্যাশবোর্ড খুলবে —
+   ভেতরে কী থাকবে তা পরে যোগ করা হবে। সাধারণ (ছোট) ট্যাপ করলে আগের মতোই
+   "কুইক সেল" মোডে যাবে, কোনো পরিবর্তন হয়নি। */
+let quickChipLongPressTimer = null, quickChipLongPressFired = false, quickChipPressX = 0, quickChipPressY = 0;
+const quickModeChip = document.querySelector('#customerModeGroup .status-chip[data-m="quick"]');
+const quickDashboardScreen = document.getElementById('quickDashboardScreen');
+
+quickModeChip.addEventListener('pointerdown', (ev)=>{
+  quickChipLongPressFired = false;
+  quickChipPressX = ev.clientX; quickChipPressY = ev.clientY;
+  quickChipLongPressTimer = setTimeout(()=>{
+    quickChipLongPressFired = true;
+    if(navigator.vibrate) navigator.vibrate(15);
+    quickDashboardScreen.classList.add('show');
+  }, 500);
+});
+quickModeChip.addEventListener('pointermove', (ev)=>{
+  if(!quickChipLongPressTimer) return;
+  if(Math.abs(ev.clientX-quickChipPressX) > 10 || Math.abs(ev.clientY-quickChipPressY) > 10){
+    clearTimeout(quickChipLongPressTimer); quickChipLongPressTimer = null;
+  }
+});
+['pointerup','pointerleave','pointercancel'].forEach(evt=>{
+  quickModeChip.addEventListener(evt, ()=>{
+    if(quickChipLongPressTimer){ clearTimeout(quickChipLongPressTimer); quickChipLongPressTimer = null; }
+  });
+});
+quickModeChip.addEventListener('contextmenu', (ev)=> ev.preventDefault());
+
+document.getElementById('quickDashboardCloseBtn').addEventListener('click', ()=> quickDashboardScreen.classList.remove('show'));
 
 function renderOldCustList(query){
   const q = query.trim().toLowerCase();
@@ -5422,6 +5470,17 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     }
   }
 
+  // এই কাস্টমারকে আগে সম্পূর্ণ ডিলিট করা হয়ে থাকলে, তার নামে নতুন সেল করার মানে
+  // হলো সে আবার সচল কাস্টমার — তাই পুরনো ডিলিট-লিস্ট (tombstone) থেকে বাদ দেওয়া
+  // হচ্ছে, নাহলে এই নতুন সেল-সহ কাস্টমারও persistData()-তে আবার মুছে যেত।
+  {
+    const key = custKey(name, phone);
+    if(deletedCustomerKeys.includes(key)){
+      deletedCustomerKeys = deletedCustomerKeys.filter(k => k !== key);
+      saveDeletedCustomerKeys(deletedCustomerKeys);
+    }
+  }
+
   const previousDue = getCustomerTotalDue(name, phone);
   const previousDueItems = getCustomerDueItems(name, phone);
 
@@ -5560,6 +5619,14 @@ document.getElementById('addCustomerOnlyBtn').addEventListener('click', async ()
   const openingDue = Math.max(0, Number(document.getElementById('acOpeningDue').value)||0);
   if(!name){ toast('নাম দিতে হবে'); return; }
   if(!shopCustomers.some(c => (phone && c.phone === phone) || (!phone && c.name === name))) {
+    // এই কাস্টমার আগে ডিলিট করা হয়ে থাকলে, ইচ্ছাকৃতভাবে আবার যোগ করার মানে হলো
+    // এটা একটা নতুন/সচল কাস্টমার — তাই পুরনো ডিলিট-লিস্ট (tombstone) থেকে বাদ
+    // দেওয়া হচ্ছে, নাহলে সিঙ্কের সময় এটা আবার স্বয়ংক্রিয়ভাবে মুছে যেত।
+    const key = custKey(name, phone);
+    if(deletedCustomerKeys.includes(key)){
+      deletedCustomerKeys = deletedCustomerKeys.filter(k => k !== key);
+      saveDeletedCustomerKeys(deletedCustomerKeys);
+    }
     shopCustomers.push({name, phone: phone || ''});
     if(openingDue > 0){
       retailEntries.unshift({
@@ -6001,6 +6068,13 @@ document.getElementById('editSave').addEventListener('click', async ()=>{
   
   if(!shopCustomers.some(c => (e.phone && c.phone === e.phone) || (!e.phone && c.name === e.name))) {
     shopCustomers.push({name: e.name, phone: e.phone});
+  }
+  {
+    const key = custKey(e.name, e.phone);
+    if(deletedCustomerKeys.includes(key)){
+      deletedCustomerKeys = deletedCustomerKeys.filter(k => k !== key);
+      saveDeletedCustomerKeys(deletedCustomerKeys);
+    }
   }
   
   await persistData();
