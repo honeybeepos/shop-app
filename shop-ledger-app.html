@@ -425,6 +425,7 @@
      পপআপগুলো (প্রোডাক্ট খোঁজা / বিক্রি সম্পূর্ণ করা) খোলে, সেগুলো যেন পেছনে
      লুকিয়ে না যায় — তাই সাধারণ modal-overlay-এর (z-index:700) চেয়ে বেশি রাখা হলো */
   #qiSearchModal, #qiSellModal{ z-index:900; }
+  #qiPaymentMethodModal{ z-index:920; }
   #moneyCalcModal{ z-index:950; }
   .modal-overlay.show{display:flex;}
   .modal-box{ background:var(--card); border-radius:14px; padding:20px; width:100%; max-width:340px; box-shadow:0 8px 0 var(--copper-dark); }
@@ -1182,6 +1183,17 @@
       <button class="qiBigBtn" id="qiSellCompleteBtn">✅ বিক্রি সম্পূর্ণ করুন</button>
     </div>
     <button class="mini-btn" id="qiSellCancelBtn" style="width:100%; margin-top:12px;">বাতিল</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="qiPaymentMethodModal">
+  <div class="modal-box qiDarkModal" style="max-width:380px; text-align:center;">
+    <h3 style="margin:0 0 16px; color:#fff;">💰 টাকা কোথায় জমা হয়েছে?</h3>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <button class="qiBigBtn" id="qiPayCashBtn" style="background:linear-gradient(135deg,#34d399,#22c55e);">💵 Cash (নগদ)</button>
+      <button class="qiBigBtn" id="qiPayBankBtn" style="background:linear-gradient(135deg,#60a5fa,#3b82f6);">🏦 Bank</button>
+    </div>
+    <button class="mini-btn" id="qiPayCancelBtn" style="width:100%; margin-top:14px;">বাতিল</button>
   </div>
 </div>
 
@@ -4656,6 +4668,23 @@ document.getElementById('qiSellCancelBtn').addEventListener('click', ()=>{
   document.getElementById('qiSellModal').classList.remove('show');
 });
 
+function showPaymentMethodModal(){
+  return new Promise((resolve)=>{
+    const modal = document.getElementById('qiPaymentMethodModal');
+    modal.classList.add('show');
+    const cashBtn = document.getElementById('qiPayCashBtn');
+    const bankBtn = document.getElementById('qiPayBankBtn');
+    const cancelBtn = document.getElementById('qiPayCancelBtn');
+    function cleanup(){
+      modal.classList.remove('show');
+      cashBtn.onclick = null; bankBtn.onclick = null; cancelBtn.onclick = null;
+    }
+    cashBtn.onclick = ()=>{ cleanup(); resolve('cash'); };
+    bankBtn.onclick = ()=>{ cleanup(); resolve('bank'); };
+    cancelBtn.onclick = ()=>{ cleanup(); resolve(null); };
+  });
+}
+
 document.getElementById('qiSellCompleteBtn').addEventListener('click', async ()=>{
   const amount = Number(document.getElementById('qiSellAmount').value);
   if(!amount || amount <= 0){ toast('বিক্রির টাকার পরিমাণ দিন'); return; }
@@ -4678,12 +4707,18 @@ document.getElementById('qiSellCompleteBtn').addEventListener('click', async ()=
   if(received === null) return;
   if(received < amount){ toast('মোট দামের চেয়ে কম টাকা দেওয়া হয়েছে'); return; }
 
+  // টাকাটা Cash-এ নাকি Bank-এ জমা হয়েছে সেটা জিজ্ঞেস করা হচ্ছে
+  const method = await showPaymentMethodModal();
+  if(method === null) return;
+  const methodLabel = method === 'bank' ? '🏦 Bank' : '💵 Cash';
+
   // কেনা দাম (cost) প্রোডাক্ট থেকে অটোমেটিক্যালি নেওয়া হচ্ছে — আলাদা করে
   // দেখানো/জিজ্ঞাসা করার দরকার নেই, এটা নগদ বিক্রি হিসেবে সাথে সাথেই সম্পূর্ণ হবে
   retailEntries.unshift({
     id: genLineId(), name: 'নগদ কাস্টমার', item: prod.name, productId: prod.id, phone: '',
     cost: Number(prod.buy)||0, price: amount, paid: amount, qty: 1,
-    unitCost: Number(prod.buy)||0, unitPrice: amount, note: '⚡ Quick Item দিয়ে বিক্রি', status: 'নগদ-বিক্রি',
+    unitCost: Number(prod.buy)||0, unitPrice: amount, paymentMethod: method,
+    note: `⚡ Quick Item দিয়ে বিক্রি — ${methodLabel}`, status: 'নগদ-বিক্রি',
     billId: genLineId(), invoiceNo: '', date: new Date().toISOString(), soldBy: currentSalesPersonName()
   });
 
@@ -4693,7 +4728,7 @@ document.getElementById('qiSellCompleteBtn').addEventListener('click', async ()=
   await persistData();
   document.getElementById('qiSellModal').classList.remove('show');
   const change = received - amount;
-  toast(change>0 ? `✅ ${prod.name} বিক্রি সম্পূর্ণ — গ্রাহককে ফেরত দিন ${fmt(change)}` : `✅ ${prod.name} — ${fmt(amount)} বিক্রি সম্পূর্ণ হয়েছে`);
+  toast(change>0 ? `✅ ${prod.name} বিক্রি সম্পূর্ণ (${methodLabel}) — গ্রাহককে ফেরত দিন ${fmt(change)}` : `✅ ${prod.name} — ${fmt(amount)} বিক্রি সম্পূর্ণ (${methodLabel})`);
   render();
 });
 
