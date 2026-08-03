@@ -5758,6 +5758,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     const billTotalPrice = billItems.reduce((s,it)=>s+it.price,0);
 
     let paid;
+    let paymentMethod = null;
     if(status === 'নগদ-বিক্রি'){
       const received = await showMoneyCalcModal({
         title: '💵 নগদ বিক্রি — টাকার হিসাব',
@@ -5773,6 +5774,10 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
       if(received === null) return;
       if(received < billTotalPrice){ toast('মোট বিলের চেয়ে কম টাকা — "বাকি" অপশন ব্যবহার করুন'); return; }
       paid = billTotalPrice;
+
+      // টাকাটা Cash-এ নাকি Bank-এ জমা হয়েছে সেটা জিজ্ঞেস করা হচ্ছে
+      paymentMethod = await showPaymentMethodModal();
+      if(paymentMethod === null) return;
     } else {
       paid = Number(document.getElementById('fPaid').value)||0;
     }
@@ -5789,7 +5794,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
         itemPaid = Math.max(0, Math.min(it.price, remainingPaid));
         remainingPaid -= itemPaid;
       }
-      return { id: genLineId(), name, item: it.item, productId: it.productId || '', phone, cost: it.cost, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, note, status, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName() };
+      return { id: genLineId(), name, item: it.item, productId: it.productId || '', phone, cost: it.cost, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, paymentMethod, note, status, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName() };
     });
     retailEntries.unshift(...newEntries);
     bccAdjustStockForSale(billItems);
@@ -5926,6 +5931,7 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
 
   // নগদ বিক্রির সময় গ্রাহক কত টাকা দিলো এবং ফেরত (এক্সচেঞ্জ) কত দিতে হবে সেটা হিসাব করে দেখানো
   let paid = billTotalPrice;
+  let paymentMethod = null;
   if(qsType !== 'বাকি'){
     const received = await showMoneyCalcModal({
       title: '💵 এক্সচেঞ্জ — টাকার হিসাব',
@@ -5941,6 +5947,10 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
     if(received === null) return;
     if(received < billTotalPrice){ toast('মোট বিলের চেয়ে কম টাকা — "বাকি" অপশন ব্যবহার করুন'); return; }
     paid = billTotalPrice;
+
+    // টাকাটা Cash-এ নাকি Bank-এ জমা হয়েছে সেটা জিজ্ঞেস করা হচ্ছে
+    paymentMethod = await showPaymentMethodModal();
+    if(paymentMethod === null) return;
   } else {
     paid = 0;
   }
@@ -5950,7 +5960,7 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
   const saleTime = new Date().toISOString();
   const billItems = qsCart.slice();
   const newEntries = billItems.map(it => ({
-    id: genLineId(), name:custName, item: it.item, productId: it.productId || '', phone:custPhone, cost: it.cost, price: it.price, paid: qsType==='বাকি' ? 0 : it.price, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, note:'', status:qsType, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName()
+    id: genLineId(), name:custName, item: it.item, productId: it.productId || '', phone:custPhone, cost: it.cost, price: it.price, paid: qsType==='বাকি' ? 0 : it.price, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, paymentMethod, note:'', status:qsType, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName()
   }));
   retailEntries.unshift(...newEntries);
   bccAdjustStockForSale(qsCart);
@@ -6001,6 +6011,7 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
   let paid = isDue ? 0 : billTotalPrice;
 
   // নগদ বিক্রির সময় গ্রাহক কত টাকা দিলো এবং ফেরত (এক্সচেঞ্জ) কত দিতে হবে সেটা হিসাব করে দেখানো
+  let paymentMethod = null;
   if(!isDue){
     const received = await showMoneyCalcModal({
       title: '💵 এক্সচেঞ্জ — টাকার হিসাব',
@@ -6016,6 +6027,10 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
     if(received === null) return;
     if(received < billTotalPrice){ toast('মোট বিলের চেয়ে কম টাকা — "বাকি" অপশন ব্যবহার করুন'); return; }
     paid = billTotalPrice;
+
+    // টাকাটা Cash-এ নাকি Bank-এ জমা হয়েছে সেটা জিজ্ঞেস করা হচ্ছে
+    paymentMethod = await showPaymentMethodModal();
+    if(paymentMethod === null) return;
   }
 
   // সব হিসাবে (মূল লেজারে) যোগ করা হচ্ছে, যেন এটি "সব হিসাব" লিস্টে দেখা যায়, বাকি ট্র্যাক হয়, এবং সম্পূর্ণ জমা/এডিট/মুছুন কাজ করে — আগের মতো।
@@ -6031,7 +6046,7 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
       itemPaid = Math.max(0, Math.min(it.price, remainingPaid));
       remainingPaid -= itemPaid;
     }
-    return { id: genLineId(), name: esName, item: it.item, productId: it.productId || '', phone: esPhone, cost: it.cost||0, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost||0, unitPrice: it.unitPrice, note: 'এক্সট্রা সেল', status: esType, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName() };
+    return { id: genLineId(), name: esName, item: it.item, productId: it.productId || '', phone: esPhone, cost: it.cost||0, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost||0, unitPrice: it.unitPrice, paymentMethod, note: 'এক্সট্রা সেল', status: esType, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName() };
   });
   retailEntries.unshift(...newEntries);
 
