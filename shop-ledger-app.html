@@ -405,6 +405,28 @@
   }
   .qiDarkModal{ background:linear-gradient(160deg,#0f2027,#203a43,#2c5364) !important; color:#fff; }
   .qiDarkModal .pin-desc{ color:rgba(255,255,255,0.7); }
+
+  /* ===== স্টাফ সেলিং Overview — glass (glassmorphism) স্টাইল কার্ড ===== */
+  #staffSellingOverviewCountBadge{
+    display:inline-block; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.22);
+    border-radius:20px; padding:3px 12px; font-size:12px; font-weight:800; color:#a7f3d0;
+    font-family:'Space Mono',monospace; margin-left:6px;
+  }
+  .staffOvRow{
+    background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.16);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    border-radius:14px; padding:12px 14px; margin-bottom:10px; cursor:pointer;
+    transition:background .15s, transform .1s;
+  }
+  .staffOvRow:active{ background:rgba(255,255,255,0.14); transform:scale(0.99); }
+  .staffOvTop{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+  .staffOvName{ font-weight:800; font-size:14px; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .staffOvCount{ font-size:11px; color:rgba(255,255,255,0.6); font-family:'Space Mono',monospace; white-space:nowrap; }
+  .staffOvBottom{ display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12.5px; font-family:'Space Mono',monospace; }
+  .staffOvSale{ color:#93c5fd; font-weight:700; }
+  .staffOvProfit.pos{ color:#6ee7b7; font-weight:800; }
+  .staffOvProfit.neg{ color:#fca5a5; font-weight:800; }
+  .staffOvChevron{ color:rgba(255,255,255,0.4); font-size:12px; }
   .qiSellCard{
     background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.22);
     backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
@@ -1087,6 +1109,7 @@
       <div style="background:var(--paper-2); border-radius:8px; padding:8px;"><div style="color:#8a7f6c; font-size:10.5px;">সাপ্তাহিক সেল</div><div id="empSalesWeekly" style="font-weight:800; font-family:'Space Mono',monospace;">-</div></div>
       <div style="background:var(--paper-2); border-radius:8px; padding:8px;"><div style="color:#8a7f6c; font-size:10.5px;">মাসিক সেল</div><div id="empSalesMonthly" style="font-weight:800; font-family:'Space Mono',monospace;">-</div></div>
     </div>
+    <div id="empSalesMonthlyPL" style="border-radius:8px; padding:10px; margin-bottom:10px; text-align:center; font-weight:800; font-family:'Space Mono',monospace;">-</div>
     <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px;">
       <button class="mini-btn" id="empSalesPrintBtn">🖨️ Print</button>
       <button class="mini-btn" id="empSalesDownloadBtn">⬇️ Download</button>
@@ -1261,12 +1284,12 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="itemSellingOverviewModal">
+<div class="modal-overlay" id="staffSellingOverviewModal">
   <div class="modal-box qiDarkModal" style="max-width:420px; text-align:left; max-height:80vh; display:flex; flex-direction:column;">
-    <h3 style="margin:0 0 4px; color:#fff;">🛍️ Item Selling Overview</h3>
-    <p class="pin-desc" style="margin:0 0 14px;">আজকে কোন আইটেম কতবার বিক্রি হয়েছে</p>
-    <div id="itemSellingOverviewRows" style="overflow-y:auto; flex:1; min-height:60px;"></div>
-    <button class="mini-btn" id="itemSellingOverviewCloseBtn" style="width:100%; margin-top:12px;">বন্ধ করুন</button>
+    <h3 style="margin:0 0 4px; color:#fff;">🧑‍💼 স্টাফ সেলিং Overview <span id="staffSellingOverviewCountBadge">0 জন</span></h3>
+    <p class="pin-desc" style="margin:0 0 14px;">নতুন স্টাফের একাউন্ট খোলা মাত্রই এখানে যোগ হয়ে যাবে — নামের উপর ট্যাপ করলে সাপ্তাহিক/মাসিক লাভ-ক্ষতিসহ পূর্ণ বিবরণ দেখা যাবে</p>
+    <div id="staffSellingOverviewRows" style="overflow-y:auto; flex:1; min-height:60px;"></div>
+    <button class="mini-btn" id="staffSellingOverviewCloseBtn" style="width:100%; margin-top:12px;">বন্ধ করুন</button>
   </div>
 </div>
 
@@ -7062,21 +7085,47 @@ document.getElementById('damagedStockModal').addEventListener('click', (ev)=>{
   if(ev.target === document.getElementById('damagedStockModal')) document.getElementById('damagedStockModal').classList.remove('show');
 });
 
+/* ---------------- স্টাফ সেলিং Overview (আগের \"Item Selling Overview\") ----------------
+   এখন এটা আইটেম না, স্টাফ ধরে ধরে আজকের বিক্রি + লাভ দেখায়। স্টাফ একাউন্ট খোলা মাত্রই
+   (shopMembersList লাইভ শোনা হয়) এখানে যোগ হয়ে যায়, বিক্রি না করলেও। নামের উপর ট্যাপ করলে
+   সাপ্তাহিক/মাসিক হিসাব + সেই স্টাফ কী কী বিক্রি করেছে তার তালিকা + মাসিক লাভ-ক্ষতি দেখায়
+   (openEmpSalesDetail, নিচে সংজ্ঞায়িত)। */
+function renderStaffSellingOverview(){
+  const stats = monGetEmployeeSalesStats();
+  document.getElementById('staffSellingOverviewCountBadge').textContent = stats.length + ' জন';
+  const rowsEl = document.getElementById('staffSellingOverviewRows');
+  rowsEl.innerHTML = stats.length ? stats.map(s=>{
+    const profitCls = s.dailyProfit >= 0 ? 'pos' : 'neg';
+    const profitLbl = s.dailyProfit >= 0 ? 'আজকের লাভ' : 'আজকের ক্ষতি';
+    return `
+    <div class="staffOvRow" data-staff="${escapeHtml(s.name)}">
+      <div class="staffOvTop">
+        <span class="staffOvName">🧑‍💼 ${escapeHtml(s.name)}</span>
+        <span class="staffOvCount">${s.count} সেল · <span class="staffOvChevron">বিস্তারিত ›</span></span>
+      </div>
+      <div class="staffOvBottom">
+        <span class="staffOvSale">আজকের বিক্রি: ${fmt(s.daily)}</span>
+        <span class="staffOvProfit ${profitCls}">${profitLbl}: ${fmt(Math.abs(s.dailyProfit))}</span>
+      </div>
+    </div>`;
+  }).join('') : '<div style="text-align:center; color:rgba(255,255,255,0.6); padding:30px 0; font-size:13px;">এখনো কোনো স্টাফ যোগ হয়নি</div>';
+  rowsEl.querySelectorAll('[data-staff]').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      document.getElementById('staffSellingOverviewModal').classList.remove('show');
+      openEmpSalesDetail(row.dataset.staff);
+    });
+  });
+}
+
 document.getElementById('monTodaySalesCard').addEventListener('click', ()=>{
-  const rowsEl = document.getElementById('itemSellingOverviewRows');
-  rowsEl.innerHTML = monItemSoldTodayData.length ? monItemSoldTodayData.map(([nm,qty])=>`
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 4px; border-bottom:1px solid rgba(255,255,255,0.15);">
-      <div style="font-weight:700; font-size:13.5px; color:#fff;">${escapeHtml(nm)}</div>
-      <div style="font-size:13px; font-weight:800; color:#60a5fa; white-space:nowrap;">${qty} pcs</div>
-    </div>
-  `).join('') : '<div style="text-align:center; color:rgba(255,255,255,0.6); padding:30px 0; font-size:13px;">আজকে এখনো কোনো আইটেম বিক্রি হয়নি</div>';
-  document.getElementById('itemSellingOverviewModal').classList.add('show');
+  renderStaffSellingOverview();
+  document.getElementById('staffSellingOverviewModal').classList.add('show');
 });
-document.getElementById('itemSellingOverviewCloseBtn').addEventListener('click', ()=>{
-  document.getElementById('itemSellingOverviewModal').classList.remove('show');
+document.getElementById('staffSellingOverviewCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('staffSellingOverviewModal').classList.remove('show');
 });
-document.getElementById('itemSellingOverviewModal').addEventListener('click', (ev)=>{
-  if(ev.target === document.getElementById('itemSellingOverviewModal')) document.getElementById('itemSellingOverviewModal').classList.remove('show');
+document.getElementById('staffSellingOverviewModal').addEventListener('click', (ev)=>{
+  if(ev.target === document.getElementById('staffSellingOverviewModal')) document.getElementById('staffSellingOverviewModal').classList.remove('show');
 });
 
 document.getElementById('monCashBankCard').addEventListener('click', ()=>{
@@ -7595,25 +7644,53 @@ function monRenderAll(){
 let empSalesListVisible = false;
 let empSalesCurrentName = null;
 
+// দোকানের সব স্টাফ (এডমিন + সাব-ইউজার) — Firestore-এর members কালেকশন থেকে লাইভ শোনা হয়,
+// যাতে নতুন স্টাফ একাউন্ট খোলা মাত্রই "স্টাফ সেলিং Overview"-এ বিক্রি ছাড়াই যোগ হয়ে যায়।
+let shopMembersList = [];
+function watchShopMembers(shopId){
+  db.collection("shops").doc(shopId).collection("members").onSnapshot(snap=>{
+    shopMembersList = snap.docs.map(d=> d.data());
+    if(typeof renderStaffSellingOverview === 'function' && document.getElementById('staffSellingOverviewModal').classList.contains('show')){
+      renderStaffSellingOverview();
+    }
+    if(typeof monRenderEmployeeSales === 'function') monRenderEmployeeSales();
+  }, err=> console.error("watchShopMembers failed:", err));
+}
+
 function monGetEmployeeSalesStats(){
   const now = new Date();
   const todayStr = now.toDateString();
   const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate()-6); weekAgo.setHours(0,0,0,0);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const byEmp = {};
+  function ensure(name){
+    if(!byEmp[name]) byEmp[name] = {
+      name, daily:0, weekly:0, monthly:0, allTime:0,
+      dailyProfit:0, weeklyProfit:0, monthlyProfit:0, allTimeProfit:0,
+      count:0, entries:[]
+    };
+    return byEmp[name];
+  }
+  // স্টাফের একাউন্ট খোলার সাথে সাথেই এখানে যোগ হয়ে যাবে, এখনো কোনো সেল না করলেও
+  shopMembersList.forEach(m=> ensure(m.name || 'স্টাফ'));
+
   retailEntries.forEach(e=>{
     if(!SALE_STATUSES.includes(e.status)) return;
-    const emp = e.soldBy || 'এডমিন';
-    if(!byEmp[emp]) byEmp[emp] = { name: emp, daily:0, weekly:0, monthly:0, allTime:0, count:0, entries:[] };
+    const emp = ensure(e.soldBy || 'এডমিন');
     const d = new Date(e.date);
-    byEmp[emp].allTime += (e.price||0);
-    byEmp[emp].count += 1;
-    byEmp[emp].entries.push(e);
-    if(d.toDateString() === todayStr) byEmp[emp].daily += (e.price||0);
-    if(d >= weekAgo) byEmp[emp].weekly += (e.price||0);
-    if(d >= monthStart) byEmp[emp].monthly += (e.price||0);
+    const profit = (e.price||0) - (e.cost||0);
+    emp.allTime += (e.price||0); emp.allTimeProfit += profit;
+    emp.count += 1;
+    emp.entries.push(e);
+    if(d.toDateString() === todayStr){ emp.daily += (e.price||0); emp.dailyProfit += profit; }
+    if(d >= weekAgo){ emp.weekly += (e.price||0); emp.weeklyProfit += profit; }
+    if(d >= monthStart){ emp.monthly += (e.price||0); emp.monthlyProfit += profit; }
   });
-  return Object.values(byEmp).sort((a,b)=> b.allTime - a.allTime);
+
+  const memberNames = new Set(shopMembersList.map(m=> m.name || 'স্টাফ'));
+  return Object.values(byEmp)
+    .filter(s=> memberNames.has(s.name) || s.count > 0) // পুরনো/অমিল soldBy নাম থাকলে সেল থাকলেই দেখাবে
+    .sort((a,b)=> b.allTime - a.allTime);
 }
 
 function monRenderEmployeeSales(){
@@ -7667,6 +7744,18 @@ function openEmpSalesDetail(name){
   document.getElementById('empSalesDaily').textContent = fmt(stats.daily);
   document.getElementById('empSalesWeekly').textContent = fmt(stats.weekly);
   document.getElementById('empSalesMonthly').textContent = fmt(stats.monthly);
+
+  const plEl = document.getElementById('empSalesMonthlyPL');
+  if(stats.count === 0){
+    plEl.textContent = 'এখনো কোনো সেল করেননি';
+    plEl.style.background = 'var(--paper-2)'; plEl.style.color = '#8a7f6c';
+  } else if(stats.monthlyProfit >= 0){
+    plEl.textContent = `✅ এই মাসে লাভ হয়েছে: ${fmt(stats.monthlyProfit)}`;
+    plEl.style.background = '#dcf0e8'; plEl.style.color = 'var(--paid)';
+  } else {
+    plEl.textContent = `⚠️ এই মাসে ক্ষতি হয়েছে: ${fmt(Math.abs(stats.monthlyProfit))}`;
+    plEl.style.background = '#f5e0dc'; plEl.style.color = 'var(--due)';
+  }
 
   const sortedEntries = stats.entries.slice().sort((a,b)=> new Date(b.date)-new Date(a.date));
   document.getElementById('empSalesHistory').innerHTML = sortedEntries.length ? sortedEntries.map(e=>{
@@ -7976,6 +8065,7 @@ auth.onAuthStateChanged(async (user)=>{
     const btn = document.getElementById("subUserBtn");
     btn.style.display = "inline-block";
     btn.addEventListener("click", ()=>createSubUser(session.shopId));
+    watchShopMembers(session.shopId); // স্টাফ সেলিং Overview-এর জন্য — নতুন স্টাফ যোগ হলেই লাইভ আপডেট হবে
   }
 
   try{
