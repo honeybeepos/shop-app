@@ -1197,6 +1197,44 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="cashBankModal">
+  <div class="modal-box qiDarkModal" style="max-width:380px; text-align:center;">
+    <h3 style="margin:0 0 4px; color:#fff;">💳 Cash / Bank হিসাব</h3>
+    <p class="pin-desc" style="margin:0 0 18px;">নগদ ও ব্যাংকে মোট কত টাকা জমা হয়েছে</p>
+
+    <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:8px;">
+      <div class="qiSellCard" style="background:linear-gradient(135deg,rgba(52,211,153,0.28),rgba(34,197,94,0.18)); text-align:left; display:flex; align-items:center; gap:14px;">
+        <div style="font-size:30px;">💵</div>
+        <div style="flex:1;">
+          <div style="font-size:12.5px; color:rgba(255,255,255,0.75); font-weight:700;">Cash — আজকে</div>
+          <div style="font-size:20px; font-weight:800; color:#fff;" id="cashBankTodayCash">SAR 0</div>
+        </div>
+      </div>
+      <div class="qiSellCard" style="background:linear-gradient(135deg,rgba(96,165,250,0.28),rgba(59,130,246,0.18)); text-align:left; display:flex; align-items:center; gap:14px;">
+        <div style="font-size:30px;">🏦</div>
+        <div style="flex:1;">
+          <div style="font-size:12.5px; color:rgba(255,255,255,0.75); font-weight:700;">Bank — আজকে</div>
+          <div style="font-size:20px; font-weight:800; color:#fff;" id="cashBankTodayBank">SAR 0</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="pin-desc" style="margin:14px 0 8px; text-align:left;">দোকান শুরু থেকে (All-Time)</p>
+    <div style="display:flex; gap:10px;">
+      <div class="qiSellCard" style="flex:1; padding:14px;">
+        <div style="font-size:11px; color:rgba(255,255,255,0.65); font-weight:700;">💵 Cash</div>
+        <div style="font-size:16px; font-weight:800; color:#fff; margin-top:4px;" id="cashBankAllCash">SAR 0</div>
+      </div>
+      <div class="qiSellCard" style="flex:1; padding:14px;">
+        <div style="font-size:11px; color:rgba(255,255,255,0.65); font-weight:700;">🏦 Bank</div>
+        <div style="font-size:16px; font-weight:800; color:#fff; margin-top:4px;" id="cashBankAllBank">SAR 0</div>
+      </div>
+    </div>
+
+    <button class="mini-btn" id="cashBankCloseBtn" style="width:100%; margin-top:18px;">বন্ধ করুন</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="pinModal">
   <div class="modal-box">
     <h3 id="pinTitle">পাসওয়ার্ড দিন</h3>
@@ -1856,6 +1894,19 @@
     #program-monitor .glassCard.alert .val{ color:#fca5a5; }
     @keyframes monFloat{ 0%,100%{ transform:translateY(0) rotateX(0deg); } 50%{ transform:translateY(-6px) rotateX(4deg); } }
 
+    @keyframes qiCashBankGlow{
+      0%,100%{ background-position:0% 50%; box-shadow:0 10px 26px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 18px rgba(96,165,250,0.35); }
+      50%{ background-position:100% 50%; box-shadow:0 10px 26px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.25), 0 0 26px rgba(52,211,153,0.5); }
+    }
+    #program-monitor .qiCashBankCard{
+      background:linear-gradient(120deg, rgba(52,211,153,0.28), rgba(96,165,250,0.28), rgba(52,211,153,0.28));
+      background-size:200% 200%;
+      border:1px solid rgba(255,255,255,0.35);
+      animation: qiCashBankGlow 3.2s ease-in-out infinite;
+    }
+    #program-monitor .qiCashBankCard .ic{ animation: qiCashBankIconPulse 2s ease-in-out infinite; }
+    @keyframes qiCashBankIconPulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.18); } }
+
     #program-monitor .glassList{
       border-radius:16px; padding:4px; margin-bottom:14px; max-height:50vh; overflow-y:auto;
       background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
@@ -1891,7 +1942,7 @@
       <div class="glassGrid">
         <div class="glassCard wide"><div class="ic">💰</div><div class="lbl">আজকের মোট বিক্রি</div><div class="val" id="monTodaySales">SAR 0</div></div>
         <div class="glassCard wide" style="background:linear-gradient(120deg,rgba(167,243,208,0.18),rgba(255,255,255,0.08));"><div class="ic">🏆</div><div class="lbl">দোকান শুরু থেকে মোট বিক্রি (All-Time)</div><div class="val" id="monAllTimeSales">SAR 0</div></div>
-        <div class="glassCard"><div class="ic">📊</div><div class="lbl">Daily Sales</div><div class="val small" id="monDailySales">SAR 0</div></div>
+        <div class="glassCard qiCashBankCard" id="monCashBankCard" style="cursor:pointer;"><div class="ic">💳</div><div class="lbl">Cash / Bank</div><div class="val small" id="monCashBankTotal">SAR 0</div></div>
         <div class="glassCard"><div class="ic">📊</div><div class="lbl">Weekly Sales</div><div class="val small" id="monWeeklySales">SAR 0</div></div>
         <div class="glassCard"><div class="ic">📊</div><div class="lbl">Monthly Sales</div><div class="val small" id="monMonthlySales">SAR 0</div></div>
         <div class="glassCard"><div class="ic">🛒</div><div class="lbl">Total Product Sold</div><div class="val small" id="monTotalProductSold">0</div></div>
@@ -2381,6 +2432,7 @@ function saveDeletedCustomerKeys(keys){ localStorage.setItem('phone-shop-deleted
 function custKey(name, phone){ return (phone ? phone : '') + '|' + (name||''); }
 let deletedEntryIds = loadDeletedEntryIds();
 let deletedCustomerKeys = loadDeletedCustomerKeys();
+let monCashBankData = { todayCash:0, todayBank:0, allTimeCash:0, allTimeBank:0 };
 function stripTombstonedData(){
   if(deletedEntryIds.length){
     retailEntries = retailEntries.filter(e => !deletedEntryIds.includes(e.id));
@@ -6961,6 +7013,18 @@ document.getElementById('damagedStockModal').addEventListener('click', (ev)=>{
   if(ev.target === document.getElementById('damagedStockModal')) document.getElementById('damagedStockModal').classList.remove('show');
 });
 
+document.getElementById('monCashBankCard').addEventListener('click', ()=>{
+  document.getElementById('cashBankTodayCash').textContent = fmt(monCashBankData.todayCash);
+  document.getElementById('cashBankTodayBank').textContent = fmt(monCashBankData.todayBank);
+  document.getElementById('cashBankAllCash').textContent = fmt(monCashBankData.allTimeCash);
+  document.getElementById('cashBankAllBank').textContent = fmt(monCashBankData.allTimeBank);
+  document.getElementById('cashBankModal').classList.add('show');
+});
+document.getElementById('cashBankCloseBtn').addEventListener('click', ()=> document.getElementById('cashBankModal').classList.remove('show'));
+document.getElementById('cashBankModal').addEventListener('click', (ev)=>{
+  if(ev.target === document.getElementById('cashBankModal')) document.getElementById('cashBankModal').classList.remove('show');
+});
+
 document.getElementById('damagedStockPrintBtn').addEventListener('click', ()=>{
   const items = getDamagedStockEntries();
   if(!items.length){ toast('কোনো নষ্ট মাল নেই'); return; }
@@ -7294,6 +7358,7 @@ function monRenderAll(){
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   let todaySales=0, weeklySales=0, monthlySales=0, allTimeSales=0, totalProductSold=0, totalPaidAll=0, totalDueAll=0, totalProfitAll=0;
+  let todayCash=0, todayBank=0, allTimeCash=0, allTimeBank=0;
   const itemSoldMap = {};
   const itemSoldTodayMap = {};
   const itemSoldWeekMap = {};
@@ -7316,6 +7381,13 @@ function monRenderAll(){
       if(d.toDateString() === todayStr) todaySales += (e.price||0);
       if(d >= weekAgo) weeklySales += (e.price||0);
       if(d >= monthStart) monthlySales += (e.price||0);
+      if(e.paymentMethod === 'cash'){
+        allTimeCash += (e.paid||0);
+        if(d.toDateString() === todayStr) todayCash += (e.paid||0);
+      } else if(e.paymentMethod === 'bank'){
+        allTimeBank += (e.paid||0);
+        if(d.toDateString() === todayStr) todayBank += (e.paid||0);
+      }
       if(e.billId){
         if(!billMap[e.billId]) billMap[e.billId] = {items:[], total:0, name:e.name, date:e.date};
         billMap[e.billId].items.push(e.item);
@@ -7326,10 +7398,11 @@ function monRenderAll(){
 
   document.getElementById('monTodaySales').textContent = fmt(todaySales);
   document.getElementById('monAllTimeSales').textContent = fmt(allTimeSales);
-  document.getElementById('monDailySales').textContent = fmt(todaySales);
+  document.getElementById('monCashBankTotal').textContent = fmt(allTimeCash + allTimeBank);
   document.getElementById('monWeeklySales').textContent = fmt(weeklySales);
   document.getElementById('monMonthlySales').textContent = fmt(monthlySales);
   document.getElementById('monTotalProductSold').textContent = totalProductSold;
+  monCashBankData = { todayCash, todayBank, allTimeCash, allTimeBank };
 
   const prods = bccLoadProducts();
   const totalStock = prods.reduce((s,p)=> s+(Number(p.qty)||0), 0);
