@@ -426,6 +426,7 @@
      লুকিয়ে না যায় — তাই সাধারণ modal-overlay-এর (z-index:700) চেয়ে বেশি রাখা হলো */
   #qiSearchModal, #qiSellModal{ z-index:900; }
   #qiPaymentMethodModal{ z-index:920; }
+  #cashBankTransferModal{ z-index:750; }
   #moneyCalcModal{ z-index:950; }
   .modal-overlay.show{display:flex;}
   .modal-box{ background:var(--card); border-radius:14px; padding:20px; width:100%; max-width:340px; box-shadow:0 8px 0 var(--copper-dark); }
@@ -1219,19 +1220,44 @@
       </div>
     </div>
 
+    <p class="pin-desc" style="margin:14px 0 6px; text-align:left;">সাপ্তাহিক (গত ৭ দিন)</p>
+    <div style="display:flex; gap:10px; margin-bottom:4px;">
+      <div class="qiSellCard" style="flex:1; padding:10px 12px;">
+        <div style="font-size:10.5px; color:rgba(255,255,255,0.6); font-weight:700;">💵 Cash</div>
+        <div style="font-size:14px; font-weight:800; color:#fff; margin-top:2px;" id="cashBankWeeklyCash">SAR 0</div>
+      </div>
+      <div class="qiSellCard" style="flex:1; padding:10px 12px;">
+        <div style="font-size:10.5px; color:rgba(255,255,255,0.6); font-weight:700;">🏦 Bank</div>
+        <div style="font-size:14px; font-weight:800; color:#fff; margin-top:2px;" id="cashBankWeeklyBank">SAR 0</div>
+      </div>
+    </div>
+
     <p class="pin-desc" style="margin:14px 0 8px; text-align:left;">দোকান শুরু থেকে (All-Time)</p>
     <div style="display:flex; gap:10px;">
       <div class="qiSellCard" style="flex:1; padding:14px;">
         <div style="font-size:11px; color:rgba(255,255,255,0.65); font-weight:700;">💵 Cash</div>
         <div style="font-size:16px; font-weight:800; color:#fff; margin-top:4px;" id="cashBankAllCash">SAR 0</div>
       </div>
-      <div class="qiSellCard" style="flex:1; padding:14px;">
+      <div class="qiSellCard" id="cashBankAllBankCard" style="flex:1; padding:14px; cursor:pointer; border:1px dashed rgba(255,255,255,0.4);">
         <div style="font-size:11px; color:rgba(255,255,255,0.65); font-weight:700;">🏦 Bank</div>
         <div style="font-size:16px; font-weight:800; color:#fff; margin-top:4px;" id="cashBankAllBank">SAR 0</div>
+        <div style="font-size:9.5px; color:rgba(255,255,255,0.5); margin-top:3px;">চাপুন — Cash-এ নিন</div>
       </div>
     </div>
 
     <button class="mini-btn" id="cashBankCloseBtn" style="width:100%; margin-top:18px;">বন্ধ করুন</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cashBankTransferModal">
+  <div class="modal-box qiDarkModal" style="max-width:360px;">
+    <h3 style="margin:0 0 4px; color:#fff; text-align:center;">🏦 ➜ 💵 Bank থেকে Cash</h3>
+    <p class="pin-desc" style="text-align:center; margin:0 0 16px;" id="cashBankTransferAvail">Bank-এ আছে: SAR 0</p>
+    <div class="qiSellCard">
+      <input type="number" inputmode="decimal" id="cashBankTransferAmount" class="qiBigInput" placeholder="কত টাকা নিতে চান">
+      <button class="qiBigBtn" id="cashBankTransferConfirmBtn">✅ নিশ্চিত করুন</button>
+    </div>
+    <button class="mini-btn" id="cashBankTransferCancelBtn" style="width:100%; margin-top:12px;">বাতিল</button>
   </div>
 </div>
 
@@ -2432,7 +2458,20 @@ function saveDeletedCustomerKeys(keys){ localStorage.setItem('phone-shop-deleted
 function custKey(name, phone){ return (phone ? phone : '') + '|' + (name||''); }
 let deletedEntryIds = loadDeletedEntryIds();
 let deletedCustomerKeys = loadDeletedCustomerKeys();
-let monCashBankData = { todayCash:0, todayBank:0, allTimeCash:0, allTimeBank:0 };
+let monCashBankData = { todayCash:0, todayBank:0, weeklyCash:0, weeklyBank:0, allTimeCash:0, allTimeBank:0 };
+// Bank থেকে Cash-এ (বা উল্টো) ম্যানুয়ালি সরানো টাকার হিসাব — এটা কোনো সেল না,
+// শুধু হাতে থাকা টাকার অবস্থান পাল্টানো, তাই এটা শুধু "All-Time" ব্যালেন্সে যোগ হয়
+function loadCashBankTransfers(){ try{ return JSON.parse(localStorage.getItem('cash-bank-transfers')||'[]'); }catch(e){ return []; } }
+function saveCashBankTransfers(list){ localStorage.setItem('cash-bank-transfers', JSON.stringify(list)); }
+function getCashBankTransferAdjustment(){
+  const transfers = loadCashBankTransfers();
+  let cash = 0, bank = 0;
+  transfers.forEach(t=>{
+    if(t.from === 'bank' && t.to === 'cash'){ bank -= t.amount; cash += t.amount; }
+    else if(t.from === 'cash' && t.to === 'bank'){ cash -= t.amount; bank += t.amount; }
+  });
+  return { cash, bank };
+}
 function stripTombstonedData(){
   if(deletedEntryIds.length){
     retailEntries = retailEntries.filter(e => !deletedEntryIds.includes(e.id));
@@ -7016,6 +7055,8 @@ document.getElementById('damagedStockModal').addEventListener('click', (ev)=>{
 document.getElementById('monCashBankCard').addEventListener('click', ()=>{
   document.getElementById('cashBankTodayCash').textContent = fmt(monCashBankData.todayCash);
   document.getElementById('cashBankTodayBank').textContent = fmt(monCashBankData.todayBank);
+  document.getElementById('cashBankWeeklyCash').textContent = fmt(monCashBankData.weeklyCash);
+  document.getElementById('cashBankWeeklyBank').textContent = fmt(monCashBankData.weeklyBank);
   document.getElementById('cashBankAllCash').textContent = fmt(monCashBankData.allTimeCash);
   document.getElementById('cashBankAllBank').textContent = fmt(monCashBankData.allTimeBank);
   document.getElementById('cashBankModal').classList.add('show');
@@ -7023,6 +7064,34 @@ document.getElementById('monCashBankCard').addEventListener('click', ()=>{
 document.getElementById('cashBankCloseBtn').addEventListener('click', ()=> document.getElementById('cashBankModal').classList.remove('show'));
 document.getElementById('cashBankModal').addEventListener('click', (ev)=>{
   if(ev.target === document.getElementById('cashBankModal')) document.getElementById('cashBankModal').classList.remove('show');
+});
+
+// Bank থেকে Cash-এ টাকা সরানো — "All-Time Bank" কার্ডে ক্লিক করলে খুলবে
+document.getElementById('cashBankAllBankCard').addEventListener('click', ()=>{
+  document.getElementById('cashBankTransferAvail').textContent = `Bank-এ আছে: ${fmt(monCashBankData.allTimeBank)}`;
+  document.getElementById('cashBankTransferAmount').value = '';
+  document.getElementById('cashBankTransferModal').classList.add('show');
+  setTimeout(()=> document.getElementById('cashBankTransferAmount').focus(), 50);
+});
+document.getElementById('cashBankTransferCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('cashBankTransferModal').classList.remove('show');
+});
+
+document.getElementById('cashBankTransferConfirmBtn').addEventListener('click', async ()=>{
+  const amount = Number(document.getElementById('cashBankTransferAmount').value);
+  if(!amount || amount <= 0){ toast('কত টাকা নিতে চান লিখুন'); return; }
+  if(amount > monCashBankData.allTimeBank){
+    toast(`এত টাকা নেই — Bank-এ আছে ${fmt(monCashBankData.allTimeBank)}`);
+    return;
+  }
+  const transfers = loadCashBankTransfers();
+  transfers.push({ id: genLineId(), from:'bank', to:'cash', amount, date: new Date().toISOString(), by: currentSalesPersonName() });
+  saveCashBankTransfers(transfers);
+  await persistData();
+  document.getElementById('cashBankTransferModal').classList.remove('show');
+  document.getElementById('cashBankModal').classList.remove('show');
+  toast(`✅ Bank থেকে ${fmt(amount)} Cash-এ নেওয়া হয়েছে`);
+  if(typeof monRenderAll === 'function') monRenderAll();
 });
 
 document.getElementById('damagedStockPrintBtn').addEventListener('click', ()=>{
@@ -7358,7 +7427,7 @@ function monRenderAll(){
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   let todaySales=0, weeklySales=0, monthlySales=0, allTimeSales=0, totalProductSold=0, totalPaidAll=0, totalDueAll=0, totalProfitAll=0;
-  let todayCash=0, todayBank=0, allTimeCash=0, allTimeBank=0;
+  let todayCash=0, todayBank=0, weeklyCash=0, weeklyBank=0, allTimeCash=0, allTimeBank=0;
   const itemSoldMap = {};
   const itemSoldTodayMap = {};
   const itemSoldWeekMap = {};
@@ -7384,9 +7453,11 @@ function monRenderAll(){
       if(e.paymentMethod === 'cash'){
         allTimeCash += (e.paid||0);
         if(d.toDateString() === todayStr) todayCash += (e.paid||0);
+        if(d >= weekAgo) weeklyCash += (e.paid||0);
       } else if(e.paymentMethod === 'bank'){
         allTimeBank += (e.paid||0);
         if(d.toDateString() === todayStr) todayBank += (e.paid||0);
+        if(d >= weekAgo) weeklyBank += (e.paid||0);
       }
       if(e.billId){
         if(!billMap[e.billId]) billMap[e.billId] = {items:[], total:0, name:e.name, date:e.date};
@@ -7402,7 +7473,12 @@ function monRenderAll(){
   document.getElementById('monWeeklySales').textContent = fmt(weeklySales);
   document.getElementById('monMonthlySales').textContent = fmt(monthlySales);
   document.getElementById('monTotalProductSold').textContent = totalProductSold;
-  monCashBankData = { todayCash, todayBank, allTimeCash, allTimeBank };
+  const transferAdj = getCashBankTransferAdjustment();
+  monCashBankData = {
+    todayCash, todayBank, weeklyCash, weeklyBank,
+    allTimeCash: allTimeCash + transferAdj.cash,
+    allTimeBank: allTimeBank + transferAdj.bank
+  };
 
   const prods = bccLoadProducts();
   const totalStock = prods.reduce((s,p)=> s+(Number(p.qty)||0), 0);
