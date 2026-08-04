@@ -1261,6 +1261,15 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="itemSellingOverviewModal">
+  <div class="modal-box qiDarkModal" style="max-width:420px; text-align:left; max-height:80vh; display:flex; flex-direction:column;">
+    <h3 style="margin:0 0 4px; color:#fff;">🛍️ Item Selling Overview</h3>
+    <p class="pin-desc" style="margin:0 0 14px;">আজকে কোন আইটেম কতবার বিক্রি হয়েছে</p>
+    <div id="itemSellingOverviewRows" style="overflow-y:auto; flex:1; min-height:60px;"></div>
+    <button class="mini-btn" id="itemSellingOverviewCloseBtn" style="width:100%; margin-top:12px;">বন্ধ করুন</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="pinModal">
   <div class="modal-box">
     <h3 id="pinTitle">পাসওয়ার্ড দিন</h3>
@@ -1966,7 +1975,7 @@
     <div class="monSection" id="mtab-sales">
       <div class="monSectionTitle">💰 Sales Overview</div>
       <div class="glassGrid">
-        <div class="glassCard wide"><div class="ic">💰</div><div class="lbl">আজকের মোট বিক্রি</div><div class="val" id="monTodaySales">SAR 0</div></div>
+        <div class="glassCard wide" id="monTodaySalesCard" style="cursor:pointer;"><div class="ic">💰</div><div class="lbl">আজকের মোট বিক্রি</div><div class="val" id="monTodaySales">SAR 0</div></div>
         <div class="glassCard wide" style="background:linear-gradient(120deg,rgba(167,243,208,0.18),rgba(255,255,255,0.08));"><div class="ic">🏆</div><div class="lbl">দোকান শুরু থেকে মোট বিক্রি (All-Time)</div><div class="val" id="monAllTimeSales">SAR 0</div></div>
         <div class="glassCard qiCashBankCard" id="monCashBankCard" style="cursor:pointer;"><div class="ic">💳</div><div class="lbl">Cash / Bank</div><div class="val small" id="monCashBankTotal">SAR 0</div></div>
         <div class="glassCard"><div class="ic">📊</div><div class="lbl">Weekly Sales</div><div class="val small" id="monWeeklySales">SAR 0</div></div>
@@ -2459,6 +2468,7 @@ function custKey(name, phone){ return (phone ? phone : '') + '|' + (name||''); }
 let deletedEntryIds = loadDeletedEntryIds();
 let deletedCustomerKeys = loadDeletedCustomerKeys();
 let monCashBankData = { todayCash:0, todayBank:0, weeklyCash:0, weeklyBank:0, allTimeCash:0, allTimeBank:0 };
+let monItemSoldTodayData = [];
 // Bank থেকে Cash-এ (বা উল্টো) ম্যানুয়ালি সরানো টাকার হিসাব — এটা কোনো সেল না,
 // শুধু হাতে থাকা টাকার অবস্থান পাল্টানো, তাই এটা শুধু "All-Time" ব্যালেন্সে যোগ হয়
 function loadCashBankTransfers(){ try{ return JSON.parse(localStorage.getItem('cash-bank-transfers')||'[]'); }catch(e){ return []; } }
@@ -7052,6 +7062,23 @@ document.getElementById('damagedStockModal').addEventListener('click', (ev)=>{
   if(ev.target === document.getElementById('damagedStockModal')) document.getElementById('damagedStockModal').classList.remove('show');
 });
 
+document.getElementById('monTodaySalesCard').addEventListener('click', ()=>{
+  const rowsEl = document.getElementById('itemSellingOverviewRows');
+  rowsEl.innerHTML = monItemSoldTodayData.length ? monItemSoldTodayData.map(([nm,qty])=>`
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 4px; border-bottom:1px solid rgba(255,255,255,0.15);">
+      <div style="font-weight:700; font-size:13.5px; color:#fff;">${escapeHtml(nm)}</div>
+      <div style="font-size:13px; font-weight:800; color:#60a5fa; white-space:nowrap;">${qty} pcs</div>
+    </div>
+  `).join('') : '<div style="text-align:center; color:rgba(255,255,255,0.6); padding:30px 0; font-size:13px;">আজকে এখনো কোনো আইটেম বিক্রি হয়নি</div>';
+  document.getElementById('itemSellingOverviewModal').classList.add('show');
+});
+document.getElementById('itemSellingOverviewCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('itemSellingOverviewModal').classList.remove('show');
+});
+document.getElementById('itemSellingOverviewModal').addEventListener('click', (ev)=>{
+  if(ev.target === document.getElementById('itemSellingOverviewModal')) document.getElementById('itemSellingOverviewModal').classList.remove('show');
+});
+
 document.getElementById('monCashBankCard').addEventListener('click', ()=>{
   document.getElementById('cashBankTodayCash').textContent = fmt(monCashBankData.todayCash);
   document.getElementById('cashBankTodayBank').textContent = fmt(monCashBankData.todayBank);
@@ -7492,6 +7519,7 @@ function monRenderAll(){
   document.getElementById('monAlertOutOfStock').innerHTML = oosHtml;
 
   const todayProductQty = Object.values(itemSoldTodayMap).reduce((s,q)=>s+q,0);
+  monItemSoldTodayData = Object.entries(itemSoldTodayMap).sort((a,b)=>b[1]-a[1]);
   document.getElementById('monTodayProductSaleCount').textContent = todayProductQty + ' pcs';
   const weeklyProductQty = Object.values(itemSoldWeekMap).reduce((s,q)=>s+q,0);
   document.getElementById('monWeeklyProductSaleCount').textContent = weeklyProductQty + ' pcs';
