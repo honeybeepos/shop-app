@@ -493,6 +493,8 @@
     #cdPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #permCustPrintArea.printing, #permCustPrintArea.printing *{visibility:visible;}
     #permCustPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
+    #saleReceiptPrintArea.printing, #saleReceiptPrintArea.printing *{visibility:visible;}
+    #saleReceiptPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     .no-print{display:none !important;}
   }
 </style>
@@ -1413,13 +1415,15 @@
 
 <div class="modal-overlay" id="shareModal">
   <div class="modal-box">
-    <h3>📨 Send Notification?</h3>
+    <h3>📨 রসিদ পাঠান / প্রিন্ট করুন</h3>
     <p class="pin-desc" id="shareMsgPreview"></p>
-    <a class="btn" id="shareWhatsapp" style="text-decoration:none; display:block; text-align:center;" target="_blank">✅ Send via WhatsApp</a>
+    <button class="btn" id="sharePrint" style="margin-top:0;">🖨️ থার্মাল প্রিন্ট (রসিদ)</button>
+    <a class="btn" id="shareWhatsapp" style="text-decoration:none; display:block; text-align:center; margin-top:10px;" target="_blank">✅ Send via WhatsApp</a>
     <button class="btn secondary" id="shareSms" style="margin-top:10px;">💬 Send via SMS</button>
     <button class="mini-btn" id="shareSkip" style="margin-top:10px; width:100%;">Not Now</button>
   </div>
 </div>
+<div id="saleReceiptPrintArea" style="display:none;"></div>
 
 <div id="program-bizmgmt" style="display:none; position:fixed; inset:0; z-index:500; background:radial-gradient(circle at 15% -10%, #1f3b4d 0%, #14262f 45%, #0a1418 100%); flex-direction:column;">
   <style>
@@ -4921,7 +4925,7 @@ document.getElementById('qiSellCompleteBtn').addEventListener('click', async ()=
     cost: Number(prod.buy)||0, price: amount, paid: amount, qty: 1,
     unitCost: Number(prod.buy)||0, unitPrice: amount, paymentMethod: method,
     note: `⚡ Quick Item দিয়ে বিক্রি — ${methodLabel}`, status: 'নগদ-বিক্রি',
-    billId: genLineId(), invoiceNo: '', date: new Date().toISOString(), soldBy: currentSalesPersonName()
+    billId: genLineId(), invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName()
   });
 
   const prods = bccLoadProducts().map(p => p.id===prod.id ? {...p, qty: Math.max((Number(p.qty)||0)-1, 0)} : p);
@@ -4932,6 +4936,9 @@ document.getElementById('qiSellCompleteBtn').addEventListener('click', async ()=
   const change = received - amount;
   toast(change>0 ? `✅ ${prod.name} বিক্রি সম্পূর্ণ (${methodLabel}) — গ্রাহককে ফেরত দিন ${fmt(change)}` : `✅ ${prod.name} — ${fmt(amount)} বিক্রি সম্পূর্ণ (${methodLabel})`);
   render();
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  const qiMsg = `🧾 SALES RECEIPT\n${shopName}\n\nInvoice No: ${retailEntries[0].invoiceNo}\nDate: ${new Date().toLocaleDateString('en-GB')}\n\nItem: ${prod.name}\nQty: 1\nPrice: SAR ${amount}\nPaid: SAR ${amount} (${methodLabel})${change>0?`\nChange Due: SAR ${change}`:''}\n\nThank you!`;
+  openShareModal('নগদ কাস্টমার', '', qiMsg);
 });
 
 
@@ -5891,7 +5898,7 @@ async function finishAndMaybeShare(name, phone, message){
   await persistData();
   render();
   toast('হিসাব আপডেট করা হয়েছে');
-  if(phone && message){
+  if(message){
     openShareModal(name, phone, message);
   }
   document.querySelector('.tab-btn[data-tab="list"]').click();
@@ -6012,7 +6019,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     let extraNote = (cashBack==='yes' ? `Cash return: SAR ${value}` : `SAR ${value} deducted from balance.`) + (condition==='bad' ? ' [খারাপ/নষ্ট মাল — স্টকে যোগ হয়নি]' : ' [ভালো মাল — স্টকে যোগ হয়েছে]');
     if(cashBack === 'no' && value>0){ allocateDuePayment(name, phone, value); }
 
-    retailEntries.unshift({ id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, returnValue: value, cashBack, note: (note ? note+' — ' : '')+extraNote, status, condition, date: new Date().toISOString(), soldBy: currentSalesPersonName() });
+    retailEntries.unshift({ id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, returnValue: value, cashBack, note: (note ? note+' — ' : '')+extraNote, status, condition, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() });
     // ফেরত দেওয়া মাল "ভালো" হলে স্টকে ফেরত যোগ হবে, "খারাপ/নষ্ট" হলে স্টকে যোগ হবে না
     if(condition === 'bad'){
       toast(`"${item}" খারাপ/নষ্ট হিসেবে চিহ্নিত হয়েছে, তাই স্টকে যোগ হয়নি`);
@@ -6050,7 +6057,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
 
     allocateDuePayment(name, phone, amount);
     
-    retailEntries.unshift({ id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, depositAmount: amount, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, date: new Date().toISOString(), soldBy: currentSalesPersonName() });
+    retailEntries.unshift({ id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, depositAmount: amount, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() });
     
     const isCleared = isCustomerFullyPaid(name, phone);
     const changeBack = Math.max(amount - previousDue, 0);
@@ -6543,13 +6550,43 @@ document.getElementById('editSave').addEventListener('click', async ()=>{
 const shareModal = document.getElementById('shareModal');
 function openShareModal(name, phone, message){
   document.getElementById('shareMsgPreview').textContent = message;
-  let digits = phone.replace(/\D/g,'');
-  document.getElementById('shareWhatsapp').href = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-  document.getElementById('shareSms').onclick = ()=>{
-    window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
-    shareModal.classList.remove('show');
-  };
+  document.getElementById('sharePrint').onclick = ()=> printSaleReceipt(name, phone, message);
+  const waBtn = document.getElementById('shareWhatsapp');
+  const smsBtn = document.getElementById('shareSms');
+  if(phone){
+    let digits = phone.replace(/\D/g,'');
+    waBtn.href = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+    waBtn.style.display = 'block'; waBtn.style.opacity = '1'; waBtn.style.pointerEvents = 'auto';
+    smsBtn.style.display = 'block'; smsBtn.disabled = false;
+    smsBtn.onclick = ()=>{
+      window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
+      shareModal.classList.remove('show');
+    };
+  } else {
+    // ফোন নাম্বার ছাড়া (ওয়াক-ইন) সেল হলে WhatsApp/SMS পাঠানো যাবে না, তাই সেই
+    // বাটন দুটো লুকিয়ে রাখা হচ্ছে — কিন্তু প্রিন্ট বাটন সবসময়ই কাজ করবে
+    waBtn.style.display = 'none';
+    smsBtn.style.display = 'none';
+  }
   shareModal.classList.add('show');
+}
+// থার্মাল/POS প্রিন্টারে ছোট রসিদ প্রিন্ট করার জন্য — WhatsApp/SMS-এর জন্য বানানো
+// একই বার্তাটাই (ইনভয়েস নাম্বার, আইটেম, দাম, বাকি সব থাকে) রসিদ আকারে প্রিন্ট হয়,
+// ফোন নাম্বার থাকুক বা না থাকুক — সব সেলেই এই অপশন কাজ করবে
+function printSaleReceipt(name, phone, message){
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  const printArea = document.getElementById('saleReceiptPrintArea');
+  printArea.innerHTML = `
+    <div style="width:280px; margin:0 auto; padding:10px; font-family:'Space Mono',monospace; font-size:12px; color:#000;">
+      ${shopName ? `<div style="text-align:center; font-weight:800; font-size:14px; margin-bottom:6px;">${escapeHtml(shopName)}</div>` : ''}
+      <div style="border-top:1px dashed #000; margin:6px 0;"></div>
+      <div style="white-space:pre-wrap; word-break:break-word; line-height:1.5;">${escapeHtml(message)}</div>
+      <div style="border-top:1px dashed #000; margin:8px 0 4px;"></div>
+      <div style="text-align:center; font-size:10.5px;">ধন্যবাদ! আবার আসবেন 🙏</div>
+    </div>`;
+  printArea.classList.add('printing');
+  window.print();
+  setTimeout(()=> printArea.classList.remove('printing'), 500);
 }
 document.getElementById('shareSkip').addEventListener('click', ()=> shareModal.classList.remove('show'));
 
@@ -6648,7 +6685,11 @@ function handleWaMiniClick(id) {
 
 function render(showSecureInfo = false){
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
-  const filtered = retailEntries.filter(e => e.name.toLowerCase().includes(q) || e.item.toLowerCase().includes(q) || (e.phone && e.phone.includes(q)));
+  const qDigits = q.replace(/[^0-9]/g, '');
+  const filtered = retailEntries.filter(e =>
+    e.name.toLowerCase().includes(q) || e.item.toLowerCase().includes(q) || (e.phone && e.phone.includes(q)) ||
+    (qDigits.length >= 4 && e.invoiceNo && (()=>{ const d = e.invoiceNo.replace(/[^0-9]/g,''); return d === qDigits || d.endsWith(qDigits); })())
+  );
   const dueQ = document.getElementById('dueSearchBox').value.trim().toLowerCase();
   
   let totalDue = 0, totalPaid = 0, totalProfit = 0, dueByCustomer = {}, todayCustomers = new Set(), todaySaleCount = 0, todayStr = new Date().toDateString();
@@ -6707,7 +6748,7 @@ function render(showSecureInfo = false){
   document.getElementById('entryList').innerHTML = filtered.length ? filtered.map(e=>{
     const due = Math.max((e.price||0)-(e.paid||0),0);
     const qtyLine = e.qty && e.qty>1 ? ` — ${e.qty} pcs × ${fmt(getUnitPrice(e))} = ${fmt(e.price)}` : '';
-    return `<div class="entry ${e.status==='ফেরত'?'ret':e.status==='বদলি'?'exc':e.status==='বাকি'?'due-s':e.status==='নগদ-বিক্রি'?'cash-sale':'cash-s'}"><div class="entry-top"><div><div class="who">${escapeHtml(e.name)}</div><div class="item">${escapeHtml(e.item)}${qtyLine}${e.phone?' · '+escapeHtml(e.phone):''}</div></div><span class="badge">${e.status}</span></div><div class="entry-nums"><span><b>দাম</b>${fmt(e.price)}</span><span class="paid-amt"><b>জমা</b>${fmt(e.paid)}</span><span class="due-amt"><b>বাকি</b>${fmt(due)}</span></div><div class="entry-actions">${due>0?`<button class="mini-btn pay" onclick="markPaid('${e.id}')">সম্পূর্ণ জমা</button>`:''}${e.phone?`<button class="mini-btn wa-mini" onclick="handleWaMiniClick('${e.id}')">💬 WhatsApp</button>`:''}<button class="mini-btn" onclick="openEditModal('${e.id}')">✏️ ঠিক করুন</button><button class="mini-btn danger" onclick="deleteEntry('${e.id}')">মুছুন</button></div></div>`;
+    return `<div class="entry ${e.status==='ফেরত'?'ret':e.status==='বদলি'?'exc':e.status==='বাকি'?'due-s':e.status==='নগদ-বিক্রি'?'cash-sale':'cash-s'}"><div class="entry-top"><div><div class="who">${e.invoiceNo?`<span style="color:#8a7f6c; font-weight:700; font-size:11.5px; font-family:'Space Mono',monospace;">#${escapeHtml(e.invoiceNo.replace('INV-',''))}</span> `:''}${escapeHtml(e.name)}</div><div class="item">${escapeHtml(e.item)}${qtyLine}${e.phone?' · '+escapeHtml(e.phone):''}</div></div><span class="badge">${e.status}</span></div><div class="entry-nums"><span><b>দাম</b>${fmt(e.price)}</span><span class="paid-amt"><b>জমা</b>${fmt(e.paid)}</span><span class="due-amt"><b>বাকি</b>${fmt(due)}</span></div><div class="entry-actions">${due>0?`<button class="mini-btn pay" onclick="markPaid('${e.id}')">সম্পূর্ণ জমা</button>`:''}${e.phone?`<button class="mini-btn wa-mini" onclick="handleWaMiniClick('${e.id}')">💬 WhatsApp</button>`:''}<button class="mini-btn" onclick="openEditModal('${e.id}')">✏️ ঠিক করুন</button><button class="mini-btn danger" onclick="deleteEntry('${e.id}')">মুছুন</button></div></div>`;
   }).join('') : '<div class="empty">কোনো হিসাব নেই।</div>';
 
   const dueIcon = document.getElementById('dueHeaderIcon');
