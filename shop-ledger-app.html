@@ -2894,6 +2894,14 @@ function opsAddEmployeeTxn(employeeId, type, amount, note){
   list.push({ id: bccUid(), employeeId, type, amount: Number(amount)||0, note: note||'', date: new Date().toISOString() });
   opsSaveEmployeeTxns(list);
 }
+// স্টাফকে বেতন/অগ্রিম দেওয়া বা সাপ্লায়ারকে টাকা দেওয়ার মতো টাকা-বের-হওয়া কাজগুলোর
+// আগে মাস্টার পাসওয়ার্ড চেয়ে নেয় — ভুল করে বা অন্য কেউ চাপ দিলে যাতে টাকা বের না হয়ে যায়
+async function opsVerifyPassword(desc){
+  const entered = await openPinModal('🔒 পাসওয়ার্ড দিন', desc || 'এই কাজটা করতে পাসওয়ার্ড লাগবে');
+  if(entered === null) return false; // ব্যবহারকারী বাতিল করেছে
+  if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, কাজটি হয়নি'); return false; }
+  return true;
+}
 // স্টাফকে অগ্রিম/বেতন দেওয়ার পর ইচ্ছা করলে সাথে সাথে WhatsApp-এ একটা ডিজিটাল রসিদ
 // পাঠিয়ে দেওয়া যায় (এক-ট্যাপ wa.me লিংক — আলাদা কোনো ব্যাকএন্ড/API লাগে না)
 async function opsSendStaffWhatsAppReceipt(emp, txnTypeLabel, amount){
@@ -3556,6 +3564,8 @@ async function opsAddMonthlySalary(id){
   const list = opsLoadEmployees();
   const emp = list.find(x=>x.id===id);
   if(!emp || !emp.salary) return;
+  const okPw = await opsVerifyPassword('মাসিক বেতন যোগ করতে পাসওয়ার্ড দিন');
+  if(!okPw) return;
   const now = new Date();
   const monthLabel = now.toLocaleDateString('bn-BD', {month:'long', year:'numeric'});
   const alreadyDone = opsLoadEmployeeTxns().some(t =>
@@ -3578,6 +3588,11 @@ async function opsAddMonthlySalary(id){
 document.getElementById('opsTxnSaveBtn').addEventListener('click', async ()=>{
   const amount = Number(document.getElementById('opsTxnAmount').value)||0;
   if(amount <= 0){ toast('সঠিক টাকার পরিমাণ দিন'); return; }
+  const PASSWORD_REQUIRED_MODES = ['supplier-payment','employee-due','employee-payment','employee-advance'];
+  if(PASSWORD_REQUIRED_MODES.includes(opsTxnMode)){
+    const ok = await opsVerifyPassword('টাকার হিসাব পরিবর্তন করতে পাসওয়ার্ড দিন');
+    if(!ok) return;
+  }
   if(opsTxnMode === 'supplier-purchase' || opsTxnMode === 'supplier-payment'){
     const list = opsLoadSuppliers();
     const s = list.find(x=>x.id===opsTxnTargetId);
@@ -3666,6 +3681,8 @@ document.getElementById('opsPayStaffSaveBtn').addEventListener('click', async ()
   const note = document.getElementById('opsPayStaffNote').value.trim();
   if(!sid){ toast('স্টাফ বাছাই করুন'); return; }
   if(amount <= 0){ toast('সঠিক টাকার পরিমাণ দিন'); return; }
+  const okPw = await opsVerifyPassword('স্টাফকে টাকা দিতে পাসওয়ার্ড দিন');
+  if(!okPw) return;
   const list = opsLoadEmployees();
   const emp = list.find(x=>x.id===sid);
   if(!emp) return;
@@ -3716,6 +3733,8 @@ async function opsOpenAdvanceSettle(id){
   const adv = Number(emp.advance)||0;
   const addToSalary = await opsYesNoConfirm('বেতনে যোগ করবেন?', `${emp.name} আগে বেতন ছাড়া ${fmt(adv)} টাকা নিয়েছে। এটা কি এখন বেতন থেকে কেটে সমন্বয় করবেন?`);
   if(addToSalary){
+    const okPw = await opsVerifyPassword('অগ্রিম সমন্বয় করতে পাসওয়ার্ড দিন');
+    if(!okPw) return;
     emp.due = Math.max(0, (Number(emp.due)||0) - adv);
     emp.advance = 0;
     opsSaveEmployees(list);
