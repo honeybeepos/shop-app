@@ -2487,9 +2487,30 @@ function loadDeletedEntryIds(){ try{ return JSON.parse(localStorage.getItem('pho
 function saveDeletedEntryIds(ids){ localStorage.setItem('phone-shop-deleted-entry-ids', JSON.stringify(ids)); }
 function loadDeletedCustomerKeys(){ try{ return JSON.parse(localStorage.getItem('phone-shop-deleted-customer-keys')||'[]'); }catch(e){ return []; } }
 function saveDeletedCustomerKeys(keys){ localStorage.setItem('phone-shop-deleted-customer-keys', JSON.stringify(keys)); }
+// কোনো কাস্টমার ডিলিট করার পর একই নাম/নম্বর দিয়ে আবার যোগ করলে ("পুনরায়-যোগ"/restore),
+// সেটাও এখানে সময়সহ (at) মনে রাখা হয় — যাতে ক্লাউড সিঙ্কের সময় "সবচেয়ে সাম্প্রতিক কাজটাই
+// জেতে" নিয়মে চলে, আর ডিলিট করা কাস্টমার আবার যোগ করলে সেটা সিঙ্কের পর হারিয়ে না যায়।
+function loadRestoredCustomerKeys(){ try{ return JSON.parse(localStorage.getItem('phone-shop-restored-customer-keys')||'[]'); }catch(e){ return []; } }
+function saveRestoredCustomerKeys(list){ localStorage.setItem('phone-shop-restored-customer-keys', JSON.stringify(list)); }
 function custKey(name, phone){ return (phone ? phone : '') + '|' + (name||''); }
+// পুরনো ফরম্যাট (শুধু স্ট্রিং) আর নতুন ফরম্যাট ({key, at}) — দুটোই সাপোর্ট করে
+function normalizeTombEntry(x){ return (typeof x === 'string') ? { key:x, at:0 } : x; }
+function isCustomerTombstoned(key){
+  const delEntry = deletedCustomerKeys.map(normalizeTombEntry).find(t=> t.key === key);
+  if(!delEntry) return false;
+  const resEntry = restoredCustomerKeys.map(normalizeTombEntry).find(t=> t.key === key);
+  return !(resEntry && resEntry.at >= (delEntry.at||0));
+}
+// একটা কাস্টমারকে ডিলিট-লিস্ট থেকে বাদ দেওয়ার (restore করার) সঠিক উপায় — সময়সহ
+function restoreCustomerKey(key){
+  if(!isCustomerTombstoned(key)) return;
+  restoredCustomerKeys = restoredCustomerKeys.filter(t=> normalizeTombEntry(t).key !== key);
+  restoredCustomerKeys.push({ key, at: Date.now() });
+  saveRestoredCustomerKeys(restoredCustomerKeys);
+}
 let deletedEntryIds = loadDeletedEntryIds();
 let deletedCustomerKeys = loadDeletedCustomerKeys();
+let restoredCustomerKeys = loadRestoredCustomerKeys();
 let monCashBankData = { todayCash:0, todayBank:0, weeklyCash:0, weeklyBank:0, allTimeCash:0, allTimeBank:0 };
 let monItemSoldTodayData = [];
 // Bank থেকে Cash-এ (বা উল্টো) ম্যানুয়ালি সরানো টাকার হিসাব — এটা কোনো সেল না,
@@ -2510,8 +2531,8 @@ function stripTombstonedData(){
     retailEntries = retailEntries.filter(e => !deletedEntryIds.includes(e.id));
   }
   if(deletedCustomerKeys.length){
-    retailEntries = retailEntries.filter(e => !deletedCustomerKeys.includes(custKey(e.name, e.phone)));
-    shopCustomers = shopCustomers.filter(c => !deletedCustomerKeys.includes(custKey(c.name, c.phone)));
+    retailEntries = retailEntries.filter(e => !isCustomerTombstoned(custKey(e.name, e.phone)));
+    shopCustomers = shopCustomers.filter(c => !isCustomerTombstoned(custKey(c.name, c.phone)));
   }
 }
 let systemMasterPin = "12345";
@@ -2665,6 +2686,7 @@ async function loadSystemData(){
     // এখানেই সেটা আবার বাদ দিয়ে দেওয়া হচ্ছে।
     deletedEntryIds = loadDeletedEntryIds();
     deletedCustomerKeys = loadDeletedCustomerKeys();
+    restoredCustomerKeys = loadRestoredCustomerKeys();
     stripTombstonedData();
   }catch(e){
     console.error(e);
@@ -5858,10 +5880,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
   // হচ্ছে, নাহলে এই নতুন সেল-সহ কাস্টমারও persistData()-তে আবার মুছে যেত।
   {
     const key = custKey(name, phone);
-    if(deletedCustomerKeys.includes(key)){
-      deletedCustomerKeys = deletedCustomerKeys.filter(k => k !== key);
-      saveDeletedCustomerKeys(deletedCustomerKeys);
-    }
+    restoreCustomerKey(key);
   }
 
   const previousDue = getCustomerTotalDue(name, phone);
@@ -6011,10 +6030,7 @@ document.getElementById('addCustomerOnlyBtn').addEventListener('click', async ()
     // এটা একটা নতুন/সচল কাস্টমার — তাই পুরনো ডিলিট-লিস্ট (tombstone) থেকে বাদ
     // দেওয়া হচ্ছে, নাহলে সিঙ্কের সময় এটা আবার স্বয়ংক্রিয়ভাবে মুছে যেত।
     const key = custKey(name, phone);
-    if(deletedCustomerKeys.includes(key)){
-      deletedCustomerKeys = deletedCustomerKeys.filter(k => k !== key);
-      saveDeletedCustomerKeys(deletedCustomerKeys);
-    }
+    restoreCustomerKey(key);
     shopCustomers.push({name, phone: phone || ''});
     if(openingDue > 0){
       retailEntries.unshift({
@@ -6469,10 +6485,7 @@ document.getElementById('editSave').addEventListener('click', async ()=>{
   }
   {
     const key = custKey(e.name, e.phone);
-    if(deletedCustomerKeys.includes(key)){
-      deletedCustomerKeys = deletedCustomerKeys.filter(k => k !== key);
-      saveDeletedCustomerKeys(deletedCustomerKeys);
-    }
+    restoreCustomerKey(key);
   }
   
   await persistData();
@@ -6925,7 +6938,7 @@ document.getElementById('pcaDeleteBtn').addEventListener('click', async ()=>{
 
   shopCustomers = shopCustomers.filter(c => !matchC(c));
   retailEntries = retailEntries.filter(e => !matchE(e));
-  deletedCustomerKeys.push(custKey(target.name, target.phone));
+  deletedCustomerKeys.push({ key: custKey(target.name, target.phone), at: Date.now() });
   saveDeletedCustomerKeys(deletedCustomerKeys);
 
   try{

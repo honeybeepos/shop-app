@@ -164,16 +164,29 @@ function safeParseArray(str) {
   try { const v = JSON.parse(str); return Array.isArray(v) ? v : []; } catch (e) { return []; }
 }
 
-/* দুটো লিস্ট (যেমন প্রোডাক্ট বা ক্যাটাগরি) তাদের id দিয়ে "মার্জ" (মিলিয়ে) করে —
-   কোনোটাই ওভাররাইট/মুছে যায় না, শুধু conflict হলে overlayArr-এর ভার্সনটা রাখা হয়।
-   এটাই মূল সমাধান "অফলাইনে যোগ করা প্রোডাক্ট হারিয়ে যাওয়া" সমস্যার — আগে পুরো
-   লিস্টটাই একপাশ থেকে আরেকপাশে ওভাররাইট হয়ে যেত, তাই অন্য ডিভাইসের ডেটা সিঙ্ক
-   হওয়ার সময় এই ডিভাইসে অফলাইনে যোগ করা (এখনো push না হওয়া) প্রোডাক্ট মুছে যেত। */
-function mergeArraysById(baseArr, overlayArr) {
-  const map = new Map();
-  (baseArr || []).forEach(item => { if (item && item.id != null) map.set(item.id, item); });
-  (overlayArr || []).forEach(item => { if (item && item.id != null) map.set(item.id, item); });
-  return Array.from(map.values());
+/* ডিলিট করা কাস্টমারের "tombstone" লিস্ট এখন {key, at} আকারে থাকে (at = কখন ডিলিট
+   হয়েছে, মিলিসেকেন্ডে)। আগে এটা শুধু ["key1","key2"] স্ট্রিং অ্যারে ছিল — সেই পুরনো
+   ফরম্যাটও এখানে সাপোর্ট করা হচ্ছে যাতে আগের ডেটা ভেঙে না যায়। */
+function normalizeTombList(arr) {
+  return arr.map(x => (typeof x === "string") ? { key: x, at: 0 } : x).filter(x => x && x.key);
+}
+// একই key একাধিকবার থাকলে সবচেয়ে নতুন (সর্বোচ্চ at) এন্ট্রিটা রাখা হয়
+function mergeTombLists(localArr, cloudArr) {
+  const merged = {};
+  [...normalizeTombList(localArr), ...normalizeTombList(cloudArr)].forEach(({ key, at }) => {
+    if (!merged[key] || (at || 0) > merged[key].at) merged[key] = { key, at: at || 0 };
+  });
+  return Object.values(merged);
+}
+// একটা কাস্টমার "এখনো ডিলিট করা" ধরা হবে শুধু তখনই, যখন তার ডিলিট-টাইম তার সবচেয়ে
+// সাম্প্রতিক "আবার যোগ করা" (restore) টাইমের চেয়ে নতুন — অর্থাৎ সর্বশেষ কাজটাই জেতে।
+// এভাবে পুরনো ডিভাইসের স্টেল ডিলিট-সিগন্যালও হারায় না, আবার ইচ্ছাকৃত পুনরায়-যোগও টিকে থাকে।
+function activeDeletedKeys(deletedList, restoredList) {
+  const restoredAt = {};
+  normalizeTombList(restoredList).forEach(({ key, at }) => { restoredAt[key] = at || 0; });
+  return normalizeTombList(deletedList)
+    .filter(({ key, at }) => !(key in restoredAt) || restoredAt[key] < (at || 0))
+    .map(({ key }) => key);
 }
 
 async function pushLocalStorageToCloud() {
@@ -189,15 +202,8 @@ async function pushLocalStorageToCloud() {
      এই কারণে push করার আগে ক্লাউডে বর্তমানে কী আছে সেটা একবার দেখে নেওয়া হয়।
      ডিলিট-লিস্ট (tombstone) সবসময় স্থানীয় + ক্লাউড দুটোর "ইউনিয়ন" রাখা হয় (কখনো
      ছোট/হারিয়ে যায় না), এবং সেই মার্জ করা লিস্ট দিয়ে এন্ট্রি/কাস্টমার লিস্ট থেকেও
-     ডিলিট হওয়া জিনিস বাদ দেওয়া হয়। প্রোডাক্ট/ক্যাটাগরিও একই কারণে id দিয়ে মার্জ
-     করা হয় (এখানে লোকাল ভার্সন প্রায়োরিটি পায়, যেহেতু এটা এই ডিভাইসের সাম্প্রতিক
-     পরিবর্তন) — যাতে অফলাইনে যোগ করা প্রোডাক্ট অন্য ডিভাইসের ডেটার কারণে হারিয়ে না যায়।
-
-     গুরুত্বপূর্ণ: এই ধাপটা (আগে থেকে ক্লাউড ডেটা পড়া) যদি কোনো কারণে ব্যর্থ হয়
-     (যেমন পারমিশন সমস্যা — সাব-ইউজারের জন্য এই কালেকশনে read এক্সেস না থাকতে
-     পারে, বা সাময়িক নেটওয়ার্ক সমস্যা), তাহলেও যেন আসল push (নিচের set কল)
-     আটকে না যায় — তাই এটা একদম আলাদা try/catch-এ রাখা হলো এবং ব্যর্থ হলে
-     শুধু মার্জ স্কিপ করে সরাসরি push চালিয়ে যাওয়া হয়। */
+     ডিলিট হওয়া জিনিস বাদ দেওয়া হয় — এই ডিভাইসের ডেটা স্টেল (পুরনো) থাকলেও যেন
+     অন্য ডিভাইসের সাম্প্রতিক ডিলিট ভুলবশত ওভাররাইট না হয়ে যায়। */
   try {
     const cloudSnap = await db.collection("shops").doc(__syncShopId)
       .collection("appdata").doc("main").get();
@@ -210,78 +216,47 @@ async function pushLocalStorageToCloud() {
 
       const localDelCust = safeParseArray(blob["phone-shop-deleted-customer-keys"]);
       const cloudDelCust = safeParseArray(cloudBlob["phone-shop-deleted-customer-keys"]);
-      const mergedDelCust = Array.from(new Set([...localDelCust, ...cloudDelCust]));
+      const mergedDelCust = mergeTombLists(localDelCust, cloudDelCust);
+
+      const localResCust = safeParseArray(blob["phone-shop-restored-customer-keys"]);
+      const cloudResCust = safeParseArray(cloudBlob["phone-shop-restored-customer-keys"]);
+      const mergedResCust = mergeTombLists(localResCust, cloudResCust);
 
       if (mergedDelEntries.length) blob["phone-shop-deleted-entry-ids"] = JSON.stringify(mergedDelEntries);
       if (mergedDelCust.length) blob["phone-shop-deleted-customer-keys"] = JSON.stringify(mergedDelCust);
+      if (mergedResCust.length) blob["phone-shop-restored-customer-keys"] = JSON.stringify(mergedResCust);
 
-      if (mergedDelEntries.length || mergedDelCust.length) {
+      // "এখনো সত্যিই ডিলিট আছে" এমন কাস্টমার-কী গুলো বের করা হচ্ছে — যেগুলো পরে আবার
+      // যোগ করা (restore) হয়ে গেছে সেগুলো আর এখানে থাকবে না
+      const activeDelCustKeys = activeDeletedKeys(mergedDelCust, mergedResCust);
+
+      if (mergedDelEntries.length || activeDelCustKeys.length) {
         const custKey = (name, phone) => (phone || "") + "|" + (name || "");
         let entries = safeParseArray(blob["phone-shop-entries"]);
         if (entries.length) {
-          entries = entries.filter(e => !mergedDelEntries.includes(e.id) && !mergedDelCust.includes(custKey(e.name, e.phone)));
+          entries = entries.filter(e => !mergedDelEntries.includes(e.id) && !activeDelCustKeys.includes(custKey(e.name, e.phone)));
           blob["phone-shop-entries"] = JSON.stringify(entries);
         }
         let customers = safeParseArray(blob["phone-shop-customers"]);
         if (customers.length) {
-          customers = customers.filter(c => !mergedDelCust.includes(custKey(c.name, c.phone)));
+          customers = customers.filter(c => !activeDelCustKeys.includes(custKey(c.name, c.phone)));
           blob["phone-shop-customers"] = JSON.stringify(customers);
         }
       }
-
-      const localDelProducts = safeParseArray(blob["bcc-deleted-product-ids"]);
-      const cloudDelProducts = safeParseArray(cloudBlob["bcc-deleted-product-ids"]);
-      const mergedDelProducts = Array.from(new Set([...localDelProducts, ...cloudDelProducts]));
-
-      const localDelCategories = safeParseArray(blob["bcc-deleted-category-ids"]);
-      const cloudDelCategories = safeParseArray(cloudBlob["bcc-deleted-category-ids"]);
-      const mergedDelCategories = Array.from(new Set([...localDelCategories, ...cloudDelCategories]));
-
-      if (mergedDelProducts.length) blob["bcc-deleted-product-ids"] = JSON.stringify(mergedDelProducts);
-      if (mergedDelCategories.length) blob["bcc-deleted-category-ids"] = JSON.stringify(mergedDelCategories);
-
-      // প্রোডাক্ট ও ক্যাটাগরি: cloud + local দুটো মিলিয়ে (local প্রায়োরিটি পেয়ে) রাখা হচ্ছে,
-      // এরপর ডিলিট-লিস্টে থাকা কোনো id থাকলে সেটা মার্জ করা লিস্ট থেকে বাদ দেওয়া হচ্ছে —
-      // যাতে ডিলিট করা প্রোডাক্ট/ক্যাটাগরি merge-এর সময় আবার ফিরে আসতে না পারে
-      let mergedProducts = mergeArraysById(safeParseArray(cloudBlob["bcc-products"]), safeParseArray(blob["bcc-products"]));
-      if (mergedDelProducts.length) mergedProducts = mergedProducts.filter(p => p && !mergedDelProducts.includes(p.id));
-      blob["bcc-products"] = JSON.stringify(mergedProducts);
-
-      let mergedCategories = mergeArraysById(safeParseArray(cloudBlob["bcc-categories"]), safeParseArray(blob["bcc-categories"]));
-      if (mergedDelCategories.length) mergedCategories = mergedCategories.filter(c => c && !mergedDelCategories.includes(c.id));
-      blob["bcc-categories"] = JSON.stringify(mergedCategories);
 
       // এই ডিভাইসের নিজের localStorage-ও ঠিক করে দেওয়া হচ্ছে, যাতে এটা নিজেও
       // বারবার পুরনো/স্টেল ডেটা push করতে না থাকে (সিঙ্ক লুপ এড়াতে মূল
       // setItem override ব্যবহার না করে সরাসরি লেখা হচ্ছে)
       if (blob["phone-shop-deleted-entry-ids"]) __origSetItem.call(localStorage, "phone-shop-deleted-entry-ids", blob["phone-shop-deleted-entry-ids"]);
       if (blob["phone-shop-deleted-customer-keys"]) __origSetItem.call(localStorage, "phone-shop-deleted-customer-keys", blob["phone-shop-deleted-customer-keys"]);
+      if (blob["phone-shop-restored-customer-keys"]) __origSetItem.call(localStorage, "phone-shop-restored-customer-keys", blob["phone-shop-restored-customer-keys"]);
       if (blob["phone-shop-entries"]) __origSetItem.call(localStorage, "phone-shop-entries", blob["phone-shop-entries"]);
       if (blob["phone-shop-customers"]) __origSetItem.call(localStorage, "phone-shop-customers", blob["phone-shop-customers"]);
-      if (blob["bcc-deleted-product-ids"]) __origSetItem.call(localStorage, "bcc-deleted-product-ids", blob["bcc-deleted-product-ids"]);
-      if (blob["bcc-deleted-category-ids"]) __origSetItem.call(localStorage, "bcc-deleted-category-ids", blob["bcc-deleted-category-ids"]);
-      __origSetItem.call(localStorage, "bcc-products", blob["bcc-products"]);
-      __origSetItem.call(localStorage, "bcc-categories", blob["bcc-categories"]);
     }
-  } catch (mergeErr) {
-    console.warn("ডেটা মার্জ করা যায়নি, সরাসরি push করা হচ্ছে:", mergeErr);
-  }
 
-  try {
-    const blobStr = JSON.stringify(blob);
-    // Firestore-এর প্রতিটা ডকুমেন্টের সাইজ লিমিট ~1MB। ডেটা (সেল/কাস্টমার/প্রোডাক্ট)
-    // অনেক বেড়ে গেলে এই লিমিটে গিয়ে ঠেকতে পারে — তখন push ব্যর্থ হবে, কিন্তু এটা
-    // ইন্টারনেট সমস্যা না। তাই আগেভাগে চেক করে স্পষ্ট এরর দেওয়া হচ্ছে, যাতে ভুল
-    // করে মনে না হয় যে ইন্টারনেট নেই।
-    const approxSizeMb = new Blob([blobStr]).size / (1024 * 1024);
-    if (approxSizeMb > 0.9) {
-      console.error(`ডেটার সাইজ অনেক বড় হয়ে গেছে (~${approxSizeMb.toFixed(2)}MB) — Firestore-এর ১MB লিমিটের কাছাকাছি/বেশি। পুরনো ডেটা আর্কাইভ/ছাঁটাই করার দরকার হতে পারে।`);
-      setSyncIndicator("error");
-      throw Object.assign(new Error("ডেটার সাইজ সীমার (~1MB) কাছাকাছি বা বেশি হয়ে গেছে"), { code: "data-too-large" });
-    }
     await db.collection("shops").doc(__syncShopId)
       .collection("appdata").doc("main")
-      .set({ blob: blobStr, updatedAt: fbNow(), updatedBy: __deviceId }, { merge: true });
+      .set({ blob: JSON.stringify(blob), updatedAt: fbNow(), updatedBy: __deviceId }, { merge: true });
     setSyncIndicator("ok");
   } catch (e) {
     console.error("Cloud sync failed:", e);
@@ -295,34 +270,6 @@ async function pullCloudToLocalStorage(shopId) {
     .collection("appdata").doc("main").get();
   if (!snap.exists || !snap.data().blob) return false;
   const blob = JSON.parse(snap.data().blob);
-
-  // প্রোডাক্ট/ক্যাটাগরি পুরোপুরি ওভাররাইট না করে cloud + বর্তমান local মিলিয়ে
-  // (cloud প্রায়োরিটি পেয়ে, কিন্তু local-এ থাকা এখনো push না হওয়া নতুন প্রোডাক্টও
-  // রেখে) রাখা হচ্ছে — এতে অফলাইনে যোগ করা প্রোডাক্ট pull করার সময় হারিয়ে যায় না।
-  try {
-    const localProducts = safeParseArray(__origGetItem.call(localStorage, "bcc-products"));
-    const cloudProducts = safeParseArray(blob["bcc-products"]);
-    const localDelProducts = safeParseArray(__origGetItem.call(localStorage, "bcc-deleted-product-ids"));
-    const cloudDelProducts = safeParseArray(blob["bcc-deleted-product-ids"]);
-    const mergedDelProducts = Array.from(new Set([...localDelProducts, ...cloudDelProducts]));
-    let mergedProducts = mergeArraysById(localProducts, cloudProducts);
-    if (mergedDelProducts.length) mergedProducts = mergedProducts.filter(p => p && !mergedDelProducts.includes(p.id));
-    blob["bcc-products"] = JSON.stringify(mergedProducts);
-    if (mergedDelProducts.length) blob["bcc-deleted-product-ids"] = JSON.stringify(mergedDelProducts);
-
-    const localCategories = safeParseArray(__origGetItem.call(localStorage, "bcc-categories"));
-    const cloudCategories = safeParseArray(blob["bcc-categories"]);
-    const localDelCategories = safeParseArray(__origGetItem.call(localStorage, "bcc-deleted-category-ids"));
-    const cloudDelCategories = safeParseArray(blob["bcc-deleted-category-ids"]);
-    const mergedDelCategories = Array.from(new Set([...localDelCategories, ...cloudDelCategories]));
-    let mergedCategories = mergeArraysById(localCategories, cloudCategories);
-    if (mergedDelCategories.length) mergedCategories = mergedCategories.filter(c => c && !mergedDelCategories.includes(c.id));
-    blob["bcc-categories"] = JSON.stringify(mergedCategories);
-    if (mergedDelCategories.length) blob["bcc-deleted-category-ids"] = JSON.stringify(mergedDelCategories);
-  } catch (mergeErr) {
-    console.warn("প্রোডাক্ট/ক্যাটাগরি মার্জ করা যায়নি, cloud ভার্সন দিয়েই বসানো হচ্ছে:", mergeErr);
-  }
-
   // bcc-session এখন localStorage-এ থাকে (মিনিমাইজ করলে যেন লগইন না হারায়), কিন্তু নিচের
   // clear() পুরো localStorage মুছে দেয় — তাই সাময়িক ব্যাকআপ রেখে পরে আবার বসানো হচ্ছে
   const savedSession = __origGetItem.call(localStorage, "bcc-session");
