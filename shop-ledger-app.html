@@ -2908,7 +2908,8 @@ async function opsSendStaffWhatsAppReceipt(emp, txnTypeLabel, amount){
   if(!emp.phone){ return; }
   const send = await opsYesNoConfirm('WhatsApp রসিদ পাঠাবেন?', `${emp.name}-এর WhatsApp নাম্বারে (${emp.phone}) এই লেনদেনের একটা রসিদ এখনই পাঠিয়ে দিতে চান?`);
   if(!send) return;
-  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || 'আমাদের দোকান';
+  let shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  if(!shopName || shopName === '[object Object]') shopName = 'আমাদের দোকান';
   const dateStr = new Date().toLocaleDateString('en-GB');
   const due = Number(emp.due)||0, adv = Number(emp.advance)||0;
   let text = `📌 ${shopName}\n`;
@@ -3621,19 +3622,32 @@ document.getElementById('opsTxnSaveBtn').addEventListener('click', async ()=>{
         opsSaveExpenses(exList);
         opsRenderExpenses();
         await opsSendStaffWhatsAppReceipt(s, 'Advance Received (অগ্রিম নেওয়া)', amount);
-      } else {
-        s.due = Math.max(0, (Number(s.due)||0) + (opsTxnMode==='employee-due' ? amount : -amount));
+      } else if(opsTxnMode === 'employee-due'){
+        s.due = (Number(s.due)||0) + amount;
         opsSaveEmployees(list);
-        opsAddEmployeeTxn(s.id, opsTxnMode==='employee-due' ? 'due' : 'payment', amount, note);
+        opsAddEmployeeTxn(s.id, 'due', amount, note);
+        opsRenderEmployees();
+      } else { // employee-payment
+        const currentDue = Number(s.due)||0;
+        const deductAmount = Math.min(currentDue, amount);
+        const extraAsAdvance = amount - deductAmount;
+        s.due = Math.max(0, currentDue - deductAmount);
+        if(extraAsAdvance > 0){
+          s.advance = (Number(s.advance)||0) + extraAsAdvance;
+          toast(currentDue <= 0
+            ? `${s.name}-এর কোনো বেতন বাকি নেই, তাই ${fmt(amount)} টাকা অগ্রিম হিসেবে যোগ হলো`
+            : `${fmt(deductAmount)} বাকি বেতন থেকে কাটা হলো, বাকি ${fmt(extraAsAdvance)} অগ্রিম হিসেবে যোগ হলো`);
+        }
+        opsSaveEmployees(list);
+        if(deductAmount > 0) opsAddEmployeeTxn(s.id, 'payment', deductAmount, note);
+        if(extraAsAdvance > 0) opsAddEmployeeTxn(s.id, 'advance', extraAsAdvance, (note?note+' - ':'') + 'বাকি বেতনের বেশি দেওয়া অংশ');
         opsRenderEmployees();
         // স্টাফকে বেতন পেমেন্ট দিলে এটা দোকানের খরচ হিসেবেও যোগ হয়ে যাবে
-        if(opsTxnMode === 'employee-payment'){
-          const exList = opsLoadExpenses();
-          exList.push({ id: bccUid(), category: 'স্টাফ বেতন', person: s.name, amount, note, date: new Date().toISOString() });
-          opsSaveExpenses(exList);
-          opsRenderExpenses();
-          await opsSendStaffWhatsAppReceipt(s, 'Salary Paid (বেতন পরিশোধ)', amount);
-        }
+        const exList = opsLoadExpenses();
+        exList.push({ id: bccUid(), category: 'স্টাফ বেতন', person: s.name, amount, note, date: new Date().toISOString() });
+        opsSaveExpenses(exList);
+        opsRenderExpenses();
+        await opsSendStaffWhatsAppReceipt(s, extraAsAdvance>0 ? (deductAmount>0 ? 'Salary Paid + Advance' : 'Advance Received (অগ্রিম নেওয়া)') : 'Salary Paid (বেতন পরিশোধ)', amount);
       }
     }
   }
@@ -3705,23 +3719,43 @@ document.getElementById('opsPayStaffSaveBtn').addEventListener('click', async ()
     await opsSendStaffWhatsAppReceipt(opsLoadEmployees().find(x=>x.id===emp.id) || emp, 'Salary Paid (বেতন পরিশোধ)', amount);
   } else {
     document.getElementById('opsPayStaffModal').classList.remove('show');
-    const deductNow = await opsYesNoConfirm('বেতন থেকে কাটবেন?', `${emp.name}-কে দেওয়া এই ${fmt(amount)} টাকা কি এখনই বেতন থেকে কেটে নেওয়া হবে?`);
+    const currentDue = Number(emp.due)||0;
     // এই টাকা দোকান থেকে বের হয়ে গেছে, তাই এটা সবসময় খরচ হিসেবে যোগ হবে
     const exList = opsLoadExpenses();
     exList.push({ id: bccUid(), category: 'স্টাফ অন্যান্য টাকা', person: emp.name, amount, note, date: new Date().toISOString() });
     opsSaveExpenses(exList);
     opsRenderExpenses();
-    if(deductNow){
-      emp.due = Math.max(0, (Number(emp.due)||0) - amount);
-      opsAddEmployeeTxn(emp.id, 'payment', amount, 'অন্য বাবদে (বেতন থেকে কর্তন)' + (note?' - '+note:''));
+
+    let deductAmount = 0, advanceAmount = 0, txnLabel = '';
+    if(currentDue <= 0){
+      // কোনো বেতন বাকিই নেই, তাই কাটার প্রশ্নই আসে না — পুরোটাই অগ্রিম হিসেবে যোগ হবে,
+      // সামনে বেতন বাকি হলে তখন এটা কেটে সমন্বয় করা যাবে
+      advanceAmount = amount;
+      toast(`${emp.name}-এর কোনো বেতন বাকি নেই, তাই ${fmt(amount)} টাকা অগ্রিম হিসেবে যোগ হলো`);
     } else {
-      emp.advance = (Number(emp.advance)||0) + amount;
-      opsAddEmployeeTxn(emp.id, 'advance', amount, 'অন্য বাবদে (অগ্রিম)' + (note?' - '+note:''));
+      const deductNow = await opsYesNoConfirm('বেতন থেকে কাটবেন?', `${emp.name}-এর বর্তমানে ${fmt(currentDue)} টাকা বেতন বাকি আছে। দেওয়া এই ${fmt(amount)} টাকা কি এখনই সেই বাকি বেতন থেকে কেটে নেওয়া হবে?`);
+      if(deductNow){
+        deductAmount = Math.min(currentDue, amount);
+        advanceAmount = amount - deductAmount; // বাকির চেয়ে বেশি দিলে বাকি অংশটা অগ্রিম হবে
+        if(advanceAmount > 0) toast(`${fmt(deductAmount)} বাকি বেতন থেকে কাটা হলো, বাকি ${fmt(advanceAmount)} অগ্রিম হিসেবে যোগ হলো`);
+      } else {
+        advanceAmount = amount;
+      }
+    }
+    if(deductAmount > 0){
+      emp.due = Math.max(0, currentDue - deductAmount);
+      opsAddEmployeeTxn(emp.id, 'payment', deductAmount, 'অন্য বাবদে (বেতন থেকে কর্তন)' + (note?' - '+note:''));
+      txnLabel = 'Salary Paid (বেতন পরিশোধ)';
+    }
+    if(advanceAmount > 0){
+      emp.advance = (Number(emp.advance)||0) + advanceAmount;
+      opsAddEmployeeTxn(emp.id, 'advance', advanceAmount, 'অন্য বাবদে (অগ্রিম)' + (note?' - '+note:''));
+      txnLabel = deductAmount > 0 ? 'Salary Paid + Advance (আংশিক বেতন, বাকিটা অগ্রিম)' : 'Advance Received (অগ্রিম নেওয়া)';
     }
     opsSaveEmployees(list);
     opsRenderEmployees();
     toast('টাকা দেওয়া হয়েছে ✅');
-    await opsSendStaffWhatsAppReceipt(opsLoadEmployees().find(x=>x.id===emp.id) || emp, deductNow ? 'Salary Paid (বেতন পরিশোধ)' : 'Advance Received (অগ্রিম নেওয়া)', amount);
+    await opsSendStaffWhatsAppReceipt(opsLoadEmployees().find(x=>x.id===emp.id) || emp, txnLabel, amount);
   }
 });
 
