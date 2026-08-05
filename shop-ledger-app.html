@@ -1707,7 +1707,6 @@
       </div>
       <input class="opsSearchInput" id="opsEmployeeSearch" type="text" placeholder="🔍 স্টাফের নাম বা নাম্বার দিয়ে খুঁজুন...">
       <div class="opsSectionTitle">🧑‍🔧 স্টাফ লিস্ট <button class="opsAddBtn bizNavCard" id="opsAddEmployeeBtn">+ নতুন স্টাফ</button></div>
-      <button class="opsAddBtn bizNavCard" id="opsPayStaffBtn" style="width:100%;margin:0 0 12px;">💰 স্টাফকে টাকা দিন</button>
       <div class="glassList" id="opsEmployeeList"></div>
     </div>
 
@@ -1869,6 +1868,8 @@
       <label>ফোন (অপশনাল)</label><input type="text" id="opsEmpPhone" placeholder="যেমনঃ 01XXXXXXXXX">
       <label>পদবী (অপশনাল)</label><input type="text" id="opsEmpRole" placeholder="যেমনঃ সেলসম্যান, টেকনিশিয়ান">
       <label>মাসিক বেতন (অপশনাল)</label><input type="number" id="opsEmpSalary" placeholder="যেমনঃ 1500">
+      <label>যোগদানের তারিখ (অপশনাল)</label><input type="date" id="opsEmpJoinDate">
+      <p style="margin:2px 0 8px; font-size:11.5px; color:#8a7f6c;">এই তারিখ দিলে "এই মাসের বেতন যোগ করুন" বাটন মাসের শুরু থেকে না গুনে, যোগদানের দিন থেকে হিসাব করবে (আংশিক মাসের বেতন সঠিকভাবে গণনা হবে)।</p>
       <label>পূর্বের বাকি বেতন (অপশনাল)</label><input type="number" id="opsEmpOpeningDue" placeholder="আগে থেকে যদি বেতন বাকি থাকে, এখানে লিখুন">
       <p style="margin:4px 0 0; font-size:12px; color:#8a7f6c;">পুরাতন স্টাফ যোগ করলে, তার আগের বকেয়া বেতনের পরিমাণ এখানে দিন — সেটা তার হিসাবের শুরুতে "পুরাতন বাকি" হিসেবে যোগ হয়ে যাবে।</p>
       <div class="opsModalActions">
@@ -1915,26 +1916,6 @@
     </div>
   </div>
 
-  <!-- স্টাফকে টাকা দেওয়ার মোডাল -->
-  <div class="opsModalOverlay" id="opsPayStaffModal">
-    <div class="opsModalBox">
-      <h3>💰 স্টাফকে টাকা দিন</h3>
-      <label>স্টাফ বাছাই করুন</label>
-      <select id="opsPayStaffSelect"></select>
-      <label>কী কারণে টাকা দিচ্ছেন?</label>
-      <div class="status-group" id="opsPayStaffTypeGroup">
-        <div class="status-chip" data-ptype="full">১. পুরো বেতন</div>
-        <div class="status-chip" data-ptype="partial">২. বেতনের কিছু অংশ</div>
-        <div class="status-chip" data-ptype="other">৩. অন্য কোনো বাবদে</div>
-      </div>
-      <label>টাকার পরিমাণ</label><input type="number" id="opsPayStaffAmount" placeholder="যেমনঃ 500">
-      <label>নোট (অপশনাল)</label><input type="text" id="opsPayStaffNote" placeholder="বিস্তারিত লিখুন">
-      <div class="opsModalActions">
-        <button class="opsCancelBtn" id="opsPayStaffCancelBtn">বাতিল</button>
-        <button class="opsSaveBtn" id="opsPayStaffSaveBtn">সেভ করুন</button>
-      </div>
-    </div>
-  </div>
 
   <!-- হ্যাঁ/না কনফার্মেশন মোডাল -->
   <div class="opsModalOverlay" id="opsYesNoModal">
@@ -3390,6 +3371,7 @@ document.getElementById('opsAddEmployeeBtn').addEventListener('click', ()=>{
   document.getElementById('opsEmpPhone').value = '';
   document.getElementById('opsEmpRole').value = '';
   document.getElementById('opsEmpSalary').value = '';
+  document.getElementById('opsEmpJoinDate').value = new Date().toISOString().slice(0,10);
   document.getElementById('opsEmpOpeningDue').value = '';
   document.getElementById('opsEmployeeModal').classList.add('show');
 });
@@ -3403,6 +3385,8 @@ document.getElementById('opsEmpSaveBtn').addEventListener('click', ()=>{
     phone: document.getElementById('opsEmpPhone').value.trim(),
     role: document.getElementById('opsEmpRole').value.trim(),
     salary: Number(document.getElementById('opsEmpSalary').value)||0,
+    joinDate: document.getElementById('opsEmpJoinDate').value || null,
+    lastSalaryCreditDate: null,
     due: openingDue,
     advance: 0
   };
@@ -3561,29 +3545,55 @@ function opsOpenTxnModal(mode, targetId){
 document.getElementById('opsTxnCancelBtn').addEventListener('click', ()=> document.getElementById('opsTxnModal').classList.remove('show'));
 // এক ট্যাপে এই মাসের নির্ধারিত মূল বেতনটা 'বাকি' হিসেবে যোগ করে দেয় (Monthly Base Salary Credit)।
 // একই মাসে ভুলে দুইবার চাপ পড়লে যাতে বেতন দুইবার যোগ না হয়ে যায়, তার জন্য আগে চেক করে নেয়।
+// দৈনিক বেতন (আনুমানিক) = মাসিক বেতন / সেই নির্দিষ্ট মাসে যতদিন আছে (২৮/২৯/৩০/৩১)।
+// এই ফাংশন সবসময় "মাসের শুরু থেকে আজ পর্যন্ত" পুরো হিসাব করে না — বরং যোগদানের তারিখ
+// (বা আগে যে তারিখ পর্যন্ত বেতন যোগ করা হয়েছে, তার পরের দিন থেকে) আজ পর্যন্ত যতদিন
+// হয়েছে, ততদিনের বেতনই যোগ করে। ফলে মাঝপথে যোগ দেওয়া স্টাফ বা মাসের মাঝখানে বাটনে
+// চাপ দিলে সঠিক আংশিক বেতন হিসাব হয়, পুরো মাসের বেতন ভুলভাবে যোগ হয় না।
 async function opsAddMonthlySalary(id){
   const list = opsLoadEmployees();
   const emp = list.find(x=>x.id===id);
   if(!emp || !emp.salary) return;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const daysInThisMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+  const dailyRate = Number(emp.salary) / daysInThisMonth;
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  let countFrom = monthStart;
+  if(emp.joinDate){
+    const jd = new Date(emp.joinDate); jd.setHours(0,0,0,0);
+    if(jd > countFrom) countFrom = jd; // এই মাসেই যোগ দিয়ে থাকলে, মাসের শুরু থেকে না গুনে যোগদানের দিন থেকে গোনা হবে
+  }
+  if(emp.lastSalaryCreditDate){
+    const lastPaidThrough = new Date(emp.lastSalaryCreditDate); lastPaidThrough.setHours(0,0,0,0);
+    const dayAfter = new Date(lastPaidThrough); dayAfter.setDate(dayAfter.getDate()+1);
+    if(dayAfter > countFrom) countFrom = dayAfter; // আগে যতদিন পর্যন্ত যোগ করা হয়েছে, তার আগ পর্যন্ত আবার গোনা হবে না
+  }
+
+  if(countFrom > today){
+    toast(`${emp.name}-এর আজ পর্যন্ত সব বেতন ইতিমধ্যে যোগ করা হয়ে গেছে`);
+    return;
+  }
+
+  const days = Math.round((today - countFrom) / 86400000) + 1;
+  const amount = Math.round(dailyRate * days);
+  if(amount <= 0) return;
+
   const okPw = await opsVerifyPassword('মাসিক বেতন যোগ করতে পাসওয়ার্ড দিন');
   if(!okPw) return;
-  const now = new Date();
-  const monthLabel = now.toLocaleDateString('bn-BD', {month:'long', year:'numeric'});
-  const alreadyDone = opsLoadEmployeeTxns().some(t =>
-    t.employeeId === id && t.type === 'due' &&
-    new Date(t.date).getMonth() === now.getMonth() && new Date(t.date).getFullYear() === now.getFullYear() &&
-    (t.note||'').includes('মাসিক বেতন')
-  );
-  if(alreadyDone){
-    const again = await opsYesNoConfirm('আবার যোগ করবেন?', `${emp.name}-এর এই মাসের (${monthLabel}) বেতন আগেই যোগ করা হয়েছে। আবার যোগ করতে চান?`);
-    if(!again) return;
-  }
-  emp.due = (Number(emp.due)||0) + Number(emp.salary);
+
+  const dateRangeLabel = days === 1
+    ? countFrom.toLocaleDateString('bn-BD', {day:'numeric', month:'long'})
+    : `${countFrom.toLocaleDateString('bn-BD', {day:'numeric', month:'short'})} - ${today.toLocaleDateString('bn-BD', {day:'numeric', month:'long'})}`;
+
+  emp.due = (Number(emp.due)||0) + amount;
+  emp.lastSalaryCreditDate = today.toISOString().slice(0,10);
   opsSaveEmployees(list);
-  opsAddEmployeeTxn(emp.id, 'due', Number(emp.salary), `মাসিক বেতন - ${monthLabel}`);
+  opsAddEmployeeTxn(emp.id, 'due', amount, `বেতন - ${dateRangeLabel} (${days} দিন)`);
   opsRenderEmployees();
-  toast(`${monthLabel}-এর বেতন যোগ হয়েছে ✅`);
-  await opsSendStaffWhatsAppReceipt(emp, `Salary Credited (${monthLabel})`, Number(emp.salary));
+  toast(`${days} দিনের বেতন (${fmt(amount)}) যোগ হয়েছে ✅`);
+  await opsSendStaffWhatsAppReceipt(emp, `Salary Credited - ${dateRangeLabel} (${days} din)`, amount);
 }
 
 document.getElementById('opsTxnSaveBtn').addEventListener('click', async ()=>{
@@ -3655,109 +3665,6 @@ document.getElementById('opsTxnSaveBtn').addEventListener('click', async ()=>{
   toast('আপডেট হয়েছে ✅');
 });
 
-// ---------------- স্টাফকে টাকা দিন (পুরো/আংশিক বেতন অথবা অন্য কোনো বাবদে) ----------------
-let opsPayStaffType = 'full';
-document.getElementById('opsPayStaffBtn').addEventListener('click', ()=>{
-  const list = opsLoadEmployees();
-  const sel = document.getElementById('opsPayStaffSelect');
-  sel.innerHTML = list.length ? list.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('') : '<option value="">কোনো স্টাফ নেই</option>';
-  opsPayStaffType = 'full';
-  document.querySelectorAll('#opsPayStaffTypeGroup .status-chip').forEach(c=>c.classList.remove('active'));
-  document.querySelector('#opsPayStaffTypeGroup .status-chip[data-ptype="full"]').classList.add('active');
-  const emp = list.find(x=>x.id===sel.value);
-  document.getElementById('opsPayStaffAmount').value = emp ? (Number(emp.due)||Number(emp.salary)||'') : '';
-  document.getElementById('opsPayStaffNote').value = '';
-  document.getElementById('opsPayStaffModal').classList.add('show');
-});
-document.getElementById('opsPayStaffSelect').addEventListener('change', ()=>{
-  if(opsPayStaffType === 'full'){
-    const emp = opsLoadEmployees().find(x=>x.id===document.getElementById('opsPayStaffSelect').value);
-    document.getElementById('opsPayStaffAmount').value = emp ? (Number(emp.due)||Number(emp.salary)||'') : '';
-  }
-});
-document.querySelectorAll('#opsPayStaffTypeGroup .status-chip').forEach(chip=>{
-  chip.addEventListener('click', ()=>{
-    document.querySelectorAll('#opsPayStaffTypeGroup .status-chip').forEach(c=>c.classList.remove('active'));
-    chip.classList.add('active');
-    opsPayStaffType = chip.dataset.ptype;
-    if(opsPayStaffType === 'full'){
-      const emp = opsLoadEmployees().find(x=>x.id===document.getElementById('opsPayStaffSelect').value);
-      document.getElementById('opsPayStaffAmount').value = emp ? (Number(emp.due)||Number(emp.salary)||'') : '';
-    } else if(opsPayStaffType === 'partial' || opsPayStaffType === 'other'){
-      document.getElementById('opsPayStaffAmount').value = '';
-    }
-  });
-});
-document.getElementById('opsPayStaffCancelBtn').addEventListener('click', ()=> document.getElementById('opsPayStaffModal').classList.remove('show'));
-document.getElementById('opsPayStaffSaveBtn').addEventListener('click', async ()=>{
-  const sid = document.getElementById('opsPayStaffSelect').value;
-  const amount = Number(document.getElementById('opsPayStaffAmount').value)||0;
-  const note = document.getElementById('opsPayStaffNote').value.trim();
-  if(!sid){ toast('স্টাফ বাছাই করুন'); return; }
-  if(amount <= 0){ toast('সঠিক টাকার পরিমাণ দিন'); return; }
-  const okPw = await opsVerifyPassword('স্টাফকে টাকা দিতে পাসওয়ার্ড দিন');
-  if(!okPw) return;
-  const list = opsLoadEmployees();
-  const emp = list.find(x=>x.id===sid);
-  if(!emp) return;
-
-  if(opsPayStaffType === 'full' || opsPayStaffType === 'partial'){
-    emp.due = Math.max(0, (Number(emp.due)||0) - amount);
-    opsSaveEmployees(list);
-    opsAddEmployeeTxn(emp.id, 'payment', amount, (opsPayStaffType==='full' ? 'পূর্ণ বেতন' : 'আংশিক বেতন') + (note?' - '+note:''));
-    opsRenderEmployees();
-    const exList = opsLoadExpenses();
-    exList.push({ id: bccUid(), category: 'স্টাফ বেতন', person: emp.name, amount, note, date: new Date().toISOString() });
-    opsSaveExpenses(exList);
-    opsRenderExpenses();
-    document.getElementById('opsPayStaffModal').classList.remove('show');
-    toast('বেতন দেওয়া হয়েছে ✅');
-    // আগে অগ্রিম নেওয়া থাকলে, বেতন দেওয়ার সাথে সাথেই সেটা কেটে সমন্বয় করার সুযোগ দেওয়া হচ্ছে
-    if(Number(emp.advance)||0){
-      await opsOpenAdvanceSettle(emp.id);
-    }
-    await opsSendStaffWhatsAppReceipt(opsLoadEmployees().find(x=>x.id===emp.id) || emp, 'Salary Paid (বেতন পরিশোধ)', amount);
-  } else {
-    document.getElementById('opsPayStaffModal').classList.remove('show');
-    const currentDue = Number(emp.due)||0;
-    // এই টাকা দোকান থেকে বের হয়ে গেছে, তাই এটা সবসময় খরচ হিসেবে যোগ হবে
-    const exList = opsLoadExpenses();
-    exList.push({ id: bccUid(), category: 'স্টাফ অন্যান্য টাকা', person: emp.name, amount, note, date: new Date().toISOString() });
-    opsSaveExpenses(exList);
-    opsRenderExpenses();
-
-    let deductAmount = 0, advanceAmount = 0, txnLabel = '';
-    if(currentDue <= 0){
-      // কোনো বেতন বাকিই নেই, তাই কাটার প্রশ্নই আসে না — পুরোটাই অগ্রিম হিসেবে যোগ হবে,
-      // সামনে বেতন বাকি হলে তখন এটা কেটে সমন্বয় করা যাবে
-      advanceAmount = amount;
-      toast(`${emp.name}-এর কোনো বেতন বাকি নেই, তাই ${fmt(amount)} টাকা অগ্রিম হিসেবে যোগ হলো`);
-    } else {
-      const deductNow = await opsYesNoConfirm('বেতন থেকে কাটবেন?', `${emp.name}-এর বর্তমানে ${fmt(currentDue)} টাকা বেতন বাকি আছে। দেওয়া এই ${fmt(amount)} টাকা কি এখনই সেই বাকি বেতন থেকে কেটে নেওয়া হবে?`);
-      if(deductNow){
-        deductAmount = Math.min(currentDue, amount);
-        advanceAmount = amount - deductAmount; // বাকির চেয়ে বেশি দিলে বাকি অংশটা অগ্রিম হবে
-        if(advanceAmount > 0) toast(`${fmt(deductAmount)} বাকি বেতন থেকে কাটা হলো, বাকি ${fmt(advanceAmount)} অগ্রিম হিসেবে যোগ হলো`);
-      } else {
-        advanceAmount = amount;
-      }
-    }
-    if(deductAmount > 0){
-      emp.due = Math.max(0, currentDue - deductAmount);
-      opsAddEmployeeTxn(emp.id, 'payment', deductAmount, 'অন্য বাবদে (বেতন থেকে কর্তন)' + (note?' - '+note:''));
-      txnLabel = 'Salary Paid (বেতন পরিশোধ)';
-    }
-    if(advanceAmount > 0){
-      emp.advance = (Number(emp.advance)||0) + advanceAmount;
-      opsAddEmployeeTxn(emp.id, 'advance', advanceAmount, 'অন্য বাবদে (অগ্রিম)' + (note?' - '+note:''));
-      txnLabel = deductAmount > 0 ? 'Salary Paid + Advance (আংশিক বেতন, বাকিটা অগ্রিম)' : 'Advance Received (অগ্রিম নেওয়া)';
-    }
-    opsSaveEmployees(list);
-    opsRenderEmployees();
-    toast('টাকা দেওয়া হয়েছে ✅');
-    await opsSendStaffWhatsAppReceipt(opsLoadEmployees().find(x=>x.id===emp.id) || emp, txnLabel, amount);
-  }
-});
 
 // আগে বেতন ছাড়া নেওয়া টাকা এখন বেতনের সাথে সমন্বয় (settle) করার জন্য
 async function opsOpenAdvanceSettle(id){
