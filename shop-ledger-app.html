@@ -2836,47 +2836,11 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
   });
 });
 
-/* ব্যাক বাটন হ্যান্ডলিং: ড্যাশবোর্ডে থাকা অবস্থায় ব্যাক চাপলে সরাসরি বন্ধ হয়ে না গিয়ে
-   "হ্যাঁ/না" কনফার্মেশন দেখাবে। কনফার্মেশন খোলা অবস্থায় আবার ব্যাক চাপলে সেটা শুধু
-   পপআপ লুকিয়ে দেবে (অ্যাপ বন্ধ হবে না)। অন্য কোনো ট্যাবে থাকলে ব্যাক চাপলে
-   প্রথমে ড্যাশবোর্ডে ফিরিয়ে আনবে। */
-let exitModalOpen = false;
-history.pushState({appBackTrap:true}, '', location.href);
-
-window.addEventListener('popstate', ()=>{
-  const exitModal = document.getElementById('exitConfirmModal');
-  if(exitModalOpen){
-    exitModal.classList.remove('show');
-    exitModalOpen = false;
-    history.pushState({appBackTrap:true}, '', location.href);
-    return;
-  }
-  const onDash = document.querySelector('.tab-btn[data-tab="dash"]').classList.contains('active');
-  if(onDash){
-    exitModal.classList.add('show');
-    exitModalOpen = true;
-    history.pushState({appBackTrap:true}, '', location.href);
-  } else {
-    document.querySelector('.tab-btn[data-tab="dash"]').click();
-    history.pushState({appBackTrap:true}, '', location.href);
-  }
-});
-
-document.getElementById('exitNoBtn').addEventListener('click', ()=>{
-  document.getElementById('exitConfirmModal').classList.remove('show');
-  exitModalOpen = false;
-});
-
-document.getElementById('exitYesBtn').addEventListener('click', ()=>{
-  document.getElementById('exitConfirmModal').classList.remove('show');
-  exitModalOpen = false;
-  if(window.navigator && window.navigator.app && window.navigator.app.exitApp){
-    window.navigator.app.exitApp();
-  } else {
-    window.close();
-    setTimeout(()=>{ history.go(-(history.length)); }, 100);
-  }
-});
+/* পুরনো, সরল ব্যাক-বাটন হ্যান্ডলারটা এখান থেকে সরানো হয়েছে — এটা নিচের
+   initBackButtonHandling() ফাংশনের সাথে একই popstate ইভেন্টে সংঘর্ষ করছিল
+   (দুটোই একসাথে চলতো, ফলে ভুল পেইজে চলে যাওয়ার বাগ হচ্ছিল)। এখন শুধু
+   initBackButtonHandling()-ই ব্যাক বাটন সামলাবে, যেটা Product Management →
+   Business Management → হোম — এই স্তরক্রম সঠিকভাবে মেনে চলে। */
 
 function openMiniProgram(id){
   document.getElementById('mainApp').style.display = 'none';
