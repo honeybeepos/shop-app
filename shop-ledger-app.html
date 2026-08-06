@@ -1716,13 +1716,17 @@
 
     <div class="opsSection" id="otab-otherexpense" style="display:none;">
       <div class="glassGrid">
-        <div class="glassCard"><div class="ic">💸</div><div class="lbl">মোট অন্য খরচ</div><div class="val">SAR 0</div></div>
-        <div class="glassCard"><div class="ic">🏪</div><div class="lbl">দোকানের খরচ</div><div class="val">SAR 0</div></div>
-        <div class="glassCard"><div class="ic">🏠</div><div class="lbl">রুম ভাড়া</div><div class="val">SAR 0</div></div>
-        <div class="glassCard"><div class="ic">🍽️</div><div class="lbl">খাবার-দাবার খরচ</div><div class="val">SAR 0</div></div>
+        <div class="glassCard wide"><div class="ic">💸</div><div class="lbl">মোট অন্য খরচ (স্টাফ ছাড়া)</div><div class="val" id="opsOtherExpTotal">SAR 0</div></div>
+        <div class="glassCard"><div class="ic">💵</div><div class="lbl">Cash-এ মোট খরচ</div><div class="val" id="opsOtherExpCash">SAR 0</div></div>
+        <div class="glassCard"><div class="ic">🏦</div><div class="lbl">Bank-এ মোট খরচ</div><div class="val" id="opsOtherExpBank">SAR 0</div></div>
+        <div class="glassCard"><div class="ic">📅</div><div class="lbl">আজকের খরচ</div><div class="val" id="opsOtherExpToday">SAR 0</div></div>
+        <div class="glassCard"><div class="ic">📆</div><div class="lbl">এই মাসের খরচ</div><div class="val" id="opsOtherExpMonth">SAR 0</div></div>
       </div>
-      <div class="opsSectionTitle">💸 অন্য খরচ</div>
-      <div class="glassList"><div class="empty">এই সেকশনে কী কী থাকবে তা পরে যোগ করা হবে।</div></div>
+      <div class="opsAddBtn bizNavCard" id="opsOtherExpenseBtn" style="width:100%; text-align:center; padding:14px; margin:4px 0 16px; cursor:pointer; font-size:14.5px;">
+        😊 আপনি কি কোনো খরচ করতে যাচ্ছেন?<br><span style="font-weight:800;">💸 খরচ করুন</span>
+      </div>
+      <div class="opsSectionTitle">🧾 খরচের হিসাব</div>
+      <div class="glassList" id="opsOtherExpenseList"></div>
     </div>
 
     <div class="opsSection" id="otab-expense" style="display:none;">
@@ -1899,7 +1903,12 @@
         <option value="অন্যান্য">📦 অন্যান্য</option>
       </select>
       <label>টাকার পরিমাণ</label><input type="number" id="opsExpAmount" placeholder="যেমনঃ 500">
-      <label>নোট (অপশনাল)</label><input type="text" id="opsExpNote" placeholder="বিস্তারিত লিখুন">
+      <label>পেমেন্ট মাধ্যম</label>
+      <div class="status-group" id="opsExpMethodGroup">
+        <div class="status-chip active" data-method="cash">💵 Cash</div>
+        <div class="status-chip" data-method="bank">🏦 Bank</div>
+      </div>
+      <label>কোন ক্ষেত্রে খরচ করছেন? (বাধ্যতামূলক)</label><input type="text" id="opsExpNote" placeholder="যেমনঃ দোকানের সাইনবোর্ড মেরামত">
       <div class="opsModalActions">
         <button class="opsCancelBtn" id="opsExpCancelBtn">বাতিল</button>
         <button class="opsSaveBtn" id="opsExpSaveBtn">সেভ করুন</button>
@@ -3497,6 +3506,45 @@ function opsRenderExpenses(){
       </div>`;
     }).join('') : `<div class="glassEmpty">এখনো কোনো খরচ যোগ করা হয়নি</div>`;
   }
+  opsRenderOtherExpense(list);
+}
+// "💸 অন্য খরচ" ট্যাব — স্টাফ-সংক্রান্ত খরচ (বেতন/অগ্রিম) ছাড়া দোকানের বাকি সব খরচ এখানে
+// দেখানো হয়, সাথে Cash আর Bank দুই মাধ্যমে আলাদা করে মোট কত খরচ হয়েছে সেটার মিটার
+const STAFF_EXPENSE_CATEGORIES = ['স্টাফ বেতন', 'স্টাফ অগ্রিম', 'স্টাফ অন্যান্য টাকা'];
+function opsRenderOtherExpense(allExpenses){
+  const listEl = document.getElementById('opsOtherExpenseList');
+  if(!listEl) return;
+  const list = (allExpenses || opsLoadExpenses())
+    .filter(x => !STAFF_EXPENSE_CATEGORIES.includes(x.category))
+    .sort((a,b)=> new Date(b.date) - new Date(a.date));
+
+  const todayStr = new Date().toDateString();
+  const now = new Date();
+  let total = 0, cashTotal = 0, bankTotal = 0, todayTotal = 0, monthTotal = 0;
+  list.forEach(x=>{
+    const amt = Number(x.amount)||0;
+    total += amt;
+    if((x.method||'cash') === 'bank') bankTotal += amt; else cashTotal += amt;
+    const d = new Date(x.date);
+    if(d.toDateString() === todayStr) todayTotal += amt;
+    if(d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth()) monthTotal += amt;
+  });
+  document.getElementById('opsOtherExpTotal').textContent = fmt(total);
+  document.getElementById('opsOtherExpCash').textContent = fmt(cashTotal);
+  document.getElementById('opsOtherExpBank').textContent = fmt(bankTotal);
+  document.getElementById('opsOtherExpToday').textContent = fmt(todayTotal);
+  document.getElementById('opsOtherExpMonth').textContent = fmt(monthTotal);
+
+  listEl.innerHTML = list.length ? list.map(x=>{
+    const methodTag = (x.method||'cash')==='bank' ? '🏦 Bank' : '💵 Cash';
+    return `<div class="opsRow">
+      <div class="opsRowTop"><span class="nm">${escapeHtml(x.category)}</span><span class="amt red">${fmt(Number(x.amount)||0)}</span></div>
+      <div class="opsRowMeta">${formatInvoiceDate(x.date)} · ${methodTag}${x.note ? ' · '+escapeHtml(x.note) : ''}</div>
+      <div class="opsRowActions">
+        <button class="opsMiniBtn danger" onclick="opsDeleteExpense('${x.id}')">🗑 ডিলিট</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="glassEmpty">এখনো কোনো খরচ যোগ করা হয়নি</div>`;
 }
 const opsAddExpenseBtnEl = document.getElementById('opsAddExpenseBtn');
 if(opsAddExpenseBtnEl) opsAddExpenseBtnEl.addEventListener('click', ()=>{
@@ -3505,16 +3553,31 @@ if(opsAddExpenseBtnEl) opsAddExpenseBtnEl.addEventListener('click', ()=>{
   document.getElementById('opsExpNote').value = '';
   document.getElementById('opsExpenseModal').classList.add('show');
 });
+document.getElementById('opsOtherExpenseBtn').addEventListener('click', ()=>{
+  document.getElementById('opsExpCategory').value = 'অন্যান্য';
+  document.getElementById('opsExpAmount').value = '';
+  document.getElementById('opsExpNote').value = '';
+  document.querySelectorAll('#opsExpMethodGroup .status-chip').forEach(c=>c.classList.remove('active'));
+  document.querySelector('#opsExpMethodGroup .status-chip[data-method="cash"]').classList.add('active');
+  document.getElementById('opsExpenseModal').classList.add('show');
+});
 document.getElementById('opsExpCancelBtn').addEventListener('click', ()=> document.getElementById('opsExpenseModal').classList.remove('show'));
-document.getElementById('opsExpSaveBtn').addEventListener('click', ()=>{
+document.getElementById('opsExpSaveBtn').addEventListener('click', async ()=>{
   const amount = Number(document.getElementById('opsExpAmount').value)||0;
   if(amount <= 0){ toast('সঠিক টাকার পরিমাণ দিন'); return; }
+  const note = document.getElementById('opsExpNote').value.trim();
+  if(!note){ toast('কোন ক্ষেত্রে খরচ করছেন লিখুন — এটা বাধ্যতামূলক'); return; }
+  const methodChip = document.querySelector('#opsExpMethodGroup .status-chip.active');
+  const method = methodChip ? methodChip.dataset.method : 'cash';
+  const okPw = await opsVerifyPassword('খরচ যোগ করতে পাসওয়ার্ড দিন');
+  if(!okPw) return;
   const list = opsLoadExpenses();
   list.push({
     id: bccUid(),
     category: document.getElementById('opsExpCategory').value,
     amount,
-    note: document.getElementById('opsExpNote').value.trim(),
+    method,
+    note,
     date: new Date().toISOString()
   });
   opsSaveExpenses(list);
