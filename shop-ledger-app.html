@@ -1719,11 +1719,12 @@
     <div class="opsSection" id="otab-otherexpense" style="display:none;">
       <div class="glassGrid">
         <div class="glassCard wide"><div class="ic">💸</div><div class="lbl">মোট অন্য খরচ (স্টাফ ছাড়া)</div><div class="val" id="opsOtherExpTotal">SAR 0</div></div>
-        <div class="glassCard"><div class="ic">💵</div><div class="lbl">Cash-এ মোট খরচ</div><div class="val" id="opsOtherExpCash">SAR 0</div></div>
-        <div class="glassCard"><div class="ic">🏦</div><div class="lbl">Bank-এ মোট খরচ</div><div class="val" id="opsOtherExpBank">SAR 0</div></div>
+        <div class="glassCard" id="opsCashBalanceCard" style="cursor:pointer;"><div class="ic">💵</div><div class="lbl">ক্যাশে আছে</div><div class="val" id="opsOtherExpCash">SAR 0</div></div>
+        <div class="glassCard" id="opsBankBalanceCard" style="cursor:pointer;"><div class="ic">🏦</div><div class="lbl">ব্যাংকে আছে</div><div class="val" id="opsOtherExpBank">SAR 0</div></div>
         <div class="glassCard"><div class="ic">📅</div><div class="lbl">আজকের খরচ</div><div class="val" id="opsOtherExpToday">SAR 0</div></div>
         <div class="glassCard"><div class="ic">📆</div><div class="lbl">এই মাসের খরচ</div><div class="val" id="opsOtherExpMonth">SAR 0</div></div>
       </div>
+      <p style="margin:-6px 0 14px; font-size:11px; color:#8a7f6c; text-align:center;">💡 "ক্যাশে আছে" বা "ব্যাংকে আছে" কার্ডে ট্যাপ করে আগের জমানো টাকা (শুরুর ব্যালেন্স) বসাতে পারবেন</p>
       <div class="opsAddBtn bizNavCard" id="opsOtherExpenseBtn" style="width:100%; text-align:center; padding:14px; margin:4px 0 16px; cursor:pointer; font-size:14.5px;">
         😊 আপনি কি কোনো খরচ করতে যাচ্ছেন?<br><span style="font-weight:800;">💸 খরচ করুন</span>
       </div>
@@ -3533,29 +3534,47 @@ function opsRenderExpenses(){
 // "💸 অন্য খরচ" ট্যাব — স্টাফ-সংক্রান্ত খরচ (বেতন/অগ্রিম) ছাড়া দোকানের বাকি সব খরচ এখানে
 // দেখানো হয়, সাথে Cash আর Bank দুই মাধ্যমে আলাদা করে মোট কত খরচ হয়েছে সেটার মিটার
 const STAFF_EXPENSE_CATEGORIES = ['স্টাফ বেতন', 'স্টাফ অগ্রিম', 'স্টাফ অন্যান্য টাকা'];
+function opsLoadOpeningBalance(kind){ return Number(localStorage.getItem('ops-opening-'+kind))||0; }
+function opsSaveOpeningBalance(kind, val){ localStorage.setItem('ops-opening-'+kind, String(Number(val)||0)); }
+
 function opsRenderOtherExpense(allExpenses){
   const listEl = document.getElementById('opsOtherExpenseList');
   if(!listEl) return;
-  const list = (allExpenses || opsLoadExpenses())
+  if(typeof monRenderAll === 'function') monRenderAll(); // মনিটরিং পেজে না গেলেও cash/bank বিক্রির আয় হালনাগাদ থাকবে
+  const allX = allExpenses || opsLoadExpenses();
+  const list = allX
     .filter(x => !STAFF_EXPENSE_CATEGORIES.includes(x.category))
     .sort((a,b)=> new Date(b.date) - new Date(a.date));
 
   const todayStr = new Date().toDateString();
   const now = new Date();
-  let total = 0, cashTotal = 0, bankTotal = 0, todayTotal = 0, monthTotal = 0;
+  let total = 0, todayTotal = 0, monthTotal = 0;
   list.forEach(x=>{
     const amt = Number(x.amount)||0;
     total += amt;
-    if((x.method||'cash') === 'bank') bankTotal += amt; else cashTotal += amt;
     const d = new Date(x.date);
     if(d.toDateString() === todayStr) todayTotal += amt;
     if(d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth()) monthTotal += amt;
   });
   document.getElementById('opsOtherExpTotal').textContent = fmt(total);
-  document.getElementById('opsOtherExpCash').textContent = fmt(cashTotal);
-  document.getElementById('opsOtherExpBank').textContent = fmt(bankTotal);
   document.getElementById('opsOtherExpToday').textContent = fmt(todayTotal);
   document.getElementById('opsOtherExpMonth').textContent = fmt(monthTotal);
+
+  // ক্যাশে/ব্যাংকে আসলে এখন কত টাকা আছে — এটা শুধু "অন্য খরচ" না, দোকানের সব ধরনের
+  // খরচ (স্টাফের বেতন/অগ্রিমসহ) বিয়োগ করেই হিসাব করা হয়, কারণ ক্যাশ বক্স থেকে
+  // যেকোনো কারণে টাকা বের হলেই আসল ক্যাশ কমে যায়। সাথে শুরুর (আগের দিনের) ব্যালেন্স
+  // আর বিক্রির আয়ও (cash/bank অনুযায়ী) যোগ হয়।
+  let allCashExpense = 0, allBankExpense = 0;
+  allX.forEach(x=>{
+    const amt = Number(x.amount)||0;
+    if((x.method||'cash') === 'bank') allBankExpense += amt; else allCashExpense += amt;
+  });
+  const salesCash = (typeof monCashBankData !== 'undefined') ? (monCashBankData.allTimeCash||0) : 0;
+  const salesBank = (typeof monCashBankData !== 'undefined') ? (monCashBankData.allTimeBank||0) : 0;
+  const cashBalance = opsLoadOpeningBalance('cash') + salesCash - allCashExpense;
+  const bankBalance = opsLoadOpeningBalance('bank') + salesBank - allBankExpense;
+  document.getElementById('opsOtherExpCash').textContent = fmt(cashBalance);
+  document.getElementById('opsOtherExpBank').textContent = fmt(bankBalance);
 
   listEl.innerHTML = list.length ? list.map(x=>{
     const methodTag = (x.method||'cash')==='bank' ? '🏦 Bank' : '💵 Cash';
@@ -3568,6 +3587,26 @@ function opsRenderOtherExpense(allExpenses){
     </div>`;
   }).join('') : `<div class="glassEmpty">এখনো কোনো খরচ যোগ করা হয়নি</div>`;
 }
+document.getElementById('opsCashBalanceCard').addEventListener('click', async ()=>{
+  const okPw = await opsVerifyPassword('ক্যাশের শুরুর ব্যালেন্স বসাতে পাসওয়ার্ড দিন');
+  if(!okPw) return;
+  const current = opsLoadOpeningBalance('cash');
+  const val = prompt('আগের জমানো/শুরুর ক্যাশ ব্যালেন্স কত? (এখন বসানো আছে: '+fmt(current)+')', current);
+  if(val === null) return;
+  opsSaveOpeningBalance('cash', val);
+  opsRenderOtherExpense();
+  toast('ক্যাশের শুরুর ব্যালেন্স আপডেট হয়েছে ✅');
+});
+document.getElementById('opsBankBalanceCard').addEventListener('click', async ()=>{
+  const okPw = await opsVerifyPassword('ব্যাংকের শুরুর ব্যালেন্স বসাতে পাসওয়ার্ড দিন');
+  if(!okPw) return;
+  const current = opsLoadOpeningBalance('bank');
+  const val = prompt('আগের জমানো/শুরুর ব্যাংক ব্যালেন্স কত? (এখন বসানো আছে: '+fmt(current)+')', current);
+  if(val === null) return;
+  opsSaveOpeningBalance('bank', val);
+  opsRenderOtherExpense();
+  toast('ব্যাংকের শুরুর ব্যালেন্স আপডেট হয়েছে ✅');
+});
 const opsAddExpenseBtnEl = document.getElementById('opsAddExpenseBtn');
 if(opsAddExpenseBtnEl) opsAddExpenseBtnEl.addEventListener('click', ()=>{
   document.getElementById('opsExpCategory').value = 'দোকান ভাড়া';
