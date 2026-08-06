@@ -1943,6 +1943,114 @@
   </div>
 </div>
 
+<!-- 💸 অন্য খরচ — "খরচ করুন" বাটনে ক্লিক করলে খোলা পূর্ণ-স্ক্রিন ড্যাশবোর্ড (মোডালের বদলে) -->
+<div id="program-otherexpense" style="display:none; position:fixed; inset:0; z-index:520; flex-direction:column; overflow:auto;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(251,146,60,0.30), transparent 42%),
+      radial-gradient(circle at 88% 18%, rgba(220,38,38,0.24), transparent 42%),
+      radial-gradient(circle at 25% 92%, rgba(180,83,9,0.26), transparent 42%),
+      linear-gradient(160deg,#2b1608,#20120a 55%,#160c07);
+    color:#fff3e8; font-family:-apple-system,'Segoe UI',Roboto,sans-serif;">
+  <style>
+    #program-otherexpense .oedHeader{ display:flex; align-items:center; gap:12px; padding:18px 20px 12px; }
+    #program-otherexpense .oedHeader .backBtn{ background:rgba(255,255,255,0.12); border:none; width:38px; height:38px; border-radius:12px; color:#fff; font-size:18px; cursor:pointer; backdrop-filter:blur(6px); flex-shrink:0; }
+    #program-otherexpense .oedHeader h1{ margin:0; font-size:18px; font-weight:800; }
+    #program-otherexpense .oedHeader .sub{ font-size:11px; color:#fed7aa; margin-top:2px; letter-spacing:0.4px; }
+    #program-otherexpense .oedContent{ padding:0 20px 34px; max-width:520px; margin:0 auto; }
+    #program-otherexpense .oedSectionTitle{ font-size:13px; font-weight:800; color:#fff; margin:18px 0 10px; display:flex; align-items:center; gap:8px; }
+    #program-otherexpense .oedSectionTitle:first-child{ margin-top:2px; }
+
+    #program-otherexpense .oedGrid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:6px; }
+    #program-otherexpense .oedCard{
+      border-radius:18px; padding:16px 14px; position:relative; overflow:hidden;
+      background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.22);
+      backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+      box-shadow:0 10px 26px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+    #program-otherexpense .oedCard.wide{ grid-column:1 / -1; }
+    #program-otherexpense .oedCard .ic{ font-size:22px; margin-bottom:6px; }
+    #program-otherexpense .oedCard .lbl{ font-size:11px; color:#fed7aa; font-weight:700; }
+    #program-otherexpense .oedCard .val{ font-size:20px; font-weight:800; color:#fff; margin-top:4px; font-family:'Space Mono',monospace; }
+
+    #program-otherexpense .oedFormBox{
+      border-radius:16px; padding:16px; margin-bottom:16px;
+      background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18);
+      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    }
+    #program-otherexpense .oedFormBox label{ display:block; font-size:12px; color:#fed7aa; margin:10px 0 5px; font-weight:700; }
+    #program-otherexpense .oedFormBox label:first-child{ margin-top:0; }
+    #program-otherexpense .oedFormBox select,
+    #program-otherexpense .oedFormBox input{
+      width:100%; box-sizing:border-box; padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.07); color:#fff; font-size:14px; outline:none; font-family:inherit;
+    }
+    #program-otherexpense .oedMethodGroup{ display:flex; gap:8px; }
+    #program-otherexpense .oedMethodChip{
+      flex:1; text-align:center; padding:9px 6px; border-radius:10px; border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.06); font-size:13px; cursor:pointer; font-weight:700; color:#fed7aa;
+    }
+    #program-otherexpense .oedMethodChip.active{ background:#ea580c; color:#fff; border-color:#ea580c; }
+    #program-otherexpense .oedSaveBtn{
+      width:100%; margin-top:16px; padding:13px; border:none; border-radius:14px; cursor:pointer;
+      font-size:14.5px; font-weight:800; background:linear-gradient(135deg,#fb923c,#dc2626); color:#fff;
+    }
+    #program-otherexpense .oedSaveBtn:active{ transform:scale(0.97); }
+
+    #program-otherexpense .oedList{
+      border-radius:16px; padding:4px; margin-bottom:14px; overflow:hidden;
+      background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
+      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    }
+    #program-otherexpense .oedRow{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.08); font-size:12.5px; }
+    #program-otherexpense .oedRow:last-child{ border-bottom:none; }
+    #program-otherexpense .oedRow .nm{ color:#fff; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+    #program-otherexpense .oedRow .meta{ color:#fed7aa; font-size:10.5px; white-space:nowrap; }
+    #program-otherexpense .oedRow .amt{ font-family:'Space Mono',monospace; font-weight:700; color:#fca5a5; white-space:nowrap; }
+    #program-otherexpense .oedRow .delBtn{ background:none; border:none; color:#fca5a5; font-size:14px; cursor:pointer; flex-shrink:0; }
+    #program-otherexpense .oedEmpty{ padding:16px; text-align:center; color:#fed7aa; font-size:12px; }
+  </style>
+
+  <div class="oedHeader">
+    <button class="backBtn" id="backFromOtherExpenseDash">←</button>
+    <div><h1>💸 খরচ করুন</h1><div class="sub">OTHER EXPENSE DASHBOARD</div></div>
+  </div>
+
+  <div class="oedContent">
+    <div class="oedSectionTitle">📊 Overview</div>
+    <div class="oedGrid">
+      <div class="oedCard wide"><div class="ic">💸</div><div class="lbl">মোট অন্য খরচ (স্টাফ ছাড়া)</div><div class="val" id="oedTotal">SAR 0</div></div>
+      <div class="oedCard"><div class="ic">💵</div><div class="lbl">Cash-এ মোট খরচ</div><div class="val" id="oedCash">SAR 0</div></div>
+      <div class="oedCard"><div class="ic">🏦</div><div class="lbl">Bank-এ মোট খরচ</div><div class="val" id="oedBank">SAR 0</div></div>
+      <div class="oedCard"><div class="ic">📅</div><div class="lbl">আজকের খরচ</div><div class="val" id="oedToday">SAR 0</div></div>
+      <div class="oedCard"><div class="ic">📆</div><div class="lbl">এই মাসের খরচ</div><div class="val" id="oedMonth">SAR 0</div></div>
+    </div>
+
+    <div class="oedSectionTitle">🧾 নতুন খরচ যোগ করুন</div>
+    <div class="oedFormBox">
+      <label>ক্যাটাগরি</label>
+      <select id="oedCategory">
+        <option value="দোকান ভাড়া">🏠 দোকান ভাড়া</option>
+        <option value="বিদ্যুৎ বিল">💡 বিদ্যুৎ বিল</option>
+        <option value="পরিবহন">🚗 পরিবহন</option>
+        <option value="মেরামত/রক্ষণাবেক্ষণ">🔧 মেরামত/রক্ষণাবেক্ষণ</option>
+        <option value="সাপ্লায়ার পেমেন্ট">🚚 সাপ্লায়ার পেমেন্ট</option>
+        <option value="অন্যান্য" selected>📦 অন্যান্য</option>
+      </select>
+      <label>টাকার পরিমাণ</label><input type="number" id="oedAmount" placeholder="যেমনঃ 500">
+      <label>পেমেন্ট মাধ্যম</label>
+      <div class="oedMethodGroup" id="oedMethodGroup">
+        <div class="oedMethodChip active" data-method="cash">💵 Cash</div>
+        <div class="oedMethodChip" data-method="bank">🏦 Bank</div>
+      </div>
+      <label>কোন ক্ষেত্রে খরচ করছেন? (বাধ্যতামূলক)</label><input type="text" id="oedNote" placeholder="যেমনঃ দোকানের সাইনবোর্ড মেরামত">
+      <button class="oedSaveBtn" id="oedSaveBtn">💸 খরচ সেভ করুন</button>
+    </div>
+
+    <div class="oedSectionTitle">📋 খরচের হিসাব</div>
+    <div class="oedList" id="oedList"></div>
+  </div>
+</div>
+
 <div id="program-monitor" style="display:none; position:fixed; inset:0; z-index:500; flex-direction:column; overflow:auto;
     background:
       radial-gradient(circle at 10% 10%, rgba(244,114,182,0.35), transparent 40%),
@@ -3545,6 +3653,30 @@ function opsRenderOtherExpense(allExpenses){
       </div>
     </div>`;
   }).join('') : `<div class="glassEmpty">এখনো কোনো খরচ যোগ করা হয়নি</div>`;
+
+  // পূর্ণ-স্ক্রিন "খরচ করুন" ড্যাশবোর্ড (program-otherexpense) খোলা থাকলে সেটার
+  // ওভারভিউ কার্ড আর লিস্টও একই ডেটা দিয়ে আপডেট করে দেওয়া হয়, যাতে দুই জায়গাতেই
+  // (Ops ট্যাব ও এই ড্যাশবোর্ড) সবসময় একই হিসাব দেখা যায়
+  const oedTotalEl = document.getElementById('oedTotal');
+  if(oedTotalEl){
+    oedTotalEl.textContent = fmt(total);
+    document.getElementById('oedCash').textContent = fmt(cashTotal);
+    document.getElementById('oedBank').textContent = fmt(bankTotal);
+    document.getElementById('oedToday').textContent = fmt(todayTotal);
+    document.getElementById('oedMonth').textContent = fmt(monthTotal);
+    const oedListEl = document.getElementById('oedList');
+    oedListEl.innerHTML = list.length ? list.map(x=>{
+      const methodTag = (x.method||'cash')==='bank' ? '🏦 Bank' : '💵 Cash';
+      return `<div class="oedRow">
+        <div style="flex:1; overflow:hidden;">
+          <div class="nm">${escapeHtml(x.category)}${x.note ? ' — '+escapeHtml(x.note) : ''}</div>
+          <div class="meta">${formatInvoiceDate(x.date)} · ${methodTag}</div>
+        </div>
+        <span class="amt">${fmt(Number(x.amount)||0)}</span>
+        <button class="delBtn" onclick="opsDeleteExpense('${x.id}')">🗑</button>
+      </div>`;
+    }).join('') : `<div class="oedEmpty">এখনো কোনো খরচ যোগ করা হয়নি</div>`;
+  }
 }
 const opsAddExpenseBtnEl = document.getElementById('opsAddExpenseBtn');
 if(opsAddExpenseBtnEl) opsAddExpenseBtnEl.addEventListener('click', ()=>{
@@ -3553,13 +3685,47 @@ if(opsAddExpenseBtnEl) opsAddExpenseBtnEl.addEventListener('click', ()=>{
   document.getElementById('opsExpNote').value = '';
   document.getElementById('opsExpenseModal').classList.add('show');
 });
+// "💸 খরচ করুন" বাটনে ক্লিক করলে আগে একটা পপ-আপ মোডাল খুলতো, এখন এটার বদলে
+// পূর্ণ-স্ক্রিন "program-otherexpense" ড্যাশবোর্ড খোলে (ফর্ম + ওভারভিউ + লিস্ট একসাথে)
 document.getElementById('opsOtherExpenseBtn').addEventListener('click', ()=>{
-  document.getElementById('opsExpCategory').value = 'অন্যান্য';
-  document.getElementById('opsExpAmount').value = '';
-  document.getElementById('opsExpNote').value = '';
-  document.querySelectorAll('#opsExpMethodGroup .status-chip').forEach(c=>c.classList.remove('active'));
-  document.querySelector('#opsExpMethodGroup .status-chip[data-method="cash"]').classList.add('active');
-  document.getElementById('opsExpenseModal').classList.add('show');
+  document.getElementById('oedCategory').value = 'অন্যান্য';
+  document.getElementById('oedAmount').value = '';
+  document.getElementById('oedNote').value = '';
+  document.querySelectorAll('#oedMethodGroup .oedMethodChip').forEach(c=>c.classList.remove('active'));
+  document.querySelector('#oedMethodGroup .oedMethodChip[data-method="cash"]').classList.add('active');
+  switchProgram('program-ops', 'program-otherexpense');
+  opsRenderOtherExpense();
+});
+document.getElementById('backFromOtherExpenseDash').addEventListener('click', ()=> switchProgram('program-otherexpense', 'program-ops'));
+document.querySelectorAll('#oedMethodGroup .oedMethodChip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#oedMethodGroup .oedMethodChip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+  });
+});
+document.getElementById('oedSaveBtn').addEventListener('click', async ()=>{
+  const amount = Number(document.getElementById('oedAmount').value)||0;
+  if(amount <= 0){ toast('সঠিক টাকার পরিমাণ দিন'); return; }
+  const note = document.getElementById('oedNote').value.trim();
+  if(!note){ toast('কোন ক্ষেত্রে খরচ করছেন লিখুন — এটা বাধ্যতামূলক'); return; }
+  const methodChip = document.querySelector('#oedMethodGroup .oedMethodChip.active');
+  const method = methodChip ? methodChip.dataset.method : 'cash';
+  const okPw = await opsVerifyPassword('খরচ যোগ করতে পাসওয়ার্ড দিন');
+  if(!okPw) return;
+  const list = opsLoadExpenses();
+  list.push({
+    id: bccUid(),
+    category: document.getElementById('oedCategory').value,
+    amount,
+    method,
+    note,
+    date: new Date().toISOString()
+  });
+  opsSaveExpenses(list);
+  document.getElementById('oedAmount').value = '';
+  document.getElementById('oedNote').value = '';
+  opsRenderExpenses();
+  toast('খরচ যোগ হয়েছে ✅');
 });
 document.getElementById('opsExpCancelBtn').addEventListener('click', ()=> document.getElementById('opsExpenseModal').classList.remove('show'));
 document.getElementById('opsExpSaveBtn').addEventListener('click', async ()=>{
@@ -5872,6 +6038,16 @@ function initBackButtonHandling(){
     const openModal = document.querySelector('.modal-overlay.show');
     if(openModal){
       openModal.classList.remove('show');
+      pushBackTrap();
+      return;
+    }
+
+    // "💸 খরচ করুন" ড্যাশবোর্ড (program-otherexpense) আসলে program-ops-এর ভেতর থেকে
+    // খোলে, তাই এটা খোলা থাকলে ব্যাক বাটনে সরাসরি Business Management-এ না গিয়ে
+    // এক ধাপ পেছনে program-ops-এ ফিরে আসবে
+    const otherExpEl = document.getElementById('program-otherexpense');
+    if(otherExpEl && otherExpEl.style.display !== 'none'){
+      switchProgram('program-otherexpense', 'program-ops');
       pushBackTrap();
       return;
     }
