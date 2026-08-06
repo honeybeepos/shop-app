@@ -1708,6 +1708,8 @@
       <div class="glassGrid">
         <div class="glassCard" id="opsEmployeeCountCard" style="cursor:pointer;"><div class="ic">🧑‍🔧</div><div class="lbl">মোট স্টাফ</div><div class="val" id="opsEmployeeCount">0</div></div>
         <div class="glassCard alert"><div class="ic">💳</div><div class="lbl">স্টাফকে মোট বাকি</div><div class="val" id="opsEmployeeTotalDue">SAR 0</div></div>
+        <div class="glassCard"><div class="ic">💵</div><div class="lbl">Cash থেকে স্টাফকে দেওয়া</div><div class="val" id="opsEmployeeCashPaid">SAR 0</div></div>
+        <div class="glassCard"><div class="ic">🏦</div><div class="lbl">Bank থেকে স্টাফকে দেওয়া</div><div class="val" id="opsEmployeeBankPaid">SAR 0</div></div>
       </div>
       <input class="opsSearchInput" id="opsEmployeeSearch" type="text" placeholder="🔍 স্টাফের নাম বা নাম্বার দিয়ে খুঁজুন...">
       <div class="opsSectionTitle">🧑‍🔧 স্টাফ লিস্ট <button class="opsAddBtn bizNavCard" id="opsAddEmployeeBtn">+ নতুন স্টাফ</button></div>
@@ -1921,6 +1923,13 @@
     <div class="opsModalBox">
       <h3 id="opsTxnTitle">লেনদেন</h3>
       <label>টাকার পরিমাণ</label><input type="number" id="opsTxnAmount" placeholder="যেমনঃ 500">
+      <div id="opsTxnMethodWrap" style="display:none;">
+        <label>কোথা থেকে দিচ্ছেন?</label>
+        <div class="status-group" id="opsTxnMethodGroup">
+          <div class="status-chip active" data-method="cash">💵 Cash</div>
+          <div class="status-chip" data-method="bank">🏦 Bank</div>
+        </div>
+      </div>
       <label>নোট (অপশনাল)</label><input type="text" id="opsTxnNote" placeholder="বিস্তারিত লিখুন">
       <div class="opsModalActions">
         <button class="opsCancelBtn" id="opsTxnCancelBtn">বাতিল</button>
@@ -2883,9 +2892,9 @@ function opsLoadEmployees(){ try{ return JSON.parse(localStorage.getItem('shop-e
 function opsSaveEmployees(list){ localStorage.setItem('shop-employees', JSON.stringify(list)); }
 function opsLoadEmployeeTxns(){ try{ return JSON.parse(localStorage.getItem('shop-employee-txns')||'[]'); }catch(e){ return []; } }
 function opsSaveEmployeeTxns(list){ localStorage.setItem('shop-employee-txns', JSON.stringify(list)); }
-function opsAddEmployeeTxn(employeeId, type, amount, note){
+function opsAddEmployeeTxn(employeeId, type, amount, note, method){
   const list = opsLoadEmployeeTxns();
-  list.push({ id: bccUid(), employeeId, type, amount: Number(amount)||0, note: note||'', date: new Date().toISOString() });
+  list.push({ id: bccUid(), employeeId, type, amount: Number(amount)||0, note: note||'', method: method||'cash', date: new Date().toISOString() });
   opsSaveEmployeeTxns(list);
 }
 // স্টাফকে বেতন/অগ্রিম দেওয়া বা সাপ্লায়ারকে টাকা দেওয়ার মতো টাকা-বের-হওয়া কাজগুলোর
@@ -3357,6 +3366,19 @@ function opsRenderEmployees(){
   const totalDue = all.reduce((s,x)=> s + Math.max(Number(x.due)||0,0), 0);
   document.getElementById('opsEmployeeTotalDue').textContent = fmt(totalDue);
 
+  // স্টাফকে অগ্রিম/বেতন হিসেবে Cash আর Bank থেকে মোট কত দেওয়া হয়েছে, তার হিসাব
+  const txns = opsLoadEmployeeTxns();
+  let cashPaid = 0, bankPaid = 0;
+  txns.forEach(t=>{
+    if(t.type !== 'advance' && t.type !== 'payment') return;
+    const amt = Number(t.amount)||0;
+    if((t.method||'cash') === 'bank') bankPaid += amt; else cashPaid += amt;
+  });
+  const cashEl = document.getElementById('opsEmployeeCashPaid');
+  const bankEl = document.getElementById('opsEmployeeBankPaid');
+  if(cashEl) cashEl.textContent = fmt(cashPaid);
+  if(bankEl) bankEl.textContent = fmt(bankPaid);
+
   const q = document.getElementById('opsEmployeeSearch').value.trim().toLowerCase();
   const list = q ? all.filter(s => s.name.toLowerCase().includes(q) || (s.phone||'').includes(q)) : all;
 
@@ -3602,11 +3624,18 @@ const opsTxnTitles = {
   'employee-payment': '💵 স্টাফকে বেতন দিন (বাকি কমবে)',
   'employee-advance': '📌 স্টাফকে অগ্রিম দিন'
 };
+const OPS_TXN_METHOD_MODES = ['employee-payment', 'employee-advance'];
 function opsOpenTxnModal(mode, targetId){
   opsTxnMode = mode; opsTxnTargetId = targetId;
   document.getElementById('opsTxnTitle').textContent = opsTxnTitles[mode] || 'লেনদেন';
   document.getElementById('opsTxnAmount').value = '';
   document.getElementById('opsTxnNote').value = '';
+  const showMethod = OPS_TXN_METHOD_MODES.includes(mode);
+  document.getElementById('opsTxnMethodWrap').style.display = showMethod ? '' : 'none';
+  if(showMethod){
+    document.querySelectorAll('#opsTxnMethodGroup .status-chip').forEach(c=>c.classList.remove('active'));
+    document.querySelector('#opsTxnMethodGroup .status-chip[data-method="cash"]').classList.add('active');
+  }
   document.getElementById('opsTxnModal').classList.add('show');
 }
 document.getElementById('opsTxnCancelBtn').addEventListener('click', ()=> document.getElementById('opsTxnModal').classList.remove('show'));
@@ -3685,17 +3714,19 @@ document.getElementById('opsTxnSaveBtn').addEventListener('click', async ()=>{
     const s = list.find(x=>x.id===opsTxnTargetId);
     if(s){
       const note = document.getElementById('opsTxnNote').value.trim();
+      const methodChip = document.querySelector('#opsTxnMethodGroup .status-chip.active');
+      const method = methodChip ? methodChip.dataset.method : 'cash';
       if(opsTxnMode === 'employee-advance'){
         // অগ্রিম মানে স্টাফ বেতনের বাইরে টাকা নিয়েছে — এটা 'বাকি' (due, যেটা দোকান
         // স্টাফকে দিতে বাকি আছে) থেকে সম্পূর্ণ আলাদা একটা হিসাব: স্টাফ এখন দোকানকে
         // ফেরত দেবে (পরের বেতন থেকে কাটা হবে)। তাই শুধু advance বাড়বে, due অপরিবর্তিত।
         s.advance = (Number(s.advance)||0) + amount;
-        opsAddEmployeeTxn(s.id, 'advance', amount, note || 'অগ্রিম নেওয়া');
+        opsAddEmployeeTxn(s.id, 'advance', amount, note || 'অগ্রিম নেওয়া', method);
         opsSaveEmployees(list);
         opsRenderEmployees();
-        // এই টাকা দোকানের ক্যাশ থেকে বের হয়ে গেছে, তাই খরচ হিসেবেও যোগ হবে
+        // এই টাকা দোকানের ক্যাশ/ব্যাংক থেকে বের হয়ে গেছে, তাই খরচ হিসেবেও যোগ হবে
         const exList = opsLoadExpenses();
-        exList.push({ id: bccUid(), category: 'স্টাফ অগ্রিম', person: s.name, amount, note, date: new Date().toISOString() });
+        exList.push({ id: bccUid(), category: 'স্টাফ অগ্রিম', person: s.name, amount, method, note, date: new Date().toISOString() });
         opsSaveExpenses(exList);
         opsRenderExpenses();
         await opsSendStaffWhatsAppReceipt(s, 'Advance Received (অগ্রিম নেওয়া)', amount);
@@ -3716,12 +3747,12 @@ document.getElementById('opsTxnSaveBtn').addEventListener('click', async ()=>{
             : `${fmt(deductAmount)} বাকি বেতন থেকে কাটা হলো, বাকি ${fmt(extraAsAdvance)} অগ্রিম হিসেবে যোগ হলো`);
         }
         opsSaveEmployees(list);
-        if(deductAmount > 0) opsAddEmployeeTxn(s.id, 'payment', deductAmount, note);
-        if(extraAsAdvance > 0) opsAddEmployeeTxn(s.id, 'advance', extraAsAdvance, (note?note+' - ':'') + 'বাকি বেতনের বেশি দেওয়া অংশ');
+        if(deductAmount > 0) opsAddEmployeeTxn(s.id, 'payment', deductAmount, note, method);
+        if(extraAsAdvance > 0) opsAddEmployeeTxn(s.id, 'advance', extraAsAdvance, (note?note+' - ':'') + 'বাকি বেতনের বেশি দেওয়া অংশ', method);
         opsRenderEmployees();
         // স্টাফকে বেতন পেমেন্ট দিলে এটা দোকানের খরচ হিসেবেও যোগ হয়ে যাবে
         const exList = opsLoadExpenses();
-        exList.push({ id: bccUid(), category: 'স্টাফ বেতন', person: s.name, amount, note, date: new Date().toISOString() });
+        exList.push({ id: bccUid(), category: 'স্টাফ বেতন', person: s.name, amount, method, note, date: new Date().toISOString() });
         opsSaveExpenses(exList);
         opsRenderExpenses();
         await opsSendStaffWhatsAppReceipt(s, extraAsAdvance>0 ? (deductAmount>0 ? 'Salary Paid + Advance' : 'Advance Received (অগ্রিম নেওয়া)') : 'Salary Paid (বেতন পরিশোধ)', amount);
