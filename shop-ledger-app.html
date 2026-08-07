@@ -1283,6 +1283,7 @@
       <button class="qiBigBtn" id="cashBankTransferConfirmBtn">✅ নিশ্চিত করুন</button>
     </div>
     <button class="mini-btn" id="cashBankTransferCancelBtn" style="width:100%; margin-top:12px;">বাতিল</button>
+    <button class="mini-btn danger" id="cashBankTransferResetBtn" style="width:100%; margin-top:8px;">🗑️ সব ট্রান্সফার রেকর্ড মুছে ফেলুন (রিসেট)</button>
   </div>
 </div>
 
@@ -2930,7 +2931,18 @@ async function opsSendStaffWhatsAppReceipt(emp, txnTypeLabel, amount){
   const digits = emp.phone.replace(/[^0-9]/g,'');
   window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, '_blank');
 }
-function opsLoadExpenses(){ try{ return JSON.parse(localStorage.getItem('shop-expenses')||'[]'); }catch(e){ return []; } }
+function opsLoadDeletedExpenseIds(){ try{ return JSON.parse(localStorage.getItem('shop-deleted-expense-ids')||'[]'); }catch(e){ return []; } }
+function opsSaveDeletedExpenseIds(ids){ localStorage.setItem('shop-deleted-expense-ids', JSON.stringify(ids)); }
+function opsLoadExpenses(){
+  try{
+    const raw = JSON.parse(localStorage.getItem('shop-expenses')||'[]');
+    const deletedIds = opsLoadDeletedExpenseIds();
+    // ডিলিট করা খরচ যেন ভুলবশত ক্লাউড সিঙ্কের কারণে আবার ফিরে না আসে, তাই প্রতিবার
+    // পড়ার সময়ই ডিলিট-লিস্টের সাথে মিলিয়ে বাদ দেওয়া হয় (কাস্টমার ডিলিটের সমস্যাটার
+    // মতোই — একবার ডিলিট করা জিনিস যেন স্থায়ীভাবে ডিলিটই থাকে)
+    return deletedIds.length ? raw.filter(x => !deletedIds.includes(x.id)) : raw;
+  }catch(e){ return []; }
+}
 function opsSaveExpenses(list){ localStorage.setItem('shop-expenses', JSON.stringify(list)); }
 
 document.getElementById('bizOpsCard').addEventListener('click', ()=>{
@@ -3669,7 +3681,10 @@ async function opsDeleteExpense(id){
   const entered = await openPinModal('পাসওয়ার্ড দিন', 'এই খরচের এন্ট্রিটি ডিলিট করার জন্য পাসওয়ার্ড দিন।');
   if(entered === null) return;
   if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, ডিলিট হয়নি'); return; }
+  const deletedIds = opsLoadDeletedExpenseIds();
+  if(!deletedIds.includes(id)){ deletedIds.push(id); opsSaveDeletedExpenseIds(deletedIds); }
   opsSaveExpenses(opsLoadExpenses().filter(x=>x.id!==id));
+  await persistData();
   opsRenderExpenses();
 }
 
@@ -7404,6 +7419,17 @@ document.getElementById('cashBankAllBankCard').addEventListener('click', ()=>{
 });
 document.getElementById('cashBankTransferCancelBtn').addEventListener('click', ()=>{
   document.getElementById('cashBankTransferModal').classList.remove('show');
+});
+document.getElementById('cashBankTransferResetBtn').addEventListener('click', async ()=>{
+  const entered = await openPinModal('পাসওয়ার্ড দিন', 'সব Bank/Cash ট্রান্সফার রেকর্ড স্থায়ীভাবে মুছে ফেলার জন্য পাসওয়ার্ড দিন।');
+  if(entered === null) return;
+  if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, রিসেট হয়নি'); return; }
+  saveCashBankTransfers([]);
+  await persistData();
+  monRenderAll();
+  if(typeof opsRenderOtherExpense === 'function') opsRenderOtherExpense();
+  document.getElementById('cashBankTransferModal').classList.remove('show');
+  toast('ট্রান্সফার রেকর্ড রিসেট হয়েছে ✅');
 });
 
 document.getElementById('cashBankTransferConfirmBtn').addEventListener('click', async ()=>{

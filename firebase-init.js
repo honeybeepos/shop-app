@@ -214,6 +214,10 @@ async function pushLocalStorageToCloud() {
       const cloudDelEntries = safeParseArray(cloudBlob["phone-shop-deleted-entry-ids"]);
       const mergedDelEntries = Array.from(new Set([...localDelEntries, ...cloudDelEntries]));
 
+      const localDelExp = safeParseArray(blob["shop-deleted-expense-ids"]);
+      const cloudDelExp = safeParseArray(cloudBlob["shop-deleted-expense-ids"]);
+      const mergedDelExp = Array.from(new Set([...localDelExp, ...cloudDelExp]));
+
       const localDelCust = safeParseArray(blob["phone-shop-deleted-customer-keys"]);
       const cloudDelCust = safeParseArray(cloudBlob["phone-shop-deleted-customer-keys"]);
       const mergedDelCust = mergeTombLists(localDelCust, cloudDelCust);
@@ -223,6 +227,7 @@ async function pushLocalStorageToCloud() {
       const mergedResCust = mergeTombLists(localResCust, cloudResCust);
 
       if (mergedDelEntries.length) blob["phone-shop-deleted-entry-ids"] = JSON.stringify(mergedDelEntries);
+      if (mergedDelExp.length) blob["shop-deleted-expense-ids"] = JSON.stringify(mergedDelExp);
       if (mergedDelCust.length) blob["phone-shop-deleted-customer-keys"] = JSON.stringify(mergedDelCust);
       if (mergedResCust.length) blob["phone-shop-restored-customer-keys"] = JSON.stringify(mergedResCust);
 
@@ -243,15 +248,24 @@ async function pushLocalStorageToCloud() {
           blob["phone-shop-customers"] = JSON.stringify(customers);
         }
       }
+      if (mergedDelExp.length) {
+        let expenses = safeParseArray(blob["shop-expenses"]);
+        if (expenses.length) {
+          expenses = expenses.filter(x => !mergedDelExp.includes(x.id));
+          blob["shop-expenses"] = JSON.stringify(expenses);
+        }
+      }
 
       // এই ডিভাইসের নিজের localStorage-ও ঠিক করে দেওয়া হচ্ছে, যাতে এটা নিজেও
       // বারবার পুরনো/স্টেল ডেটা push করতে না থাকে (সিঙ্ক লুপ এড়াতে মূল
       // setItem override ব্যবহার না করে সরাসরি লেখা হচ্ছে)
       if (blob["phone-shop-deleted-entry-ids"]) __origSetItem.call(localStorage, "phone-shop-deleted-entry-ids", blob["phone-shop-deleted-entry-ids"]);
+      if (blob["shop-deleted-expense-ids"]) __origSetItem.call(localStorage, "shop-deleted-expense-ids", blob["shop-deleted-expense-ids"]);
       if (blob["phone-shop-deleted-customer-keys"]) __origSetItem.call(localStorage, "phone-shop-deleted-customer-keys", blob["phone-shop-deleted-customer-keys"]);
       if (blob["phone-shop-restored-customer-keys"]) __origSetItem.call(localStorage, "phone-shop-restored-customer-keys", blob["phone-shop-restored-customer-keys"]);
       if (blob["phone-shop-entries"]) __origSetItem.call(localStorage, "phone-shop-entries", blob["phone-shop-entries"]);
       if (blob["phone-shop-customers"]) __origSetItem.call(localStorage, "phone-shop-customers", blob["phone-shop-customers"]);
+      if (blob["shop-expenses"]) __origSetItem.call(localStorage, "shop-expenses", blob["shop-expenses"]);
     }
 
     await db.collection("shops").doc(__syncShopId)
