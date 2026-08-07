@@ -1450,6 +1450,24 @@
 </div>
 <div id="saleReceiptPrintArea" style="display:none;"></div>
 
+<div class="modal-overlay" id="factoryResetModal">
+  <div class="modal-box qiDarkModal" style="max-width:340px;">
+    <h3 style="margin:0 0 4px; color:#fff; text-align:center;">🛠️ ফ্যাক্টরি রিসেট</h3>
+    <p class="pin-desc" style="text-align:center; margin:0 0 14px; color:#fca5a5;">⚠️ এটা দোকানের সব ডেটা (সেল, কাস্টমার, প্রোডাক্ট, স্টাফ, সাপ্লায়ার, খরচ — সব) স্থায়ীভাবে মুছে দিয়ে অ্যাপটা একদম নতুন নিবন্ধনের মতো ফাঁকা করে দেবে। লগইন থেকে যাবে, শুধু ডেটা মুছে যাবে। এই কাজ ফেরানো যাবে না।</p>
+    <label style="color:#d8f5ea; font-size:12px; font-weight:700;">সিক্রেট কোড</label>
+    <input type="text" id="factoryResetSecretInput" placeholder="সিক্রেট কোড দিন" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; font-size:15px; margin:4px 0 10px; background:rgba(255,255,255,0.08); color:#fff;">
+    <label style="color:#d8f5ea; font-size:12px; font-weight:700;">মাস্টার পাসওয়ার্ড</label>
+    <input type="password" id="factoryResetPasswordInput" placeholder="পাসওয়ার্ড দিন" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; font-size:15px; margin:4px 0 10px; background:rgba(255,255,255,0.08); color:#fff;">
+    <label style="color:#d8f5ea; font-size:12px; font-weight:700;">নিশ্চিত করতে বড় হাতের অক্ষরে RESET লিখুন</label>
+    <input type="text" id="factoryResetConfirmInput" placeholder="RESET" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; font-size:15px; margin:4px 0 6px; background:rgba(255,255,255,0.08); color:#fff;">
+    <p id="factoryResetError" style="color:#fca5a5; font-size:12.5px; margin:0 0 10px; display:none;">ভুল তথ্য — আবার চেষ্টা করুন</p>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button class="mini-btn" id="factoryResetCancelBtn" style="flex:1;">বাতিল</button>
+      <button class="btn" id="factoryResetConfirmBtn" style="flex:1; margin-top:0; background:#c0392b;">🗑️ সব মুছে ফেলুন</button>
+    </div>
+  </div>
+</div>
+
 <div id="program-bizmgmt" style="display:none; position:fixed; inset:0; z-index:500; background:radial-gradient(circle at 15% -10%, #1f3b4d 0%, #14262f 45%, #0a1418 100%); flex-direction:column;">
   <style>
     #program-bizmgmt .bizHeaderBar{
@@ -2650,6 +2668,51 @@ shopSubtitleEl.addEventListener('blur', ()=>{
 });
 
 document.getElementById('logoWrap').addEventListener('click', ()=> logoInputEl.click());
+
+// ---------------- সিক্রেট ফ্যাক্টরি রিসেট (লুকানো) ----------------
+// দোকানের লোগোর জায়গায় দ্রুত ৭ বার ট্যাপ করলে এই লুকানো অপশনটা খুলবে —
+// কারও চোখে পড়বে না, কিন্তু জানা থাকলে ব্যবহার করা যাবে।
+const FACTORY_RESET_SECRET_CODE = 'RESET-7788';
+let __logoTapCount = 0, __logoTapTimer = null;
+document.getElementById('logoWrap').addEventListener('click', ()=>{
+  __logoTapCount++;
+  clearTimeout(__logoTapTimer);
+  __logoTapTimer = setTimeout(()=>{ __logoTapCount = 0; }, 2500);
+  if(__logoTapCount >= 7){
+    __logoTapCount = 0;
+    document.getElementById('factoryResetSecretInput').value = '';
+    document.getElementById('factoryResetPasswordInput').value = '';
+    document.getElementById('factoryResetConfirmInput').value = '';
+    document.getElementById('factoryResetError').style.display = 'none';
+    document.getElementById('factoryResetModal').classList.add('show');
+  }
+});
+document.getElementById('factoryResetCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('factoryResetModal').classList.remove('show');
+});
+document.getElementById('factoryResetConfirmBtn').addEventListener('click', async ()=>{
+  const code = document.getElementById('factoryResetSecretInput').value.trim();
+  const pass = document.getElementById('factoryResetPasswordInput').value;
+  const confirmWord = document.getElementById('factoryResetConfirmInput').value.trim();
+  const errEl = document.getElementById('factoryResetError');
+  if(code !== FACTORY_RESET_SECRET_CODE || pass !== systemMasterPin || confirmWord !== 'RESET'){
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+  document.getElementById('factoryResetModal').classList.remove('show');
+  toast('রিসেট হচ্ছে... একটু অপেক্ষা করুন');
+  // 'bcc-session' বাদে localStorage-এর বাকি সব কিছু মুছে ফেলা হচ্ছে, যাতে লগইন
+  // অবস্থা ঠিক থাকে কিন্তু দোকানের সব ডেটা একদম নতুন নিবন্ধনের মতো ফাঁকা হয়ে যায়।
+  // localStorage.removeItem override করা আছে বলে এটা এমনিতেই ক্লাউডেও সিঙ্ক হয়ে যাবে,
+  // তাই ডিলিট করা ডেটা আর কোনোভাবে ফিরে আসবে না।
+  const keysToKeep = ['bcc-session'];
+  const allKeys = [];
+  for(let i=0; i<localStorage.length; i++){ allKeys.push(localStorage.key(i)); }
+  allKeys.forEach(k=>{ if(!keysToKeep.includes(k)) localStorage.removeItem(k); });
+  try{ await confirmCloudSave(); }catch(e){ console.error(e); }
+  setTimeout(()=> window.location.reload(), 800);
+});
 logoInputEl.addEventListener('change', (e)=>{
   const file = e.target.files[0];
   if(!file) return;
