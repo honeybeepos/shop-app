@@ -1721,6 +1721,8 @@
         <div class="glassCard wide"><div class="ic">💸</div><div class="lbl">মোট অন্য খরচ (স্টাফ ছাড়া)</div><div class="val" id="opsOtherExpTotal">SAR 0</div></div>
         <div class="glassCard" id="opsCashBalanceCard" style="cursor:pointer;"><div class="ic">💵</div><div class="lbl">ক্যাশে আছে</div><div class="val" id="opsOtherExpCash">SAR 0</div></div>
         <div class="glassCard" id="opsBankBalanceCard" style="cursor:pointer;"><div class="ic">🏦</div><div class="lbl">ব্যাংকে আছে</div><div class="val" id="opsOtherExpBank">SAR 0</div></div>
+        <div class="glassCard"><div class="ic">💵</div><div class="lbl">আজকের ক্যাশ (নীট)</div><div class="val" id="opsTodayCashNet">SAR 0</div></div>
+        <div class="glassCard"><div class="ic">🏦</div><div class="lbl">আজকের ব্যাংক (নীট)</div><div class="val" id="opsTodayBankNet">SAR 0</div></div>
         <div class="glassCard"><div class="ic">📅</div><div class="lbl">আজকের খরচ</div><div class="val" id="opsOtherExpToday">SAR 0</div></div>
         <div class="glassCard"><div class="ic">📆</div><div class="lbl">এই মাসের খরচ</div><div class="val" id="opsOtherExpMonth">SAR 0</div></div>
       </div>
@@ -3540,7 +3542,9 @@ function opsSaveOpeningBalance(kind, val){ localStorage.setItem('ops-opening-'+k
 function opsRenderOtherExpense(allExpenses){
   const listEl = document.getElementById('opsOtherExpenseList');
   if(!listEl) return;
-  if(typeof monRenderAll === 'function') monRenderAll(); // মনিটরিং পেজে না গেলেও cash/bank বিক্রির আয় হালনাগাদ থাকবে
+  // মনিটরিং পেজে না গেলেও cash/bank বিক্রির আয় হালনাগাদ থাকবে — কোনো কারণে এখানে
+  // এরর হলেও যেন নিচের ব্যালেন্স হিসাব বন্ধ হয়ে না যায়, তাই try/catch দিয়ে ঘেরা
+  try{ if(typeof monRenderAll === 'function') monRenderAll(); }catch(e){ console.error('monRenderAll failed inside opsRenderOtherExpense:', e); }
   const allX = allExpenses || opsLoadExpenses();
   const list = allX
     .filter(x => !STAFF_EXPENSE_CATEGORIES.includes(x.category))
@@ -3575,6 +3579,21 @@ function opsRenderOtherExpense(allExpenses){
   const bankBalance = opsLoadOpeningBalance('bank') + salesBank - allBankExpense;
   document.getElementById('opsOtherExpCash').textContent = fmt(cashBalance);
   document.getElementById('opsOtherExpBank').textContent = fmt(bankBalance);
+
+  // আজকে নির্দিষ্টভাবে ক্যাশ/ব্যাংকে কত টাকা ঢুকলো আর কত বের হলো — নীট হিসাব
+  let todayCashExpense = 0, todayBankExpense = 0;
+  allX.forEach(x=>{
+    const d = new Date(x.date);
+    if(d.toDateString() !== todayStr) return;
+    const amt = Number(x.amount)||0;
+    if((x.method||'cash') === 'bank') todayBankExpense += amt; else todayCashExpense += amt;
+  });
+  const todaySalesCash = (typeof monCashBankData !== 'undefined') ? (monCashBankData.todayCash||0) : 0;
+  const todaySalesBank = (typeof monCashBankData !== 'undefined') ? (monCashBankData.todayBank||0) : 0;
+  const cashEl2 = document.getElementById('opsTodayCashNet');
+  const bankEl2 = document.getElementById('opsTodayBankNet');
+  if(cashEl2) cashEl2.textContent = fmt(todaySalesCash - todayCashExpense);
+  if(bankEl2) bankEl2.textContent = fmt(todaySalesBank - todayBankExpense);
 
   listEl.innerHTML = list.length ? list.map(x=>{
     const methodTag = (x.method||'cash')==='bank' ? '🏦 Bank' : '💵 Cash';
@@ -6604,6 +6623,8 @@ async function deleteEntry(id){
   saveDeletedEntryIds(deletedEntryIds);
   await persistData();
   render();
+  try{ if(typeof monRenderAll === 'function') monRenderAll(); }catch(e){}
+  try{ if(typeof opsRenderOtherExpense === 'function') opsRenderOtherExpense(); }catch(e){}
   toast('এন্ট্রি মুছে ফেলা হয়েছে');
 }
 
