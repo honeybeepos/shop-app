@@ -3551,6 +3551,45 @@ const STAFF_EXPENSE_CATEGORIES = ['স্টাফ বেতন', 'স্টা�
 function opsLoadOpeningBalance(kind){ return Number(localStorage.getItem('ops-opening-'+kind))||0; }
 function opsSaveOpeningBalance(kind, val){ localStorage.setItem('ops-opening-'+kind, String(Number(val)||0)); }
 
+// ক্যাশ/ব্যাংকে আসলে এখন কত টাকা আছে — এটা এক জায়গায় রাখা হলো যাতে খরচ করার
+// আগে (কেনার মতো) ব্যালেন্স চেক করা যায়, আর বিভিন্ন জায়গায় একই হিসাব বারবার
+// লেখা না লাগে। বিক্রির আয়, শুরুর ব্যালেন্স, আর সব ধরনের খরচ (স্টাফসহ) মিলিয়ে হিসাব।
+function opsCalcCashBankBalance(){
+  try{ if(typeof monRenderAll === 'function') monRenderAll(); }catch(e){ console.error('monRenderAll failed inside opsCalcCashBankBalance:', e); }
+  const allX = opsLoadExpenses();
+  let allCashExpense = 0, allBankExpense = 0;
+  allX.forEach(x=>{
+    const amt = Number(x.amount)||0;
+    if((x.method||'cash') === 'bank') allBankExpense += amt; else allCashExpense += amt;
+  });
+  // প্রোডাক্ট ফেরত দিলে যদি নগদ টাকা ফেরত দেওয়া হয় (cashBack==='yes'), তাহলে সেটাও
+  // দোকানের ক্যাশ থেকেই বের হয় — তাই এটাও ক্যাশ খরচের মতোই বিয়োগ হবে
+  let returnCashOut = 0;
+  (typeof retailEntries !== 'undefined' ? retailEntries : []).forEach(e=>{
+    if(e.status === 'ফেরত' && e.cashBack === 'yes') returnCashOut += (Number(e.returnValue)||0);
+  });
+  allCashExpense += returnCashOut;
+  const salesCash = (typeof monCashBankData !== 'undefined') ? (monCashBankData.allTimeCash||0) : 0;
+  const salesBank = (typeof monCashBankData !== 'undefined') ? (monCashBankData.allTimeBank||0) : 0;
+  return {
+    cash: opsLoadOpeningBalance('cash') + salesCash - allCashExpense,
+    bank: opsLoadOpeningBalance('bank') + salesBank - allBankExpense
+  };
+}
+// কোনো খরচ/বেতন/অগ্রিম দেওয়ার আগে চেক করে, ক্যাশ/ব্যাংকে বাস্তবে অতো টাকা আছে কিনা।
+// বাস্তবে ক্যাশ কখনো "মাইনাস" হতে পারে না — তাই টাকা কম থাকলে কাজটা আটকে দেওয়া হয়,
+// একটা স্পষ্ট বার্তাসহ (কতো আছে, কতো দরকার)।
+function opsCheckSufficientBalance(method, amount){
+  const bal = opsCalcCashBankBalance();
+  const available = method === 'bank' ? bal.bank : bal.cash;
+  if(amount > available){
+    const label = method === 'bank' ? 'ব্যাংকে' : 'ক্যাশে';
+    toast(`${label} যথেষ্ট টাকা নেই — এখন আছে ${fmt(Math.max(available,0))}, দরকার ${fmt(amount)}`);
+    return false;
+  }
+  return true;
+}
+
 function opsRenderOtherExpense(allExpenses){
   const listEl = document.getElementById('opsOtherExpenseList');
   if(!listEl) return;
@@ -3576,21 +3615,11 @@ function opsRenderOtherExpense(allExpenses){
   document.getElementById('opsOtherExpToday').textContent = fmt(todayTotal);
   document.getElementById('opsOtherExpMonth').textContent = fmt(monthTotal);
 
-  // ক্যাশে/ব্যাংকে আসলে এখন কত টাকা আছে — এটা শুধু "অন্য খরচ" না, দোকানের সব ধরনের
-  // খরচ (স্টাফের বেতন/অগ্রিমসহ) বিয়োগ করেই হিসাব করা হয়, কারণ ক্যাশ বক্স থেকে
-  // যেকোনো কারণে টাকা বের হলেই আসল ক্যাশ কমে যায়। সাথে শুরুর (আগের দিনের) ব্যালেন্স
-  // আর বিক্রির আয়ও (cash/bank অনুযায়ী) যোগ হয়।
-  let allCashExpense = 0, allBankExpense = 0;
-  allX.forEach(x=>{
-    const amt = Number(x.amount)||0;
-    if((x.method||'cash') === 'bank') allBankExpense += amt; else allCashExpense += amt;
-  });
-  const salesCash = (typeof monCashBankData !== 'undefined') ? (monCashBankData.allTimeCash||0) : 0;
-  const salesBank = (typeof monCashBankData !== 'undefined') ? (monCashBankData.allTimeBank||0) : 0;
-  const cashBalance = opsLoadOpeningBalance('cash') + salesCash - allCashExpense;
-  const bankBalance = opsLoadOpeningBalance('bank') + salesBank - allBankExpense;
-  document.getElementById('opsOtherExpCash').textContent = fmt(cashBalance);
-  document.getElementById('opsOtherExpBank').textContent = fmt(bankBalance);
+  // ক্যাশ/ব্যাংকে বাস্তবে টাকা কখনো মাইনাসে যেতে পারে না — তাই দেখানোর সময় সর্বনিম্ন ০-তেই
+  // থামিয়ে দেওয়া হচ্ছে। (হিসাবে গরমিল থাকলে "মাইনাস" নম্বর না দেখিয়ে ০ দেখানোই স্পষ্ট)
+  const bal = opsCalcCashBankBalance();
+  document.getElementById('opsOtherExpCash').textContent = fmt(Math.max(bal.cash, 0));
+  document.getElementById('opsOtherExpBank').textContent = fmt(Math.max(bal.bank, 0));
 
   // আজকে নির্দিষ্টভাবে ক্যাশ/ব্যাংকে কত টাকা ঢুকলো আর কত বের হলো — নীট হিসাব
   let todayCashExpense = 0, todayBankExpense = 0;
@@ -3661,6 +3690,7 @@ document.getElementById('opsExpSaveBtn').addEventListener('click', async ()=>{
   if(!note){ toast('কোন ক্ষেত্রে খরচ করছেন লিখুন — এটা বাধ্যতামূলক'); return; }
   const methodChip = document.querySelector('#opsExpMethodGroup .status-chip.active');
   const method = methodChip ? methodChip.dataset.method : 'cash';
+  if(!opsCheckSufficientBalance(method, amount)) return;
   const okPw = await opsVerifyPassword('খরচ যোগ করতে পাসওয়ার্ড দিন');
   if(!okPw) return;
   const list = opsLoadExpenses();
@@ -3768,6 +3798,11 @@ async function opsAddMonthlySalary(id){
 document.getElementById('opsTxnSaveBtn').addEventListener('click', async ()=>{
   const amount = Number(document.getElementById('opsTxnAmount').value)||0;
   if(amount <= 0){ toast('সঠিক টাকার পরিমাণ দিন'); return; }
+  if(OPS_TXN_METHOD_MODES.includes(opsTxnMode)){
+    const methodChip0 = document.querySelector('#opsTxnMethodGroup .status-chip.active');
+    const method0 = methodChip0 ? methodChip0.dataset.method : 'cash';
+    if(!opsCheckSufficientBalance(method0, amount)) return;
+  }
   const PASSWORD_REQUIRED_MODES = ['supplier-payment','employee-due','employee-payment','employee-advance'];
   if(PASSWORD_REQUIRED_MODES.includes(opsTxnMode)){
     const ok = await opsVerifyPassword('টাকার হিসাব পরিবর্তন করতে পাসওয়ার্ড দিন');
@@ -6181,6 +6216,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     const cashBack = cashBackChip.dataset.rc;
     const condition = conditionChip.dataset.rcond;
     if(!item){ toast('কোন মাল ফেরত দিচ্ছে লিখুন'); return; }
+    if(cashBack === 'yes' && value > 0 && typeof opsCheckSufficientBalance === 'function' && !opsCheckSufficientBalance('cash', value)) return;
     const rtQty = readRequiredQty('rtQty');
     if(rtQty === null) return;
     let extraNote = (cashBack==='yes' ? `Cash return: SAR ${value}` : `SAR ${value} deducted from balance.`) + (condition==='bad' ? ' [খারাপ/নষ্ট মাল — স্টকে যোগ হয়নি]' : ' [ভালো মাল — স্টকে যোগ হয়েছে]');
