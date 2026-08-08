@@ -1777,12 +1777,14 @@
         <div class="glassCard"><div class="ic">📅</div><div class="lbl">আজকের খরচ</div><div class="val" id="opsOtherExpToday">SAR 0</div></div>
         <div class="glassCard"><div class="ic">📆</div><div class="lbl">এই মাসের খরচ</div><div class="val" id="opsOtherExpMonth">SAR 0</div></div>
       </div>
-      <p style="margin:-6px 0 14px; font-size:11px; color:#8a7f6c; text-align:center;">💡 "ক্যাশে আছে" বা "ব্যাংকে আছে" কার্ডে ট্যাপ করে আগের জমানো টাকা (শুরুর ব্যালেন্স) বসাতে পারবেন</p>
+      <p style="margin:-6px 0 14px; font-size:11px; color:#8a7f6c; text-align:center;">💡 "ক্যাশে আছে" বা "ব্যাংকে আছে" কার্ডে ট্যাপ করে অতিরিক্ত টাকা যোগ করতে পারবেন (কারণসহ, ইতিহাসে জমা থাকবে)</p>
       <div class="opsAddBtn bizNavCard" id="opsOtherExpenseBtn" style="width:100%; text-align:center; padding:14px; margin:4px 0 16px; cursor:pointer; font-size:14.5px;">
         😊 আপনি কি কোনো খরচ করতে যাচ্ছেন?<br><span style="font-weight:800;">💸 খরচ করুন</span>
       </div>
       <div class="opsSectionTitle">🧾 খরচের হিসাব</div>
       <div class="glassList" id="opsOtherExpenseList"></div>
+      <div class="opsSectionTitle" style="margin-top:6px;">➕ ক্যাশ/ব্যাংকে টাকা যোগের ইতিহাস</div>
+      <div class="glassList" id="opsCashAdjustmentList"></div>
     </div>
 
     <div class="opsSection" id="otab-expense" style="display:none;">
@@ -1946,7 +1948,7 @@
   <!-- খরচ যোগ করার মোডাল -->
   <div class="opsModalOverlay" id="opsExpenseModal">
     <div class="opsModalBox">
-      <h3>🧾 নতুন খরচ</h3>
+      <h3 id="opsExpModalTitle">🧾 নতুন খরচ</h3>
       <label>ক্যাটাগরি</label>
       <select id="opsExpCategory">
         <option value="দোকান ভাড়া">🏠 দোকান ভাড়া</option>
@@ -3159,6 +3161,11 @@ function opsLoadExpenses(){
   }catch(e){ return []; }
 }
 function opsSaveExpenses(list){ localStorage.setItem('shop-expenses', JSON.stringify(list)); }
+// রিটার্ন হয়ে যাওয়া (refunded) খরচ বাদে শুধু আসল/চলমান খরচগুলো — ব্যালেন্স, রিপোর্ট,
+// লাভ-ক্ষতির হিসাবে সবসময় এটাই ব্যবহার করা হয়, যাতে রিটার্ন হওয়া টাকা আবার
+// ক্যাশ/ব্যাংকে ফিরে আসে এবং খরচ হিসেবে গণনা না হয়। তালিকায় দেখানোর সময় অবশ্য
+// রিটার্ন হওয়া এন্ট্রিও ইতিহাস হিসেবে (badge সহ) দেখানো হয় — opsLoadExpenses() ব্যবহার করে।
+function opsLoadActiveExpenses(){ return opsLoadExpenses().filter(x => !x.refunded); }
 
 document.getElementById('bizOpsCard').addEventListener('click', ()=>{
   switchProgram('program-bizmgmt', 'program-ops');
@@ -3240,7 +3247,7 @@ function repComputeSummary(){
     if(SALE_STATUSES.includes(e.status)){ totalSales += (e.price||0); custPayment += (e.paid||0); profit += ((e.price||0)-(e.cost||0)); }
     if(e.status === 'ফেরত') salesReturn += (Number(e.returnValue)||0);
   });
-  const expenses = opsLoadExpenses().filter(x => repInRange(x.date, from, to));
+  const expenses = opsLoadActiveExpenses().filter(x => repInRange(x.date, from, to));
   const totalExpense = expenses.reduce((s,x)=> s+(Number(x.amount)||0), 0);
   const salaryPaid = expenses.filter(x=>STAFF_EXPENSE_CATEGORIES.includes(x.category)).reduce((s,x)=> s+(Number(x.amount)||0), 0);
   const supTxns = opsLoadSupplierTxns().filter(t => repInRange(t.date, from, to));
@@ -3302,8 +3309,8 @@ function repBuildReportData(){
       .sort((a,b)=> new Date(b.date)-new Date(a.date));
     return {
       title:'Expense Report',
-      rows: rows.map(x=>({ title:x.category, amt:fmt(x.amount), meta:`${formatInvoiceDate(x.date)} · ${(x.method||'cash')==='bank'?'Bank':'Cash'}${x.note?' · '+escapeHtml(x.note):''}` })),
-      csv: [['Date','Category','Amount','Method','Note'], ...rows.map(x=>[new Date(x.date).toISOString().slice(0,10), x.category, x.amount||0, x.method||'cash', x.note||''])]
+      rows: rows.map(x=>({ title:x.category, amt:fmt(x.amount), meta:`${formatInvoiceDate(x.date)} · ${(x.method||'cash')==='bank'?'Bank':'Cash'}${x.note?' · '+escapeHtml(x.note):''}${x.refunded?' · ↩️ Refunded':''}` })),
+      csv: [['Date','Category','Amount','Method','Note','Refunded'], ...rows.map(x=>[new Date(x.date).toISOString().slice(0,10), x.category, x.amount||0, x.method||'cash', x.note||'', x.refunded?'Yes':'No'])]
     };
   }
   if(repActiveReport === 'customerdue'){
@@ -3394,7 +3401,7 @@ function repBuildReportData(){
     const entries = (typeof retailEntries !== 'undefined' ? retailEntries : []).filter(e => repInRange(e.date, from, to) && SALE_STATUSES.includes(e.status));
     let periodCash=0, periodBank=0;
     entries.forEach(e=>{ if((e.paymentMethod||'cash')==='bank') periodBank += (e.paid||0); else periodCash += (e.paid||0); });
-    const exps = opsLoadExpenses().filter(x=>repInRange(x.date, from, to));
+    const exps = opsLoadActiveExpenses().filter(x=>repInRange(x.date, from, to));
     let expCash=0, expBank=0;
     exps.forEach(x=>{ if((x.method||'cash')==='bank') expBank += (Number(x.amount)||0); else expCash += (Number(x.amount)||0); });
     const bal = (typeof opsCalcCashBankBalance === 'function') ? opsCalcCashBankBalance() : {cash:0,bank:0};
@@ -4041,13 +4048,29 @@ async function opsDeleteEmployee(id){
   opsRenderEmployees();
 }
 
+// একটা খরচ এন্ট্রি রিটার্ন (refunded) হয়ে থাকলে সেটা মেটা-লাইনে দেখানোর জন্য
+function opsExpenseRowMetaExtra(x){
+  return x.refunded ? ` · ↩️ রিটার্ন হয়েছে (${formatInvoiceDate(x.refundDate)} ${formatInvoiceTime(x.refundDate)})` : '';
+}
+// রিটার্ন হয়ে যাওয়া খরচের ক্ষেত্রে এডিট/রিটার্ন বাটন লুকিয়ে শুধু ডিলিট রাখা হয় —
+// রিটার্ন হওয়া এন্ট্রি আর নতুন করে এডিট বা আবার রিটার্ন করার কিছু থাকে না
+function opsExpenseRowActionsHtml(x){
+  if(x.refunded){
+    return `<button class="opsMiniBtn danger" onclick="opsDeleteExpense('${x.id}')">🗑 ডিলিট</button>`;
+  }
+  return `<button class="opsMiniBtn" onclick="opsEditExpense('${x.id}')">✏️ এডিট</button>
+        <button class="opsMiniBtn" style="background:#e0f2fe; color:#075985; border-color:#7dd3fc; font-weight:800;" onclick="opsRefundExpense('${x.id}')">↩️ রিটার্ন</button>
+        <button class="opsMiniBtn danger" onclick="opsDeleteExpense('${x.id}')">🗑 ডিলিট</button>`;
+}
+
 // ---------------- Expense ----------------
 function opsRenderExpenses(){
   const list = opsLoadExpenses().sort((a,b)=> new Date(b.date) - new Date(a.date));
+  const activeList = list.filter(x=> !x.refunded); // রিটার্ন হয়ে যাওয়া খরচ টোটাল/লাভ-ক্ষতির হিসাবে ধরা হয় না
   const todayStr = new Date().toDateString();
   const now = new Date();
   let todayTotal = 0, monthTotal = 0, allTotal = 0;
-  list.forEach(x=>{
+  activeList.forEach(x=>{
     const amt = Number(x.amount)||0;
     allTotal += amt;
     const d = new Date(x.date);
@@ -4070,7 +4093,7 @@ function opsRenderExpenses(){
       if(endDate && d > endDate) return;
       salesProfit += (e.price||0) - (e.cost||0);
     });
-    opsLoadExpenses().forEach(x=>{
+    opsLoadActiveExpenses().forEach(x=>{
       const d = new Date(x.date);
       if(startDate && d < startDate) return;
       if(endDate && d > endDate) return;
@@ -4107,7 +4130,7 @@ function opsRenderExpenses(){
     if(e.status === 'ফেরত') return;
     cashCollectedProfit += (e.paid||0) - (e.cost||0);
   });
-  const allExpensesEver = opsLoadExpenses().reduce((s,x)=> s + (Number(x.amount)||0), 0);
+  const allExpensesEver = opsLoadActiveExpenses().reduce((s,x)=> s + (Number(x.amount)||0), 0);
   const realProfitExcDue = Math.max(cashCollectedProfit - allExpensesEver, 0);
   document.getElementById('opsRealProfitExcDue').textContent = fmt(realProfitExcDue);
   opsRenderTotalInvest();
@@ -4118,9 +4141,9 @@ function opsRenderExpenses(){
       const title = x.person ? `${escapeHtml(x.category)} — ${escapeHtml(x.person)}` : escapeHtml(x.category);
       return `<div class="opsRow">
         <div class="opsRowTop"><span class="nm">${title}</span><span class="amt red">${fmt(Number(x.amount)||0)}</span></div>
-        <div class="opsRowMeta">${formatInvoiceDate(x.date)}${x.note ? ' · '+escapeHtml(x.note) : ''}</div>
+        <div class="opsRowMeta">${formatInvoiceDate(x.date)}${x.note ? ' · '+escapeHtml(x.note) : ''}${opsExpenseRowMetaExtra(x)}</div>
         <div class="opsRowActions">
-          <button class="opsMiniBtn danger" onclick="opsDeleteExpense('${x.id}')">🗑 ডিলিট</button>
+          ${opsExpenseRowActionsHtml(x)}
         </div>
       </div>`;
     }).join('') : `<div class="glassEmpty">এখনো কোনো খরচ যোগ করা হয়নি</div>`;
@@ -4132,13 +4155,19 @@ function opsRenderExpenses(){
 const STAFF_EXPENSE_CATEGORIES = ['স্টাফ বেতন', 'স্টাফ অগ্রিম', 'স্টাফ অন্যান্য টাকা'];
 function opsLoadOpeningBalance(kind){ return Number(localStorage.getItem('ops-opening-'+kind))||0; }
 function opsSaveOpeningBalance(kind, val){ localStorage.setItem('ops-opening-'+kind, String(Number(val)||0)); }
+// ক্যাশ/ব্যাংকে হাতে হাতে অতিরিক্ত টাকা ঢোকানো হলে (যেমনঃ মালিক নিজের পকেট থেকে টাকা
+// ঢোকালেন, বা ধার আনলেন) — প্রতিটা এন্ট্রি এখানে কারণ (note) আর তারিখ-সময়সহ জমা থাকে,
+// যাতে পরে হিসাব মেলাতে গিয়ে "এই টাকাটা কোত্থেকে এলো" জিজ্ঞাসা করা লাগে না
+function opsLoadCashAdjustments(){ try{ return JSON.parse(localStorage.getItem('shop-cash-adjustments')||'[]'); }catch(e){ return []; } }
+function opsSaveCashAdjustments(list){ localStorage.setItem('shop-cash-adjustments', JSON.stringify(list)); }
 
 // ক্যাশ/ব্যাংকে আসলে এখন কত টাকা আছে — এটা এক জায়গায় রাখা হলো যাতে খরচ করার
 // আগে (কেনার মতো) ব্যালেন্স চেক করা যায়, আর বিভিন্ন জায়গায় একই হিসাব বারবার
-// লেখা না লাগে। বিক্রির আয়, শুরুর ব্যালেন্স, আর সব ধরনের খরচ (স্টাফসহ) মিলিয়ে হিসাব।
+// লেখা না লাগে। বিক্রির আয়, শুরুর ব্যালেন্স, অতিরিক্ত টাকা যোগ, আর সব ধরনের খরচ
+// (স্টাফসহ) মিলিয়ে হিসাব।
 function opsCalcCashBankBalance(){
   try{ if(typeof monRenderAll === 'function') monRenderAll(); }catch(e){ console.error('monRenderAll failed inside opsCalcCashBankBalance:', e); }
-  const allX = opsLoadExpenses();
+  const allX = opsLoadActiveExpenses();
   let allCashExpense = 0, allBankExpense = 0;
   allX.forEach(x=>{
     const amt = Number(x.amount)||0;
@@ -4151,11 +4180,16 @@ function opsCalcCashBankBalance(){
     if(e.status === 'ফেরত' && e.cashBack === 'yes') returnCashOut += (Number(e.returnValue)||0);
   });
   allCashExpense += returnCashOut;
+  let adjCash = 0, adjBank = 0;
+  opsLoadCashAdjustments().forEach(a=>{
+    const amt = Number(a.amount)||0;
+    if((a.method||'cash') === 'bank') adjBank += amt; else adjCash += amt;
+  });
   const salesCash = (typeof monCashBankData !== 'undefined') ? (monCashBankData.allTimeCash||0) : 0;
   const salesBank = (typeof monCashBankData !== 'undefined') ? (monCashBankData.allTimeBank||0) : 0;
   return {
-    cash: opsLoadOpeningBalance('cash') + salesCash - allCashExpense,
-    bank: opsLoadOpeningBalance('bank') + salesBank - allBankExpense
+    cash: opsLoadOpeningBalance('cash') + salesCash - allCashExpense + adjCash,
+    bank: opsLoadOpeningBalance('bank') + salesBank - allBankExpense + adjBank
   };
 }
 // কোনো খরচ/বেতন/অগ্রিম দেওয়ার আগে চেক করে, ক্যাশ/ব্যাংকে বাস্তবে অতো টাকা আছে কিনা।
@@ -4186,7 +4220,7 @@ function opsRenderOtherExpense(allExpenses){
   const todayStr = new Date().toDateString();
   const now = new Date();
   let total = 0, todayTotal = 0, monthTotal = 0;
-  list.forEach(x=>{
+  list.filter(x=> !x.refunded).forEach(x=>{
     const amt = Number(x.amount)||0;
     total += amt;
     const d = new Date(x.date);
@@ -4205,7 +4239,7 @@ function opsRenderOtherExpense(allExpenses){
 
   // আজকে নির্দিষ্টভাবে ক্যাশ/ব্যাংকে কত টাকা ঢুকলো আর কত বের হলো — নীট হিসাব
   let todayCashExpense = 0, todayBankExpense = 0;
-  allX.forEach(x=>{
+  allX.filter(x=> !x.refunded).forEach(x=>{
     const d = new Date(x.date);
     if(d.toDateString() !== todayStr) return;
     const amt = Number(x.amount)||0;
@@ -4222,41 +4256,84 @@ function opsRenderOtherExpense(allExpenses){
     const methodTag = (x.method||'cash')==='bank' ? '🏦 Bank' : '💵 Cash';
     return `<div class="opsRow">
       <div class="opsRowTop"><span class="nm">${escapeHtml(x.category)}</span><span class="amt red">${fmt(Number(x.amount)||0)}</span></div>
-      <div class="opsRowMeta">${formatInvoiceDate(x.date)} · ${methodTag}${x.note ? ' · '+escapeHtml(x.note) : ''}</div>
+      <div class="opsRowMeta">${formatInvoiceDate(x.date)} · ${methodTag}${x.note ? ' · '+escapeHtml(x.note) : ''}${opsExpenseRowMetaExtra(x)}</div>
       <div class="opsRowActions">
-        <button class="opsMiniBtn danger" onclick="opsDeleteExpense('${x.id}')">🗑 ডিলিট</button>
+        ${opsExpenseRowActionsHtml(x)}
       </div>
     </div>`;
   }).join('') : `<div class="glassEmpty">এখনো কোনো খরচ যোগ করা হয়নি</div>`;
+
+  const adjListEl = document.getElementById('opsCashAdjustmentList');
+  if(adjListEl){
+    const adjList = opsLoadCashAdjustments().sort((a,b)=> new Date(b.date) - new Date(a.date));
+    adjListEl.innerHTML = adjList.length ? adjList.map(a=>{
+      const methodTag = (a.method||'cash')==='bank' ? '🏦 Bank' : '💵 Cash';
+      return `<div class="opsRow">
+        <div class="opsRowTop"><span class="nm">${escapeHtml(a.note)}</span><span class="amt" style="color:#27633f;">+${fmt(Number(a.amount)||0)}</span></div>
+        <div class="opsRowMeta">${formatInvoiceDate(a.date)} ${formatInvoiceTime(a.date)} · ${methodTag}</div>
+        <div class="opsRowActions">
+          <button class="opsMiniBtn danger" onclick="opsDeleteCashAdjustment('${a.id}')">🗑 ডিলিট</button>
+        </div>
+      </div>`;
+    }).join('') : `<div class="glassEmpty">এখনো কোনো টাকা যোগ করা হয়নি</div>`;
+  }
+}
+async function opsDeleteCashAdjustment(id){
+  const entered = await openPinModal('পাসওয়ার্ড দিন', 'এই এন্ট্রিটি ডিলিট করার জন্য পাসওয়ার্ড দিন।');
+  if(entered === null) return;
+  if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, ডিলিট হয়নি'); return; }
+  opsSaveCashAdjustments(opsLoadCashAdjustments().filter(x=>x.id!==id));
+  opsRenderOtherExpense();
 }
 document.getElementById('opsCashBalanceCard').addEventListener('click', async ()=>{
-  const okPw = await opsVerifyPassword('ক্যাশের শুরুর ব্যালেন্স বসাতে পাসওয়ার্ড দিন');
+  const okPw = await opsVerifyPassword('ক্যাশে টাকা যোগ করতে পাসওয়ার্ড দিন');
   if(!okPw) return;
-  const current = opsLoadOpeningBalance('cash');
-  const val = prompt('আগের জমানো/শুরুর ক্যাশ ব্যালেন্স কত? (এখন বসানো আছে: '+fmt(current)+')', current);
-  if(val === null) return;
-  opsSaveOpeningBalance('cash', val);
+  const amtStr = prompt('ক্যাশে কত টাকা যোগ করতে চান?', '');
+  if(amtStr === null) return;
+  const amount = Number(amtStr)||0;
+  if(amount <= 0){ toast('সঠিক টাকার পরিমাণ দিন'); return; }
+  const note = prompt('এই টাকাটা কিসের? (যেমনঃ মালিকের নিজের টাকা, ধার আনা, শুরুর মূলধন ইত্যাদি — বাধ্যতামূলক)', '');
+  if(note === null) return;
+  const noteTrim = note.trim();
+  if(!noteTrim){ toast('টাকাটা কিসের তা লিখতে হবে — এটা বাধ্যতামূলক'); return; }
+  const list = opsLoadCashAdjustments();
+  list.push({ id: bccUid(), method:'cash', amount, note: noteTrim, date: new Date().toISOString() });
+  opsSaveCashAdjustments(list);
   opsRenderOtherExpense();
-  toast('ক্যাশের শুরুর ব্যালেন্স আপডেট হয়েছে ✅');
+  toast(`✅ ${fmt(amount)} টাকা ক্যাশে যোগ হয়েছে`);
 });
 document.getElementById('opsBankBalanceCard').addEventListener('click', async ()=>{
-  const okPw = await opsVerifyPassword('ব্যাংকের শুরুর ব্যালেন্স বসাতে পাসওয়ার্ড দিন');
+  const okPw = await opsVerifyPassword('ব্যাংকে টাকা যোগ করতে পাসওয়ার্ড দিন');
   if(!okPw) return;
-  const current = opsLoadOpeningBalance('bank');
-  const val = prompt('আগের জমানো/শুরুর ব্যাংক ব্যালেন্স কত? (এখন বসানো আছে: '+fmt(current)+')', current);
-  if(val === null) return;
-  opsSaveOpeningBalance('bank', val);
+  const amtStr = prompt('ব্যাংকে কত টাকা যোগ করতে চান?', '');
+  if(amtStr === null) return;
+  const amount = Number(amtStr)||0;
+  if(amount <= 0){ toast('সঠিক টাকার পরিমাণ দিন'); return; }
+  const note = prompt('এই টাকাটা কিসের? (যেমনঃ মালিকের নিজের টাকা, ধার আনা, শুরুর মূলধন ইত্যাদি — বাধ্যতামূলক)', '');
+  if(note === null) return;
+  const noteTrim = note.trim();
+  if(!noteTrim){ toast('টাকাটা কিসের তা লিখতে হবে — এটা বাধ্যতামূলক'); return; }
+  const list = opsLoadCashAdjustments();
+  list.push({ id: bccUid(), method:'bank', amount, note: noteTrim, date: new Date().toISOString() });
+  opsSaveCashAdjustments(list);
   opsRenderOtherExpense();
-  toast('ব্যাংকের শুরুর ব্যালেন্স আপডেট হয়েছে ✅');
+  toast(`✅ ${fmt(amount)} টাকা ব্যাংকে যোগ হয়েছে`);
 });
+let opsExpEditId = null; // এডিট মোডে থাকলে এই আইডির খরচ এন্ট্রিটাই আপডেট হবে, নাহলে নতুন এন্ট্রি তৈরি হবে
 const opsAddExpenseBtnEl = document.getElementById('opsAddExpenseBtn');
 if(opsAddExpenseBtnEl) opsAddExpenseBtnEl.addEventListener('click', ()=>{
+  opsExpEditId = null;
+  document.getElementById('opsExpModalTitle').textContent = '🧾 নতুন খরচ';
   document.getElementById('opsExpCategory').value = 'দোকান ভাড়া';
   document.getElementById('opsExpAmount').value = '';
   document.getElementById('opsExpNote').value = '';
+  document.querySelectorAll('#opsExpMethodGroup .status-chip').forEach(c=>c.classList.remove('active'));
+  document.querySelector('#opsExpMethodGroup .status-chip[data-method="cash"]').classList.add('active');
   document.getElementById('opsExpenseModal').classList.add('show');
 });
 document.getElementById('opsOtherExpenseBtn').addEventListener('click', ()=>{
+  opsExpEditId = null;
+  document.getElementById('opsExpModalTitle').textContent = '🧾 নতুন খরচ';
   document.getElementById('opsExpCategory').value = 'অন্যান্য';
   document.getElementById('opsExpAmount').value = '';
   document.getElementById('opsExpNote').value = '';
@@ -4264,7 +4341,22 @@ document.getElementById('opsOtherExpenseBtn').addEventListener('click', ()=>{
   document.querySelector('#opsExpMethodGroup .status-chip[data-method="cash"]').classList.add('active');
   document.getElementById('opsExpenseModal').classList.add('show');
 });
-document.getElementById('opsExpCancelBtn').addEventListener('click', ()=> document.getElementById('opsExpenseModal').classList.remove('show'));
+// একটা বিদ্যমান খরচ এন্ট্রি এডিট করার জন্য মোডালটা তার পুরনো তথ্য দিয়ে ভরে খুলে দেয়
+function opsEditExpense(id){
+  const x = opsLoadExpenses().find(e=>e.id===id);
+  if(!x) return;
+  if(x.refunded){ toast('রিটার্ন হয়ে যাওয়া খরচ এডিট করা যাবে না'); return; }
+  opsExpEditId = id;
+  document.getElementById('opsExpModalTitle').textContent = '✏️ খরচ এডিট করুন';
+  document.getElementById('opsExpCategory').value = x.category;
+  document.getElementById('opsExpAmount').value = x.amount;
+  document.getElementById('opsExpNote').value = x.note || '';
+  document.querySelectorAll('#opsExpMethodGroup .status-chip').forEach(c=>c.classList.remove('active'));
+  const chip = document.querySelector(`#opsExpMethodGroup .status-chip[data-method="${x.method||'cash'}"]`);
+  if(chip) chip.classList.add('active');
+  document.getElementById('opsExpenseModal').classList.add('show');
+}
+document.getElementById('opsExpCancelBtn').addEventListener('click', ()=>{ opsExpEditId = null; document.getElementById('opsExpenseModal').classList.remove('show'); });
 document.getElementById('opsExpSaveBtn').addEventListener('click', async ()=>{
   const amount = Number(document.getElementById('opsExpAmount').value)||0;
   if(amount <= 0){ toast('সঠিক টাকার পরিমাণ দিন'); return; }
@@ -4272,10 +4364,29 @@ document.getElementById('opsExpSaveBtn').addEventListener('click', async ()=>{
   if(!note){ toast('কোন ক্ষেত্রে খরচ করছেন লিখুন — এটা বাধ্যতামূলক'); return; }
   const methodChip = document.querySelector('#opsExpMethodGroup .status-chip.active');
   const method = methodChip ? methodChip.dataset.method : 'cash';
+  const list = opsLoadExpenses();
+
+  if(opsExpEditId){
+    // এডিট মোড — পুরনো এন্ট্রিটাই খুঁজে বের করে তার তথ্য আপডেট করা হবে (নতুন এন্ট্রি তৈরি হবে না)
+    const x = list.find(e=>e.id===opsExpEditId);
+    if(!x){ toast('এই খরচ এন্ট্রিটা আর নেই'); opsExpEditId = null; document.getElementById('opsExpenseModal').classList.remove('show'); return; }
+    const okPw = await opsVerifyPassword('খরচ এডিট করতে পাসওয়ার্ড দিন');
+    if(!okPw) return;
+    x.category = document.getElementById('opsExpCategory').value;
+    x.amount = amount;
+    x.method = method;
+    x.note = note;
+    opsSaveExpenses(list);
+    opsExpEditId = null;
+    document.getElementById('opsExpenseModal').classList.remove('show');
+    opsRenderExpenses();
+    toast('খরচ আপডেট হয়েছে ✅');
+    return;
+  }
+
   if(!opsCheckSufficientBalance(method, amount)) return;
   const okPw = await opsVerifyPassword('খরচ যোগ করতে পাসওয়ার্ড দিন');
   if(!okPw) return;
-  const list = opsLoadExpenses();
   list.push({
     id: bccUid(),
     category: document.getElementById('opsExpCategory').value,
@@ -4289,6 +4400,26 @@ document.getElementById('opsExpSaveBtn').addEventListener('click', async ()=>{
   opsRenderExpenses();
   toast('খরচ যোগ হয়েছে ✅');
 });
+// কোনো খরচের জন্য টাকা দেওয়া হয়েছিল কিন্তু আসলে খরচ হয়নি — সেই টাকা ফেরত পেলে এই
+// ফাংশন দিয়ে খরচটাকে "রিটার্ন" হিসেবে চিহ্নিত করা হয়। রিটার্ন হওয়া টাকাটা ক্যাশ/ব্যাংক
+// ব্যালেন্সে আবার যোগ হয়ে যায় (খরচের হিসাব থেকে বাদ পড়ে যায়), কিন্তু এন্ট্রিটা তারিখ-সময়সহ
+// ইতিহাসে থেকে যায় — মুছে ফেলা হয় না।
+async function opsRefundExpense(id){
+  const list = opsLoadExpenses();
+  const x = list.find(e=>e.id===id);
+  if(!x) return;
+  if(x.refunded){ toast('এই খরচ ইতিমধ্যে রিটার্ন করা হয়ে গেছে'); return; }
+  const methodLabel = (x.method||'cash')==='bank' ? 'ব্যাংক' : 'ক্যাশ';
+  const ok = await opsYesNoConfirm('রিটার্ন করবেন?', `"${x.category}" খাতে দেওয়া ${fmt(Number(x.amount)||0)} টাকা কি আসলে খরচ হয়নি, ফেরত পাওয়া গেছে? নিশ্চিত করলে টাকাটা আবার ${methodLabel} ব্যালেন্সে যোগ হয়ে যাবে।`);
+  if(!ok) return;
+  const okPw = await opsVerifyPassword('খরচ রিটার্ন করতে পাসওয়ার্ড দিন');
+  if(!okPw) return;
+  x.refunded = true;
+  x.refundDate = new Date().toISOString();
+  opsSaveExpenses(list);
+  opsRenderExpenses();
+  toast(`✅ ${fmt(Number(x.amount)||0)} টাকা রিটার্ন হয়ে ${methodLabel}-এ ফিরে এসেছে`);
+}
 async function opsDeleteExpense(id){
   const entered = await openPinModal('পাসওয়ার্ড দিন', 'এই খরচের এন্ট্রিটি ডিলিট করার জন্য পাসওয়ার্ড দিন।');
   if(entered === null) return;
