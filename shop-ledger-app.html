@@ -2102,7 +2102,11 @@
     <div class="repQTab" data-rt="customerdue">👤 Customer Due</div>
     <div class="repQTab" data-rt="supplier">🚚 Supplier</div>
     <div class="repQTab" data-rt="salary">🧑‍🔧 Salary</div>
+    <div class="repQTab" data-rt="staff">🏆 Staff Sales</div>
     <div class="repQTab" data-rt="stock">📦 Stock</div>
+    <div class="repQTab" data-rt="returns">↩️ Returns</div>
+    <div class="repQTab" data-rt="extraincome">💎 Extra Income</div>
+    <div class="repQTab" data-rt="cashbank">💵 Cash/Bank</div>
     <div class="repQTab" data-rt="pnl">📊 Profit &amp; Loss</div>
     <div class="repQTab" data-rt="invoices">🧾 Invoices</div>
   </div>
@@ -3346,6 +3350,65 @@ function repBuildReportData(){
       csv: [['Product','Stock Qty','Buy Price','Sell Price','Stock Value'], ...prods.map(p=>[p.name, p.qty||0, p.buy||0, p.sell||0, (Number(p.qty)||0)*(Number(p.buy)||0)])]
     };
   }
+  if(repActiveReport === 'staff'){
+    const byStaff = {};
+    (typeof retailEntries !== 'undefined' ? retailEntries : [])
+      .filter(e => repInRange(e.date, from, to) && SALE_STATUSES.includes(e.status))
+      .forEach(e=>{
+        const nm = e.soldBy || 'এডমিন';
+        if(!byStaff[nm]) byStaff[nm] = { name:nm, count:0, sales:0, profit:0 };
+        byStaff[nm].count += 1;
+        byStaff[nm].sales += (e.price||0);
+        byStaff[nm].profit += ((e.price||0)-(e.cost||0));
+      });
+    let rows = Object.values(byStaff).filter(s=> !q || s.name.toLowerCase().includes(q));
+    rows.sort((a,b)=> b.sales-a.sales);
+    return {
+      title:'Staff Sales Performance Report',
+      rows: rows.map(s=>({ title:`🧑‍💼 ${s.name}`, amt:fmt(s.sales), meta:`${s.count} সেল · লাভঃ ${fmt(s.profit)}` })),
+      csv: [['Staff','Sales Count','Total Sales','Profit'], ...rows.map(s=>[s.name, s.count, s.sales, s.profit])]
+    };
+  }
+  if(repActiveReport === 'returns'){
+    const rows = (typeof retailEntries !== 'undefined' ? retailEntries : [])
+      .filter(e => repInRange(e.date, from, to) && (e.status==='ফেরত' || e.status==='বদলি'))
+      .filter(e => !q || e.name.toLowerCase().includes(q) || (e.item||'').toLowerCase().includes(q))
+      .sort((a,b)=> new Date(b.date)-new Date(a.date));
+    return {
+      title:'Sales Return / Exchange Report',
+      rows: rows.map(e=>({ title:`${e.name} — ${escapeHtml(e.item)}`, amt: e.status==='ফেরত' ? fmt(e.returnValue||0) : 'বদলি', meta:`${formatInvoiceDate(e.date)} · ${e.status}${e.cashBack==='yes'?' · নগদ ফেরত':''}${e.condition?' · '+escapeHtml(e.condition):''}` })),
+      csv: [['Date','Customer','Item','Status','Return Value','Cash Back'], ...rows.map(e=>[new Date(e.date).toISOString().slice(0,10), e.name, e.item, e.status, e.returnValue||0, e.cashBack||''])]
+    };
+  }
+  if(repActiveReport === 'extraincome'){
+    const rows = eiLoad().filter(x=>repInRange(x.date, from, to))
+      .filter(x => !q || (x.source||'').toLowerCase().includes(q) || (x.customerName||'').toLowerCase().includes(q))
+      .sort((a,b)=> new Date(b.date)-new Date(a.date));
+    return {
+      title:'Extra Income Report',
+      rows: rows.map(x=>({ title:x.source||'—', amt:fmt(x.amount||0), meta:`${formatInvoiceDate(x.date)}${x.customerName?' · '+escapeHtml(x.customerName):''} · জমাঃ ${fmt(x.paid||0)}${(x.amount||0)>(x.paid||0)?' · বাকিঃ '+fmt((x.amount||0)-(x.paid||0)):''}` })),
+      csv: [['Date','Source','Customer','Amount','Paid','Due'], ...rows.map(x=>[new Date(x.date).toISOString().slice(0,10), x.source||'', x.customerName||'', x.amount||0, x.paid||0, Math.max((x.amount||0)-(x.paid||0),0)])]
+    };
+  }
+  if(repActiveReport === 'cashbank'){
+    const entries = (typeof retailEntries !== 'undefined' ? retailEntries : []).filter(e => repInRange(e.date, from, to) && SALE_STATUSES.includes(e.status));
+    let periodCash=0, periodBank=0;
+    entries.forEach(e=>{ if((e.paymentMethod||'cash')==='bank') periodBank += (e.paid||0); else periodCash += (e.paid||0); });
+    const exps = opsLoadExpenses().filter(x=>repInRange(x.date, from, to));
+    let expCash=0, expBank=0;
+    exps.forEach(x=>{ if((x.method||'cash')==='bank') expBank += (Number(x.amount)||0); else expCash += (Number(x.amount)||0); });
+    const bal = (typeof opsCalcCashBankBalance === 'function') ? opsCalcCashBankBalance() : {cash:0,bank:0};
+    const rows = [
+      { title:'💵 এই সময়ে Cash আয়', amt: fmt(periodCash) },
+      { title:'💵 এই সময়ে Cash খরচ', amt: '- '+fmt(expCash) },
+      { title:'🏦 এই সময়ে Bank আয়', amt: fmt(periodBank) },
+      { title:'🏦 এই সময়ে Bank খরচ', amt: '- '+fmt(expBank) },
+      { title:'💵 এখন ক্যাশে আছে (সর্বমোট)', amt: fmt(Math.max(bal.cash,0)) },
+      { title:'🏦 এখন ব্যাংকে আছে (সর্বমোট)', amt: fmt(Math.max(bal.bank,0)) },
+    ];
+    return { title:'Cash / Bank Report', rows: rows.map(r=>({...r, meta:''})),
+      csv: [['Item','Amount'], ...rows.map(r=>[r.title, r.amt])] };
+  }
   if(repActiveReport === 'pnl'){
     const s = repComputeSummary();
     const rows = [
@@ -3436,7 +3499,7 @@ document.getElementById('repPrintBtn').addEventListener('click', ()=>{
 document.getElementById('repExportAllBtn').addEventListener('click', ()=>{
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
   const { from, to } = repGetRange();
-  const reportTypes = ['sales','expense','customerdue','supplier','salary','stock','pnl','invoices'];
+  const reportTypes = ['sales','expense','customerdue','supplier','salary','staff','stock','returns','extraincome','cashbank','pnl','invoices'];
   const savedActive = repActiveReport;
   let html = `<div style="width:100%; max-width:700px; margin:0 auto; padding:16px; font-family:-apple-system,sans-serif; color:#000;">`;
   html += shopName ? `<h2 style="margin:0 0 2px;">${escapeHtml(shopName)}</h2>` : '';
