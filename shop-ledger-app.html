@@ -3969,18 +3969,27 @@ function opsRenderEmployees(){
 
   const q = document.getElementById('opsEmployeeSearch').value.trim().toLowerCase();
   const list = q ? all.filter(s => s.name.toLowerCase().includes(q) || (s.phone||'').includes(q)) : all;
+  const todayStr = new Date().toISOString().slice(0,10);
 
   document.getElementById('opsEmployeeList').innerHTML = list.length ? list.map(s=>{
     const due = Number(s.due)||0;
     const adv = Number(s.advance)||0;
     const salaryTxt = s.salary ? `মাসিক বেতনঃ ${fmt(Number(s.salary)||0)}` : '';
+    // "এই মাসের বেতন যোগ করুন" বাটনটা দিনে একবার চাপ দেওয়ার পর, আজকের জন্য
+    // নিষ্ক্রিয় (গ্রে) হয়ে যাবে — পরদিন আবার নিজে থেকেই সক্রিয় হয়ে যাবে
+    const salaryAlreadyDoneToday = s.lastSalaryCreditDate === todayStr;
+    const salaryBtn = s.salary
+      ? (salaryAlreadyDoneToday
+          ? `<button class="opsMiniBtn" disabled style="opacity:0.5; cursor:not-allowed;">✅ আজকের বেতন যোগ করা হয়েছে</button>`
+          : `<button class="opsMiniBtn bizNavCard" onclick="opsAddMonthlySalary('${s.id}')">🗓️ এই মাসের বেতন যোগ করুন</button>`)
+      : '';
     return `<div class="opsRow">
       <div class="opsRowTop" style="cursor:pointer;" onclick="opsShowEmployeeDetail('${s.id}')"><span class="nm">${escapeHtml(s.name)}</span><span class="amt ${due>0?'red':''}">${fmt(due)}</span></div>
       <div class="opsRowMeta">${s.role ? escapeHtml(s.role) : ''}${salaryTxt ? (s.role?' · ':'')+salaryTxt : ''}${s.phone ? ' · 📞 '+escapeHtml(s.phone) : ''}</div>
       <div class="opsRowActions">
         <button class="opsMiniBtn bizNavCard" onclick="opsOpenTxnModal('employee-payment','${s.id}')">💵 বেতন দিন</button>
         <button class="opsMiniBtn bizNavCard" onclick="opsOpenTxnModal('employee-advance','${s.id}')">📌 অগ্রিম দিন</button>
-        ${s.salary ? `<button class="opsMiniBtn bizNavCard" onclick="opsAddMonthlySalary('${s.id}')">🗓️ এই মাসের বেতন যোগ করুন</button>` : ''}
+        ${salaryBtn}
         <button class="opsMiniBtn" onclick="opsShowEmployeeDetail('${s.id}')">📋 বিস্তারিত</button>
         ${adv>0 ? `<button class="opsMiniBtn" style="background:#fff3cd; color:#7a5200; border-color:#e6c766; font-weight:800;" onclick="opsOpenAdvanceSettle('${s.id}')">📌 বেতন ছাড়া নিয়েছেঃ ${fmt(adv)}</button>` : ''}
         <button class="opsMiniBtn danger" onclick="opsDeleteEmployee('${s.id}')">🗑 ডিলিট</button>
