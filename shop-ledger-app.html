@@ -114,6 +114,19 @@
   .cart-item .ci-remove{ background:none; border:none; color:var(--due); font-size:18px; line-height:1; cursor:pointer; padding:4px 8px; font-weight:700; }
   .cart-summary{ background:#e2ede9; border:1px solid var(--teal-2); border-radius:9px; padding:9px 12px; margin-top:10px; font-size:13px; font-weight:600; color:var(--teal); }
   .old-cust-item:active{background:var(--paper-2);}
+
+  .holdCartRow{ display:flex; gap:8px; margin-top:10px; }
+  .holdCartRow button{ flex:1; padding:11px 6px; border-radius:9px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; border:1px solid var(--teal); background:transparent; color:var(--teal); }
+  .holdCartRow button.hcListBtn{ border-color:var(--copper); color:var(--copper); }
+  .heldCart-item{ border:1px solid var(--line); border-radius:10px; padding:11px 12px; margin-bottom:10px; background:#fff; }
+  .heldCart-item .hc-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px; }
+  .heldCart-item .hc-name{ font-weight:800; font-size:14px; color:var(--ink); }
+  .heldCart-item .hc-type{ font-size:10.5px; color:#8a7f6c; font-family:'Space Mono',monospace; margin-top:2px; }
+  .heldCart-item .hc-meta{ font-size:12.5px; color:#6b6153; margin-bottom:9px; font-family:'Space Mono',monospace; }
+  .heldCart-item .hc-actions{ display:flex; gap:8px; }
+  .heldCart-item .hc-actions button{ flex:1; padding:8px; border-radius:7px; border:1px solid var(--line); font-family:inherit; font-weight:700; font-size:12.5px; cursor:pointer; }
+  .heldCart-item .hc-resume{ background:var(--teal); color:#fff; border-color:var(--teal); }
+  .heldCart-item .hc-delete{ background:#fbebeb; color:var(--due); border-color:#f0c9c3; }
   .old-cust-hint{ font-size:11.5px; color:#a89d87; margin:-2px 0 8px; }
   .old-cust-item .snm{font-weight:700; font-size:13.5px;}
   .old-cust-item .sph{color:#8a7f6c; font-family:'Space Mono',monospace; font-size:12px;}
@@ -768,6 +781,11 @@
         <div id="qsCartList"></div>
         <div id="qsCartSummary" class="cart-summary" style="display:none;"></div>
 
+        <div class="holdCartRow">
+          <button type="button" id="qsHoldBtn">⏸️ কাস্টমার হোল্ড করুন</button>
+          <button type="button" class="hcListBtn" id="qsHoldListBtn">📋 হোল্ড তালিকা (<span id="qsHoldCount">0</span>)</button>
+        </div>
+
         <button class="btn" id="quickSellBtn">⚡ সম্পূর্ণ হিসাব যোগ করুন</button>
       </div>
 
@@ -820,6 +838,11 @@
 
         <div id="esCartList"></div>
         <div id="esCartSummary" class="cart-summary" style="display:none;"></div>
+
+        <div class="holdCartRow">
+          <button type="button" id="esHoldBtn">⏸️ কাস্টমার হোল্ড করুন</button>
+          <button type="button" class="hcListBtn" id="esHoldListBtn">📋 হোল্ড তালিকা (<span id="esHoldCount">0</span>)</button>
+        </div>
 
         <button class="btn" id="extraSaleBtn">🎁 এক্সট্রা সেল যোগ করুন</button>
       </div>
@@ -937,6 +960,11 @@
             <textarea id="fNote" rows="2" placeholder="বাড়তি কিছু লিখতে চাইলে"></textarea>
           </div>
         </div>
+        <div class="holdCartRow" id="creditHoldRow" style="display:none;">
+          <button type="button" id="creditHoldBtn">⏸️ কাস্টমার হোল্ড করুন</button>
+          <button type="button" class="hcListBtn" id="creditHoldListBtn">📋 হোল্ড তালিকা (<span id="creditHoldCount">0</span>)</button>
+        </div>
+
         <button class="btn" id="addBtn" style="display:none;">সম্পূর্ণ হিসাব যোগ করুন</button>
       </div>
     </div>
@@ -1015,6 +1043,15 @@
       <input type="file" id="restoreFile" accept=".json,application/json">
       <button class="btn secondary" id="restoreBtn" style="margin-top:10px;">রিস্টোর করুন</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="heldCartsModal">
+  <div class="modal-box" style="max-width:400px; text-align:left; max-height:85vh; display:flex; flex-direction:column; position:relative;">
+    <button id="heldCartsCloseBtn" style="position:absolute; top:10px; right:10px; width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:#fff; font-size:16px; line-height:1; cursor:pointer; color:#555;">✕</button>
+    <h3 style="margin:0 22px 4px 0;">📋 হোল্ড করা কার্ট তালিকা</h3>
+    <p class="pin-desc" style="margin:0 0 10px;">মোট <b id="heldCartsCount">0</b>টি কার্ট হোল্ড করা আছে।</p>
+    <div id="heldCartsListArea" style="overflow-y:auto; flex:1; min-height:60px;"></div>
   </div>
 </div>
 
@@ -2096,8 +2133,6 @@
     </div>
   </div>
 
-  <div class="repGrid" id="repSummaryGrid"></div>
-
   <div class="repQuickTabs" id="repQuickTabs">
     <div class="repQTab active" data-rt="sales">🧾 Sales</div>
     <div class="repQTab" data-rt="expense">💸 Expense</div>
@@ -2118,6 +2153,8 @@
     <button class="repToolBtn" id="repPrintBtn">🖨️ PDF</button>
     <button class="repToolBtn" id="repCsvBtn">📊 Excel</button>
   </div>
+
+  <div class="repGrid" id="repSummaryGrid"></div>
 
   <div class="repListCard"><div id="repListArea"></div></div>
 
@@ -6154,7 +6191,16 @@ function setupCustPicker(searchId, resultsId, tagId){
 
   return {
     getSelected: ()=> selected,
-    reset: ()=>{ selected = null; tagEl.style.display = 'none'; searchEl.value = ''; resultsEl.innerHTML = ''; }
+    reset: ()=>{ selected = null; tagEl.style.display = 'none'; searchEl.value = ''; resultsEl.innerHTML = ''; },
+    setSelected: (custOrNull)=>{
+      if(!custOrNull){ selected = null; tagEl.style.display = 'none'; return; }
+      selected = { name: custOrNull.name, phone: custOrNull.phone||'' };
+      tagEl.style.display = 'flex';
+      tagEl.className = 'selected-tag';
+      tagEl.innerHTML = `<span>নির্বাচিতঃ <b>${escapeHtml(selected.name)}</b>${selected.phone ? ' · '+escapeHtml(selected.phone) : ''}</span><span class="change-link" data-clear="1">বদলান</span>`;
+      resultsEl.innerHTML = '';
+      searchEl.value = '';
+    }
   };
 }
 
@@ -6191,6 +6237,8 @@ function updateAddBtnVisibility(){
   const isCartFlow = (status === 'বাকি' || status === 'নগদ-বিক্রি');
   const addBtn = document.getElementById('addBtn');
   addBtn.style.display = (isCartFlow && !creditCart.length) ? 'none' : 'block';
+  const creditHoldRow = document.getElementById('creditHoldRow');
+  if(creditHoldRow) creditHoldRow.style.display = isCartFlow ? 'flex' : 'none';
 }
 
 /* ফেরত করার সময় এবং জমা নেওয়ার সময় এই কাস্টমারের বর্তমান বাকি কত সেটা দেখানো হয়,
@@ -6708,6 +6756,195 @@ function renderEsCart(){ renderCartInto(esCart, 'esCartList', 'esCartSummary', '
 function removeCreditCartItem(idx){ creditCart.splice(idx,1); renderCreditCart(); }
 function removeQsCartItem(idx){ qsCart.splice(idx,1); renderQsCart(); }
 function removeEsCartItem(idx){ esCart.splice(idx,1); renderEsCart(); }
+
+/* ==================== ⏸️ Hold Cart / Multi-Cart ====================
+   কোনো কাস্টমারকে মাঝপথে (আইটেম যোগ করা অবস্থায়) হোল্ড করে রেখে আরেকজন কাস্টমারের
+   সেল শুরু করা যায় — কুইক সেল, নতুন/পুরাতন কাস্টমার এন্ট্রি এবং এক্সট্রা সেল, তিন
+   স্ক্রিনেই কাজ করে। সব হোল্ড করা কার্ট একটাই তালিকায় (heldCarts) জমা থাকে। */
+let heldCarts = [];
+
+function updateHeldCartBadges(){
+  const n = heldCarts.length;
+  ['qsHoldCount','esHoldCount','creditHoldCount','heldCartsCount'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.textContent = n;
+  });
+}
+
+function heldCartTypeLabel(hc){
+  if(hc.cartType === 'quick') return '⚡ কুইক সেল';
+  if(hc.cartType === 'extrasale') return '🎁 এক্সট্রা সেল';
+  return hc.mode === 'old' ? '👤 পুরাতন কাস্টমার এন্ট্রি' : '➕ নতুন কাস্টমার এন্ট্রি';
+}
+
+function renderHeldCartsModalList(){
+  const area = document.getElementById('heldCartsListArea');
+  if(!area) return;
+  if(!heldCarts.length){
+    area.innerHTML = '<div style="text-align:center; padding:24px 10px; color:#8a7f6c; font-size:13px;">কোনো কার্ট হোল্ড করা নেই</div>';
+  } else {
+    area.innerHTML = heldCarts.slice().reverse().map(hc=>{
+      const itemCount = hc.items.reduce((s,it)=>s+(Number(it.qty)||0),0);
+      return `
+      <div class="heldCart-item">
+        <div class="hc-top">
+          <div>
+            <div class="hc-name">${escapeHtml(hc.customer)}</div>
+            <div class="hc-type">${heldCartTypeLabel(hc)}</div>
+          </div>
+        </div>
+        <div class="hc-meta">${hc.items.length} আইটেম (মোট ${itemCount} পিস) — মোট মূল্য: ${fmt(hc.totalAmount)}</div>
+        <div class="hc-actions">
+          <button type="button" class="hc-resume" onclick="resumeHeldCart(${hc.id})">▶️ ফিরিয়ে আনুন</button>
+          <button type="button" class="hc-delete" onclick="deleteHeldCart(${hc.id})">🗑️ মুছুন</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  updateHeldCartBadges();
+}
+
+function deleteHeldCart(id){
+  const idx = heldCarts.findIndex(h=>h.id===id);
+  if(idx===-1) return;
+  const hc = heldCarts[idx];
+  heldCarts.splice(idx,1);
+  renderHeldCartsModalList();
+  toast(`🗑️ "${hc.customer}"-এর হোল্ড করা কার্টটি মুছে ফেলা হয়েছে`);
+}
+
+function resumeHeldCart(id){
+  const idx = heldCarts.findIndex(h=>h.id===id);
+  if(idx===-1) return;
+  const hc = heldCarts[idx];
+  heldCarts.splice(idx,1);
+
+  if(hc.cartType === 'quick'){
+    document.querySelector('#customerModeGroup .status-chip[data-m="quick"]').click();
+    const hasCust = hc.customer && hc.customer !== 'General Customer';
+    qsCustPicker.setSelected(hasCust ? { name: hc.customer, phone: hc.customerPhone||'' } : null);
+    const typeChip = document.querySelector(`#qsTypeGroup .status-chip[data-s="${hc.status}"]`);
+    if(typeChip) typeChip.click();
+    qsCart = hc.items.slice();
+    renderQsCart();
+  } else if(hc.cartType === 'extrasale'){
+    document.querySelector('#customerModeGroup .status-chip[data-m="extrasale"]').click();
+    const hasCust = hc.customer && hc.customer !== 'General Customer';
+    esCustPicker.setSelected(hasCust ? { name: hc.customer, phone: hc.customerPhone||'' } : null);
+    const typeChip = document.querySelector(`#esTypeGroup .status-chip[data-s="${hc.status}"]`);
+    if(typeChip) typeChip.click();
+    esCart = hc.items.slice();
+    renderEsCart();
+  } else if(hc.cartType === 'credit'){
+    document.querySelector(`#customerModeGroup .status-chip[data-m="${hc.mode}"]`).click();
+    const hasCust = hc.customer && hc.customer !== 'General Customer';
+    if(hc.mode === 'old' && hasCust){
+      selectOldCustomer(hc.customer, hc.customerPhone||'');
+    } else {
+      document.getElementById('fName').value = hasCust ? hc.customer : '';
+      document.getElementById('fPhone').value = hc.customerPhone || '';
+    }
+    const statusChip = document.querySelector(`#statusGroup .status-chip[data-s="${hc.status}"]`);
+    if(statusChip) statusChip.click();
+    creditCart = hc.items.slice();
+    renderCreditCart();
+    document.getElementById('fPaid').value = hc.paid || '';
+    document.getElementById('fNote').value = hc.note || '';
+    updateCustDueInfo();
+  }
+
+  document.getElementById('heldCartsModal').classList.remove('show');
+  updateHeldCartBadges();
+  toast(`▶️ "${hc.customer}"-এর কার্ট ফিরিয়ে আনা হয়েছে`);
+}
+
+function openHeldCartsModal(){
+  renderHeldCartsModalList();
+  document.getElementById('heldCartsModal').classList.add('show');
+}
+['qsHoldListBtn','esHoldListBtn','creditHoldListBtn'].forEach(btnId=>{
+  const btn = document.getElementById(btnId);
+  if(btn) btn.addEventListener('click', openHeldCartsModal);
+});
+const heldCartsCloseBtn = document.getElementById('heldCartsCloseBtn');
+if(heldCartsCloseBtn) heldCartsCloseBtn.addEventListener('click', ()=>{
+  document.getElementById('heldCartsModal').classList.remove('show');
+});
+
+document.getElementById('qsHoldBtn').addEventListener('click', ()=>{
+  if(!qsCart.length){ toast('তালিকায় কোনো আইটেম নেই — হোল্ড করার কিছু নেই'); return; }
+  const sel = qsCustPicker.getSelected();
+  const customerName = sel && sel.name ? sel.name : 'General Customer';
+  const status = document.querySelector('#qsTypeGroup .status-chip.active')?.dataset.s || 'নগদ-বিক্রি';
+  heldCarts.push({
+    id: Date.now(),
+    cartType: 'quick',
+    customer: customerName,
+    customerPhone: sel ? (sel.phone||'') : '',
+    status,
+    items: qsCart.slice(),
+    totalAmount: qsCart.reduce((s,it)=>s+it.price,0)
+  });
+  qsCart = [];
+  renderQsCart();
+  qsCustPicker.reset();
+  updateHeldCartBadges();
+  toast(`⏸️ "${customerName}"-এর কার্ট হোল্ড করা হয়েছে`);
+});
+
+document.getElementById('esHoldBtn').addEventListener('click', ()=>{
+  if(!esCart.length){ toast('তালিকায় কোনো আইটেম নেই — হোল্ড করার কিছু নেই'); return; }
+  const sel = esCustPicker.getSelected();
+  const customerName = sel && sel.name ? sel.name : 'General Customer';
+  const status = document.querySelector('#esTypeGroup .status-chip.active')?.dataset.s || 'নগদ-বিক্রি';
+  heldCarts.push({
+    id: Date.now(),
+    cartType: 'extrasale',
+    customer: customerName,
+    customerPhone: sel ? (sel.phone||'') : '',
+    status,
+    items: esCart.slice(),
+    totalAmount: esCart.reduce((s,it)=>s+it.price,0)
+  });
+  esCart = [];
+  renderEsCart();
+  esCustPicker.reset();
+  updateHeldCartBadges();
+  toast(`⏸️ "${customerName}"-এর কার্ট হোল্ড করা হয়েছে`);
+});
+
+document.getElementById('creditHoldBtn').addEventListener('click', ()=>{
+  if(!creditCart.length){ toast('তালিকায় কোনো আইটেম নেই — হোল্ড করার কিছু নেই'); return; }
+  const mode = document.querySelector('#customerModeGroup .status-chip.active')?.dataset.m || 'new';
+  const status = document.querySelector('#statusGroup .status-chip.active')?.dataset.s || 'বাকি';
+  const name = document.getElementById('fName').value.trim();
+  const phone = document.getElementById('fPhone').value.trim();
+  const customerName = name || 'General Customer';
+  heldCarts.push({
+    id: Date.now(),
+    cartType: 'credit',
+    mode,
+    status,
+    customer: customerName,
+    customerPhone: phone,
+    paid: document.getElementById('fPaid').value || '',
+    note: document.getElementById('fNote').value || '',
+    items: creditCart.slice(),
+    totalAmount: creditCart.reduce((s,it)=>s+it.price,0)
+  });
+  creditCart = [];
+  renderCreditCart();
+  document.getElementById('fName').value='';
+  document.getElementById('fPhone').value='';
+  document.getElementById('fPaid').value='';
+  document.getElementById('fNote').value='';
+  selectedCustTag.style.display='none';
+  updateCustDueInfo();
+  updateAddBtnVisibility();
+  updateHeldCartBadges();
+  toast(`⏸️ "${customerName}"-এর কার্ট হোল্ড করা হয়েছে`);
+});
+/* ==================== Hold Cart শেষ ==================== */
 
 function readCartLineFromFields(itemId, qtyId, costId, priceId){
   const itemEl = document.getElementById(itemId);
