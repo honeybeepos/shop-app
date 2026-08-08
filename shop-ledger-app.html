@@ -4368,6 +4368,96 @@ async function opsAddMonthlySalary(id){
   await opsSendStaffWhatsAppReceipt(emp, `Salary Credited - ${dateRangeLabel} (${days} din)`, amount);
 }
 
+/* ==================== 🗓️ স্বয়ংক্রিয় মাসিক বেতন (Auto Monthly Salary Credit) ====================
+   এখন থেকে "এই মাসের বেতন যোগ করুন" বাটনে ম্যানুয়ালি চাপ দেওয়ার দরকার নেই — অ্যাপ যখনই
+   খোলা হবে (মাসের ১ তারিখে বা তার পরে যেদিনই প্রথম খোলা হোক না কেন), তখনই এই ফাংশনটা
+   প্রতিটা স্টাফের জন্য স্বয়ংক্রিয়ভাবে চেক করে দেখবে বেতন যোগ করার মতো নতুন দিন বাকি আছে কিনা।
+
+   বেতন যোগ করার ঠিক আগে প্রতিটা স্টাফের ক্ষেত্রে চেক করা হয় — সে আগে থেকে কোনো "অগ্রিম"
+   (বেতনের বাইরে বাড়তি টাকা) নিয়ে রেখেছে কিনা। যদি নিয়ে থাকে, তাহলে নতুন যোগ হওয়া বেতন
+   থেকে সেই অগ্রিমের টাকাটা স্বয়ংক্রিয়ভাবে কেটে (সমন্বয় করে) নেওয়া হয় — বাকি যা থাকে
+   সেটাই স্টাফের "বর্তমান বাকি"-তে যোগ হয়ে যায়। ফলে অগ্রিম নেওয়া থাকলে বেতন যোগ হওয়ার পর
+   বাকির অঙ্কে দুইবার হিসাব হয় না, একদম নির্ভুল ব্যালেন্স দেখা যায়।
+
+   দিনভিত্তিক হিসাব (opsAddMonthlySalary-এর মতোই) ব্যবহার করা হয় বলে মাসের মাঝপথে অ্যাপ
+   প্রথম খোলা হলেও সঠিক আংশিক বেতন যোগ হয়, আর lastSalaryCreditDate ট্র্যাক করা হয় বলে
+   একই দিনের বেতন ভুলে দুইবার যোগ হওয়ার কোনো সুযোগ নেই। */
+function opsAutoCreditMonthlySalaries(){
+  const list = opsLoadEmployees();
+  if(!list.length) return;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const daysInThisMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+  let anyCredited = false;
+
+  list.forEach(emp=>{
+    if(!emp.salary) return; // যাদের মাসিক বেতন নির্ধারিত নেই, তাদের জন্য অটো হিসাব প্রযোজ্য না
+
+    const dailyRate = Number(emp.salary) / daysInThisMonth;
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    let countFrom = monthStart;
+    if(emp.joinDate){
+      const jd = new Date(emp.joinDate); jd.setHours(0,0,0,0);
+      if(jd > countFrom) countFrom = jd;
+    }
+    if(emp.lastSalaryCreditDate){
+      const lastPaidThrough = new Date(emp.lastSalaryCreditDate); lastPaidThrough.setHours(0,0,0,0);
+      const dayAfter = new Date(lastPaidThrough); dayAfter.setDate(dayAfter.getDate()+1);
+      if(dayAfter > countFrom) countFrom = dayAfter;
+    }
+
+    if(countFrom > today) return; // আজ পর্যন্ত এই স্টাফের বেতন ইতিমধ্যে যোগ হয়ে গেছে
+
+    const days = Math.round((today - countFrom) / 86400000) + 1;
+    const amount = Math.round(dailyRate * days);
+    if(amount <= 0) return;
+
+    const dateRangeLabel = days === 1
+      ? countFrom.toLocaleDateString('bn-BD', {day:'numeric', month:'long'})
+      : `${countFrom.toLocaleDateString('bn-BD', {day:'numeric', month:'short'})} - ${today.toLocaleDateString('bn-BD', {day:'numeric', month:'long'})}`;
+
+    // ১. এই মাসের/এই কয়দিনের বেতনটা প্রথমে পুরোপুরি "বাকি"-তে যোগ হবে
+    emp.due = (Number(emp.due)||0) + amount;
+    emp.lastSalaryCreditDate = today.toISOString().slice(0,10);
+    opsAddEmployeeTxn(emp.id, 'due', amount, `বেতন - ${dateRangeLabel} (${days} দিন) [স্বয়ংক্রিয়]`);
+
+    // ২. আগে থেকে অগ্রিম নেওয়া থাকলে, নতুন যোগ হওয়া বেতনের সাথে সেটা এখন
+    //    স্বয়ংক্রিয়ভাবে সমন্বয় (settle) হয়ে যাবে
+    const adv = Number(emp.advance)||0;
+    if(adv > 0){
+      const settleAmount = Math.min(adv, emp.due);
+      if(settleAmount > 0){
+        emp.due = Math.max(0, emp.due - settleAmount);
+        emp.advance = Math.max(0, adv - settleAmount);
+        opsAddEmployeeTxn(emp.id, 'payment', settleAmount, 'অগ্রিম সমন্বয় (বেতন থেকে স্বয়ংক্রিয় কর্তন)');
+      }
+    }
+
+    anyCredited = true;
+    toast(`${emp.name}-এর ${dateRangeLabel} বেতন (${fmt(amount)}) স্বয়ংক্রিয়ভাবে বাকিতে যোগ হয়েছে ✅`);
+  });
+
+  if(anyCredited){
+    opsSaveEmployees(list);
+    if(typeof opsRenderEmployees === 'function'){
+      try{ opsRenderEmployees(); }catch(e){}
+    }
+  }
+}
+
+// প্রতিবার অ্যাপ খোলার সময় বারবার এই হিসাব না চালিয়ে, দিনে একবারই চালানো হয় —
+// শেষ কবে চেক করা হয়েছে তা localStorage-এ মনে রাখা থাকে
+function opsRunAutoSalaryCheckOnce(){
+  try{
+    const todayStr = new Date().toISOString().slice(0,10);
+    const lastCheck = localStorage.getItem('shop-lastAutoSalaryCheck');
+    if(lastCheck === todayStr) return;
+    localStorage.setItem('shop-lastAutoSalaryCheck', todayStr);
+    opsAutoCreditMonthlySalaries();
+  }catch(e){ console.error('Auto salary check failed:', e); }
+}
+
 document.getElementById('opsTxnSaveBtn').addEventListener('click', async ()=>{
   const amount = Number(document.getElementById('opsTxnAmount').value)||0;
   if(amount <= 0){ toast('সঠিক টাকার পরিমাণ দিন'); return; }
@@ -9024,6 +9114,13 @@ auth.onAuthStateChanged(async (user)=>{
 
   document.getElementById("authGate").style.display = "none";
   loadSystemData();
+
+  // ক্লাউড থেকে সর্বশেষ ডেটা সিঙ্ক হয়ে আসার পর, স্টাফদের এই মাসের বেতন স্বয়ংক্রিয়ভাবে
+  // "বাকি"-তে যোগ হয়ে গেছে কিনা তা একবার চেক করা হয় (শুধু এডমিনের সেশনে — সাব-ইউজার
+  // এই আর্থিক পরিবর্তন নিজে থেকে ট্রিগার করবে না)
+  if(session.role === "admin" && typeof opsRunAutoSalaryCheckOnce === "function"){
+    try{ opsRunAutoSalaryCheckOnce(); }catch(e){ console.error("Auto salary check failed:", e); }
+  }
 });
 </script>
 </body>
