@@ -583,10 +583,28 @@
   <div class="left"><span id="cloudSyncDot"></span><span id="cloudShopLabel"></span><span id="cloudNetLabel" style="margin-left:6px;font-weight:700;"></span></div>
   <div class="left">
     <button id="subUserBtn" style="display:none;">+ সাব-ইউজার</button>
+    <button id="shopSettingsBtn" title="সেটিং" style="padding:6px 10px; font-size:15px;">⚙️</button>
     <button id="cloudLogoutBtn">লগআউট</button>
   </div>
 </div>
 <div id="announceBar"></div>
+
+<div class="modal-overlay" id="shopSettingsModalOverlay">
+  <div class="modal-box" style="max-width:380px; text-align:left;">
+    <h3 style="margin:0 0 4px;">🧾 SALES INVOICE সেটিং</h3>
+    <p class="pin-desc" style="margin:0 0 14px;">এখানে যা লিখবেন সেটাই বিল/ইনভয়েসে দোকানের নাম হিসেবে দেখাবে।</p>
+
+    <label style="display:block; font-size:12px; color:#8b7f6c; margin:0 0 4px;">🏪 দোকানের নাম</label>
+    <h1 id="shopTitle" contenteditable="true" spellcheck="false"
+      style="outline:none; border:1px solid var(--line); border-radius:9px; padding:10px 12px; font-size:17px; margin:0 0 14px; background:#fff; min-height:22px;"></h1>
+
+    <label style="display:block; font-size:12px; color:#8b7f6c; margin:0 0 4px;">📝 সাব-টাইটেল (ছোট বিবরণ, যেমনঃ কি কি সেল হয়)</label>
+    <p id="shopSubtitle" contenteditable="true" spellcheck="false"
+      style="outline:none; border:1px solid var(--line); border-radius:9px; padding:10px 12px; font-size:13.5px; margin:0 0 16px; background:#fff; min-height:18px;"></p>
+
+    <button class="btn" id="shopSettingsCloseBtn" style="width:100%;">✓ সম্পন্ন</button>
+  </div>
+</div>
 
 <header style="display:flex; align-items:center; gap:12px;">
   <div id="logoWrap" style="cursor:pointer; flex-shrink:0;">
@@ -594,10 +612,6 @@
     <div id="logoPlaceholder" style="width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:22px;">➕</div>
   </div>
   <input type="file" id="logoInput" accept="image/*" style="display:none;">
-  <div style="flex:1; min-width:0;">
-    <h1 id="shopTitle" contenteditable="true" spellcheck="false" style="outline:none;"></h1>
-    <p id="shopSubtitle" contenteditable="true" spellcheck="false" style="outline:none;"></p>
-  </div>
 </header>
 
 <div class="wrap" id="mainApp">
@@ -2836,7 +2850,7 @@ const logoPlaceholderEl = document.getElementById('logoPlaceholder');
 const logoInputEl = document.getElementById('logoInput');
 
 function loadHeaderCustomization(){
-  shopTitleEl.textContent = localStorage.getItem('shop-title') || 'Shop Operations Center';
+  shopTitleEl.textContent = localStorage.getItem('shop-title') || '';
   shopSubtitleEl.textContent = localStorage.getItem('shop-subtitle') || '';
   const savedLogo = localStorage.getItem('shop-logo');
   if(savedLogo){
@@ -2852,6 +2866,24 @@ shopTitleEl.addEventListener('blur', ()=>{
 });
 shopSubtitleEl.addEventListener('blur', ()=>{
   localStorage.setItem('shop-subtitle', shopSubtitleEl.textContent.trim());
+});
+
+// দোকানের নাম/সাব-টাইটেল এখন ⚙️ সেটিং বাটনের ভেতরে এডিট করা যায় — এডমিন এবং
+// সাব-ইউজার (সেলার) সবার জন্যই এই বাটন দেখা যাবে।
+document.getElementById('shopSettingsBtn').addEventListener('click', ()=>{
+  document.getElementById('shopSettingsModalOverlay').classList.add('show');
+});
+document.getElementById('shopSettingsCloseBtn').addEventListener('click', ()=>{
+  shopTitleEl.blur();
+  shopSubtitleEl.blur();
+  document.getElementById('shopSettingsModalOverlay').classList.remove('show');
+});
+document.getElementById('shopSettingsModalOverlay').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'shopSettingsModalOverlay'){
+    shopTitleEl.blur();
+    shopSubtitleEl.blur();
+    document.getElementById('shopSettingsModalOverlay').classList.remove('show');
+  }
 });
 
 document.getElementById('logoWrap').addEventListener('click', ()=> logoInputEl.click());
@@ -5283,6 +5315,7 @@ function nextInvoiceNumber(){
 //   যতবারই করা হোক, একই ইনভয়েস নাম্বার থাকবে) — সেটাই এখানে parameter হিসেবে আসে
 function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared, invoiceNo, saleTime}){
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || 'Mumen Electronics';
+  const shopSubtitle = (document.getElementById('shopSubtitle') && document.getElementById('shopSubtitle').textContent.trim()) || '';
   const now = saleTime ? new Date(saleTime) : new Date();
   const dateStr = formatInvoiceDate(now);
   const timeStr = formatInvoiceTime(now);
@@ -5299,7 +5332,7 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
     return lines.join('\n');
   }).join(`\n\n${DIVIDER}\n\n`);
 
-  let msg = `🧾 SALES INVOICE\n\n${shopName}\n\nInvoice No: ${invoiceNo || nextInvoiceNumber()}\nDate: ${dateStr}\nTime: ${timeStr}\n\nCustomer Name: ${name}\nPhone: ${phone || '-'}\n\n${DIVIDER}\n\n${itemBlocks}\n\n${DIVIDER}\n\nTotal Bill : SAR ${billTotalPrice}\nReceived   : SAR ${paid}\nPrevious Due : SAR ${previousDue}`;
+  let msg = `🧾 SALES INVOICE\n\n${shopName}${shopSubtitle ? `\n_${shopSubtitle}_` : ''}\n\nInvoice No: ${invoiceNo || nextInvoiceNumber()}\nDate: ${dateStr}\nTime: ${timeStr}\n\nCustomer Name: ${name}\nPhone: ${phone || '-'}\n\n${DIVIDER}\n\n${itemBlocks}\n\n${DIVIDER}\n\nTotal Bill : SAR ${billTotalPrice}\nReceived   : SAR ${paid}\nPrevious Due : SAR ${previousDue}`;
 
   msg += `\n\n${DIVIDER}\n\nCurrent Due : SAR ${currentDue}\n\nThank you for shopping with us.\n${shopName}`;
 
