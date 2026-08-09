@@ -685,7 +685,7 @@
             <div class="status-chip active" data-m="new">➕ নতুন</div>
             <div class="status-chip" data-m="old">👤 পুরাতন</div>
             <div class="status-chip" data-m="addcust">🧑‍🤝‍🧑 কাস্টমার এড</div>
-            <div class="status-chip" data-m="quick">⚡ কুইক</div>
+            <div class="status-chip" data-m="quick" id="quickModeChipEl" title="কুইক সেল — সেটিং-এর জন্য দুইবার ট্যাপ করুন">⚡</div>
             <div class="status-chip" data-m="extrasale">🎁 এক্সট্রা সেল</div>
           </div>
         </div>
@@ -754,7 +754,7 @@
       <div id="quickSellBlock" style="display:none;">
         <p class="pin-desc">দ্রুত ক্যাশ বিক্রি — কাস্টমারের নাম-নাম্বার লাগবে না। একাধিক আইটেম হলে একটি একটি করে "তালিকায় যোগ করুন"।</p>
 
-        <div class="row">
+        <div class="row" id="qsCustRow">
           <div style="position:relative;">
             <label>কাস্টমার (ঐচ্ছিক — পুরাতন কাস্টমারকে বাকি দিতে চাইলে খুঁজে নিন)</label>
             <input id="qsCustSearch" type="text" placeholder="নাম বা নাম্বার লিখুন" autocomplete="off">
@@ -763,7 +763,7 @@
         <div id="qsCustResults"></div>
         <div id="qsSelectedCustTag" style="display:none;"></div>
 
-        <div class="row">
+        <div class="row" id="qsTypeRow">
           <div>
             <label>ধরন</label>
             <div class="status-group" id="qsTypeGroup">
@@ -787,7 +787,7 @@
           </div>
         </div>
         <div class="row">
-          <div>
+          <div id="qsCostField">
             <label>কেনা দাম (প্রতি পিস) (SAR)</label>
             <input id="qsCost" type="number" inputmode="numeric" placeholder="০">
           </div>
@@ -808,6 +808,26 @@
         </div>
 
         <button class="btn" id="quickSellBtn">⚡ সম্পূর্ণ হিসাব যোগ করুন</button>
+      </div>
+
+      <div class="modal-overlay" id="qsSettingsModalOverlay">
+        <div class="modal-box" style="max-width:340px; text-align:left;">
+          <h3 style="margin:0 0 4px;">⚡ কুইক সেল সেটিং</h3>
+          <p class="pin-desc" style="margin:0 0 14px;">যেগুলো দরকার নেই সেগুলোর টিক তুলে দিন — কুইক সেল স্ক্রিন থেকে লুকিয়ে যাবে।</p>
+          <label style="display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); cursor:pointer;">
+            <input type="checkbox" id="qsCfgType" checked style="width:18px; height:18px; flex-shrink:0;">
+            <span>বাকি / নগদ ধরন বাছাই</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); cursor:pointer;">
+            <input type="checkbox" id="qsCfgCust" checked style="width:18px; height:18px; flex-shrink:0;">
+            <span>নাম-নাম্বার দিয়ে কাস্টমার খুঁজুন</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; padding:11px 0; cursor:pointer;">
+            <input type="checkbox" id="qsCfgCost" checked style="width:18px; height:18px; flex-shrink:0;">
+            <span>কেনা দাম (Cost Price) ফিল্ড</span>
+          </label>
+          <button class="btn" id="qsSettingsSaveBtn" style="width:100%; margin-top:16px;">✓ সেভ করুন</button>
+        </div>
       </div>
 
       <div id="extraSaleBlock" style="display:none;">
@@ -5986,6 +6006,53 @@ quickModeChip.addEventListener('pointermove', (ev)=>{
 quickModeChip.addEventListener('contextmenu', (ev)=> ev.preventDefault());
 
 document.getElementById('quickDashboardCloseBtn').addEventListener('click', ()=> quickDashboardScreen.classList.remove('show'));
+
+/* ⚡ "কুইক" চিপে দুইবার ট্যাপ (double-click) করলে একটা সেটিং পপআপ খুলবে —
+   এখানে টিক দিয়ে ঠিক করা যাবে কুইক সেল স্ক্রিনে কোন কোন অপশনাল ফিল্ড
+   (বাকি/নগদ ধরন, কাস্টমার সার্চ, কেনা দাম) দেখাবে। টিক তোলা মানে ফিল্ডটা
+   লুকিয়ে যাবে, যাতে দ্রুত ক্যাশ সেল আরও সহজ হয়। প্রতিটা ইউজারের জন্য
+   আলাদাভাবে সেভ থাকে (localStorage-এ)। */
+function qsFieldConfigKey(){ return 'qs-field-config-' + qiCurrentUid(); }
+function loadQsFieldConfig(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(qsFieldConfigKey()) || 'null');
+    return Object.assign({ type:true, cust:true, cost:true }, saved || {});
+  }catch(e){ return { type:true, cust:true, cost:true }; }
+}
+function applyQsFieldConfig(){
+  const cfg = loadQsFieldConfig();
+  document.getElementById('qsTypeRow').style.display = cfg.type ? '' : 'none';
+  document.getElementById('qsCustRow').style.display = cfg.cust ? '' : 'none';
+  if(!cfg.cust){
+    document.getElementById('qsCustResults').style.display = 'none';
+    document.getElementById('qsSelectedCustTag').style.display = 'none';
+  }
+  document.getElementById('qsCostField').style.display = cfg.cost ? '' : 'none';
+}
+applyQsFieldConfig();
+
+quickModeChip.addEventListener('dblclick', (ev)=>{
+  ev.preventDefault();
+  const cfg = loadQsFieldConfig();
+  document.getElementById('qsCfgType').checked = cfg.type;
+  document.getElementById('qsCfgCust').checked = cfg.cust;
+  document.getElementById('qsCfgCost').checked = cfg.cost;
+  document.getElementById('qsSettingsModalOverlay').classList.add('show');
+});
+document.getElementById('qsSettingsModalOverlay').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'qsSettingsModalOverlay') document.getElementById('qsSettingsModalOverlay').classList.remove('show');
+});
+document.getElementById('qsSettingsSaveBtn').addEventListener('click', ()=>{
+  const cfg = {
+    type: document.getElementById('qsCfgType').checked,
+    cust: document.getElementById('qsCfgCust').checked,
+    cost: document.getElementById('qsCfgCost').checked
+  };
+  localStorage.setItem(qsFieldConfigKey(), JSON.stringify(cfg));
+  applyQsFieldConfig();
+  document.getElementById('qsSettingsModalOverlay').classList.remove('show');
+  toast('⚡ কুইক সেল সেটিং সেভ হয়েছে');
+});
 
 /* ================= Quick Items (কুইক ড্যাশবোর্ডের শর্টকাট প্রোডাক্ট) =================
    প্রতিটা ইউজার (Admin/সাব-এডমিন/সেলার) নিজের মতো করে শর্টকাট প্রোডাক্ট যোগ করে
