@@ -3435,8 +3435,10 @@ function repBuildReportData(){
   }
   if(repActiveReport === 'cashbank'){
     const entries = (typeof retailEntries !== 'undefined' ? retailEntries : []).filter(e => repInRange(e.date, from, to) && SALE_STATUSES.includes(e.status));
+    const deposits = (typeof retailEntries !== 'undefined' ? retailEntries : []).filter(e => repInRange(e.date, from, to) && e.status === 'নগদ');
     let periodCash=0, periodBank=0;
     entries.forEach(e=>{ if((e.paymentMethod||'cash')==='bank') periodBank += (e.paid||0); else periodCash += (e.paid||0); });
+    deposits.forEach(e=>{ const amt = Number(e.depositAmount)||0; if((e.paymentMethod||'cash')==='bank') periodBank += amt; else periodCash += amt; });
     const exps = opsLoadActiveExpenses().filter(x=>repInRange(x.date, from, to));
     let expCash=0, expBank=0;
     exps.forEach(x=>{ if((x.method||'cash')==='bank') expBank += (Number(x.amount)||0); else expCash += (Number(x.amount)||0); });
@@ -7216,6 +7218,11 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
       if(paymentMethod === null) return;
     } else {
       paid = Number(document.getElementById('fPaid').value)||0;
+      if(paid > 0){
+        // "বাকি" সেলেও যদি সাথে সাথে কিছু টাকা জমা নেওয়া হয়, সেই টাকাটা Cash নাকি Bank সেটা জিজ্ঞেস করা হচ্ছে
+        paymentMethod = await showPaymentMethodModal();
+        if(paymentMethod === null) return;
+      }
     }
 
     const billId = genLineId();
@@ -7297,9 +7304,14 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     });
     if(confirmed === null) return;
 
+    // এই জমা নেওয়া টাকাটা Cash-এ নাকি Bank-এ ঢুকলো সেটা জিজ্ঞেস করা হচ্ছে, নাহলে Cash/Bank
+    // রিপোর্টে এই টাকাটা ধরাই পড়বে না।
+    const depositMethod = await showPaymentMethodModal();
+    if(depositMethod === null) return;
+
     allocateDuePayment(name, phone, amount);
     
-    retailEntries.unshift({ id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, depositAmount: amount, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() });
+    retailEntries.unshift({ id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, depositAmount: amount, paymentMethod: depositMethod, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() });
     
     const isCleared = isCustomerFullyPaid(name, phone);
     const changeBack = Math.max(amount - previousDue, 0);
@@ -8880,11 +8892,13 @@ function monRenderAll(){
       if(d.toDateString() === todayStr) todaySales += (e.price||0);
       if(d >= weekAgo) weeklySales += (e.price||0);
       if(d >= monthStart) monthlySales += (e.price||0);
-      if(e.paymentMethod === 'cash'){
+      // paymentMethod না থাকলে (পুরনো এন্ট্রি) ডিফল্টভাবে Cash ধরা হচ্ছে, রিপোর্ট সেন্টারের হিসাবের সাথে মিল রাখতে
+      const pm = e.paymentMethod || 'cash';
+      if(pm === 'cash'){
         allTimeCash += (e.paid||0);
         if(d.toDateString() === todayStr) todayCash += (e.paid||0);
         if(d >= weekAgo) weeklyCash += (e.paid||0);
-      } else if(e.paymentMethod === 'bank'){
+      } else {
         allTimeBank += (e.paid||0);
         if(d.toDateString() === todayStr) todayBank += (e.paid||0);
         if(d >= weekAgo) weeklyBank += (e.paid||0);
@@ -8893,6 +8907,21 @@ function monRenderAll(){
         if(!billMap[e.billId]) billMap[e.billId] = {items:[], total:0, name:e.name, date:e.date};
         billMap[e.billId].items.push(e.item);
         billMap[e.billId].total += (e.price||0);
+      }
+    }
+    // বাকি টাকা জমা নেওয়ার (status='নগদ') সময় ঢোকা টাকাও Cash/Bank ব্যালান্সে যোগ হচ্ছে —
+    // এটা SALE_STATUSES-এর বাইরে, তাই আলাদাভাবে হিসাব করা হচ্ছে।
+    if(e.status === 'নগদ'){
+      const amt = Number(e.depositAmount)||0;
+      const pm = e.paymentMethod || 'cash';
+      if(pm === 'cash'){
+        allTimeCash += amt;
+        if(d.toDateString() === todayStr) todayCash += amt;
+        if(d >= weekAgo) weeklyCash += amt;
+      } else {
+        allTimeBank += amt;
+        if(d.toDateString() === todayStr) todayBank += amt;
+        if(d >= weekAgo) weeklyBank += amt;
       }
     }
   });
