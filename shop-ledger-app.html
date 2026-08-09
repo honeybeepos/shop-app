@@ -3049,6 +3049,11 @@ async function loadSystemData(){
     deletedCustomerKeys = loadDeletedCustomerKeys();
     restoredCustomerKeys = loadRestoredCustomerKeys();
     stripTombstonedData();
+
+    // পুরনো ভাঙা "INV-000NaN" ইনভয়েস নাম্বারগুলো একবার ঠিক করে আলাদা আলাদা নাম্বার বসানো হচ্ছে
+    if(fixBrokenInvoiceNumbers()){
+      await persistData();
+    }
   }catch(e){
     console.error(e);
   }
@@ -5299,11 +5304,61 @@ function formatInvoiceTime(d){
 }
 
 // প্রতিটা বিলের জন্য ক্রমিক Invoice No (যেমন INV-000125) জেনারেট ও সেভ করে।
+// আগে শুধু localStorage-এর একটা কাউন্টার থেকে নাম্বার বাড়ানো হতো — কোনো কারণে এই
+// কাউন্টার নষ্ট (NaN) হয়ে গেলে বা একাধিক ডিভাইস/সাব-ইউজার একসাথে সেল করলে একই
+// নাম্বার/NaN বারবার জেনারেট হতো। এখন retailEntries-এ ইতিমধ্যে সেভ থাকা সবচেয়ে বড়
+// নাম্বারটা খুঁজে বের করে তার পরেরটা দেওয়া হয় — তাই কাউন্টার নষ্ট থাকলেও বা একাধিক
+// ডিভাইস থেকে সেল হলেও প্রতিটা ইনভয়েস নাম্বার আলাদা ও সঠিক হবে।
 function nextInvoiceNumber(){
-  let n = Number(localStorage.getItem('shop-invoice-counter') || '0');
-  n += 1;
+  let maxN = 0;
+  if(typeof retailEntries !== 'undefined' && Array.isArray(retailEntries)){
+    retailEntries.forEach(e=>{
+      if(!e.invoiceNo) return;
+      const num = parseInt(String(e.invoiceNo).replace(/[^0-9]/g, ''), 10);
+      if(!isNaN(num) && num > maxN) maxN = num;
+    });
+  }
+  const storedN = parseInt(localStorage.getItem('shop-invoice-counter'), 10);
+  if(!isNaN(storedN) && storedN > maxN) maxN = storedN;
+
+  const n = maxN + 1;
   localStorage.setItem('shop-invoice-counter', String(n));
   return 'INV-' + String(n).padStart(6, '0');
+}
+
+// আগে যেসব এন্ট্রি ভাঙা কাউন্টারের কারণে "INV-000NaN" (সব কয়টা একই নাম্বার) হয়ে
+// গিয়েছিল, সেগুলোকে একবার স্ক্যান করে পুরনো তারিখ অনুযায়ী ক্রমান্বয়ে নতুন, আলাদা
+// আলাদা ইনভয়েস নাম্বার বসিয়ে দেওয়া হয় — যাতে নাম/নাম্বার দিয়ে খুঁজে প্রতিটা বিল
+// আলাদাভাবে পাওয়া যায়।
+function fixBrokenInvoiceNumbers(){
+  if(typeof retailEntries === 'undefined' || !Array.isArray(retailEntries)) return false;
+  const broken = retailEntries.filter(e => e.invoiceNo && /NaN/i.test(e.invoiceNo));
+  if(!broken.length) return false;
+
+  let maxN = 0;
+  retailEntries.forEach(e=>{
+    if(!e.invoiceNo || /NaN/i.test(e.invoiceNo)) return;
+    const num = parseInt(String(e.invoiceNo).replace(/[^0-9]/g, ''), 10);
+    if(!isNaN(num) && num > maxN) maxN = num;
+  });
+
+  // billId অনুযায়ী গ্রুপ করা হচ্ছে — যাতে একই বিলের একাধিক আইটেম একই নতুন নাম্বার পায়
+  const groups = {};
+  const order = [];
+  broken.slice().sort((a,b)=> new Date(a.date) - new Date(b.date)).forEach(e=>{
+    const key = e.billId || e.id;
+    if(!groups[key]){ groups[key] = []; order.push(key); }
+    groups[key].push(e);
+  });
+
+  order.forEach(key=>{
+    maxN += 1;
+    const newNo = 'INV-' + String(maxN).padStart(6, '0');
+    groups[key].forEach(e => e.invoiceNo = newNo);
+  });
+
+  localStorage.setItem('shop-invoice-counter', String(maxN));
+  return true;
 }
 
 // একটা প্রফেশনাল "🧾 SALES INVOICE" স্টাইলের WhatsApp Case Memo বানায়:
