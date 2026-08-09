@@ -2531,6 +2531,19 @@
     }
     #program-bcc .bccModalBody select option{ background:#10152a; }
     #program-bcc .bccTwoCol{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .bccPNameWrap{ position:relative; }
+    .bccPNameResults{
+      display:none; position:absolute; left:0; right:0; top:calc(100% - 2px); z-index:20;
+      max-height:220px; overflow-y:auto; background:#161c34; border:1px solid rgba(255,255,255,0.12);
+      border-radius:0 0 10px 10px; box-shadow:0 10px 24px rgba(0,0,0,0.45);
+    }
+    .bccPNameResults.show{ display:block; }
+    .bccPNameResults .pnr-item{ padding:10px 12px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.06); }
+    .bccPNameResults .pnr-item:last-child{ border-bottom:none; }
+    .bccPNameResults .pnr-item:active{ background:rgba(255,255,255,0.08); }
+    .bccPNameResults .pnr-name{ font-size:13.5px; font-weight:700; color:#eef1f7; }
+    .bccPNameResults .pnr-meta{ font-size:11px; color:#8b94b8; margin-top:2px; }
+    .bccPNameResults .pnr-empty{ padding:10px 12px; font-size:12.5px; color:#8b94b8; }
     #bccSettingsOverlay{
       display:none; position:fixed; inset:0; z-index:700; background:rgba(6,8,16,0.6);
       align-items:flex-end; justify-content:center;
@@ -2623,7 +2636,11 @@
     <div class="bccModalBox">
       <div class="bccModalHead"><h3 id="bccProductModalTitle">➕ Add Product</h3><button class="bccModalClose" id="bccProductModalClose">✕</button></div>
       <div class="bccModalBody">
-        <label>📝 Product Name</label><input id="bccPName" placeholder="যেমন: Samsung A32 Display">
+        <label>📝 Product Name</label>
+        <div class="bccPNameWrap">
+          <input id="bccPName" placeholder="যেমন: Samsung A32 Display" autocomplete="off">
+          <div class="bccPNameResults" id="bccPNameResults"></div>
+        </div>
         <label>🔤 Product Number / Code (Optional)</label><input id="bccPCode" placeholder="যেমন: F-1001">
         <label>🏷️ Category (Optional)</label><select id="bccPCat"></select>
         <p class="pin-desc" style="margin:2px 0 10px;">ক্যাটাগরি সিলেক্ট করা বাধ্যতামূলক (এটাই Invoice-এ Brand হিসেবে দেখানো হয়)।</p>
@@ -2648,7 +2665,11 @@
     <div class="bccModalBox">
       <div class="bccModalHead"><h3>⚡ Quick Add Product</h3><button class="bccModalClose" id="bccQuickModalClose">✕</button></div>
       <div class="bccModalBody">
-        <label>📝 Product Name</label><input id="bccQName" placeholder="প্রোডাক্টের নাম">
+        <label>📝 Product Name</label>
+        <div class="bccPNameWrap">
+          <input id="bccQName" placeholder="প্রোডাক্টের নাম" autocomplete="off">
+          <div class="bccPNameResults" id="bccQNameResults"></div>
+        </div>
         <label>🔤 Product Code (Optional)</label><input id="bccQCode" placeholder="কোড (না দিলেও চলবে)">
         <label>🏷️ Category (Optional)</label><select id="bccQCat"></select>
         <label>📂 Sub-Category (Optional)</label><select id="bccQSub"></select>
@@ -5506,6 +5527,7 @@ function bccOpenProductModal(editId){
   document.getElementById('bccPNote').value = p ? (p.note||'') : '';
   document.getElementById('bccPImage').value = '';
   bccPendingImage = p ? (p.image||'') : '';
+  document.getElementById('bccPNameResults').classList.remove('show');
   document.getElementById('bccProductModalOverlay').classList.add('show');
 }
 document.getElementById('bccAddProductBtn').addEventListener('click', ()=> bccOpenProductModal(null));
@@ -5520,6 +5542,58 @@ document.getElementById('bccPImage').addEventListener('change', (e)=>{
   reader.onload = ()=>{ bccPendingImage = reader.result; };
   reader.readAsDataURL(file);
 });
+
+// প্রোডাক্টের নাম লেখার সময় আগে থেকে থাকা মিলে-যাওয়া প্রোডাক্টগুলো সাজেশন হিসেবে
+// দেখানো হয় (যেমন "i" লিখলে iPhone সিরিজের সব প্রোডাক্ট দেখাবে) — যাতে ডুপ্লিকেট
+// প্রোডাক্ট তৈরি না করে সহজে বোঝা যায় এই প্রোডাক্ট আগে থেকে আছে কিনা।
+function setupProductNameSuggest(inputId, resultsId, excludeIdFn){
+  const inputEl = document.getElementById(inputId);
+  const resultsEl = document.getElementById(resultsId);
+  if(!inputEl || !resultsEl) return;
+
+  function render(query){
+    const q = query.trim().toLowerCase();
+    if(!q){ resultsEl.classList.remove('show'); resultsEl.innerHTML=''; return; }
+    const excludeId = excludeIdFn ? excludeIdFn() : null;
+    const matches = bccLoadProducts()
+      .filter(p => p.id !== excludeId && (p.name||'').toLowerCase().includes(q))
+      .slice(0, 8);
+    if(!matches.length){
+      resultsEl.innerHTML = '<div class="pnr-empty">এই নামে কোনো প্রোডাক্ট নেই — নতুন হিসেবে যোগ হবে</div>';
+      resultsEl.classList.add('show');
+      return;
+    }
+    resultsEl.innerHTML = matches.map(p=>`
+      <div class="pnr-item" data-id="${p.id}">
+        <div class="pnr-name">${escapeHtml(p.name)}</div>
+        <div class="pnr-meta">বর্তমান স্টক: ${p.qty||0} পিস${p.code ? ' · কোড: '+escapeHtml(p.code) : ''}</div>
+      </div>
+    `).join('');
+    resultsEl.classList.add('show');
+  }
+
+  inputEl.addEventListener('input', ()=> render(inputEl.value));
+  inputEl.addEventListener('focus', ()=>{ if(inputEl.value.trim()) render(inputEl.value); });
+
+  resultsEl.addEventListener('click', (ev)=>{
+    const item = ev.target.closest('.pnr-item');
+    if(!item || !item.dataset.id) return;
+    const prod = bccLoadProducts().find(p=>p.id===item.dataset.id);
+    if(!prod) return;
+    inputEl.value = prod.name;
+    resultsEl.classList.remove('show');
+    resultsEl.innerHTML = '';
+    inputEl.dispatchEvent(new Event('change'));
+  });
+
+  document.addEventListener('click', (ev)=>{
+    if(!inputEl.contains(ev.target) && !resultsEl.contains(ev.target)){
+      resultsEl.classList.remove('show');
+    }
+  });
+}
+setupProductNameSuggest('bccPName', 'bccPNameResults', ()=> bccEditingProductId);
+setupProductNameSuggest('bccQName', 'bccQNameResults', ()=> null);
 document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
   const name = document.getElementById('bccPName').value.trim();
   if(!name){ toast('প্রোডাক্টের নাম দিন'); return; }
@@ -5599,6 +5673,7 @@ document.getElementById('bccQuickAddBtn').addEventListener('click', ()=>{
   document.getElementById('bccQBuy').value='';
   document.getElementById('bccQSell').value='';
   document.getElementById('bccQQty').value='';
+  document.getElementById('bccQNameResults').classList.remove('show');
   document.getElementById('bccQuickModalOverlay').classList.add('show');
 });
 document.getElementById('bccQuickModalClose').addEventListener('click', ()=> document.getElementById('bccQuickModalOverlay').classList.remove('show'));
