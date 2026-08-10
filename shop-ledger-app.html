@@ -1491,6 +1491,40 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="multiEditModal">
+  <div class="modal-box" style="max-width:420px; text-align:left; max-height:85vh; overflow-y:auto;">
+    <h3>✏️ বিল ঠিক করুন (<span id="meItemCount">0</span>টি আইটেম)</h3>
+    <div class="row">
+      <div>
+        <label>কাস্টমারের নাম</label>
+        <input id="meName" type="text">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>মোবাইল নাম্বার</label>
+        <input id="mePhone" type="text">
+      </div>
+    </div>
+    <div id="meItemsArea"></div>
+    <div class="modal-actions">
+      <button class="mini-btn" id="meCancel">বাতিল</button>
+      <button class="btn" id="meSave" style="margin-top:0;">সেভ করুন</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteItemPickerModal">
+  <div class="modal-box" style="max-width:380px; text-align:left;">
+    <h3>🗑️ কোন আইটেম মুছবেন?</h3>
+    <p class="pin-desc" style="margin:0 0 12px;">বিলে <span id="dipItemCount">0</span>টি আইটেম আছে — যেটা মুছতে চান তার পাশের বাটনে চাপুন।</p>
+    <div id="dipItemsArea"></div>
+    <div class="modal-actions">
+      <button class="mini-btn" id="dipCloseBtn" style="flex:1;">বন্ধ করুন</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="custEditModal">
   <div class="modal-box" style="max-width:360px; text-align:left;">
     <h3>👤 কাস্টমার ঠিক করুন</h3>
@@ -8076,6 +8110,158 @@ document.getElementById('editSave').addEventListener('click', async ()=>{
   toast('হিসাব ঠিক করা হয়েছে');
 });
 
+/* ==================== একই বিলের একাধিক আইটেম — গ্রুপ করে দেখানো ====================
+   একই বিলের (billId) সব আইটেম আগে আলাদা আলাদা কার্ডে দেখাতো, এখন একটামাত্র কার্ডে
+   একসাথে দেখায় — এবং এই ৩টা ফাংশন সেই গ্রুপ করা বিলের জন্য এডিট/মুছুন/জমা-চিহ্নিত
+   করার কাজ করে। */
+let meEditingKey = null;
+function openMultiEditModal(billKey){
+  const items = retailEntries.filter(e => (e.billId||e.id) === billKey);
+  if(!items.length) return;
+  meEditingKey = billKey;
+  document.getElementById('meItemCount').textContent = items.length;
+  document.getElementById('meName').value = items[0].name || '';
+  document.getElementById('mePhone').value = items[0].phone || '';
+  document.getElementById('meItemsArea').innerHTML = items.map((e,idx)=>`
+    <div style="border-top:1px dashed var(--line); padding-top:10px; margin-top:10px;">
+      <label>আইটেম ${idx+1} — মালামালের নাম</label>
+      <input class="meItemInput" data-id="${e.id}" data-field="item" type="text" value="${escapeHtml(e.item||'')}">
+    </div>
+    <div class="row">
+      <div>
+        <label>পরিমাণ</label>
+        <input class="meItemInput" data-id="${e.id}" data-field="qty" type="number" inputmode="numeric" min="1" step="1" value="${e.qty||1}">
+      </div>
+      <div>
+        <label>মোট কেনা দাম (SAR)</label>
+        <input class="meItemInput" data-id="${e.id}" data-field="cost" type="number" inputmode="numeric" value="${e.cost||0}">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>মোট বিক্রি দাম (SAR)</label>
+        <input class="meItemInput" data-id="${e.id}" data-field="price" type="number" inputmode="numeric" value="${e.price||0}">
+      </div>
+      <div>
+        <label>জমা (SAR)</label>
+        <input class="meItemInput" data-id="${e.id}" data-field="paid" type="number" inputmode="numeric" value="${e.paid||0}">
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('multiEditModal').classList.add('show');
+}
+document.getElementById('meCancel').addEventListener('click', ()=>{
+  document.getElementById('multiEditModal').classList.remove('show');
+  meEditingKey = null;
+});
+document.getElementById('meSave').addEventListener('click', async ()=>{
+  if(!meEditingKey) return;
+  const name = document.getElementById('meName').value.trim();
+  const phone = document.getElementById('mePhone').value.trim();
+  if(!name){ toast('কাস্টমারের নাম দিতে হবে'); return; }
+
+  const items = retailEntries.filter(e => (e.billId||e.id) === meEditingKey);
+  const inputs = document.querySelectorAll('#meItemsArea .meItemInput');
+  const byId = {};
+  inputs.forEach(inp=>{
+    const id = inp.dataset.id;
+    if(!byId[id]) byId[id] = {};
+    byId[id][inp.dataset.field] = inp.value;
+  });
+
+  for(const id in byId){
+    const e = items.find(x=>x.id===id);
+    if(!e) continue;
+    const item = (byId[id].item||'').trim();
+    if(!item){ toast('প্রতিটা আইটেমের নাম দিতে হবে'); return; }
+    const qtyRaw = parseInt(byId[id].qty, 10);
+    e.item = item;
+    e.qty = (!qtyRaw || qtyRaw < 1) ? 1 : qtyRaw;
+    e.cost = Number(byId[id].cost)||0;
+    e.price = Number(byId[id].price)||0;
+    e.paid = Number(byId[id].paid)||0;
+    e.name = name;
+    e.phone = phone;
+  }
+
+  if(!shopCustomers.some(c => (phone && c.phone === phone) || (!phone && c.name === name))) {
+    shopCustomers.push({name, phone});
+  }
+  restoreCustomerKey(custKey(name, phone));
+
+  await persistData();
+  document.getElementById('multiEditModal').classList.remove('show');
+  meEditingKey = null;
+  render();
+  toast('বিল ঠিক করা হয়েছে');
+});
+
+function renderDeleteItemPicker(billKey){
+  const items = retailEntries.filter(e => (e.billId||e.id) === billKey);
+  if(!items.length){
+    document.getElementById('deleteItemPickerModal').classList.remove('show');
+    return;
+  }
+  document.getElementById('dipItemCount').textContent = items.length;
+  document.getElementById('dipItemsArea').innerHTML = items.map(e=>`
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--line);">
+      <div>
+        <div style="font-weight:700; font-size:13.5px;">${escapeHtml(e.item)}</div>
+        <div style="font-size:11.5px; color:#8a7f6c;">${e.qty||1} pcs — ${fmt(e.price)}</div>
+      </div>
+      <button class="mini-btn danger" onclick="deleteItemFromPicker('${e.id}','${billKey}')">মুছুন</button>
+    </div>
+  `).join('');
+}
+function openDeleteItemPicker(billKey){
+  renderDeleteItemPicker(billKey);
+  document.getElementById('deleteItemPickerModal').classList.add('show');
+}
+async function deleteItemFromPicker(id, billKey){
+  await deleteEntry(id);
+  if(!retailEntries.find(x=>x.id===id)){
+    renderDeleteItemPicker(billKey);
+  }
+}
+document.getElementById('dipCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('deleteItemPickerModal').classList.remove('show');
+});
+
+async function markPaidBill(billKey){
+  const entered = await openPinModal('পাসওয়ার্ড দিন', 'পুরো বিলটি সম্পূর্ণ জমা হিসেবে চিহ্নিত করার জন্য পাসওয়ার্ড দিন।');
+  if(entered === null) return;
+  if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, জমা হিসেবে চিহ্নিত হয়নি'); return; }
+
+  const items = retailEntries.filter(e => (e.billId||e.id) === billKey);
+  let collected = 0, custName = '';
+  items.forEach(e=>{
+    const due = Math.max((e.price||0)-(e.paid||0),0);
+    if(due>0) collected += due;
+    e.paid = e.price;
+    custName = e.name;
+  });
+  if(collected > 0) bccLogDueCollection(custName, collected);
+  await persistData();
+  render();
+  toast('পুরো বিল সম্পূর্ণ জমা হিসেবে চিহ্নিত করা হয়েছে');
+}
+
+function handleWaMiniClickBill(billKey){
+  const items = retailEntries.filter(e => (e.billId||e.id) === billKey);
+  if(!items.length || !items[0].phone) return;
+  const first = items[0];
+  const currentDue = getCustomerTotalDue(first.name, first.phone);
+  const digits = first.phone.replace(/\D/g,'');
+  const totalPrice = items.reduce((s,e)=>s+(e.price||0),0);
+  const totalPaid = items.reduce((s,e)=>s+(e.paid||0),0);
+  const itemLines = items.map(e=>{
+    const qtyLine = e.qty && e.qty>1 ? ` (${e.qty} pcs x SAR ${getUnitPrice(e)}/pc)` : '';
+    return `- ${e.item}${qtyLine}: SAR ${e.price}`;
+  }).join('\n');
+  const text = `Dear ${first.name},\nYour statement summary:\n${itemLines}\nTotal Price: SAR ${totalPrice}\nReceived: SAR ${totalPaid}\nTotal Due Balance: SAR ${currentDue}`;
+  window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, '_blank');
+}
+
 const shareModal = document.getElementById('shareModal');
 function openShareModal(name, phone, message){
   document.getElementById('shareMsgPreview').textContent = message;
@@ -8274,10 +8460,33 @@ function render(showSecureInfo = false){
     <div class="dash-stat-card c2"><span class="ic">🔁</span><div class="lbl">কতবার সেল হয়েছে</div><div class="val">${todaySaleCount}</div></div>
   </div>`;
 
-  document.getElementById('entryList').innerHTML = filtered.length ? filtered.map(e=>{
-    const due = Math.max((e.price||0)-(e.paid||0),0);
-    const qtyLine = e.qty && e.qty>1 ? ` — ${e.qty} pcs × ${fmt(getUnitPrice(e))} = ${fmt(e.price)}` : '';
-    return `<div class="entry ${e.status==='ফেরত'?'ret':e.status==='বদলি'?'exc':e.status==='বাকি'?'due-s':e.status==='নগদ-বিক্রি'?'cash-sale':'cash-s'}"><div class="entry-top"><div><div class="who">${e.invoiceNo?`<span style="color:#8a7f6c; font-weight:700; font-size:11.5px; font-family:'Space Mono',monospace;">#${escapeHtml(e.invoiceNo.replace('INV-',''))}</span> `:''}${escapeHtml(e.name)}</div><div class="item">${escapeHtml(e.item)}${qtyLine}${e.phone?' · '+escapeHtml(e.phone):''}</div></div><span class="badge">${e.status}</span></div><div class="entry-nums"><span><b>দাম</b>${fmt(e.price)}</span><span class="paid-amt"><b>জমা</b>${fmt(e.paid)}</span><span class="due-amt"><b>বাকি</b>${fmt(due)}</span></div><div class="entry-actions">${due>0?`<button class="mini-btn pay" onclick="markPaid('${e.id}')">সম্পূর্ণ জমা</button>`:''}${e.phone?`<button class="mini-btn wa-mini" onclick="handleWaMiniClick('${e.id}')">💬 WhatsApp</button>`:''}<button class="mini-btn" onclick="openEditModal('${e.id}')">✏️ ঠিক করুন</button><button class="mini-btn danger" onclick="deleteEntry('${e.id}')">মুছুন</button></div></div>`;
+  // একই বিলের (billId) সব আইটেমকে একটামাত্র কার্ডে গ্রুপ করে দেখানো হচ্ছে —
+  // filtered-এর ক্রম অনুযায়ীই গ্রুপগুলো সাজানো হয়, তাই আগের (নতুন-থেকে-পুরনো) সর্ট বজায় থাকে।
+  const billGroups = {};
+  const billOrder = [];
+  filtered.forEach(e=>{
+    const key = e.billId || e.id;
+    if(!billGroups[key]){ billGroups[key] = []; billOrder.push(key); }
+    billGroups[key].push(e);
+  });
+
+  document.getElementById('entryList').innerHTML = billOrder.length ? billOrder.map(key=>{
+    const items = billGroups[key];
+    const first = items[0];
+    const multi = items.length > 1;
+    const totalPrice = items.reduce((s,e)=>s+(e.price||0),0);
+    const totalPaid = items.reduce((s,e)=>s+(e.paid||0),0);
+    const totalDue = Math.max(totalPrice - totalPaid, 0);
+    const statusClass = first.status==='ফেরত'?'ret':first.status==='বদলি'?'exc':first.status==='বাকি'?'due-s':first.status==='নগদ-বিক্রি'?'cash-sale':'cash-s';
+    const itemsHtml = items.map(e=>{
+      const qtyLine = e.qty && e.qty>1 ? ` — ${e.qty} pcs × ${fmt(getUnitPrice(e))} = ${fmt(e.price)}` : ` — ${fmt(e.price)}`;
+      return `<div>${escapeHtml(e.item)}${qtyLine}</div>`;
+    }).join('');
+    const editAction = multi ? `openMultiEditModal('${key}')` : `openEditModal('${first.id}')`;
+    const deleteAction = multi ? `openDeleteItemPicker('${key}')` : `deleteEntry('${first.id}')`;
+    const waAction = multi ? `handleWaMiniClickBill('${key}')` : `handleWaMiniClick('${first.id}')`;
+    const payAction = multi ? `markPaidBill('${key}')` : `markPaid('${first.id}')`;
+    return `<div class="entry ${statusClass}"><div class="entry-top"><div><div class="who">${first.invoiceNo?`<span style="color:#8a7f6c; font-weight:700; font-size:11.5px; font-family:'Space Mono',monospace;">#${escapeHtml(first.invoiceNo.replace('INV-',''))}</span> `:''}${escapeHtml(first.name)}</div><div class="item">${itemsHtml}${first.phone?`<div>${escapeHtml(first.phone)}</div>`:''}</div></div><span class="badge">${first.status}</span></div><div class="entry-nums"><span><b>দাম</b>${fmt(totalPrice)}</span><span class="paid-amt"><b>জমা</b>${fmt(totalPaid)}</span><span class="due-amt"><b>বাকি</b>${fmt(totalDue)}</span></div><div class="entry-actions">${totalDue>0?`<button class="mini-btn pay" onclick="${payAction}">সম্পূর্ণ জমা</button>`:''}${first.phone?`<button class="mini-btn wa-mini" onclick="${waAction}">💬 WhatsApp</button>`:''}<button class="mini-btn" onclick="${editAction}">✏️ ঠিক করুন</button><button class="mini-btn danger" onclick="${deleteAction}">মুছুন</button></div></div>`;
   }).join('') : '<div class="empty">কোনো হিসাব নেই।</div>';
 
   const dueIcon = document.getElementById('dueHeaderIcon');
