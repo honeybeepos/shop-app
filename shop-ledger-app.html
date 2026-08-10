@@ -1045,6 +1045,7 @@
       <div id="printArea">
         <div class="stmt-head">
           <h3 id="stmtShopName">📱 হিসাব খাতা প্রো</h3>
+          <div id="stmtShopSubtitle" style="font-size:12px; color:#8b7f6c; margin:-6px 0 6px;"></div>
           <div id="stmtCust"></div>
           <div class="stmt-date" id="stmtDate"></div>
         </div>
@@ -8331,6 +8332,14 @@ document.getElementById('showStatementBtn').addEventListener('click', ()=>{
 
 function renderStatement(name, list){
   const phone = list[0].phone || '';
+  // দোকানের নাম/সাব-টাইটেল সেটিং থেকে যা লেখা আছে সেটাই এখানে দেখানো হচ্ছে — আগে এই
+  // জায়গাটা সবসময় হার্ডকোড করা "হিসাব খাতা প্রো" দেখাতো, দোকানের আসল নাম বসতো না।
+  const shopNameEl = document.getElementById('shopTitle');
+  const shopSubtitleEl2 = document.getElementById('shopSubtitle');
+  const shopName = (shopNameEl && shopNameEl.textContent.trim()) || 'Mumen Electronics';
+  const shopSubtitle = (shopSubtitleEl2 && shopSubtitleEl2.textContent.trim()) || '';
+  document.getElementById('stmtShopName').textContent = '📱 ' + shopName;
+  document.getElementById('stmtShopSubtitle').textContent = shopSubtitle;
   document.getElementById('stmtCust').textContent = 'Customer: ' + name + (phone ? ' · ' + phone : '');
   document.getElementById('stmtDate').textContent = 'Date: ' + new Date().toLocaleDateString('bn-BD', {day:'numeric', month:'long', year:'numeric'});
   let totalPrice=0, totalPaid=0, totalDue=0;
