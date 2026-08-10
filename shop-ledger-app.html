@@ -6093,10 +6093,17 @@ function applyQsFieldConfig(){
   if(!cfg.cust){
     document.getElementById('qsCustResults').style.display = 'none';
     document.getElementById('qsSelectedCustTag').style.display = 'none';
-    qsCustPicker.reset();
+    // qsCustPicker (নিচে, অনেক পরে ডিক্লেয়ার হয়) রেডি থাকলেই কেবল reset() কল করা হচ্ছে —
+    // qsPickerReady ফ্ল্যাগটা qsCustPicker তৈরি হওয়ার পরই true হয় (নিচে দেখুন)। আগে এখানে
+    // সরাসরি qsCustPicker.reset() কল করা হতো, কিন্তু এই ফাংশনটা পেজ লোডের শুরুতেই একবার
+    // সিঙ্ক্রোনাসভাবে কল হয় — তখন qsCustPicker এখনও ডিক্লেয়ারই হয়নি (const, temporal
+    // dead zone), তাই সরাসরি রেফারেন্স করলে পুরো স্ক্রিপ্ট ক্র্যাশ করে যেত এবং লগইনই আর
+    // কখনো শেষ হতো না ("যাচাই করা হচ্ছে..." স্ক্রিনে চিরকাল আটকে থাকতো)।
+    if(qsPickerReady) qsCustPicker.reset();
   }
   document.getElementById('qsCostField').style.display = cfg.cost ? '' : 'none';
 }
+var qsPickerReady = false;
 applyQsFieldConfig();
 
 // কাস্টমার সার্চ বন্ধ করলে "বাকি অপশন" চেকবক্সটাও সাথে সাথে বন্ধ ও নিষ্ক্রিয় করে দেওয়া
@@ -6531,6 +6538,10 @@ function setupCustPicker(searchId, resultsId, tagId){
 
 const qsCustPicker = setupCustPicker('qsCustSearch', 'qsCustResults', 'qsSelectedCustTag');
 const esCustPicker = setupCustPicker('esCustSearch', 'esCustResults', 'esSelectedCustTag');
+// qsCustPicker এখন রেডি — এই মুহূর্তে আবার applyQsFieldConfig() কল করা হচ্ছে, যাতে
+// "কাস্টমার সার্চ বন্ধ" সেটিং থাকলে qsCustPicker.reset()-ও ঠিকভাবে চলে (উপরের কমেন্ট দেখুন)।
+qsPickerReady = true;
+applyQsFieldConfig();
 
 const fieldBlocks = {
   'বাকি': document.getElementById('fieldsCredit'),
