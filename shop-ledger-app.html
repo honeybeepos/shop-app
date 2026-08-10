@@ -3223,7 +3223,18 @@ async function persistData(){
   stripTombstonedData();
   localStorage.setItem('phone-shop-customers', JSON.stringify(shopCustomers));
   localStorage.setItem('phone-shop-entries', JSON.stringify(retailEntries));
-  await confirmCloudSave();
+  // ক্লাউড সিঙ্ক (confirmCloudSave) নেটওয়ার্ক-নির্ভর — মাঝে মাঝে ব্যর্থ/থ্রো করতে পারে।
+  // আগে এটা try-catch ছাড়া await করা হতো, তাই ক্লাউড সিঙ্ক ব্যর্থ হলে পুরো ফাংশনটাই
+  // এক্সসেপশন থ্রো করে থেমে যেত — এর মানে যেই কোড persistData()-কে await করছিল (যেমন
+  // "সহজ বিক্রি"-এর পর render() কল করা), সেই পরের কোডটাই আর চলতো না। ফলে সেল ও লোকাল
+  // ডেটা (localStorage-এ, উপরেই সেভ হয়ে গেছে) ঠিকই সেভ হতো, কিন্তু স্ক্রিনটা রিফ্রেশ
+  // না হওয়ায় মনে হতো "সেল হচ্ছে কিন্তু হিসাবে যোগ হচ্ছে না"। এখন ক্লাউড সিঙ্ক ব্যর্থ
+  // হলেও লোকাল ডেটা সেভ থাকবে এবং পরের কোড (render() ইত্যাদি) স্বাভাবিকভাবে চলবে।
+  try{
+    await confirmCloudSave();
+  }catch(e){
+    console.error('Cloud save failed, but local data is safe:', e);
+  }
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -7743,27 +7754,38 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
   const newEntries = billItems.map(it => ({
     id: genLineId(), name:custName, item: it.item, productId: it.productId || '', phone:custPhone, cost: it.cost, price: it.price, paid: qsType==='বাকি' ? 0 : it.price, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, paymentMethod, note:'', status:qsType, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName()
   }));
-  retailEntries.unshift(...newEntries);
-  bccAdjustStockForSale(qsCart);
 
-  const itemCount = qsCart.length;
-  qsCart = [];
-  renderQsCart();
-  resetLineFields('qsItem','qsQty','qsCost','qsPrice','qsTotalPreview');
-  qsCustPicker.reset();
-  document.querySelector('#qsTypeGroup .status-chip[data-s="নগদ-বিক্রি"]').click();
+  try{
+    retailEntries.unshift(...newEntries);
+    bccAdjustStockForSale(qsCart);
 
-  await persistData();
-  render();
-  toast(`কুইক সেল সেভ হয়েছে (${itemCount}টি আইটেম)${qsType==='বাকি' ? ' — বাকি হিসেবে যোগ হয়েছে' : ''}`);
+    const itemCount = qsCart.length;
+    qsCart = [];
+    renderQsCart();
+    resetLineFields('qsItem','qsQty','qsCost','qsPrice','qsTotalPreview');
+    qsCustPicker.reset();
+    document.querySelector('#qsTypeGroup .status-chip[data-s="নগদ-বিক্রি"]').click();
 
-  // SALES INVOICE বানিয়ে Print/SMS/WhatsApp/Download-এর জন্য শেয়ার-মোডাল দেখানো
-  const isCleared = qsCust ? isCustomerFullyPaid(custName, custPhone) : true;
-  const currentDue = isCleared ? 0 : getCustomerTotalDue(custName, custPhone);
-  const previousDue = qsCust ? getCustomerTotalDue(custName, custPhone) : 0;
-  const previousDueItems = qsCust ? getCustomerDueItems(custName, custPhone) : [];
-  const msg = buildSalesInvoiceMessage({name: custName, phone: custPhone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared, invoiceNo, saleTime});
-  openShareModal(custName, custPhone, msg);
+    await persistData();
+    render();
+    toast(`কুইক সেল সেভ হয়েছে (${itemCount}টি আইটেম)${qsType==='বাকি' ? ' — বাকি হিসেবে যোগ হয়েছে' : ''}`);
+
+    // SALES INVOICE বানিয়ে Print/SMS/WhatsApp/Download-এর জন্য শেয়ার-মোডাল দেখানো
+    const isCleared = qsCust ? isCustomerFullyPaid(custName, custPhone) : true;
+    const currentDue = isCleared ? 0 : getCustomerTotalDue(custName, custPhone);
+    const previousDue = qsCust ? getCustomerTotalDue(custName, custPhone) : 0;
+    const previousDueItems = qsCust ? getCustomerDueItems(custName, custPhone) : [];
+    const msg = buildSalesInvoiceMessage({name: custName, phone: custPhone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared, invoiceNo, saleTime});
+    openShareModal(custName, custPhone, msg);
+  }catch(err){
+    // আগে এখানে কোনো try-catch ছিল না — মাঝপথে কোনো অপ্রত্যাশিত এরর হলে (যেমন ক্লাউড
+    // সিঙ্ক ব্যর্থ হওয়া) পুরো ফাংশনটা নিঃশব্দে থেমে যেত, ইউজার কোনো এরর মেসেজ দেখতো না,
+    // মনে হতো সেল হয়ে গেছে অথচ স্ক্রিন রিফ্রেশ/আপডেট হতো না। এখন এমন হলে সেল এন্ট্রি
+    // ইতিমধ্যে যোগ হয়ে থাকলে সেটা রিফ্রেশ করে দেখানো হচ্ছে এবং ইউজারকে জানানো হচ্ছে।
+    console.error('Quick sale error:', err);
+    try{ render(); }catch(e2){}
+    toast('⚠️ একটা সমস্যা হয়েছিল, তবে সেল সেভ হয়ে থাকতে পারে — "সব হিসাব" ট্যাবে চেক করে দেখুন');
+  }
 });
 
 document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
