@@ -2839,14 +2839,19 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// নিরাপত্তার জন্য একটা "সেফটি-নেট" — কোনো কারণে (নেটওয়ার্ক আটকে যাওয়া, অপ্রত্যাশিত এরর ইত্যাদি)
-// লগইনের পুরো প্রসেসটাই যদি কখনো আটকে যায়, তাহলে ২০ সেকেন্ড পর "যাচাই করা হচ্ছে..." স্ক্রিনটা
-// জোর করে সরিয়ে দেওয়া হবে, যাতে ইউজার চিরদিনের জন্য আটকে না থাকে (ডেটা ক্লিয়ার করার দরকার না হয়)।
+// নিরাপত্তার জন্য একটা "সেফটি-নেট" — কোনো কারণে লগইনের প্রসেসটা আটকে গেলে ২০ সেকেন্ড পর
+// ইউজারকে চিরদিনের জন্য "যাচাই করা হচ্ছে..." স্ক্রিনে আটকে না রেখে রিলোড করার সুযোগ দেওয়া হয়।
+// আগে এটা সরাসরি স্ক্রিনটা লুকিয়ে দিত, কিন্তু তাতে দোকানের নাম/সাব-ইউজার বাটনের মতো যেসব
+// জিনিস auth কলব্যাকের ভেতরে সেট হয় সেগুলো তখনও খালি থেকে যেত (কলব্যাকটা তখনও শেষ হয়নি,
+// শুধু লোডিং স্ক্রিনটা জোর করে সরানো হয়েছিল) — তাই এখন স্ক্রিন লুকানোর বদলে রিলোড করার
+// অপশন দেখানো হচ্ছে, যাতে অসম্পূর্ণ অবস্থায় অ্যাপ দেখা না যায়।
 setTimeout(()=>{
   const gate = document.getElementById('authGate');
   if(gate && gate.style.display !== 'none'){
-    console.warn('authGate safety-net timeout fired — force hiding');
-    gate.style.display = 'none';
+    console.warn('authGate safety-net timeout fired — showing retry option');
+    gate.innerHTML = '<p>নেটওয়ার্ক সমস্যা হচ্ছে, লোড হতে বেশি সময় লাগছে।</p>' +
+      '<button id="authGateRetryBtn" style="margin-top:6px; padding:10px 22px; border:none; border-radius:9px; background:#1f4a48; color:#fff; font-weight:700; font-family:inherit; font-size:14px; cursor:pointer;">🔄 আবার চেষ্টা করুন</button>';
+    document.getElementById('authGateRetryBtn').addEventListener('click', ()=> window.location.reload());
   }
 }, 20000);
 
