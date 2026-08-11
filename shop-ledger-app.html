@@ -7603,8 +7603,19 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
   const qsCust = qsCustPicker.getSelected();
   if(qsType === 'বাকি' && !qsCust){ toast('বাকি দিতে হলে আগে পুরাতন কাস্টমার সিলেক্ট করুন'); return; }
 
-  const custName = qsCust ? qsCust.name : 'ওয়াক-ইন কাস্টমার';
+  // আগে কাস্টমার সার্চ বক্সে টাইপ করা নাম যদি বিদ্যমান কোনো কাস্টমারের সাথে না মিলতো
+  // (নতুন কাস্টমার), তাহলে সেটা সিলেক্টই হতো না এবং সাইলেন্টলি বাদ পড়ে যেত — সেল
+  // "ওয়াক-ইন কাস্টমার" নামে সেভ হয়ে যেত, টাইপ করা নামটা হারিয়ে যেত। এখন লিস্ট থেকে
+  // সিলেক্ট না করলেও, বক্সে টাইপ করা নাম থাকলে সেটাই নতুন কাস্টমারের নাম হিসেবে ব্যবহার
+  // করা হচ্ছে।
+  const qsTypedName = document.getElementById('qsCustSearch').value.trim();
+  const custName = qsCust ? qsCust.name : (qsTypedName || 'ওয়াক-ইন কাস্টমার');
   const custPhone = qsCust ? qsCust.phone : '';
+  // নতুন টাইপ করা নাম হলে (তালিকা থেকে সিলেক্ট করা না হলে) সেটা shopCustomers-এ যোগ করে
+  // রাখা হচ্ছে, যাতে পরের বার এই নামে সার্চ করলে সাজেশনে চলে আসে।
+  if(!qsCust && qsTypedName && !shopCustomers.some(c => c.name === qsTypedName)){
+    shopCustomers.push({name: qsTypedName, phone: ''});
+  }
   const billTotalPrice = qsCart.reduce((s,it)=>s+it.price,0);
 
   // নগদ বিক্রির সময় গ্রাহক কত টাকা দিলো এবং ফেরত (এক্সচেঞ্জ) কত দিতে হবে সেটা হিসাব করে দেখানো
@@ -7690,8 +7701,14 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
   if(esType === 'বাকি' && !esCust){ toast('বাকি দিতে হলে আগে পুরাতন কাস্টমার সিলেক্ট করুন'); return; }
 
   const isDue = esType === 'বাকি';
-  const esName = esCust ? esCust.name : 'ওয়াক-ইন কাস্টমার';
+  // কুইক সেলের মতো এখানেও তালিকা থেকে সিলেক্ট না করে টাইপ করা নাম আগে হারিয়ে যেত —
+  // এখন টাইপ করা নাম থাকলে সেটাই নতুন কাস্টমারের নাম হিসেবে ব্যবহার করা হচ্ছে।
+  const esTypedName = document.getElementById('esCustSearch').value.trim();
+  const esName = esCust ? esCust.name : (esTypedName || 'ওয়াক-ইন কাস্টমার');
   const esPhone = esCust ? esCust.phone : '';
+  if(!esCust && esTypedName && !shopCustomers.some(c => c.name === esTypedName)){
+    shopCustomers.push({name: esTypedName, phone: ''});
+  }
   const previousDue = esCust ? getCustomerTotalDue(esName, esPhone) : 0;
   const previousDueItems = esCust ? getCustomerDueItems(esName, esPhone) : [];
 
