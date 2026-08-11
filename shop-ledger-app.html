@@ -820,7 +820,6 @@
             <input type="checkbox" id="qsCfgDue" checked style="width:18px; height:18px; flex-shrink:0;">
             <span>বাকি অপশন</span>
           </label>
-          <p id="qsCfgDueNote" style="display:none; margin:-4px 0 8px; font-size:11.5px; color:var(--due, #b23b3b);">⚠️ "বাকি" সেলের জন্য কাস্টমার সিলেক্ট করা লাগে — তাই "নাম-নাম্বার দিয়ে কাস্টমার খুঁজুন" বন্ধ থাকলে এটা ব্যবহার করা যাবে না।</p>
           <label style="display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); cursor:pointer;">
             <input type="checkbox" id="qsCfgCust" checked style="width:18px; height:18px; flex-shrink:0;">
             <span>নাম-নাম্বার দিয়ে কাস্টমার খুঁজুন</span>
@@ -6089,16 +6088,15 @@ function applyQsFieldConfig(){
   const cashChip = document.querySelector('#qsTypeGroup .status-chip[data-s="নগদ-বিক্রি"]');
   const dueChip = document.querySelector('#qsTypeGroup .status-chip[data-s="বাকি"]');
 
-  // "বাকি" সেলের জন্য বাধ্যতামূলকভাবে একজন কাস্টমার সিলেক্ট থাকতে হয় — তাই কাস্টমার
-  // সার্চ ফিল্ড লুকানো থাকলে "বাকি" অপশনও লুকিয়ে/বন্ধ রাখা হচ্ছে, নাহলে কাস্টমার
-  // সিলেক্ট করারই কোনো উপায় না থাকায় "বাকি" সেল কখনোই কমপ্লিট করা যেত না।
-  const effectiveDue = cfg.due && cfg.cust;
-
+  // প্রতিটা অপশন সম্পূর্ণ স্বাধীন — একটা লুকানো থাকলে অন্যটার কাজে কোনো প্রভাব পড়বে না।
+  // শুধু চোখের সামনে থেকে লুকানো থাকবে, ভেতরের লজিক (সেল কমপ্লিট হওয়া) সবসময় স্বাভাবিকভাবে
+  // কাজ করবে — "বাকি" অপশন চালু রেখে কাস্টমার সার্চ লুকিয়ে রাখলেও বাকি সেল ঠিকমতো হবে
+  // (তখন এটা "ওয়াক-ইন কাস্টমার" নামে বাকি হিসেবে সেভ হবে, নিচে quickSellBtn দেখুন)।
   if(cashChip) cashChip.style.display = cfg.cash ? '' : 'none';
-  if(dueChip) dueChip.style.display = effectiveDue ? '' : 'none';
-  document.getElementById('qsTypeRow').style.display = (cfg.cash || effectiveDue) ? '' : 'none';
-  if(!cfg.cash && cashChip && cashChip.classList.contains('active') && dueChip && effectiveDue){ dueChip.click(); }
-  if(!effectiveDue && dueChip && dueChip.classList.contains('active') && cashChip){ cashChip.click(); }
+  if(dueChip) dueChip.style.display = cfg.due ? '' : 'none';
+  document.getElementById('qsTypeRow').style.display = (cfg.cash || cfg.due) ? '' : 'none';
+  if(!cfg.cash && cashChip && cashChip.classList.contains('active') && dueChip && cfg.due){ dueChip.click(); }
+  if(!cfg.due && dueChip && dueChip.classList.contains('active') && cashChip){ cashChip.click(); }
 
   document.getElementById('qsCustRow').style.display = cfg.cust ? '' : 'none';
   if(!cfg.cust){
@@ -6117,17 +6115,6 @@ function applyQsFieldConfig(){
 var qsPickerReady = false;
 applyQsFieldConfig();
 
-// কাস্টমার সার্চ বন্ধ করলে "বাকি অপশন" চেকবক্সটাও সাথে সাথে বন্ধ ও নিষ্ক্রিয় করে দেওয়া
-// হচ্ছে (সেটিং পপআপেই), যাতে ইউজার আগে থেকেই বুঝতে পারে এই দুইটা একসাথে যুক্ত।
-function syncQsDueCheckboxState(){
-  const custOn = document.getElementById('qsCfgCust').checked;
-  const dueBox = document.getElementById('qsCfgDue');
-  dueBox.disabled = !custOn;
-  if(!custOn) dueBox.checked = false;
-  document.getElementById('qsCfgDueNote').style.display = custOn ? 'none' : 'block';
-}
-document.getElementById('qsCfgCust').addEventListener('change', syncQsDueCheckboxState);
-
 quickModeChip.addEventListener('dblclick', (ev)=>{
   ev.preventDefault();
   const cfg = loadQsFieldConfig();
@@ -6135,7 +6122,6 @@ quickModeChip.addEventListener('dblclick', (ev)=>{
   document.getElementById('qsCfgDue').checked = cfg.due;
   document.getElementById('qsCfgCust').checked = cfg.cust;
   document.getElementById('qsCfgCost').checked = cfg.cost;
-  syncQsDueCheckboxState();
   document.getElementById('qsSettingsModalOverlay').classList.add('show');
 });
 document.getElementById('qsSettingsModalOverlay').addEventListener('click', (ev)=>{
@@ -6144,13 +6130,11 @@ document.getElementById('qsSettingsModalOverlay').addEventListener('click', (ev)
 document.getElementById('qsSettingsSaveBtn').addEventListener('click', ()=>{
   const cashOn = document.getElementById('qsCfgCash').checked;
   const dueOn = document.getElementById('qsCfgDue').checked;
-  const custOn = document.getElementById('qsCfgCust').checked;
-  const effectiveDue = dueOn && custOn;
-  if(!cashOn && !effectiveDue){ toast('নগদ বা বাকি — অন্তত একটা অপশন রাখতে হবে'); return; }
+  if(!cashOn && !dueOn){ toast('নগদ বা বাকি — অন্তত একটা অপশন রাখতে হবে'); return; }
   const cfg = {
     cash: cashOn,
     due: dueOn,
-    cust: custOn,
+    cust: document.getElementById('qsCfgCust').checked,
     cost: document.getElementById('qsCfgCost').checked
   };
   localStorage.setItem(qsFieldConfigKey(), JSON.stringify(cfg));
@@ -7715,7 +7699,12 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
 
   const qsType = document.querySelector('#qsTypeGroup .status-chip.active').dataset.s;
   const qsCust = qsCustPicker.getSelected();
-  if(qsType === 'বাকি' && !qsCust){ toast('বাকি দিতে হলে আগে পুরাতন কাস্টমার সিলেক্ট করুন'); return; }
+  // "কাস্টমার সার্চ" ফিল্ডটা সেটিং থেকে লুকিয়ে রাখা থাকলে কাস্টমার সিলেক্ট করারই কোনো
+  // উপায় থাকে না — সেক্ষেত্রে "বাকি" সেলে বাধ্য করে আটকানো হয় না, বরং ক্যাশ সেলের মতোই
+  // "ওয়াক-ইন কাস্টমার" নামে বাকি হিসেবে সেভ হয়ে যায়। কাস্টমার সার্চ ফিল্ড দেখা গেলে এবং
+  // তাও যদি কেউ সিলেক্ট না করে থাকে, তখনই শুধু আটকানো হয় (কারণ তখন সিলেক্ট করার সুযোগ ছিল)।
+  const qsCustFieldVisible = loadQsFieldConfig().cust;
+  if(qsType === 'বাকি' && !qsCust && qsCustFieldVisible){ toast('বাকি দিতে হলে আগে পুরাতন কাস্টমার সিলেক্ট করুন'); return; }
 
   const custName = qsCust ? qsCust.name : 'ওয়াক-ইন কাস্টমার';
   const custPhone = qsCust ? qsCust.phone : '';
