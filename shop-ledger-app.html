@@ -685,7 +685,7 @@
             <div class="status-chip active" data-m="new">➕ নতুন</div>
             <div class="status-chip" data-m="old">👤 পুরাতন</div>
             <div class="status-chip" data-m="addcust">🧑‍🤝‍🧑 কাস্টমার এড</div>
-            <div class="status-chip" data-m="quick" id="quickModeChipEl" title="সহজ বিক্রি — সেটিং-এর জন্য দুইবার ট্যাপ করুন">⚡ সহজ বিক্রি</div>
+            <div class="status-chip" data-m="quick">⚡ কুইক</div>
             <div class="status-chip" data-m="extrasale">🎁 এক্সট্রা সেল</div>
           </div>
         </div>
@@ -752,7 +752,9 @@
       </div>
 
       <div id="quickSellBlock" style="display:none;">
-        <div class="row" id="qsCustRow">
+        <p class="pin-desc">দ্রুত ক্যাশ বিক্রি — কাস্টমারের নাম-নাম্বার লাগবে না। একাধিক আইটেম হলে একটি একটি করে "তালিকায় যোগ করুন"।</p>
+
+        <div class="row">
           <div style="position:relative;">
             <label>কাস্টমার (ঐচ্ছিক — পুরাতন কাস্টমারকে বাকি দিতে চাইলে খুঁজে নিন)</label>
             <input id="qsCustSearch" type="text" placeholder="নাম বা নাম্বার লিখুন" autocomplete="off">
@@ -761,7 +763,7 @@
         <div id="qsCustResults"></div>
         <div id="qsSelectedCustTag" style="display:none;"></div>
 
-        <div class="row" id="qsTypeRow">
+        <div class="row">
           <div>
             <label>ধরন</label>
             <div class="status-group" id="qsTypeGroup">
@@ -785,7 +787,7 @@
           </div>
         </div>
         <div class="row">
-          <div id="qsCostField">
+          <div>
             <label>কেনা দাম (প্রতি পিস) (SAR)</label>
             <input id="qsCost" type="number" inputmode="numeric" placeholder="০">
           </div>
@@ -806,30 +808,6 @@
         </div>
 
         <button class="btn" id="quickSellBtn">⚡ সম্পূর্ণ হিসাব যোগ করুন</button>
-      </div>
-
-      <div class="modal-overlay" id="qsSettingsModalOverlay">
-        <div class="modal-box" style="max-width:340px; text-align:left;">
-          <h3 style="margin:0 0 4px;">⚡ সহজ বিক্রি সেটিং</h3>
-          <p class="pin-desc" style="margin:0 0 14px;">যেগুলো দরকার নেই সেগুলোর টিক তুলে দিন — সহজ বিক্রি স্ক্রিন থেকে লুকিয়ে যাবে।</p>
-          <label style="display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); cursor:pointer;">
-            <input type="checkbox" id="qsCfgCash" checked style="width:18px; height:18px; flex-shrink:0;">
-            <span>নগদ বিক্রি অপশন</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); cursor:pointer;">
-            <input type="checkbox" id="qsCfgDue" checked style="width:18px; height:18px; flex-shrink:0;">
-            <span>বাকি অপশন</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); cursor:pointer;">
-            <input type="checkbox" id="qsCfgCust" checked style="width:18px; height:18px; flex-shrink:0;">
-            <span>নাম-নাম্বার দিয়ে কাস্টমার খুঁজুন</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:10px; padding:11px 0; cursor:pointer;">
-            <input type="checkbox" id="qsCfgCost" checked style="width:18px; height:18px; flex-shrink:0;">
-            <span>কেনা দাম (Cost Price) ফিল্ড</span>
-          </label>
-          <button class="btn" id="qsSettingsSaveBtn" style="width:100%; margin-top:16px;">✓ সেভ করুন</button>
-        </div>
       </div>
 
       <div id="extraSaleBlock" style="display:none;">
@@ -6071,78 +6049,6 @@ quickModeChip.addEventListener('contextmenu', (ev)=> ev.preventDefault());
 
 document.getElementById('quickDashboardCloseBtn').addEventListener('click', ()=> quickDashboardScreen.classList.remove('show'));
 
-/* ⚡ "কুইক" চিপে দুইবার ট্যাপ (double-click) করলে একটা সেটিং পপআপ খুলবে —
-   এখানে টিক দিয়ে ঠিক করা যাবে সহজ বিক্রি স্ক্রিনে কোন কোন অপশনাল ফিল্ড
-   (নগদ, বাকি, কাস্টমার সার্চ, কেনা দাম) দেখাবে। টিক তোলা মানে ফিল্ডটা
-   লুকিয়ে যাবে, যাতে দ্রুত ক্যাশ সেল আরও সহজ হয়। প্রতিটা ইউজারের জন্য
-   আলাদাভাবে সেভ থাকে (localStorage-এ)। */
-function qsFieldConfigKey(){ return 'qs-field-config-' + qiCurrentUid(); }
-function loadQsFieldConfig(){
-  try{
-    const saved = JSON.parse(localStorage.getItem(qsFieldConfigKey()) || 'null');
-    return Object.assign({ cash:true, due:true, cust:true, cost:true }, saved || {});
-  }catch(e){ return { cash:true, due:true, cust:true, cost:true }; }
-}
-function applyQsFieldConfig(){
-  const cfg = loadQsFieldConfig();
-  const cashChip = document.querySelector('#qsTypeGroup .status-chip[data-s="নগদ-বিক্রি"]');
-  const dueChip = document.querySelector('#qsTypeGroup .status-chip[data-s="বাকি"]');
-
-  // প্রতিটা অপশন সম্পূর্ণ স্বাধীন — একটা লুকানো থাকলে অন্যটার কাজে কোনো প্রভাব পড়বে না।
-  // শুধু চোখের সামনে থেকে লুকানো থাকবে, ভেতরের লজিক (সেল কমপ্লিট হওয়া) সবসময় স্বাভাবিকভাবে
-  // কাজ করবে — "বাকি" অপশন চালু রেখে কাস্টমার সার্চ লুকিয়ে রাখলেও বাকি সেল ঠিকমতো হবে
-  // (তখন এটা "ওয়াক-ইন কাস্টমার" নামে বাকি হিসেবে সেভ হবে, নিচে quickSellBtn দেখুন)।
-  if(cashChip) cashChip.style.display = cfg.cash ? '' : 'none';
-  if(dueChip) dueChip.style.display = cfg.due ? '' : 'none';
-  document.getElementById('qsTypeRow').style.display = (cfg.cash || cfg.due) ? '' : 'none';
-  if(!cfg.cash && cashChip && cashChip.classList.contains('active') && dueChip && cfg.due){ dueChip.click(); }
-  if(!cfg.due && dueChip && dueChip.classList.contains('active') && cashChip){ cashChip.click(); }
-
-  document.getElementById('qsCustRow').style.display = cfg.cust ? '' : 'none';
-  if(!cfg.cust){
-    document.getElementById('qsCustResults').style.display = 'none';
-    document.getElementById('qsSelectedCustTag').style.display = 'none';
-    // qsCustPicker (নিচে, অনেক পরে ডিক্লেয়ার হয়) রেডি থাকলেই কেবল reset() কল করা হচ্ছে —
-    // qsPickerReady ফ্ল্যাগটা qsCustPicker তৈরি হওয়ার পরই true হয় (নিচে দেখুন)। আগে এখানে
-    // সরাসরি qsCustPicker.reset() কল করা হতো, কিন্তু এই ফাংশনটা পেজ লোডের শুরুতেই একবার
-    // সিঙ্ক্রোনাসভাবে কল হয় — তখন qsCustPicker এখনও ডিক্লেয়ারই হয়নি (const, temporal
-    // dead zone), তাই সরাসরি রেফারেন্স করলে পুরো স্ক্রিপ্ট ক্র্যাশ করে যেত এবং লগইনই আর
-    // কখনো শেষ হতো না ("যাচাই করা হচ্ছে..." স্ক্রিনে চিরকাল আটকে থাকতো)।
-    if(qsPickerReady) qsCustPicker.reset();
-  }
-  document.getElementById('qsCostField').style.display = cfg.cost ? '' : 'none';
-}
-var qsPickerReady = false;
-applyQsFieldConfig();
-
-quickModeChip.addEventListener('dblclick', (ev)=>{
-  ev.preventDefault();
-  const cfg = loadQsFieldConfig();
-  document.getElementById('qsCfgCash').checked = cfg.cash;
-  document.getElementById('qsCfgDue').checked = cfg.due;
-  document.getElementById('qsCfgCust').checked = cfg.cust;
-  document.getElementById('qsCfgCost').checked = cfg.cost;
-  document.getElementById('qsSettingsModalOverlay').classList.add('show');
-});
-document.getElementById('qsSettingsModalOverlay').addEventListener('click', (ev)=>{
-  if(ev.target.id === 'qsSettingsModalOverlay') document.getElementById('qsSettingsModalOverlay').classList.remove('show');
-});
-document.getElementById('qsSettingsSaveBtn').addEventListener('click', ()=>{
-  const cashOn = document.getElementById('qsCfgCash').checked;
-  const dueOn = document.getElementById('qsCfgDue').checked;
-  if(!cashOn && !dueOn){ toast('নগদ বা বাকি — অন্তত একটা অপশন রাখতে হবে'); return; }
-  const cfg = {
-    cash: cashOn,
-    due: dueOn,
-    cust: document.getElementById('qsCfgCust').checked,
-    cost: document.getElementById('qsCfgCost').checked
-  };
-  localStorage.setItem(qsFieldConfigKey(), JSON.stringify(cfg));
-  applyQsFieldConfig();
-  document.getElementById('qsSettingsModalOverlay').classList.remove('show');
-  toast('⚡ সহজ বিক্রি সেটিং সেভ হয়েছে');
-});
-
 /* ================= Quick Items (কুইক ড্যাশবোর্ডের শর্টকাট প্রোডাক্ট) =================
    প্রতিটা ইউজার (Admin/সাব-এডমিন/সেলার) নিজের মতো করে শর্টকাট প্রোডাক্ট যোগ করে
    নিতে পারবে — কারণ সবার বেশি-বিক্রি হওয়া প্রোডাক্ট এক না। তাই এই লিস্টটা প্রতিটা
@@ -6533,10 +6439,6 @@ function setupCustPicker(searchId, resultsId, tagId){
 
 const qsCustPicker = setupCustPicker('qsCustSearch', 'qsCustResults', 'qsSelectedCustTag');
 const esCustPicker = setupCustPicker('esCustSearch', 'esCustResults', 'esSelectedCustTag');
-// qsCustPicker এখন রেডি — এই মুহূর্তে আবার applyQsFieldConfig() কল করা হচ্ছে, যাতে
-// "কাস্টমার সার্চ বন্ধ" সেটিং থাকলে qsCustPicker.reset()-ও ঠিকভাবে চলে (উপরের কমেন্ট দেখুন)।
-qsPickerReady = true;
-applyQsFieldConfig();
 
 const fieldBlocks = {
   'বাকি': document.getElementById('fieldsCredit'),
@@ -7699,12 +7601,7 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
 
   const qsType = document.querySelector('#qsTypeGroup .status-chip.active').dataset.s;
   const qsCust = qsCustPicker.getSelected();
-  // "কাস্টমার সার্চ" ফিল্ডটা সেটিং থেকে লুকিয়ে রাখা থাকলে কাস্টমার সিলেক্ট করারই কোনো
-  // উপায় থাকে না — সেক্ষেত্রে "বাকি" সেলে বাধ্য করে আটকানো হয় না, বরং ক্যাশ সেলের মতোই
-  // "ওয়াক-ইন কাস্টমার" নামে বাকি হিসেবে সেভ হয়ে যায়। কাস্টমার সার্চ ফিল্ড দেখা গেলে এবং
-  // তাও যদি কেউ সিলেক্ট না করে থাকে, তখনই শুধু আটকানো হয় (কারণ তখন সিলেক্ট করার সুযোগ ছিল)।
-  const qsCustFieldVisible = loadQsFieldConfig().cust;
-  if(qsType === 'বাকি' && !qsCust && qsCustFieldVisible){ toast('বাকি দিতে হলে আগে পুরাতন কাস্টমার সিলেক্ট করুন'); return; }
+  if(qsType === 'বাকি' && !qsCust){ toast('বাকি দিতে হলে আগে পুরাতন কাস্টমার সিলেক্ট করুন'); return; }
 
   const custName = qsCust ? qsCust.name : 'ওয়াক-ইন কাস্টমার';
   const custPhone = qsCust ? qsCust.phone : '';
