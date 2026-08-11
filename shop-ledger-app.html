@@ -3130,6 +3130,14 @@ async function loadSystemData(){
     restoredCustomerKeys = loadRestoredCustomerKeys();
     stripTombstonedData();
 
+    // সেল-এন্ট্রি সেফটি-নেট ব্যাকআপ চেক করা হচ্ছে — কোনো সাম্প্রতিক সেল যদি মূল
+    // তালিকা থেকে (ক্লাউড-সিঙ্কের কোনো ব্যাকগ্রাউন্ড ওভাররাইটের কারণে) হারিয়ে গিয়ে
+    // থাকে, এখানেই সেটা ফিরিয়ে আনা হচ্ছে। এটা অ্যাপ বন্ধ করে আবার খোলার পরেও কাজ
+    // করে, কারণ ব্যাকআপ localStorage-এর একটা সম্পূর্ণ আলাদা কি-তে থাকে।
+    if(typeof reconcileRecentSaleBackup === 'function' && reconcileRecentSaleBackup()){
+      entriesChanged = true;
+    }
+
     // উপরের merge-এর ফলে যদি নতুন কিছু যোগ হয়ে থাকে, সেটা localStorage-এও লিখে রাখা
     // হচ্ছে (cloud round-trip ছাড়াই, শুধু লোকাল সেভ) যাতে পরের বার একই ডেটা আবার
     // মুছে না যায়।
@@ -3240,6 +3248,53 @@ async function persistData(){
   }catch(e){
     console.error('Cloud save failed, but local data is safe:', e);
   }
+}
+
+// ==================== সেল-এন্ট্রি সেফটি-নেট (ব্যাকআপ) ====================
+// persistData() সাথে সাথেই localStorage-এ সঠিক ডেটা লেখে, কিন্তু ক্লাউড সিঙ্ক
+// কোডের (firebase-init.js, আমাদের নিয়ন্ত্রণের বাইরে) নিজস্ব কোনো ব্যাকগ্রাউন্ড পুল
+// যদি ঠিক তার পরপরই একটু পুরনো/স্টেল ডেটা দিয়ে সরাসরি localStorage-এর মূল কি
+// ওভাররাইট করে দেয় — তাহলে অ্যাপ বন্ধ করে আবার খোলার সময় (বা রিফ্রেশে) সেই
+// এন্ট্রিটা হারিয়ে যায়, যদিও তখনকার মতো স্ক্রিনে ঠিকই দেখা গিয়েছিল। এটা ঠেকাতে
+// প্রতিটা নতুন সেল একটা আলাদা "ব্যাকআপ" কি-তেও (recent-sale-backup) সেভ রাখা হয় —
+// এই কি-টা cloud-sync কোড স্পর্শই করে না, তাই এটা নিরাপদ। অ্যাপ চালু হওয়ার সময়
+// (loadSystemData) এই ব্যাকআপ চেক করে দেখা হয় মূল তালিকায় সবগুলো ঠিকমতো আছে কিনা —
+// কোনোটা মিসিং থাকলে সেটা আবার যোগ করে দেওয়া হয়।
+function backupRecentSaleEntries(entries){
+  try{
+    const raw = localStorage.getItem('recent-sale-backup');
+    let backup = raw ? JSON.parse(raw) : [];
+    const now = Date.now();
+    // ৭২ ঘণ্টার বেশি পুরনো ব্যাকআপ আর দরকার নেই (ততক্ষণে নিশ্চিতভাবেই সিঙ্ক হয়ে গেছে ধরে নেওয়া যায়)
+    backup = backup.filter(b => (now - b.ts) < 72*60*60*1000);
+    entries.forEach(e => backup.push({ id: e.id, entry: e, ts: now }));
+    localStorage.setItem('recent-sale-backup', JSON.stringify(backup));
+  }catch(err){ console.error('backupRecentSaleEntries failed:', err); }
+}
+
+function reconcileRecentSaleBackup(){
+  try{
+    const raw = localStorage.getItem('recent-sale-backup');
+    if(!raw) return false;
+    let backup = JSON.parse(raw);
+    if(!backup.length) return false;
+    const now = Date.now();
+    backup = backup.filter(b => (now - b.ts) < 72*60*60*1000);
+
+    const existingIds = new Set(retailEntries.map(e=>e.id));
+    let changed = false;
+    backup.forEach(b=>{
+      if(!existingIds.has(b.id) && !deletedEntryIds.includes(b.id)){
+        retailEntries.push(b.entry);
+        existingIds.add(b.id);
+        changed = true;
+      }
+    });
+
+    localStorage.setItem('recent-sale-backup', JSON.stringify(backup));
+    if(changed) localStorage.setItem('phone-shop-entries', JSON.stringify(retailEntries));
+    return changed;
+  }catch(err){ console.error('reconcileRecentSaleBackup failed:', err); return false; }
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -6223,13 +6278,15 @@ document.getElementById('qiSellCompleteBtn').addEventListener('click', async ()=
 
   // কেনা দাম (cost) প্রোডাক্ট থেকে অটোমেটিক্যালি নেওয়া হচ্ছে — আলাদা করে
   // দেখানো/জিজ্ঞাসা করার দরকার নেই, এটা নগদ বিক্রি হিসেবে সাথে সাথেই সম্পূর্ণ হবে
-  retailEntries.unshift({
+  const qiNewEntry = {
     id: genLineId(), name: 'নগদ কাস্টমার', item: prod.name, productId: prod.id, phone: '',
     cost: Number(prod.buy)||0, price: amount, paid: amount, qty: 1,
     unitCost: Number(prod.buy)||0, unitPrice: amount, paymentMethod: method,
     note: `⚡ Quick Item দিয়ে বিক্রি — ${methodLabel}`, status: 'নগদ-বিক্রি',
     billId: genLineId(), invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName()
-  });
+  };
+  retailEntries.unshift(qiNewEntry);
+  backupRecentSaleEntries([qiNewEntry]);
 
   const prods = bccLoadProducts().map(p => p.id===prod.id ? {...p, qty: Math.max((Number(p.qty)||0)-1, 0)} : p);
   bccSaveProducts(prods);
@@ -7500,6 +7557,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
       return { id: genLineId(), name, item: it.item, productId: it.productId || '', phone, cost: it.cost, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost, unitPrice: it.unitPrice, paymentMethod, note, status, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName() };
     });
     retailEntries.unshift(...newEntries);
+    backupRecentSaleEntries(newEntries);
     bccAdjustStockForSale(billItems);
 
     creditCart = [];
@@ -7528,7 +7586,9 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     let extraNote = (cashBack==='yes' ? `Cash return: SAR ${value}` : `SAR ${value} deducted from balance.`) + (condition==='bad' ? ' [খারাপ/নষ্ট মাল — স্টকে যোগ হয়নি]' : ' [ভালো মাল — স্টকে যোগ হয়েছে]');
     if(cashBack === 'no' && value>0){ allocateDuePayment(name, phone, value); }
 
-    retailEntries.unshift({ id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, returnValue: value, cashBack, note: (note ? note+' — ' : '')+extraNote, status, condition, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() });
+    const rtNewEntry = { id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, returnValue: value, cashBack, note: (note ? note+' — ' : '')+extraNote, status, condition, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() };
+    retailEntries.unshift(rtNewEntry);
+    backupRecentSaleEntries([rtNewEntry]);
     // ফেরত দেওয়া মাল "ভালো" হলে স্টকে ফেরত যোগ হবে, "খারাপ/নষ্ট" হলে স্টকে যোগ হবে না
     if(condition === 'bad'){
       toast(`"${item}" খারাপ/নষ্ট হিসেবে চিহ্নিত হয়েছে, তাই স্টকে যোগ হয়নি`);
@@ -7571,7 +7631,9 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
 
     allocateDuePayment(name, phone, amount);
     
-    retailEntries.unshift({ id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, depositAmount: amount, paymentMethod: depositMethod, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() });
+    const dpNewEntry = { id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, depositAmount: amount, paymentMethod: depositMethod, note: (note?note+' — ':'')+`SAR ${amount} deposited`, status, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() };
+    retailEntries.unshift(dpNewEntry);
+    backupRecentSaleEntries([dpNewEntry]);
     
     const isCleared = isCustomerFullyPaid(name, phone);
     const changeBack = Math.max(amount - previousDue, 0);
@@ -7599,12 +7661,14 @@ document.getElementById('addCustomerOnlyBtn').addEventListener('click', async ()
     restoreCustomerKey(key);
     shopCustomers.push({name, phone: phone || ''});
     if(openingDue > 0){
-      retailEntries.unshift({
+      const odNewEntry = {
         id: genLineId(), name, item: 'পুরাতন বাকি (হিসাব যোগ করার সময় শুরুতে যোগ করা হয়েছে)',
         productId: '', phone, cost: 0, price: openingDue, paid: 0, qty: 1,
         unitCost: 0, unitPrice: openingDue, note: '', status: 'বাকি',
         billId: genLineId(), invoiceNo: '', date: new Date().toISOString(), soldBy: currentSalesPersonName()
-      });
+      };
+      retailEntries.unshift(odNewEntry);
+      backupRecentSaleEntries([odNewEntry]);
     }
     await persistData();
     document.getElementById('acName').value='';
@@ -7682,6 +7746,7 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
 
   try{
     retailEntries.unshift(...newEntries);
+    backupRecentSaleEntries(newEntries);
     bccAdjustStockForSale(qsCart);
 
     const itemCount = qsCart.length;
@@ -7783,7 +7848,7 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
     return { id: genLineId(), name: esName, item: it.item, productId: it.productId || '', phone: esPhone, cost: it.cost||0, price: it.price, paid: itemPaid, qty: it.qty, unitCost: it.unitCost||0, unitPrice: it.unitPrice, paymentMethod, note: 'এক্সট্রা সেল', status: esType, billId, invoiceNo, date: saleTime, soldBy: currentSalesPersonName() };
   });
   retailEntries.unshift(...newEntries);
-
+  backupRecentSaleEntries(newEntries);
   // Extra Income Monitoring-এও লগ থাকবে (রিপোর্টিং এর জন্য) — বাকি ট্র্যাকিং এখন মূল হিসাবেই হবে, তাই এখানে সবসময় জমা হিসেবেই রাখা হচ্ছে (ডাবল-কাউন্ট এড়াতে)।
   const eiList = eiLoad();
   billItems.forEach(it=>{
