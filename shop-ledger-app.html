@@ -3092,11 +3092,33 @@ function findSmartMatchingCustomer(inputStr) {
 async function loadSystemData(){
   try{
     const cRes = localStorage.getItem('phone-shop-customers');
-    shopCustomers = cRes ? JSON.parse(cRes) : [];
-    
+    const freshCustomers = cRes ? JSON.parse(cRes) : [];
+
     const eRes = localStorage.getItem('phone-shop-entries');
-    retailEntries = eRes ? JSON.parse(eRes) : [];
-    
+    const freshEntries = eRes ? JSON.parse(eRes) : [];
+
+    // localStorage থেকে আসা ডেটার সাথে মেমোরিতে যা আছে সেটা "merge" (id মিলিয়ে union)
+    // করা হচ্ছে — প্রোডাক্ট/ক্যাটাগরির মতোই। এটা ছাড়া একটা রেস কন্ডিশন ছিল: কুইক
+    // সেল/এক্সট্রা সেল করার পর নতুন এন্ট্রি মেমোরি+localStorage-এ ঠিকই সেভ হতো এবং
+    // প্রিন্ট মোডাল পর্যন্ত দেখাতো, কিন্তু ঠিক তার পরপরই যদি ক্লাউড থেকে একটু পুরনো
+    // (স্টেল) ডেটা সিঙ্ক হয়ে আসতো (watchAppDataChanges), সেটা এই ফাংশনের মাধ্যমে
+    // localStorage-এর নতুন ডেটাকে ওভাররাইট করে সদ্য করা সেলটাই মুছে ফেলতো — মনে হতো
+    // "প্রিন্ট পর্যন্ত আসে কিন্তু হিসাবে সেভ হয় না"। এখন merge করার ফলে মেমোরিতে থাকা
+    // কোনো এন্ট্রি/কাস্টমার এভাবে হারিয়ে যাবে না (আসল ডিলিট এখনও tombstone-এর মাধ্যমে
+    // ঠিকভাবে কাজ করবে, নিচের stripTombstonedData() কল দেখুন)।
+    const freshEntryIds = new Set(freshEntries.map(e=>e.id));
+    const mergedEntries = freshEntries.slice();
+    let entriesChanged = false;
+    retailEntries.forEach(e=>{ if(!freshEntryIds.has(e.id)){ mergedEntries.push(e); entriesChanged = true; } });
+    retailEntries = mergedEntries;
+
+    const custKeyOf = c => (c.phone ? 'p:'+c.phone : 'n:'+c.name);
+    const freshCustKeys = new Set(freshCustomers.map(custKeyOf));
+    const mergedCustomers = freshCustomers.slice();
+    let customersChanged = false;
+    shopCustomers.forEach(c=>{ if(!freshCustKeys.has(custKeyOf(c))){ mergedCustomers.push(c); customersChanged = true; } });
+    shopCustomers = mergedCustomers;
+
     const pRes = localStorage.getItem('phone-shop-pin');
     if(pRes) systemMasterPin = JSON.parse(pRes);
     else localStorage.setItem('phone-shop-pin', JSON.stringify(systemMasterPin));
@@ -3107,6 +3129,12 @@ async function loadSystemData(){
     deletedCustomerKeys = loadDeletedCustomerKeys();
     restoredCustomerKeys = loadRestoredCustomerKeys();
     stripTombstonedData();
+
+    // উপরের merge-এর ফলে যদি নতুন কিছু যোগ হয়ে থাকে, সেটা localStorage-এও লিখে রাখা
+    // হচ্ছে (cloud round-trip ছাড়াই, শুধু লোকাল সেভ) যাতে পরের বার একই ডেটা আবার
+    // মুছে না যায়।
+    if(entriesChanged) localStorage.setItem('phone-shop-entries', JSON.stringify(retailEntries));
+    if(customersChanged) localStorage.setItem('phone-shop-customers', JSON.stringify(shopCustomers));
 
     // পুরনো ভাঙা "INV-000NaN" ইনভয়েস নাম্বারগুলো একবার ঠিক করে আলাদা আলাদা নাম্বার বসানো হচ্ছে
     if(fixBrokenInvoiceNumbers()){
