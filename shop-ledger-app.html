@@ -2479,10 +2479,48 @@
     display:inline-block; margin-top:8px; font-size:9.5px; letter-spacing:1px; text-transform:uppercase;
     color:var(--hb-bg1); background:var(--hb-amber); padding:3px 9px; border-radius:20px; font-weight:800;
   }
-  #program-honeybee .hbFootNote{
-    text-align:center; font-size:11.5px; color:rgba(255,248,232,0.45); padding:0 30px 34px; line-height:1.7;
+  #program-honeybee .hbCardValue{ font-size:20px; font-weight:900; color:var(--hb-amber); margin-top:2px; }
+  #program-honeybee .hbAddBtn{
+    display:block; width:calc(100% - 36px); margin:0 18px 22px; padding:13px; border:none; border-radius:14px;
+    background:linear-gradient(135deg, var(--hb-amber), var(--hb-gold)); color:#1a1206; font-weight:800;
+    font-size:14px; cursor:pointer; box-shadow:0 8px 20px rgba(255,183,3,0.35);
   }
+  #program-honeybee .hbListWrap{ padding:0 18px 30px; }
+  #program-honeybee .hbListTitle{ font-size:13px; font-weight:800; color:var(--hb-amber); margin:0 0 10px; letter-spacing:0.4px; }
+  #program-honeybee .hbOrderRow{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:12px 14px; border-radius:12px; background:var(--hb-glass); border:1px solid var(--hb-border);
+    margin-bottom:8px; backdrop-filter:blur(8px);
+  }
+  #program-honeybee .hbOrderRow .hbOrderInfo{ font-size:12.5px; color:#fff8e8; }
+  #program-honeybee .hbOrderRow .hbOrderMeta{ font-size:10.5px; color:rgba(255,248,232,0.55); margin-top:2px; }
+  #program-honeybee .hbOrderRow .hbOrderDel{
+    background:rgba(255,90,90,0.15); border:1px solid rgba(255,120,120,0.4); color:#ffb4b4;
+    border-radius:8px; padding:6px 10px; font-size:11px; cursor:pointer; flex-shrink:0;
+  }
+  #program-honeybee .hbEmpty{ text-align:center; font-size:12px; color:rgba(255,248,232,0.4); padding:16px 0; }
 </style>
+
+<div id="hbAddModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:340px; text-align:left; background:#241605; color:#fff8e8; border:1px solid rgba(255,209,102,0.35);">
+    <h3 style="margin:0 0 4px; color:var(--hb-amber, #ffd166);">🐝 নতুন অর্ডার যোগ করুন</h3>
+    <p class="pin-desc" style="margin:0 0 14px; color:rgba(255,248,232,0.6);">Honey Bee Network থেকে আসা একটা অনলাইন অর্ডার/ডেলিভারি লগ করুন</p>
+
+    <label style="display:block; font-size:12px; color:rgba(255,248,232,0.7); margin:0 0 4px;">অর্ডারের টাকা (SAR)</label>
+    <input id="hbOrderAmount" type="number" inputmode="numeric" placeholder="০" style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid rgba(255,209,102,0.35); background:rgba(255,255,255,0.06); color:#fff8e8; font-size:15px; margin-bottom:12px;">
+
+    <label style="display:block; font-size:12px; color:rgba(255,248,232,0.7); margin:0 0 4px;">অতিরিক্ত আয় / কমিশন (SAR)</label>
+    <input id="hbOrderIncome" type="number" inputmode="numeric" placeholder="০" style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid rgba(255,209,102,0.35); background:rgba(255,255,255,0.06); color:#fff8e8; font-size:15px; margin-bottom:12px;">
+
+    <label style="display:block; font-size:12px; color:rgba(255,248,232,0.7); margin:0 0 4px;">নোট (ঐচ্ছিক)</label>
+    <input id="hbOrderNote" type="text" placeholder="যেমনঃ কাস্টমারের এলাকা/আইটেম" style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid rgba(255,209,102,0.35); background:rgba(255,255,255,0.06); color:#fff8e8; font-size:14px; margin-bottom:16px;">
+
+    <div style="display:flex; gap:8px;">
+      <button id="hbOrderCancelBtn" style="flex:1; padding:11px; border-radius:10px; border:1px solid rgba(255,209,102,0.35); background:transparent; color:#fff8e8; font-weight:700; cursor:pointer;">বাতিল</button>
+      <button id="hbOrderSaveBtn" style="flex:1; padding:11px; border-radius:10px; border:none; background:linear-gradient(135deg,#ffd166,#fca311); color:#1a1206; font-weight:800; cursor:pointer;">✓ যোগ করুন</button>
+    </div>
+  </div>
+</div>
 
 <div id="program-honeybee" style="display:none; flex-direction:column; position:fixed; inset:0; z-index:500; overflow:auto;">
   <div class="hbHeader">
@@ -2498,33 +2536,35 @@
       <div class="hbHex">🐝</div>
     </div>
     <div class="hbTitle">Honey Bee Network</div>
-    <p class="hbTagline">প্রতিটা মৌমাছি আলাদা কাজ করে, কিন্তু একসাথে একটা মজবুত চাক গড়ে তোলে — এই নেটওয়ার্কও তেমনই দোকানের সব শাখা-প্রশাখাকে এক জায়গায় নিয়ে আসবে।</p>
+    <p class="hbTagline">দোকানের সার্বিক লাইভ স্ট্যাটাস — আজকের অনলাইন অর্ডার, ডেলিভারি ও অতিরিক্ত আয় এক নজরে।</p>
   </div>
 
   <div class="hbComb">
     <div class="hbCard">
+      <div class="hbCardIcon">💰</div>
+      <div class="hbCardTitle">আজকের অনলাইন অর্ডার</div>
+      <div class="hbCardValue" id="hbTodayOrderAmount">SAR 0</div>
+    </div>
+    <div class="hbCard">
+      <div class="hbCardIcon">🛵</div>
+      <div class="hbCardTitle">মোট ডেলিভারি (আজ)</div>
+      <div class="hbCardValue" id="hbTodayDeliveryCount">0</div>
+    </div>
+    <div class="hbCard" style="grid-column:1 / -1;">
       <div class="hbCardIcon">🍯</div>
-      <div class="hbCardTitle">Hive Overview</div>
-      <span class="hbCardTag">শীঘ্রই আসছে</span>
-    </div>
-    <div class="hbCard">
-      <div class="hbCardIcon">🕸️</div>
-      <div class="hbCardTitle">Network Map</div>
-      <span class="hbCardTag">শীঘ্রই আসছে</span>
-    </div>
-    <div class="hbCard">
-      <div class="hbCardIcon">👥</div>
-      <div class="hbCardTitle">Members</div>
-      <span class="hbCardTag">শীঘ্রই আসছে</span>
-    </div>
-    <div class="hbCard">
-      <div class="hbCardIcon">📈</div>
-      <div class="hbCardTitle">Growth</div>
-      <span class="hbCardTag">শীঘ্রই আসছে</span>
+      <div class="hbCardTitle">অতিরিক্ত আয় (আজ)</div>
+      <div class="hbCardValue" id="hbTodayExtraIncome">SAR 0</div>
     </div>
   </div>
 
-  <p class="hbFootNote">🐝 নতুন এই সেকশনটা এখনো তৈরি হচ্ছে — এখানে ঠিক কী কী থাকবে বলে দিলে সেভাবেই সাজিয়ে দেওয়া হবে।</p>
+  <button class="hbAddBtn" id="hbAddOrderBtn">➕ নতুন অর্ডার যোগ করুন</button>
+
+  <div class="hbListWrap">
+    <div class="hbListTitle">📋 আজকের অর্ডার তালিকা</div>
+    <div id="hbOrderList"></div>
+  </div>
+
+  <p class="hbFootNote">🐝 প্রতিটা অনলাইন অর্ডার/ডেলিভারি হাতে যোগ করে রাখলে এখানে দৈনিক হিসাব স্বয়ংক্রিয়ভাবে দেখা যাবে।</p>
 </div>
 
 <div id="bccModalOverlay" style="display:none; position:fixed; inset:0; z-index:600; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
@@ -3573,8 +3613,80 @@ document.getElementById('backFromReport').addEventListener('click', ()=> switchP
 
 document.getElementById('bizHoneyBeeCard').addEventListener('click', ()=>{
   switchProgram('program-bizmgmt', 'program-honeybee');
+  hbRenderDashboard();
 });
 document.getElementById('backFromHoneyBee').addEventListener('click', ()=> switchProgram('program-honeybee', 'program-bizmgmt'));
+
+/* ==================== 🐝 Honey Bee Network — অনলাইন অর্ডার/ডেলিভারি লগ ====================
+   দোকানের বাইরে থেকে (Honey Bee Network-এর মাধ্যমে) আসা অনলাইন অর্ডার/ডেলিভারি হাতে
+   লগ করে রাখার জায়গা — এখান থেকেই আজকের অর্ডার-টাকা, ডেলিভারি সংখ্যা ও অতিরিক্ত
+   আয় স্বয়ংক্রিয়ভাবে হিসাব হয়ে দেখায়। */
+function hbLoadOrders(){ try{ return JSON.parse(localStorage.getItem('honeybee-orders')||'[]'); }catch(e){ return []; } }
+function hbSaveOrders(list){ localStorage.setItem('honeybee-orders', JSON.stringify(list)); }
+function hbIsToday(dateStr){
+  const d = new Date(dateStr), now = new Date();
+  return d.toDateString() === now.toDateString();
+}
+
+function hbRenderDashboard(){
+  const all = hbLoadOrders();
+  const todays = all.filter(o => hbIsToday(o.date)).sort((a,b)=> new Date(b.date) - new Date(a.date));
+
+  const totalOrderAmount = todays.reduce((s,o)=> s + (Number(o.amount)||0), 0);
+  const totalIncome = todays.reduce((s,o)=> s + (Number(o.income)||0), 0);
+
+  document.getElementById('hbTodayOrderAmount').textContent = `SAR ${fmt(totalOrderAmount)}`;
+  document.getElementById('hbTodayDeliveryCount').textContent = todays.length;
+  document.getElementById('hbTodayExtraIncome').textContent = `SAR ${fmt(totalIncome)}`;
+
+  const listEl = document.getElementById('hbOrderList');
+  if(!todays.length){
+    listEl.innerHTML = '<div class="hbEmpty">আজ এখনো কোনো অর্ডার যোগ করা হয়নি</div>';
+    return;
+  }
+  listEl.innerHTML = todays.map(o => `
+    <div class="hbOrderRow">
+      <div>
+        <div class="hbOrderInfo">💰 SAR ${fmt(o.amount)}${o.income ? ` &nbsp;·&nbsp; 🍯 SAR ${fmt(o.income)}` : ''}</div>
+        <div class="hbOrderMeta">${o.note ? escapeHtml(o.note) + ' — ' : ''}${new Date(o.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}</div>
+      </div>
+      <button class="hbOrderDel" onclick="hbDeleteOrder('${o.id}')">মুছুন</button>
+    </div>
+  `).join('');
+}
+
+function hbDeleteOrder(id){
+  const all = hbLoadOrders().filter(o => o.id !== id);
+  hbSaveOrders(all);
+  hbRenderDashboard();
+}
+
+document.getElementById('hbAddOrderBtn').addEventListener('click', ()=>{
+  document.getElementById('hbOrderAmount').value = '';
+  document.getElementById('hbOrderIncome').value = '';
+  document.getElementById('hbOrderNote').value = '';
+  document.getElementById('hbAddModal').classList.add('show');
+});
+document.getElementById('hbOrderCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('hbAddModal').classList.remove('show');
+});
+document.getElementById('hbAddModal').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'hbAddModal') document.getElementById('hbAddModal').classList.remove('show');
+});
+document.getElementById('hbOrderSaveBtn').addEventListener('click', ()=>{
+  const amount = Number(document.getElementById('hbOrderAmount').value) || 0;
+  const income = Number(document.getElementById('hbOrderIncome').value) || 0;
+  const note = document.getElementById('hbOrderNote').value.trim();
+  if(amount <= 0 && income <= 0){ toast('অর্ডারের টাকা বা অতিরিক্ত আয় — অন্তত একটা দিন'); return; }
+
+  const all = hbLoadOrders();
+  all.unshift({ id: genLineId(), amount, income, note, date: new Date().toISOString() });
+  hbSaveOrders(all);
+
+  document.getElementById('hbAddModal').classList.remove('show');
+  hbRenderDashboard();
+  toast('🐝 অর্ডার যোগ করা হয়েছে');
+});
 
 /* ============================================================
    REPORT CENTER — সব হিসাব এক জায়গা থেকে, Date filter দিয়ে
