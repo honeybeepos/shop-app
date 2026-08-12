@@ -2887,8 +2887,15 @@ function stripTombstonedData(){
     retailEntries = retailEntries.filter(e => !deletedEntryIds.includes(e.id));
   }
   if(deletedCustomerKeys.length){
-    retailEntries = retailEntries.filter(e => !isCustomerTombstoned(custKey(e.name, e.phone)));
-    shopCustomers = shopCustomers.filter(c => !isCustomerTombstoned(custKey(c.name, c.phone)));
+    // ফোন নাম্বার ছাড়া এন্ট্রি/কাস্টমার (যেমন ওয়াক-ইন / জেনেরিক কাস্টমার) এখানে বাদ
+    // রাখা হচ্ছে। কারণ: ফোন ছাড়া প্রতিটা walk-in সেলের key (নাম+খালি ফোন) হুবহু একই
+    // থাকে, তাই কেউ একবার এই নামে "কাস্টমার ডিলিট" করলে (কাস্টমার লিস্টে এরা একসাথে
+    // একজন "কাস্টমার" হিসেবে দেখাতো) — এই একটা ডিলিটে অতীত ও ভবিষ্যতের সব walk-in
+    // সেল চিরদিনের জন্য (সব ডিভাইসে) নিঃশব্দে মুছে যেত। এখন ফোন নাম্বার-যুক্ত আসল
+    // কাস্টমার ডিলিট আগের মতোই ঠিকভাবে কাজ করবে — শুধু ফোন-ছাড়া জেনেরিক এন্ট্রিগুলো
+    // এই "কাস্টমার-ডিলিট" মেকানিজম থেকে সুরক্ষিত থাকবে।
+    retailEntries = retailEntries.filter(e => !e.phone || !isCustomerTombstoned(custKey(e.name, e.phone)));
+    shopCustomers = shopCustomers.filter(c => !c.phone || !isCustomerTombstoned(custKey(c.name, c.phone)));
   }
 }
 let systemMasterPin = "12345";
@@ -7701,7 +7708,7 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
   // সিলেক্ট না করলেও, বক্সে টাইপ করা নাম থাকলে সেটাই নতুন কাস্টমারের নাম হিসেবে ব্যবহার
   // করা হচ্ছে।
   const qsTypedName = document.getElementById('qsCustSearch').value.trim();
-  const custName = qsCust ? qsCust.name : (qsTypedName || 'ওয়াক-ইন কাস্টমার');
+  const custName = qsCust ? qsCust.name : (qsTypedName || 'Unknown Customer');
   const custPhone = qsCust ? qsCust.phone : '';
   // নতুন টাইপ করা নাম হলে (তালিকা থেকে সিলেক্ট করা না হলে) সেটা shopCustomers-এ যোগ করে
   // রাখা হচ্ছে, যাতে পরের বার এই নামে সার্চ করলে সাজেশনে চলে আসে।
@@ -7797,7 +7804,7 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
   // কুইক সেলের মতো এখানেও তালিকা থেকে সিলেক্ট না করে টাইপ করা নাম আগে হারিয়ে যেত —
   // এখন টাইপ করা নাম থাকলে সেটাই নতুন কাস্টমারের নাম হিসেবে ব্যবহার করা হচ্ছে।
   const esTypedName = document.getElementById('esCustSearch').value.trim();
-  const esName = esCust ? esCust.name : (esTypedName || 'ওয়াক-ইন কাস্টমার');
+  const esName = esCust ? esCust.name : (esTypedName || 'Unknown Customer');
   const esPhone = esCust ? esCust.phone : '';
   if(!esCust && esTypedName && !shopCustomers.some(c => c.name === esTypedName)){
     shopCustomers.push({name: esTypedName, phone: ''});
