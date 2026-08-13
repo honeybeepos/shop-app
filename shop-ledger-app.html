@@ -591,10 +591,33 @@
   <div class="left">
     <button id="subUserBtn" style="display:none;">+ সাব-ইউজার</button>
     <button id="shopSettingsBtn" title="সেটিং" style="padding:6px 10px; font-size:15px;">⚙️</button>
+    <button id="hbBellBtn" title="অনলাইন অর্ডার" style="position:relative; padding:6px 10px; font-size:15px;">
+      🔔<span id="hbBellBadge" style="display:none; position:absolute; top:-4px; right:-2px; background:#e0433c; color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:9px; line-height:16px; text-align:center; padding:0 3px; font-family:inherit;">0</span>
+    </button>
     <button id="cloudLogoutBtn">লগআউট</button>
   </div>
 </div>
 <div id="announceBar"></div>
+
+<style>
+  @keyframes hbBellShake{
+    0%,100%{ transform:rotate(0deg); }
+    10%,30%,50%,70%{ transform:rotate(-14deg); }
+    20%,40%,60%,80%{ transform:rotate(14deg); }
+    90%{ transform:rotate(0deg); }
+  }
+  #hbBellBtn.hbRinging{ animation:hbBellShake 1.1s ease-in-out infinite; animation-delay:0s; }
+  #hbBellBtn.hbRinging{ animation-iteration-count: infinite; }
+</style>
+
+<div class="modal-overlay" id="hbOrdersModalOverlay">
+  <div class="modal-box" style="max-width:400px; text-align:left; max-height:85vh; overflow-y:auto; background:#241605; color:#fff8e8; border:1px solid rgba(255,209,102,0.35);">
+    <h3 style="margin:0 0 4px; color:#ffd166;">🐝 অনলাইন অর্ডার</h3>
+    <p class="pin-desc" style="margin:0 0 14px; color:rgba(255,248,232,0.6);">প্রতিটা অর্ডার একসেপ্ট বা রিজেক্ট করতে পাসওয়ার্ড লাগবে।</p>
+    <div id="hbPendingListArea"></div>
+    <button id="hbOrdersModalCloseBtn" style="width:100%; margin-top:14px; padding:11px; border-radius:10px; border:1px solid rgba(255,209,102,0.35); background:transparent; color:#fff8e8; font-weight:700; cursor:pointer;">বন্ধ করুন</button>
+  </div>
+</div>
 
 <div class="modal-overlay" id="shopSettingsModalOverlay">
   <div class="modal-box" style="max-width:380px; text-align:left;">
@@ -3679,14 +3702,112 @@ document.getElementById('hbOrderSaveBtn').addEventListener('click', ()=>{
   const note = document.getElementById('hbOrderNote').value.trim();
   if(amount <= 0 && income <= 0){ toast('অর্ডারের টাকা বা অতিরিক্ত আয় — অন্তত একটা দিন'); return; }
 
-  const all = hbLoadOrders();
-  all.unshift({ id: genLineId(), amount, income, note, date: new Date().toISOString() });
-  hbSaveOrders(all);
+  // নতুন অর্ডার সরাসরি আজকের হিসাবে যোগ হয় না — আগে "পেন্ডিং" (অপেক্ষমাণ) তালিকায় যায়,
+  // ঘণ্টা আইকনে নোটিফিকেশন দেখায়, এবং একসেপ্ট করলে তবেই আজকের অর্ডারে যোগ হয়।
+  const pending = hbLoadPending();
+  pending.unshift({ id: genLineId(), amount, income, note, date: new Date().toISOString() });
+  hbSavePending(pending);
+  hbUpdateBellBadge();
 
   document.getElementById('hbAddModal').classList.remove('show');
-  hbRenderDashboard();
-  toast('🐝 অর্ডার যোগ করা হয়েছে');
+  toast('🔔 নতুন অর্ডার এসেছে — ঘণ্টা আইকনে গিয়ে একসেপ্ট/রিজেক্ট করুন');
 });
+
+/* ==================== 🔔 অনলাইন অর্ডার নোটিফিকেশন (একসেপ্ট/রিজেক্ট) ====================
+   নতুন অর্ডার প্রথমে "পেন্ডিং" (অপেক্ষমাণ) থাকে — ঘণ্টা আইকনে কাঁপা অ্যানিমেশন ও কাউন্ট
+   ব্যাজ দেখায়। ঘণ্টায় ক্লিক করলে তালিকা আসে, প্রতিটার সাথে ✅ একসেপ্ট / ❌ রিজেক্ট বাটন
+   থাকে — দুটোতেই পাসওয়ার্ড লাগে, যাতে ভুলবশত ট্যাপ হয়ে গেলে কিছু বদলে না যায়।
+   একসেপ্ট করলে অর্ডারটা আজকের Honey Bee Network হিসাবে যোগ হয় এবং সাথে সাথে
+   প্রিন্ট শুরু হয়ে যায়। */
+function hbLoadPending(){ try{ return JSON.parse(localStorage.getItem('honeybee-pending-orders')||'[]'); }catch(e){ return []; } }
+function hbSavePending(list){ localStorage.setItem('honeybee-pending-orders', JSON.stringify(list)); }
+
+function hbUpdateBellBadge(){
+  const n = hbLoadPending().length;
+  const badge = document.getElementById('hbBellBadge');
+  const bell = document.getElementById('hbBellBtn');
+  if(n > 0){
+    badge.textContent = n > 99 ? '99+' : n;
+    badge.style.display = 'flex';
+    badge.style.alignItems = 'center';
+    badge.style.justifyContent = 'center';
+    bell.classList.add('hbRinging');
+  } else {
+    badge.style.display = 'none';
+    bell.classList.remove('hbRinging');
+  }
+}
+hbUpdateBellBadge();
+
+function hbRenderPendingList(){
+  const pending = hbLoadPending().sort((a,b)=> new Date(b.date) - new Date(a.date));
+  const area = document.getElementById('hbPendingListArea');
+  if(!pending.length){
+    area.innerHTML = '<div class="hbEmpty">এখন কোনো নতুন অর্ডার নেই</div>';
+    return;
+  }
+  area.innerHTML = pending.map(o => `
+    <div class="hbOrderRow" style="flex-direction:column; align-items:stretch; gap:8px;">
+      <div>
+        <div class="hbOrderInfo">💰 SAR ${fmt(o.amount)}${o.income ? ` &nbsp;·&nbsp; 🍯 SAR ${fmt(o.income)}` : ''}</div>
+        <div class="hbOrderMeta">${o.note ? escapeHtml(o.note) + ' — ' : ''}${new Date(o.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button onclick="hbAcceptOrder('${o.id}')" style="flex:1; padding:9px; border-radius:9px; border:none; background:linear-gradient(135deg,#4ade80,#16a34a); color:#fff; font-weight:800; cursor:pointer;">✅ একসেপ্ট</button>
+        <button onclick="hbRejectOrder('${o.id}')" style="flex:1; padding:9px; border-radius:9px; border:1px solid rgba(255,120,120,0.4); background:rgba(255,90,90,0.15); color:#ffb4b4; font-weight:800; cursor:pointer;">❌ রিজেক্ট</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('hbBellBtn').addEventListener('click', ()=>{
+  hbRenderPendingList();
+  document.getElementById('hbOrdersModalOverlay').classList.add('show');
+});
+document.getElementById('hbOrdersModalCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('hbOrdersModalOverlay').classList.remove('show');
+});
+document.getElementById('hbOrdersModalOverlay').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'hbOrdersModalOverlay') document.getElementById('hbOrdersModalOverlay').classList.remove('show');
+});
+
+async function hbAcceptOrder(id){
+  const entered = await openPinModal('পাসওয়ার্ড দিন', 'অর্ডারটা একসেপ্ট করতে পাসওয়ার্ড দিন।');
+  if(entered === null) return;
+  if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, একসেপ্ট হয়নি'); return; }
+
+  const pending = hbLoadPending();
+  const idx = pending.findIndex(o => o.id === id);
+  if(idx === -1) return;
+  const order = pending[idx];
+  pending.splice(idx, 1);
+  hbSavePending(pending);
+
+  const accepted = hbLoadOrders();
+  accepted.unshift(order);
+  hbSaveOrders(accepted);
+
+  hbUpdateBellBadge();
+  hbRenderPendingList();
+  if(document.getElementById('program-honeybee').style.display !== 'none') hbRenderDashboard();
+  toast('✅ অর্ডার একসেপ্ট হয়েছে — আজকের হিসাবে যোগ হয়েছে');
+
+  // একসেপ্ট করার সাথে সাথেই অর্ডার প্রিন্ট শুরু হবে
+  const msg = `🐝 Honey Bee Network Order\n\nOrder Amount: SAR ${order.amount}${order.income ? `\nExtra Income: SAR ${order.income}` : ''}${order.note ? `\nNote: ${order.note}` : ''}\n\nTime: ${new Date(order.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}\nDate: ${new Date(order.date).toLocaleDateString('en-GB')}\n\nStatus: ✅ Accepted`;
+  printSaleReceipt('Honey Bee Network', '', msg);
+}
+
+async function hbRejectOrder(id){
+  const entered = await openPinModal('পাসওয়ার্ড দিন', 'অর্ডারটা রিজেক্ট করতে পাসওয়ার্ড দিন।');
+  if(entered === null) return;
+  if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, রিজেক্ট হয়নি'); return; }
+
+  const pending = hbLoadPending().filter(o => o.id !== id);
+  hbSavePending(pending);
+  hbUpdateBellBadge();
+  hbRenderPendingList();
+  toast('❌ অর্ডার রিজেক্ট করা হয়েছে');
+}
 
 /* ============================================================
    REPORT CENTER — সব হিসাব এক জায়গা থেকে, Date filter দিয়ে
