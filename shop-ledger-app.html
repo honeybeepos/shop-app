@@ -2581,11 +2581,7 @@
   </div>
 
   <button class="hbAddBtn" id="hbAddOrderBtn">➕ নতুন অর্ডার যোগ করুন</button>
-  <button class="hbAddBtn" id="hbCallDeliveryBtn" style="background:linear-gradient(145deg,#16a34a,#0f7a3a); margin-top:10px;">📞 ডেলিভারি ম্যান কে ডাকুন</button>
-  <div id="hbDeliveryPhoneRow" style="text-align:center; margin-top:6px;">
-    <span id="hbDeliveryPhoneLabel" style="font-size:11px; color:rgba(255,248,232,0.55);"></span>
-    <span id="hbEditDeliveryPhoneBtn" style="font-size:11px; color:var(--hb-amber); cursor:pointer; margin-left:8px; text-decoration:underline;">✏️ নম্বর পরিবর্তন</span>
-  </div>
+  <button class="hbAddBtn" id="hbCallDeliveryBtn" style="background:linear-gradient(145deg,#16a34a,#0f7a3a); margin-top:10px;">🔔 ডেলিভারি ম্যান কে ডাকুন</button>
   <div id="hbConnectCodeRow" style="text-align:center; margin-top:4px;">
     <span id="hbRingStatusLbl" style="font-size:11px; color:rgba(255,248,232,0.4);"></span>
     <span id="hbShowConnectCodeBtn" style="font-size:11px; color:var(--hb-amber); cursor:pointer; text-decoration:underline; margin-left:8px;">🔗 ডেলিভারি অ্যাপ কানেক্ট কোড দেখুন</span>
@@ -3649,35 +3645,11 @@ document.getElementById('bizHoneyBeeCard').addEventListener('click', ()=>{
 });
 document.getElementById('backFromHoneyBee').addEventListener('click', ()=> switchProgram('program-honeybee', 'program-bizmgmt'));
 
-/* ==================== 📞 ডেলিভারি ম্যান কে কল করা + অ্যাপে রিং পাঠানো ====================
-   Honey Bee Network স্ক্রিন থেকে এক ট্যাপে ডেলিভারি ম্যানকে ফোন করার সুবিধা,
-   পাশাপাশি ডেলিভারি ম্যানের আলাদা অ্যাপে (delivery-man-app.html) একটা রিয়েলটাইম
-   "রিং" সিগন্যাল পাঠানো হয় Firestore-এর মাধ্যমে — সে অ্যাপ চালু/সামনে রাখলে
-   ভাইব্রেশন ও শব্দ করে জানিয়ে দেবে যে দোকান থেকে ডাকা হচ্ছে। */
-function hbGetDeliveryPhone(){ return localStorage.getItem('honeybee-delivery-phone') || ''; }
-function hbSetDeliveryPhone(num){ localStorage.setItem('honeybee-delivery-phone', num); }
-
-function hbRenderDeliveryPhoneLabel(){
-  const lbl = document.getElementById('hbDeliveryPhoneLabel');
-  if(!lbl) return;
-  const phone = hbGetDeliveryPhone();
-  lbl.textContent = phone ? ('☎️ ' + phone) : 'এখনো কোনো নম্বর সেট করা হয়নি';
-}
-
-function hbPromptDeliveryPhone(){
-  const current = hbGetDeliveryPhone();
-  const input = prompt('ডেলিভারি ম্যানের মোবাইল নম্বর দিন:', current);
-  if(input === null) return null;
-  const phone = input.trim();
-  if(!phone){ alert('সঠিক একটা নম্বর দিন।'); return null; }
-  hbSetDeliveryPhone(phone);
-  hbRenderDeliveryPhoneLabel();
-  return phone;
-}
-
-// ডেলিভারি ম্যানের আলাদা অ্যাপে রিং পাঠানো — এটা একটা Promise রিটার্ন করে,
-// যাতে কল করার আগে অন্তত রিকোয়েস্টটা পাঠানো নিশ্চিত করা যায় (নাহলে tel: এ
-// চলে যাওয়ার সময় ব্রাউজার ব্যাকগ্রাউন্ডে চলে যায় এবং রিকোয়েস্ট মাঝপথে থেমে যায়)
+/* ==================== 🔔 ডেলিভারি ম্যান কে ডাকা (রিং পাঠানো) ====================
+   Honey Bee Network স্ক্রিন থেকে এক ট্যাপে ডেলিভারি ম্যানের আলাদা অ্যাপে
+   (delivery-man-app.html) একটা রিয়েলটাইম "রিং" সিগন্যাল পাঠানো হয়
+   Firestore-এর মাধ্যমে — সে অ্যাপ চালু/সামনে রাখলে ভাইব্রেশন ও শব্দ করে
+   জানিয়ে দেবে যে দোকান থেকে ডাকা হচ্ছে। এখানে কোনো ফোন নম্বর/ডায়াল লাগে না। */
 function hbPingDeliveryApp(){
   return new Promise((resolve)=>{
     try{
@@ -3701,26 +3673,9 @@ function hbPingDeliveryApp(){
 }
 
 document.getElementById('hbCallDeliveryBtn').addEventListener('click', async ()=>{
-  let phone = hbGetDeliveryPhone();
-  if(!phone){
-    phone = hbPromptDeliveryPhone();
-    if(!phone) return;
-  }
-  // রিং পাঠানো শেষ হওয়া (বা সর্বোচ্চ ২ সেকেন্ড অপেক্ষা করা — ইন্টারনেট স্লো/না
-  // থাকলে যেন কল করাটা আটকে না থাকে) পর্যন্ত অপেক্ষা করে তারপর ডায়াল করা হয়,
-  // নাহলে ডায়ালার খোলার সময় ব্রাউজার ব্যাকগ্রাউন্ডে চলে গিয়ে রিং পাঠানো মাঝপথে
-  // থেমে যায় এবং ডেলিভারি অ্যাপে কিছুই পৌঁছায় না।
   const lbl = document.getElementById('hbRingStatusLbl');
   if(lbl) lbl.textContent = '🔔 ডেলিভারি অ্যাপে রিং পাঠানো হচ্ছে...';
-  await Promise.race([
-    hbPingDeliveryApp(),
-    new Promise((resolve)=> setTimeout(resolve, 2000))
-  ]);
-  window.location.href = 'tel:' + phone;
-});
-
-document.getElementById('hbEditDeliveryPhoneBtn').addEventListener('click', ()=>{
-  hbPromptDeliveryPhone();
+  await hbPingDeliveryApp();
 });
 
 document.getElementById('hbShowConnectCodeBtn').addEventListener('click', ()=>{
@@ -3742,7 +3697,6 @@ function hbIsToday(dateStr){
 }
 
 function hbRenderDashboard(){
-  hbRenderDeliveryPhoneLabel();
   const all = hbLoadOrders();
   const todays = all.filter(o => hbIsToday(o.date)).sort((a,b)=> new Date(b.date) - new Date(a.date));
 
