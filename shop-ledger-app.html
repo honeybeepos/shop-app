@@ -2581,6 +2581,15 @@
   </div>
 
   <button class="hbAddBtn" id="hbAddOrderBtn">➕ নতুন অর্ডার যোগ করুন</button>
+  <button class="hbAddBtn" id="hbCallDeliveryBtn" style="background:linear-gradient(145deg,#16a34a,#0f7a3a); margin-top:10px;">📞 ডেলিভারি ম্যান কে ডাকুন</button>
+  <div id="hbDeliveryPhoneRow" style="text-align:center; margin-top:6px;">
+    <span id="hbDeliveryPhoneLabel" style="font-size:11px; color:rgba(255,248,232,0.55);"></span>
+    <span id="hbEditDeliveryPhoneBtn" style="font-size:11px; color:var(--hb-amber); cursor:pointer; margin-left:8px; text-decoration:underline;">✏️ নম্বর পরিবর্তন</span>
+  </div>
+  <div id="hbConnectCodeRow" style="text-align:center; margin-top:4px;">
+    <span id="hbRingStatusLbl" style="font-size:11px; color:rgba(255,248,232,0.4);"></span>
+    <span id="hbShowConnectCodeBtn" style="font-size:11px; color:var(--hb-amber); cursor:pointer; text-decoration:underline; margin-left:8px;">🔗 ডেলিভারি অ্যাপ কানেক্ট কোড দেখুন</span>
+  </div>
 
   <div class="hbListWrap">
     <div class="hbListTitle">📋 আজকের অর্ডার তালিকা</div>
@@ -3640,6 +3649,73 @@ document.getElementById('bizHoneyBeeCard').addEventListener('click', ()=>{
 });
 document.getElementById('backFromHoneyBee').addEventListener('click', ()=> switchProgram('program-honeybee', 'program-bizmgmt'));
 
+/* ==================== 📞 ডেলিভারি ম্যান কে কল করা + অ্যাপে রিং পাঠানো ====================
+   Honey Bee Network স্ক্রিন থেকে এক ট্যাপে ডেলিভারি ম্যানকে ফোন করার সুবিধা,
+   পাশাপাশি ডেলিভারি ম্যানের আলাদা অ্যাপে (delivery-man-app.html) একটা রিয়েলটাইম
+   "রিং" সিগন্যাল পাঠানো হয় Firestore-এর মাধ্যমে — সে অ্যাপ চালু/সামনে রাখলে
+   ভাইব্রেশন ও শব্দ করে জানিয়ে দেবে যে দোকান থেকে ডাকা হচ্ছে। */
+function hbGetDeliveryPhone(){ return localStorage.getItem('honeybee-delivery-phone') || ''; }
+function hbSetDeliveryPhone(num){ localStorage.setItem('honeybee-delivery-phone', num); }
+
+function hbRenderDeliveryPhoneLabel(){
+  const lbl = document.getElementById('hbDeliveryPhoneLabel');
+  if(!lbl) return;
+  const phone = hbGetDeliveryPhone();
+  lbl.textContent = phone ? ('☎️ ' + phone) : 'এখনো কোনো নম্বর সেট করা হয়নি';
+}
+
+function hbPromptDeliveryPhone(){
+  const current = hbGetDeliveryPhone();
+  const input = prompt('ডেলিভারি ম্যানের মোবাইল নম্বর দিন:', current);
+  if(input === null) return null;
+  const phone = input.trim();
+  if(!phone){ alert('সঠিক একটা নম্বর দিন।'); return null; }
+  hbSetDeliveryPhone(phone);
+  hbRenderDeliveryPhoneLabel();
+  return phone;
+}
+
+// ডেলিভারি ম্যানের আলাদা অ্যাপে রিং পাঠানো — এটা fire-and-forget (ব্যর্থ হলেও
+// tel: কল করাটা যেন আটকে না যায়, তাই কখনো await/throw করা হয় না)
+function hbPingDeliveryApp(){
+  try{
+    const session = (typeof getSession === 'function') ? getSession() : null;
+    if(!session || !session.shopId || typeof db === 'undefined') return;
+    const lbl = document.getElementById('hbRingStatusLbl');
+    db.collection('shops').doc(session.shopId).collection('deliveryCalls').add({
+      calledAt: fbNow(),
+      calledBy: (typeof __deviceId !== 'undefined' ? __deviceId : 'shop-app'),
+      status: 'ringing'
+    }).then(()=>{
+      if(lbl) lbl.textContent = '🔔 ডেলিভারি অ্যাপে রিং পাঠানো হয়েছে';
+    }).catch((e)=>{
+      console.warn('Delivery app ring failed:', e);
+      if(lbl) lbl.textContent = '⚠️ ডেলিভারি অ্যাপে রিং পাঠানো যায়নি (ইন্টারনেট চেক করুন)';
+    });
+  }catch(e){ console.warn('Delivery ping error:', e); }
+}
+
+document.getElementById('hbCallDeliveryBtn').addEventListener('click', ()=>{
+  let phone = hbGetDeliveryPhone();
+  if(!phone){
+    phone = hbPromptDeliveryPhone();
+    if(!phone) return;
+  }
+  hbPingDeliveryApp();
+  window.location.href = 'tel:' + phone;
+});
+
+document.getElementById('hbEditDeliveryPhoneBtn').addEventListener('click', ()=>{
+  hbPromptDeliveryPhone();
+});
+
+document.getElementById('hbShowConnectCodeBtn').addEventListener('click', ()=>{
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  const code = session && session.shopId ? session.shopId : '';
+  if(!code){ alert('কোড পাওয়া যায়নি — লগইন ঠিক আছে কিনা চেক করুন।'); return; }
+  prompt('এই কোডটা ডেলিভারি ম্যানের "Honey Bee — ডেলিভারি অ্যাপ"-এ একবার বসিয়ে কানেক্ট করে দিন (নিচের বক্স থেকে কপি করুন):', code);
+});
+
 /* ==================== 🐝 Honey Bee Network — অনলাইন অর্ডার/ডেলিভারি লগ ====================
    দোকানের বাইরে থেকে (Honey Bee Network-এর মাধ্যমে) আসা অনলাইন অর্ডার/ডেলিভারি হাতে
    লগ করে রাখার জায়গা — এখান থেকেই আজকের অর্ডার-টাকা, ডেলিভারি সংখ্যা ও অতিরিক্ত
@@ -3652,6 +3728,7 @@ function hbIsToday(dateStr){
 }
 
 function hbRenderDashboard(){
+  hbRenderDeliveryPhoneLabel();
   const all = hbLoadOrders();
   const todays = all.filter(o => hbIsToday(o.date)).sort((a,b)=> new Date(b.date) - new Date(a.date));
 
