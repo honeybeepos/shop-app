@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🐝 Honey Bee Bazar</title>
+<meta name="theme-color" content="#1a1206">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg1:#1a1206; --bg2:#3d2405; --gold:#ffb703; --amber:#ffd166;
+    --card:#241705; --border:rgba(255,209,102,0.22); --danger:#e2543d; --ok:#2fbf71; --muted:rgba(255,248,232,0.55);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{ height:100%; margin:0; }
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(255,183,3,0.16), transparent 45%),
+      radial-gradient(circle at 90% 100%, rgba(255,209,102,0.10), transparent 40%),
+      linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 100%);
+    color:#fff8e8; font-family:'Noto Sans Bengali','Space Mono',sans-serif;
+  }
+  .wrap{ max-width:640px; margin:0 auto; padding:20px 16px 50px; }
+
+  header{ display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  header .hex{ font-size:34px; }
+  header h1{ margin:0; font-size:18px; font-weight:800; }
+  header p{ margin:2px 0 0; font-size:10.5px; color:var(--amber); letter-spacing:1.3px; text-transform:uppercase; opacity:0.85; }
+  .backBtn{
+    background:transparent; border:1px solid var(--border); color:var(--muted); padding:8px 12px;
+    border-radius:9px; font-size:12px; cursor:pointer; font-family:inherit; margin-bottom:14px;
+  }
+
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px;
+    margin-bottom:12px; box-shadow:0 8px 20px rgba(0,0,0,0.28);
+  }
+
+  .searchBox{
+    width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border);
+    background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:14px; margin-bottom:16px;
+  }
+  .searchBox:focus{ outline:2px solid var(--gold); outline-offset:1px; }
+
+  .marketItem, .shopItem{
+    display:flex; align-items:center; gap:12px; padding:14px; cursor:pointer;
+  }
+  .marketItem .ic, .shopItem .ic{ font-size:26px; flex-shrink:0; }
+  .marketItem .info, .shopItem .info{ flex:1; min-width:0; }
+  .marketItem .name, .shopItem .name{ font-weight:700; font-size:14.5px; }
+  .marketItem .meta, .shopItem .meta{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .chev{ color:var(--muted); font-size:16px; }
+
+  .productRow{
+    display:flex; align-items:center; justify-content:space-between; padding:13px 14px;
+    border-bottom:1px solid var(--border);
+  }
+  .productRow:last-child{ border-bottom:none; }
+  .productRow .pname{ font-size:14px; font-weight:600; }
+  .productRow .pstock{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .stockBadge{ font-size:11px; padding:4px 10px; border-radius:20px; font-weight:700; flex-shrink:0; }
+  .stockBadge.in{ background:rgba(47,191,113,0.18); color:var(--ok); }
+  .stockBadge.low{ background:rgba(255,209,102,0.18); color:var(--amber); }
+  .stockBadge.out{ background:rgba(226,84,61,0.18); color:var(--danger); }
+
+  .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
+  .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
+
+  #screenMarkets, #screenShops, #screenProducts{ display:none; }
+  #screenMarkets.active, #screenShops.active, #screenProducts.active{ display:block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="hex">🐝</div>
+    <div>
+      <h1>Honey Bee Bazar</h1>
+      <p>Browse Markets &amp; Shops</p>
+    </div>
+  </header>
+
+  <!-- ধাপ ১: বাজার নির্বাচন -->
+  <div id="screenMarkets" class="active">
+    <input type="text" class="searchBox" id="marketSearch" placeholder="🔍 আপনার এলাকার বাজার খুঁজুন...">
+    <div id="marketsList"><div class="loadingMsg">বাজারের তালিকা লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- ধাপ ২: দোকানের তালিকা -->
+  <div id="screenShops">
+    <button class="backBtn" id="backToMarkets">← বাজার পরিবর্তন করুন</button>
+    <div class="card" style="text-align:center; padding:12px;">
+      <div style="font-size:13px; color:var(--muted);">বাজার</div>
+      <div style="font-size:16px; font-weight:800; color:var(--amber);" id="currentMarketName">—</div>
+    </div>
+    <input type="text" class="searchBox" id="shopSearch" placeholder="🔍 দোকান খুঁজুন...">
+    <div id="shopsList"><div class="loadingMsg">দোকানের তালিকা লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- ধাপ ৩: প্রোডাক্ট/স্টক -->
+  <div id="screenProducts">
+    <button class="backBtn" id="backToShops">← দোকানের তালিকায় ফিরে যান</button>
+    <div class="card" style="text-align:center; padding:12px;">
+      <div style="font-size:13px; color:var(--muted);">দোকান</div>
+      <div style="font-size:16px; font-weight:800; color:var(--amber);" id="currentShopName">—</div>
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div id="productsList"><div class="loadingMsg">স্টক লোড হচ্ছে...</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD6qmuWkNUrskMIBHq8Z_AQ0N_WT1DL8Is",
+  authDomain: "honeybee-984dd.firebaseapp.com",
+  projectId: "honeybee-984dd",
+  storageBucket: "honeybee-984dd.firebasestorage.app",
+  messagingSenderId: "610211112501",
+  appId: "1:610211112501:web:9ea40b9060d425e85b737c"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+function $(id){ return document.getElementById(id); }
+let allMarkets = [];
+let allShops = [];
+let currentMarketId = null, currentShopId = null;
+
+function showScreen(id){
+  ["screenMarkets","screenShops","screenProducts"].forEach(s=> $(s).classList.remove("active"));
+  $(id).classList.add("active");
+}
+
+function escapeHtml(str){
+  const d = document.createElement("div");
+  d.textContent = str == null ? "" : String(str);
+  return d.innerHTML;
+}
+
+/* ---------- ধাপ ১: বাজারের তালিকা ---------- */
+async function loadMarkets(){
+  try{
+    const qs = await db.collection("markets").orderBy("name").get();
+    allMarkets = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+    renderMarkets(allMarkets);
+  }catch(e){
+    console.error(e);
+    $("marketsList").innerHTML = '<div class="emptyMsg">বাজারের তালিকা লোড করা যায়নি — ইন্টারনেট চেক করুন।</div>';
+  }
+}
+
+function renderMarkets(list){
+  if(list.length === 0){
+    $("marketsList").innerHTML = '<div class="emptyMsg">এখনো কোনো বাজার নিবন্ধিত হয়নি।</div>';
+    return;
+  }
+  $("marketsList").innerHTML = list.map(m => `
+    <div class="card marketItem" onclick="selectMarket('${m.id}')">
+      <div class="ic">🏙️</div>
+      <div class="info">
+        <div class="name">${escapeHtml(m.name || m.id)}</div>
+        <div class="meta">${escapeHtml(m.region || "")}</div>
+      </div>
+      <div class="chev">›</div>
+    </div>`).join("");
+}
+
+$("marketSearch").addEventListener("input", (e)=>{
+  const q = e.target.value.trim().toLowerCase();
+  renderMarkets(allMarkets.filter(m => (m.name||"").toLowerCase().includes(q)));
+});
+
+window.selectMarket = function(marketId){
+  currentMarketId = marketId;
+  const market = allMarkets.find(m=> m.id === marketId);
+  $("currentMarketName").textContent = market ? (market.name || marketId) : marketId;
+  showScreen("screenShops");
+  loadShops(marketId);
+};
+
+$("backToMarkets").addEventListener("click", ()=> showScreen("screenMarkets"));
+
+/* ---------- ধাপ ২: দোকানের তালিকা ---------- */
+async function loadShops(marketId){
+  $("shopsList").innerHTML = '<div class="loadingMsg">দোকানের তালিকা লোড হচ্ছে...</div>';
+  try{
+    const qs = await db.collection("shops")
+      .where("marketId", "==", marketId)
+      .where("status", "==", "active")
+      .get();
+    allShops = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+    renderShops(allShops);
+  }catch(e){
+    console.error(e);
+    $("shopsList").innerHTML = '<div class="emptyMsg">দোকানের তালিকা লোড করা যায়নি।</div>';
+  }
+}
+
+function renderShops(list){
+  if(list.length === 0){
+    $("shopsList").innerHTML = '<div class="emptyMsg">এই বাজারে এখনো কোনো সক্রিয় দোকান নেই।</div>';
+    return;
+  }
+  $("shopsList").innerHTML = list.map(s => `
+    <div class="card shopItem" onclick="selectShop('${s.id}')">
+      <div class="ic">🏪</div>
+      <div class="info">
+        <div class="name">${escapeHtml(s.name || s.shopName || "দোকান")}</div>
+        <div class="meta">${escapeHtml(s.category || "")}</div>
+      </div>
+      <div class="chev">›</div>
+    </div>`).join("");
+}
+
+$("shopSearch").addEventListener("input", (e)=>{
+  const q = e.target.value.trim().toLowerCase();
+  renderShops(allShops.filter(s => (s.name||s.shopName||"").toLowerCase().includes(q)));
+});
+
+$("backToShops").addEventListener("click", ()=> showScreen("screenShops"));
+
+/* ---------- ধাপ ৩: প্রোডাক্ট/স্টক ---------- */
+window.selectShop = function(shopId){
+  currentShopId = shopId;
+  const shop = allShops.find(s=> s.id === shopId);
+  $("currentShopName").textContent = shop ? (shop.name || shop.shopName || shopId) : shopId;
+  showScreen("screenProducts");
+  loadProducts(shopId);
+};
+
+async function loadProducts(shopId){
+  $("productsList").innerHTML = '<div class="loadingMsg">স্টক লোড হচ্ছে...</div>';
+  try{
+    const qs = await db.collection("shops").doc(shopId).collection("publicStock").get();
+    if(qs.empty){
+      $("productsList").innerHTML = '<div class="emptyMsg">এই দোকান এখনো কোনো প্রোডাক্ট/স্টক তালিকা প্রকাশ করেনি।</div>';
+      return;
+    }
+    $("productsList").innerHTML = qs.docs.map(doc=>{
+      const p = doc.data();
+      const qty = Number(p.stockQty);
+      let stockClass = "in", stockLabel = "স্টকে আছে";
+      if(!isNaN(qty)){
+        if(qty <= 0){ stockClass = "out"; stockLabel = "স্টক নেই"; }
+        else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
+        else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
+      }
+      return `
+        <div class="productRow">
+          <div>
+            <div class="pname">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
+            <div class="pstock">${p.price != null ? ("SAR " + p.price) : ""}</div>
+          </div>
+          <span class="stockBadge ${stockClass}">${stockLabel}</span>
+        </div>`;
+    }).join("");
+  }catch(e){
+    console.error(e);
+    $("productsList").innerHTML = '<div class="emptyMsg">স্টক লোড করা যায়নি।</div>';
+  }
+}
+
+loadMarkets();
+</script>
+</body>
+</html>
