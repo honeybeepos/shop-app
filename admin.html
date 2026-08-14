@@ -21,7 +21,7 @@
   .wrap{max-width:920px;margin:0 auto;padding:16px;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 2px 0 var(--line);}
   .card h2{font-size:15px;margin:0 0 10px;color:var(--teal);}
-  textarea,input{width:100%;padding:9px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:13.5px;margin-bottom:8px;}
+  textarea,input,select{width:100%;padding:9px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:13.5px;margin-bottom:8px;background:#fff;}
   .btn{padding:9px 16px;border:none;border-radius:8px;background:var(--copper);color:#fff;font-weight:700;cursor:pointer;font-family:inherit;font-size:13.5px;}
   .shop{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:#fffefb;}
   .shop-top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;}
@@ -63,6 +63,26 @@
   </div>
 
   <div class="card">
+    <h2>🏙️ বাজার ম্যানেজমেন্ট (<span id="marketCount">0</span>)</h2>
+    <input type="text" id="newMarketName" placeholder="বাজারের নাম (যেমনঃ দাম্মাম বাজার)">
+    <input type="text" id="newMarketRegion" placeholder="অঞ্চল/শহর (ঐচ্ছিক)">
+    <button class="btn" id="addMarketBtn">➕ নতুন বাজার যোগ করুন</button>
+    <div id="marketList" style="margin-top:12px;">লোড হচ্ছে...</div>
+  </div>
+
+  <div class="card">
+    <h2>🧑‍💼 এজেন্ট ম্যানেজমেন্ট (<span id="agentCount">0</span>)</h2>
+    <input type="text" id="newAgentName" placeholder="এজেন্টের নাম">
+    <input type="email" id="newAgentEmail" placeholder="ইমেইল (লগইনের জন্য)">
+    <input type="text" id="newAgentPass" placeholder="পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)">
+    <select id="newAgentMarket"><option value="">-- বাজার নির্বাচন করুন --</option></select>
+    <input type="number" id="newAgentCommission" placeholder="কমিশন % (যেমনঃ 20)" value="20">
+    <button class="btn" id="addAgentBtn">➕ নতুন এজেন্ট যোগ করুন</button>
+    <p id="agentAddMsg" style="display:none; font-size:12.5px; margin:4px 0 0;"></p>
+    <div id="agentList" style="margin-top:12px;">লোড হচ্ছে...</div>
+  </div>
+
+  <div class="card">
     <h2>🏪 সব দোকান (<span id="shopCount">0</span>)</h2>
     <div id="shopList">লোড হচ্ছে...</div>
   </div>
@@ -94,6 +114,8 @@ auth.onAuthStateChanged(async (user)=>{
   document.getElementById("loginGate").style.display = "none";
   loadShops();
   loadAnnouncement();
+  loadMarkets();
+  loadAgents();
 });
 
 document.getElementById("logoutBtn").addEventListener("click", async ()=>{
@@ -119,6 +141,143 @@ document.getElementById("sendAnnounce").addEventListener("click", async ()=>{
 document.getElementById("clearAnnounce").addEventListener("click", async ()=>{
   await db.collection("system").doc("announcement").set({ active: false, updatedAt: fbNow() }, { merge: true });
   document.getElementById("announceText").value = "";
+});
+
+/* ==================== 🏙️ বাজার ম্যানেজমেন্ট ==================== */
+let __marketsCache = [];
+
+async function loadMarkets(){
+  const snap = await db.collection("markets").orderBy("name").get();
+  __marketsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  document.getElementById("marketCount").textContent = snap.size;
+
+  const list = document.getElementById("marketList");
+  list.innerHTML = snap.empty
+    ? "<p>এখনো কোনো বাজার তৈরি হয়নি।</p>"
+    : __marketsCache.map(m => `
+        <div class="member-row">
+          <span>🏙️ ${m.name || m.id}${m.region ? " · " + m.region : ""}</span>
+          <span style="font-family:'Space Mono',monospace; font-size:11px; color:#8a7f6c;">${m.id}</span>
+        </div>`).join("");
+
+  // এজেন্ট তৈরির ফর্মে বাজারের ড্রপডাউন আপডেট
+  const sel = document.getElementById("newAgentMarket");
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">-- বাজার নির্বাচন করুন --</option>' +
+    __marketsCache.map(m => `<option value="${m.id}">${m.name || m.id}</option>`).join("");
+  sel.value = currentVal;
+}
+
+document.getElementById("addMarketBtn").addEventListener("click", async ()=>{
+  const name = document.getElementById("newMarketName").value.trim();
+  const region = document.getElementById("newMarketRegion").value.trim();
+  if(!name){ alert("বাজারের নাম দিন।"); return; }
+  const btn = document.getElementById("addMarketBtn");
+  btn.disabled = true; btn.textContent = "যোগ হচ্ছে...";
+  try{
+    await db.collection("markets").add({ name, region: region || null, createdAt: fbNow() });
+    document.getElementById("newMarketName").value = "";
+    document.getElementById("newMarketRegion").value = "";
+    await loadMarkets();
+  }catch(e){
+    alert("বাজার যোগ করা যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "➕ নতুন বাজার যোগ করুন";
+  }
+});
+
+/* ==================== 🧑‍💼 এজেন্ট ম্যানেজমেন্ট ==================== */
+async function loadAgents(){
+  const snap = await db.collection("agents").orderBy("createdAt","desc").get();
+  document.getElementById("agentCount").textContent = snap.size;
+
+  const list = document.getElementById("agentList");
+  if(snap.empty){ list.innerHTML = "<p>এখনো কোনো এজেন্ট নিয়োগ করা হয়নি।</p>"; return; }
+
+  list.innerHTML = "";
+  for(const doc of snap.docs){
+    const agent = doc.data();
+    const agentId = doc.id;
+    const market = __marketsCache.find(m => m.id === agent.marketId);
+    const div = document.createElement("div");
+    div.className = "shop";
+    div.innerHTML = `
+      <div class="shop-top">
+        <span class="shop-name">${agent.name || "(নামহীন এজেন্ট)"}</span>
+        <span class="chip ${agent.status === 'blocked' ? 'blocked' : 'active'}">${agent.status === 'blocked' ? 'ব্লকড' : 'সক্রিয়'}</span>
+      </div>
+      <div class="meta">${agent.email || ''} · বাজার: ${market ? (market.name || market.id) : (agent.marketId || '—')} · কমিশন: ${agent.commissionPercent != null ? agent.commissionPercent : '—'}%</div>
+      <div class="row">
+        ${agent.status === 'blocked'
+          ? `<button class="btn unblock" data-agent-act="unblock" data-id="${agentId}">✅ আনব্লক করুন</button>`
+          : `<button class="btn block" data-agent-act="block" data-id="${agentId}">⛔ ব্লক করুন</button>`}
+      </div>
+    `;
+    list.appendChild(div);
+  }
+  list.querySelectorAll('[data-agent-act="block"]').forEach(b=>b.addEventListener("click", ()=>setAgentStatus(b.dataset.id,"blocked")));
+  list.querySelectorAll('[data-agent-act="unblock"]').forEach(b=>b.addEventListener("click", ()=>setAgentStatus(b.dataset.id,"active")));
+}
+
+async function setAgentStatus(agentId, status){
+  await db.collection("agents").doc(agentId).set({ status, updatedAt: fbNow() }, { merge: true });
+  loadAgents();
+}
+
+document.getElementById("addAgentBtn").addEventListener("click", async ()=>{
+  const name = document.getElementById("newAgentName").value.trim();
+  const email = document.getElementById("newAgentEmail").value.trim();
+  const pass = document.getElementById("newAgentPass").value;
+  const marketId = document.getElementById("newAgentMarket").value;
+  const commission = Number(document.getElementById("newAgentCommission").value) || 0;
+  const msgEl = document.getElementById("agentAddMsg");
+  msgEl.style.display = "none";
+
+  if(!name || !email || !pass || !marketId){
+    msgEl.textContent = "⚠️ নাম, ইমেইল, পাসওয়ার্ড ও বাজার — সবগুলো দিন।";
+    msgEl.style.color = "var(--due)"; msgEl.style.display = "block";
+    return;
+  }
+  if(pass.length < 6){
+    msgEl.textContent = "⚠️ পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।";
+    msgEl.style.color = "var(--due)"; msgEl.style.display = "block";
+    return;
+  }
+
+  const btn = document.getElementById("addAgentBtn");
+  btn.disabled = true; btn.textContent = "তৈরি হচ্ছে...";
+  try{
+    // secondaryAuth ব্যবহার করা হচ্ছে যাতে নতুন এজেন্ট তৈরি করার সময়
+    // সুপার-অ্যাডমিনের নিজের লগইন সেশন নষ্ট না হয়
+    const cred = await secondaryAuth.createUserWithEmailAndPassword(email, pass);
+    const newUid = cred.user.uid;
+    await secondaryAuth.signOut();
+
+    await db.collection("users").doc(newUid).set({ role: "agent", email, createdAt: fbNow() });
+    await db.collection("agents").doc(newUid).set({
+      name, email, marketId,
+      commissionPercent: commission,
+      status: "active",
+      createdAt: fbNow()
+    });
+
+    document.getElementById("newAgentName").value = "";
+    document.getElementById("newAgentEmail").value = "";
+    document.getElementById("newAgentPass").value = "";
+    document.getElementById("newAgentMarket").value = "";
+    document.getElementById("newAgentCommission").value = "20";
+    msgEl.textContent = "✅ এজেন্ট তৈরি হয়েছে — এখন এই ইমেইল/পাসওয়ার্ড দিয়ে Honey Bee Agent অ্যাপে লগইন করতে পারবেন।";
+    msgEl.style.color = "var(--paid)"; msgEl.style.display = "block";
+    await loadAgents();
+  }catch(e){
+    console.error(e);
+    let friendly = e.message;
+    if(e.code === "auth/email-already-in-use") friendly = "এই ইমেইল দিয়ে আগে থেকেই একটা অ্যাকাউন্ট আছে।";
+    msgEl.textContent = "⚠️ এজেন্ট তৈরি করা যায়নি: " + friendly;
+    msgEl.style.color = "var(--due)"; msgEl.style.display = "block";
+  }finally{
+    btn.disabled = false; btn.textContent = "➕ নতুন এজেন্ট যোগ করুন";
+  }
 });
 
 async function loadShops(){
