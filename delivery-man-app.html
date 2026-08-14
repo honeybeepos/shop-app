@@ -154,6 +154,12 @@
       <button class="btn" id="enablePushBtn">🔔 নোটিফিকেশন চালু করুন</button>
     </div>
 
+    <div class="card" id="gpsCard">
+      <h2>📍 লাইভ লোকেশন শেয়ারিং</h2>
+      <p class="desc" id="gpsDesc">এটা চালু থাকলে দোকান ও এজেন্ট আপনার লাইভ অবস্থান ম্যাপে দেখতে পারবে — কাস্টমারের কাছে পৌঁছাতে সুবিধা হবে।</p>
+      <button class="btn" id="toggleGpsBtn">📍 লোকেশন শেয়ারিং চালু করুন</button>
+    </div>
+
     <button class="btn secondary" id="testRingBtn">🔔 টেস্ট রিং (নিজে টেস্ট করুন)</button>
 
     <div class="footerLink">
@@ -191,7 +197,7 @@ const db = firebase.firestore();
 /* ---------- FCM (ব্যাকগ্রাউন্ড পুশ নোটিফিকেশন) ----------
    VAPID_KEY: Firebase Console → Project Settings → Cloud Messaging →
    "Web configuration" → "Generate key pair" থেকে পাওয়া কী এখানে বসান। */
-const VAPID_KEY = "BCEdpLGNUIBG2IW9lTVGcaM7qbFrbaEnGg9N1CYGNCojCVUIruqqcWP4cdX3YietIJ1kWe1ZUulbCQpvSQXAIKg";
+const VAPID_KEY = "PASTE-YOUR-VAPID-PUBLIC-KEY-HERE";
 let messaging = null;
 try{ messaging = firebase.messaging.isSupported() ? firebase.messaging() : null; }catch(e){ messaging = null; }
 
@@ -219,6 +225,7 @@ window.addEventListener("DOMContentLoaded", ()=>{
   $("disconnectBtn").addEventListener("click", ()=>{
     if(!confirm("এই দোকানের সংযোগ বিচ্ছিন্ন করে নতুন কোড দিতে চান?")) return;
     stopListening();
+    if(typeof stopGpsSharing === "function" && isGpsSharingOn()) stopGpsSharing();
     localStorage.removeItem(LS_KEY);
     $("mainScreen").style.display = "none";
     $("setupScreen").style.display = "block";
@@ -361,6 +368,91 @@ if(messaging){
     });
   }catch(e){ console.warn("onMessage setup failed:", e); }
 }
+
+/* ==================== 📍 লাইভ GPS লোকেশন শেয়ারিং ====================
+   navigator.geolocation.watchPosition দিয়ে ডিভাইসের লাইভ অবস্থান পাওয়া হয়,
+   কিন্তু প্রতিবার না লিখে প্রতি ~৭ সেকেন্ডে একবার Firestore-এ লেখা হয় (থ্রটল
+   করা) — যাতে অপ্রয়োজনীয় লেখা কম হয়। বন্ধ করলে watchPosition থেমে যায় এবং
+   Firestore-এ "অফলাইন" হিসেবে চিহ্নিত করা হয়। */
+let __gpsWatchId = null;
+let __gpsLastSentAt = 0;
+const GPS_SEND_INTERVAL_MS = 7000;
+
+function isGpsSharingOn(){ return localStorage.getItem("deliveryman-gps-sharing") === "on"; }
+
+function refreshGpsUi(){
+  const btn = $("toggleGpsBtn");
+  const desc = $("gpsDesc");
+  if(!btn) return;
+  if(isGpsSharingOn()){
+    btn.textContent = "⏹️ লোকেশন শেয়ারিং বন্ধ করুন";
+    desc.textContent = "✅ চালু আছে — দোকান/এজেন্ট এখন আপনার লাইভ অবস্থান দেখতে পাচ্ছে।";
+  }else{
+    btn.textContent = "📍 লোকেশন শেয়ারিং চালু করুন";
+    desc.textContent = "এটা চালু থাকলে দোকান ও এজেন্ট আপনার লাইভ অবস্থান ম্যাপে দেখতে পারবে — কাস্টমারের কাছে পৌঁছাতে সুবিধা হবে।";
+  }
+}
+
+async function writeRiderLocation(lat, lng, extra){
+  const shopId = localStorage.getItem(LS_KEY);
+  if(!shopId) return;
+  try{
+    await db.collection("shops").doc(shopId).collection("live").doc("riderLocation").set({
+      lat, lng,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      sharing: true,
+      ...(extra || {})
+    }, { merge: true });
+  }catch(e){ console.warn("Rider location write failed:", e); }
+}
+
+async function markRiderOffline(){
+  const shopId = localStorage.getItem(LS_KEY);
+  if(!shopId) return;
+  try{
+    await db.collection("shops").doc(shopId).collection("live").doc("riderLocation").set({
+      sharing: false, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  }catch(e){ /* ignore */ }
+}
+
+function startGpsSharing(){
+  if(!navigator.geolocation){ alert("এই ডিভাইসে লোকেশন সাপোর্ট নেই।"); return; }
+  __gpsWatchId = navigator.geolocation.watchPosition((pos)=>{
+    const now = Date.now();
+    if(now - __gpsLastSentAt < GPS_SEND_INTERVAL_MS) return; // থ্রটল — প্রতি ৭ সেকেন্ডে একবার
+    __gpsLastSentAt = now;
+    writeRiderLocation(pos.coords.latitude, pos.coords.longitude, {
+      speed: pos.coords.speed || null,
+      heading: pos.coords.heading || null,
+      accuracy: pos.coords.accuracy || null
+    });
+  }, (err)=>{
+    console.warn("GPS watch error:", err);
+    alert("লোকেশন পাওয়া যাচ্ছে না — লোকেশন পারমিশন চেক করুন।");
+    stopGpsSharing();
+  }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+
+  localStorage.setItem("deliveryman-gps-sharing", "on");
+  refreshGpsUi();
+}
+
+function stopGpsSharing(){
+  if(__gpsWatchId != null){ navigator.geolocation.clearWatch(__gpsWatchId); __gpsWatchId = null; }
+  localStorage.setItem("deliveryman-gps-sharing", "off");
+  markRiderOffline();
+  refreshGpsUi();
+}
+
+$("toggleGpsBtn") && $("toggleGpsBtn").addEventListener("click", ()=>{
+  if(isGpsSharingOn()) stopGpsSharing(); else startGpsSharing();
+});
+
+// পেজ লোড হওয়ার সময় আগে থেকে চালু থাকলে আবার শুরু করা (শপ কানেক্ট থাকা অবস্থায়)
+window.addEventListener("DOMContentLoaded", ()=>{
+  refreshGpsUi();
+  if(isGpsSharingOn() && localStorage.getItem(LS_KEY)) startGpsSharing();
+});
 
 /* ---------- ভাইব্রেশন + শব্দ (রিং) ---------- */
 function beepOnce(){

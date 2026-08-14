@@ -575,6 +575,9 @@
     100%{ box-shadow:0 0 0 0 rgba(39,214,127,0); }
   }
 </style>
+<!-- Leaflet.js (OpenStreetMap) — সম্পূর্ণ ফ্রি, কোনো API key/কার্ড লাগে না -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -619,7 +622,40 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="shopSettingsModalOverlay">
+<!-- 🗺️ লাইভ ম্যাপ — Honey Bee Network ডেলিভারি ট্র্যাকিং -->
+<div class="modal-overlay" id="hbLiveMapModalOverlay">
+  <div class="modal-box" style="max-width:520px; width:94vw; text-align:left; max-height:92vh; display:flex; flex-direction:column; background:#241605; color:#fff8e8; border:1px solid rgba(255,209,102,0.35); padding:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <h3 style="margin:0; font-size:15.5px; color:#ffd166;">🗺️ লাইভ ডেলিভারি ম্যাপ</h3>
+      <span id="hbCloseLiveMapBtn" style="cursor:pointer; font-size:13px; color:rgba(255,248,232,0.6); text-decoration:underline;">✕ বন্ধ করুন</span>
+    </div>
+    <div id="hbLiveMapEl" style="width:100%; height:340px; border-radius:12px; overflow:hidden; background:#111; margin-bottom:12px;"></div>
+    <div id="hbLiveMapInfo" style="font-size:12.5px; color:rgba(255,248,232,0.75); line-height:1.7;">
+      <div>🏪 দোকান: <span id="hbMapStoreStatus">লোড হচ্ছে...</span></div>
+      <div>🛵 রাইডার: <span id="hbMapRiderStatus">—</span></div>
+      <div>🏠 কাস্টমার: <span id="hbMapCustomerStatus">—</span></div>
+      <div id="hbMapDistanceRow" style="display:none; margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,209,102,0.2);">
+        দূরত্ব: <b id="hbMapDistanceVal" style="color:#ffd166;">—</b> ·
+        আনুমানিক ডেলিভারি চার্জ: <b id="hbMapChargeVal" style="color:#ffd166;">—</b>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 📍 ডেলিভারি লোকেশন পিন করা (কাস্টমারের ঠিকানা ম্যাপে ট্যাপ করে) -->
+<div class="modal-overlay" id="hbPickLocationModalOverlay">
+  <div class="modal-box" style="max-width:520px; width:94vw; text-align:left; max-height:92vh; display:flex; flex-direction:column; background:#241605; color:#fff8e8; border:1px solid rgba(255,209,102,0.35); padding:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <h3 style="margin:0; font-size:15.5px; color:#ffd166;">📍 কাস্টমারের ডেলিভারি লোকেশন</h3>
+      <span id="hbClosePickLocationBtn" style="cursor:pointer; font-size:13px; color:rgba(255,248,232,0.6); text-decoration:underline;">✕ বন্ধ করুন</span>
+    </div>
+    <p class="pin-desc" style="margin:0 0 10px; color:rgba(255,248,232,0.6);">ম্যাপে ট্যাপ করে ডেলিভারির ঠিকানায় পিন বসান।</p>
+    <div id="hbPickLocationMapEl" style="width:100%; height:300px; border-radius:12px; overflow:hidden; background:#111; margin-bottom:12px;"></div>
+    <p id="hbPickLocationDistanceTxt" style="font-size:12.5px; color:rgba(255,248,232,0.7); margin:0 0 12px;"></p>
+    <button class="hbAddBtn" id="hbConfirmPickLocationBtn" style="background:linear-gradient(145deg,#16a34a,#0f7a3a);">✅ এই লোকেশন দিয়ে ডেলিভারি ম্যানকে ডাকুন</button>
+    <button class="hbAddBtn" id="hbSkipPickLocationBtn" style="background:transparent; border:1px solid rgba(255,209,102,0.35); color:#ffd166; margin-top:8px;">লোকেশন ছাড়াই শুধু ডাকুন</button>
+  </div>
+</div>
   <div class="modal-box" style="max-width:380px; text-align:left;">
     <h3 style="margin:0 0 4px;">🧾 SALES INVOICE সেটিং</h3>
     <p class="pin-desc" style="margin:0 0 14px;">এখানে যা লিখবেন সেটাই বিল/ইনভয়েসে দোকানের নাম হিসেবে দেখাবে।</p>
@@ -2586,6 +2622,10 @@
     <span id="hbRingStatusLbl" style="font-size:11px; color:rgba(255,248,232,0.4);"></span>
     <span id="hbShowConnectCodeBtn" style="font-size:11px; color:var(--hb-amber); cursor:pointer; text-decoration:underline; margin-left:8px;">🔗 ডেলিভারি অ্যাপ কানেক্ট কোড দেখুন</span>
   </div>
+  <div style="text-align:center; margin-top:8px; display:flex; gap:14px; justify-content:center; flex-wrap:wrap;">
+    <span id="hbSetStoreLocationBtn" style="font-size:11.5px; color:var(--hb-amber); cursor:pointer; text-decoration:underline;">📍 দোকানের অবস্থান সেট করুন</span>
+    <span id="hbOpenLiveMapBtn" style="font-size:11.5px; color:var(--hb-amber); cursor:pointer; text-decoration:underline;">🗺️ লাইভ ম্যাপ দেখুন</span>
+  </div>
 
   <div class="hbListWrap">
     <div class="hbListTitle">📋 আজকের অর্ডার তালিকা</div>
@@ -3645,44 +3685,279 @@ document.getElementById('bizHoneyBeeCard').addEventListener('click', ()=>{
 });
 document.getElementById('backFromHoneyBee').addEventListener('click', ()=> switchProgram('program-honeybee', 'program-bizmgmt'));
 
-/* ==================== 🔔 ডেলিভারি ম্যান কে ডাকা (রিং পাঠানো) ====================
-   Honey Bee Network স্ক্রিন থেকে এক ট্যাপে ডেলিভারি ম্যানের আলাদা অ্যাপে
-   (delivery-man-app.html) একটা রিয়েলটাইম "রিং" সিগন্যাল পাঠানো হয়
-   Firestore-এর মাধ্যমে — সে অ্যাপ চালু/সামনে রাখলে ভাইব্রেশন ও শব্দ করে
-   জানিয়ে দেবে যে দোকান থেকে ডাকা হচ্ছে। এখানে কোনো ফোন নম্বর/ডায়াল লাগে না। */
-function hbPingDeliveryApp(){
-  return new Promise((resolve)=>{
+/* ==================== 🔔 ডেলিভারি ম্যান কে ডাকা + 🗺️ লাইভ ম্যাপ ====================
+   Honey Bee Network স্ক্রিন থেকে ডেলিভারি ম্যানের আলাদা অ্যাপে (delivery-man-app.html)
+   একটা রিয়েলটাইম "রিং" সিগন্যাল পাঠানো হয়, সাথে ঐচ্ছিকভাবে কাস্টমারের
+   ডেলিভারি-লোকেশন (ম্যাপে ট্যাপ করে বসানো)। রাইডারের লাইভ GPS, দোকানের
+   অবস্থান ও কাস্টমারের অবস্থান — তিনটেই একটা Leaflet(OpenStreetMap) ম্যাপে
+   একসাথে দেখানো হয়, দূরত্ব হিসাব হয় Haversine ফর্মুলা দিয়ে আর রুট আনা হয়
+   OSRM-এর ফ্রি পাবলিক সার্ভার থেকে — কোনো কিছুতেই কার্ড/API-key লাগে না। */
+
+// ---------- দূরত্ব হিসাব (Haversine, কার্ড/key ছাড়াই) ----------
+function hbHaversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ---------- OSRM পাবলিক সার্ভার থেকে রোড-ডিস্ট্যান্স/রুট আনা (ফ্রি, key লাগে না) ----------
+async function hbFetchOsrmRoute(lat1, lng1, lat2, lng2){
+  try{
+    const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if(data && data.routes && data.routes[0]){
+      const r = data.routes[0];
+      return {
+        distanceKm: r.distance / 1000,
+        durationMin: r.duration / 60,
+        coords: r.geometry.coordinates.map(c => [c[1], c[0]]) // [lng,lat] -> [lat,lng]
+      };
+    }
+  }catch(e){ console.warn('OSRM route fetch failed, falling back to straight line:', e); }
+  return null;
+}
+
+function hbEstimateCharge(distanceKm){
+  // ডিফল্ট বেস চার্জ + প্রতি-কিমি রেট (localStorage-এ সেভ থাকে, চাইলে বদলানো যাবে)
+  const base = Number(localStorage.getItem('honeybee-base-charge')) || 5;
+  const perKm = Number(localStorage.getItem('honeybee-per-km-charge')) || 1.5;
+  return base + (perKm * distanceKm);
+}
+
+// ---------- 📍 দোকানের অবস্থান সেট করা (একবার) ----------
+document.getElementById('hbSetStoreLocationBtn').addEventListener('click', ()=>{
+  if(!navigator.geolocation){ alert('এই ডিভাইসে লোকেশন সাপোর্ট নেই।'); return; }
+  const el = document.getElementById('hbSetStoreLocationBtn');
+  const origText = el.textContent;
+  el.textContent = '📍 অবস্থান খোঁজা হচ্ছে...';
+  navigator.geolocation.getCurrentPosition(async (pos)=>{
+    el.textContent = origText;
+    const { latitude, longitude } = pos.coords;
+    if(!confirm('বর্তমান অবস্থানটাই কি দোকানের ঠিকানা হিসেবে সেভ করবেন?')) return;
     try{
       const session = (typeof getSession === 'function') ? getSession() : null;
-      if(!session || !session.shopId || typeof db === 'undefined'){ resolve(false); return; }
-      const lbl = document.getElementById('hbRingStatusLbl');
-      db.collection('shops').doc(session.shopId).collection('deliveryCalls').add({
-        calledAt: fbNow(),
-        calledBy: (typeof __deviceId !== 'undefined' ? __deviceId : 'shop-app'),
-        status: 'ringing'
-      }).then(()=>{
-        if(lbl) lbl.textContent = '🔔 ডেলিভারি অ্যাপে রিং পাঠানো হয়েছে';
-        resolve(true);
-      }).catch((e)=>{
-        console.warn('Delivery app ring failed:', e);
-        if(lbl) lbl.textContent = '⚠️ ডেলিভারি অ্যাপে রিং পাঠানো যায়নি (ইন্টারনেট চেক করুন)';
-        resolve(false);
-      });
-    }catch(e){ console.warn('Delivery ping error:', e); resolve(false); }
-  });
+      if(!session || !session.shopId) return;
+      await db.collection('shops').doc(session.shopId).set({
+        storeLocation: { lat: latitude, lng: longitude, updatedAt: fbNow() }
+      }, { merge: true });
+      alert('✅ দোকানের অবস্থান সেভ হয়েছে।');
+    }catch(e){ alert('সেভ করা যায়নি: ' + e.message); }
+  }, (err)=>{
+    el.textContent = origText;
+    alert('লোকেশন পাওয়া যায়নি — লোকেশন পারমিশন চেক করুন।');
+  }, { enableHighAccuracy: true, timeout: 12000 });
+});
+
+// ---------- ডেলিভারি ম্যানকে ডাকার আগে কাস্টমারের লোকেশন পিন করা (ঐচ্ছিক) ----------
+let __hbPickMap = null, __hbPickMarker = null, __hbPickedLatLng = null, __hbStoreLatLng = null;
+
+async function hbGetStoreLatLng(){
+  if(__hbStoreLatLng) return __hbStoreLatLng;
+  try{
+    const session = (typeof getSession === 'function') ? getSession() : null;
+    if(!session || !session.shopId) return null;
+    const doc = await db.collection('shops').doc(session.shopId).get();
+    const loc = doc.exists && doc.data().storeLocation;
+    if(loc && loc.lat != null){ __hbStoreLatLng = [loc.lat, loc.lng]; return __hbStoreLatLng; }
+  }catch(e){ /* ignore */ }
+  return null;
 }
 
 document.getElementById('hbCallDeliveryBtn').addEventListener('click', async ()=>{
+  document.getElementById('hbPickLocationModalOverlay').classList.add('show');
+  document.getElementById('hbPickLocationDistanceTxt').textContent = '';
+  __hbPickedLatLng = null;
+
+  const storeLatLng = await hbGetStoreLatLng();
+  const center = storeLatLng || [24.7136, 46.6753]; // ফলব্যাক: রিয়াদ (দোকানের অবস্থান সেট না থাকলে)
+
+  setTimeout(()=>{
+    const mapEl = document.getElementById('hbPickLocationMapEl');
+    if(__hbPickMap){ __hbPickMap.remove(); __hbPickMap = null; }
+    __hbPickMap = L.map(mapEl).setView(center, storeLatLng ? 14 : 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(__hbPickMap);
+
+    if(storeLatLng){
+      L.marker(storeLatLng, { title: 'দোকান' }).addTo(__hbPickMap)
+        .bindPopup('🏪 দোকান').openPopup();
+    }
+
+    __hbPickMap.on('click', async (e)=>{
+      __hbPickedLatLng = [e.latlng.lat, e.latlng.lng];
+      if(__hbPickMarker) __hbPickMap.removeLayer(__hbPickMarker);
+      __hbPickMarker = L.marker(__hbPickedLatLng, { title: 'কাস্টমার' }).addTo(__hbPickMap).bindPopup('🏠 কাস্টমার').openPopup();
+
+      if(storeLatLng){
+        const straightKm = hbHaversineKm(storeLatLng[0], storeLatLng[1], __hbPickedLatLng[0], __hbPickedLatLng[1]);
+        document.getElementById('hbPickLocationDistanceTxt').textContent =
+          `দূরত্ব (আনুমানিক): ${straightKm.toFixed(1)} কিমি · সম্ভাব্য চার্জ: SAR ${hbEstimateCharge(straightKm).toFixed(1)}`;
+      }
+    });
+  }, 60);
+});
+
+document.getElementById('hbClosePickLocationBtn').addEventListener('click', ()=>{
+  document.getElementById('hbPickLocationModalOverlay').classList.remove('show');
+});
+
+document.getElementById('hbSkipPickLocationBtn').addEventListener('click', async ()=>{
+  document.getElementById('hbPickLocationModalOverlay').classList.remove('show');
   const lbl = document.getElementById('hbRingStatusLbl');
   if(lbl) lbl.textContent = '🔔 ডেলিভারি অ্যাপে রিং পাঠানো হচ্ছে...';
-  await hbPingDeliveryApp();
+  await hbPingDeliveryApp(null);
 });
+
+document.getElementById('hbConfirmPickLocationBtn').addEventListener('click', async ()=>{
+  document.getElementById('hbPickLocationModalOverlay').classList.remove('show');
+  const lbl = document.getElementById('hbRingStatusLbl');
+  if(lbl) lbl.textContent = '🔔 ডেলিভারি অ্যাপে রিং পাঠানো হচ্ছে...';
+  await hbPingDeliveryApp(__hbPickedLatLng);
+});
+
+function hbPingDeliveryApp(customerLatLng){
+  return new Promise((resolve)=>{
+    (async ()=>{
+      try{
+        const session = (typeof getSession === 'function') ? getSession() : null;
+        if(!session || !session.shopId || typeof db === 'undefined'){ resolve(false); return; }
+        const lbl = document.getElementById('hbRingStatusLbl');
+
+        const payload = {
+          calledAt: fbNow(),
+          calledBy: (typeof __deviceId !== 'undefined' ? __deviceId : 'shop-app'),
+          status: 'ringing'
+        };
+
+        if(customerLatLng){
+          payload.customerLocation = { lat: customerLatLng[0], lng: customerLatLng[1] };
+          const storeLatLng = await hbGetStoreLatLng();
+          if(storeLatLng){
+            const straightKm = hbHaversineKm(storeLatLng[0], storeLatLng[1], customerLatLng[0], customerLatLng[1]);
+            payload.distanceKm = Number(straightKm.toFixed(2));
+            payload.estimatedCharge = Number(hbEstimateCharge(straightKm).toFixed(2));
+          }
+        }
+
+        await db.collection('shops').doc(session.shopId).collection('deliveryCalls').add(payload);
+        if(lbl) lbl.textContent = '🔔 ডেলিভারি অ্যাপে রিং পাঠানো হয়েছে';
+        resolve(true);
+      }catch(e){
+        console.warn('Delivery app ring failed:', e);
+        const lbl = document.getElementById('hbRingStatusLbl');
+        if(lbl) lbl.textContent = '⚠️ ডেলিভারি অ্যাপে রিং পাঠানো যায়নি (ইন্টারনেট চেক করুন)';
+        resolve(false);
+      }
+    })();
+  });
+}
 
 document.getElementById('hbShowConnectCodeBtn').addEventListener('click', ()=>{
   const session = (typeof getSession === 'function') ? getSession() : null;
   const code = session && session.shopId ? session.shopId : '';
   if(!code){ alert('কোড পাওয়া যায়নি — লগইন ঠিক আছে কিনা চেক করুন।'); return; }
   prompt('এই কোডটা ডেলিভারি ম্যানের "Honey Bee — ডেলিভারি অ্যাপ"-এ একবার বসিয়ে কানেক্ট করে দিন (নিচের বক্স থেকে কপি করুন):', code);
+});
+
+/* ---------- 🗺️ লাইভ ম্যাপ (দোকান + রাইডার + সাম্প্রতিক কাস্টমার লোকেশন) ---------- */
+let __hbLiveMap = null, __hbLiveMarkers = { store:null, rider:null, customer:null }, __hbLiveMapUnsub = null, __hbLiveRoute = null;
+
+document.getElementById('hbOpenLiveMapBtn').addEventListener('click', async ()=>{
+  document.getElementById('hbLiveMapModalOverlay').classList.add('show');
+  document.getElementById('hbMapStoreStatus').textContent = 'লোড হচ্ছে...';
+  document.getElementById('hbMapRiderStatus').textContent = 'লোড হচ্ছে...';
+  document.getElementById('hbMapCustomerStatus').textContent = 'লোড হচ্ছে...';
+  document.getElementById('hbMapDistanceRow').style.display = 'none';
+
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId) return;
+
+  setTimeout(async ()=>{
+    const mapEl = document.getElementById('hbLiveMapEl');
+    if(__hbLiveMap){ __hbLiveMap.remove(); __hbLiveMap = null; }
+    __hbLiveMap = L.map(mapEl).setView([24.7136, 46.6753], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(__hbLiveMap);
+
+    // 🏪 দোকান
+    const storeLatLng = await hbGetStoreLatLng();
+    if(storeLatLng){
+      __hbLiveMarkers.store = L.marker(storeLatLng).addTo(__hbLiveMap).bindPopup('🏪 দোকান');
+      __hbLiveMap.setView(storeLatLng, 13);
+      document.getElementById('hbMapStoreStatus').textContent = '✅ সেট করা আছে';
+    }else{
+      document.getElementById('hbMapStoreStatus').textContent = '⚠️ এখনো সেট করা হয়নি ("📍 দোকানের অবস্থান সেট করুন" চাপুন)';
+    }
+
+    // 🏠 সাম্প্রতিক কাস্টমার লোকেশন (শেষ deliveryCall থেকে)
+    try{
+      const lastCallSnap = await db.collection('shops').doc(session.shopId).collection('deliveryCalls')
+        .orderBy('calledAt','desc').limit(1).get();
+      if(!lastCallSnap.empty){
+        const callData = lastCallSnap.docs[0].data();
+        if(callData.customerLocation){
+          const custLatLng = [callData.customerLocation.lat, callData.customerLocation.lng];
+          __hbLiveMarkers.customer = L.marker(custLatLng).addTo(__hbLiveMap).bindPopup('🏠 কাস্টমার (সর্বশেষ কল)');
+          document.getElementById('hbMapCustomerStatus').textContent = '✅ সর্বশেষ কলের ঠিকানা দেখানো হচ্ছে';
+
+          if(storeLatLng){
+            document.getElementById('hbMapDistanceRow').style.display = 'block';
+            const straightKm = hbHaversineKm(storeLatLng[0], storeLatLng[1], custLatLng[0], custLatLng[1]);
+            document.getElementById('hbMapDistanceVal').textContent = straightKm.toFixed(1) + ' কিমি (সরলরেখা)';
+            document.getElementById('hbMapChargeVal').textContent = 'SAR ' + hbEstimateCharge(straightKm).toFixed(1);
+
+            // OSRM দিয়ে আসল রোড-রুট আনার চেষ্টা (ফ্রি, key লাগে না)
+            hbFetchOsrmRoute(storeLatLng[0], storeLatLng[1], custLatLng[0], custLatLng[1]).then(route=>{
+              if(route && __hbLiveMap){
+                if(__hbLiveRoute) __hbLiveMap.removeLayer(__hbLiveRoute);
+                __hbLiveRoute = L.polyline(route.coords, { color:'#ffb703', weight:4 }).addTo(__hbLiveMap);
+                __hbLiveMap.fitBounds(__hbLiveRoute.getBounds(), { padding:[24,24] });
+                document.getElementById('hbMapDistanceVal').textContent = route.distanceKm.toFixed(1) + ' কিমি (রোড রুট, ~' + Math.round(route.durationMin) + ' মিনিট)';
+                document.getElementById('hbMapChargeVal').textContent = 'SAR ' + hbEstimateCharge(route.distanceKm).toFixed(1);
+              }
+            });
+          }
+        }else{
+          document.getElementById('hbMapCustomerStatus').textContent = 'সর্বশেষ কলে কোনো লোকেশন যোগ করা হয়নি';
+        }
+      }else{
+        document.getElementById('hbMapCustomerStatus').textContent = 'এখনো কোনো কল করা হয়নি';
+      }
+    }catch(e){ document.getElementById('hbMapCustomerStatus').textContent = 'লোড করা যায়নি'; }
+
+    // 🛵 রাইডারের লাইভ অবস্থান (রিয়েলটাইম)
+    if(__hbLiveMapUnsub) __hbLiveMapUnsub();
+    __hbLiveMapUnsub = db.collection('shops').doc(session.shopId).collection('live').doc('riderLocation')
+      .onSnapshot((doc)=>{
+        if(!doc.exists || !doc.data().lat){
+          document.getElementById('hbMapRiderStatus').textContent = '⚪ এখন অফলাইন / শেয়ার করছে না';
+          return;
+        }
+        const d = doc.data();
+        const riderLatLng = [d.lat, d.lng];
+        const ageSec = d.updatedAt && d.updatedAt.toDate ? (Date.now() - d.updatedAt.toDate().getTime())/1000 : 999;
+        const isFresh = ageSec < 60;
+        document.getElementById('hbMapRiderStatus').textContent = isFresh ? '🟢 লাইভ' : '🟡 কিছুক্ষণ আগে (' + Math.round(ageSec/60) + ' মিনিট আগে)';
+
+        if(__hbLiveMarkers.rider){
+          __hbLiveMarkers.rider.setLatLng(riderLatLng);
+        }else if(__hbLiveMap){
+          __hbLiveMarkers.rider = L.marker(riderLatLng, {
+            icon: L.divIcon({ html:'🛵', className:'', iconSize:[26,26] })
+          }).addTo(__hbLiveMap).bindPopup('🛵 রাইডার');
+        }
+      }, (err)=> console.warn('rider location listener error:', err));
+  }, 60);
+});
+
+document.getElementById('hbCloseLiveMapBtn').addEventListener('click', ()=>{
+  document.getElementById('hbLiveMapModalOverlay').classList.remove('show');
+  if(__hbLiveMapUnsub){ __hbLiveMapUnsub(); __hbLiveMapUnsub = null; }
 });
 
 /* ==================== 🐝 Honey Bee Network — অনলাইন অর্ডার/ডেলিভারি লগ ====================
