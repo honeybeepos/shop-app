@@ -108,6 +108,9 @@
   #acceptRingBtn{ background:var(--ok); color:#fff; max-width:280px; }
   #snoozeRingBtn{ max-width:280px; margin-top:10px; }
 </style>
+<!-- Leaflet.js (OpenStreetMap) — ফ্রি, কোনো API key লাগে না -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -147,6 +150,20 @@
     </div>
 
     <div class="lastCallCard" id="lastCallInfo"></div>
+
+    <div class="card" id="activeCallCard" style="display:none;">
+      <h2>📦 বর্তমান অর্ডার</h2>
+      <div id="activeCallMapEl" style="width:100%; height:200px; border-radius:12px; overflow:hidden; background:#111; margin-bottom:12px; display:none;"></div>
+      <p class="desc" id="activeCallStatusTxt" style="margin-bottom:10px;"></p>
+      <div id="stageButtonsRow" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+        <button class="btn secondary stageBtn" data-stage="picked_up" style="flex:1; min-width:100px; font-size:12px; padding:9px;">🛵 পিকআপ করলাম</button>
+        <button class="btn secondary stageBtn" data-stage="on_the_way" style="flex:1; min-width:100px; font-size:12px; padding:9px;">🚴 পথে আছি</button>
+        <button class="btn secondary stageBtn" data-stage="delivered" style="flex:1; min-width:100px; font-size:12px; padding:9px;">✅ ডেলিভারি সম্পন্ন</button>
+      </div>
+      <a id="navigateLinkBtn" href="#" target="_blank" style="display:none; text-align:center; text-decoration:none;">
+        <button class="btn" style="background:#3b82f6; color:#fff;">🧭 কাস্টমারের কাছে নেভিগেট করুন</button>
+      </a>
+    </div>
 
     <div class="card" id="pushCard">
       <h2>🔔 ব্যাকগ্রাউন্ড নোটিফিকেশন</h2>
@@ -290,6 +307,8 @@ function startListening(shopId){
         (data.calledAt && data.calledAt.toDate ? data.calledAt.toDate().toLocaleTimeString('bn-BD',{hour:'numeric',minute:'2-digit'}) : "এইমাত্র") +
         "</b>";
 
+      updateActiveCallCard(shopId, doc.id, data);
+
       // প্রথমবার সংযোগ হওয়ার সময় পুরনো কল দেখেই রিং বাজানো ঠিক না —
       // শুধু এরপর নতুন কল আসলেই বাজবে
       if(__firstSnapshot){ __firstSnapshot = false; __lastSeenCallId = doc.id; return; }
@@ -311,6 +330,71 @@ function startListening(shopId){
 function stopListening(){
   if(__callsUnsub){ __callsUnsub(); __callsUnsub = null; }
 }
+
+/* ---------- 📦 বর্তমান অর্ডার কার্ড — কাস্টমারের লোকেশন + স্ট্যাটাস স্টেজ ---------- */
+let __activeCallMap = null, __activeCallMarker = null;
+const STAGE_LABELS = {
+  packing: '📦 দোকান প্যাকিং করছে',
+  picked_up: '🛵 আপনি পিকআপ করেছেন',
+  on_the_way: '🚴 আপনি পথে আছেন',
+  delivered: '✅ ডেলিভারি সম্পন্ন হয়েছে'
+};
+
+function updateActiveCallCard(shopId, callId, data){
+  const status = data.status || 'packing';
+  if(status === 'delivered'){
+    $("activeCallCard").style.display = "none";
+    return;
+  }
+  $("activeCallCard").style.display = "block";
+  $("activeCallStatusTxt").textContent = STAGE_LABELS[status] || status;
+  $("activeCallCard").dataset.shopId = shopId;
+  $("activeCallCard").dataset.callId = callId;
+
+  document.querySelectorAll(".stageBtn").forEach(btn=>{
+    const isActive = btn.dataset.stage === status;
+    btn.style.opacity = isActive ? "0.5" : "1";
+    btn.disabled = isActive;
+  });
+
+  if(data.customerLocation){
+    const custLatLng = [data.customerLocation.lat, data.customerLocation.lng];
+
+    $("navigateLinkBtn").style.display = "block";
+    $("navigateLinkBtn").href = `https://www.google.com/maps/dir/?api=1&destination=${custLatLng[0]},${custLatLng[1]}`;
+
+    const mapEl = $("activeCallMapEl");
+    mapEl.style.display = "block";
+    if(!__activeCallMap){
+      __activeCallMap = L.map(mapEl).setView(custLatLng, 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap', maxZoom: 19
+      }).addTo(__activeCallMap);
+      __activeCallMarker = L.marker(custLatLng).addTo(__activeCallMap).bindPopup('🏠 কাস্টমার');
+    }else{
+      __activeCallMap.setView(custLatLng, 14);
+      __activeCallMarker.setLatLng(custLatLng);
+      setTimeout(()=> __activeCallMap.invalidateSize(), 100);
+    }
+  }else{
+    $("navigateLinkBtn").style.display = "none";
+    $("activeCallMapEl").style.display = "none";
+  }
+}
+
+document.querySelectorAll(".stageBtn").forEach(btn=>{
+  btn.addEventListener("click", async ()=>{
+    const shopId = $("activeCallCard").dataset.shopId;
+    const callId = $("activeCallCard").dataset.callId;
+    if(!shopId || !callId) return;
+    try{
+      await db.collection("shops").doc(shopId).collection("deliveryCalls").doc(callId).update({
+        status: btn.dataset.stage,
+        statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(e){ alert("স্ট্যাটাস আপডেট করা যায়নি: " + e.message); }
+  });
+});
 
 /* ---------- FCM চালু/স্ট্যাটাস ---------- */
 function refreshPushStatus(){

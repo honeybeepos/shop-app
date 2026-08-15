@@ -16,6 +16,7 @@ const APP_SHELL = [
   "admin.html",
   "shop-ledger-app.html",
   "delivery-man-app.html",
+  "honey-bee-track.html",
   "firebase-init.js",
   "manifest.json",
   "icon-192.png",

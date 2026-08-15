@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🐝 আপনার ডেলিভারি ট্র্যাক করুন</title>
+<meta name="theme-color" content="#1a1206">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg1:#1a1206; --bg2:#3d2405; --gold:#ffb703; --amber:#ffd166;
+    --card:#241705; --border:rgba(255,209,102,0.25); --ok:#2fbf71; --muted:rgba(255,248,232,0.55);
+  }
+  *{box-sizing:border-box;}
+  html,body{ height:100%; margin:0; }
+  body{
+    min-height:100vh;
+    background: radial-gradient(circle at 20% 0%, rgba(255,183,3,0.18), transparent 45%), linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 100%);
+    color:#fff8e8; font-family:'Noto Sans Bengali','Space Mono',sans-serif;
+  }
+  .wrap{ max-width:480px; margin:0 auto; padding:20px 16px 40px; }
+  header{ text-align:center; margin-bottom:16px; }
+  header .hex{ font-size:38px; }
+  header h1{ margin:6px 0 2px; font-size:17px; font-weight:800; }
+  header p{ margin:0; font-size:11px; color:var(--amber); letter-spacing:1.3px; text-transform:uppercase; opacity:0.85; }
+
+  #mapEl{ width:100%; height:280px; border-radius:14px; overflow:hidden; background:#111; margin-bottom:16px; }
+
+  .stageTrack{ display:flex; justify-content:space-between; margin-bottom:20px; position:relative; }
+  .stageTrack::before{ content:''; position:absolute; top:14px; left:20px; right:20px; height:2px; background:var(--border); z-index:0; }
+  .stageDot{ flex:1; text-align:center; position:relative; z-index:1; }
+  .stageDot .circle{ width:28px; height:28px; border-radius:50%; background:var(--card); border:2px solid var(--border); display:flex; align-items:center; justify-content:center; margin:0 auto 6px; font-size:13px; }
+  .stageDot.done .circle{ background:var(--ok); border-color:var(--ok); }
+  .stageDot.current .circle{ background:var(--amber); border-color:var(--amber); box-shadow:0 0 0 4px rgba(255,209,102,0.25); }
+  .stageDot .lbl{ font-size:9.5px; color:var(--muted); }
+  .stageDot.done .lbl, .stageDot.current .lbl{ color:#fff8e8; font-weight:700; }
+
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:12px; }
+  .card .row{ display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px; color:var(--muted); }
+  .card .row b{ color:#fff8e8; }
+
+  .emptyMsg{ text-align:center; color:var(--muted); font-size:13px; padding:60px 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="hex">🐝</div>
+    <h1 id="shopNameLbl">Honey Bee</h1>
+    <p>Order Tracking</p>
+  </header>
+
+  <div id="content">
+    <div id="mapEl"></div>
+
+    <div class="stageTrack" id="stageTrack">
+      <div class="stageDot" data-stage="packing"><div class="circle">📦</div><div class="lbl">প্যাকিং</div></div>
+      <div class="stageDot" data-stage="picked_up"><div class="circle">🛵</div><div class="lbl">পিকআপ</div></div>
+      <div class="stageDot" data-stage="on_the_way"><div class="circle">🚴</div><div class="lbl">পথে</div></div>
+      <div class="stageDot" data-stage="delivered"><div class="circle">✅</div><div class="lbl">সম্পন্ন</div></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><span>রাইডার</span><b id="riderStatusTxt">লোড হচ্ছে...</b></div>
+      <div class="row" id="etaRow" style="display:none;"><span>আনুমানিক সময়</span><b id="etaTxt">—</b></div>
+      <div class="row" id="distRow" style="display:none;"><span>দূরত্ব</span><b id="distTxt">—</b></div>
+    </div>
+  </div>
+
+  <div id="errorMsg" class="emptyMsg" style="display:none;"></div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD6qmuWkNUrskMIBHq8Z_AQ0N_WT1DL8Is",
+  authDomain: "honeybee-984dd.firebaseapp.com",
+  projectId: "honeybee-984dd",
+  storageBucket: "honeybee-984dd.firebasestorage.app",
+  messagingSenderId: "610211112501",
+  appId: "1:610211112501:web:9ea40b9060d425e85b737c"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+function $(id){ return document.getElementById(id); }
+
+const params = new URLSearchParams(window.location.search);
+const shopId = params.get("shop");
+const callId = params.get("call");
+
+if(!shopId || !callId){
+  $("content").style.display = "none";
+  $("errorMsg").style.display = "block";
+  $("errorMsg").textContent = "⚠️ ট্র্যাকিং লিংকটা সঠিক না — দোকানের কাছ থেকে সঠিক লিংক নিন।";
+} else {
+  init();
+}
+
+let map = null, storeMarker = null, riderMarker = null, customerMarker = null, routeLine = null;
+let storeLatLng = null;
+
+function haversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+async function fetchOsrmRoute(lat1, lng1, lat2, lng2){
+  try{
+    const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if(data && data.routes && data.routes[0]){
+      const r = data.routes[0];
+      return { distanceKm: r.distance/1000, durationMin: r.duration/60, coords: r.geometry.coordinates.map(c=>[c[1],c[0]]) };
+    }
+  }catch(e){ /* fallback silently */ }
+  return null;
+}
+
+function updateStageTrack(status){
+  const order = ["packing","picked_up","on_the_way","delivered"];
+  const idx = order.indexOf(status);
+  document.querySelectorAll(".stageDot").forEach(dot=>{
+    const dotIdx = order.indexOf(dot.dataset.stage);
+    dot.classList.remove("done","current");
+    if(dotIdx < idx) dot.classList.add("done");
+    else if(dotIdx === idx) dot.classList.add("current");
+  });
+}
+
+async function init(){
+  try{
+    const shopDoc = await db.collection("shops").doc(shopId).get();
+    if(shopDoc.exists){
+      const sd = shopDoc.data();
+      $("shopNameLbl").textContent = sd.name || sd.shopName || "Honey Bee";
+      if(sd.storeLocation) storeLatLng = [sd.storeLocation.lat, sd.storeLocation.lng];
+    }
+  }catch(e){ /* ignore */ }
+
+  map = L.map("mapEl").setView(storeLatLng || [24.7136, 46.6753], storeLatLng ? 13 : 6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19
+  }).addTo(map);
+
+  if(storeLatLng){
+    storeMarker = L.marker(storeLatLng).addTo(map).bindPopup("🏪 দোকান");
+  }
+
+  // অর্ডারের তথ্য + স্ট্যাটাস (রিয়েলটাইম)
+  db.collection("shops").doc(shopId).collection("deliveryCalls").doc(callId)
+    .onSnapshot((doc)=>{
+      if(!doc.exists){
+        $("content").style.display = "none";
+        $("errorMsg").style.display = "block";
+        $("errorMsg").textContent = "এই অর্ডারের তথ্য পাওয়া যায়নি।";
+        return;
+      }
+      const data = doc.data();
+      updateStageTrack(data.status || "packing");
+
+      if(data.customerLocation){
+        const custLatLng = [data.customerLocation.lat, data.customerLocation.lng];
+        if(customerMarker){ customerMarker.setLatLng(custLatLng); }
+        else{ customerMarker = L.marker(custLatLng).addTo(map).bindPopup("🏠 আপনার ঠিকানা"); }
+
+        if(storeLatLng){
+          $("distRow").style.display = "flex";
+          const straightKm = haversineKm(storeLatLng[0], storeLatLng[1], custLatLng[0], custLatLng[1]);
+          $("distTxt").textContent = straightKm.toFixed(1) + " কিমি";
+
+          fetchOsrmRoute(storeLatLng[0], storeLatLng[1], custLatLng[0], custLatLng[1]).then(route=>{
+            if(route && map){
+              if(routeLine) map.removeLayer(routeLine);
+              routeLine = L.polyline(route.coords, { color:'#ffb703', weight:4 }).addTo(map);
+              map.fitBounds(routeLine.getBounds(), { padding:[24,24] });
+              $("distTxt").textContent = route.distanceKm.toFixed(1) + " কিমি";
+              $("etaRow").style.display = "flex";
+              $("etaTxt").textContent = "~" + Math.round(route.durationMin) + " মিনিট";
+            }
+          });
+        }
+      }
+    }, (err)=> console.warn("call listener error:", err));
+
+  // রাইডারের লাইভ অবস্থান (রিয়েলটাইম)
+  db.collection("shops").doc(shopId).collection("live").doc("riderLocation")
+    .onSnapshot((doc)=>{
+      if(!doc.exists || !doc.data().lat || doc.data().sharing === false){
+        $("riderStatusTxt").textContent = "⚪ এখনো রওনা হননি";
+        return;
+      }
+      const d = doc.data();
+      const riderLatLng = [d.lat, d.lng];
+      const ageSec = d.updatedAt && d.updatedAt.toDate ? (Date.now() - d.updatedAt.toDate().getTime())/1000 : 999;
+      $("riderStatusTxt").textContent = ageSec < 60 ? "🟢 লাইভ" : "🟡 কিছুক্ষণ আগে";
+
+      if(riderMarker){ riderMarker.setLatLng(riderLatLng); }
+      else if(map){ riderMarker = L.marker(riderLatLng, { icon: L.divIcon({ html:'🛵', className:'', iconSize:[26,26] }) }).addTo(map).bindPopup("🛵 রাইডার"); }
+    }, (err)=> console.warn("rider listener error:", err));
+}
+</script>
+</body>
+</html>
