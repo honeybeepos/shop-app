@@ -72,6 +72,7 @@
   #screenMarkets, #screenShops, #screenProducts{ display:none; }
   #screenMarkets.active, #screenShops.active, #screenProducts.active{ display:block; }
 </style>
+<script src="bd-locations.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -86,7 +87,18 @@
 
   <!-- ধাপ ১: বাজার নির্বাচন -->
   <div id="screenMarkets" class="active">
-    <input type="text" class="searchBox" id="marketSearch" placeholder="🔍 আপনার এলাকার বাজার খুঁজুন...">
+    <div id="gpsStatusBanner" style="font-size:11.5px; color:var(--muted); margin-bottom:10px;"></div>
+
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
+      <select id="districtFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+        <option value="">সব জেলা</option>
+      </select>
+      <select id="upazilaFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;" disabled>
+        <option value="">সব উপজেলা</option>
+      </select>
+    </div>
+
+    <input type="text" class="searchBox" id="marketSearch" placeholder="🔍 বাজারের নাম দিয়ে খুঁজুন...">
     <div id="marketsList"><div class="loadingMsg">বাজারের তালিকা লোড হচ্ছে...</div></div>
   </div>
 
@@ -131,6 +143,7 @@ function $(id){ return document.getElementById(id); }
 let allMarkets = [];
 let allShops = [];
 let currentMarketId = null, currentShopId = null;
+let userLatLng = null;
 
 function showScreen(id){
   ["screenMarkets","screenShops","screenProducts"].forEach(s=> $(s).classList.remove("active"));
@@ -143,12 +156,75 @@ function escapeHtml(str){
   return d.innerHTML;
 }
 
+function haversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+/* ---------- 📍 GPS অটো-লোকেশন — সবচেয়ে কাছের বাজার আগে দেখানোর জন্য ---------- */
+function requestGpsLocation(){
+  if(!navigator.geolocation){
+    $("gpsStatusBanner").textContent = "";
+    return;
+  }
+  $("gpsStatusBanner").textContent = "📍 আপনার কাছের বাজার খোঁজা হচ্ছে...";
+  navigator.geolocation.getCurrentPosition((pos)=>{
+    userLatLng = [pos.coords.latitude, pos.coords.longitude];
+    $("gpsStatusBanner").textContent = "📍 আপনার কাছের বাজার আগে দেখানো হচ্ছে";
+    renderMarkets(getFilteredMarkets());
+  }, ()=>{
+    $("gpsStatusBanner").textContent = "";
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+/* ---------- জেলা/উপজেলা ম্যানুয়াল ফিল্টার ---------- */
+function getAllDistricts(){
+  const list = [];
+  Object.values(BD_LOCATIONS).forEach(div => Object.keys(div).forEach(d => list.push(d)));
+  return list.sort((a,b)=> a.localeCompare(b, 'bn'));
+}
+function getUpazilasForDistrict(district){
+  let found = [];
+  Object.values(BD_LOCATIONS).forEach(div => { if(div[district]) found = div[district]; });
+  return found.slice().sort((a,b)=> a.localeCompare(b, 'bn'));
+}
+$("districtFilter").innerHTML += getAllDistricts().map(d=>`<option value="${d}">${d}</option>`).join("");
+$("districtFilter").addEventListener("change", (e)=>{
+  const district = e.target.value;
+  const upSel = $("upazilaFilter");
+  if(!district){
+    upSel.innerHTML = '<option value="">সব উপজেলা</option>';
+    upSel.disabled = true;
+  }else{
+    upSel.disabled = false;
+    upSel.innerHTML = '<option value="">সব উপজেলা</option>' +
+      getUpazilasForDistrict(district).map(u=>`<option value="${u}">${u}</option>`).join("");
+  }
+  renderMarkets(getFilteredMarkets());
+});
+$("upazilaFilter").addEventListener("change", ()=> renderMarkets(getFilteredMarkets()));
+
+function getFilteredMarkets(){
+  const district = $("districtFilter").value;
+  const upazila = $("upazilaFilter").value;
+  const q = $("marketSearch").value.trim().toLowerCase();
+  return allMarkets.filter(m=>
+    (!district || m.district === district) &&
+    (!upazila || m.upazila === upazila) &&
+    (!q || (m.name||"").toLowerCase().includes(q))
+  );
+}
+
 /* ---------- ধাপ ১: বাজারের তালিকা ---------- */
 async function loadMarkets(){
   try{
     const qs = await db.collection("markets").orderBy("name").get();
     allMarkets = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
     renderMarkets(allMarkets);
+    requestGpsLocation();
   }catch(e){
     console.error(e);
     $("marketsList").innerHTML = '<div class="emptyMsg">বাজারের তালিকা লোড করা যায়নি — ইন্টারনেট চেক করুন।</div>';
@@ -157,23 +233,38 @@ async function loadMarkets(){
 
 function renderMarkets(list){
   if(list.length === 0){
-    $("marketsList").innerHTML = '<div class="emptyMsg">এখনো কোনো বাজার নিবন্ধিত হয়নি।</div>';
+    $("marketsList").innerHTML = '<div class="emptyMsg">এই তালিকায় কোনো বাজার পাওয়া যায়নি।</div>';
     return;
   }
-  $("marketsList").innerHTML = list.map(m => `
+
+  let sorted = list;
+  if(userLatLng){
+    sorted = list.map(m=>{
+      const dist = (m.location && m.location.lat != null)
+        ? haversineKm(userLatLng[0], userLatLng[1], m.location.lat, m.location.lng)
+        : null;
+      return { ...m, __dist: dist };
+    }).sort((a,b)=>{
+      if(a.__dist == null && b.__dist == null) return 0;
+      if(a.__dist == null) return 1;
+      if(b.__dist == null) return -1;
+      return a.__dist - b.__dist;
+    });
+  }
+
+  $("marketsList").innerHTML = sorted.map(m => `
     <div class="card marketItem" onclick="selectMarket('${m.id}')">
       <div class="ic">🏙️</div>
       <div class="info">
         <div class="name">${escapeHtml(m.name || m.id)}</div>
-        <div class="meta">${escapeHtml(m.region || "")}</div>
+        <div class="meta">${escapeHtml(m.upazila || "")}${m.district ? ", " + escapeHtml(m.district) : ""}${m.__dist != null ? " · " + m.__dist.toFixed(1) + " কিমি দূরে" : ""}</div>
       </div>
       <div class="chev">›</div>
     </div>`).join("");
 }
 
-$("marketSearch").addEventListener("input", (e)=>{
-  const q = e.target.value.trim().toLowerCase();
-  renderMarkets(allMarkets.filter(m => (m.name||"").toLowerCase().includes(q)));
+$("marketSearch").addEventListener("input", ()=>{
+  renderMarkets(getFilteredMarkets());
 });
 
 window.selectMarket = function(marketId){
@@ -187,19 +278,27 @@ window.selectMarket = function(marketId){
 $("backToMarkets").addEventListener("click", ()=> showScreen("screenMarkets"));
 
 /* ---------- ধাপ ২: দোকানের তালিকা ---------- */
-async function loadShops(marketId){
+let shopsUnsub = null;
+function loadShops(marketId){
   $("shopsList").innerHTML = '<div class="loadingMsg">দোকানের তালিকা লোড হচ্ছে...</div>';
-  try{
-    const qs = await db.collection("shops")
-      .where("marketId", "==", marketId)
-      .where("status", "==", "active")
-      .get();
-    allShops = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
-    renderShops(allShops);
-  }catch(e){
-    console.error(e);
-    $("shopsList").innerHTML = '<div class="emptyMsg">দোকানের তালিকা লোড করা যায়নি।</div>';
-  }
+  if(shopsUnsub) shopsUnsub();
+  // রিয়েল-টাইম লিসেনার — দোকান নতুন অনুমোদন/আপডেট হলে সাথে সাথেই এখানে দেখাবে
+  shopsUnsub = db.collection("shops")
+    .where("marketId", "==", marketId)
+    .where("status", "==", "active")
+    .onSnapshot((qs)=>{
+      allShops = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+      renderShops(getFilteredShops());
+    }, (e)=>{
+      console.error(e);
+      $("shopsList").innerHTML = '<div class="emptyMsg">দোকানের তালিকা লোড করা যায়নি।</div>';
+    });
+}
+
+function getFilteredShops(){
+  const q = ($("shopSearch") ? $("shopSearch").value : "").trim().toLowerCase();
+  if(!q) return allShops;
+  return allShops.filter(s => (s.name||s.shopName||"").toLowerCase().includes(q));
 }
 
 function renderShops(list){

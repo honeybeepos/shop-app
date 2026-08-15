@@ -33,6 +33,8 @@
   .msg.ok{display:block;background:#dcf0e8;color:var(--paid);}
   .panel{display:none;}
   .panel.active{display:block;}
+  select{width:100%;padding:11px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-family:inherit;font-size:14.5px;color:var(--ink);margin-bottom:12px;}
+  select:disabled{background:var(--paper-2);color:#a89e8c;}
 </style>
 </head>
 <body>
@@ -67,10 +69,22 @@
     <input type="email" id="suEmail" placeholder="you@example.com">
     <label>পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
     <input type="password" id="suPass" placeholder="••••••••">
+
+    <label>জেলা</label>
+    <select id="suDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
+    <label>উপজেলা/থানা</label>
+    <select id="suUpazila" disabled><option value="">-- আগে জেলা নির্বাচন করুন --</option></select>
+    <label>বাজার</label>
+    <select id="suMarket" disabled><option value="">-- আগে উপজেলা নির্বাচন করুন --</option></select>
+    <label>এজেন্ট <span style="font-weight:400; color:#a89e8c;">(এই বাজারে এজেন্ট থাকলে বেছে নিন)</span></label>
+    <select id="suAgent" disabled><option value="">-- বাজার নির্বাচন করুন --</option></select>
+
     <button class="btn" id="signupBtn">দোকান তৈরি করুন</button>
     <div class="msg" id="signupMsg"></div>
   </div>
 </div>
+
+<script src="bd-locations.js"></script>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -95,6 +109,86 @@ function showMsg(id, text, ok){
   el.textContent = text;
   el.className = "msg " + (ok ? "ok" : "err");
 }
+
+/* ==================== জেলা → উপজেলা → বাজার → এজেন্ট কাসকেডিং ==================== */
+function getAllDistricts(){
+  const list = [];
+  Object.values(BD_LOCATIONS).forEach(div => Object.keys(div).forEach(d => list.push(d)));
+  return list.sort((a,b)=> a.localeCompare(b, 'bn'));
+}
+function getUpazilasForDistrict(district){
+  let found = [];
+  Object.values(BD_LOCATIONS).forEach(div => { if(div[district]) found = div[district]; });
+  return found.slice().sort((a,b)=> a.localeCompare(b, 'bn'));
+}
+
+document.getElementById("suDistrict").innerHTML += getAllDistricts().map(d=>`<option value="${d}">${d}</option>`).join("");
+
+document.getElementById("suDistrict").addEventListener("change", (e)=>{
+  const district = e.target.value;
+  const upSel = document.getElementById("suUpazila");
+  const marketSel = document.getElementById("suMarket");
+  const agentSel = document.getElementById("suAgent");
+  marketSel.innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; marketSel.disabled = true;
+  agentSel.innerHTML = '<option value="">-- বাজার নির্বাচন করুন --</option>'; agentSel.disabled = true;
+  if(!district){
+    upSel.innerHTML = '<option value="">-- আগে জেলা নির্বাচন করুন --</option>'; upSel.disabled = true;
+    return;
+  }
+  upSel.disabled = false;
+  upSel.innerHTML = '<option value="">-- উপজেলা/থানা নির্বাচন করুন --</option>' +
+    getUpazilasForDistrict(district).map(u=>`<option value="${u}">${u}</option>`).join("");
+});
+
+document.getElementById("suUpazila").addEventListener("change", async (e)=>{
+  const district = document.getElementById("suDistrict").value;
+  const upazila = e.target.value;
+  const marketSel = document.getElementById("suMarket");
+  const agentSel = document.getElementById("suAgent");
+  agentSel.innerHTML = '<option value="">-- বাজার নির্বাচন করুন --</option>'; agentSel.disabled = true;
+
+  if(!upazila){
+    marketSel.innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; marketSel.disabled = true;
+    return;
+  }
+  marketSel.innerHTML = '<option value="">লোড হচ্ছে...</option>'; marketSel.disabled = true;
+  try{
+    const qs = await db.collection("markets").where("district","==",district).where("upazila","==",upazila).get();
+    if(qs.empty){
+      marketSel.innerHTML = '<option value="">এই উপজেলায় এখনো কোনো বাজার নিবন্ধিত হয়নি</option>';
+      marketSel.disabled = true;
+      return;
+    }
+    marketSel.innerHTML = '<option value="">-- বাজার নির্বাচন করুন --</option>' +
+      qs.docs.map(d=> `<option value="${d.id}">${d.data().name || d.id}</option>`).join("");
+    marketSel.disabled = false;
+  }catch(e){
+    marketSel.innerHTML = '<option value="">লোড করা যায়নি</option>';
+  }
+});
+
+document.getElementById("suMarket").addEventListener("change", async (e)=>{
+  const marketId = e.target.value;
+  const agentSel = document.getElementById("suAgent");
+  if(!marketId){
+    agentSel.innerHTML = '<option value="">-- বাজার নির্বাচন করুন --</option>'; agentSel.disabled = true;
+    return;
+  }
+  agentSel.innerHTML = '<option value="">লোড হচ্ছে...</option>'; agentSel.disabled = true;
+  try{
+    const qs = await db.collection("agents").where("marketId","==",marketId).where("status","==","active").get();
+    if(qs.empty){
+      agentSel.innerHTML = '<option value="">এই বাজারে এখনো কোনো এজেন্ট নেই (ঐচ্ছিক, খালি রাখতে পারেন)</option>';
+      agentSel.disabled = true;
+      return;
+    }
+    agentSel.innerHTML = '<option value="">-- এজেন্ট নির্বাচন করুন --</option>' +
+      qs.docs.map(d=> `<option value="${d.id}">${d.data().name || d.id}</option>`).join("");
+    agentSel.disabled = false;
+  }catch(e){
+    agentSel.innerHTML = '<option value="">লোড করা যায়নি</option>';
+  }
+});
 
 async function afterLoginRoute(uid){
   const superAdmin = await isSuperAdmin(uid);
@@ -167,8 +261,16 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   const name = document.getElementById("suName").value.trim();
   const email = document.getElementById("suEmail").value.trim();
   const pass = document.getElementById("suPass").value;
+  const district = document.getElementById("suDistrict").value;
+  const upazila = document.getElementById("suUpazila").value;
+  const marketId = document.getElementById("suMarket").value;
+  const assignedAgentId = document.getElementById("suAgent").value || null;
+
   if(!shopName || !name || !email || pass.length < 6){
     showMsg("signupMsg","সব ঘর সঠিকভাবে পূরণ করুন (পাসওয়ার্ড কমপক্ষে ৬ অক্ষর)",false); return;
+  }
+  if(!district || !upazila || !marketId){
+    showMsg("signupMsg","জেলা, উপজেলা ও বাজার — তিনটাই নির্বাচন করুন।",false); return;
   }
   const btn = document.getElementById("signupBtn");
   btn.disabled = true; btn.textContent = "তৈরি হচ্ছে...";
@@ -179,6 +281,7 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
     await db.collection("shops").doc(uid).set({
       shopId: uid, ownerUid: uid, shopName, ownerName: name, ownerEmail: email,
       status: "active",
+      district, upazila, marketId, assignedAgentId,
       features: { reports:true, extraIncome:true, ops:true, monitor:true, whatsapp:true },
       createdAt: fbNow(), updatedAt: fbNow()
     });

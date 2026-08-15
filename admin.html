@@ -23,6 +23,7 @@
   .card h2{font-size:15px;margin:0 0 10px;color:var(--teal);}
   textarea,input,select{width:100%;padding:9px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:13.5px;margin-bottom:8px;background:#fff;}
   .btn{padding:9px 16px;border:none;border-radius:8px;background:var(--copper);color:#fff;font-weight:700;cursor:pointer;font-family:inherit;font-size:13.5px;}
+  .btn.secondary{background:transparent;border:1px solid var(--line);color:var(--copper);}
   .shop{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:#fffefb;}
   .shop-top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;}
   .shop-name{font-weight:800;font-size:15px;}
@@ -41,6 +42,7 @@
   .members{margin-top:8px;font-size:12.5px;}
   .member-row{display:flex;justify-content:space-between;padding:5px 0;border-top:1px dashed var(--line);}
 </style>
+<script src="bd-locations.js"></script>
 </head>
 <body>
 
@@ -64,10 +66,27 @@
 
   <div class="card">
     <h2>🏙️ বাজার ম্যানেজমেন্ট (<span id="marketCount">0</span>)</h2>
-    <input type="text" id="newMarketName" placeholder="বাজারের নাম (যেমনঃ দাম্মাম বাজার)">
-    <input type="text" id="newMarketRegion" placeholder="অঞ্চল/শহর (ঐচ্ছিক)">
+    <label style="display:block; font-size:12px; color:#8a7f6c; margin-bottom:4px;">জেলা</label>
+    <select id="newMarketDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
+    <label style="display:block; font-size:12px; color:#8a7f6c; margin-bottom:4px;">উপজেলা/থানা</label>
+    <select id="newMarketUpazila" disabled><option value="">-- আগে জেলা নির্বাচন করুন --</option></select>
+    <label style="display:block; font-size:12px; color:#8a7f6c; margin-bottom:4px;">বাজারের নাম</label>
+    <input type="text" id="newMarketName" placeholder="যেমনঃ কারওয়ান বাজার">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+      <span id="pinMarketLocationBtn" style="font-size:12px; color:var(--copper); cursor:pointer; text-decoration:underline;">📍 বাজারের অবস্থান পিন করুন (ঐচ্ছিক, GPS দিয়ে "কাছের বাজার" দেখাতে সাহায্য করে)</span>
+      <span id="marketLocationStatus" style="font-size:11px; color:var(--paid);"></span>
+    </div>
     <button class="btn" id="addMarketBtn">➕ নতুন বাজার যোগ করুন</button>
+    <p id="marketAddMsg" style="display:none; font-size:12.5px; margin:8px 0 0;"></p>
     <div id="marketList" style="margin-top:12px;">লোড হচ্ছে...</div>
+  </div>
+
+  <div class="card">
+    <h2>➕ উপজেলা/থানা তালিকায় যোগ করুন</h2>
+    <p style="font-size:12px; color:#8a7f6c; margin:0 0 8px;">উপরের তালিকায় কোনো উপজেলা/থানা মিসিং থাকলে এখান থেকে যোগ করে নিন (শুধু এই ব্রাউজারেই সেভ থাকবে)।</p>
+    <select id="addUpazilaDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
+    <input type="text" id="addUpazilaName" placeholder="উপজেলা/থানার নাম">
+    <button class="btn secondary" id="addUpazilaBtn">➕ যোগ করুন</button>
   </div>
 
   <div class="card">
@@ -143,6 +162,70 @@ document.getElementById("clearAnnounce").addEventListener("click", async ()=>{
   document.getElementById("announceText").value = "";
 });
 
+/* ==================== 🗺️ জেলা/উপজেলা ড্রপডাউন (bd-locations.js থেকে) ==================== */
+const LS_CUSTOM_UPAZILA_KEY = "honeybee-custom-upazilas"; // ব্রাউজারে সেভ করা কাস্টম উপজেলা
+
+function getCustomUpazilas(){
+  try{ return JSON.parse(localStorage.getItem(LS_CUSTOM_UPAZILA_KEY) || "{}"); }catch(e){ return {}; }
+}
+function saveCustomUpazila(district, upazila){
+  const data = getCustomUpazilas();
+  if(!data[district]) data[district] = [];
+  if(!data[district].includes(upazila)) data[district].push(upazila);
+  localStorage.setItem(LS_CUSTOM_UPAZILA_KEY, JSON.stringify(data));
+}
+
+function getAllDistricts(){
+  const list = [];
+  Object.values(BD_LOCATIONS).forEach(div => Object.keys(div).forEach(d => list.push(d)));
+  return list.sort((a,b)=> a.localeCompare(b, 'bn'));
+}
+function getUpazilasForDistrict(district){
+  let found = [];
+  Object.values(BD_LOCATIONS).forEach(div => { if(div[district]) found = div[district]; });
+  const custom = getCustomUpazilas()[district] || [];
+  return [...new Set([...found, ...custom])].sort((a,b)=> a.localeCompare(b, 'bn'));
+}
+
+function populateDistrictSelect(selectEl){
+  selectEl.innerHTML = '<option value="">-- জেলা নির্বাচন করুন --</option>' +
+    getAllDistricts().map(d => `<option value="${d}">${d}</option>`).join("");
+}
+
+populateDistrictSelect(document.getElementById("newMarketDistrict"));
+populateDistrictSelect(document.getElementById("addUpazilaDistrict"));
+
+let __pinnedMarketLatLng = null;
+document.getElementById("pinMarketLocationBtn").addEventListener("click", ()=>{
+  if(!navigator.geolocation){ alert("এই ব্রাউজারে লোকেশন সাপোর্ট নেই।"); return; }
+  const statusEl = document.getElementById("marketLocationStatus");
+  statusEl.textContent = "খোঁজা হচ্ছে...";
+  navigator.geolocation.getCurrentPosition((pos)=>{
+    __pinnedMarketLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    statusEl.textContent = "✅ অবস্থান পিন করা হয়েছে";
+  }, ()=>{
+    statusEl.textContent = "⚠️ লোকেশন পাওয়া যায়নি";
+  }, { enableHighAccuracy: true, timeout: 12000 });
+});
+
+document.getElementById("newMarketDistrict").addEventListener("change", (e)=>{
+  const upSel = document.getElementById("newMarketUpazila");
+  const district = e.target.value;
+  if(!district){ upSel.innerHTML = '<option value="">-- আগে জেলা নির্বাচন করুন --</option>'; upSel.disabled = true; return; }
+  upSel.disabled = false;
+  upSel.innerHTML = '<option value="">-- উপজেলা/থানা নির্বাচন করুন --</option>' +
+    getUpazilasForDistrict(district).map(u => `<option value="${u}">${u}</option>`).join("");
+});
+
+document.getElementById("addUpazilaBtn").addEventListener("click", ()=>{
+  const district = document.getElementById("addUpazilaDistrict").value;
+  const name = document.getElementById("addUpazilaName").value.trim();
+  if(!district || !name){ alert("জেলা ও উপজেলার নাম দিন।"); return; }
+  saveCustomUpazila(district, name);
+  document.getElementById("addUpazilaName").value = "";
+  alert(`✅ "${name}" যোগ করা হয়েছে। "বাজার ম্যানেজমেন্ট"-এ ${district} জেলা সিলেক্ট করলে এখন এটা দেখাবে।`);
+});
+
 /* ==================== 🏙️ বাজার ম্যানেজমেন্ট ==================== */
 let __marketsCache = [];
 
@@ -156,7 +239,7 @@ async function loadMarkets(){
     ? "<p>এখনো কোনো বাজার তৈরি হয়নি।</p>"
     : __marketsCache.map(m => `
         <div class="member-row">
-          <span>🏙️ ${m.name || m.id}${m.region ? " · " + m.region : ""}</span>
+          <span>🏙️ ${m.name || m.id}${m.upazila ? " · " + m.upazila : ""}${m.district ? ", " + m.district : ""}</span>
           <span style="font-family:'Space Mono',monospace; font-size:11px; color:#8a7f6c;">${m.id}</span>
         </div>`).join("");
 
@@ -164,23 +247,39 @@ async function loadMarkets(){
   const sel = document.getElementById("newAgentMarket");
   const currentVal = sel.value;
   sel.innerHTML = '<option value="">-- বাজার নির্বাচন করুন --</option>' +
-    __marketsCache.map(m => `<option value="${m.id}">${m.name || m.id}</option>`).join("");
+    __marketsCache.map(m => {
+      const label = (m.name || m.id) + (m.upazila ? ` (${m.upazila}, ${m.district || ''})` : '');
+      return `<option value="${m.id}">${label}</option>`;
+    }).join("");
   sel.value = currentVal;
 }
 
 document.getElementById("addMarketBtn").addEventListener("click", async ()=>{
+  const district = document.getElementById("newMarketDistrict").value;
+  const upazila = document.getElementById("newMarketUpazila").value;
   const name = document.getElementById("newMarketName").value.trim();
-  const region = document.getElementById("newMarketRegion").value.trim();
-  if(!name){ alert("বাজারের নাম দিন।"); return; }
+  const msgEl = document.getElementById("marketAddMsg");
+  msgEl.style.display = "none";
+
+  if(!district || !upazila || !name){
+    msgEl.textContent = "⚠️ জেলা, উপজেলা ও বাজারের নাম — সবগুলো দিন।";
+    msgEl.style.color = "var(--due)"; msgEl.style.display = "block";
+    return;
+  }
   const btn = document.getElementById("addMarketBtn");
   btn.disabled = true; btn.textContent = "যোগ হচ্ছে...";
   try{
-    await db.collection("markets").add({ name, region: region || null, createdAt: fbNow() });
+    const marketData = { name, district, upazila, createdAt: fbNow() };
+    if(__pinnedMarketLatLng) marketData.location = __pinnedMarketLatLng;
+    await db.collection("markets").add(marketData);
     document.getElementById("newMarketName").value = "";
-    document.getElementById("newMarketRegion").value = "";
+    document.getElementById("marketLocationStatus").textContent = "";
+    __pinnedMarketLatLng = null;
+    msgEl.textContent = "";
     await loadMarkets();
   }catch(e){
-    alert("বাজার যোগ করা যায়নি: " + e.message);
+    msgEl.textContent = "⚠️ বাজার যোগ করা যায়নি: " + e.message;
+    msgEl.style.color = "var(--due)"; msgEl.style.display = "block";
   }finally{
     btn.disabled = false; btn.textContent = "➕ নতুন বাজার যোগ করুন";
   }
@@ -240,6 +339,20 @@ document.getElementById("addAgentBtn").addEventListener("click", async ()=>{
   }
   if(pass.length < 6){
     msgEl.textContent = "⚠️ পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।";
+    msgEl.style.color = "var(--due)"; msgEl.style.display = "block";
+    return;
+  }
+
+  // Agent Cap: একটা বাজারে সর্বোচ্চ ২ জন এজেন্ট — ভুলবশত অনির্দিষ্টসংখ্যক
+  // এজেন্ট একই বাজারে যুক্ত হওয়া ঠেকাতে
+  const MAX_AGENTS_PER_MARKET = 2;
+  const existingSnap = await db.collection("agents")
+    .where("marketId", "==", marketId)
+    .where("status", "==", "active")
+    .get();
+  if(existingSnap.size >= MAX_AGENTS_PER_MARKET){
+    const marketLabel = (__marketsCache.find(m=>m.id===marketId) || {}).name || marketId;
+    msgEl.textContent = `⚠️ "${marketLabel}" বাজারে ইতিমধ্যে সর্বোচ্চ ${MAX_AGENTS_PER_MARKET} জন এজেন্ট আছে। নতুন এজেন্ট যোগ করতে হলে আগে একজনকে ব্লক/সরাতে হবে।`;
     msgEl.style.color = "var(--due)"; msgEl.style.display = "block";
     return;
   }
