@@ -9,7 +9,7 @@
 /* গুরুত্বপূর্ণ: প্রতিবার কোড আপডেট করে সার্ভারে দেওয়ার সময় এই ভার্সন নাম্বারটা
    বাড়িয়ে দিন (v2 → v3 → v4 ...)। এটা বাড়ালে পুরনো ক্যাশ মুছে ফেলা হয় এবং
    ইউজার নতুন ভার্সন পায়। */
-const CACHE_VERSION = "shop-app-v76";
+const CACHE_VERSION = "shop-app-v77";
 
 const APP_SHELL = [
   "login.html",
@@ -69,7 +69,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          if (res && res.status === 200) {
+          if (res && res.status === 200 && req.method === "GET") {
             const clone = res.clone();
             caches.open(CACHE_VERSION).then((cache) => cache.put(req, clone));
           }
@@ -77,6 +77,13 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => caches.match(req))
     );
+    return;
+  }
+
+  // Cache API শুধু GET রিকোয়েস্ট ক্যাশ করতে পারে — POST/PUT ইত্যাদি (যেমন
+  // Firestore-এর ডেটা পাঠানো) ক্যাশ করার চেষ্টা করলে এরর দেয়, তাই সেসব
+  // রিকোয়েস্ট সরাসরি নেটওয়ার্কে পাঠিয়ে দেওয়া হয়, ক্যাশ ছোঁয়াই হয় না
+  if (event.request.method !== "GET") {
     return;
   }
 
