@@ -192,15 +192,26 @@
     <h3>➕ নতুন রাইডার যোগ করুন</h3>
     <label for="riderName">রাইডারের নাম</label>
     <input type="text" id="riderName" placeholder="পূর্ণ নাম">
-    <label for="riderPhone">মোবাইল নম্বর</label>
+    <label for="riderPhone">মোবাইল নম্বর (লগইনের জন্য ব্যবহার হবে)</label>
     <input type="text" id="riderPhone" placeholder="05XXXXXXXX">
+    <label for="riderPassword">পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
+    <input type="text" id="riderPassword" placeholder="রাইডারকে এই পাসওয়ার্ড জানিয়ে দিন">
     <label for="riderNid">NID/ইকামা নম্বর</label>
     <input type="text" id="riderNid" placeholder="আইডি নম্বর">
+    <label for="riderZone">কাজের জোন/এলাকা</label>
+    <input type="text" id="riderZone" placeholder="যেমনঃ আল-মদিনা এলাকা">
+    <label for="riderVehicle">যানবাহনের ধরন</label>
+    <select id="riderVehicle">
+      <option value="bike">🏍️ বাইক</option>
+      <option value="bicycle">🚲 সাইকেল</option>
+      <option value="car">🚗 কার</option>
+    </select>
     <label for="riderGuarantor">জামিনদারের নাম ও নম্বর</label>
     <input type="text" id="riderGuarantor" placeholder="নাম — মোবাইল নম্বর">
     <label for="riderCashLimit">ক্যাশ হোল্ড লিমিট (SAR)</label>
     <input type="number" id="riderCashLimit" value="500" min="0" step="50">
     <button class="btn" id="saveRiderBtn">✅ রাইডার যোগ করুন</button>
+    <p id="riderAddMsg" style="display:none; font-size:12.5px; margin:8px 0 0;"></p>
     <div class="modalClose"><span id="closeRiderModal">✕ বন্ধ করুন</span></div>
   </div>
 </div>
@@ -217,6 +228,18 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+// রাইডারের নতুন লগইন অ্যাকাউন্ট তৈরির সময় এজেন্টের নিজের সেশন যেন নষ্ট না
+// হয়, তাই একটা আলাদা সেকেন্ডারি Firebase app ব্যবহার করা হচ্ছে
+const secondaryApp = firebase.initializeApp(firebaseConfig, "Secondary");
+const secondaryAuth = secondaryApp.auth();
+
+// ফোন নম্বর দিয়ে লগইন করানোর জন্য Firebase Auth-এ একটা "সিন্থেটিক" ইমেইল
+// বানানো হয় (SMS/OTP সেটআপ এড়াতে — কার্ড-ফ্রি রাখতে) — এই ইমেইলটা কখনো
+// প্রকৃত মেইল পাঠাতে ব্যবহার হয় না, শুধু Auth আইডেন্টিফায়ার হিসেবে কাজ করে
+function phoneToAuthEmail(phone){
+  const digits = phone.replace(/[^0-9]/g, "");
+  return `rider_${digits}@honeybee-riders.app`;
+}
 
 function $(id){ return document.getElementById(id); }
 let currentAgent = null; // { uid, marketId, deliveryChargeConfig, status }
@@ -378,29 +401,64 @@ $("closeRiderModal").addEventListener("click", ()=> $("riderModal").style.displa
 $("saveRiderBtn").addEventListener("click", async ()=>{
   const name = $("riderName").value.trim();
   const phone = $("riderPhone").value.trim();
+  const password = $("riderPassword").value;
   const nid = $("riderNid").value.trim();
+  const zone = $("riderZone").value.trim();
+  const vehicle = $("riderVehicle").value;
   const guarantor = $("riderGuarantor").value.trim();
   const cashLimit = Number($("riderCashLimit").value) || 500;
-  if(!name || !phone){ alert("নাম ও মোবাইল নম্বর আবশ্যক।"); return; }
+  const msgEl = $("riderAddMsg");
+  msgEl.style.display = "none";
+
+  if(!name || !phone || !password){
+    msgEl.textContent = "⚠️ নাম, মোবাইল নম্বর ও পাসওয়ার্ড আবশ্যক।";
+    msgEl.style.color = "#e2543d"; msgEl.style.display = "block";
+    return;
+  }
+  if(password.length < 6){
+    msgEl.textContent = "⚠️ পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।";
+    msgEl.style.color = "#e2543d"; msgEl.style.display = "block";
+    return;
+  }
 
   $("saveRiderBtn").disabled = true; $("saveRiderBtn").textContent = "যোগ হচ্ছে...";
   try{
-    await db.collection("riders").add({
+    // Honey Bee Delivery App-এ লগইন করার জন্য একটা আসল Firebase Auth
+    // অ্যাকাউন্ট তৈরি হচ্ছে (ফোন নম্বর দিয়ে, সিন্থেটিক ইমেইলের মাধ্যমে)
+    const authEmail = phoneToAuthEmail(phone);
+    const cred = await secondaryAuth.createUserWithEmailAndPassword(authEmail, password);
+    const newUid = cred.user.uid;
+    await secondaryAuth.signOut();
+
+    await db.collection("users").doc(newUid).set({
+      role: "rider", phone, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    await db.collection("riders").doc(newUid).set({
       name, phone,
       nidNumber: nid,
+      zone, vehicleType: vehicle,
       guarantorDetails: guarantor,
       assignedAgentId: currentAgent.uid,
       marketId: currentAgent.marketId,
       cashHoldLimit: cashLimit,
       currentCashHeld: 0,
       status: "active",
+      online: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+
     $("riderModal").style.display = "none";
-    $("riderName").value = ""; $("riderPhone").value = ""; $("riderNid").value = "";
-    $("riderGuarantor").value = ""; $("riderCashLimit").value = "500";
+    $("riderName").value = ""; $("riderPhone").value = ""; $("riderPassword").value = "";
+    $("riderNid").value = ""; $("riderZone").value = ""; $("riderGuarantor").value = "";
+    $("riderCashLimit").value = "500";
+    msgEl.textContent = "";
   }catch(e){
-    alert("রাইডার যোগ করা যায়নি: " + e.message);
+    console.error(e);
+    let friendly = e.message;
+    if(e.code === "auth/email-already-in-use") friendly = "এই মোবাইল নম্বর দিয়ে আগে থেকেই একজন রাইডার নিবন্ধিত আছে।";
+    msgEl.textContent = "⚠️ রাইডার যোগ করা যায়নি: " + friendly;
+    msgEl.style.color = "#e2543d"; msgEl.style.display = "block";
   }finally{
     $("saveRiderBtn").disabled = false; $("saveRiderBtn").textContent = "✅ রাইডার যোগ করুন";
   }
