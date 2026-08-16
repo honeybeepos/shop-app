@@ -489,12 +489,16 @@ function renderProducts(products){
       else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
       else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
     }
+    const hasOffer = p.offerPrice != null && p.price != null && Number(p.offerPrice) < Number(p.price);
+    const priceHtml = hasOffer
+      ? `<span style="text-decoration:line-through; color:var(--muted); margin-right:6px;">SAR ${p.price}</span><span style="color:#fb923c; font-weight:800;">SAR ${p.offerPrice}</span>`
+      : (p.price != null ? ("SAR " + p.price) : "");
     return `
       <div class="productRow">
         <div class="productImgWrap" id="pimg-${p.id}">${guessCategoryIcon(p.name)}</div>
         <div style="flex:1; margin:0 10px;">
-          <div class="pname">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
-          <div class="pstock">${p.price != null ? ("SAR " + p.price) : ""}</div>
+          <div class="pname">${escapeHtml(p.name || "প্রোডাক্ট")} ${hasOffer ? '<span style="font-size:10px; background:rgba(251,146,60,0.18); color:#fb923c; padding:2px 7px; border-radius:20px; margin-left:6px;">🔥 Special Offer</span>' : ''}</div>
+          <div class="pstock">${priceHtml}</div>
         </div>
         <span class="stockBadge ${stockClass}">${stockLabel}</span>
       </div>`;
