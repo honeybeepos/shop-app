@@ -1,1 +1,1 @@
-# shop-app
+# honey-bee-pos
