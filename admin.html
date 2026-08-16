@@ -106,16 +106,31 @@
     <div id="shopList">লোড হচ্ছে...</div>
   </div>
 
+  <div class="card">
+    <h2>🛵 সব রাইডার (<span id="riderCount">0</span>)</h2>
+    <div id="allRidersList">লোড হচ্ছে...</div>
+  </div>
+
+  <div class="card">
+    <h2>📊 Honey Bee Bazar — লাইভ অ্যানালিটিক্স</h2>
+    <p style="font-size:13px; margin:0 0 10px;">এই মুহূর্তে অ্যাপে ব্রাউজ করছে: <b id="liveUserCount" style="color:var(--paid); font-size:16px;">0</b> জন</p>
+    <div id="recentSessionsList" style="font-size:12px; color:#5a5142;">লোড হচ্ছে...</div>
+  </div>
+
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script src="firebase-init.js"></script>
 <script>
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("service-worker.js").catch(()=>{});
 }
+
+const cloudFunctions = firebase.functions();
+const deleteAccountFn = cloudFunctions.httpsCallable("deleteAccount");
 
 const FEATURE_LABELS = {
   reports: "রিপোর্ট", extraIncome: "বাড়তি আয়", ops: "সাপ্লায়ার/স্টাফ/খরচ",
@@ -135,6 +150,8 @@ auth.onAuthStateChanged(async (user)=>{
   loadAnnouncement();
   loadMarkets();
   loadAgents();
+  loadAllRiders();
+  startAnalyticsListener();
 });
 
 document.getElementById("logoutBtn").addEventListener("click", async ()=>{
@@ -310,12 +327,32 @@ async function loadAgents(){
         ${agent.status === 'blocked'
           ? `<button class="btn unblock" data-agent-act="unblock" data-id="${agentId}">✅ আনব্লক করুন</button>`
           : `<button class="btn block" data-agent-act="block" data-id="${agentId}">⛔ ব্লক করুন</button>`}
+        <button class="btn secondary" data-agent-act="edit" data-id="${agentId}">✏️ এডিট</button>
+        <button class="btn" style="background:var(--due);" data-agent-act="delete" data-id="${agentId}">🗑️ ডিলিট</button>
       </div>
     `;
     list.appendChild(div);
   }
   list.querySelectorAll('[data-agent-act="block"]').forEach(b=>b.addEventListener("click", ()=>setAgentStatus(b.dataset.id,"blocked")));
   list.querySelectorAll('[data-agent-act="unblock"]').forEach(b=>b.addEventListener("click", ()=>setAgentStatus(b.dataset.id,"active")));
+  list.querySelectorAll('[data-agent-act="edit"]').forEach(b=>b.addEventListener("click", ()=>editAgent(b.dataset.id)));
+  list.querySelectorAll('[data-agent-act="delete"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "agent", "এজেন্ট")));
+}
+
+async function editAgent(agentId){
+  const doc = await db.collection("agents").doc(agentId).get();
+  if(!doc.exists) return;
+  const agent = doc.data();
+  const newName = prompt("এজেন্টের নাম:", agent.name || "");
+  if(newName === null) return;
+  const newCommission = prompt("কমিশন %:", agent.commissionPercent != null ? agent.commissionPercent : "20");
+  if(newCommission === null) return;
+  try{
+    await db.collection("agents").doc(agentId).set({
+      name: newName.trim(), commissionPercent: Number(newCommission) || 0, updatedAt: fbNow()
+    }, { merge: true });
+    await loadAgents();
+  }catch(e){ alert("এডিট করা যায়নি: " + e.message); }
 }
 
 async function setAgentStatus(agentId, status){
@@ -421,6 +458,8 @@ async function loadShops(){
           ? `<button class="btn unblock" data-act="unblock" data-id="${shopId}">✅ আনব্লক করুন</button>`
           : `<button class="btn block" data-act="block" data-id="${shopId}">⛔ ব্লক করুন</button>`}
         <button class="btn ghost" data-act="savefeat" data-id="${shopId}">💾 ফিচার সেভ করুন</button>
+        <button class="btn secondary" data-act="editshop" data-id="${shopId}">✏️ এডিট</button>
+        <button class="btn" style="background:var(--due);" data-act="deleteshop" data-id="${shopId}">🗑️ ডিলিট</button>
       </div>
     `;
     list.appendChild(div);
@@ -430,6 +469,41 @@ async function loadShops(){
   list.querySelectorAll('[data-act="block"]').forEach(b=>b.addEventListener("click", ()=>setStatus(b.dataset.id,"blocked")));
   list.querySelectorAll('[data-act="unblock"]').forEach(b=>b.addEventListener("click", ()=>setStatus(b.dataset.id,"active")));
   list.querySelectorAll('[data-act="savefeat"]').forEach(b=>b.addEventListener("click", ()=>saveFeatures(b.dataset.id, b.closest(".shop"))));
+  list.querySelectorAll('[data-act="editshop"]').forEach(b=>b.addEventListener("click", ()=>editShop(b.dataset.id)));
+  list.querySelectorAll('[data-act="deleteshop"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "shop", "দোকান")));
+}
+
+async function editShop(shopId){
+  const doc = await db.collection("shops").doc(shopId).get();
+  if(!doc.exists) return;
+  const shop = doc.data();
+  const newName = prompt("দোকানের নাম:", shop.shopName || "");
+  if(newName === null) return;
+  const newOwnerName = prompt("মালিকের নাম:", shop.ownerName || "");
+  if(newOwnerName === null) return;
+  try{
+    await db.collection("shops").doc(shopId).set({
+      shopName: newName.trim(), ownerName: newOwnerName.trim(), updatedAt: fbNow()
+    }, { merge: true });
+    await loadShops();
+  }catch(e){ alert("এডিট করা যায়নি: " + e.message); }
+}
+
+// ⚠️ এই ফাংশনটা শুধু Firestore ডেটা না, Firebase Authentication থেকেও
+// অ্যাকাউন্টটা পুরোপুরি মুছে দেয় (Cloud Function দিয়ে) — তাই ইমেইলটা
+// সম্পূর্ণ ফ্রি হয়ে যায়, ফেরত আনা যায় না
+async function deleteAccount(uid, accountType, label){
+  const sure = prompt(`⚠️ এই ${label} অ্যাকাউন্টটা স্থায়ীভাবে মুছে যাবে (আর ফেরত আনা যাবে না) এবং এই ইমেইল দিয়ে আবার নতুন অ্যাকাউন্ট খোলা যাবে। নিশ্চিত হলে "DELETE" লিখুন:`);
+  if(sure !== "DELETE") return;
+  try{
+    await deleteAccountFn({ targetUid: uid, accountType });
+    alert(`✅ ${label} অ্যাকাউন্টটা মুছে ফেলা হয়েছে।`);
+    if(accountType === "shop") await loadShops();
+    else if(accountType === "agent") await loadAgents();
+    else if(accountType === "rider") await loadAllRiders();
+  }catch(e){
+    alert("ডিলিট করা যায়নি: " + (e.message || e));
+  }
 }
 
 async function loadMembers(shopId){
@@ -466,6 +540,80 @@ async function saveFeatures(shopId, shopEl){
   });
   await db.collection("shops").doc(shopId).set({ features, updatedAt: fbNow() }, { merge: true });
   alert("ফিচার সেটিং সেভ হয়েছে।");
+}
+
+/* ==================== 🛵 সব রাইডার (Super Admin ভিউ) ==================== */
+async function loadAllRiders(){
+  const snap = await db.collection("riders").orderBy("createdAt","desc").get();
+  document.getElementById("riderCount").textContent = snap.size;
+  const list = document.getElementById("allRidersList");
+  if(snap.empty){ list.innerHTML = "<p>এখনো কোনো রাইডার নিবন্ধিত হয়নি।</p>"; return; }
+
+  list.innerHTML = "";
+  for(const doc of snap.docs){
+    const rider = doc.data();
+    const riderId = doc.id;
+    const div = document.createElement("div");
+    div.className = "shop";
+    div.innerHTML = `
+      <div class="shop-top">
+        <span class="shop-name">${rider.name || "(নামহীন রাইডার)"}</span>
+        <span class="chip ${rider.status === 'blocked' ? 'blocked' : 'active'}">${rider.status === 'blocked' ? 'ব্লকড' : 'সক্রিয়'}</span>
+      </div>
+      <div class="meta">📱 ${rider.phone || ''} · জোন: ${rider.zone || '—'} · ${rider.online ? '🟢 অনলাইন' : '⚪ অফলাইন'}</div>
+      <div class="row">
+        ${rider.status === 'blocked'
+          ? `<button class="btn unblock" data-rider-act="unblock" data-id="${riderId}">✅ আনব্লক করুন</button>`
+          : `<button class="btn block" data-rider-act="block" data-id="${riderId}">⛔ ব্লক করুন</button>`}
+        <button class="btn" style="background:var(--due);" data-rider-act="delete" data-id="${riderId}">🗑️ ডিলিট</button>
+      </div>
+    `;
+    list.appendChild(div);
+  }
+  list.querySelectorAll('[data-rider-act="block"]').forEach(b=>b.addEventListener("click", async ()=>{
+    await db.collection("riders").doc(b.dataset.id).set({ status:"blocked", updatedAt: fbNow() }, { merge:true });
+    loadAllRiders();
+  }));
+  list.querySelectorAll('[data-rider-act="unblock"]').forEach(b=>b.addEventListener("click", async ()=>{
+    await db.collection("riders").doc(b.dataset.id).set({ status:"active", updatedAt: fbNow() }, { merge:true });
+    loadAllRiders();
+  }));
+  list.querySelectorAll('[data-rider-act="delete"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "rider", "রাইডার")));
+}
+
+/* ==================== 📊 Honey Bee Bazar লাইভ অ্যানালিটিক্স ====================
+   Honey Bee Bazar অ্যাপ প্রতি ~১৫ সেকেন্ডে activeSessions/{sessionId}-এ একটা
+   "হার্টবিট" পাঠায় (সময়, স্ক্রল কাউন্ট, কোন দোকান দেখছে)। ৩০ সেকেন্ডের বেশি
+   পুরনো হার্টবিটকে "অফলাইন" ধরা হয় — তাই এটা রিয়েলটাইম লাইভ কাউন্ট দেয়। */
+function startAnalyticsListener(){
+  db.collection("activeSessions").onSnapshot((snap)=>{
+    const now = Date.now();
+    const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const live = sessions.filter(s => {
+      const last = s.lastHeartbeat && s.lastHeartbeat.toDate ? s.lastHeartbeat.toDate().getTime() : 0;
+      return (now - last) < 30000;
+    });
+    document.getElementById("liveUserCount").textContent = live.length;
+
+    const recent = sessions.sort((a,b)=>{
+      const at = a.lastHeartbeat && a.lastHeartbeat.toDate ? a.lastHeartbeat.toDate().getTime() : 0;
+      const bt = b.lastHeartbeat && b.lastHeartbeat.toDate ? b.lastHeartbeat.toDate().getTime() : 0;
+      return bt - at;
+    }).slice(0, 15);
+
+    document.getElementById("recentSessionsList").innerHTML = recent.length === 0
+      ? "<p>এখনো কোনো সেশন রেকর্ড হয়নি।</p>"
+      : recent.map(s=>{
+          const last = s.lastHeartbeat && s.lastHeartbeat.toDate ? s.lastHeartbeat.toDate().getTime() : 0;
+          const isLive = (now - last) < 30000;
+          const durationMin = Math.floor((s.totalDurationSec || 0) / 60);
+          const durationSec = (s.totalDurationSec || 0) % 60;
+          return `<div style="padding:6px 0; border-bottom:1px solid var(--line);">
+            ${isLive ? '🟢' : '⚪'} ${s.customerName || 'অতিথি'} · সময়: ${durationMin}মি ${durationSec}সে ·
+            স্ক্রল: ${s.scrollCount || 0} · ${s.currentShopName ? 'দেখছে: ' + s.currentShopName : ''}
+          </div>`;
+        }).join("");
+  }, (err)=> console.warn("analytics listener error:", err));
 }
 </script>
 </body>
