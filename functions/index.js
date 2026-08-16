@@ -19,9 +19,11 @@
 
 const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
+const { getAuth } = require("firebase-admin/auth");
 
 initializeApp();
 const db = getFirestore();
@@ -226,4 +228,54 @@ exports.checkExpiredOffers = onSchedule("every 2 minutes", async () => {
     expiredSnap.docs.map((doc) => doc.ref.update({ status: "expired" }))
   );
   console.log(`${expiredSnap.size}টা মেয়াদোত্তীর্ণ অফার আপডেট করা হয়েছে`);
+});
+
+/* ==================== 🗑️ অ্যাকাউন্ট ডিলিট + জিমেইল ফ্রি করা ====================
+   শুধু ক্লায়েন্ট থেকে Firestore ডকুমেন্ট মুছে দিলে Firebase Authentication-এ
+   ইমেইলটা "ব্যবহৃত" হিসেবেই থেকে যায় — তাই একই ইমেইল দিয়ে আবার সাইন-আপ করা
+   যায় না। এই ফাংশনটা (শুধু Admin SDK দিয়েই সম্ভব, ক্লায়েন্ট থেকে না):
+   ১. Firestore থেকে ইউজারের সব ডেটা (সাব-কালেকশনসহ) মুছে দেয়
+   ২. Firebase Authentication থেকে অ্যাকাউন্টটাই মুছে দেয় — এতে ইমেইলটা
+      সম্পূর্ণ ফ্রি হয়ে যায়, সাথে সাথে আবার রেজিস্ট্রেশনে ব্যবহার করা যাবে। */
+exports.deleteAccount = onCall(async (request) => {
+  const callerUid = request.auth && request.auth.uid;
+  if (!callerUid) {
+    throw new HttpsError("unauthenticated", "লগইন করা নেই।");
+  }
+
+  // কলার সত্যিই সুপার অ্যাডমিন কিনা যাচাই করা (Admin SDK দিয়ে, তাই নিরাপদ —
+  // ক্লায়েন্ট এখানে মিথ্যা দাবি করতে পারবে না)
+  const superAdminDoc = await db.collection("superadmins").doc(callerUid).get();
+  if (!superAdminDoc.exists) {
+    throw new HttpsError("permission-denied", "শুধু সুপার অ্যাডমিন অ্যাকাউন্ট ডিলিট করতে পারবেন।");
+  }
+
+  const { targetUid, accountType } = request.data || {};
+  if (!targetUid || !["shop", "agent", "rider"].includes(accountType)) {
+    throw new HttpsError("invalid-argument", "targetUid ও accountType (shop/agent/rider) দিতে হবে।");
+  }
+
+  // ১. Firestore থেকে ডেটা মুছে ফেলা (সাব-কালেকশনসহ, recursiveDelete দিয়ে)
+  if (accountType === "shop") {
+    await db.recursiveDelete(db.collection("shops").doc(targetUid));
+  } else if (accountType === "agent") {
+    await db.recursiveDelete(db.collection("agents").doc(targetUid));
+  } else if (accountType === "rider") {
+    await db.recursiveDelete(db.collection("riders").doc(targetUid));
+  }
+  // users/{uid} — লগইন রোল-ডকুমেন্ট, সব ধরনের অ্যাকাউন্টের জন্যই থাকে
+  await db.collection("users").doc(targetUid).delete().catch(() => {});
+
+  // ২. Firebase Authentication থেকে মুছে ফেলা — এতেই ইমেইল ফ্রি হয়
+  try {
+    await getAuth().deleteUser(targetUid);
+  } catch (e) {
+    // অ্যাকাউন্ট আগে থেকেই Auth-এ না থাকলে (auth/user-not-found) সেটা সমস্যা না,
+    // Firestore ডেটা তো মুছে গেছে already — কিন্তু অন্য কোনো এরর হলে জানানো দরকার
+    if (e.code !== "auth/user-not-found") {
+      throw new HttpsError("internal", "Firestore ডেটা মুছে গেছে, কিন্তু Auth অ্যাকাউন্ট মুছতে সমস্যা হয়েছে: " + e.message);
+    }
+  }
+
+  return { success: true, deletedUid: targetUid, accountType };
 });
