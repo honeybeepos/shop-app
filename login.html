@@ -70,6 +70,15 @@
     <label>পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
     <input type="password" id="suPass" placeholder="••••••••">
 
+    <label>দোকানের ধরন <span style="font-weight:400; color:#a89e8c;">(এটা অনুযায়ী POS-এর ফিচার সাজানো হবে)</span></label>
+    <select id="suCategory">
+      <option value="grocery">🟢 মুদি দোকান / কাঁচাবাজার</option>
+      <option value="fish_meat">🟢 মাছ ও মাংসের দোকান</option>
+      <option value="sweets">🟢 মিষ্টির দোকান</option>
+      <option value="fruits">🟢 ফলের দোকান</option>
+      <option value="other">🟡 অন্যান্য (সাধারণ মোড)</option>
+    </select>
+
     <label>জেলা</label>
     <select id="suDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
     <label>উপজেলা/থানা</label>
@@ -261,10 +270,18 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   const name = document.getElementById("suName").value.trim();
   const email = document.getElementById("suEmail").value.trim();
   const pass = document.getElementById("suPass").value;
+  const category = document.getElementById("suCategory").value;
   const district = document.getElementById("suDistrict").value;
   const upazila = document.getElementById("suUpazila").value;
   const marketId = document.getElementById("suMarket").value;
   const assignedAgentId = document.getElementById("suAgent").value || null;
+
+  // দোকানের ক্যাটাগরি অনুযায়ী POS-এর "মোড" ঠিক হয় — এই মোড অনুযায়ী POS-এ
+  // কোন ফিচার (ওজন-হিসাব, মেয়াদ-ট্র্যাকিং, সিরিয়াল/IMEI ইত্যাদি) দেখাবে
+  // সেটা ঠিক হবে। আপাতত শুধু ওজনভিত্তিক মোড বানানো হয়েছে — বাকি মোড
+  // (ব্যাচ/এক্সপায়ারি, সিরিয়াল/IMEI, ভ্যারিয়েন্ট) পরের ধাপে যোগ হবে।
+  const WEIGHT_MODE_CATEGORIES = ["grocery", "fish_meat", "sweets", "fruits"];
+  const appMode = WEIGHT_MODE_CATEGORIES.includes(category) ? "weight" : "standard";
 
   if(!shopName || !name || !email || pass.length < 6){
     showMsg("signupMsg","সব ঘর সঠিকভাবে পূরণ করুন (পাসওয়ার্ড কমপক্ষে ৬ অক্ষর)",false); return;
@@ -282,6 +299,7 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
       shopId: uid, ownerUid: uid, shopName, ownerName: name, ownerEmail: email,
       status: "active",
       district, upazila, marketId, assignedAgentId,
+      storeCategory: category, appMode,
       features: { reports:true, extraIncome:true, ops:true, monitor:true, whatsapp:true },
       createdAt: fbNow(), updatedAt: fbNow()
     });

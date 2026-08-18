@@ -852,17 +852,21 @@
         </div>
         <div class="row">
           <div>
-            <label>পরিমাণ (কতটি) *</label>
+            <label id="qsQtyLabel">পরিমাণ (কতটি) *</label>
             <input id="qsQty" type="number" inputmode="numeric" min="1" step="1" value="1" placeholder="১">
+            <div class="bccWeightToggle" id="qsWeightToggle" style="display:none; margin-top:6px; gap:6px;">
+              <button type="button" class="wtBtn active" data-wtunit="gram">গ্রাম</button>
+              <button type="button" class="wtBtn" data-wtunit="kg">কেজি</button>
+            </div>
           </div>
         </div>
         <div class="row">
           <div>
-            <label>কেনা দাম (প্রতি পিস) (SAR)</label>
+            <label id="qsCostLabel">কেনা দাম (প্রতি পিস) (SAR)</label>
             <input id="qsCost" type="number" inputmode="numeric" placeholder="০">
           </div>
           <div>
-            <label>বেচা দাম (প্রতি পিস) (SAR)</label>
+            <label id="qsPriceLabel">বেচা দাম (প্রতি পিস) (SAR)</label>
             <input id="qsPrice" type="number" inputmode="numeric" placeholder="০">
           </div>
         </div>
@@ -962,17 +966,21 @@
           </div>
           <div class="row">
             <div>
-              <label>পরিমাণ (কতটি) *</label>
+              <label id="fQtyLabel">পরিমাণ (কতটি) *</label>
               <input id="fQty" type="number" inputmode="numeric" min="1" step="1" value="1" placeholder="১">
+              <div class="bccWeightToggle" id="fWeightToggle" style="display:none; margin-top:6px; gap:6px;">
+                <button type="button" class="wtBtn active" data-wtunit="gram">গ্রাম</button>
+                <button type="button" class="wtBtn" data-wtunit="kg">কেজি</button>
+              </div>
             </div>
           </div>
           <div class="row">
             <div>
-              <label>কেনা দাম (প্রতি পিস) (SAR)</label>
+              <label id="fCostLabel">কেনা দাম (প্রতি পিস) (SAR)</label>
               <input id="fCost" type="number" inputmode="numeric" placeholder="০">
             </div>
             <div>
-              <label>বিক্রি দাম (প্রতি পিস) (SAR)</label>
+              <label id="fPriceLabel">বিক্রি দাম (প্রতি পিস) (SAR)</label>
               <input id="fPrice" type="number" inputmode="numeric" placeholder="০">
             </div>
           </div>
@@ -2798,6 +2806,12 @@
     #program-bcc .bccProductCard .pubBadge.off{ background:rgba(239,68,68,0.18); color:#f87171; }
     #program-bcc .bccProductCard .bulkCheck{ width:20px; height:20px; flex-shrink:0; }
     .bccPublishSwitch{ position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0; }
+    .bccWeightToggle{ display:flex; }
+    .bccWeightToggle .wtBtn{
+      padding:6px 14px; border-radius:8px; border:1px solid var(--line,#d8cbb0); background:#fff;
+      font-family:inherit; font-size:12.5px; cursor:pointer; color:#5a5142;
+    }
+    .bccWeightToggle .wtBtn.active{ background:#1f4a48; color:#fff; border-color:#1f4a48; }
     .bccPublishSwitch input{ opacity:0; width:0; height:0; }
     .bccPublishSwitch span{ position:absolute; inset:0; background:#d1d5db; border-radius:26px; transition:.2s; cursor:pointer; }
     .bccPublishSwitch span::before{ content:''; position:absolute; width:20px; height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
@@ -2978,13 +2992,23 @@
         <label>🏷️ Category (Optional)</label><select id="bccPCat"></select>
         <p class="pin-desc" style="margin:2px 0 10px;">ক্যাটাগরি সিলেক্ট করা বাধ্যতামূলক (এটাই Invoice-এ Brand হিসেবে দেখানো হয়)।</p>
         <label>📂 Sub-Category</label><select id="bccPSub"></select>
+
+        <div id="bccPUnitRow" style="display:none;">
+          <label>⚖️ বিক্রয় একক</label>
+          <select id="bccPUnit">
+            <option value="pcs">🔢 পিস/সংখ্যা হিসেবে</option>
+            <option value="kg">⚖️ ওজন হিসেবে (কেজি/গ্রাম)</option>
+          </select>
+          <p class="pin-desc" id="bccPUnitHint" style="display:none; margin:2px 0 10px;">নিচের "বিক্রয় মূল্য" হবে <b>প্রতি কেজির দাম</b>। সেলস স্ক্রিনে গ্রাম/কেজি লিখে বিক্রি করা যাবে।</p>
+        </div>
+
         <div class="bccTwoCol">
           <div><label>💰 ক্রয় মূল্য</label><input type="number" id="bccPBuy" placeholder="0"></div>
-          <div><label>💵 বিক্রয় মূল্য</label><input type="number" id="bccPSell" placeholder="0"></div>
+          <div><label id="bccPSellLabel">💵 বিক্রয় মূল্য</label><input type="number" id="bccPSell" placeholder="0"></div>
         </div>
         <p id="bccMarginWarning" style="display:none; background:#fee2e2; color:#991b1b; padding:8px 10px; border-radius:8px; font-size:12.5px; margin:0 0 10px;">⚠️ বিক্রয় মূল্য ক্রয় মূল্যের সমান বা কম — এই দামে বিক্রি করলে লাভ হবে না/লোকসান হবে!</p>
         <div class="bccTwoCol">
-          <div><label>📦 Stock Quantity</label><input type="number" id="bccPQty" placeholder="0"></div>
+          <div><label id="bccPQtyLabel">📦 Stock Quantity</label><input type="number" id="bccPQty" placeholder="0" step="0.001"></div>
           <div><label>⚠️ Minimum Stock</label><input type="number" id="bccPMin" placeholder="0"></div>
         </div>
         <label>🔥 অফার/ডিসকাউন্ট মূল্য (ঐচ্ছিক — Bazar-এ "Special Offer" ব্যাজ দেখাবে)</label>
@@ -6114,6 +6138,63 @@ function bccLoadCategories(){
   }catch(e){ return []; }
 }
 function bccSaveCategories(cats){ localStorage.setItem('bcc-categories', JSON.stringify(cats)); }
+
+/* ==================== 📦 দোকানের মোড (Weight-Based ইত্যাদি) ====================
+   সাইনআপের সময় ক্যাটাগরি অনুযায়ী ঠিক হওয়া মোড অনুযায়ী POS-এর কিছু ফিচার
+   (আপাতত শুধু ওজন-হিসাব) দেখানো/লুকানো হয়। */
+function bccGetAppMode(){ return localStorage.getItem('shop-app-mode') || 'standard'; }
+function bccIsWeightMode(){ return bccGetAppMode() === 'weight'; }
+
+function bccApplyAppMode(){
+  const weightMode = bccIsWeightMode();
+  const unitRow = document.getElementById('bccPUnitRow');
+  if(unitRow) unitRow.style.display = weightMode ? 'block' : 'none';
+}
+
+function bccUpdateUnitLabels(){
+  const unit = document.getElementById('bccPUnit') ? document.getElementById('bccPUnit').value : 'pcs';
+  const isWeight = unit === 'kg';
+  document.getElementById('bccPUnitHint').style.display = isWeight ? 'block' : 'none';
+  document.getElementById('bccPSellLabel').textContent = isWeight ? '💵 বিক্রয় মূল্য (প্রতি কেজি)' : '💵 বিক্রয় মূল্য';
+  document.getElementById('bccPQtyLabel').textContent = isWeight ? '📦 Stock Quantity (কেজি)' : '📦 Stock Quantity';
+}
+
+/* ---------- সেলস স্ক্রিনে ওজন-ভিত্তিক প্রোডাক্টের জন্য গ্রাম/কেজি টগল ----------
+   প্রোডাক্ট সাজেশন থেকে "kg" ইউনিটের প্রোডাক্ট বেছে নিলে Qty ফিল্ডের নিচে
+   একটা "গ্রাম/কেজি" টগল দেখা যায়। গ্রাম মোডে থাকলে ইউজারের টাইপ করা সংখ্যাটা
+   ১০০০ দিয়ে ভাগ করে কেজিতে রূপান্তর করে স্টক/দাম হিসাব করা হয় (কারণ দাম
+   সবসময় "প্রতি কেজি" হিসেবেই সেভ থাকে)। */
+function bccToggleWeightUI(qtyId, prod){
+  const toggleId = qtyId.replace('Qty','WeightToggle');
+  const toggleEl = document.getElementById(toggleId);
+  const qtyEl = document.getElementById(qtyId);
+  if(!toggleEl || !qtyEl) return;
+  const isWeightProduct = bccIsWeightMode() && prod && prod.unit === 'kg';
+  toggleEl.style.display = isWeightProduct ? 'flex' : 'none';
+  if(isWeightProduct){
+    qtyEl.dataset.weightUnit = 'gram';
+    qtyEl.step = '1';
+    qtyEl.placeholder = 'যেমনঃ ৫০০ (গ্রাম)';
+    toggleEl.querySelectorAll('.wtBtn').forEach(b=> b.classList.toggle('active', b.dataset.wtunit==='gram'));
+  }else{
+    delete qtyEl.dataset.weightUnit;
+    qtyEl.step = '1';
+    qtyEl.placeholder = '১';
+  }
+}
+document.querySelectorAll('.bccWeightToggle').forEach(toggleEl=>{
+  toggleEl.querySelectorAll('.wtBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      toggleEl.querySelectorAll('.wtBtn').forEach(b=> b.classList.remove('active'));
+      btn.classList.add('active');
+      const qtyId = toggleEl.id.replace('WeightToggle','Qty');
+      const qtyEl = document.getElementById(qtyId);
+      if(qtyEl) qtyEl.dataset.weightUnit = btn.dataset.wtunit; // 'gram' | 'kg'
+      qtyEl.placeholder = btn.dataset.wtunit === 'gram' ? 'যেমনঃ ৫০০ (গ্রাম)' : 'যেমনঃ ০.৫ (কেজি)';
+    });
+  });
+});
+
 function bccLoadProducts(){
   try{
     deletedProductIds = loadDeletedProductIds();
@@ -6386,8 +6467,8 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
     const { model, category } = getProductDetails(it.item, it.productId);
     const lines = [`Item ${idx + 1}`, `Product : ${model}`];
     if(category) lines.push(`Category: ${category}`);
-    lines.push(`Quantity: ${it.qty}`);
-    lines.push(`Unit Price: SAR ${it.unitPrice}`);
+    lines.push(it.weightLabel ? `Quantity: ${it.weightLabel}` : `Quantity: ${it.qty}`);
+    lines.push(`Unit Price: SAR ${it.unitPrice}${it.weightLabel ? '/kg' : ''}`);
     lines.push(`Amount: SAR ${it.price}`);
     lines.push(`Time: ${formatInvoiceTime(it.date || now)} (${formatInvoiceDate(it.date || now)})`);
     return lines.join('\n');
@@ -6580,8 +6661,8 @@ function bccRenderProducts(){
         ${p.offerPrice ? '<span class="pubBadge on" style="background:rgba(251,146,60,0.18); color:#fb923c;">🔥 Special Offer</span>' : ''}
       </div>
       <div class="price">
-        <div class="sell">${fmt(p.sell)}</div>
-        <div class="qty ${low?'low':''}">${low?'⚠️ ':''}স্টক: ${p.qty||0}</div>
+        <div class="sell">${fmt(p.sell)}${p.unit==='kg' ? '/kg' : ''}</div>
+        <div class="qty ${low?'low':''}">${low?'⚠️ ':''}স্টক: ${p.unit==='kg' ? (Number(p.qty)||0).toFixed(3)+' kg' : (p.qty||0)}</div>
       </div>
       <div class="actions">
         <button data-restock="${p.id}" title="স্টক যোগ করুন">🔄</button>
@@ -6669,6 +6750,7 @@ function bccOpenProductModal(editId){
   document.getElementById('bccPCode').value = p ? (p.code||'') : '';
   bccPopulateCategorySelect(document.getElementById('bccPCat'), p ? p.catId : '');
   bccPopulateSubSelect(document.getElementById('bccPSub'), p ? p.catId : '', p ? p.subId : '');
+  document.getElementById('bccPUnit').value = p ? (p.unit||'pcs') : 'pcs';
   document.getElementById('bccPBuy').value = p ? p.buy : '';
   document.getElementById('bccPSell').value = p ? p.sell : '';
   document.getElementById('bccPQty').value = p ? p.qty : '';
@@ -6681,8 +6763,11 @@ function bccOpenProductModal(editId){
   document.getElementById('bccPPublished').checked = p ? !!p.published : false;
   bccUpdatePublishStatusTxt();
   bccCheckMarginWarning();
+  bccApplyAppMode();
+  bccUpdateUnitLabels();
   document.getElementById('bccProductModalOverlay').classList.add('show');
 }
+document.getElementById('bccPUnit') && document.getElementById('bccPUnit').addEventListener('change', bccUpdateUnitLabels);
 document.getElementById('bccAddProductBtn').addEventListener('click', ()=> bccOpenProductModal(null));
 document.getElementById('bccProductModalClose').addEventListener('click', ()=> document.getElementById('bccProductModalOverlay').classList.remove('show'));
 
@@ -6773,6 +6858,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
   const enteredSell = Number(document.getElementById('bccPSell').value)||0;
   const enteredOfferPrice = Number(document.getElementById('bccPOfferPrice').value) || 0;
   const enteredPublished = document.getElementById('bccPPublished').checked;
+  const enteredUnit = bccIsWeightMode() ? (document.getElementById('bccPUnit').value || 'pcs') : 'pcs';
 
   if(enteredOfferPrice && enteredSell && enteredOfferPrice >= enteredSell){
     toast('⚠️ অফার মূল্য বিক্রয় মূল্যের চেয়ে কম হতে হবে');
@@ -6793,6 +6879,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     if(enteredSell) dup.sell = enteredSell;
     dup.offerPrice = enteredOfferPrice || null;
     dup.published = enteredPublished;
+    dup.unit = enteredUnit;
     const enteredMin = Number(document.getElementById('bccPMin').value)||0;
     if(enteredMin) dup.min = enteredMin;
     const enteredCode = document.getElementById('bccPCode').value.trim();
@@ -6814,6 +6901,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     code: document.getElementById('bccPCode').value.trim(),
     catId,
     subId: document.getElementById('bccPSub').value,
+    unit: enteredUnit,
     buy: enteredBuy,
     sell: enteredSell,
     offerPrice: enteredOfferPrice || null,
@@ -7756,10 +7844,14 @@ function checkStockAvailable(productId, itemName, requestedQty, cartArray){
 }
 
 function readRequiredQty(fieldId){
-  const raw = document.getElementById(fieldId).value.trim();
-  const qty = parseInt(raw, 10);
-  if(!raw || isNaN(qty) || qty < 1){
-    toast('পরিমাণ (Quantity) দিতে হবে — কমপক্ষে ১');
+  const el = document.getElementById(fieldId);
+  const raw = el.value.trim();
+  // ওজনভিত্তিক প্রোডাক্টে (গ্রাম/কেজি) দশমিক সংখ্যা লাগতে পারে (যেমনঃ ০.৫ কেজি) —
+  // সাধারণ পিস-গোনা প্রোডাক্টে পূর্ণ সংখ্যাই লাগে
+  const isWeight = el.dataset.weightUnit;
+  const qty = isWeight ? parseFloat(raw) : parseInt(raw, 10);
+  if(!raw || isNaN(qty) || qty <= 0){
+    toast('পরিমাণ (Quantity) দিতে হবে — কমপক্ষে ১ (বা ০-এর বেশি)');
     return null;
   }
   return qty;
@@ -7854,6 +7946,7 @@ function setupSmartSuggest(cfg){
         inputEl.dataset.productId = prod.id;
         if(cfg.costId){ const el=document.getElementById(cfg.costId); if(el) el.value = prod.buy || ''; }
         if(cfg.priceId){ const el=document.getElementById(cfg.priceId); if(el) el.value = prod.sell || ''; }
+        if(cfg.qtyId) bccToggleWeightUI(cfg.qtyId, prod);
         if(cfg.qtyId && cfg.priceId && cfg.previewId) updateTotalPreview(cfg.qtyId, cfg.priceId, cfg.previewId);
         boxEl.classList.remove('show');
         boxEl.innerHTML = '';
@@ -8002,7 +8095,7 @@ function renderCartInto(cart, listElId, summaryElId, removeFn){
   if(!cart.length){ box.innerHTML=''; summary.style.display='none'; return; }
   box.innerHTML = cart.map((it, idx)=> `
     <div class="cart-item">
-      <div class="ci-info"><b>${escapeHtml(it.item)}</b><span class="ci-meta">${it.qty} pcs × ${fmt(it.unitPrice)} = ${fmt(it.price)}</span></div>
+      <div class="ci-info"><b>${escapeHtml(it.item)}</b><span class="ci-meta">${it.weightLabel ? it.weightLabel : (it.qty + ' pcs')} × ${fmt(it.unitPrice)}${it.weightLabel ? '/kg' : ''} = ${fmt(it.price)}</span></div>
       <button type="button" class="ci-remove" onclick="${removeFn}(${idx})">✕</button>
     </div>`).join('');
   const totalPrice = cart.reduce((s,it)=>s+it.price,0);
@@ -8211,11 +8304,23 @@ function readCartLineFromFields(itemId, qtyId, costId, priceId){
   const itemEl = document.getElementById(itemId);
   const item = itemEl.value.trim();
   if(!item){ toast('মালামালের নাম দিতে হবে'); return null; }
-  const qty = readRequiredQty(qtyId);
+  const qtyEl = document.getElementById(qtyId);
+  let qty = readRequiredQty(qtyId);
   if(qty === null) return null;
+  let weightLabel = null;
+  if(qtyEl && qtyEl.dataset.weightUnit){
+    // ওজনভিত্তিক প্রোডাক্ট — গ্রাম মোডে থাকলে কেজিতে রূপান্তর করা হচ্ছে
+    // (দাম সবসময় "প্রতি কেজি" হিসেবে সেভ থাকে)
+    if(qtyEl.dataset.weightUnit === 'gram'){
+      weightLabel = qty + ' g';
+      qty = qty / 1000;
+    }else{
+      weightLabel = qty + ' kg';
+    }
+  }
   const unitCost = Number(document.getElementById(costId).value)||0;
   const unitPrice = Number(document.getElementById(priceId).value)||0;
-  return { item, productId: itemEl.dataset.productId || '', qty, unitCost, unitPrice, cost: unitCost*qty, price: unitPrice*qty };
+  return { item, productId: itemEl.dataset.productId || '', qty, weightLabel, unitCost, unitPrice, cost: unitCost*qty, price: unitPrice*qty };
 }
 
 function readEsCartLine(){
@@ -8236,6 +8341,11 @@ function resetLineFields(itemId, qtyId, costId, priceId, previewId){
   document.getElementById(costId).value = '';
   document.getElementById(priceId).value = '';
   document.getElementById(qtyId).value = '1';
+  const qtyEl = document.getElementById(qtyId);
+  delete qtyEl.dataset.weightUnit;
+  qtyEl.placeholder = '১';
+  const toggleEl = document.getElementById(qtyId.replace('Qty','WeightToggle'));
+  if(toggleEl) toggleEl.style.display = 'none';
   updateTotalPreview(qtyId, priceId, previewId);
   itemEl.focus();
 }
@@ -10948,6 +11058,16 @@ auth.onAuthStateChanged(async (user)=>{
   // ডিভাইসে প্রথমবার লগইন করার সময় এটা খালি অবস্থায় (লোকাল ডেটা তখনও ছিল না) সেট হয়ে
   // থেকে যেত, ক্লাউড থেকে আসল নাম চলে এলেও স্ক্রিনে আর রিফ্রেশ হতো না।
   loadHeaderCustomization();
+
+  // 📦 দোকানের "মোড" (ওজনভিত্তিক/সাধারণ/ভবিষ্যতে ব্যাচ/সিরিয়াল ইত্যাদি) — সাইনআপের
+  // সময় ক্যাটাগরি অনুযায়ী ঠিক হয়। এখানে একবার Firestore থেকে পড়ে localStorage-এ
+  // ক্যাশ করে রাখা হয়, যাতে POS-এর প্রতিটা স্ক্রিন সিঙ্ক্রোনাসভাবে এটা ব্যবহার করতে পারে।
+  try{
+    const shopDoc = await db.collection('shops').doc(session.shopId).get();
+    const mode = (shopDoc.exists && shopDoc.data().appMode) || 'standard';
+    localStorage.setItem('shop-app-mode', mode);
+    if(typeof bccApplyAppMode === 'function') bccApplyAppMode();
+  }catch(e){ console.warn('appMode fetch failed:', e); }
 
   function updateNetLabel(){
     const el = document.getElementById("cloudNetLabel");
