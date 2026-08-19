@@ -683,13 +683,99 @@
   </div>
 </div>
 
-<header style="display:flex; align-items:center; gap:12px;">
+<header id="posHeader" style="display:flex; align-items:center; gap:12px;">
   <div id="logoWrap" style="cursor:pointer; flex-shrink:0;">
     <img id="shopLogo" src="" style="display:none; width:52px;height:52px;border-radius:12px;object-fit:cover;border:2px solid rgba(255,255,255,.4);" />
     <div id="logoPlaceholder" style="width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:22px;">➕</div>
   </div>
   <input type="file" id="logoInput" accept="image/*" style="display:none;">
 </header>
+
+<!-- ==================== 🚑 DRIVER MODE — ট্রান্সপোর্ট ড্রাইভার লগইন করলে এই পুরো
+     ভিউটা দেখাবে, বাকি সব POS UI (উপরের header + নিচের mainApp) লুকানো থাকবে ==================== -->
+<div id="driverModeApp" style="display:none; max-width:480px; margin:0 auto; padding:16px 14px 90px; font-family:'Noto Sans Bengali',sans-serif;">
+  <style>
+    #driverModeApp{ min-height:100vh; background:linear-gradient(160deg,#0f2318,#123024); color:#eafff2; }
+    #driverModeApp .dmCard{ background:#173a29; border:1px solid rgba(74,222,128,0.25); border-radius:16px; padding:16px; margin-bottom:14px; }
+    #driverModeApp .dmToggleRow{ display:flex; align-items:center; justify-content:center; gap:12px; padding:14px; }
+    #driverModeApp .dmSwitch{ width:64px; height:34px; border-radius:20px; background:#3a3a3a; position:relative; cursor:pointer; transition:.2s; flex-shrink:0; }
+    #driverModeApp .dmSwitch.online{ background:#16a34a; }
+    #driverModeApp .dmSwitch.busy{ background:#f59e0b; }
+    #driverModeApp .dmKnob{ width:28px; height:28px; border-radius:50%; background:#fff; position:absolute; top:3px; left:3px; transition:.2s; }
+    #driverModeApp .dmSwitch.online .dmKnob, #driverModeApp .dmSwitch.busy .dmKnob{ left:33px; }
+    #driverModeApp .dmStatusLbl{ font-size:15px; font-weight:800; }
+    #driverModeApp .dmVehicleRow{ font-size:12.5px; color:#a8d9c0; }
+    #driverModeApp .dmBtn{ width:100%; padding:13px; border:none; border-radius:11px; font-size:14.5px; font-weight:800; cursor:pointer; font-family:inherit; }
+    #driverModeApp .dmBtnGreen{ background:#16a34a; color:#fff; }
+    #driverModeApp .dmBtnRed{ background:#dc2626; color:#fff; }
+    #driverModeApp .dmBtnGrey{ background:transparent; border:1px solid rgba(255,255,255,0.2); color:#eafff2; }
+    #driverModeApp .dmStatGrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    #driverModeApp .dmStatBox{ background:#173a29; border:1px solid rgba(74,222,128,0.2); border-radius:12px; padding:12px; text-align:center; }
+    #driverModeApp .dmStatBox .num{ font-size:20px; font-weight:800; color:#4ade80; }
+    #driverModeApp .dmStatBox .lbl{ font-size:10.5px; color:#a8d9c0; margin-top:2px; }
+    #driverModeApp .dmMapEl{ width:100%; height:180px; border-radius:12px; overflow:hidden; margin-bottom:10px; background:#111; }
+    #dmOfferOverlay{ display:none; position:fixed; inset:0; z-index:999; background:rgba(0,0,0,0.75); align-items:center; justify-content:center; padding:16px; }
+    #dmOfferOverlay .card{ background:#173a29; border:2px solid #4ade80; border-radius:18px; padding:20px; max-width:380px; width:100%; }
+    #dmOfferTimer{ text-align:center; font-size:34px; font-weight:800; color:#4ade80; margin:8px 0; font-family:'Space Mono',monospace; }
+  </style>
+
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+    <div style="font-size:30px;">🚑</div>
+    <div>
+      <div style="font-weight:800; font-size:15px;" id="dmDriverName">Honey Bee Transport</div>
+      <div style="font-size:10.5px; color:#a8d9c0; text-transform:uppercase; letter-spacing:1px;">Driver Mode</div>
+    </div>
+    <button id="dmLogoutBtn" style="margin-left:auto; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#a8d9c0; padding:7px 12px; border-radius:8px; font-size:11px; cursor:pointer; font-family:inherit;">লগআউট</button>
+  </div>
+
+  <div class="dmCard">
+    <div class="dmToggleRow">
+      <div class="dmSwitch" id="dmStatusSwitch"><div class="dmKnob"></div></div>
+      <div>
+        <div class="dmStatusLbl" id="dmStatusLbl">🔴 Offline</div>
+        <div style="font-size:11px; color:#a8d9c0;" id="dmGpsStatusTxt"></div>
+      </div>
+    </div>
+    <div class="dmVehicleRow" id="dmVehicleInfo" style="text-align:center; padding-top:6px; border-top:1px solid rgba(255,255,255,0.08);"></div>
+  </div>
+
+  <div class="dmStatGrid" style="margin-bottom:14px;">
+    <div class="dmStatBox"><div class="num" id="dmTodayEarning">SAR 0</div><div class="lbl">💰 আজকের আয়</div></div>
+    <div class="dmStatBox"><div class="num" id="dmTodayTrips">0</div><div class="lbl">🧭 আজকের ট্রিপ</div></div>
+  </div>
+
+  <!-- চলমান ট্রিপ কার্ড -->
+  <div class="dmCard" id="dmCurrentTripCard" style="display:none;">
+    <h3 style="margin:0 0 10px; font-size:14px; color:#4ade80;">🧭 বর্তমান ট্রিপ</h3>
+    <div class="dmMapEl" id="dmTripMapEl"></div>
+    <p style="font-size:12.5px; margin:0 0 4px;">👤 কাস্টমার: <b id="dmTripCustomerName">—</b></p>
+    <p style="font-size:12.5px; margin:0 0 10px;">📍 <span id="dmTripStatus">—</span></p>
+    <button class="dmBtn dmBtnGreen" id="dmStartTripBtn" style="margin-bottom:8px;">▶️ Start Trip</button>
+    <button class="dmBtn dmBtnGreen" id="dmEndTripBtn" style="display:none; margin-bottom:8px;">✅ End Trip</button>
+    <button class="dmBtn dmBtnGrey" id="dmCancelTripBtn">✕ Cancel Trip</button>
+  </div>
+
+  <div class="dmCard" id="dmHistoryCard">
+    <h3 style="margin:0 0 10px; font-size:14px; color:#4ade80;">📋 সাম্প্রতিক ট্রিপ</h3>
+    <div id="dmHistoryList" style="font-size:12px; color:#a8d9c0;">এখনো কোনো ট্রিপ সম্পন্ন হয়নি।</div>
+  </div>
+</div>
+
+<!-- ইনকামিং ট্রিপ রিকোয়েস্ট পপ-আপ -->
+<div id="dmOfferOverlay">
+  <div class="card">
+    <h3 style="margin:0 0 4px; font-size:16px; color:#eafff2;">📦 নতুন ট্রিপ রিকোয়েস্ট!</h3>
+    <div id="dmOfferTimer">০:৬০</div>
+    <p style="font-size:12.5px; color:#a8d9c0; margin:0 0 4px;">📍 Pickup: <b id="dmOfferPickup" style="color:#eafff2;">—</b></p>
+    <p style="font-size:12.5px; color:#a8d9c0; margin:0 0 4px;">🏁 Drop: <b id="dmOfferDrop" style="color:#eafff2;">—</b></p>
+    <p style="font-size:12.5px; color:#a8d9c0; margin:0 0 12px;">📏 দূরত্ব: <b id="dmOfferDistance" style="color:#eafff2;">—</b></p>
+    <p style="text-align:center; font-size:20px; font-weight:800; color:#4ade80; margin:0 0 14px;">💰 SAR <span id="dmOfferFare">—</span></p>
+    <div style="display:flex; gap:10px;">
+      <button class="dmBtn dmBtnGrey" id="dmRejectBtn" style="flex:1;">❌ Reject</button>
+      <button class="dmBtn dmBtnGreen" id="dmAcceptBtn" style="flex:1;">✅ Accept</button>
+    </div>
+  </div>
+</div>
 
 <div class="wrap" id="mainApp">
   <div class="summary" style="display:none;">
@@ -11213,10 +11299,222 @@ document.getElementById("cloudLogoutBtn").addEventListener("click", async ()=>{
   window.location.href = "login.html";
 });
 
+/* ==================== 🚑 DRIVER MODE — সম্পূর্ণ লজিক ====================
+   ট্রান্সপোর্ট ড্রাইভার লগইন করলে POS-এর বদলে এই মোডটা চলে। Online/Busy/
+   Offline টগল, ইনকামিং ট্রিপ রিকোয়েস্ট (৬০ সেকেন্ড কাউন্টডাউন + Accept/
+   Reject), লাইভ GPS, Trip শুরু/শেষ, এবং আয়ের হিসাব — সবকিছু এখানে। */
+let __dmDriverId = null, __dmDriver = null, __dmGpsWatchId = null;
+let __dmOffersUnsub = null, __dmCurrentOfferId = null, __dmOfferTimerInterval = null;
+let __dmCurrentTripId = null, __dmTripUnsub = null, __dmTripMap = null, __dmTripMarkers = {};
+
+async function initDriverMode(uid){
+  __dmDriverId = uid;
+  try{
+    const doc = await db.collection("transportDrivers").doc(uid).get();
+    if(!doc.exists){ alert("প্রোফাইল পাওয়া যায়নি।"); auth.signOut(); return; }
+    __dmDriver = doc.data();
+    if(__dmDriver.status === "blocked"){
+      alert("আপনার অ্যাকাউন্ট ব্লক করা আছে।");
+      auth.signOut(); return;
+    }
+  }catch(e){ console.error(e); return; }
+
+  document.getElementById("dmDriverName").textContent = __dmDriver.name || "Honey Bee Transport";
+  const v = __dmDriver.vehicle || {};
+  const vLabel = { bike:"🏍️ বাইক", cng:"🛺 CNG", sedan:"🚗 সেডান", hiace:"🚐 হাইএস", microbus:"🚐 মাইক্রোবাস",
+    pickup:"🛻 পিকআপ", ambulance_ac:"🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac:"🚑 অ্যাম্বুলেন্স (Non-AC)", ambulance_icu:"🚑 অ্যাম্বুলেন্স (ICU)" }[v.type] || v.type || "";
+  document.getElementById("dmVehicleInfo").textContent =
+    [vLabel, v.model, v.regNumber, v.color, v.seatCount ? v.seatCount+" সিট" : ""].filter(Boolean).join(" · ") || "গাড়ির তথ্য নেই";
+  document.getElementById("dmTodayEarning").textContent = "SAR " + (__dmDriver.todayEarning || 0);
+  document.getElementById("dmTodayTrips").textContent = __dmDriver.todayTripCount || 0;
+
+  dmRefreshStatusUi(__dmDriver.driverStatus || "offline");
+  if(__dmDriver.driverStatus === "online" || __dmDriver.driverStatus === "busy"){ dmStartGps(); }
+
+  dmListenForOffers();
+  dmCheckOngoingTrip();
+
+  document.getElementById("dmLogoutBtn").addEventListener("click", ()=> auth.signOut());
+}
+
+/* ---------- Online/Busy/Offline টগল ---------- */
+function dmRefreshStatusUi(status){
+  const sw = document.getElementById("dmStatusSwitch");
+  sw.classList.remove("online","busy");
+  if(status === "online") sw.classList.add("online");
+  if(status === "busy") sw.classList.add("busy");
+  const lbl = document.getElementById("dmStatusLbl");
+  lbl.textContent = status === "online" ? "🟢 Online" : status === "busy" ? "🟠 Busy (ট্রিপে আছেন)" : "🔴 Offline";
+}
+
+document.getElementById("dmStatusSwitch").addEventListener("click", async ()=>{
+  const current = __dmDriver.driverStatus || "offline";
+  if(current === "busy"){ alert("এই মুহূর্তে ট্রিপে আছেন — ট্রিপ শেষ না হওয়া পর্যন্ত স্ট্যাটাস বদলানো যাবে না।"); return; }
+  const next = current === "online" ? "offline" : "online";
+  __dmDriver.driverStatus = next;
+  dmRefreshStatusUi(next);
+  try{ await db.collection("transportDrivers").doc(__dmDriverId).update({ driverStatus: next }); }
+  catch(e){ console.warn(e); }
+  if(next === "online") dmStartGps(); else dmStopGps();
+});
+
+/* ---------- লাইভ GPS (প্রতি ১-২ সেকেন্ডে, শুধু Online/Busy অবস্থায়) ---------- */
+function dmStartGps(){
+  if(!navigator.geolocation){ document.getElementById("dmGpsStatusTxt").textContent = "📍 GPS সাপোর্ট নেই"; return; }
+  document.getElementById("dmGpsStatusTxt").textContent = "📍 লাইভ ট্র্যাকিং চালু";
+  let lastSent = 0;
+  __dmGpsWatchId = navigator.geolocation.watchPosition((pos)=>{
+    const now = Date.now();
+    if(now - lastSent < 1500) return; // প্রতি ~১.৫ সেকেন্ডে একবার (স্পেক অনুযায়ী ১-২ সেকেন্ড)
+    lastSent = now;
+    db.collection("transportDrivers").doc(__dmDriverId).update({
+      liveLocation: { lat: pos.coords.latitude, lng: pos.coords.longitude, updatedAt: fbNow() }
+    }).catch(()=>{});
+  }, (err)=>{ console.warn("GPS error:", err); document.getElementById("dmGpsStatusTxt").textContent = "⚠️ GPS পারমিশন লাগবে"; },
+  { enableHighAccuracy:true, maximumAge:2000, timeout:15000 });
+}
+function dmStopGps(){
+  if(__dmGpsWatchId != null){ navigator.geolocation.clearWatch(__dmGpsWatchId); __dmGpsWatchId = null; }
+  document.getElementById("dmGpsStatusTxt").textContent = "";
+}
+
+/* ---------- ইনকামিং ট্রিপ রিকোয়েস্ট (৬০ সেকেন্ড কাউন্টডাউন) ---------- */
+function dmListenForOffers(){
+  if(__dmOffersUnsub) __dmOffersUnsub();
+  __dmOffersUnsub = db.collection("tripOffers")
+    .where("driverId", "==", __dmDriverId)
+    .where("status", "==", "pending")
+    .onSnapshot((qs)=>{
+      if(qs.empty) return;
+      const doc = qs.docs[0];
+      if(doc.id === __dmCurrentOfferId) return;
+      dmShowOfferPopup(doc.id, doc.data());
+    }, (err)=> console.warn("trip offers listener error:", err));
+}
+
+function dmShowOfferPopup(offerId, data){
+  __dmCurrentOfferId = offerId;
+  document.getElementById("dmOfferPickup").textContent = data.pickupAddress || "—";
+  document.getElementById("dmOfferDrop").textContent = data.dropAddress || "—";
+  document.getElementById("dmOfferDistance").textContent = data.distanceKm ? data.distanceKm.toFixed(1) + " কিমি" : "—";
+  document.getElementById("dmOfferFare").textContent = data.driverEarning != null ? data.driverEarning : (data.estimatedFare || "—");
+  document.getElementById("dmOfferOverlay").style.display = "flex";
+
+  let secondsLeft = 60;
+  document.getElementById("dmOfferTimer").textContent = "0:60";
+  if(__dmOfferTimerInterval) clearInterval(__dmOfferTimerInterval);
+  __dmOfferTimerInterval = setInterval(()=>{
+    secondsLeft--;
+    document.getElementById("dmOfferTimer").textContent = "0:" + String(secondsLeft).padStart(2,'0');
+    if(secondsLeft <= 0){
+      clearInterval(__dmOfferTimerInterval);
+      dmRespondToOffer(offerId, "expired");
+    }
+  }, 1000);
+}
+
+async function dmRespondToOffer(offerId, status){
+  if(__dmOfferTimerInterval){ clearInterval(__dmOfferTimerInterval); __dmOfferTimerInterval = null; }
+  document.getElementById("dmOfferOverlay").style.display = "none";
+  __dmCurrentOfferId = null;
+  try{ await db.collection("tripOffers").doc(offerId).update({ status, respondedAt: fbNow() }); }
+  catch(e){ console.warn(e); }
+}
+document.getElementById("dmAcceptBtn").addEventListener("click", ()=>{ if(__dmCurrentOfferId) dmRespondToOffer(__dmCurrentOfferId, "accepted"); });
+document.getElementById("dmRejectBtn").addEventListener("click", ()=>{ if(__dmCurrentOfferId) dmRespondToOffer(__dmCurrentOfferId, "rejected"); });
+
+/* ---------- চলমান ট্রিপ ---------- */
+function dmCheckOngoingTrip(){
+  db.collection("trips")
+    .where("driverId", "==", __dmDriverId)
+    .where("status", "in", ["accepted","ongoing"])
+    .limit(1)
+    .onSnapshot((qs)=>{
+      if(qs.empty){
+        document.getElementById("dmCurrentTripCard").style.display = "none";
+        __dmCurrentTripId = null;
+        return;
+      }
+      const doc = qs.docs[0];
+      __dmCurrentTripId = doc.id;
+      dmRenderTrip(doc.id, doc.data());
+    }, (err)=> console.warn("trip listener error:", err));
+}
+
+function dmRenderTrip(tripId, trip){
+  document.getElementById("dmCurrentTripCard").style.display = "block";
+  document.getElementById("dmTripCustomerName").textContent = trip.customerName || "কাস্টমার";
+  document.getElementById("dmTripStatus").textContent = trip.status === "ongoing" ? "🚗 ট্রিপ চলছে..." : "🕐 পিকআপে যাচ্ছেন";
+  document.getElementById("dmStartTripBtn").style.display = trip.status === "accepted" ? "block" : "none";
+  document.getElementById("dmEndTripBtn").style.display = trip.status === "ongoing" ? "block" : "none";
+
+  setTimeout(()=>{
+    const mapEl = document.getElementById("dmTripMapEl");
+    if(!__dmTripMap){
+      __dmTripMap = L.map(mapEl).setView([trip.pickupLat, trip.pickupLng], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(__dmTripMap);
+      __dmTripMarkers.pickup = L.marker([trip.pickupLat, trip.pickupLng]).addTo(__dmTripMap).bindPopup("📍 Pickup");
+      if(trip.dropLat) __dmTripMarkers.drop = L.marker([trip.dropLat, trip.dropLng]).addTo(__dmTripMap).bindPopup("🏁 Drop");
+    }
+  }, 60);
+}
+
+document.getElementById("dmStartTripBtn").addEventListener("click", async ()=>{
+  if(!__dmCurrentTripId) return;
+  try{ await db.collection("trips").doc(__dmCurrentTripId).update({ status: "ongoing", startedAt: fbNow() }); }
+  catch(e){ alert("শুরু করা যায়নি: " + e.message); }
+});
+
+document.getElementById("dmEndTripBtn").addEventListener("click", async ()=>{
+  if(!__dmCurrentTripId) return;
+  try{
+    const tripDoc = await db.collection("trips").doc(__dmCurrentTripId).get();
+    const trip = tripDoc.data();
+    const fare = trip.driverEarning || trip.estimatedFare || 0;
+    await db.collection("trips").doc(__dmCurrentTripId).update({ status: "completed", completedAt: fbNow() });
+    await db.collection("transportDrivers").doc(__dmDriverId).update({
+      driverStatus: "online",
+      todayEarning: (__dmDriver.todayEarning || 0) + fare,
+      todayTripCount: (__dmDriver.todayTripCount || 0) + 1
+    });
+    __dmDriver.todayEarning = (__dmDriver.todayEarning || 0) + fare;
+    __dmDriver.todayTripCount = (__dmDriver.todayTripCount || 0) + 1;
+    __dmDriver.driverStatus = "online";
+    document.getElementById("dmTodayEarning").textContent = "SAR " + __dmDriver.todayEarning;
+    document.getElementById("dmTodayTrips").textContent = __dmDriver.todayTripCount;
+    dmRefreshStatusUi("online");
+    if(__dmTripMap){ __dmTripMap.remove(); __dmTripMap = null; __dmTripMarkers = {}; }
+  }catch(e){ alert("শেষ করা যায়নি: " + e.message); }
+});
+
+document.getElementById("dmCancelTripBtn").addEventListener("click", async ()=>{
+  if(!__dmCurrentTripId) return;
+  if(!confirm("এই ট্রিপ বাতিল করবেন?")) return;
+  try{
+    await db.collection("trips").doc(__dmCurrentTripId).update({ status: "cancelled", cancelledAt: fbNow() });
+    await db.collection("transportDrivers").doc(__dmDriverId).update({ driverStatus: "online" });
+    __dmDriver.driverStatus = "online";
+    dmRefreshStatusUi("online");
+    if(__dmTripMap){ __dmTripMap.remove(); __dmTripMap = null; __dmTripMarkers = {}; }
+  }catch(e){ alert("বাতিল করা যায়নি: " + e.message); }
+});
+
 auth.onAuthStateChanged(async (user)=>{
   const session = getSession();
   if(!user || !session || session.role === "superadmin"){
     window.location.href = "login.html";
+    return;
+  }
+
+  // 🚑 ট্রান্সপোর্ট ড্রাইভার হলে সম্পূর্ণ আলাদা "Driver Mode" UI দেখানো হয় —
+  // বাকি POS-এর কোনো কোড/ডেটা-লোড এখানে চলবে না (কারণ ড্রাইভারের session-এ
+  // shopId নেই, POS-এর কোড সেটা আশা করে)
+  if(session.role === "transport_driver"){
+    document.getElementById("authGate").style.display = "none";
+    document.getElementById("posHeader").style.display = "none";
+    document.getElementById("mainApp").style.display = "none";
+    document.getElementById("driverModeApp").style.display = "block";
+    initDriverMode(session.uid);
     return;
   }
 
