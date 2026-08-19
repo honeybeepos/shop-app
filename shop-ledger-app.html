@@ -858,6 +858,10 @@
               <button type="button" class="wtBtn active" data-wtunit="gram">গ্রাম</button>
               <button type="button" class="wtBtn" data-wtunit="kg">কেজি</button>
             </div>
+            <div id="qsSerialRow" style="display:none; margin-top:6px;">
+              <label style="font-size:11.5px;">📱 IMEI/সিরিয়াল নম্বর</label>
+              <input id="qsSerialInput" type="text" placeholder="IMEI/সিরিয়াল নম্বর লিখুন">
+            </div>
           </div>
         </div>
         <div class="row">
@@ -971,6 +975,10 @@
               <div class="bccWeightToggle" id="fWeightToggle" style="display:none; margin-top:6px; gap:6px;">
                 <button type="button" class="wtBtn active" data-wtunit="gram">গ্রাম</button>
                 <button type="button" class="wtBtn" data-wtunit="kg">কেজি</button>
+              </div>
+              <div id="fSerialRow" style="display:none; margin-top:6px;">
+                <label style="font-size:11.5px;">📱 IMEI/সিরিয়াল নম্বর</label>
+                <input id="fSerialInput" type="text" placeholder="IMEI/সিরিয়াল নম্বর লিখুন">
               </div>
             </div>
           </div>
@@ -3018,6 +3026,17 @@
           <input id="bccPBatchNo" placeholder="যেমনঃ BN-2026-08">
           <label>📅 মেয়াদ শেষ হওয়ার তারিখ (ঐচ্ছিক)</label>
           <input type="date" id="bccPExpiryDate">
+        </div>
+
+        <div id="bccPSerialRow" style="display:none;">
+          <label>📱 এই প্রোডাক্টে সিরিয়াল/IMEI লাগবে?</label>
+          <select id="bccPRequiresSerial">
+            <option value="no">না (এক্সেসরিজ/সাধারণ প্রোডাক্ট)</option>
+            <option value="yes">হ্যাঁ (প্রতিটা ইউনিটের নিজস্ব IMEI/Serial আছে)</option>
+          </select>
+          <label>🛡️ ডিফল্ট ওয়ারেন্টি মেয়াদ (মাস, ঐচ্ছিক)</label>
+          <input type="number" id="bccPWarrantyMonths" placeholder="যেমনঃ 12 (১ বছর)">
+          <p class="pin-desc" style="margin:2px 0 10px;">সিরিয়াল/IMEI লাগবে বললে সেলস স্ক্রিনে এই প্রোডাক্ট বিক্রি করার সময় IMEI/সিরিয়াল নম্বর চাওয়া হবে, এবং মেমোতে ওয়ারেন্টি তারিখসহ প্রিন্ট হবে।</p>
         </div>
 
         <div class="bccTwoCol">
@@ -6163,14 +6182,18 @@ function bccSaveCategories(cats){ localStorage.setItem('bcc-categories', JSON.st
 function bccGetAppMode(){ return localStorage.getItem('shop-app-mode') || 'standard'; }
 function bccIsWeightMode(){ return bccGetAppMode() === 'weight'; }
 function bccIsBatchMode(){ return bccGetAppMode() === 'batch'; }
+function bccIsSerialMode(){ return bccGetAppMode() === 'serial'; }
 
 function bccApplyAppMode(){
   const weightMode = bccIsWeightMode();
   const batchMode = bccIsBatchMode();
+  const serialMode = bccIsSerialMode();
   const unitRow = document.getElementById('bccPUnitRow');
   if(unitRow) unitRow.style.display = weightMode ? 'block' : 'none';
   const batchRow = document.getElementById('bccPBatchRow');
   if(batchRow) batchRow.style.display = batchMode ? 'block' : 'none';
+  const serialRow = document.getElementById('bccPSerialRow');
+  if(serialRow) serialRow.style.display = serialMode ? 'block' : 'none';
 }
 
 /* ---------- 🔴 ব্যাচ ও মেয়াদ-উত্তীর্ণ অ্যালার্ট ----------
@@ -6258,6 +6281,21 @@ document.querySelectorAll('.bccWeightToggle').forEach(toggleEl=>{
     });
   });
 });
+
+/* ---------- 🔵 সিরিয়াল/IMEI ইনপুট (সিরিয়াল-মোড দোকানে) ----------
+   প্রোডাক্ট সাজেশন থেকে "requiresSerial:true" প্রোডাক্ট বেছে নিলে
+   Qty ফিল্ডের নিচে IMEI/সিরিয়াল নম্বর লেখার একটা ইনপুট দেখা যায়। */
+function bccToggleSerialUI(qtyId, prod){
+  const rowId = qtyId.replace('Qty','SerialRow');
+  const rowEl = document.getElementById(rowId);
+  if(!rowEl) return;
+  const needsSerial = bccIsSerialMode() && prod && prod.requiresSerial;
+  rowEl.style.display = needsSerial ? 'block' : 'none';
+  if(!needsSerial){
+    const inputEl = document.getElementById(qtyId.replace('Qty','SerialInput'));
+    if(inputEl) inputEl.value = '';
+  }
+}
 
 function bccLoadProducts(){
   try{
@@ -6534,6 +6572,8 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
     lines.push(it.weightLabel ? `Quantity: ${it.weightLabel}` : `Quantity: ${it.qty}`);
     lines.push(`Unit Price: SAR ${it.unitPrice}${it.weightLabel ? '/kg' : ''}`);
     lines.push(`Amount: SAR ${it.price}`);
+    if(it.serialNumber) lines.push(`IMEI/Serial: ${it.serialNumber}`);
+    if(it.warrantyMonths) lines.push(`Warranty: ${it.warrantyMonths} Month(s) (expires: ${it.warrantyExpiry})`);
     lines.push(`Time: ${formatInvoiceTime(it.date || now)} (${formatInvoiceDate(it.date || now)})`);
     return lines.join('\n');
   }).join(`\n\n${DIVIDER}\n\n`);
@@ -6841,6 +6881,8 @@ function bccOpenProductModal(editId){
   document.getElementById('bccPPiecesPerStrip').value = p ? (p.piecesPerStrip||'') : '';
   document.getElementById('bccPBatchNo').value = '';
   document.getElementById('bccPExpiryDate').value = '';
+  document.getElementById('bccPRequiresSerial').value = p ? (p.requiresSerial ? 'yes' : 'no') : 'no';
+  document.getElementById('bccPWarrantyMonths').value = p ? (p.warrantyMonths||'') : '';
   document.getElementById('bccPBuy').value = p ? p.buy : '';
   document.getElementById('bccPSell').value = p ? p.sell : '';
   document.getElementById('bccPQty').value = p ? p.qty : '';
@@ -6955,6 +6997,8 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
   const enteredPiecesPerStrip = Number(document.getElementById('bccPPiecesPerStrip').value) || 0;
   const enteredBatchNo = document.getElementById('bccPBatchNo').value.trim();
   const enteredExpiryDate = document.getElementById('bccPExpiryDate').value;
+  const enteredRequiresSerial = bccIsSerialMode() && document.getElementById('bccPRequiresSerial').value === 'yes';
+  const enteredWarrantyMonths = Number(document.getElementById('bccPWarrantyMonths').value) || 0;
 
   // ব্যাচ মোডে থাকলে ও এক্সপায়ারি তারিখ দেওয়া থাকলে এই স্টক-ইনটা একটা
   // "ব্যাচ" হিসেবে রেকর্ড হবে — মেয়াদ শেষ হওয়ার ৩০ দিন আগে অ্যালার্ট দেখাবে
@@ -6987,6 +7031,8 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     dup.rackLocation = enteredRack || null;
     if(enteredStripsPerBox) dup.stripsPerBox = enteredStripsPerBox;
     if(enteredPiecesPerStrip) dup.piecesPerStrip = enteredPiecesPerStrip;
+    dup.requiresSerial = enteredRequiresSerial;
+    dup.warrantyMonths = enteredWarrantyMonths || null;
     const newBatch = bccMakeNewBatchEntry();
     if(newBatch){ dup.batches = dup.batches || []; dup.batches.push(newBatch); }
     const enteredMin = Number(document.getElementById('bccPMin').value)||0;
@@ -7016,6 +7062,8 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     rackLocation: enteredRack || null,
     stripsPerBox: enteredStripsPerBox || (existingProduct ? existingProduct.stripsPerBox : 0) || 0,
     piecesPerStrip: enteredPiecesPerStrip || (existingProduct ? existingProduct.piecesPerStrip : 0) || 0,
+    requiresSerial: enteredRequiresSerial,
+    warrantyMonths: enteredWarrantyMonths || null,
     batches: existingProduct ? (existingProduct.batches || []) : [],
     buy: enteredBuy,
     sell: enteredSell,
@@ -8064,6 +8112,7 @@ function setupSmartSuggest(cfg){
         if(cfg.costId){ const el=document.getElementById(cfg.costId); if(el) el.value = prod.buy || ''; }
         if(cfg.priceId){ const el=document.getElementById(cfg.priceId); if(el) el.value = prod.sell || ''; }
         if(cfg.qtyId) bccToggleWeightUI(cfg.qtyId, prod);
+        if(cfg.qtyId) bccToggleSerialUI(cfg.qtyId, prod);
         if(cfg.qtyId && cfg.priceId && cfg.previewId) updateTotalPreview(cfg.qtyId, cfg.priceId, cfg.previewId);
         boxEl.classList.remove('show');
         boxEl.innerHTML = '';
@@ -8212,7 +8261,7 @@ function renderCartInto(cart, listElId, summaryElId, removeFn){
   if(!cart.length){ box.innerHTML=''; summary.style.display='none'; return; }
   box.innerHTML = cart.map((it, idx)=> `
     <div class="cart-item">
-      <div class="ci-info"><b>${escapeHtml(it.item)}</b><span class="ci-meta">${it.weightLabel ? it.weightLabel : (it.qty + ' pcs')} × ${fmt(it.unitPrice)}${it.weightLabel ? '/kg' : ''} = ${fmt(it.price)}</span></div>
+      <div class="ci-info"><b>${escapeHtml(it.item)}</b><span class="ci-meta">${it.weightLabel ? it.weightLabel : (it.qty + ' pcs')} × ${fmt(it.unitPrice)}${it.weightLabel ? '/kg' : ''} = ${fmt(it.price)}${it.serialNumber ? ' · IMEI: '+escapeHtml(it.serialNumber) : ''}</span></div>
       <button type="button" class="ci-remove" onclick="${removeFn}(${idx})">✕</button>
     </div>`).join('');
   const totalPrice = cart.reduce((s,it)=>s+it.price,0);
@@ -8437,7 +8486,24 @@ function readCartLineFromFields(itemId, qtyId, costId, priceId){
   }
   const unitCost = Number(document.getElementById(costId).value)||0;
   const unitPrice = Number(document.getElementById(priceId).value)||0;
-  return { item, productId: itemEl.dataset.productId || '', qty, weightLabel, unitCost, unitPrice, cost: unitCost*qty, price: unitPrice*qty };
+
+  // 🔵 সিরিয়াল/IMEI ও ওয়ারেন্টি — প্রোডাক্ট থেকে ডিফল্ট ওয়ারেন্টি মেয়াদ এবং
+  // ইউজারের টাইপ করা IMEI/সিরিয়াল নম্বর সংগ্রহ করা হচ্ছে
+  let serialNumber = null, warrantyMonths = null, warrantyExpiry = null;
+  const serialInputEl = document.getElementById(qtyId.replace('Qty','SerialInput'));
+  if(serialInputEl && serialInputEl.value.trim()){
+    serialNumber = serialInputEl.value.trim();
+    const prods = bccLoadProducts();
+    const prod = itemEl.dataset.productId ? prods.find(x=>x.id===itemEl.dataset.productId) : null;
+    if(prod && prod.warrantyMonths){
+      warrantyMonths = prod.warrantyMonths;
+      const expDate = new Date();
+      expDate.setMonth(expDate.getMonth() + Number(prod.warrantyMonths));
+      warrantyExpiry = expDate.toISOString().slice(0,10);
+    }
+  }
+
+  return { item, productId: itemEl.dataset.productId || '', qty, weightLabel, unitCost, unitPrice, cost: unitCost*qty, price: unitPrice*qty, serialNumber, warrantyMonths, warrantyExpiry };
 }
 
 function readEsCartLine(){
@@ -8463,6 +8529,12 @@ function resetLineFields(itemId, qtyId, costId, priceId, previewId){
   qtyEl.placeholder = '১';
   const toggleEl = document.getElementById(qtyId.replace('Qty','WeightToggle'));
   if(toggleEl) toggleEl.style.display = 'none';
+  const serialRowEl = document.getElementById(qtyId.replace('Qty','SerialRow'));
+  if(serialRowEl){
+    serialRowEl.style.display = 'none';
+    const serialInputEl = document.getElementById(qtyId.replace('Qty','SerialInput'));
+    if(serialInputEl) serialInputEl.value = '';
+  }
   updateTotalPreview(qtyId, priceId, previewId);
   itemEl.focus();
 }
