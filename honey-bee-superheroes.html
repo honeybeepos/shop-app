@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🦸 Honey Bee Superheroes</title>
+<meta name="theme-color" content="#78350f">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{ --amber:#f59e0b; --dark:#1a1206; --card:#2b1c05; --border:rgba(245,158,11,0.35); --ok:#16a34a; --muted:#e2c9a0; }
+  *{box-sizing:border-box;}
+  html,body{ height:100%; margin:0; }
+  body{ min-height:100vh; background:linear-gradient(160deg,#1a1206,#3d2405); color:#fff8e8; font-family:'Noto Sans Bengali','Space Mono',sans-serif; }
+  .wrap{ max-width:520px; margin:0 auto; padding:20px 16px 40px; }
+  header{ text-align:center; margin-bottom:18px; }
+  header .hex{ font-size:48px; }
+  header h1{ margin:8px 0 2px; font-size:20px; font-weight:900; }
+  header p{ margin:0; font-size:12px; color:#fcd34d; letter-spacing:1px; }
+
+  .gpsStatusBanner{ font-size:12px; color:var(--muted); margin-bottom:14px; text-align:center; }
+
+  /* বড়, উজ্জ্বল, উচ্চ-কনট্রাস্ট ক্যাটাগরি গ্রিড — সহজে চেনার জন্য */
+  .catGrid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+  .catCard{
+    background:var(--card); border:2px solid var(--border); border-radius:20px; padding:18px 10px;
+    text-align:center; cursor:pointer; transition:.15s;
+  }
+  .catCard.active{ background:linear-gradient(145deg, var(--amber), #d97706); border-color:var(--amber); }
+  .catCard .icBig{ font-size:52px; line-height:1; margin-bottom:8px; display:block; }
+  .catCard .lbl{ font-size:14px; font-weight:800; color:#fff8e8; }
+  .catCard.active .lbl{ color:#1a1206; }
+  .catCard .allCard{ font-size:15px; }
+
+  .workerCard{
+    background:var(--card); border:1px solid var(--border); border-radius:18px; padding:16px;
+    margin-bottom:12px; display:flex; align-items:center; gap:14px;
+  }
+  .workerCard .avatarIc{ font-size:44px; flex-shrink:0; width:64px; height:64px; display:flex; align-items:center; justify-content:center;
+    background:rgba(245,158,11,0.12); border-radius:16px; }
+  .workerCard .info{ flex:1; min-width:0; }
+  .workerCard .name{ font-weight:800; font-size:16px; }
+  .workerCard .meta{ font-size:12.5px; color:var(--muted); margin-top:3px; }
+
+  .callBtn{
+    background:var(--amber); color:#1a1206; border:none; padding:12px 18px; border-radius:12px;
+    font-weight:900; font-size:13.5px; cursor:pointer; font-family:inherit; flex-shrink:0; white-space:nowrap;
+  }
+
+  .emptyMsg{ text-align:center; color:var(--muted); font-size:14px; padding:50px 16px; }
+  .loadingMsg{ text-align:center; color:var(--muted); font-size:14px; padding:30px; }
+
+  /* সম্মানজনক কল-রিভিল পপ-আপ */
+  .modalOverlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:900; align-items:center; justify-content:center; padding:20px; }
+  .modalOverlay.show{ display:flex; }
+  .gentleModal{ background:var(--card); border:2px solid var(--amber); border-radius:22px; padding:26px 22px; max-width:380px; width:100%; text-align:center; }
+  .gentleModal .heroIc{ font-size:56px; margin-bottom:10px; }
+  .gentleModal h3{ margin:0 0 12px; font-size:17px; }
+  .gentleModal p{ font-size:13.5px; color:var(--muted); line-height:1.6; margin:0 0 18px; }
+  .gentleBtnRow{ display:flex; gap:10px; }
+  .gentleBtnRow button{ flex:1; padding:13px; border-radius:12px; border:none; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; }
+  .gentleCancelBtn{ background:transparent; border:1px solid var(--border) !important; color:var(--muted); }
+  .gentleRevealBtn{ background:var(--ok); color:#fff; text-decoration:none; display:flex; align-items:center; justify-content:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="hex">🦸</div>
+    <h1>Honey Bee Superheroes</h1>
+    <p>আমাদের প্রতিদিনের নায়করা</p>
+  </header>
+
+  <div class="gpsStatusBanner" id="gpsStatusBanner"></div>
+
+  <div class="catGrid" id="catGrid">
+    <div class="catCard active" data-cat="all" style="grid-column:1 / -1;">
+      <span class="icBig allCard">🦸‍♂️🦸‍♀️</span>
+      <div class="lbl">সবাই দেখুন</div>
+    </div>
+    <div class="catCard" data-cat="agri">
+      <span class="icBig">🌾🚜</span>
+      <div class="lbl">Agri Superhero</div>
+    </div>
+    <div class="catCard" data-cat="hygiene">
+      <span class="icBig">🧹✨</span>
+      <div class="lbl">Hygiene Superhero</div>
+    </div>
+    <div class="catCard" data-cat="electric">
+      <span class="icBig">⚡🔌</span>
+      <div class="lbl">Electric Superhero</div>
+    </div>
+    <div class="catCard" data-cat="masonry">
+      <span class="icBig">🧱🏗️</span>
+      <div class="lbl">Masonry Superhero</div>
+    </div>
+    <div class="catCard" data-cat="plumbing" style="grid-column:1 / -1;">
+      <span class="icBig">🚰🔧</span>
+      <div class="lbl">Plumbing Superhero</div>
+    </div>
+  </div>
+
+  <div id="workersList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+</div>
+
+<!-- 🌸 সম্মানজনক কল-রিভিল পপ-আপ -->
+<div class="modalOverlay" id="gentleModalOverlay">
+  <div class="gentleModal">
+    <div class="heroIc">🦸‍♂️</div>
+    <h3>A Gentle Request</h3>
+    <p>আপনি এখন আমাদের সম্মানিত একজন Superhero-র সাথে যোগাযোগ করতে যাচ্ছেন, যিনি আমাদের সমাজ, খাবার ও পরিবেশকে নিরাপদ ও পরিষ্কার রাখেন।<br><br>🌸 অনুগ্রহ করে তার সাথে যথাযথ সম্মান ও ভদ্রতার সাথে কথা বলুন।</p>
+    <div class="gentleBtnRow">
+      <button class="gentleCancelBtn" id="gentleCancelBtn">Cancel</button>
+      <a class="gentleRevealBtn" id="gentleRevealBtn" href="#">📞 Reveal &amp; Call</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD6qmuWkNUrskMIBHq8Z_AQ0N_WT1DL8Is",
+  authDomain: "honeybee-984dd.firebaseapp.com",
+  projectId: "honeybee-984dd",
+  storageBucket: "honeybee-984dd.firebasestorage.app",
+  messagingSenderId: "610211112501",
+  appId: "1:610211112501:web:9ea40b9060d425e85b737c"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+function $(id){ return document.getElementById(id); }
+function escapeHtml(str){
+  const d = document.createElement("div");
+  d.textContent = str == null ? "" : String(str);
+  return d.innerHTML;
+}
+
+const CATEGORY_INFO = {
+  agri: { icon: "🌾🚜", label: "Agri Superhero" },
+  hygiene: { icon: "🧹✨", label: "Hygiene Superhero" },
+  electric: { icon: "⚡🔌", label: "Electric Superhero" },
+  masonry: { icon: "🧱🏗️", label: "Masonry Superhero" },
+  plumbing: { icon: "🚰🔧", label: "Plumbing Superhero" }
+};
+
+let allWorkers = [];
+let currentCategory = "all";
+let userLatLng = null;
+
+function haversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function requestGpsLocation(){
+  if(!navigator.geolocation){ $("gpsStatusBanner").textContent = ""; return; }
+  $("gpsStatusBanner").textContent = "📍 আপনার কাছের Superhero খোঁজা হচ্ছে...";
+  navigator.geolocation.getCurrentPosition((pos)=>{
+    userLatLng = [pos.coords.latitude, pos.coords.longitude];
+    $("gpsStatusBanner").textContent = "📍 দূরত্ব অনুযায়ী সাজানো হয়েছে";
+    render();
+  }, ()=>{ $("gpsStatusBanner").textContent = ""; }, { enableHighAccuracy:true, timeout:10000 });
+}
+
+// শুধু সক্রিয় + ভেরিফাইড + বর্তমানে-প্রস্তুত Superhero-ই দেখানো হয়
+db.collection("superheroes")
+  .where("status", "==", "active")
+  .where("isVerified", "==", true)
+  .where("isAvailable", "==", true)
+  .onSnapshot((qs)=>{
+    allWorkers = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+    render();
+  }, (e)=>{
+    console.error(e);
+    $("workersList").innerHTML = '<div class="emptyMsg">তালিকা লোড করা যায়নি — ইন্টারনেট চেক করুন।</div>';
+  });
+
+requestGpsLocation();
+
+document.querySelectorAll(".catCard").forEach(card=>{
+  card.addEventListener("click", ()=>{
+    document.querySelectorAll(".catCard").forEach(c=> c.classList.remove("active"));
+    card.classList.add("active");
+    currentCategory = card.dataset.cat;
+    render();
+  });
+});
+
+function render(){
+  let list = currentCategory === "all" ? allWorkers : allWorkers.filter(w=> w.category === currentCategory);
+
+  if(userLatLng){
+    list = list.map(w=>{
+      const dist = (w.liveLocation && w.liveLocation.lat != null)
+        ? haversineKm(userLatLng[0], userLatLng[1], w.liveLocation.lat, w.liveLocation.lng)
+        : null;
+      return { ...w, __dist: dist };
+    }).sort((a,b)=>{
+      if(a.__dist == null && b.__dist == null) return 0;
+      if(a.__dist == null) return 1;
+      if(b.__dist == null) return -1;
+      return a.__dist - b.__dist;
+    });
+  }
+
+  if(list.length === 0){
+    $("workersList").innerHTML = '<div class="emptyMsg">এই মুহূর্তে কেউ প্রস্তুত নেই। একটু পর আবার চেষ্টা করুন।</div>';
+    return;
+  }
+
+  $("workersList").innerHTML = list.map(w=>{
+    const info = CATEGORY_INFO[w.category] || { icon: "🦸", label: w.category || "" };
+    const distTxt = w.__dist != null ? ` · ${w.__dist.toFixed(1)} কিমি দূরে` : "";
+    return `
+      <div class="workerCard">
+        <div class="avatarIc">${info.icon}</div>
+        <div class="info">
+          <div class="name">${escapeHtml(w.name || "Superhero")} 🛡️</div>
+          <div class="meta">${info.label}${distTxt}</div>
+        </div>
+        <button class="callBtn" onclick="openGentleModal('${escapeHtml(w.phone||'').replace(/'/g,'')}')">📞 Call Superhero</button>
+      </div>`;
+  }).join("");
+}
+
+window.openGentleModal = function(phone){
+  $("gentleRevealBtn").href = "tel:" + phone;
+  $("gentleModalOverlay").classList.add("show");
+};
+$("gentleCancelBtn").addEventListener("click", ()=> $("gentleModalOverlay").classList.remove("show"));
+$("gentleRevealBtn").addEventListener("click", ()=>{
+  setTimeout(()=> $("gentleModalOverlay").classList.remove("show"), 300);
+});
+</script>
+</body>
+</html>
