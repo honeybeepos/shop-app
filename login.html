@@ -76,6 +76,9 @@
       <option value="fish_meat">🟢 মাছ ও মাংসের দোকান</option>
       <option value="sweets">🟢 মিষ্টির দোকান</option>
       <option value="fruits">🟢 ফলের দোকান</option>
+      <option value="pharmacy">🔴 ফার্মেসি / ওষুধের দোকান</option>
+      <option value="cosmetics">🔴 কসমেটিকস ও বিউটি শপ</option>
+      <option value="packaged_food">🔴 প্যাকেটজাত খাদ্য ও ডেইরি শপ</option>
       <option value="other">🟡 অন্যান্য (সাধারণ মোড)</option>
     </select>
 
@@ -281,7 +284,10 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   // সেটা ঠিক হবে। আপাতত শুধু ওজনভিত্তিক মোড বানানো হয়েছে — বাকি মোড
   // (ব্যাচ/এক্সপায়ারি, সিরিয়াল/IMEI, ভ্যারিয়েন্ট) পরের ধাপে যোগ হবে।
   const WEIGHT_MODE_CATEGORIES = ["grocery", "fish_meat", "sweets", "fruits"];
-  const appMode = WEIGHT_MODE_CATEGORIES.includes(category) ? "weight" : "standard";
+  const BATCH_MODE_CATEGORIES = ["pharmacy", "cosmetics", "packaged_food"];
+  const appMode = WEIGHT_MODE_CATEGORIES.includes(category) ? "weight"
+    : BATCH_MODE_CATEGORIES.includes(category) ? "batch"
+    : "standard";
 
   if(!shopName || !name || !email || pass.length < 6){
     showMsg("signupMsg","সব ঘর সঠিকভাবে পূরণ করুন (পাসওয়ার্ড কমপক্ষে ৬ অক্ষর)",false); return;

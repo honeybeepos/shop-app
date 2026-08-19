@@ -2968,7 +2968,8 @@
         <button class="bccBtnPrimary" id="bccBulkPublishBtn" style="flex:1; background:#16a34a;">🟢 বাছাইকৃতগুলো Bazar-এ প্রকাশ করুন</button>
         <button class="bccBtnQuick" id="bccBulkUnpublishBtn" style="flex:1;">🔴 বাছাইকৃতগুলো লুকান</button>
       </div>
-      <input type="text" id="bccProductSearch" class="bccSearchInput" placeholder="🔍 নাম, কোড দিয়ে খুঁজুন...">
+      <input type="text" id="bccProductSearch" class="bccSearchInput" placeholder="🔍 নাম, কোড, জেনেরিক নাম দিয়ে খুঁজুন...">
+      <div id="bccExpiryAlertBox" style="display:none;"></div>
       <div id="bccProductList"></div>
     </div>
 
@@ -3000,6 +3001,23 @@
             <option value="kg">⚖️ ওজন হিসেবে (কেজি/গ্রাম)</option>
           </select>
           <p class="pin-desc" id="bccPUnitHint" style="display:none; margin:2px 0 10px;">নিচের "বিক্রয় মূল্য" হবে <b>প্রতি কেজির দাম</b>। সেলস স্ক্রিনে গ্রাম/কেজি লিখে বিক্রি করা যাবে।</p>
+        </div>
+
+        <div id="bccPBatchRow" style="display:none;">
+          <label>🧪 জেনেরিক নাম (ঐচ্ছিক)</label>
+          <input id="bccPGeneric" placeholder="যেমনঃ Paracetamol (মূল উপাদান/সক্রিয় উপাদান)">
+          <label>📍 র‍্যাক/শেলফ লোকেশন (ঐচ্ছিক)</label>
+          <input id="bccPRack" placeholder="যেমনঃ Rack A-2">
+          <label>📦 ইউনিট ব্রেকডাউন (ঐচ্ছিক — বক্স/পাতা/পিস হিসেবে বিক্রি করতে)</label>
+          <div class="bccTwoCol">
+            <div><label style="font-size:11.5px;">১ বক্সে কত পাতা/স্ট্রিপ</label><input type="number" id="bccPStripsPerBox" placeholder="যেমনঃ 10"></div>
+            <div><label style="font-size:11.5px;">১ পাতায় কত পিস</label><input type="number" id="bccPPiecesPerStrip" placeholder="যেমনঃ 10"></div>
+          </div>
+          <p class="pin-desc" style="margin:2px 0 10px;">এটা দিলে সেলস স্ক্রিনে বক্স/পাতা/পিস বেছে বিক্রি করা যাবে (দাম হিসাব হবে নিচের "বিক্রয় মূল্য" — যেটা <b>১ পিসের দাম</b> ধরা হয়)।</p>
+          <label>🔢 ব্যাচ নম্বর (এই স্টক-ইনটার জন্য, ঐচ্ছিক)</label>
+          <input id="bccPBatchNo" placeholder="যেমনঃ BN-2026-08">
+          <label>📅 মেয়াদ শেষ হওয়ার তারিখ (ঐচ্ছিক)</label>
+          <input type="date" id="bccPExpiryDate">
         </div>
 
         <div class="bccTwoCol">
@@ -6139,16 +6157,62 @@ function bccLoadCategories(){
 }
 function bccSaveCategories(cats){ localStorage.setItem('bcc-categories', JSON.stringify(cats)); }
 
-/* ==================== 📦 দোকানের মোড (Weight-Based ইত্যাদি) ====================
+/* ==================== 📦 দোকানের মোড (Weight-Based / Batch-Expiry ইত্যাদি) ====================
    সাইনআপের সময় ক্যাটাগরি অনুযায়ী ঠিক হওয়া মোড অনুযায়ী POS-এর কিছু ফিচার
-   (আপাতত শুধু ওজন-হিসাব) দেখানো/লুকানো হয়। */
+   দেখানো/লুকানো হয়। */
 function bccGetAppMode(){ return localStorage.getItem('shop-app-mode') || 'standard'; }
 function bccIsWeightMode(){ return bccGetAppMode() === 'weight'; }
+function bccIsBatchMode(){ return bccGetAppMode() === 'batch'; }
 
 function bccApplyAppMode(){
   const weightMode = bccIsWeightMode();
+  const batchMode = bccIsBatchMode();
   const unitRow = document.getElementById('bccPUnitRow');
   if(unitRow) unitRow.style.display = weightMode ? 'block' : 'none';
+  const batchRow = document.getElementById('bccPBatchRow');
+  if(batchRow) batchRow.style.display = batchMode ? 'block' : 'none';
+}
+
+/* ---------- 🔴 ব্যাচ ও মেয়াদ-উত্তীর্ণ অ্যালার্ট ----------
+   প্রতিটা প্রোডাক্টের সব ব্যাচের মধ্যে সবচেয়ে কাছের (আগে শেষ হবে এমন) মেয়াদ
+   বের করে — ৩০ দিনের মধ্যে/আগে শেষ হলে সতর্কতা দেখানো হয়। */
+function bccGetNearestExpiry(p){
+  if(!p.batches || !p.batches.length) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  let nearest = null;
+  p.batches.forEach(b=>{
+    if(!b.expiryDate) return;
+    const expDate = new Date(b.expiryDate);
+    const daysLeft = Math.ceil((expDate - today) / (1000*60*60*24));
+    if(nearest === null || daysLeft < nearest.daysLeft){
+      nearest = { daysLeft, expired: daysLeft < 0, batchNo: b.batchNo, expiryDate: b.expiryDate };
+    }
+  });
+  if(!nearest || nearest.daysLeft > 30) return null; // ৩০ দিনের বেশি বাকি থাকলে অ্যালার্ট দরকার নেই
+  return nearest;
+}
+
+function bccRenderExpiryAlert(){
+  const box = document.getElementById('bccExpiryAlertBox');
+  if(!box || !bccIsBatchMode()){ if(box) box.style.display = 'none'; return; }
+  const prods = bccLoadProducts();
+  const alerts = prods.map(p=> ({ p, exp: bccGetNearestExpiry(p) })).filter(x=> x.exp);
+  if(!alerts.length){ box.style.display = 'none'; return; }
+  alerts.sort((a,b)=> a.exp.daysLeft - b.exp.daysLeft);
+  const expiredCount = alerts.filter(a=> a.exp.expired).length;
+  box.style.display = 'block';
+  box.style.cssText = 'display:block; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:12px; padding:12px 14px; margin-bottom:12px;';
+  box.innerHTML = `
+    <div style="font-weight:700; font-size:13px; color:#dc2626; margin-bottom:8px;">
+      ⏳ ${alerts.length}টা প্রোডাক্টের মেয়াদ শীঘ্রই শেষ হবে${expiredCount ? ` (${expiredCount}টা ইতিমধ্যে মেয়াদোত্তীর্ণ!)` : ''}
+    </div>
+    ${alerts.slice(0,6).map(a=> `
+      <div style="font-size:12px; color:#6b7280; padding:3px 0;">
+        ${a.exp.expired ? '⛔' : '⏳'} ${escapeHtml(a.p.name)}${a.exp.batchNo ? ' (ব্যাচ: '+escapeHtml(a.exp.batchNo)+')' : ''} —
+        ${a.exp.expired ? 'মেয়াদ শেষ হয়ে গেছে' : a.exp.daysLeft + ' দিন বাকি'} (${a.exp.expiryDate})
+      </div>`).join('')}
+    ${alerts.length > 6 ? `<div style="font-size:11px; color:#9ca3af; margin-top:4px;">+ আরও ${alerts.length-6}টা</div>` : ''}
+  `;
 }
 
 function bccUpdateUnitLabels(){
@@ -6635,9 +6699,14 @@ let bccBulkSelectedIds = new Set();
 
 function bccRenderProducts(){
   const q = (document.getElementById('bccProductSearch').value||'').trim().toLowerCase();
-  const prods = bccLoadProducts().filter(p=> !q || p.name.toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q));
+  const prods = bccLoadProducts().filter(p=> !q ||
+    p.name.toLowerCase().includes(q) ||
+    (p.code||'').toLowerCase().includes(q) ||
+    (p.genericName||'').toLowerCase().includes(q)
+  );
   const cats = bccLoadCategories();
   const listEl = document.getElementById('bccProductList');
+  bccRenderExpiryAlert();
   if(!prods.length){ listEl.innerHTML = '<div style="text-align:center;color:#8b94b8;padding:30px 0;font-size:13px;">কোনো প্রোডাক্ট পাওয়া যায়নি</div>'; return; }
   listEl.innerHTML = prods.map(p=>{
     const cat = cats.find(c=>c.id===p.catId);
@@ -6647,7 +6716,10 @@ function bccRenderProducts(){
     const metaParts = [];
     if(p.code) metaParts.push(escapeHtml(p.code));
     if(cat) metaParts.push(escapeHtml(cat.name) + (sub?(' / '+escapeHtml(sub.name)):''));
+    if(p.genericName) metaParts.push('🧪 '+escapeHtml(p.genericName));
+    if(p.rackLocation) metaParts.push('📍 '+escapeHtml(p.rackLocation));
     const isPublished = !!p.published;
+    const nearestExpiry = bccGetNearestExpiry(p);
     const checkbox = bccBulkMode
       ? `<input type="checkbox" class="bulkCheck" data-bulkid="${p.id}" ${bccBulkSelectedIds.has(p.id)?'checked':''}>`
       : '';
@@ -6659,6 +6731,7 @@ function bccRenderProducts(){
         <div class="meta">${metaParts.join(' • ')}</div>
         <span class="pubBadge ${isPublished?'on':'off'}">${isPublished?'🟢 Published':'🔴 Hidden'}</span>
         ${p.offerPrice ? '<span class="pubBadge on" style="background:rgba(251,146,60,0.18); color:#fb923c;">🔥 Special Offer</span>' : ''}
+        ${nearestExpiry ? `<span class="pubBadge ${nearestExpiry.expired?'off':'on'}" style="background:${nearestExpiry.expired?'rgba(239,68,68,0.18)':'rgba(251,191,36,0.18)'}; color:${nearestExpiry.expired?'#f87171':'#fbbf24'};">${nearestExpiry.expired?'⛔ মেয়াদোত্তীর্ণ':'⏳ মেয়াদ শেষ '+nearestExpiry.daysLeft+' দিনে'}</span>` : ''}
       </div>
       <div class="price">
         <div class="sell">${fmt(p.sell)}${p.unit==='kg' ? '/kg' : ''}</div>
@@ -6733,6 +6806,17 @@ function bccQuickRestock(id){
   const addQty = Number(input);
   if(!addQty || addQty <= 0){ toast('সঠিক পরিমাণ দিন'); return; }
   p.qty = (Number(p.qty)||0) + addQty;
+
+  // ব্যাচ মোডে থাকলে এই নতুন স্টকের জন্য ব্যাচ নম্বর ও মেয়াদ জানতে চাওয়া হয়
+  if(bccIsBatchMode()){
+    const batchNo = prompt('ব্যাচ নম্বর (ঐচ্ছিক, ফাঁকা রাখলে বাদ যাবে):', '') || '';
+    const expiryDate = prompt('মেয়াদ শেষ হওয়ার তারিখ (YYYY-MM-DD, ঐচ্ছিক):', '') || '';
+    if(expiryDate){
+      p.batches = p.batches || [];
+      p.batches.push({ batchNo, expiryDate, qty: addQty, addedAt: Date.now() });
+    }
+  }
+
   bccSaveProducts(prods);
   bccRenderProducts(); bccRenderOverview();
   toast(`✅ ${addQty} পিস যোগ হলো — নতুন স্টক: ${p.qty} পিস`);
@@ -6751,6 +6835,12 @@ function bccOpenProductModal(editId){
   bccPopulateCategorySelect(document.getElementById('bccPCat'), p ? p.catId : '');
   bccPopulateSubSelect(document.getElementById('bccPSub'), p ? p.catId : '', p ? p.subId : '');
   document.getElementById('bccPUnit').value = p ? (p.unit||'pcs') : 'pcs';
+  document.getElementById('bccPGeneric').value = p ? (p.genericName||'') : '';
+  document.getElementById('bccPRack').value = p ? (p.rackLocation||'') : '';
+  document.getElementById('bccPStripsPerBox').value = p ? (p.stripsPerBox||'') : '';
+  document.getElementById('bccPPiecesPerStrip').value = p ? (p.piecesPerStrip||'') : '';
+  document.getElementById('bccPBatchNo').value = '';
+  document.getElementById('bccPExpiryDate').value = '';
   document.getElementById('bccPBuy').value = p ? p.buy : '';
   document.getElementById('bccPSell').value = p ? p.sell : '';
   document.getElementById('bccPQty').value = p ? p.qty : '';
@@ -6859,6 +6949,19 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
   const enteredOfferPrice = Number(document.getElementById('bccPOfferPrice').value) || 0;
   const enteredPublished = document.getElementById('bccPPublished').checked;
   const enteredUnit = bccIsWeightMode() ? (document.getElementById('bccPUnit').value || 'pcs') : 'pcs';
+  const enteredGeneric = document.getElementById('bccPGeneric').value.trim();
+  const enteredRack = document.getElementById('bccPRack').value.trim();
+  const enteredStripsPerBox = Number(document.getElementById('bccPStripsPerBox').value) || 0;
+  const enteredPiecesPerStrip = Number(document.getElementById('bccPPiecesPerStrip').value) || 0;
+  const enteredBatchNo = document.getElementById('bccPBatchNo').value.trim();
+  const enteredExpiryDate = document.getElementById('bccPExpiryDate').value;
+
+  // ব্যাচ মোডে থাকলে ও এক্সপায়ারি তারিখ দেওয়া থাকলে এই স্টক-ইনটা একটা
+  // "ব্যাচ" হিসেবে রেকর্ড হবে — মেয়াদ শেষ হওয়ার ৩০ দিন আগে অ্যালার্ট দেখাবে
+  function bccMakeNewBatchEntry(){
+    if(!bccIsBatchMode() || !enteredExpiryDate || enteredQty <= 0) return null;
+    return { batchNo: enteredBatchNo, expiryDate: enteredExpiryDate, qty: enteredQty, addedAt: Date.now() };
+  }
 
   if(enteredOfferPrice && enteredSell && enteredOfferPrice >= enteredSell){
     toast('⚠️ অফার মূল্য বিক্রয় মূল্যের চেয়ে কম হতে হবে');
@@ -6880,6 +6983,12 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     dup.offerPrice = enteredOfferPrice || null;
     dup.published = enteredPublished;
     dup.unit = enteredUnit;
+    dup.genericName = enteredGeneric || null;
+    dup.rackLocation = enteredRack || null;
+    if(enteredStripsPerBox) dup.stripsPerBox = enteredStripsPerBox;
+    if(enteredPiecesPerStrip) dup.piecesPerStrip = enteredPiecesPerStrip;
+    const newBatch = bccMakeNewBatchEntry();
+    if(newBatch){ dup.batches = dup.batches || []; dup.batches.push(newBatch); }
     const enteredMin = Number(document.getElementById('bccPMin').value)||0;
     if(enteredMin) dup.min = enteredMin;
     const enteredCode = document.getElementById('bccPCode').value.trim();
@@ -6895,6 +7004,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     return;
   }
 
+  const existingProduct = bccEditingProductId ? prods.find(x=>x.id===bccEditingProductId) : null;
   const data = {
     id: bccEditingProductId || bccUid(),
     name,
@@ -6902,6 +7012,11 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     catId,
     subId: document.getElementById('bccPSub').value,
     unit: enteredUnit,
+    genericName: enteredGeneric || null,
+    rackLocation: enteredRack || null,
+    stripsPerBox: enteredStripsPerBox || (existingProduct ? existingProduct.stripsPerBox : 0) || 0,
+    piecesPerStrip: enteredPiecesPerStrip || (existingProduct ? existingProduct.piecesPerStrip : 0) || 0,
+    batches: existingProduct ? (existingProduct.batches || []) : [],
     buy: enteredBuy,
     sell: enteredSell,
     offerPrice: enteredOfferPrice || null,
@@ -6911,6 +7026,8 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     image: bccPendingImage,
     note: document.getElementById('bccPNote').value.trim(),
   };
+  const newBatchForData = bccMakeNewBatchEntry();
+  if(newBatchForData) data.batches.push(newBatchForData);
   if(bccEditingProductId){
     const idx = prods.findIndex(x=>x.id===bccEditingProductId);
     if(idx>-1) prods[idx]=data; else prods.push(data);
