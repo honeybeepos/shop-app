@@ -147,6 +147,8 @@
     <button class="tabBtn active" data-tab="tabOverview">📊 ওভারভিউ</button>
     <button class="tabBtn" data-tab="tabRiders">🛵 রাইডার</button>
     <button class="tabBtn" data-tab="tabShops">🏪 দোকান</button>
+    <button class="tabBtn" data-tab="tabTransport">🚑 ট্রান্সপোর্ট</button>
+    <button class="tabBtn" data-tab="tabSuperheroes">🦸 Superheroes</button>
     <button class="tabBtn" data-tab="tabCharge">💰 ডেলিভারি চার্জ</button>
   </div>
 
@@ -170,6 +172,18 @@
   <div class="tabPanel" id="tabShops">
     <p style="font-size:11.5px; color:var(--muted); margin:0 0 12px;">এই তালিকায় শুধু সেসব দোকান দেখাবে যেগুলো রেজিস্ট্রেশনের সময় আপনাকে (এজেন্ট) নির্বাচন করেছে।</p>
     <div id="shopsList"><div class="emptyMsg">লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- 🚑 ট্রান্সপোর্ট ড্রাইভার -->
+  <div class="tabPanel" id="tabTransport">
+    <p style="font-size:11.5px; color:var(--muted); margin:0 0 12px;">ড্রাইভাররা নিজেরাই login.html-এ গিয়ে নিবন্ধন করেন। এখানে আপনার বাজার/এলাকায় নিবন্ধিত সবাইকে দেখাবে — নতুনদের 🛡️ ভেরিফাই করুন।</p>
+    <div id="driversList"><div class="emptyMsg">লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- 🦸 Everyday Superheroes -->
+  <div class="tabPanel" id="tabSuperheroes">
+    <p style="font-size:11.5px; color:var(--muted); margin:0 0 12px;">Superhero-রা নিজেরাই login.html-এ গিয়ে নিবন্ধন করেন। এখানে আপনার বাজার/এলাকায় নিবন্ধিত সবাইকে দেখাবে — নতুনদের 🛡️ ভেরিফাই করুন।</p>
+    <div id="superheroesList"><div class="emptyMsg">লোড হচ্ছে...</div></div>
   </div>
 
   <!-- ডেলিভারি চার্জ -->
@@ -220,13 +234,13 @@
 <div class="modalOverlay" id="verifyModal">
   <div class="modalCard">
     <h3>🛡️ ভেরিফিকেশন — <span id="verifyTargetName">—</span></h3>
-    <p style="font-size:12.5px; color:rgba(255,248,232,0.6); margin:0 0 14px;">সরেজমিনে পরিদর্শন করে NID যাচাই করুন এবং ছবি তুলুন। সব ঠিক থাকলে "Approve" চাপুন — এরপর এই অ্যাকাউন্টের পাশে 🛡️ ব্যাজ দেখাবে এবং Bazar/পাবলিক তালিকায় প্রকাশিত হবে।</p>
+    <p style="font-size:12.5px; color:rgba(255,248,232,0.6); margin:0 0 14px;">সরেজমিনে পরিদর্শন করে যাচাই করুন। কমপক্ষে লাইভ ছবিটা তুলতে হবে (NID থাকলে সেটাও তুলতে পারেন, কিন্তু বাধ্যতামূলক না — সবার কাছে NID নাও থাকতে পারে)। সব ঠিক থাকলে "Approve" চাপুন — এরপর এই অ্যাকাউন্টের পাশে 🛡️ ব্যাজ দেখাবে এবং Bazar/পাবলিক তালিকায় প্রকাশিত হবে।</p>
 
-    <label>🪪 NID সামনের দিক (ছবি তুলুন)</label>
+    <label>🪪 NID সামনের দিক (ঐচ্ছিক — যাদের NID আছে তাদের জন্য)</label>
     <input type="file" accept="image/*" capture="environment" id="verifyNidFront">
     <div id="verifyNidFrontPreview" style="margin:6px 0 12px;"></div>
 
-    <label>🪪 NID পেছনের দিক (ছবি তুলুন)</label>
+    <label>🪪 NID পেছনের দিক (ঐচ্ছিক)</label>
     <input type="file" accept="image/*" capture="environment" id="verifyNidBack">
     <div id="verifyNidBackPreview" style="margin:6px 0 12px;"></div>
 
@@ -267,7 +281,7 @@ function phoneToAuthEmail(phone){
 
 function $(id){ return document.getElementById(id); }
 let currentAgent = null; // { uid, marketId, deliveryChargeConfig, status }
-let ridersUnsub = null, shopsUnsub = null;
+let ridersUnsub = null, shopsUnsub = null, driversUnsub = null, superheroesUnsub = null;
 
 /* ---------- লগইন / সেশন ---------- */
 $("loginBtn").addEventListener("click", async ()=>{
@@ -361,11 +375,15 @@ async function loadDashboard(){
 
   listenRiders();
   listenShops();
+  listenDrivers();
+  listenSuperheroes();
 }
 
 function stopListeners(){
   if(ridersUnsub){ ridersUnsub(); ridersUnsub = null; }
   if(shopsUnsub){ shopsUnsub(); shopsUnsub = null; }
+  if(driversUnsub){ driversUnsub(); driversUnsub = null; }
+  if(superheroesUnsub){ superheroesUnsub(); superheroesUnsub = null; }
 }
 
 /* ---------- রাইডার লিস্ট (রিয়েলটাইম) ---------- */
@@ -488,6 +506,97 @@ $("saveRiderBtn").addEventListener("click", async ()=>{
     $("saveRiderBtn").disabled = false; $("saveRiderBtn").textContent = "✅ রাইডার যোগ করুন";
   }
 });
+
+/* ---------- 🚑 ট্রান্সপোর্ট ড্রাইভার লিস্ট (রিয়েলটাইম) ---------- */
+const VEHICLE_LABELS = {
+  cng: "🛺 CNG/অটো", ambulance_ac: "🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac: "🚑 অ্যাম্বুলেন্স (Non-AC)",
+  ambulance_icu: "🚑 অ্যাম্বুলেন্স (ICU)", private_car: "🚗 প্রাইভেট কার", microbus: "🚐 মাইক্রোবাস",
+  pickup_truck: "🛻 পিকআপ/ট্রাক"
+};
+
+function listenDrivers(){
+  driversUnsub = db.collection("transportDrivers").where("marketId", "==", currentAgent.marketId)
+    .onSnapshot((qs)=>{
+      if(qs.empty){
+        $("driversList").innerHTML = '<div class="emptyMsg">এখনো কোনো ড্রাইভার যোগ করা হয়নি।</div>';
+        return;
+      }
+      $("driversList").innerHTML = qs.docs.map(doc=>{
+        const d = doc.data();
+        const statusClass = d.status === "active" ? "active" : "blocked";
+        const statusText = d.status === "active" ? "সক্রিয়" : "ব্লকড";
+        const toggleLabel = d.status === "active" ? "🚫 ব্লক করুন" : "✅ আনব্লক করুন";
+        const toggleClass = d.status === "active" ? "danger" : "ok";
+        const vehicleLabels = (d.vehicleTypes||[]).map(v=> VEHICLE_LABELS[v] || v).join(", ");
+        return `
+          <div class="rowItem">
+            <div class="info">
+              <div class="name">${escapeHtml(d.name || "নাম নেই")} ${d.isVerified ? '<span title="Verified">🛡️</span>' : ''} ${d.isAvailable ? '<span style="color:#4ade80;">🟢</span>' : '<span style="color:#f87171;">🔴</span>'}</div>
+              <div class="meta">📱 ${escapeHtml(d.phone || "—")} · ${escapeHtml(vehicleLabels || "যানবাহন নির্ধারিত না")}</div>
+            </div>
+            <span class="badge ${statusClass}">${statusText}</span>
+          </div>
+          <div class="rowActions" style="margin:-6px 0 10px;">
+            <button class="btn small ${toggleClass}" onclick="toggleDriverStatus('${doc.id}','${d.status}')">${toggleLabel}</button>
+            ${d.isVerified ? '<span class="badge active">🛡️ Verified</span>' : `<button class="btn small ok" onclick="openVerifyModal('driver','${doc.id}','${escapeHtml(d.name || 'ড্রাইভার').replace(/'/g,"")}')">🛡️ ভেরিফাই করুন</button>`}
+          </div>`;
+      }).join("");
+    }, (err)=>{
+      console.error("drivers listener error:", err);
+      $("driversList").innerHTML = '<div class="emptyMsg">ড্রাইভারের তালিকা লোড করা যায়নি।</div>';
+    });
+}
+
+window.toggleDriverStatus = async function(driverId, currentStatus){
+  const newStatus = currentStatus === "active" ? "blocked" : "active";
+  try{
+    await db.collection("transportDrivers").doc(driverId).update({ status: newStatus });
+  }catch(e){ alert("স্ট্যাটাস বদলানো যায়নি: " + e.message); }
+};
+
+/* ---------- 🦸 Everyday Superheroes লিস্ট (রিয়েলটাইম) ---------- */
+const SUPERHERO_LABELS = {
+  agri: "🌾🚜 Agri Superhero", hygiene: "🧹✨ Hygiene Superhero", electric: "⚡🔌 Electric Superhero",
+  masonry: "🧱🏗️ Masonry Superhero", plumbing: "🚰🔧 Plumbing Superhero"
+};
+
+function listenSuperheroes(){
+  superheroesUnsub = db.collection("superheroes").where("marketId", "==", currentAgent.marketId)
+    .onSnapshot((qs)=>{
+      if(qs.empty){
+        $("superheroesList").innerHTML = '<div class="emptyMsg">এখনো কোনো Superhero যোগ করা হয়নি।</div>';
+        return;
+      }
+      $("superheroesList").innerHTML = qs.docs.map(doc=>{
+        const s = doc.data();
+        const statusClass = s.status === "active" ? "active" : "blocked";
+        const statusText = s.status === "active" ? "সক্রিয়" : "ব্লকড";
+        const toggleLabel = s.status === "active" ? "🚫 ব্লক করুন" : "✅ আনব্লক করুন";
+        const toggleClass = s.status === "active" ? "danger" : "ok";
+        return `
+          <div class="rowItem">
+            <div class="info">
+              <div class="name">${escapeHtml(s.name || "নাম নেই")} ${s.isVerified ? '<span title="Verified">🛡️</span>' : ''} ${s.isAvailable ? '<span style="color:#4ade80;">🟢</span>' : '<span style="color:#f87171;">🔴</span>'}</div>
+              <div class="meta">📱 ${escapeHtml(s.phone || "—")} · ${SUPERHERO_LABELS[s.category] || s.category || "—"}</div>
+            </div>
+            <span class="badge ${statusClass}">${statusText}</span>
+          </div>
+          <div class="rowActions" style="margin:-6px 0 10px;">
+            <button class="btn small ${toggleClass}" onclick="toggleSuperheroStatus('${doc.id}','${s.status}')">${toggleLabel}</button>
+            ${s.isVerified ? '<span class="badge active">🛡️ Verified</span>' : `<button class="btn small ok" onclick="openVerifyModal('superhero','${doc.id}','${escapeHtml(s.name || 'Superhero').replace(/'/g,"")}')">🛡️ ভেরিফাই করুন</button>`}
+          </div>`;
+      }).join("");
+    }, (err)=>{
+      console.error("superheroes listener error:", err);
+      $("superheroesList").innerHTML = '<div class="emptyMsg">তালিকা লোড করা যায়নি।</div>';
+    });
+}
+
+window.toggleSuperheroStatus = async function(id, currentStatus){
+  const newStatus = currentStatus === "active" ? "blocked" : "active";
+  try{ await db.collection("superheroes").doc(id).update({ status: newStatus }); }
+  catch(e){ alert("স্ট্যাটাস বদলানো যায়নি: " + e.message); }
+};
 
 /* ---------- শপ লিস্ট (রিয়েলটাইম) ---------- */
 function listenShops(){
@@ -622,23 +731,27 @@ $("closeVerifyModal").addEventListener("click", ()=> $("verifyModal").style.disp
 $("approveVerifyBtn").addEventListener("click", async ()=>{
   const msgEl = $("verifyMsg");
   msgEl.style.display = "none";
-  if(!verifyPendingImages.nidFront || !verifyPendingImages.nidBack || !verifyPendingImages.livePhoto){
-    msgEl.textContent = "⚠️ তিনটা ছবিই (NID সামনে, পেছনে, লাইভ ছবি) তুলতে হবে।";
+  if(!verifyPendingImages.livePhoto){
+    msgEl.textContent = "⚠️ কমপক্ষে লাইভ ছবিটা তুলতে হবে (ব্যক্তিকে সামনাসামনি দেখে)। NID ঐচ্ছিক।";
     msgEl.style.color = "#e2543d"; msgEl.style.display = "block";
     return;
   }
   const btn = $("approveVerifyBtn");
   btn.disabled = true; btn.textContent = "যাচাই হচ্ছে...";
   try{
-    const collectionName = verifyTarget.type === "shop" ? "shops" : "riders";
-    await db.collection(collectionName).doc(verifyTarget.id).set({
+    const collectionName = verifyTarget.type === "shop" ? "shops"
+      : verifyTarget.type === "driver" ? "transportDrivers"
+      : verifyTarget.type === "superhero" ? "superheroes"
+      : "riders";
+    const verifyData = {
       isVerified: true,
       verifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
       verifiedBy: currentAgent.uid,
-      nidFrontImage: verifyPendingImages.nidFront,
-      nidBackImage: verifyPendingImages.nidBack,
       livePhotoImage: verifyPendingImages.livePhoto
-    }, { merge: true });
+    };
+    if(verifyPendingImages.nidFront) verifyData.nidFrontImage = verifyPendingImages.nidFront;
+    if(verifyPendingImages.nidBack) verifyData.nidBackImage = verifyPendingImages.nidBack;
+    await db.collection(collectionName).doc(verifyTarget.id).set(verifyData, { merge: true });
     $("verifyModal").style.display = "none";
   }catch(e){
     msgEl.textContent = "⚠️ ভেরিফাই করা যায়নি: " + e.message;

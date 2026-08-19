@@ -46,11 +46,12 @@
   <div class="tabs">
     <div class="tab-sw active" data-p="login">লগইন</div>
     <div class="tab-sw" data-p="signup">নতুন দোকান নিবন্ধন</div>
+    <div class="tab-sw" data-p="provider">🦸🚑 সেবা প্রদানকারী নিবন্ধন</div>
   </div>
 
   <div class="panel active" id="panel-login">
-    <label>ইমেইল</label>
-    <input type="email" id="loginEmail" placeholder="you@example.com">
+    <label>ইমেইল অথবা মোবাইল নম্বর</label>
+    <input type="text" id="loginEmail" placeholder="you@example.com অথবা 05XXXXXXXX">
     <label>পাসওয়ার্ড</label>
     <input type="password" id="loginPass" placeholder="••••••••">
     <button class="btn" id="loginBtn">লগইন করুন</button>
@@ -97,6 +98,56 @@
     <button class="btn" id="signupBtn">দোকান তৈরি করুন</button>
     <div class="msg" id="signupMsg"></div>
   </div>
+
+  <div class="panel" id="panel-provider">
+    <label>আপনি কী ধরনের সেবা দিতে চান?</label>
+    <select id="pvType">
+      <option value="superhero">🦸 কাজের লোক (ইলেকট্রিশিয়ান, প্লাম্বার, পরিচ্ছন্নতা কর্মী, রাজমিস্ত্রি, কৃষি পরামর্শক)</option>
+      <option value="transport">🚑 ট্রান্সপোর্ট/গাড়ি ভাড়া (CNG, প্রাইভেট কার, অ্যাম্বুলেন্স, মাইক্রোবাস, ট্রাক)</option>
+    </select>
+
+    <label>আপনার নাম</label>
+    <input type="text" id="pvName" placeholder="পূর্ণ নাম">
+    <label>মোবাইল নম্বর (লগইনের জন্য ব্যবহার হবে)</label>
+    <input type="text" id="pvPhone" placeholder="05XXXXXXXX">
+    <label>পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
+    <input type="password" id="pvPass" placeholder="••••••••">
+
+    <div id="pvSuperheroFields">
+      <label>কাজের ধরন</label>
+      <select id="pvCategory">
+        <option value="agri">🌾🚜 Agri Superhero (কৃষক ও ফসল পরামর্শক)</option>
+        <option value="hygiene">🧹✨ Hygiene Superhero (পরিষ্কার-পরিচ্ছন্নতা কর্মী)</option>
+        <option value="electric">⚡🔌 Electric Superhero (ইলেকট্রিশিয়ান, AC/ফ্রিজ টেকনিশিয়ান)</option>
+        <option value="masonry">🧱🏗️ Masonry Superhero (রাজমিস্ত্রি, পেইন্টার, টাইলস)</option>
+        <option value="plumbing">🚰🔧 Plumbing Superhero (প্লাম্বার)</option>
+      </select>
+    </div>
+
+    <div id="pvTransportFields" style="display:none;">
+      <label>যানবাহনের ধরন (একাধিক বেছে নিতে পারবেন)</label>
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400;"><input type="checkbox" value="cng" class="pvVtCheck"> 🛺 CNG / অটো রিকশা</label>
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400;"><input type="checkbox" value="ambulance_ac" class="pvVtCheck"> 🚑 অ্যাম্বুলেন্স (AC)</label>
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400;"><input type="checkbox" value="ambulance_non_ac" class="pvVtCheck"> 🚑 অ্যাম্বুলেন্স (Non-AC)</label>
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400;"><input type="checkbox" value="ambulance_icu" class="pvVtCheck"> 🚑 অ্যাম্বুলেন্স (ICU)</label>
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400;"><input type="checkbox" value="private_car" class="pvVtCheck"> 🚗 প্রাইভেট কার / মিনি</label>
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400;"><input type="checkbox" value="microbus" class="pvVtCheck"> 🚐 মাইক্রোবাস / হাইএস</label>
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400;"><input type="checkbox" value="pickup_truck" class="pvVtCheck"> 🛻 পিকআপ / ট্রাক</label>
+      </div>
+    </div>
+
+    <label>জেলা</label>
+    <select id="pvDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
+    <label>উপজেলা/থানা</label>
+    <select id="pvUpazila" disabled><option value="">-- আগে জেলা নির্বাচন করুন --</option></select>
+    <label>বাজার/এলাকা</label>
+    <select id="pvMarket" disabled><option value="">-- আগে উপজেলা নির্বাচন করুন --</option></select>
+
+    <button class="btn" id="providerSignupBtn">✅ নিবন্ধন করুন</button>
+    <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:10px;">নিবন্ধনের পর আপনার এলাকার Honey Bee Agent আপনাকে যাচাই (verify) করবেন — তারপর আপনি Honey Bee Bazar-এ 🛡️ ব্যাজসহ দেখা যাবেন।</p>
+    <div class="msg" id="providerMsg"></div>
+  </div>
 </div>
 
 <script src="bd-locations.js"></script>
@@ -125,6 +176,10 @@ function showMsg(id, text, ok){
   el.className = "msg " + (ok ? "ok" : "err");
 }
 
+function phoneToAuthEmail(phone){
+  const digits = phone.replace(/[^0-9]/g, "");
+  return `rider_${digits}@honeybee-riders.app`; // Superhero/Transport অ্যাপগুলোর সাথে একই সিন্থেটিক-ইমেইল স্কিম
+}
 /* ==================== জেলা → উপজেলা → বাজার → এজেন্ট কাসকেডিং ==================== */
 function getAllDistricts(){
   const list = [];
@@ -205,6 +260,112 @@ document.getElementById("suMarket").addEventListener("change", async (e)=>{
   }
 });
 
+/* ==================== 🦸🚑 সেবা প্রদানকারী নিবন্ধন (Superhero/Transport) ==================== */
+document.getElementById("pvType").addEventListener("change", (e)=>{
+  const isSuperhero = e.target.value === "superhero";
+  document.getElementById("pvSuperheroFields").style.display = isSuperhero ? "block" : "none";
+  document.getElementById("pvTransportFields").style.display = isSuperhero ? "none" : "block";
+});
+
+document.getElementById("pvDistrict").innerHTML += getAllDistricts().map(d=>`<option value="${d}">${d}</option>`).join("");
+
+document.getElementById("pvDistrict").addEventListener("change", (e)=>{
+  const district = e.target.value;
+  const upSel = document.getElementById("pvUpazila");
+  const marketSel = document.getElementById("pvMarket");
+  marketSel.innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; marketSel.disabled = true;
+  if(!district){
+    upSel.innerHTML = '<option value="">-- আগে জেলা নির্বাচন করুন --</option>'; upSel.disabled = true;
+    return;
+  }
+  upSel.disabled = false;
+  upSel.innerHTML = '<option value="">-- উপজেলা/থানা নির্বাচন করুন --</option>' +
+    getUpazilasForDistrict(district).map(u=>`<option value="${u}">${u}</option>`).join("");
+});
+
+document.getElementById("pvUpazila").addEventListener("change", async (e)=>{
+  const district = document.getElementById("pvDistrict").value;
+  const upazila = e.target.value;
+  const marketSel = document.getElementById("pvMarket");
+  if(!upazila){
+    marketSel.innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; marketSel.disabled = true;
+    return;
+  }
+  marketSel.innerHTML = '<option value="">লোড হচ্ছে...</option>'; marketSel.disabled = true;
+  try{
+    const qs = await db.collection("markets").where("district","==",district).where("upazila","==",upazila).get();
+    if(qs.empty){
+      marketSel.innerHTML = '<option value="">এই উপজেলায় এখনো কোনো বাজার নিবন্ধিত হয়নি</option>';
+      marketSel.disabled = true;
+      return;
+    }
+    marketSel.innerHTML = '<option value="">-- বাজার/এলাকা নির্বাচন করুন --</option>' +
+      qs.docs.map(d=> `<option value="${d.id}">${d.data().name || d.id}</option>`).join("");
+    marketSel.disabled = false;
+  }catch(e){
+    marketSel.innerHTML = '<option value="">লোড করা যায়নি</option>';
+  }
+});
+
+document.getElementById("providerSignupBtn").addEventListener("click", async ()=>{
+  const type = document.getElementById("pvType").value; // 'superhero' | 'transport'
+  const name = document.getElementById("pvName").value.trim();
+  const phone = document.getElementById("pvPhone").value.trim();
+  const pass = document.getElementById("pvPass").value;
+  const marketId = document.getElementById("pvMarket").value;
+  const district = document.getElementById("pvDistrict").value;
+  const upazila = document.getElementById("pvUpazila").value;
+
+  if(!name || !phone || pass.length < 6){
+    showMsg("providerMsg","নাম, মোবাইল নম্বর ও পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর) সঠিকভাবে দিন।",false); return;
+  }
+  if(!marketId){
+    showMsg("providerMsg","জেলা, উপজেলা ও বাজার/এলাকা নির্বাচন করুন।",false); return;
+  }
+
+  let category = null, vehicleTypes = [];
+  if(type === "superhero"){
+    category = document.getElementById("pvCategory").value;
+  }else{
+    vehicleTypes = Array.from(document.querySelectorAll(".pvVtCheck:checked")).map(cb=> cb.value);
+    if(vehicleTypes.length === 0){
+      showMsg("providerMsg","অন্তত একটা যানবাহনের ধরন বেছে নিন।",false); return;
+    }
+  }
+
+  const btn = document.getElementById("providerSignupBtn");
+  btn.disabled = true; btn.textContent = "নিবন্ধন হচ্ছে...";
+  __authFlowInProgress = true;
+  try{
+    const authEmail = phoneToAuthEmail(phone);
+    const cred = await auth.createUserWithEmailAndPassword(authEmail, pass);
+    const uid = cred.user.uid;
+
+    if(type === "superhero"){
+      await db.collection("users").doc(uid).set({ role: "superhero", phone, createdAt: fbNow() });
+      await db.collection("superheroes").doc(uid).set({
+        name, phone, category, district, upazila, marketId,
+        status: "active", isAvailable: false, isVerified: false, createdAt: fbNow()
+      });
+    }else{
+      await db.collection("users").doc(uid).set({ role: "transport_driver", phone, createdAt: fbNow() });
+      await db.collection("transportDrivers").doc(uid).set({
+        name, phone, vehicleTypes, district, upazila, marketId,
+        status: "active", isAvailable: false, isVerified: false, createdAt: fbNow()
+      });
+    }
+
+    showMsg("providerMsg","✅ নিবন্ধন সম্পন্ন হয়েছে! আপনার ড্যাশবোর্ডে নিয়ে যাওয়া হচ্ছে...", true);
+    await afterLoginRoute(uid);
+  }catch(e){
+    console.error(e);
+    let friendly = e.message;
+    if(e.code === "auth/email-already-in-use") friendly = "এই মোবাইল নম্বর দিয়ে আগে থেকেই একটা অ্যাকাউন্ট নিবন্ধিত আছে।";
+    showMsg("providerMsg","⚠️ নিবন্ধন করা যায়নি: " + friendly, false);
+  }
+  btn.disabled = false; btn.textContent = "✅ নিবন্ধন করুন";
+});
+
 async function afterLoginRoute(uid){
   const superAdmin = await isSuperAdmin(uid);
   if (superAdmin) {
@@ -214,10 +375,36 @@ async function afterLoginRoute(uid){
   }
   const userDoc = await getMyUserDoc(uid);
   if (!userDoc) {
-    showMsg("loginMsg", "এই একাউন্টের কোনো দোকান খুঁজে পাওয়া যায়নি।", false);
+    showMsg("loginMsg", "এই একাউন্টের কোনো প্রোফাইল খুঁজে পাওয়া যায়নি।", false);
     await auth.signOut();
     return;
   }
+
+  // 🦸 Superhero বা 🚑 Transport Provider হলে তাদের নিজস্ব ড্যাশবোর্ড অ্যাপে পাঠানো হয়
+  if (userDoc.role === "superhero") {
+    const doc = await db.collection("superheroes").doc(uid).get();
+    if (!doc.exists || doc.data().status === "blocked") {
+      showMsg("loginMsg", "আপনার অ্যাকাউন্টটি ব্লক করা আছে অথবা প্রোফাইল পাওয়া যায়নি।", false);
+      await auth.signOut();
+      return;
+    }
+    saveSession({ uid, role: "superhero", name: doc.data().name || "" });
+    window.location.href = "honey-bee-superhero-worker.html";
+    return;
+  }
+  if (userDoc.role === "transport_driver") {
+    const doc = await db.collection("transportDrivers").doc(uid).get();
+    if (!doc.exists || doc.data().status === "blocked") {
+      showMsg("loginMsg", "আপনার অ্যাকাউন্টটি ব্লক করা আছে অথবা প্রোফাইল পাওয়া যায়নি।", false);
+      await auth.signOut();
+      return;
+    }
+    saveSession({ uid, role: "transport_driver", name: doc.data().name || "" });
+    window.location.href = "honey-bee-transport-driver.html";
+    return;
+  }
+
+  // ডিফল্ট: দোকান (Shop/POS) ফ্লো
   const shop = await getShopDoc(userDoc.shopId);
   if (!shop || shop.status === "blocked") {
     showMsg("loginMsg", "আপনার একাউন্টটি ব্লক করা হয়েছে। দোকানের এডমিনের সাথে যোগাযোগ করুন।", false);
@@ -235,9 +422,12 @@ let __authFlowInProgress = false; // লগইন/সাইনআপ বাট�
                                     // পুরনো-সেশন-ভিত্তিক অটো-রিডাইরেক্ট যেন গায়ে না লাগে
 
 document.getElementById("loginBtn").addEventListener("click", async ()=>{
-  const email = document.getElementById("loginEmail").value.trim();
+  const rawInput = document.getElementById("loginEmail").value.trim();
   const pass = document.getElementById("loginPass").value;
-  if(!email || !pass){ showMsg("loginMsg","ইমেইল ও পাসওয়ার্ড দিন",false); return; }
+  if(!rawInput || !pass){ showMsg("loginMsg","ইমেইল/মোবাইল নম্বর ও পাসওয়ার্ড দিন",false); return; }
+  // ইমেইল না দিয়ে মোবাইল নম্বর দিলে সেটাকে Superhero/Transport-এর সিন্থেটিক
+  // ইমেইলে রূপান্তর করা হয় (দোকানদাররা আসল ইমেইল দিয়েই লগইন করেন)
+  const email = rawInput.includes("@") ? rawInput : phoneToAuthEmail(rawInput);
   const btn = document.getElementById("loginBtn");
   btn.disabled = true; btn.textContent = "লগইন হচ্ছে...";
   __authFlowInProgress = true;
@@ -250,7 +440,7 @@ document.getElementById("loginBtn").addEventListener("click", async ()=>{
     if (count >= MAX_FAILED_ATTEMPTS) {
       showMsg("loginMsg", "বারবার ভুল পাসওয়ার্ড দেওয়ার কারণে একাউন্ট ব্লক হয়ে গেছে। এডমিনের সাথে যোগাযোগ করুন।", false);
     } else {
-      showMsg("loginMsg", `ভুল ইমেইল বা পাসওয়ার্ড (${count}/${MAX_FAILED_ATTEMPTS} বার চেষ্টা)`, false);
+      showMsg("loginMsg", `ভুল ইমেইল/মোবাইল অথবা পাসওয়ার্ড (${count}/${MAX_FAILED_ATTEMPTS} বার চেষ্টা)`, false);
     }
   }
   btn.disabled = false; btn.textContent = "লগইন করুন";
