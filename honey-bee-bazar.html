@@ -357,9 +357,11 @@ function loadShops(marketId){
   $("shopsList").innerHTML = '<div class="loadingMsg">দোকানের তালিকা লোড হচ্ছে...</div>';
   if(shopsUnsub) shopsUnsub();
   // রিয়েল-টাইম লিসেনার — দোকান নতুন অনুমোদন/আপডেট হলে সাথে সাথেই এখানে দেখাবে
+  // শুধু এজেন্ট কর্তৃক ভেরিফাইড (🛡️) দোকানই কাস্টমারদের দেখানো হয়
   shopsUnsub = db.collection("shops")
     .where("marketId", "==", marketId)
     .where("status", "==", "active")
+    .where("isVerified", "==", true)
     .onSnapshot((qs)=>{
       allShops = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
       renderShops(getFilteredShops());
@@ -387,7 +389,7 @@ function renderShops(list){
     <div class="card shopItem">
       <div class="ic" style="cursor:pointer;" onclick="selectShop('${s.id}')">🏪</div>
       <div class="info" style="cursor:pointer;" onclick="selectShop('${s.id}')">
-        <div class="name">${escapeHtml(s.name || s.shopName || "দোকান")}</div>
+        <div class="name">${escapeHtml(s.name || s.shopName || "দোকান")} ${s.isVerified ? '<span title="Verified by Agent">🛡️</span>' : ''}</div>
         <div class="meta">${escapeHtml(s.category || "")}</div>
       </div>
       <div class="favHeart" onclick="toggleFavoriteShop(event,'${s.id}')">${isFav ? "❤️" : "🤍"}</div>
