@@ -12,6 +12,58 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
+  /* ==================== 🐝 Bee Flying Animation (ট্রান্সপোর্ট লাইভ ম্যাপে গাড়ির উপরে) ==================== */
+  .beeCarWrap{ position:relative; width:34px; height:34px; }
+  .beeCarWrap .carIcon{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:22px;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
+  }
+  .beeCarWrap .beeIcon{
+    position:absolute; left:50%; top:-6px; transform:translateX(-50%); font-size:15px;
+    animation: beeFloat 0.8s ease-in-out infinite, beeSway 1.6s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px #FFD54F);
+  }
+  .beeCarWrap .beeIcon .wing{ display:inline-block; animation: wingFlutter 0.4s linear infinite; }
+  @keyframes beeFloat{ 0%,100%{ transform:translateX(-50%) translateY(0px); } 50%{ transform:translateX(-50%) translateY(-3px); } }
+  @keyframes beeSway{ 0%,100%{ margin-left:0px; } 50%{ margin-left:2px; } }
+  @keyframes wingFlutter{ 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+  @keyframes glowPulse{ 0%,100%{ opacity:0.6; } 50%{ opacity:1; } }
+
+  /* ---------- হেডার: Bee অ্যানিমেশন + স্লাইডিং টেক্সট ---------- */
+  .beeHeaderAnim{ flex-shrink:0; }
+  .slideText{
+    display:inline-block; white-space:nowrap; margin:0;
+    animation: slideInText 0.6s ease-out;
+  }
+  @keyframes slideInText{ from{ transform:translateX(-20px); opacity:0; } to{ transform:translateX(0); opacity:1; } }
+
+  /* ---------- হোমস্ক্রিন সার্ভিস কার্ড গ্রিড ---------- */
+  .serviceCardGrid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:20px; }
+  .serviceCard{
+    position:relative; background:var(--card); border:1px solid var(--border); border-radius:16px;
+    padding:18px 8px; text-align:center; cursor:pointer; transition:.15s;
+  }
+  .serviceCard:active{ transform:scale(0.96); }
+  .serviceCard .ic{ font-size:32px; margin-bottom:6px; }
+  .serviceCard .lbl{ font-size:11.5px; font-weight:700; color:#fff8e8; }
+  .serviceCard.soon{ opacity:0.55; }
+  .serviceCard.soon .soonBadge{
+    position:absolute; bottom:-6px; left:50%; transform:translateX(-50%);
+    background:var(--danger); color:#fff; font-size:8.5px; padding:2px 6px; border-radius:20px; white-space:nowrap;
+  }
+
+  /* ---------- নিচের ফুটার নেভিগেশন ---------- */
+  .footerNav{
+    position:fixed; bottom:0; left:0; right:0; display:flex; background:var(--card);
+    border-top:1px solid var(--border); padding:8px 0 max(8px, env(safe-area-inset-bottom)); z-index:100;
+  }
+  .footerNavItem{ flex:1; text-align:center; cursor:pointer; color:var(--muted); }
+  .footerNavItem .ic{ font-size:20px; }
+  .footerNavItem .lbl{ font-size:9.5px; font-weight:700; margin-top:2px; }
+  .footerNavItem.active{ color:var(--amber); }
+  body{ padding-bottom:70px; }
+</style>
+<style>
   :root{
     --bg1:#1a1206; --bg2:#3d2405; --gold:#ffb703; --amber:#ffd166;
     --card:#241705; --border:rgba(255,209,102,0.22); --danger:#e2543d; --ok:#2fbf71; --muted:rgba(255,248,232,0.55);
@@ -87,8 +139,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenMarkets, #screenShops, #screenProducts, #screenTransport{ display:none; }
-  #screenMarkets.active, #screenShops.active, #screenProducts.active, #screenTransport.active{ display:block; }
+  #screenHome, #screenMarkets, #screenShops, #screenProducts, #screenTransport{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenProducts.active, #screenTransport.active{ display:block; }
 </style>
 <script src="bd-locations.js"></script>
 </head>
@@ -96,21 +148,55 @@
 <div class="wrap">
 
   <header>
-    <div class="hex">🐝</div>
-    <div>
-      <h1>Honey Bee Bazar</h1>
-      <p>Browse Markets &amp; Shops</p>
+    <div class="beeHeaderAnim">
+      <div class="beeCarWrap" style="width:44px; height:44px;">
+        <span class="beeIcon" style="font-size:30px; top:0;">🐝<span class="wing"></span></span>
+      </div>
+    </div>
+    <div style="overflow:hidden; flex:1;">
+      <h1 class="slideText">Honey Bee Bazar</h1>
+      <p>আপনার এলাকার সবকিছু, এক জায়গায়</p>
     </div>
     <div id="authArea" style="margin-left:auto;"></div>
   </header>
 
-  <div id="appNavTabs" style="display:flex; gap:8px; margin-bottom:16px;">
-    <button class="appNavTab active" data-app="bazar" style="flex:1; padding:11px; border-radius:12px; border:1px solid var(--border); background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;">🛒 Bazar</button>
-    <button class="appNavTab" data-app="transport" style="flex:1; padding:11px; border-radius:12px; border:1px solid var(--border); background:transparent; color:var(--muted); font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;">🚑 Transport</button>
+  <!-- ==================== 🏠 হোমস্ক্রিন — ৬টা সার্ভিস কার্ড ==================== -->
+  <div id="screenHome" class="active">
+    <div class="serviceCardGrid">
+      <div class="serviceCard" data-svc="market">
+        <div class="ic">🏪</div>
+        <div class="lbl">Market</div>
+      </div>
+      <div class="serviceCard" data-svc="transport">
+        <div class="ic">🚑</div>
+        <div class="lbl">Transport</div>
+      </div>
+      <div class="serviceCard soon" data-svc="worker">
+        <div class="ic">🦸</div>
+        <div class="lbl">Worker Hire</div>
+        <div class="soonBadge">শীঘ্রই আসছে</div>
+      </div>
+      <div class="serviceCard soon" data-svc="house">
+        <div class="ic">🏠</div>
+        <div class="lbl">House Rent</div>
+        <div class="soonBadge">শীঘ্রই আসছে</div>
+      </div>
+      <div class="serviceCard soon" data-svc="plot">
+        <div class="ic">📐</div>
+        <div class="lbl">Plot</div>
+        <div class="soonBadge">শীঘ্রই আসছে</div>
+      </div>
+      <div class="serviceCard soon" data-svc="hotel">
+        <div class="ic">🏨</div>
+        <div class="lbl">Hotel</div>
+        <div class="soonBadge">শীঘ্রই আসছে</div>
+      </div>
+    </div>
   </div>
 
   <!-- ধাপ ১: বাজার নির্বাচন -->
-  <div id="screenMarkets" class="active">
+  <div id="screenMarkets">
+    <button class="backBtn" id="backToHomeFromMarkets">← হোমে ফিরে যান</button>
     <div id="gpsStatusBanner" style="font-size:11.5px; color:var(--muted); margin-bottom:10px;"></div>
 
     <div style="display:flex; gap:8px; margin-bottom:10px;">
@@ -151,6 +237,7 @@
 
   <!-- ==================== 🚑 Honey Bee Transport — বুকিং ==================== -->
   <div id="screenTransport">
+    <button class="backBtn" id="backToHomeFromTransport">← হোমে ফিরে যান</button>
     <div id="transportBookScreen">
       <div id="tpGpsStatus" style="font-size:11.5px; color:var(--muted); text-align:center; margin-bottom:12px;">📍 লোকেশন খোঁজা হচ্ছে...</div>
       <div class="card">
@@ -178,6 +265,22 @@
     </div>
   </div>
 
+</div>
+
+<!-- ==================== নিচের ফুটার নেভিগেশন ==================== -->
+<div class="footerNav">
+  <div class="footerNavItem active" id="footerNavHome">
+    <div class="ic">🏠</div>
+    <div class="lbl">Home</div>
+  </div>
+  <div class="footerNavItem" id="footerNavNotif">
+    <div class="ic">🔔</div>
+    <div class="lbl">Notification</div>
+  </div>
+  <div class="footerNavItem" id="footerNavMenu">
+    <div class="ic">☰</div>
+    <div class="lbl">Menu</div>
+  </div>
 </div>
 
 <script>
@@ -256,27 +359,48 @@ let currentMarketId = null, currentShopId = null;
 let userLatLng = null;
 
 function showScreen(id){
-  ["screenMarkets","screenShops","screenProducts","screenTransport"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenShops","screenProducts","screenTransport"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 }
 
-/* ==================== 🛒/🚑 উপরের নেভ ট্যাব — Bazar বনাম Transport ==================== */
-document.querySelectorAll(".appNavTab").forEach(tab=>{
-  tab.addEventListener("click", ()=>{
-    document.querySelectorAll(".appNavTab").forEach(t=>{
-      t.classList.remove("active");
-      t.style.background = "transparent"; t.style.color = "var(--muted)";
-    });
-    tab.classList.add("active");
-    tab.style.background = "linear-gradient(135deg, var(--amber), var(--gold))"; tab.style.color = "var(--bg1)";
-    if(tab.dataset.app === "transport"){
+/* ==================== 🏠 হোমস্ক্রিন — সার্ভিস কার্ড ==================== */
+document.querySelectorAll(".serviceCard").forEach(card=>{
+  card.addEventListener("click", ()=>{
+    const svc = card.dataset.svc;
+    if(svc === "market"){
+      showScreen("screenMarkets");
+    }else if(svc === "transport"){
       showScreen("screenTransport");
       if(!__tpInitialized) initTransportBooking();
     }else{
-      showScreen("screenMarkets");
+      alert("এই সার্ভিসটা শীঘ্রই আসছে — এখনো প্রস্তুত হয়নি।");
     }
   });
 });
+
+/* ---------- নিচের ফুটার নেভিগেশন ---------- */
+$("footerNavHome").addEventListener("click", ()=>{
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavHome").classList.add("active");
+  showScreen("screenHome");
+});
+$("footerNavNotif").addEventListener("click", ()=>{
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavNotif").classList.add("active");
+  alert("🔔 এই মুহূর্তে কোনো নতুন নোটিফিকেশন নেই।");
+});
+$("footerNavMenu").addEventListener("click", ()=>{
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavMenu").classList.add("active");
+  if(currentCustomer){
+    if(confirm(`লগইন করা আছে: ${currentCustomer.name || 'কাস্টমার'}\n\nলগআউট করবেন?`)) auth.signOut();
+  }else{
+    alert("☰ মেনু — লগইন করতে উপরের Google বাটন চাপুন।");
+  }
+});
+
+document.getElementById("backToHomeFromMarkets") && document.getElementById("backToHomeFromMarkets").addEventListener("click", ()=> showScreen("screenHome"));
+document.getElementById("backToHomeFromTransport") && document.getElementById("backToHomeFromTransport").addEventListener("click", ()=> showScreen("screenHome"));
 
 function escapeHtml(str){
   const d = document.createElement("div");
@@ -708,8 +832,22 @@ function tpShowLiveTrack(trip){
       if(!doc.exists || !doc.data().liveLocation) return;
       const loc = doc.data().liveLocation;
       const latLng = [loc.lat, loc.lng];
-      if(__tpDriverMarker) __tpDriverMarker.setLatLng(latLng);
-      else __tpDriverMarker = L.marker(latLng, { icon: L.divIcon({ html:'🚑', className:'', iconSize:[26,26] }) }).addTo(__tpLiveTrackMap).bindPopup("🚑 ড্রাইভার");
+      const beeCarIcon = L.divIcon({
+        html: '<div class="beeCarWrap"><span class="carIcon">🚑</span><span class="beeIcon">🐝<span class="wing"></span></span></div>',
+        className: '', iconSize: [34,34], iconAnchor: [17,17]
+      });
+      if(__tpDriverMarker){
+        __tpDriverMarker.setLatLng(latLng); // Leaflet নিজেই smooth CSS transition দেয় marker move-এ
+      }else{
+        __tpDriverMarker = L.marker(latLng, { icon: beeCarIcon }).addTo(__tpLiveTrackMap).bindPopup("🚑 ড্রাইভার");
+      }
+      // 🔄 Auto-tracking — গাড়ি নড়লে ম্যাপ নিজে থেকেই গাড়ির উপর সেন্টার হয়
+      __tpLiveTrackMap.panTo(latLng, { animate: true, duration: 1.2 });
+
+      // 🔍 দূরত্ব অনুযায়ী auto zoom — গাড়ি পিকআপের কাছে এলে zoom in, দূরে গেলে zoom out
+      const distKm = tpHaversineKm(latLng[0], latLng[1], trip.pickupLat, trip.pickupLng);
+      const targetZoom = distKm < 0.5 ? 16 : distKm < 2 ? 15 : distKm < 5 ? 13 : 12;
+      if(__tpLiveTrackMap.getZoom() !== targetZoom) __tpLiveTrackMap.setZoom(targetZoom, { animate: true });
     });
   }
 }
