@@ -43,6 +43,15 @@
   #logoutBtn{ margin-left:auto; background:transparent; border:1px solid var(--border); color:var(--muted); padding:7px 10px; border-radius:8px; font-size:10.5px; cursor:pointer; font-family:inherit; }
 
   .toggleRow{ display:flex; align-items:center; justify-content:center; gap:10px; background:var(--card); border-radius:30px; padding:10px 16px; margin-bottom:14px; border:1px solid var(--border); }
+  /* 🔍 প্যাসেঞ্জার পিনে ট্যাপ করলে রাডার ম্যাপ ফুলস্ক্রিন হয়ে যায় */
+  #tmRadarMapEl.tmMapFullscreen{
+    position:fixed; inset:0; z-index:998; width:100vw !important; height:100vh !important;
+    border-radius:0; margin:0;
+  }
+  .tmRadarExitBtn{
+    position:fixed; top:16px; right:16px; z-index:999; padding:10px 16px; border:none; border-radius:10px;
+    background:rgba(0,0,0,0.75); color:#fff; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;
+  }
   .toggleRow .lbl{ font-size:13px; font-weight:700; color:var(--muted); }
   .toggleRow .lbl.on{ color:var(--ok); }
   .switchTrack{ width:52px; height:28px; border-radius:20px; background:#444; position:relative; cursor:pointer; transition:background 0.2s; }
@@ -429,9 +438,45 @@ async function tmRenderRadar(passengers){
     });
     const marker = L.marker([cLat, cLng], { icon }).addTo(tmMap);
     marker.bindPopup(tmBuildPopup(group));
+    marker.on("click", ()=> tmFocusFullscreen([cLat, cLng]));
     tmMarkers.push(marker);
   }
   $("tmRadarHint").textContent = nearby.length > 0 ? `📡 কাছাকাছি ${nearby.length} জন যাত্রী অপেক্ষা করছেন` : "এই মুহূর্তে ২ কিমির মধ্যে কোনো অপেক্ষমাণ যাত্রী নেই।";
+
+  // 🔍 Auto Fit — ড্রাইভার + সবচেয়ে কাছের যাত্রীকে একসাথে কাভার করে জুম
+  if(nearby.length > 0 && !tmFullscreen){
+    const nearest = nearby.reduce((a,b)=> (a.__dist < b.__dist ? a : b));
+    tmMap.fitBounds([myLatLng, [nearest.__lat, nearest.__lng]], { padding: [40,40], maxZoom: 16 });
+  }
+}
+
+/* ---------- 🔍 প্যাসেঞ্জার পিনে ট্যাপ → ফুলস্ক্রিন ম্যাপ + flyTo ---------- */
+let tmFullscreen = false;
+function tmFocusFullscreen(latLng){
+  const mapEl = document.getElementById("tmRadarMapEl");
+  if(!tmFullscreen){
+    tmFullscreen = true;
+    mapEl.classList.add("tmMapFullscreen");
+    if(!document.getElementById("tmRadarExitBtn")){
+      const exitBtn = document.createElement("button");
+      exitBtn.id = "tmRadarExitBtn";
+      exitBtn.textContent = "✕ বন্ধ করুন";
+      exitBtn.className = "tmRadarExitBtn";
+      exitBtn.onclick = ()=>{
+        tmFullscreen = false;
+        mapEl.classList.remove("tmMapFullscreen");
+        exitBtn.remove();
+        setTimeout(()=> tmMap.invalidateSize(), 100);
+      };
+      mapEl.appendChild(exitBtn);
+    }
+    setTimeout(()=>{
+      tmMap.invalidateSize();
+      tmMap.flyTo(latLng, 16, { animate: true, duration: 1 });
+    }, 100);
+  }else{
+    tmMap.flyTo(latLng, 16, { animate: true, duration: 1 });
+  }
 }
 
 function tmBuildPopup(group){
