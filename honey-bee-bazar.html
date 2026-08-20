@@ -6,6 +6,8 @@
 <title>🐝 Honey Bee Bazar</title>
 <meta name="theme-color" content="#1a1206">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -85,8 +87,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenMarkets, #screenShops, #screenProducts{ display:none; }
-  #screenMarkets.active, #screenShops.active, #screenProducts.active{ display:block; }
+  #screenMarkets, #screenShops, #screenProducts, #screenTransport{ display:none; }
+  #screenMarkets.active, #screenShops.active, #screenProducts.active, #screenTransport.active{ display:block; }
 </style>
 <script src="bd-locations.js"></script>
 </head>
@@ -101,6 +103,11 @@
     </div>
     <div id="authArea" style="margin-left:auto;"></div>
   </header>
+
+  <div id="appNavTabs" style="display:flex; gap:8px; margin-bottom:16px;">
+    <button class="appNavTab active" data-app="bazar" style="flex:1; padding:11px; border-radius:12px; border:1px solid var(--border); background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;">🛒 Bazar</button>
+    <button class="appNavTab" data-app="transport" style="flex:1; padding:11px; border-radius:12px; border:1px solid var(--border); background:transparent; color:var(--muted); font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;">🚑 Transport</button>
+  </div>
 
   <!-- ধাপ ১: বাজার নির্বাচন -->
   <div id="screenMarkets" class="active">
@@ -139,6 +146,35 @@
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
       <div id="productsList"><div class="loadingMsg">স্টক লোড হচ্ছে...</div></div>
+    </div>
+  </div>
+
+  <!-- ==================== 🚑 Honey Bee Transport — বুকিং ==================== -->
+  <div id="screenTransport">
+    <div id="transportBookScreen">
+      <div id="tpGpsStatus" style="font-size:11.5px; color:var(--muted); text-align:center; margin-bottom:12px;">📍 লোকেশন খোঁজা হচ্ছে...</div>
+      <div class="card">
+        <div style="font-size:12.5px; color:var(--muted); margin-bottom:6px; font-weight:600;">📍 পিকআপ লোকেশন</div>
+        <div id="tpPickupMapEl" style="width:100%; height:180px; border-radius:12px; overflow:hidden; background:#111; margin-bottom:10px;"></div>
+        <div style="font-size:12.5px; color:var(--muted); margin-bottom:6px; font-weight:600;">🏁 ড্রপ-অফ লোকেশন</div>
+        <div id="tpDropMapEl" style="width:100%; height:180px; border-radius:12px; overflow:hidden; background:#111; margin-bottom:6px;"></div>
+        <p style="font-size:11px; color:var(--muted); margin:0 0 14px;">ম্যাপে ট্যাপ করে গন্তব্য বসান।</p>
+        <button id="tpBookBtn" style="width:100%; padding:13px; font-size:14px; border:none; border-radius:11px; font-weight:800; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">🚕 এখন বুক করুন</button>
+      </div>
+    </div>
+
+    <div id="transportStatusScreen" style="display:none;">
+      <div class="card" style="text-align:center; padding:24px 16px;">
+        <div style="font-size:40px; margin-bottom:8px;" id="tpStatusIcon">🔍</div>
+        <div style="font-size:15px; font-weight:700; margin-bottom:6px;" id="tpStatusTitle">কাছের ড্রাইভার খোঁজা হচ্ছে...</div>
+        <div style="font-size:12.5px; color:var(--muted);" id="tpStatusSub">একটু অপেক্ষা করুন</div>
+        <div id="tpDriverInfoRow" style="display:none; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); text-align:left;">
+          <div style="font-weight:700; font-size:14px;" id="tpDriverName">—</div>
+          <div style="font-size:11.5px; color:var(--muted);" id="tpDriverMeta">—</div>
+        </div>
+      </div>
+      <div id="tpLiveTrackMapEl" style="display:none; width:100%; height:200px; border-radius:12px; overflow:hidden; background:#111; margin-bottom:12px;"></div>
+      <button id="tpCancelBtn" style="width:100%; padding:12px; border-radius:11px; font-weight:800; cursor:pointer; font-family:inherit; background:transparent; border:1px solid var(--border); color:var(--muted);">✕ বাতিল করুন</button>
     </div>
   </div>
 
@@ -220,9 +256,27 @@ let currentMarketId = null, currentShopId = null;
 let userLatLng = null;
 
 function showScreen(id){
-  ["screenMarkets","screenShops","screenProducts"].forEach(s=> $(s).classList.remove("active"));
+  ["screenMarkets","screenShops","screenProducts","screenTransport"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 }
+
+/* ==================== 🛒/🚑 উপরের নেভ ট্যাব — Bazar বনাম Transport ==================== */
+document.querySelectorAll(".appNavTab").forEach(tab=>{
+  tab.addEventListener("click", ()=>{
+    document.querySelectorAll(".appNavTab").forEach(t=>{
+      t.classList.remove("active");
+      t.style.background = "transparent"; t.style.color = "var(--muted)";
+    });
+    tab.classList.add("active");
+    tab.style.background = "linear-gradient(135deg, var(--amber), var(--gold))"; tab.style.color = "var(--bg1)";
+    if(tab.dataset.app === "transport"){
+      showScreen("screenTransport");
+      if(!__tpInitialized) initTransportBooking();
+    }else{
+      showScreen("screenMarkets");
+    }
+  });
+});
 
 function escapeHtml(str){
   const d = document.createElement("div");
@@ -519,6 +573,157 @@ async function resolveAllImages(products){
 }
 
 loadMarkets();
+
+/* ==================== 🚑 Honey Bee Transport — বুকিং ফ্লো ====================
+   Honey Bee Bazar-এর ভেতরেই একটা আলাদা ট্যাব হিসেবে — কোনো আলাদা অ্যাপ/ফাইল
+   লাগে না। পিকআপ/ড্রপ ম্যাপে বসিয়ে বুক করলে trips কালেকশনে একটা ডকুমেন্ট
+   তৈরি হয়, যেটা Cloud Function ধরে সবচেয়ে কাছের অনলাইন ড্রাইভারকে
+   অফার পাঠায় (Honey Bee Transport ড্রাইভার Honey Bee POS-এর Driver Mode-এ
+   এটা রিসিভ করে)। */
+let __tpInitialized = false;
+let __tpPickupMap, __tpDropMap, __tpPickupMarker, __tpDropMarker;
+let __tpPickupLatLng = null, __tpDropLatLng = null;
+let __tpCurrentTripId = null, __tpLiveTrackMap = null, __tpDriverMarker = null;
+
+function tpHaversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function initTransportBooking(){
+  __tpInitialized = true;
+  if(!navigator.geolocation){
+    tpInitMaps([24.7136, 46.6753]);
+    $("tpGpsStatus").textContent = "⚠️ এই ডিভাইসে GPS সাপোর্ট নেই — ম্যাপে ট্যাপ করে বসান";
+    return;
+  }
+  navigator.geolocation.getCurrentPosition((pos)=>{
+    tpInitMaps([pos.coords.latitude, pos.coords.longitude]);
+    $("tpGpsStatus").textContent = "📍 আপনার বর্তমান অবস্থান পিকআপ হিসেবে বসানো হয়েছে";
+  }, ()=>{
+    tpInitMaps([24.7136, 46.6753]);
+    $("tpGpsStatus").textContent = "⚠️ GPS পাওয়া যায়নি — ম্যাপে ট্যাপ করে পিকআপ বসান";
+  }, { enableHighAccuracy:true, timeout:10000 });
+}
+
+function tpInitMaps(centerLatLng){
+  __tpPickupMap = L.map("tpPickupMapEl").setView(centerLatLng, 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(__tpPickupMap);
+  __tpPickupMarker = L.marker(centerLatLng, { draggable:true }).addTo(__tpPickupMap);
+  __tpPickupLatLng = centerLatLng;
+  __tpPickupMarker.on("dragend", ()=>{ const p = __tpPickupMarker.getLatLng(); __tpPickupLatLng = [p.lat, p.lng]; });
+  __tpPickupMap.on("click", (e)=>{ __tpPickupLatLng = [e.latlng.lat, e.latlng.lng]; __tpPickupMarker.setLatLng(__tpPickupLatLng); });
+
+  __tpDropMap = L.map("tpDropMapEl").setView(centerLatLng, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(__tpDropMap);
+  __tpDropMap.on("click", (e)=>{
+    __tpDropLatLng = [e.latlng.lat, e.latlng.lng];
+    if(__tpDropMarker) __tpDropMap.removeLayer(__tpDropMarker);
+    __tpDropMarker = L.marker(__tpDropLatLng).addTo(__tpDropMap).bindPopup("🏁 ড্রপ-অফ").openPopup();
+  });
+}
+
+$("tpBookBtn").addEventListener("click", async ()=>{
+  if(!__tpPickupLatLng || !__tpDropLatLng){ alert("পিকআপ ও ড্রপ-অফ — দুটোই বসান।"); return; }
+  const distanceKm = tpHaversineKm(__tpPickupLatLng[0], __tpPickupLatLng[1], __tpDropLatLng[0], __tpDropLatLng[1]);
+  const estimatedFare = Math.round((30 + distanceKm * 15) * 100) / 100; // সহজ ভাড়া হিসাব — পরে ঠিক করে নেওয়া যাবে
+  const driverEarning = Math.round(estimatedFare * 0.8 * 100) / 100;
+
+  $("tpBookBtn").disabled = true; $("tpBookBtn").textContent = "বুক হচ্ছে...";
+  try{
+    const tripRef = await db.collection("trips").add({
+      status: "requested",
+      customerName: (currentCustomer && currentCustomer.name) || "কাস্টমার",
+      customerUid: currentCustomer ? currentCustomer.uid : null,
+      pickupLat: __tpPickupLatLng[0], pickupLng: __tpPickupLatLng[1],
+      pickupAddress: `${__tpPickupLatLng[0].toFixed(4)}, ${__tpPickupLatLng[1].toFixed(4)}`,
+      dropLat: __tpDropLatLng[0], dropLng: __tpDropLatLng[1],
+      dropAddress: `${__tpDropLatLng[0].toFixed(4)}, ${__tpDropLatLng[1].toFixed(4)}`,
+      distanceKm: Math.round(distanceKm*10)/10,
+      estimatedFare, driverEarning,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    __tpCurrentTripId = tripRef.id;
+    $("transportBookScreen").style.display = "none";
+    $("transportStatusScreen").style.display = "block";
+    tpWatchTrip(tripRef.id);
+  }catch(e){
+    alert("বুক করা যায়নি: " + e.message);
+  }finally{
+    $("tpBookBtn").disabled = false; $("tpBookBtn").textContent = "🚕 এখন বুক করুন";
+  }
+});
+
+function tpWatchTrip(tripId){
+  db.collection("trips").doc(tripId).onSnapshot(async (doc)=>{
+    if(!doc.exists) return;
+    const trip = doc.data();
+    if(trip.status === "requested"){
+      $("tpStatusIcon").textContent = "🔍";
+      $("tpStatusTitle").textContent = "কাছের ড্রাইভার খোঁজা হচ্ছে...";
+      $("tpStatusSub").textContent = "একটু অপেক্ষা করুন";
+      $("tpDriverInfoRow").style.display = "none";
+    }else if(trip.status === "accepted" || trip.status === "ongoing"){
+      $("tpStatusIcon").textContent = trip.status === "ongoing" ? "🚗" : "✅";
+      $("tpStatusTitle").textContent = trip.status === "ongoing" ? "ট্রিপ চলছে" : "ড্রাইভার পাওয়া গেছে!";
+      $("tpStatusSub").textContent = trip.status === "ongoing" ? "আপনার দিকে আসছেন" : "ড্রাইভার পিকআপে আসছেন";
+      $("tpDriverInfoRow").style.display = "block";
+      if(trip.driverId){
+        try{
+          const dDoc = await db.collection("transportDrivers").doc(trip.driverId).get();
+          if(dDoc.exists){
+            const d = dDoc.data();
+            $("tpDriverName").textContent = d.name || "ড্রাইভার";
+            const v = d.vehicle || {};
+            $("tpDriverMeta").textContent = [v.type, v.regNumber].filter(Boolean).join(" · ");
+          }
+        }catch(e){}
+        tpShowLiveTrack(trip);
+      }
+    }else if(trip.status === "completed"){
+      $("tpStatusIcon").textContent = "🎉";
+      $("tpStatusTitle").textContent = "ট্রিপ সম্পন্ন হয়েছে!";
+      $("tpStatusSub").textContent = "ধন্যবাদ Honey Bee Transport ব্যবহার করার জন্য";
+      $("tpCancelBtn").style.display = "none";
+    }else if(trip.status === "cancelled"){
+      $("tpStatusIcon").textContent = "✕";
+      $("tpStatusTitle").textContent = "ট্রিপ বাতিল হয়ে গেছে";
+      $("tpStatusSub").textContent = "";
+    }
+  });
+}
+
+function tpShowLiveTrack(trip){
+  $("tpLiveTrackMapEl").style.display = "block";
+  if(!__tpLiveTrackMap){
+    __tpLiveTrackMap = L.map("tpLiveTrackMapEl").setView([trip.pickupLat, trip.pickupLng], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(__tpLiveTrackMap);
+    L.marker([trip.pickupLat, trip.pickupLng]).addTo(__tpLiveTrackMap).bindPopup("📍 Pickup");
+    if(trip.dropLat) L.marker([trip.dropLat, trip.dropLng]).addTo(__tpLiveTrackMap).bindPopup("🏁 Drop");
+  }
+  if(trip.driverId){
+    db.collection("transportDrivers").doc(trip.driverId).onSnapshot((doc)=>{
+      if(!doc.exists || !doc.data().liveLocation) return;
+      const loc = doc.data().liveLocation;
+      const latLng = [loc.lat, loc.lng];
+      if(__tpDriverMarker) __tpDriverMarker.setLatLng(latLng);
+      else __tpDriverMarker = L.marker(latLng, { icon: L.divIcon({ html:'🚑', className:'', iconSize:[26,26] }) }).addTo(__tpLiveTrackMap).bindPopup("🚑 ড্রাইভার");
+    });
+  }
+}
+
+$("tpCancelBtn").addEventListener("click", async ()=>{
+  if(!__tpCurrentTripId) return;
+  if(!confirm("বুকিং বাতিল করবেন?")) return;
+  try{ await db.collection("trips").doc(__tpCurrentTripId).update({ status: "cancelled" }); }catch(e){}
+  $("transportStatusScreen").style.display = "none";
+  $("transportBookScreen").style.display = "block";
+  __tpCurrentTripId = null;
+  __tpDropLatLng = null;
+  if(__tpDropMarker){ __tpDropMap.removeLayer(__tpDropMarker); __tpDropMarker = null; }
+});
 
 /* ==================== 📊 সুপার অ্যাডমিনের জন্য লাইভ ব্যবহার-অ্যানালিটিক্স ====================
    কোনো ব্যক্তিগত তথ্য পাঠানো হয় না — শুধু সময়/স্ক্রল/কোন দোকান দেখা হচ্ছে, এটা
