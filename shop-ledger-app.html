@@ -575,9 +575,24 @@
     100%{ box-shadow:0 0 0 0 rgba(39,214,127,0); }
   }
 </style>
-<!-- Leaflet.js (OpenStreetMap) — সম্পূর্ণ ফ্রি, কোনো API key/কার্ড লাগে না -->
+<!-- Leaflet.js (OpenStreetMap) — এখনো "ডেলিভারি লোকেশন পিন" মোডালে ব্যবহার হয় -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- 🗺️ Google Maps JavaScript API — লাইভ ম্যাপে ব্যবহার হয় (Bee Flying থিম +
+     স্মুথ ইন্টারপোলেশন সহ)। এই key HTTP-referrer রেস্ট্রিকশন দিয়ে সুরক্ষিত
+     রাখা জরুরি (Google Cloud Console → Credentials)। -->
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeufdK--qSX0a6-2m1JwQOrig7q4C8IGY&libraries=geometry"></script>
+<style>
+  /* 🐝 Bee Flying Theme — লাইভ ম্যাপে রাইডারের মার্কার */
+  .bee-marker-icon{
+    font-size:26px; line-height:1; display:flex; align-items:center; justify-content:center;
+    width:34px; height:34px; animation: beeFloat 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 5px rgba(255,183,3,0.85)) drop-shadow(0 4px 6px rgba(0,0,0,0.35));
+    transition: transform 0.15s linear;
+  }
+  @keyframes beeFloat{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
+  .bee-marker-trail{ position:absolute; border-left:2px dashed rgba(255,201,60,0.45); pointer-events:none; }
+</style>
 </head>
 <body>
 
@@ -11322,7 +11337,7 @@ async function initDriverMode(uid){
   document.getElementById("dmDriverName").textContent = __dmDriver.name || "Honey Bee Transport";
   const v = __dmDriver.vehicle || {};
   const vLabel = { bike:"🏍️ বাইক", cng:"🛺 CNG", sedan:"🚗 সেডান", hiace:"🚐 হাইএস", microbus:"🚐 মাইক্রোবাস",
-    pickup:"🛻 পিকআপ", ambulance_ac:"🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac:"🚑 অ্যাম্বুলেন্স (Non-AC)", ambulance_icu:"🚑 অ্যাম্বুলেন্স (ICU)" }[v.type] || v.type || "";
+    pickup:"🛻 পিকআপ", ambulance_ac:"🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac:"🚑 অ্যাম্বুলেন্স (Non-AC)", ambulance_icu:"🚑 অ্যাম্বুলেন্স (ICU)", easy_bike:"🛺✨ ইজি বাইক" }[v.type] || v.type || "";
   document.getElementById("dmVehicleInfo").textContent =
     [vLabel, v.model, v.regNumber, v.color, v.seatCount ? v.seatCount+" সিট" : ""].filter(Boolean).join(" · ") || "গাড়ির তথ্য নেই";
   document.getElementById("dmTodayEarning").textContent = "SAR " + (__dmDriver.todayEarning || 0);

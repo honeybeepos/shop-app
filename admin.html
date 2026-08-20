@@ -112,6 +112,12 @@
   </div>
 
   <div class="card">
+    <h2>🚑 সব ট্রান্সপোর্ট ড্রাইভার (<span id="driverCount">0</span>) <span id="pendingDriverBadge" style="display:none; background:var(--due); color:#fff; font-size:11px; padding:2px 8px; border-radius:20px; margin-left:6px;"></span></h2>
+    <p style="font-size:11.5px; color:#8a7f6c; margin:0 0 10px;">ড্রাইভাররা নিজেরাই নিবন্ধন করে — এখানে সবাইকে দেখা যাবে, ভেরিফাই করার কাজ সংশ্লিষ্ট বাজারের এজেন্ট করবেন (Honey Bee Agent অ্যাপ থেকে)।</p>
+    <div id="allDriversList">লোড হচ্ছে...</div>
+  </div>
+
+  <div class="card">
     <h2>📊 Honey Bee Bazar — লাইভ অ্যানালিটিক্স</h2>
     <p style="font-size:13px; margin:0 0 10px;">এই মুহূর্তে অ্যাপে ব্রাউজ করছে: <b id="liveUserCount" style="color:var(--paid); font-size:16px;">0</b> জন</p>
     <div id="recentSessionsList" style="font-size:12px; color:#5a5142;">লোড হচ্ছে...</div>
@@ -151,6 +157,7 @@ auth.onAuthStateChanged(async (user)=>{
   loadMarkets();
   loadAgents();
   loadAllRiders();
+  startDriversListener();
   startAnalyticsListener();
 });
 
@@ -579,6 +586,60 @@ async function loadAllRiders(){
     loadAllRiders();
   }));
   list.querySelectorAll('[data-rider-act="delete"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "rider", "রাইডার")));
+}
+
+/* ==================== 🚑 সব ট্রান্সপোর্ট ড্রাইভার (Super Admin ভিউ) ==================== */
+const VEHICLE_LABELS_ADMIN = {
+  bike:"🏍️ বাইক", cng:"🛺 CNG", easy_bike:"🛺✨ ইজি বাইক", sedan:"🚗 সেডান", hiace:"🚐 হাইএস", microbus:"🚐 মাইক্রোবাস",
+  pickup:"🛻 পিকআপ", ambulance_ac:"🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac:"🚑 অ্যাম্বুলেন্স (Non-AC)", ambulance_icu:"🚑 অ্যাম্বুলেন্স (ICU)"
+};
+
+function startDriversListener(){
+  db.collection("transportDrivers").orderBy("createdAt","desc").onSnapshot((snap)=>{
+    document.getElementById("driverCount").textContent = snap.size;
+    const pendingCount = snap.docs.filter(d => !d.data().isVerified).length;
+    const badge = document.getElementById("pendingDriverBadge");
+    if(pendingCount > 0){
+      badge.textContent = `${pendingCount}টা ভেরিফিকেশন বাকি`;
+      badge.style.display = "inline-block";
+    }else{
+      badge.style.display = "none";
+    }
+
+    const list = document.getElementById("allDriversList");
+    if(snap.empty){ list.innerHTML = "<p>এখনো কোনো ড্রাইভার নিবন্ধিত হয়নি।</p>"; return; }
+
+    list.innerHTML = "";
+    for(const doc of snap.docs){
+      const d = doc.data();
+      const driverId = doc.id;
+      const v = d.vehicle || {};
+      const vLabel = VEHICLE_LABELS_ADMIN[v.type] || v.type || "—";
+      const div = document.createElement("div");
+      div.className = "shop";
+      div.innerHTML = `
+        <div class="shop-top">
+          <span class="shop-name">${d.name || "(নামহীন ড্রাইভার)"} ${d.isVerified ? '🛡️' : ''}</span>
+          <span class="chip ${d.status === 'blocked' ? 'blocked' : 'active'}">${d.status === 'blocked' ? 'ব্লকড' : 'সক্রিয়'}</span>
+        </div>
+        <div class="meta">📱 ${d.phone || ''} · ${vLabel}${v.regNumber ? ' · '+v.regNumber : ''} · ${d.driverStatus === 'online' ? '🟢 অনলাইন' : d.driverStatus === 'busy' ? '🟠 ট্রিপে' : '⚪ অফলাইন'} · ${d.isVerified ? '🛡️ ভেরিফাইড' : '⏳ ভেরিফাই বাকি'}</div>
+        <div class="row">
+          ${d.status === 'blocked'
+            ? `<button class="btn unblock" data-driver-act="unblock" data-id="${driverId}">✅ আনব্লক করুন</button>`
+            : `<button class="btn block" data-driver-act="block" data-id="${driverId}">⛔ ব্লক করুন</button>`}
+          <button class="btn" style="background:var(--due);" data-driver-act="delete" data-id="${driverId}">🗑️ ডিলিট</button>
+        </div>
+      `;
+      list.appendChild(div);
+    }
+    list.querySelectorAll('[data-driver-act="block"]').forEach(b=>b.addEventListener("click", async ()=>{
+      await db.collection("transportDrivers").doc(b.dataset.id).set({ status:"blocked", updatedAt: fbNow() }, { merge:true });
+    }));
+    list.querySelectorAll('[data-driver-act="unblock"]').forEach(b=>b.addEventListener("click", async ()=>{
+      await db.collection("transportDrivers").doc(b.dataset.id).set({ status:"active", updatedAt: fbNow() }, { merge:true });
+    }));
+    list.querySelectorAll('[data-driver-act="delete"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "driver", "ড্রাইভার")));
+  }, (err)=> console.warn("drivers listener error:", err));
 }
 
 /* ==================== 📊 Honey Bee Bazar লাইভ অ্যানালিটিক্স ====================

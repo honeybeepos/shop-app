@@ -500,9 +500,9 @@ $("saveRiderBtn").addEventListener("click", async ()=>{
 
 /* ---------- 🚑 ট্রান্সপোর্ট ড্রাইভার লিস্ট (রিয়েলটাইম) ---------- */
 const VEHICLE_LABELS = {
-  cng: "🛺 CNG/অটো", ambulance_ac: "🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac: "🚑 অ্যাম্বুলেন্স (Non-AC)",
-  ambulance_icu: "🚑 অ্যাম্বুলেন্স (ICU)", private_car: "🚗 প্রাইভেট কার", microbus: "🚐 মাইক্রোবাস",
-  pickup_truck: "🛻 পিকআপ/ট্রাক"
+  bike: "🏍️ বাইক", cng: "🛺 CNG/অটো", easy_bike: "🛺✨ ইজি বাইক", sedan: "🚗 সেডান",
+  hiace: "🚐 হাইএস", microbus: "🚐 মাইক্রোবাস", pickup: "🛻 পিকআপ/ট্রাক",
+  ambulance_ac: "🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac: "🚑 অ্যাম্বুলেন্স (Non-AC)", ambulance_icu: "🚑 অ্যাম্বুলেন্স (ICU)"
 };
 
 function listenDrivers(){
@@ -518,12 +518,16 @@ function listenDrivers(){
         const statusText = d.status === "active" ? "সক্রিয়" : "ব্লকড";
         const toggleLabel = d.status === "active" ? "🚫 ব্লক করুন" : "✅ আনব্লক করুন";
         const toggleClass = d.status === "active" ? "danger" : "ok";
-        const vehicleLabels = (d.vehicleTypes||[]).map(v=> VEHICLE_LABELS[v] || v).join(", ");
+        const v = d.vehicle || {};
+        const vehicleLabel = [VEHICLE_LABELS[v.type] || v.type, v.model, v.regNumber].filter(Boolean).join(" · ");
+        const onlineDot = d.driverStatus === "online" ? '<span style="color:#4ade80;">🟢</span>'
+          : d.driverStatus === "busy" ? '<span style="color:#fbbf24;">🟠</span>'
+          : '<span style="color:#f87171;">⚪</span>';
         return `
           <div class="rowItem">
             <div class="info">
-              <div class="name">${escapeHtml(d.name || "নাম নেই")} ${d.isVerified ? '<span title="Verified">🛡️</span>' : ''} ${d.isAvailable ? '<span style="color:#4ade80;">🟢</span>' : '<span style="color:#f87171;">🔴</span>'}</div>
-              <div class="meta">📱 ${escapeHtml(d.phone || "—")} · ${escapeHtml(vehicleLabels || "যানবাহন নির্ধারিত না")}</div>
+              <div class="name">${escapeHtml(d.name || "নাম নেই")} ${d.isVerified ? '<span title="Verified">🛡️</span>' : ''} ${onlineDot}</div>
+              <div class="meta">📱 ${escapeHtml(d.phone || "—")} · ${escapeHtml(vehicleLabel || "যানবাহন নির্ধারিত না")}</div>
             </div>
             <span class="badge ${statusClass}">${statusText}</span>
           </div>
