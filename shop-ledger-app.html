@@ -729,6 +729,20 @@
     #driverModeApp .dmStatBox .num{ font-size:20px; font-weight:800; color:#4ade80; }
     #driverModeApp .dmStatBox .lbl{ font-size:10.5px; color:#a8d9c0; margin-top:2px; }
     #driverModeApp .dmMapEl{ width:100%; height:180px; border-radius:12px; overflow:hidden; margin-bottom:10px; background:#111; }
+    /* 📡 রাডার ম্যাপ — ডার্ক থিম (CSS filter দিয়ে, ফ্রি — কোনো আলাদা ডার্ক টাইল সার্ভার লাগে না) */
+    #dmRadarMapEl .leaflet-tile-pane{ filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9); }
+    .radarBadge{
+      background:#dc2626; color:#fff; font-weight:800; font-size:11px; padding:5px 10px; border-radius:20px;
+      border:2px solid #fff; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,0.4);
+    }
+    .hotspotBadge{
+      background:#2563eb; color:#fff; font-weight:700; font-size:10px; padding:4px 9px; border-radius:20px;
+      border:2px solid #fff; white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.4); opacity:0.9;
+    }
+    .radarPopupBtn{
+      display:block; width:100%; margin-top:6px; padding:8px; border:none; border-radius:8px;
+      background:#16a34a; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;
+    }
     #dmOfferOverlay{ display:none; position:fixed; inset:0; z-index:999; background:rgba(0,0,0,0.75); align-items:center; justify-content:center; padding:16px; }
     #dmOfferOverlay .card{ background:#173a29; border:2px solid #4ade80; border-radius:18px; padding:20px; max-width:380px; width:100%; }
     #dmOfferTimer{ text-align:center; font-size:34px; font-weight:800; color:#4ade80; margin:8px 0; font-family:'Space Mono',monospace; }
@@ -757,6 +771,13 @@
   <div class="dmStatGrid" style="margin-bottom:14px;">
     <div class="dmStatBox"><div class="num" id="dmTodayEarning">SAR 0</div><div class="lbl">💰 আজকের আয়</div></div>
     <div class="dmStatBox"><div class="num" id="dmTodayTrips">0</div><div class="lbl">🧭 আজকের ট্রিপ</div></div>
+  </div>
+
+  <!-- 📡 Driver Radar — কাছের অপেক্ষমাণ যাত্রী -->
+  <div class="dmCard" id="dmRadarCard">
+    <h3 style="margin:0 0 10px; font-size:14px; color:#4ade80;">📡 কাছের যাত্রী (১-২ কিমি)</h3>
+    <div id="dmRadarMapEl" style="width:100%; height:280px; border-radius:12px; overflow:hidden; background:#111;"></div>
+    <p id="dmRadarHint" style="font-size:11px; color:#a8d9c0; margin:8px 0 0;">Online থাকলে এখানে কাছাকাছি অপেক্ষমাণ যাত্রীদের পিন দেখাবে — পিনে ট্যাপ করে Pick Up করা যাবে।</p>
   </div>
 
   <!-- চলমান ট্রিপ কার্ড -->
@@ -6275,7 +6296,10 @@ function bccLoadCategories(){
     return deletedCategoryIds.length ? cats.filter(c=>!deletedCategoryIds.includes(c.id)) : cats;
   }catch(e){ return []; }
 }
-function bccSaveCategories(cats){ localStorage.setItem('bcc-categories', JSON.stringify(cats)); }
+function bccSaveCategories(cats){
+  localStorage.setItem('bcc-categories', JSON.stringify(cats));
+  bccSyncCategoriesToBazar(); // ক্যাটাগরি বদলালেই Bazar-এও সাথে সাথে আপডেট হয়
+}
 
 /* ==================== 📦 দোকানের মোড (Weight-Based / Batch-Expiry ইত্যাদি) ====================
    সাইনআপের সময় ক্যাটাগরি অনুযায়ী ঠিক হওয়া মোড অনুযায়ী POS-এর কিছু ফিচার
@@ -6422,6 +6446,8 @@ async function bccSyncProductToBazar(p){
       offerPrice: p.offerPrice ? Number(p.offerPrice) : null,
       stockQty: Number(p.qty) || 0,
       barcode: p.code || null,
+      catId: p.catId || null,
+      subId: p.subId || null,
       updatedAt: fbNow()
     });
   }catch(e){ console.warn('Bazar sync failed:', e); }
@@ -6433,6 +6459,28 @@ async function bccUnpublishFromBazar(productId){
     if(!session || !session.shopId || typeof db === 'undefined') return;
     await db.collection('shops').doc(session.shopId).collection('publicStock').doc(productId).delete();
   }catch(e){ console.warn('Bazar unpublish failed:', e); }
+}
+
+/* ---------- 🗂️ ক্যাটাগরি/সাব-ক্যাটাগরি Honey Bee Bazar-এ সিঙ্ক ----------
+   Bazar-এ Category → SubCategory → Product এই তিন-ধাপের ব্রাউজিং দেখাতে
+   ক্যাটাগরি স্ট্রাকচারটাও (নাম + সাব-ক্যাটাগরি) পাবলিকভাবে সিঙ্ক করা হয়।
+   এখনো কোনো ছবি নেই বলে Bazar-এ প্লেসহোল্ডার আইকন দেখাবে। */
+async function bccSyncCategoriesToBazar(){
+  try{
+    const session = (typeof getSession === 'function') ? getSession() : null;
+    if(!session || !session.shopId || typeof db === 'undefined') return;
+    const cats = bccLoadCategories();
+    const batch = db.batch();
+    const catsRef = db.collection('shops').doc(session.shopId).collection('publicCategories');
+    cats.forEach(c=>{
+      batch.set(catsRef.doc(c.id), {
+        name: c.name,
+        subs: (c.subs||[]).map(s=> ({ id: s.id, name: s.name })),
+        updatedAt: fbNow()
+      });
+    });
+    await batch.commit();
+  }catch(e){ console.warn('Category sync failed:', e); }
 }
 
 // Adjust product stock when items are sold (deltaQty negative) or returned (deltaQty positive).
@@ -11348,6 +11396,8 @@ async function initDriverMode(uid){
 
   dmListenForOffers();
   dmCheckOngoingTrip();
+  dmInitRadarMap();
+  if(__dmDriver.driverStatus === "online"){ dmStartRadar(); }
 
   document.getElementById("dmLogoutBtn").addEventListener("click", ()=> auth.signOut());
 }
@@ -11370,7 +11420,7 @@ document.getElementById("dmStatusSwitch").addEventListener("click", async ()=>{
   dmRefreshStatusUi(next);
   try{ await db.collection("transportDrivers").doc(__dmDriverId).update({ driverStatus: next }); }
   catch(e){ console.warn(e); }
-  if(next === "online") dmStartGps(); else dmStopGps();
+  if(next === "online"){ dmStartGps(); dmStartRadar(); } else{ dmStopGps(); dmStopRadar(); }
 });
 
 /* ---------- লাইভ GPS (প্রতি ১-২ সেকেন্ডে, শুধু Online/Busy অবস্থায়) ---------- */
@@ -11378,7 +11428,13 @@ function dmStartGps(){
   if(!navigator.geolocation){ document.getElementById("dmGpsStatusTxt").textContent = "📍 GPS সাপোর্ট নেই"; return; }
   document.getElementById("dmGpsStatusTxt").textContent = "📍 লাইভ ট্র্যাকিং চালু";
   let lastSent = 0;
+  let firstFix = true;
   __dmGpsWatchId = navigator.geolocation.watchPosition((pos)=>{
+    __dmMyLatLng = [pos.coords.latitude, pos.coords.longitude]; // রাডার দূরত্ব হিসাবের জন্য
+    if(firstFix){
+      firstFix = false;
+      if(typeof dmLoadHotspots === 'function' && __dmRadarUnsub) dmLoadHotspots(); // GPS প্রথমবার পাওয়ার পর হটস্পট লোড
+    }
     const now = Date.now();
     if(now - lastSent < 1500) return; // প্রতি ~১.৫ সেকেন্ডে একবার (স্পেক অনুযায়ী ১-২ সেকেন্ড)
     lastSent = now;
@@ -11391,6 +11447,226 @@ function dmStartGps(){
 function dmStopGps(){
   if(__dmGpsWatchId != null){ navigator.geolocation.clearWatch(__dmGpsWatchId); __dmGpsWatchId = null; }
   document.getElementById("dmGpsStatusTxt").textContent = "";
+}
+
+/* ==================== 📡 Driver Radar — কাছের অপেক্ষমাণ যাত্রী ====================
+   passenger_waiting_queue-এ status=='WAITING' থাকা যাত্রীদের রিয়েলটাইমে শোনা হয়,
+   ড্রাইভারের বর্তমান লোকেশন থেকে ২ কিমির মধ্যে যারা আছে তাদের কাছাকাছি (~২০০মি)
+   গ্রুপ করে একটা ব্যাজ-পিন হিসেবে ডার্ক-থিম ম্যাপে দেখানো হয়। */
+let __dmMyLatLng = null;
+let __dmRadarMap = null;
+let __dmRadarMarkers = [];
+let __dmRadarUnsub = null;
+const __dmGeocodeCache = {}; // "lat,lng" (রাউন্ড করা) -> label
+
+function dmInitRadarMap(){
+  if(__dmRadarMap) return;
+  const center = __dmMyLatLng || [23.8103, 90.4125]; // ডিফল্ট: ঢাকা (GPS না পাওয়া পর্যন্ত)
+  __dmRadarMap = L.map("dmRadarMapEl").setView(center, 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(__dmRadarMap);
+}
+
+function dmStartRadar(){
+  dmInitRadarMap();
+  document.getElementById("dmRadarHint").textContent = "📡 লাইভ — কাছের অপেক্ষমাণ যাত্রী খোঁজা হচ্ছে...";
+  dmLoadHotspots(); // দোকানগুলো Pickup Hotspot হিসেবে ম্যাপে বসানো
+  if(__dmRadarUnsub) return; // ইতিমধ্যে চালু আছে
+  __dmRadarUnsub = db.collection("passenger_waiting_queue")
+    .where("status", "==", "WAITING")
+    .onSnapshot((qs)=>{
+      const passengers = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+      dmRenderRadar(passengers);
+    }, (err)=> console.warn("radar listener error:", err));
+}
+
+function dmStopRadar(){
+  if(__dmRadarUnsub){ __dmRadarUnsub(); __dmRadarUnsub = null; }
+  __dmRadarMarkers.forEach(m=> __dmRadarMap && __dmRadarMap.removeLayer(m));
+  __dmRadarMarkers = [];
+  __dmHotspotMarkers.forEach(m=> __dmRadarMap && __dmRadarMap.removeLayer(m));
+  __dmHotspotMarkers = [];
+  document.getElementById("dmRadarHint").textContent = "Online থাকলে এখানে কাছাকাছি অপেক্ষমাণ যাত্রীদের পিন দেখাবে — পিনে ট্যাপ করে Pick Up করা যাবে।";
+}
+
+/* ---------- 🏪 Pickup Hotspot — Honey Bee POS দোকানগুলো ম্যাপে অটো-ট্যাগ ----------
+   যেসব দোকান তাদের অবস্থান সেট করেছে (Honey Bee Network ফিচার দিয়ে), সেগুলোকে
+   "সম্ভাব্য যাত্রী ওঠার জায়গা" (দোকানের সামনে মানুষ থাকে) হিসেবে হালকা নীল
+   ব্যাজ দিয়ে দেখানো হয় — এটা স্থায়ী রেফারেন্স পয়েন্ট, লাইভ যাত্রীর পিন না। */
+let __dmHotspotMarkers = [];
+async function dmLoadHotspots(){
+  if(!__dmMyLatLng) return;
+  __dmHotspotMarkers.forEach(m=> __dmRadarMap.removeLayer(m));
+  __dmHotspotMarkers = [];
+  try{
+    const qs = await db.collection("shops").where("status","==","active").get();
+    qs.docs.forEach(doc=>{
+      const shop = doc.data();
+      const loc = shop.storeLocation;
+      if(!loc || loc.lat == null) return;
+      const dist = dmHaversineKm(__dmMyLatLng[0], __dmMyLatLng[1], loc.lat, loc.lng);
+      if(dist > 3) return; // হটস্পট একটু বড় রেডিয়াসে (৩ কিমি) দেখানো হয়
+      const icon = L.divIcon({
+        html: `<div class="hotspotBadge">🏪 ${escapeHtmlDm(shop.shopName || shop.name || "দোকান")}</div>`,
+        className: '', iconSize: null, iconAnchor: [30, 12]
+      });
+      const marker = L.marker([loc.lat, loc.lng], { icon }).addTo(__dmRadarMap);
+      __dmHotspotMarkers.push(marker);
+    });
+  }catch(e){ console.warn("hotspot load failed:", e); }
+}
+function escapeHtmlDm(str){
+  const d = document.createElement("div");
+  d.textContent = str == null ? "" : String(str);
+  return d.innerHTML;
+}
+
+function dmHaversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+async function dmRenderRadar(passengers){
+  __dmRadarMarkers.forEach(m=> __dmRadarMap.removeLayer(m));
+  __dmRadarMarkers = [];
+  if(!__dmMyLatLng) return; // নিজের লোকেশন না জানা পর্যন্ত দূরত্ব হিসাব করা যাবে না
+
+  // ১-২ কিমির মধ্যে যারা আছে তাদের বাছাই
+  const nearby = passengers.filter(p=>{
+    if(!p.location) return false;
+    const lat = p.location.latitude != null ? p.location.latitude : p.location._lat;
+    const lng = p.location.longitude != null ? p.location.longitude : p.location._long;
+    if(lat == null || lng == null) return false;
+    p.__lat = lat; p.__lng = lng;
+    p.__dist = dmHaversineKm(__dmMyLatLng[0], __dmMyLatLng[1], lat, lng);
+    return p.__dist <= 2;
+  });
+
+  // কাছাকাছি (~২০০ মিটার গ্রিড) যাত্রীদের একসাথে গ্রুপ করা
+  const clusters = {};
+  nearby.forEach(p=>{
+    const key = p.__lat.toFixed(3) + "," + p.__lng.toFixed(3); // ~0.001° ≈ ১১০মি গ্রিড
+    if(!clusters[key]) clusters[key] = [];
+    clusters[key].push(p);
+  });
+
+  for(const key in clusters){
+    const group = clusters[key];
+    const centerLat = group.reduce((s,p)=> s+p.__lat, 0) / group.length;
+    const centerLng = group.reduce((s,p)=> s+p.__lng, 0) / group.length;
+    const label = await dmReverseGeocode(centerLat, centerLng);
+    const badgeIcon = L.divIcon({
+      html: `<div class="radarBadge">📍 ${label} — ${group.length} জন</div>`,
+      className: '', iconSize: null, iconAnchor: [40, 15]
+    });
+    const marker = L.marker([centerLat, centerLng], { icon: badgeIcon }).addTo(__dmRadarMap);
+    marker.bindPopup(dmBuildRadarPopup(group));
+    __dmRadarMarkers.push(marker);
+  }
+  document.getElementById("dmRadarHint").textContent = nearby.length > 0
+    ? `📡 কাছাকাছি ${nearby.length} জন যাত্রী অপেক্ষা করছেন`
+    : "এই মুহূর্তে ২ কিমির মধ্যে কোনো অপেক্ষমাণ যাত্রী নেই।";
+}
+
+function dmBuildRadarPopup(group){
+  const wrap = document.createElement("div");
+  wrap.style.minWidth = "160px";
+  group.forEach(p=>{
+    const row = document.createElement("div");
+    row.style.marginBottom = "8px";
+    const vLabels = { AUTO:"🛺 অটো/সিএনজি", CAR:"🚗 কার", BIKE:"🏍️ বাইক", BUS:"🚌 বাস" };
+    const vTxt = (p.transport_types||[]).map(v=> vLabels[v]||v).join(", ") || "যেকোনো";
+    row.innerHTML = `<div style="font-size:11.5px; margin-bottom:4px;">🚕 চায়: ${vTxt} · ~${p.__dist.toFixed(1)} কিমি দূরে</div>`;
+    const btn = document.createElement("button");
+    btn.className = "radarPopupBtn";
+    btn.textContent = "✅ Pick Up";
+    btn.onclick = ()=> dmPickUpPassenger(p);
+    row.appendChild(btn);
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
+/* ---------- 💰 Wallet থেকে ভাড়া কাটা (Honey Bee Central Wallet) ----------
+   কোনো পেমেন্ট গেটওয়ে নেই — এটা শুধু Firestore-এ রাখা একটা ইন্টারনাল
+   ব্যালেন্স, যেটা এজেন্ট/অ্যাডমিন হাতে ক্যাশ নিয়ে টপ-আপ করেন (honey-bee-agent.html
+   থেকে)। যাত্রীর ওয়ালেটে পর্যাপ্ত ব্যালেন্স থাকলে সেখান থেকে কাটা হয় এবং
+   ড্রাইভারের ওয়ালেটে যোগ হয়; না থাকলে নগদ নেওয়ার কথা বলা হয় (তখনো Pick Up
+   হয়ে যায়, শুধু ওয়ালেট থেকে টাকা কাটা হয় না)। */
+async function walletChargeFare(passengerUserId, driverUid, fare){
+  if(!fare || fare <= 0) return { success: false, reason: "invalid_fare" };
+  // guest_ দিয়ে শুরু হওয়া আইডি মানে লগইন করা কাস্টমার না — তার কোনো ওয়ালেট নেই
+  if(!passengerUserId || passengerUserId.startsWith("guest_")){
+    return { success: false, reason: "no_wallet" };
+  }
+  const walletRef = db.collection("wallets").doc(passengerUserId);
+  try{
+    const result = await db.runTransaction(async (t)=>{
+      const doc = await t.get(walletRef);
+      const balance = doc.exists ? (doc.data().balance || 0) : 0;
+      if(balance < fare) return { ok: false };
+      t.set(walletRef, { balance: balance - fare, updatedAt: fbNow() }, { merge: true });
+      return { ok: true };
+    });
+    if(!result.ok) return { success: false, reason: "insufficient_balance" };
+
+    await walletRef.collection("transactions").add({
+      type: "ride_payment", amount: -fare, note: "ট্রিপ ভাড়া", createdAt: fbNow()
+    });
+
+    // ড্রাইভারের ওয়ালেটে যোগ করা
+    const driverWalletRef = db.collection("wallets").doc(driverUid);
+    await db.runTransaction(async (t)=>{
+      const doc = await t.get(driverWalletRef);
+      const balance = doc.exists ? (doc.data().balance || 0) : 0;
+      t.set(driverWalletRef, { balance: balance + fare, updatedAt: fbNow() }, { merge: true });
+    });
+    await driverWalletRef.collection("transactions").add({
+      type: "ride_earning", amount: fare, note: "ট্রিপ আয়", createdAt: fbNow()
+    });
+
+    return { success: true };
+  }catch(e){
+    console.error("wallet charge failed:", e);
+    return { success: false, reason: "error" };
+  }
+}
+
+async function dmPickUpPassenger(passenger){
+  const fareInput = prompt("ভাড়া কত নেবেন? (SAR) — যাত্রীর Wallet-এ ব্যালেন্স থাকলে সেখান থেকে কাটা হবে, না থাকলে নগদ নিন।", "");
+  if(fareInput === null) return; // বাতিল করলে Pick Up-ও হবে না
+  const fare = Number(fareInput) || 0;
+  try{
+    await db.collection("passenger_waiting_queue").doc(passenger.id).update({
+      status: "PICKED_UP", picked_up_by: __dmDriverId, picked_up_at: fbNow(), fare: fare || null
+    });
+    if(fare > 0){
+      const result = await walletChargeFare(passenger.user_id, __dmDriverId, fare);
+      if(result.success) alert(`✅ Pick Up সম্পন্ন — Wallet থেকে SAR ${fare} কাটা হয়েছে।`);
+      else if(result.reason === "insufficient_balance") alert(`✅ Pick Up সম্পন্ন — যাত্রীর Wallet-এ পর্যাপ্ত ব্যালেন্স নেই, নগদ SAR ${fare} নিন।`);
+      else if(result.reason === "no_wallet") alert(`✅ Pick Up সম্পন্ন — যাত্রী লগইন করা নেই (কোনো Wallet নেই), নগদ SAR ${fare} নিন।`);
+      else alert("✅ Pick Up সম্পন্ন — তবে Wallet থেকে কাটা যায়নি, নগদ নিন।");
+    }
+    __dmRadarMap.closePopup();
+  }catch(e){ alert("Pick Up করা যায়নি: " + e.message); }
+}
+
+// ক্লাস্টারের কেন্দ্র-বিন্দু রিভার্স-জিওকোড করে একটা সংক্ষিপ্ত এলাকা-নাম বের করা
+// (ফ্রি Nominatim OSM API, কোনো key লাগে না) — বারবার একই জায়গার জন্য না করতে ক্যাশ রাখা হয়
+async function dmReverseGeocode(lat, lng){
+  const key = lat.toFixed(3) + "," + lng.toFixed(3);
+  if(__dmGeocodeCache[key]) return __dmGeocodeCache[key];
+  try{
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16`);
+    const data = await res.json();
+    const addr = data.address || {};
+    const label = addr.suburb || addr.neighbourhood || addr.road || addr.village || addr.town || "কাছের এলাকা";
+    __dmGeocodeCache[key] = label;
+    return label;
+  }catch(e){
+    return "কাছের এলাকা";
+  }
 }
 
 /* ---------- ইনকামিং ট্রিপ রিকোয়েস্ট (৬০ সেকেন্ড কাউন্টডাউন) ---------- */

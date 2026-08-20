@@ -148,6 +148,7 @@
     <button class="tabBtn" data-tab="tabRiders">🛵 রাইডার</button>
     <button class="tabBtn" data-tab="tabShops">🏪 দোকান</button>
     <button class="tabBtn" data-tab="tabTransport">🚑 ট্রান্সপোর্ট</button>
+    <button class="tabBtn" data-tab="tabWallet">💰 Wallet</button>
     <button class="tabBtn" data-tab="tabCharge">💰 ডেলিভারি চার্জ</button>
   </div>
 
@@ -177,6 +178,20 @@
   <div class="tabPanel" id="tabTransport">
     <p style="font-size:11.5px; color:var(--muted); margin:0 0 12px;">ড্রাইভাররা নিজেরাই login.html-এ গিয়ে নিবন্ধন করেন। এখানে আপনার বাজার/এলাকায় নিবন্ধিত সবাইকে দেখাবে — নতুনদের 🛡️ ভেরিফাই করুন।</p>
     <div id="driversList"><div class="emptyMsg">লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- 💰 Honey Bee Central Wallet — ম্যানুয়াল টপ-আপ -->
+  <div class="tabPanel" id="tabWallet">
+    <p style="font-size:11.5px; color:var(--muted); margin:0 0 12px;">কাস্টমার/ড্রাইভার নগদ টাকা দিলে তার Wallet-এ যোগ করুন। কোনো পেমেন্ট গেটওয়ে নেই — এটা শুধু একটা ইন্টারনাল হিসাব-খাতা।</p>
+    <label>ইউজারের UID</label>
+    <input type="text" id="walletUid" placeholder="কাস্টমার/ড্রাইভারের UID (তার অ্যাপের Menu থেকে পাবে)">
+    <label>পরিমাণ (SAR)</label>
+    <input type="number" id="walletAmount" placeholder="যেমনঃ 100">
+    <label>নোট (ঐচ্ছিক)</label>
+    <input type="text" id="walletNote" placeholder="যেমনঃ নগদ জমা - ফরিদ ভাই">
+    <button class="btn" id="walletTopupBtn">💰 টপ-আপ করুন</button>
+    <p id="walletMsg" style="display:none; font-size:12.5px; margin:8px 0 0;"></p>
+    <div id="walletLookupResult" style="margin-top:14px;"></div>
   </div>
 
   <!-- ডেলিভারি চার্জ -->
@@ -611,6 +626,47 @@ $("saveChargeBtn").addEventListener("click", async ()=>{
     alert("সেভ করা যায়নি: " + e.message);
   }finally{
     $("saveChargeBtn").disabled = false;
+  }
+});
+
+/* ==================== 💰 Honey Bee Central Wallet — ম্যানুয়াল টপ-আপ ====================
+   কোনো পেমেন্ট গেটওয়ে নেই — এজেন্ট/অ্যাডমিন নগদ টাকা হাতে নিয়ে এই টপ-আপ করেন।
+   wallets/{uid}.balance-এ যোগ হয়, প্রতিটা লেনদেন wallets/{uid}/transactions-এ লগ হয়। */
+$("walletTopupBtn").addEventListener("click", async ()=>{
+  const uid = $("walletUid").value.trim();
+  const amount = Number($("walletAmount").value);
+  const note = $("walletNote").value.trim();
+  const msgEl = $("walletMsg");
+  msgEl.style.display = "none";
+
+  if(!uid || !amount || amount <= 0){
+    msgEl.textContent = "⚠️ UID ও সঠিক পরিমাণ (০-এর বেশি) দিন।";
+    msgEl.style.color = "#e2543d"; msgEl.style.display = "block";
+    return;
+  }
+
+  const btn = $("walletTopupBtn");
+  btn.disabled = true; btn.textContent = "যোগ হচ্ছে...";
+  try{
+    const walletRef = db.collection("wallets").doc(uid);
+    await db.runTransaction(async (t)=>{
+      const doc = await t.get(walletRef);
+      const currentBalance = doc.exists ? (doc.data().balance || 0) : 0;
+      t.set(walletRef, { balance: currentBalance + amount, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    });
+    await walletRef.collection("transactions").add({
+      type: "topup", amount, note: note || null,
+      byUid: currentAgent.uid, byName: currentAgent.name || "এজেন্ট",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    $("walletUid").value = ""; $("walletAmount").value = ""; $("walletNote").value = "";
+    msgEl.textContent = `✅ SAR ${amount} সফলভাবে যোগ হয়েছে।`;
+    msgEl.style.color = "#2fbf71"; msgEl.style.display = "block";
+  }catch(e){
+    msgEl.textContent = "⚠️ টপ-আপ করা যায়নি: " + e.message;
+    msgEl.style.color = "#e2543d"; msgEl.style.display = "block";
+  }finally{
+    btn.disabled = false; btn.textContent = "💰 টপ-আপ করুন";
   }
 });
 
