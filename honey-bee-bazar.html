@@ -71,6 +71,15 @@
   /* ---------- 🐝 Bee In-Out এন্ট্রি অ্যানিমেশন (হেডার) ---------- */
   .beeInOut{ animation: beeInOutMotion 2.4s ease-in-out infinite, beeFloat 0.8s ease-in-out infinite, beeSway 1.6s ease-in-out infinite; }
   @keyframes beeInOutMotion{ 0%{ transform:scale(0.7) translateX(-8px); opacity:0.6; } 15%{ transform:scale(1) translateX(0); opacity:1; } 85%{ transform:scale(1) translateX(0); opacity:1; } 100%{ transform:scale(0.7) translateX(8px); opacity:0.6; } }
+
+  /* ---------- 🛒 প্রোডাক্ট কার্ড (Order Now বাটনসহ) ---------- */
+  .productCard2{ border-bottom:1px solid var(--border); padding:10px 12px; }
+  .productCard2:last-child{ border-bottom:none; }
+  .orderNowBtn{
+    width:100%; margin-top:8px; padding:9px; border-radius:10px; border:none; cursor:pointer;
+    background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:12.5px; font-family:inherit;
+  }
+  .orderNowBtn:disabled{ background:rgba(255,255,255,0.08); color:var(--muted); cursor:not-allowed; }
 </style>
 <style>
   :root{
@@ -148,8 +157,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenShops, #screenProducts, #screenTransport{ display:none; }
-  #screenHome.active, #screenShops.active, #screenProducts.active, #screenTransport.active{ display:block; }
+  #screenHome, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport{ display:none; }
+  #screenHome.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active{ display:block; }
 </style>
 <script src="bd-locations.js"></script>
 </head>
@@ -230,9 +239,29 @@
     <div id="shopsList"><div class="loadingMsg">দোকানের তালিকা লোড হচ্ছে...</div></div>
   </div>
 
-  <!-- ধাপ ৩: প্রোডাক্ট/স্টক -->
+  <!-- ধাপ ৩: ক্যাটাগরি -->
+  <div id="screenCategories">
+    <button class="backBtn" id="backToShopsFromCat">← দোকানের তালিকায় ফিরে যান</button>
+    <div class="card" style="text-align:center; padding:12px;">
+      <div style="font-size:13px; color:var(--muted);">দোকান</div>
+      <div style="font-size:16px; font-weight:800; color:var(--amber);" id="currentShopNameCat">—</div>
+    </div>
+    <div class="serviceCardGrid" id="categoriesGrid"></div>
+  </div>
+
+  <!-- ধাপ ৪: সাব-ক্যাটাগরি -->
+  <div id="screenSubcategories">
+    <button class="backBtn" id="backToCategories">← ক্যাটাগরিতে ফিরে যান</button>
+    <div class="card" style="text-align:center; padding:12px;">
+      <div style="font-size:13px; color:var(--muted);">ক্যাটাগরি</div>
+      <div style="font-size:16px; font-weight:800; color:var(--amber);" id="currentCategoryName">—</div>
+    </div>
+    <div class="serviceCardGrid" id="subcategoriesGrid"></div>
+  </div>
+
+  <!-- ধাপ ৫: প্রোডাক্ট/স্টক -->
   <div id="screenProducts">
-    <button class="backBtn" id="backToShops">← দোকানের তালিকায় ফিরে যান</button>
+    <button class="backBtn" id="backToShops">← পেছনে ফিরে যান</button>
     <div class="card" style="text-align:center; padding:12px;">
       <div style="font-size:13px; color:var(--muted);">দোকান</div>
       <div style="font-size:16px; font-weight:800; color:var(--amber);" id="currentShopName">—</div>
@@ -377,7 +406,7 @@ let currentMarketId = null, currentShopId = null;
 let userLatLng = null;
 
 function showScreen(id){
-  ["screenHome","screenShops","screenProducts","screenTransport"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 }
 
@@ -610,15 +639,91 @@ $("shopSearch").addEventListener("input", (e)=>{
   renderShops(allShops.filter(s => (s.name||s.shopName||"").toLowerCase().includes(q)));
 });
 
-$("backToShops").addEventListener("click", ()=> showScreen("screenShops"));
+$("backToShops").addEventListener("click", ()=>{
+  // প্রোডাক্ট স্ক্রিন থেকে সঠিক আগের স্ক্রিনে ফিরে যাওয়া — সাব-ক্যাটাগরি
+  // দিয়ে এসে থাকলে সাব-ক্যাটাগরিতে, ক্যাটাগরি দিয়ে এসে থাকলে ক্যাটাগরিতে,
+  // নাহলে সরাসরি দোকানের তালিকায়
+  if(currentSubId) showScreen("screenSubcategories");
+  else if(currentCatId) showScreen("screenCategories");
+  else showScreen("screenShops");
+});
+$("backToShopsFromCat") && $("backToShopsFromCat").addEventListener("click", ()=> showScreen("screenShops"));
+$("backToCategories") && $("backToCategories").addEventListener("click", ()=> showScreen("screenCategories"));
 
 /* ---------- ধাপ ৩: প্রোডাক্ট/স্টক ---------- */
+let currentCatId = null, currentSubId = null;
+
 window.selectShop = function(shopId){
   currentShopId = shopId;
   const shop = allShops.find(s=> s.id === shopId);
-  $("currentShopName").textContent = shop ? (shop.name || shop.shopName || shopId) : shopId;
+  const shopName = shop ? (shop.name || shop.shopName || shopId) : shopId;
+  $("currentShopNameCat").textContent = shopName;
+  loadCategories(shopId, shopName);
+};
+
+/* ==================== 🗂️ ক্যাটাগরি → সাব-ক্যাটাগরি → প্রোডাক্ট ====================
+   দোকান সিলেক্ট করলে প্রথমে ক্যাটাগরি গ্রিড দেখানো হয় (POS থেকে সিঙ্ক করা)।
+   কোনো দোকানের এখনো ক্যাটাগরি সেট করা না থাকলে (পুরনো দোকান/প্রোডাক্ট)
+   সরাসরি সব প্রোডাক্টের তালিকায় চলে যায় — ব্যাকওয়ার্ড-কম্প্যাটিবল। */
+const CATEGORY_PLACEHOLDER_ICONS = ["🗂️","📦","🧺","🛍️","🧃","🧴","🧹","🍞","🥫","🧸"];
+function catPlaceholderIcon(id){
+  let hash = 0;
+  for(let i=0;i<id.length;i++) hash = (hash + id.charCodeAt(i)) % CATEGORY_PLACEHOLDER_ICONS.length;
+  return CATEGORY_PLACEHOLDER_ICONS[hash];
+}
+
+async function loadCategories(shopId, shopName){
+  $("categoriesGrid").innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
+  showScreen("screenCategories");
+  try{
+    const qs = await db.collection("shops").doc(shopId).collection("publicCategories").get();
+    if(qs.empty){
+      // এই দোকানের কোনো ক্যাটাগরি সেট করা নেই — সরাসরি সব প্রোডাক্ট দেখানো হচ্ছে
+      $("currentShopName").textContent = shopName;
+      currentCatId = null; currentSubId = null;
+      showScreen("screenProducts");
+      loadProducts(shopId);
+      return;
+    }
+    const cats = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+    $("categoriesGrid").innerHTML = cats.map(c=> `
+      <div class="serviceCard" onclick="selectCategory('${c.id}','${escapeHtml(c.name||'').replace(/'/g,"")}')">
+        <div class="ic">${catPlaceholderIcon(c.id)}</div>
+        <div class="lbl">${escapeHtml(c.name || "ক্যাটাগরি")}</div>
+      </div>`).join("");
+    window.__catsCache = cats;
+  }catch(e){
+    console.error(e);
+    $("categoriesGrid").innerHTML = '<div class="emptyMsg">ক্যাটাগরি লোড করা যায়নি।</div>';
+  }
+}
+
+window.selectCategory = function(catId, catName){
+  currentCatId = catId;
+  $("currentCategoryName").textContent = catName;
+  const cat = (window.__catsCache||[]).find(c=> c.id === catId);
+  const subs = cat ? (cat.subs||[]) : [];
+  if(subs.length === 0){
+    // এই ক্যাটাগরির কোনো সাব-ক্যাটাগরি নেই — সরাসরি প্রোডাক্টে চলে যাওয়া
+    currentSubId = null;
+    $("currentShopName").textContent = $("currentShopNameCat").textContent;
+    showScreen("screenProducts");
+    loadProducts(currentShopId);
+    return;
+  }
+  $("subcategoriesGrid").innerHTML = subs.map(s=> `
+    <div class="serviceCard" onclick="selectSubcategory('${s.id}','${escapeHtml(s.name||'').replace(/'/g,"")}')">
+      <div class="ic">${catPlaceholderIcon(s.id)}</div>
+      <div class="lbl">${escapeHtml(s.name || "সাব-ক্যাটাগরি")}</div>
+    </div>`).join("");
+  showScreen("screenSubcategories");
+};
+
+window.selectSubcategory = function(subId, subName){
+  currentSubId = subId;
+  $("currentShopName").textContent = $("currentShopNameCat").textContent + " · " + subName;
   showScreen("screenProducts");
-  loadProducts(shopId);
+  loadProducts(currentShopId);
 };
 
 /* ==================== 🖼️ অটোমেটেড ইমেজ পাইপলাইন (Zero-Storage) ====================
@@ -667,7 +772,13 @@ async function loadProducts(shopId){
       $("productsList").innerHTML = '<div class="emptyMsg">এই দোকান এখনো কোনো প্রোডাক্ট/স্টক তালিকা প্রকাশ করেনি।</div>';
       return;
     }
-    const products = qs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let products = qs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    if(currentSubId) products = products.filter(p=> p.subId === currentSubId);
+    else if(currentCatId) products = products.filter(p=> p.catId === currentCatId);
+    if(products.length === 0){
+      $("productsList").innerHTML = '<div class="emptyMsg">এই ক্যাটাগরিতে এখনো কোনো প্রোডাক্ট নেই।</div>';
+      return;
+    }
     renderProducts(products); // আগে টেক্সট/আইকন দিয়ে সাথে সাথে দেখানো
     resolveAllImages(products); // ছবি ব্যাকগ্রাউন্ডে লোড হয়ে ধীরে ধীরে বসবে
   }catch(e){
@@ -677,6 +788,7 @@ async function loadProducts(shopId){
 }
 
 function renderProducts(products){
+  const favs = (currentCustomer && currentCustomer.favoriteProducts) || [];
   $("productsList").innerHTML = products.map(p=>{
     const qty = Number(p.stockQty);
     let stockClass = "in", stockLabel = "স্টকে আছে";
@@ -689,17 +801,52 @@ function renderProducts(products){
     const priceHtml = hasOffer
       ? `<span style="text-decoration:line-through; color:var(--muted); margin-right:6px;">SAR ${p.price}</span><span style="color:#fb923c; font-weight:800;">SAR ${p.offerPrice}</span>`
       : (p.price != null ? ("SAR " + p.price) : "");
+    const isFav = favs.includes(p.id);
+    const outOfStock = stockClass === "out";
     return `
-      <div class="productRow">
-        <div class="productImgWrap" id="pimg-${p.id}">${guessCategoryIcon(p.name)}</div>
-        <div style="flex:1; margin:0 10px;">
-          <div class="pname">${escapeHtml(p.name || "প্রোডাক্ট")} ${hasOffer ? '<span style="font-size:10px; background:rgba(251,146,60,0.18); color:#fb923c; padding:2px 7px; border-radius:20px; margin-left:6px;">🔥 Special Offer</span>' : ''}</div>
-          <div class="pstock">${priceHtml}</div>
+      <div class="productCard2">
+        <div class="productRow">
+          <div class="productImgWrap" id="pimg-${p.id}">${guessCategoryIcon(p.name)}</div>
+          <div style="flex:1; margin:0 10px;">
+            <div class="pname">${escapeHtml(p.name || "প্রোডাক্ট")} ${hasOffer ? '<span style="font-size:10px; background:rgba(251,146,60,0.18); color:#fb923c; padding:2px 7px; border-radius:20px; margin-left:6px;">🔥 Special Offer</span>' : ''}</div>
+            <div class="pstock">${priceHtml}</div>
+          </div>
+          <span class="favHeart" style="font-size:16px;" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
+          <span class="stockBadge ${stockClass}">${stockLabel}</span>
         </div>
-        <span class="stockBadge ${stockClass}">${stockLabel}</span>
+        <button class="orderNowBtn" ${outOfStock ? "disabled" : ""} onclick="orderProductNow('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}')">
+          ${outOfStock ? "স্টক নেই" : "🛒 অর্ডার করুন"}
+        </button>
       </div>`;
   }).join("");
 }
+
+window.toggleFavoriteProduct = async function(ev, productId){
+  ev.stopPropagation();
+  if(!currentCustomer){ alert("প্রোডাক্ট সেভ করতে আগে Google দিয়ে লগইন করুন (☰ Menu থেকে)।"); return; }
+  const favs = currentCustomer.favoriteProducts || [];
+  const isFav = favs.includes(productId);
+  const updated = isFav ? favs.filter(id=>id!==productId) : [...favs, productId];
+  currentCustomer.favoriteProducts = updated;
+  loadProducts(currentShopId);
+  try{
+    await db.collection("customers").doc(currentCustomer.uid).set({ favoriteProducts: updated }, { merge: true });
+  }catch(e){ console.warn("favorite product save failed:", e); }
+};
+
+window.orderProductNow = async function(productId, productName){
+  if(!currentCustomer){ alert("অর্ডার করতে আগে Google দিয়ে লগইন করুন (☰ Menu থেকে)।"); return; }
+  try{
+    await db.collection("orderRequests").add({
+      shopId: currentShopId, productId, productName,
+      customerUid: currentCustomer.uid, customerName: currentCustomer.name || "কাস্টমার",
+      qty: 1, status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    alert(`✅ "${productName}"-এর জন্য অর্ডার রিকোয়েস্ট পাঠানো হয়েছে — দোকান শীঘ্রই যোগাযোগ করবে।`);
+  }catch(e){
+    alert("অর্ডার পাঠানো যায়নি: " + e.message);
+  }
+};
 
 async function resolveAllImages(products){
   for(const p of products){
