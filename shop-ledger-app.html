@@ -822,6 +822,111 @@
   </div>
 </div>
 
+<!-- ==================== 🛵 RIDER MODE — ডেলিভারি রাইডার লগইন করলে এই ভিউটা
+     দেখাবে (আগের আলাদা "Honey Bee Delivery" অ্যাপের সব ফিচার এখানেই) ==================== -->
+<div id="riderModeApp" style="display:none; max-width:480px; margin:0 auto; padding:16px 14px 90px; font-family:'Noto Sans Bengali',sans-serif;">
+  <style>
+    #riderModeApp{ min-height:100vh; background:#212121; color:#fff; }
+    #riderModeApp .rmCard{ background:#2b2b2b; border:1px solid rgba(255,193,7,0.25); border-radius:16px; padding:16px; margin-bottom:14px; }
+    #riderModeApp .rmToggleRow{ display:flex; align-items:center; justify-content:center; gap:10px; background:#2b2b2b; border-radius:30px; padding:10px 16px; margin-bottom:14px; border:1px solid rgba(255,193,7,0.25); }
+    #riderModeApp .rmLbl{ font-size:13px; font-weight:700; color:#a8a8a8; }
+    #riderModeApp .rmLbl.on{ color:#2fbf71; }
+    #riderModeApp .rmSwitch{ width:52px; height:28px; border-radius:20px; background:#444; position:relative; cursor:pointer; transition:background .2s; }
+    #riderModeApp .rmSwitch.on{ background:#2fbf71; }
+    #riderModeApp .rmKnob{ width:22px; height:22px; border-radius:50%; background:#fff; position:absolute; top:3px; left:3px; transition:left .2s; }
+    #riderModeApp .rmSwitch.on .rmKnob{ left:27px; }
+    #riderModeApp .rmGpsStatus{ text-align:center; font-size:11px; color:#a8a8a8; margin-bottom:14px; }
+    #riderModeApp .rmStatsGrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+    #riderModeApp .rmStatBox{ background:#2b2b2b; border:1px solid rgba(255,193,7,0.25); border-radius:14px; padding:14px; text-align:center; }
+    #riderModeApp .rmStatBox .num{ font-size:22px; font-weight:800; color:#FFC107; }
+    #riderModeApp .rmStatBox .lbl{ font-size:11px; color:#a8a8a8; margin-top:2px; }
+    #riderModeApp .rmCashCard .row{ display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px; }
+    #riderModeApp .rmCashCard .row b{ color:#FFC107; }
+    #riderModeApp .rmCashCard .row.total{ border-top:1px solid rgba(255,193,7,0.25); padding-top:8px; margin-top:4px; }
+    #riderModeApp .rmToolsGrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+    #riderModeApp .rmToolBtn{ background:#2b2b2b; border:1px solid rgba(255,193,7,0.25); border-radius:14px; padding:14px 10px; text-align:center; font-size:12px; cursor:pointer; text-decoration:none; color:#fff; display:block; }
+    #riderModeApp .rmToolBtn .ic{ font-size:22px; display:block; margin-bottom:6px; }
+    #rmRadarMapEl.rmMapFullscreen{ position:fixed; inset:0; z-index:998; width:100vw !important; height:100vh !important; border-radius:0; margin:0; }
+    .rmRadarExitBtn{ position:fixed; top:16px; right:16px; z-index:999; padding:10px 16px; border:none; border-radius:10px; background:rgba(0,0,0,0.75); color:#fff; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit; }
+    #rmOfferOverlay{ display:none; position:fixed; inset:0; z-index:900; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; padding:16px; }
+    #rmOfferOverlay .card{ background:#2b2b2b; border:2px solid #FFC107; border-radius:20px; padding:22px; max-width:400px; width:100%; }
+    #rmOfferTimer{ text-align:center; font-size:32px; font-weight:800; color:#FFC107; margin:10px 0; font-family:'Space Mono',monospace; }
+    .rmBottomNav{ position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; border-top:1px solid rgba(255,193,7,0.25); display:flex; z-index:100; padding:6px 0; }
+    .rmBottomNav .navItem{ flex:1; text-align:center; padding:6px 0; font-size:10.5px; color:#a8a8a8; cursor:pointer; }
+    .rmBottomNav .navItem .ic{ font-size:19px; display:block; margin-bottom:2px; }
+    .rmBottomNav .navItem.active{ color:#FFC107; }
+  </style>
+
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+    <div style="font-size:30px;">🐝</div>
+    <div>
+      <div style="font-weight:800; font-size:15px;" id="rmGreetingTxt">শুভ সকাল, রাইডার! 👋</div>
+      <div style="font-size:10.5px; color:#a8a8a8; text-transform:uppercase; letter-spacing:1px;">Rider Mode</div>
+    </div>
+    <button id="rmLogoutBtn" style="margin-left:auto; background:transparent; border:1px solid rgba(255,193,7,0.25); color:#a8a8a8; padding:7px 12px; border-radius:8px; font-size:11px; cursor:pointer; font-family:inherit;">লগআউট</button>
+  </div>
+
+  <div class="rmToggleRow">
+    <span class="rmLbl" id="rmOfflineLbl">🔴 Offline</span>
+    <div class="rmSwitch" id="rmOnlineSwitch"><div class="rmKnob"></div></div>
+    <span class="rmLbl on" id="rmOnlineLbl">🟢 Online</span>
+  </div>
+  <p class="rmGpsStatus" id="rmGpsStatusTxt">📍 GPS বন্ধ আছে</p>
+
+  <!-- 🚕 Transport Mode Switcher -->
+  <div class="rmToggleRow" style="margin-top:-4px;">
+    <span class="rmLbl" id="rmTmOffLbl">📦 শুধু ডেলিভারি</span>
+    <div class="rmSwitch" id="rmTransportModeSwitch"><div class="rmKnob"></div></div>
+    <span class="rmLbl" id="rmTmOnLbl">🚕 Transport Mode</span>
+  </div>
+  <p class="rmGpsStatus" id="rmTmHintTxt" style="margin-bottom:14px;">Transport Mode অন করলে ফ্রি সময়ে রাস্তার যাত্রীও পিক করতে পারবেন।</p>
+
+  <div class="rmCard" id="rmRadarCard" style="display:none;">
+    <h3 style="margin:0 0 10px; font-size:14px;">📡 কাছের যাত্রী</h3>
+    <div id="rmRadarMapEl" style="width:100%; height:240px; border-radius:12px; overflow:hidden; background:#111;"></div>
+    <p id="rmRadarHint" style="font-size:11px; color:#a8a8a8; margin:8px 0 0;"></p>
+  </div>
+
+  <div class="rmStatsGrid">
+    <div class="rmStatBox"><div class="num" id="rmStatTotal">0</div><div class="lbl">📦 আজকের মোট ডেলিভারি</div></div>
+    <div class="rmStatBox"><div class="num" id="rmStatTransit">0</div><div class="lbl">🚚 চলমান</div></div>
+    <div class="rmStatBox"><div class="num" id="rmStatPending">0</div><div class="lbl">⏳ পেন্ডিং</div></div>
+    <div class="rmStatBox"><div class="num" id="rmStatCompleted">0</div><div class="lbl">✅ কমপ্লিট</div></div>
+  </div>
+
+  <div class="rmCard rmCashCard">
+    <div class="row"><span>💰 আজকের ক্যাশ কালেকশন</span><b id="rmCashTotal">SAR 0</b></div>
+    <div class="row"><span>💵 আপনার ডেলিভারি আয়</span><b id="rmCashIncome">SAR 0</b></div>
+    <div class="row total"><span>💳 কোম্পানিকে জমার পরিমাণ</span><b id="rmCashDeposit">SAR 0</b></div>
+  </div>
+
+  <div class="rmToolsGrid">
+    <a class="rmToolBtn" id="rmRouteToolBtn" href="#"><span class="ic">🗺️</span>আজকের রুট</a>
+    <div class="rmToolBtn" id="rmCallSupportBtn"><span class="ic">📞</span>কাস্টমার কল</div>
+  </div>
+</div>
+
+<div class="rmBottomNav" id="rmBottomNav" style="display:none;">
+  <div class="navItem active"><span class="ic">🏠</span>হোম</div>
+  <div class="navItem" id="rmNavHistoryBtn"><span class="ic">📋</span>হিস্ট্রি</div>
+  <div class="navItem" id="rmNavSupportBtn"><span class="ic">📞</span>সাপোর্ট</div>
+  <div class="navItem" id="rmNavProfileBtn"><span class="ic">👤</span>প্রোফাইল</div>
+</div>
+
+<div id="rmOfferOverlay">
+  <div class="card">
+    <h2 style="margin:0 0 4px; font-size:18px; text-align:center;">📦 নতুন অর্ডার এসেছে!</h2>
+    <div id="rmOfferTimer">০০:৬০</div>
+    <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:10px; font-size:13.5px;"><span style="font-size:16px;">📍</span><span>পিকআপ: <b id="rmOfferPickup">—</b> (<span id="rmOfferDistance">—</span>)</span></div>
+    <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:10px; font-size:13.5px;"><span style="font-size:16px;">➡️</span><span>ড্রপ: <b id="rmOfferDrop">দোকান থেকে ঠিকানা</b></span></div>
+    <div style="text-align:center; font-size:22px; font-weight:800; color:#2fbf71; margin:14px 0;">💰 আয়: SAR <span id="rmOfferIncome">—</span></div>
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <button style="flex:1; padding:13px; border:none; border-radius:11px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; background:#444; color:#fff;" id="rmOfferSkipBtn">❌ স্কিপ</button>
+      <button style="flex:1; padding:13px; border:none; border-radius:11px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; background:#2fbf71; color:#fff;" id="rmOfferAcceptBtn">🟢 একসেপ্ট করুন</button>
+    </div>
+  </div>
+</div>
+
 <div class="wrap" id="mainApp">
   <div class="summary" style="display:none;">
     <div class="stat due">
@@ -11835,6 +11940,326 @@ document.getElementById("dmCancelTripBtn").addEventListener("click", async ()=>{
   }catch(e){ alert("বাতিল করা যায়নি: " + e.message); }
 });
 
+/* ==================== 🛵 RIDER MODE — সম্পূর্ণ লজিক ====================
+   ডেলিভারি রাইডার লগইন করলে POS-এর বদলে এই মোডটা চলে (আগের আলাদা
+   "Honey Bee Delivery" অ্যাপের সব ফিচার এখানে একীভূত)। Online/Offline,
+   ইনকামিং ডেলিভারি অফার (৬০ সেকেন্ড কাউন্টডাউন), স্ট্যাটস, ক্যাশ হিসাব,
+   এবং ফ্রি সময়ে "Transport Mode" (কাছের অপেক্ষমাণ যাত্রী পিক করা)। */
+let rmCurrentRider = null;
+let rmIsOnline = false;
+let rmGpsWatchId = null;
+let rmOffersUnsub = null;
+let rmActiveOfferTimer = null;
+let rmCurrentOfferId = null;
+
+async function initRiderMode(uid){
+  try{
+    const userDoc = await db.collection("users").doc(uid).get();
+    if(!userDoc.exists || userDoc.data().role !== "rider"){ alert("এই অ্যাকাউন্টটি রাইডার হিসেবে নিবন্ধিত না।"); auth.signOut(); return; }
+    const riderDoc = await db.collection("riders").doc(uid).get();
+    if(!riderDoc.exists){ alert("রাইডার প্রোফাইল পাওয়া যায়নি।"); auth.signOut(); return; }
+    rmCurrentRider = { uid, ...riderDoc.data() };
+    if(rmCurrentRider.status !== "active"){ alert("আপনার অ্যাকাউন্ট ব্লক করা আছে — এজেন্টের সাথে যোগাযোগ করুন।"); auth.signOut(); return; }
+  }catch(e){ console.error(e); return; }
+
+  document.getElementById("rmGreetingTxt").textContent = `শুভ সকাল, ${rmCurrentRider.name || "রাইডার"}! 👋`;
+  rmIsOnline = !!rmCurrentRider.online;
+  rmRefreshOnlineUi();
+  if(rmIsOnline) rmStartGps();
+
+  rmListenForOffers();
+  rmLoadTodayStats();
+
+  document.getElementById("rmLogoutBtn").addEventListener("click", ()=> auth.signOut());
+}
+
+/* ---------- Online/Offline টগল ---------- */
+function rmRefreshOnlineUi(){
+  document.getElementById("rmOnlineSwitch").classList.toggle("on", rmIsOnline);
+  document.getElementById("rmOfflineLbl").classList.toggle("on", !rmIsOnline);
+  document.getElementById("rmOnlineLbl").classList.toggle("on", rmIsOnline);
+}
+document.getElementById("rmOnlineSwitch").addEventListener("click", async ()=>{
+  rmIsOnline = !rmIsOnline;
+  rmRefreshOnlineUi();
+  try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ online: rmIsOnline }); }catch(e){ console.warn(e); }
+  if(rmIsOnline) rmStartGps(); else rmStopGps();
+});
+
+/* ---------- লাইভ GPS ---------- */
+function rmStartGps(){
+  if(!navigator.geolocation){ document.getElementById("rmGpsStatusTxt").textContent = "📍 GPS সাপোর্ট নেই"; return; }
+  document.getElementById("rmGpsStatusTxt").textContent = "📍 Live Tracking Active";
+  let lastSent = 0, firstFix = true;
+  rmGpsWatchId = navigator.geolocation.watchPosition((pos)=>{
+    __rmMyLatLng = [pos.coords.latitude, pos.coords.longitude];
+    if(firstFix){ firstFix = false; if(rmTransportModeOn) rmTmLoadHotspots(); }
+    const now = Date.now();
+    if(now - lastSent < 7000) return;
+    lastSent = now;
+    db.collection("riders").doc(rmCurrentRider.uid).update({
+      liveLocation: { lat: pos.coords.latitude, lng: pos.coords.longitude, updatedAt: fbNow() }
+    }).catch(()=>{});
+  }, (err)=>{ console.warn(err); document.getElementById("rmGpsStatusTxt").textContent = "⚠️ GPS পারমিশন লাগবে"; },
+  { enableHighAccuracy:true, maximumAge:5000, timeout:15000 });
+}
+function rmStopGps(){
+  if(rmGpsWatchId != null){ navigator.geolocation.clearWatch(rmGpsWatchId); rmGpsWatchId = null; }
+  document.getElementById("rmGpsStatusTxt").textContent = "📍 GPS বন্ধ আছে";
+}
+
+/* ---------- ইনকামিং ডেলিভারি অফার (৬০ সেকেন্ড কাউন্টডাউন) ---------- */
+function rmListenForOffers(){
+  if(rmOffersUnsub) rmOffersUnsub();
+  rmOffersUnsub = db.collection("deliveryOffers")
+    .where("riderId", "==", rmCurrentRider.uid)
+    .where("status", "==", "pending")
+    .onSnapshot((qs)=>{
+      if(qs.empty) return;
+      const doc = qs.docs[0];
+      if(doc.id === rmCurrentOfferId) return;
+      rmShowOfferCard(doc.id, doc.data());
+    }, (err)=> console.warn("rm offers listener error:", err));
+}
+
+function rmShowOfferCard(offerId, data){
+  rmCurrentOfferId = offerId;
+  document.getElementById("rmOfferPickup").textContent = data.pickupName || "দোকান";
+  document.getElementById("rmOfferDistance").textContent = data.distanceKm ? data.distanceKm.toFixed(1) + " কিমি দূরে" : "—";
+  document.getElementById("rmOfferDrop").textContent = data.dropAddress || "কাস্টমারের ঠিকানা";
+  document.getElementById("rmOfferIncome").textContent = data.riderIncome != null ? data.riderIncome : (data.estimatedCharge || "—");
+  document.getElementById("rmOfferOverlay").style.display = "flex";
+
+  let secondsLeft = 60;
+  document.getElementById("rmOfferTimer").textContent = "০০:৬০";
+  if(rmActiveOfferTimer) clearInterval(rmActiveOfferTimer);
+  rmActiveOfferTimer = setInterval(()=>{
+    secondsLeft--;
+    document.getElementById("rmOfferTimer").textContent = "০০:" + String(secondsLeft).padStart(2,'0');
+    if(secondsLeft <= 0){ clearInterval(rmActiveOfferTimer); rmRespondToOffer(offerId, "expired"); }
+  }, 1000);
+}
+
+async function rmRespondToOffer(offerId, status){
+  if(rmActiveOfferTimer){ clearInterval(rmActiveOfferTimer); rmActiveOfferTimer = null; }
+  document.getElementById("rmOfferOverlay").style.display = "none";
+  rmCurrentOfferId = null;
+  try{ await db.collection("deliveryOffers").doc(offerId).update({ status, respondedAt: fbNow() }); }
+  catch(e){ console.warn(e); }
+}
+document.getElementById("rmOfferAcceptBtn").addEventListener("click", ()=>{ if(rmCurrentOfferId) rmRespondToOffer(rmCurrentOfferId, "accepted"); });
+document.getElementById("rmOfferSkipBtn").addEventListener("click", ()=>{ if(rmCurrentOfferId) rmRespondToOffer(rmCurrentOfferId, "skipped"); });
+
+/* ---------- আজকের স্ট্যাটস ---------- */
+async function rmLoadTodayStats(){
+  try{
+    const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+    const qs = await db.collection("deliveryOffers")
+      .where("riderId", "==", rmCurrentRider.uid)
+      .where("createdAt", ">=", startOfDay)
+      .get();
+    let total=0, transit=0, completed=0, income=0;
+    qs.forEach(doc=>{
+      const d = doc.data();
+      if(d.status === "accepted" || d.status === "delivered"){
+        total++;
+        if(d.status === "delivered"){ completed++; income += Number(d.riderIncome||0); }
+        else transit++;
+      }
+    });
+    document.getElementById("rmStatTotal").textContent = total;
+    document.getElementById("rmStatTransit").textContent = transit;
+    document.getElementById("rmStatPending").textContent = Math.max(0, total-transit-completed);
+    document.getElementById("rmStatCompleted").textContent = completed;
+    document.getElementById("rmCashIncome").textContent = "SAR " + income.toFixed(0);
+  }catch(e){ console.warn("rm stats load failed:", e); }
+}
+
+/* ---------- কুইক টুলস ---------- */
+document.getElementById("rmRouteToolBtn").addEventListener("click", (e)=>{
+  e.preventDefault();
+  if(rmCurrentRider && rmCurrentRider.liveLocation){
+    window.open(`https://www.google.com/maps/search/?api=1&query=${rmCurrentRider.liveLocation.lat},${rmCurrentRider.liveLocation.lng}`, "_blank");
+  }else{ alert("লোকেশন এখনো পাওয়া যায়নি — GPS চালু করুন।"); }
+});
+document.getElementById("rmCallSupportBtn").addEventListener("click", ()=> alert("কাস্টমার সাপোর্টের নম্বর এখনো সেট করা হয়নি।"));
+document.getElementById("rmNavSupportBtn").addEventListener("click", ()=> document.getElementById("rmCallSupportBtn").click());
+document.getElementById("rmNavHistoryBtn").addEventListener("click", ()=> alert("ডেলিভারি হিস্ট্রি স্ক্রিন শীঘ্রই আসছে।"));
+document.getElementById("rmNavProfileBtn").addEventListener("click", ()=>{
+  if(rmCurrentRider) alert(`👤 ${rmCurrentRider.name}\n📱 ${rmCurrentRider.phone}\n🏍️ ${rmCurrentRider.vehicleType || '—'}\n📍 জোন: ${rmCurrentRider.zone || '—'}`);
+});
+
+/* ==================== 🚕 Rider Mode-এর ভেতরে Transport Mode Switcher ====================
+   Driver Mode-এর রাডার লজিকের সাথে একই প্যাটার্ন — dmHaversineKm/dmReverseGeocode/
+   walletChargeFare (জেনেরিক ফাংশন) পুনর্ব্যবহার করা হয়েছে, শুধু নিজস্ব
+   ম্যাপ/মার্কার/স্টেট আলাদা রাখা হয়েছে (Driver Mode-এর সাথে না মেশার জন্য)। */
+let rmTransportModeOn = false;
+let __rmMyLatLng = null;
+let rmTmMap = null, rmTmMarkers = [], rmTmHotspotMarkers = [], rmTmUnsub = null;
+let rmTmFullscreen = false;
+
+document.getElementById("rmTransportModeSwitch").addEventListener("click", async ()=>{
+  rmTransportModeOn = !rmTransportModeOn;
+  document.getElementById("rmTransportModeSwitch").classList.toggle("on", rmTransportModeOn);
+  document.getElementById("rmTmOffLbl").classList.toggle("on", !rmTransportModeOn);
+  document.getElementById("rmTmOnLbl").classList.toggle("on", rmTransportModeOn);
+  document.getElementById("rmRadarCard").style.display = rmTransportModeOn ? "block" : "none";
+  try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ transportModeOn: rmTransportModeOn }); }catch(e){}
+
+  if(rmTransportModeOn){
+    if(!rmIsOnline){
+      rmIsOnline = true; rmRefreshOnlineUi();
+      try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ online: true }); }catch(e){}
+      rmStartGps();
+    }
+    rmTmStartRadar();
+  }else{
+    rmTmStopRadar();
+  }
+});
+
+function rmTmInitMap(){
+  if(rmTmMap) return;
+  const center = __rmMyLatLng || [23.8103, 90.4125];
+  rmTmMap = L.map("rmRadarMapEl").setView(center, 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(rmTmMap);
+}
+
+function rmTmStartRadar(){
+  rmTmInitMap();
+  document.getElementById("rmRadarHint").textContent = "📡 লাইভ — কাছের অপেক্ষমাণ যাত্রী খোঁজা হচ্ছে...";
+  if(__rmMyLatLng) rmTmLoadHotspots();
+  if(rmTmUnsub) return;
+  rmTmUnsub = db.collection("passenger_waiting_queue").where("status","==","WAITING")
+    .onSnapshot((qs)=>{
+      const passengers = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+      rmTmRenderRadar(passengers);
+    }, (err)=> console.warn("rm tm radar error:", err));
+}
+function rmTmStopRadar(){
+  if(rmTmUnsub){ rmTmUnsub(); rmTmUnsub = null; }
+  rmTmMarkers.forEach(m=> rmTmMap && rmTmMap.removeLayer(m)); rmTmMarkers = [];
+  rmTmHotspotMarkers.forEach(m=> rmTmMap && rmTmMap.removeLayer(m)); rmTmHotspotMarkers = [];
+}
+
+async function rmTmLoadHotspots(){
+  if(!__rmMyLatLng || !rmTmMap) return;
+  rmTmHotspotMarkers.forEach(m=> rmTmMap.removeLayer(m)); rmTmHotspotMarkers = [];
+  try{
+    const qs = await db.collection("shops").where("status","==","active").get();
+    qs.docs.forEach(doc=>{
+      const shop = doc.data();
+      const loc = shop.storeLocation;
+      if(!loc || loc.lat == null) return;
+      if(dmHaversineKm(__rmMyLatLng[0], __rmMyLatLng[1], loc.lat, loc.lng) > 3) return;
+      const icon = L.divIcon({
+        html: `<div style="background:#2563eb; color:#fff; font-weight:700; font-size:10px; padding:4px 9px; border-radius:20px; border:2px solid #fff; white-space:nowrap;">🏪 ${escapeHtml(shop.shopName||shop.name||"দোকান")}</div>`,
+        className: '', iconSize: null, iconAnchor: [30,12]
+      });
+      rmTmHotspotMarkers.push(L.marker([loc.lat, loc.lng], { icon }).addTo(rmTmMap));
+    });
+  }catch(e){ console.warn(e); }
+}
+
+async function rmTmRenderRadar(passengers){
+  rmTmMarkers.forEach(m=> rmTmMap.removeLayer(m)); rmTmMarkers = [];
+  if(!__rmMyLatLng) return;
+  const nearby = passengers.filter(p=>{
+    if(!p.location) return false;
+    const lat = p.location.latitude != null ? p.location.latitude : p.location._lat;
+    const lng = p.location.longitude != null ? p.location.longitude : p.location._long;
+    if(lat == null || lng == null) return false;
+    p.__lat = lat; p.__lng = lng;
+    p.__dist = dmHaversineKm(__rmMyLatLng[0], __rmMyLatLng[1], lat, lng);
+    return p.__dist <= 2;
+  });
+  const clusters = {};
+  nearby.forEach(p=>{
+    const key = p.__lat.toFixed(3) + "," + p.__lng.toFixed(3);
+    (clusters[key] = clusters[key] || []).push(p);
+  });
+  for(const key in clusters){
+    const group = clusters[key];
+    const cLat = group.reduce((s,p)=>s+p.__lat,0)/group.length;
+    const cLng = group.reduce((s,p)=>s+p.__lng,0)/group.length;
+    const label = await dmReverseGeocode(cLat, cLng);
+    const icon = L.divIcon({
+      html: `<div class="radarBadge">📍 ${label} — ${group.length} জন</div>`,
+      className: '', iconSize: null, iconAnchor: [40,15]
+    });
+    const marker = L.marker([cLat, cLng], { icon }).addTo(rmTmMap);
+    marker.bindPopup(rmTmBuildPopup(group));
+    marker.on("click", ()=> rmTmFocusFullscreen([cLat, cLng]));
+    rmTmMarkers.push(marker);
+  }
+  document.getElementById("rmRadarHint").textContent = nearby.length > 0
+    ? `📡 কাছাকাছি ${nearby.length} জন যাত্রী অপেক্ষা করছেন`
+    : "এই মুহূর্তে ২ কিমির মধ্যে কোনো অপেক্ষমাণ যাত্রী নেই।";
+
+  if(nearby.length > 0 && !rmTmFullscreen){
+    const nearest = nearby.reduce((a,b)=> (a.__dist < b.__dist ? a : b));
+    rmTmMap.fitBounds([__rmMyLatLng, [nearest.__lat, nearest.__lng]], { padding:[40,40], maxZoom:16 });
+  }
+}
+
+function rmTmFocusFullscreen(latLng){
+  const mapEl = document.getElementById("rmRadarMapEl");
+  if(!rmTmFullscreen){
+    rmTmFullscreen = true;
+    mapEl.classList.add("rmMapFullscreen");
+    if(!document.getElementById("rmRadarExitBtn")){
+      const exitBtn = document.createElement("button");
+      exitBtn.id = "rmRadarExitBtn";
+      exitBtn.textContent = "✕ বন্ধ করুন";
+      exitBtn.className = "rmRadarExitBtn";
+      exitBtn.onclick = ()=>{
+        rmTmFullscreen = false;
+        mapEl.classList.remove("rmMapFullscreen");
+        exitBtn.remove();
+        setTimeout(()=> rmTmMap.invalidateSize(), 100);
+      };
+      mapEl.appendChild(exitBtn);
+    }
+    setTimeout(()=>{ rmTmMap.invalidateSize(); rmTmMap.flyTo(latLng, 16, { animate:true, duration:1 }); }, 100);
+  }else{
+    rmTmMap.flyTo(latLng, 16, { animate:true, duration:1 });
+  }
+}
+
+function rmTmBuildPopup(group){
+  const wrap = document.createElement("div");
+  wrap.style.minWidth = "160px";
+  const vLabels = { AUTO:"🛺 অটো/সিএনজি", CAR:"🚗 কার", BIKE:"🏍️ বাইক", BUS:"🚌 বাস" };
+  group.forEach(p=>{
+    const row = document.createElement("div");
+    row.style.marginBottom = "8px";
+    const vTxt = (p.transport_types||[]).map(v=>vLabels[v]||v).join(", ") || "যেকোনো";
+    row.innerHTML = `<div style="font-size:11.5px; margin-bottom:4px;">🚕 চায়: ${vTxt} · ~${p.__dist.toFixed(1)} কিমি দূরে</div>`;
+    const btn = document.createElement("button");
+    btn.className = "radarPopupBtn";
+    btn.textContent = "✅ Pick Up";
+    btn.onclick = async ()=>{
+      const fareInput = prompt("ভাড়া কত নেবেন? (SAR) — যাত্রীর Wallet-এ ব্যালেন্স থাকলে সেখান থেকে কাটা হবে, না থাকলে নগদ নিন।", "");
+      if(fareInput === null) return;
+      const fare = Number(fareInput) || 0;
+      try{
+        await db.collection("passenger_waiting_queue").doc(p.id).update({
+          status:"PICKED_UP", picked_up_by: rmCurrentRider.uid, picked_up_at: fbNow(), fare: fare || null
+        });
+        if(fare > 0){
+          const result = await walletChargeFare(p.user_id, rmCurrentRider.uid, fare);
+          if(result.success) alert(`✅ Pick Up সম্পন্ন — Wallet থেকে SAR ${fare} কাটা হয়েছে।`);
+          else alert(`✅ Pick Up সম্পন্ন — Wallet থেকে কাটা যায়নি, নগদ SAR ${fare} নিন।`);
+        }
+        rmTmMap.closePopup();
+      }catch(e){ alert("Pick Up করা যায়নি: " + e.message); }
+    };
+    row.appendChild(btn);
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
 auth.onAuthStateChanged(async (user)=>{
   const session = getSession();
   if(!user || !session || session.role === "superadmin"){
@@ -11851,6 +12276,18 @@ auth.onAuthStateChanged(async (user)=>{
     document.getElementById("mainApp").style.display = "none";
     document.getElementById("driverModeApp").style.display = "block";
     initDriverMode(session.uid);
+    return;
+  }
+
+  // 🛵 ডেলিভারি রাইডার হলে সম্পূর্ণ আলাদা "Rider Mode" UI দেখানো হয় —
+  // আগের আলাদা "Honey Bee Delivery" অ্যাপের সব ফিচার এখানেই একীভূত করা হয়েছে
+  if(session.role === "rider"){
+    document.getElementById("authGate").style.display = "none";
+    document.getElementById("posHeader").style.display = "none";
+    document.getElementById("mainApp").style.display = "none";
+    document.getElementById("riderModeApp").style.display = "block";
+    document.getElementById("rmBottomNav").style.display = "flex";
+    initRiderMode(session.uid);
     return;
   }
 

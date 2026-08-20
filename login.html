@@ -381,6 +381,21 @@ async function afterLoginRoute(uid){
     return;
   }
 
+  // 🛵 ডেলিভারি রাইডার হলেও Honey Bee POS-এই যাবে — আলাদা কোনো "Honey Bee
+  // Delivery" অ্যাপ আর নেই, session-এ role "rider" থাকায় POS নিজে থেকেই
+  // Rider Mode-এ চলে যাবে
+  if (userDoc.role === "rider") {
+    const doc = await db.collection("riders").doc(uid).get();
+    if (!doc.exists || doc.data().status === "blocked") {
+      showMsg("loginMsg", "আপনার অ্যাকাউন্টটি ব্লক করা আছে অথবা প্রোফাইল পাওয়া যায়নি।", false);
+      await auth.signOut();
+      return;
+    }
+    saveSession({ uid, role: "rider", name: doc.data().name || "" });
+    window.location.href = "shop-ledger-app.html";
+    return;
+  }
+
   // ডিফল্ট: দোকান (Shop/POS) ফ্লো
   const shop = await getShopDoc(userDoc.shopId);
   if (!shop || shop.status === "blocked") {
