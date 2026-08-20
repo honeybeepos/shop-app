@@ -20,6 +20,7 @@
 const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
@@ -27,6 +28,12 @@ const { getAuth } = require("firebase-admin/auth");
 
 initializeApp();
 const db = getFirestore();
+
+// 🔑 Google Maps API key — এটা কোডে সরাসরি লেখা নেই, Firebase Secrets Manager-এ
+// রাখা হয় (`firebase functions:secrets:set GOOGLE_MAPS_API_KEY`), তাই এটা
+// কখনো GitHub রিপোতে (পাবলিক হলেও) প্রকাশ পায় না — শুধু সার্ভার-সাইড এই
+// ফাংশনগুলোর ভেতরেই ব্যবহার হয়, ক্লায়েন্ট/HTML-এ কখনো পাঠানো হয় না।
+const googleMapsApiKey = defineSecret("GOOGLE_MAPS_API_KEY");
 
 const OFFER_TIMEOUT_SECONDS = 60;
 // রাইডার/এজেন্ট/হানি-বি — আয়ের ভাগ (Phase 5 ব্লুপ্রিন্ট অনুযায়ী: ৭০/২০/১০)
@@ -44,8 +51,47 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// OpenStreetMap Nominatim দিয়ে ফ্রি রিভার্স-জিওকোডিং (key লাগে না) — ব্যর্থ
-// হলে শুধু কোঅর্ডিনেট স্ট্রিং হিসেবে ফলব্যাক করে, ফাংশন কখনো ভেঙে পড়বে না
+// 📏 Google Distance Matrix API দিয়ে আসল রোড-ডিস্ট্যান্স/সময় বের করা —
+// প্রতিটা (origin, destination) জোড়া প্রায় ১০০ মিটার নির্ভুলতায় রাউন্ড করে
+// Firestore-এ ২ ঘণ্টার জন্য ক্যাশ করা হয়। API কল ব্যর্থ হলে সরলরেখার
+// (Haversine) দূরত্বে নিরাপদে ফলব্যাক করে।
+async function getRoadDistanceKm(originLat, originLng, destLat, destLng) {
+  const cacheKey = `${originLat.toFixed(3)}_${originLng.toFixed(3)}_${destLat.toFixed(3)}_${destLng.toFixed(3)}`;
+  const cacheRef = db.collection("distanceCache").doc(cacheKey);
+  const twoHoursAgoMs = Date.now() - 2 * 60 * 60 * 1000;
+
+  try {
+    const cacheDoc = await cacheRef.get();
+    if (cacheDoc.exists) {
+      const data = cacheDoc.data();
+      if (data.cachedAt && data.cachedAt.toMillis() > twoHoursAgoMs) {
+        return { distanceKm: data.distanceKm, durationMin: data.durationMin, source: "cache" };
+      }
+    }
+  } catch (e) { /* ক্যাশ পড়তে না পারলেও সমস্যা নেই, নতুন করে চাইবে */ }
+
+  const apiKey = googleMapsApiKey.value();
+  if (apiKey) {
+    try {
+      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${originLat},${originLng}&destinations=${destLat},${destLng}&mode=driving&key=${apiKey}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const element = data.rows && data.rows[0] && data.rows[0].elements && data.rows[0].elements[0];
+      if (element && element.status === "OK") {
+        const distanceKm = element.distance.value / 1000;
+        const durationMin = element.duration.value / 60;
+        await cacheRef.set({ distanceKm, durationMin, cachedAt: FieldValue.serverTimestamp() });
+        return { distanceKm, durationMin, source: "google" };
+      }
+      console.warn("Distance Matrix এরর রেসপন্স:", JSON.stringify(data).slice(0, 300));
+    } catch (e) {
+      console.warn("Distance Matrix API কল ব্যর্থ হয়েছে:", e);
+    }
+  }
+
+  return { distanceKm: haversineKm(originLat, originLng, destLat, destLng), durationMin: null, source: "haversine-fallback" };
+}
+
 async function reverseGeocode(lat, lng) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
@@ -57,7 +103,6 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
-/* ---------- পুরনো সিস্টেম: legacy delivery-man-app.html ডিভাইসে পুশ ---------- */
 async function notifyLegacyDevices(shopId, shopName) {
   const devicesSnap = await db
     .collection("shops").doc(shopId)
@@ -94,7 +139,6 @@ async function notifyLegacyDevices(shopId, shopName) {
   );
 }
 
-/* ---------- নতুন সিস্টেম: সবচেয়ে কাছের অনলাইন রাইডারকে অফার পাঠানো ---------- */
 async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds) {
   const shopDoc = await db.collection("shops").doc(shopId).get();
   const shopData = shopDoc.exists ? shopDoc.data() : {};
@@ -106,8 +150,6 @@ async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds)
     return null;
   }
 
-  // সব অনলাইন, সক্রিয় রাইডার আনা হচ্ছে (এখনো market/agent-ভিত্তিক ফিল্টার
-  // করা হচ্ছে না, কারণ শপ রেজিস্ট্রেশনে এখনো বাজার নির্বাচন যুক্ত হয়নি)
   const ridersSnap = await db.collection("riders")
     .where("status", "==", "active")
     .where("online", "==", true)
@@ -128,6 +170,9 @@ async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds)
   });
   candidates.sort((a, b) => a.distanceKm - b.distanceKm);
   const nearest = candidates[0];
+
+  const roadDist = await getRoadDistanceKm(storeLoc.lat, storeLoc.lng, nearest.liveLocation.lat, nearest.liveLocation.lng);
+  nearest.distanceKm = roadDist.distanceKm;
 
   const dropAddress = await reverseGeocode(callData.customerLocation.lat, callData.customerLocation.lng);
   const estimatedCharge = callData.estimatedCharge || 0;
@@ -158,9 +203,8 @@ async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds)
   return offerRef.id;
 }
 
-/* ---------- ট্রিগার ১: নতুন ডেলিভারি কল তৈরি হলে ---------- */
 exports.onDeliveryCall = onDocumentCreated(
-  "shops/{shopId}/deliveryCalls/{callId}",
+  { document: "shops/{shopId}/deliveryCalls/{callId}", secrets: [googleMapsApiKey] },
   async (event) => {
     const shopId = event.params.shopId;
     const callId = event.params.callId;
@@ -169,22 +213,18 @@ exports.onDeliveryCall = onDocumentCreated(
     const shopDoc = await db.collection("shops").doc(shopId).get();
     const shopName = (shopDoc.exists && (shopDoc.data().name || shopDoc.data().shopName)) || "দোকান";
 
-    // পুরনো সিস্টেম (শপ-কোড কানেক্টেড ডিভাইস) — এখনো সাপোর্ট করা হচ্ছে
     await notifyLegacyDevices(shopId, shopName);
-
-    // নতুন সিস্টেম (Agent-নিবন্ধিত রাইডার, geo-dispatch)
     await dispatchToNearestRider(shopId, callId, callData, []);
   }
 );
 
-/* ---------- ট্রিগার ২: রাইডার স্কিপ করলে বা অফার এক্সপায়ার হলে — পরের কাছের রাইডারকে পাঠানো ---------- */
 exports.onOfferResolved = onDocumentUpdated(
-  "deliveryOffers/{offerId}",
+  { document: "deliveryOffers/{offerId}", secrets: [googleMapsApiKey] },
   async (event) => {
     const before = event.data.before.data();
     const after = event.data.after.data();
 
-    if (before.status === after.status) return; // স্ট্যাটাস আসলেই বদলায়নি
+    if (before.status === after.status) return;
     if (after.status !== "skipped" && after.status !== "expired") return;
 
     const callRef = db.collection("shops").doc(after.shopId).collection("deliveryCalls").doc(after.callId);
@@ -192,14 +232,13 @@ exports.onOfferResolved = onDocumentUpdated(
     if (!callSnap.exists) return;
     const callData = callSnap.data();
 
-    if (callData.status === "delivered" || callData.assignedRiderId) return; // ইতিমধ্যে অন্য কেউ নিয়ে নিয়েছে
+    if (callData.status === "delivered" || callData.assignedRiderId) return;
 
     const excludeIds = callData.offeredRiderIds || [];
     await dispatchToNearestRider(after.shopId, after.callId, callData, excludeIds);
   }
 );
 
-/* ---------- ট্রিগার ৩: রাইডার অ্যাকসেপ্ট করলে কলের সাথে লিংক করা ---------- */
 exports.onOfferAccepted = onDocumentUpdated(
   "deliveryOffers/{offerId}",
   async (event) => {
@@ -214,7 +253,6 @@ exports.onOfferAccepted = onDocumentUpdated(
   }
 );
 
-/* ---------- ট্রিগার ৪ (সেফটি-নেট): অ্যাপ বন্ধ থাকলে বা ৬০ সেকেন্ড কেউ সাড়া না দিলে ---------- */
 exports.checkExpiredOffers = onSchedule("every 2 minutes", async () => {
   const now = Timestamp.now();
   const expiredSnap = await db.collection("deliveryOffers")
@@ -230,13 +268,6 @@ exports.checkExpiredOffers = onSchedule("every 2 minutes", async () => {
   console.log(`${expiredSnap.size}টা মেয়াদোত্তীর্ণ অফার আপডেট করা হয়েছে`);
 });
 
-/* ==================== 🗑️ অ্যাকাউন্ট ডিলিট + জিমেইল ফ্রি করা ====================
-   শুধু ক্লায়েন্ট থেকে Firestore ডকুমেন্ট মুছে দিলে Firebase Authentication-এ
-   ইমেইলটা "ব্যবহৃত" হিসেবেই থেকে যায় — তাই একই ইমেইল দিয়ে আবার সাইন-আপ করা
-   যায় না। এই ফাংশনটা (শুধু Admin SDK দিয়েই সম্ভব, ক্লায়েন্ট থেকে না):
-   ১. Firestore থেকে ইউজারের সব ডেটা (সাব-কালেকশনসহ) মুছে দেয়
-   ২. Firebase Authentication থেকে অ্যাকাউন্টটাই মুছে দেয় — এতে ইমেইলটা
-      সম্পূর্ণ ফ্রি হয়ে যায়, সাথে সাথে আবার রেজিস্ট্রেশনে ব্যবহার করা যাবে। */
 exports.deleteAccount = onCall(async (request) => {
   try {
     const callerUid = request.auth && request.auth.uid;
@@ -244,35 +275,30 @@ exports.deleteAccount = onCall(async (request) => {
       throw new HttpsError("unauthenticated", "লগইন করা নেই।");
     }
 
-    // কলার সত্যিই সুপার অ্যাডমিন কিনা যাচাই করা (Admin SDK দিয়ে, তাই নিরাপদ —
-    // ক্লায়েন্ট এখানে মিথ্যা দাবি করতে পারবে না)
     const superAdminDoc = await db.collection("superadmins").doc(callerUid).get();
     if (!superAdminDoc.exists) {
       throw new HttpsError("permission-denied", "শুধু সুপার অ্যাডমিন অ্যাকাউন্ট ডিলিট করতে পারবেন।");
     }
 
     const { targetUid, accountType } = request.data || {};
-    if (!targetUid || !["shop", "agent", "rider"].includes(accountType)) {
-      throw new HttpsError("invalid-argument", "targetUid ও accountType (shop/agent/rider) দিতে হবে।");
+    if (!targetUid || !["shop", "agent", "rider", "driver"].includes(accountType)) {
+      throw new HttpsError("invalid-argument", "targetUid ও accountType (shop/agent/rider/driver) দিতে হবে।");
     }
 
-    // ১. Firestore থেকে ডেটা মুছে ফেলা (সাব-কালেকশনসহ, recursiveDelete দিয়ে)
     if (accountType === "shop") {
       await db.recursiveDelete(db.collection("shops").doc(targetUid));
     } else if (accountType === "agent") {
       await db.recursiveDelete(db.collection("agents").doc(targetUid));
     } else if (accountType === "rider") {
       await db.recursiveDelete(db.collection("riders").doc(targetUid));
+    } else if (accountType === "driver") {
+      await db.recursiveDelete(db.collection("transportDrivers").doc(targetUid));
     }
-    // users/{uid} — লগইন রোল-ডকুমেন্ট, সব ধরনের অ্যাকাউন্টের জন্যই থাকে
     await db.collection("users").doc(targetUid).delete().catch(() => {});
 
-    // ২. Firebase Authentication থেকে মুছে ফেলা — এতেই ইমেইল ফ্রি হয়
     try {
       await getAuth().deleteUser(targetUid);
     } catch (e) {
-      // অ্যাকাউন্ট আগে থেকেই Auth-এ না থাকলে (auth/user-not-found) সেটা সমস্যা না,
-      // Firestore ডেটা তো মুছে গেছে already — কিন্তু অন্য কোনো এরর হলে জানানো দরকার
       if (e.code !== "auth/user-not-found") {
         throw new HttpsError("internal", "Firestore ডেটা মুছে গেছে, কিন্তু Auth অ্যাকাউন্ট মুছতে সমস্যা হয়েছে: " + e.message);
       }
@@ -280,20 +306,11 @@ exports.deleteAccount = onCall(async (request) => {
 
     return { success: true, deletedUid: targetUid, accountType };
   } catch (err) {
-    // যেকোনো অপ্রত্যাশিত এরর হলেও (রিকার্সিভ-ডিলিট ব্যর্থ হওয়া, পারমিশন সমস্যা
-    // ইত্যাদি) আসল কারণটা ক্লায়েন্টে দেখানো হয়, যাতে "internal" এর মতো
-    // অস্পষ্ট মেসেজের বদলে ঠিক কী ভুল হয়েছে সেটা বোঝা যায়
     if (err instanceof HttpsError) throw err;
     console.error("deleteAccount ব্যর্থ হয়েছে:", err);
     throw new HttpsError("internal", "ডিলিট করা যায়নি — " + (err && err.message ? err.message : String(err)));
   }
 });
-
-/* ==================== 🚑 ট্রান্সপোর্ট ট্রিপ ডিসপ্যাচ ====================
-   কাস্টমার একটা trips ডকুমেন্ট (status:'requested') তৈরি করলে, এই ফাংশন
-   সবচেয়ে কাছের অনলাইন ড্রাইভারকে খুঁজে ৬০ সেকেন্ডের একটা "অফার" পাঠায়
-   (deliveryOffers-এর মতোই একই প্যাটার্ন)। Reject/timeout হলে পরের কাছের
-   ড্রাইভারকে অটো পাঠানো হয়। */
 
 async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
   if (tripData.pickupLat == null || tripData.pickupLng == null) {
@@ -323,6 +340,11 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
   candidates.sort((a, b) => a.distanceKm - b.distanceKm);
   const nearest = candidates[0];
 
+  const roadDist = await getRoadDistanceKm(tripData.pickupLat, tripData.pickupLng, tripData.dropLat, tripData.dropLng);
+  const distanceKm = Math.round(roadDist.distanceKm * 10) / 10;
+  const estimatedFare = Math.round((30 + distanceKm * 15) * 100) / 100;
+  const driverEarning = Math.round(estimatedFare * 0.8 * 100) / 100;
+
   const expiresAt = Timestamp.fromMillis(Date.now() + 60 * 1000);
   const offerRef = await db.collection("tripOffers").add({
     tripId,
@@ -330,9 +352,7 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
     status: "pending",
     pickupAddress: tripData.pickupAddress || null,
     dropAddress: tripData.dropAddress || null,
-    distanceKm: tripData.distanceKm || null,
-    estimatedFare: tripData.estimatedFare || null,
-    driverEarning: tripData.driverEarning || null,
+    distanceKm, estimatedFare, driverEarning,
     createdAt: FieldValue.serverTimestamp(),
     expiresAt,
   });
@@ -340,6 +360,7 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
   await db.collection("trips").doc(tripId).set({
     offeredDriverIds: FieldValue.arrayUnion(nearest.id),
     currentOfferId: offerRef.id,
+    distanceKm, estimatedFare, driverEarning,
   }, { merge: true });
 
   console.log(`ট্রিপ অফার পাঠানো হয়েছে — driverId: ${nearest.id}, দূরত্ব: ${nearest.distanceKm.toFixed(1)} কিমি`);
@@ -347,7 +368,7 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
 }
 
 exports.onTripRequested = onDocumentCreated(
-  "trips/{tripId}",
+  { document: "trips/{tripId}", secrets: [googleMapsApiKey] },
   async (event) => {
     const tripId = event.params.tripId;
     const tripData = event.data.data();
@@ -357,7 +378,7 @@ exports.onTripRequested = onDocumentCreated(
 );
 
 exports.onTripOfferResolved = onDocumentUpdated(
-  "tripOffers/{offerId}",
+  { document: "tripOffers/{offerId}", secrets: [googleMapsApiKey] },
   async (event) => {
     const before = event.data.before.data();
     const after = event.data.after.data();
@@ -367,7 +388,7 @@ exports.onTripOfferResolved = onDocumentUpdated(
     const tripSnap = await db.collection("trips").doc(after.tripId).get();
     if (!tripSnap.exists) return;
     const tripData = tripSnap.data();
-    if (tripData.status !== "requested") return; // ইতিমধ্যে অন্য কেউ Accept করে নিয়েছে বা বাতিল হয়েছে
+    if (tripData.status !== "requested") return;
 
     const excludeIds = tripData.offeredDriverIds || [];
     await dispatchTripToNearestDriver(after.tripId, tripData, excludeIds);
