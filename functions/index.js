@@ -20,7 +20,6 @@
 const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
@@ -28,12 +27,6 @@ const { getAuth } = require("firebase-admin/auth");
 
 initializeApp();
 const db = getFirestore();
-
-// 🔑 Google Maps API key — এটা কোডে সরাসরি লেখা নেই, Firebase Secrets Manager-এ
-// রাখা হয় (`firebase functions:secrets:set GOOGLE_MAPS_API_KEY`), তাই এটা
-// কখনো GitHub রিপোতে (পাবলিক হলেও) প্রকাশ পায় না — শুধু সার্ভার-সাইড এই
-// ফাংশনগুলোর ভেতরেই ব্যবহার হয়, ক্লায়েন্ট/HTML-এ কখনো পাঠানো হয় না।
-const googleMapsApiKey = defineSecret("GOOGLE_MAPS_API_KEY");
 
 const OFFER_TIMEOUT_SECONDS = 60;
 // রাইডার/এজেন্ট/হানি-বি — আয়ের ভাগ (Phase 5 ব্লুপ্রিন্ট অনুযায়ী: ৭০/২০/১০)
@@ -49,50 +42,6 @@ function haversineKm(lat1, lng1, lat2, lng2) {
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// 📏 Google Distance Matrix API দিয়ে আসল রোড-ডিস্ট্যান্স/সময় বের করা —
-// প্রতিটা (origin, destination) জোড়া প্রায় ১০০ মিটার নির্ভুলতায় রাউন্ড করে
-// Firestore-এ ২ ঘণ্টার জন্য ক্যাশ করা হয় (স্পেকের "Firebase Cache" নির্দেশনা
-// অনুযায়ী — Realtime Database-এর বদলে Firestore ব্যবহার করা হয়েছে, কারণ
-// এই প্রজেক্টে এখনো Realtime Database সেটআপ করা নেই, Firestore-ই যথেষ্ট)।
-// API কল ব্যর্থ হলে সরলরেখার (Haversine) দূরত্বে নিরাপদে ফলব্যাক করে।
-async function getRoadDistanceKm(originLat, originLng, destLat, destLng) {
-  const cacheKey = `${originLat.toFixed(3)}_${originLng.toFixed(3)}_${destLat.toFixed(3)}_${destLng.toFixed(3)}`;
-  const cacheRef = db.collection("distanceCache").doc(cacheKey);
-  const twoHoursAgoMs = Date.now() - 2 * 60 * 60 * 1000;
-
-  try {
-    const cacheDoc = await cacheRef.get();
-    if (cacheDoc.exists) {
-      const data = cacheDoc.data();
-      if (data.cachedAt && data.cachedAt.toMillis() > twoHoursAgoMs) {
-        return { distanceKm: data.distanceKm, durationMin: data.durationMin, source: "cache" };
-      }
-    }
-  } catch (e) { /* ক্যাশ পড়তে না পারলেও সমস্যা নেই, নতুন করে চাইবে */ }
-
-  const apiKey = googleMapsApiKey.value();
-  if (apiKey) {
-    try {
-      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${originLat},${originLng}&destinations=${destLat},${destLng}&mode=driving&key=${apiKey}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      const element = data.rows && data.rows[0] && data.rows[0].elements && data.rows[0].elements[0];
-      if (element && element.status === "OK") {
-        const distanceKm = element.distance.value / 1000;
-        const durationMin = element.duration.value / 60;
-        await cacheRef.set({ distanceKm, durationMin, cachedAt: FieldValue.serverTimestamp() });
-        return { distanceKm, durationMin, source: "google" };
-      }
-      console.warn("Distance Matrix এরর রেসপন্স:", JSON.stringify(data).slice(0, 300));
-    } catch (e) {
-      console.warn("Distance Matrix API কল ব্যর্থ হয়েছে:", e);
-    }
-  }
-
-  // ফলব্যাক — API key না থাকলে বা কল ব্যর্থ হলে সরলরেখার দূরত্ব
-  return { distanceKm: haversineKm(originLat, originLng, destLat, destLng), durationMin: null, source: "haversine-fallback" };
 }
 
 // OpenStreetMap Nominatim দিয়ে ফ্রি রিভার্স-জিওকোডিং (key লাগে না) — ব্যর্থ
@@ -180,12 +129,6 @@ async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds)
   candidates.sort((a, b) => a.distanceKm - b.distanceKm);
   const nearest = candidates[0];
 
-  // 📏 র‍্যাংকিং-এর জন্য সরলরেখা (দ্রুত, অনেক প্রার্থীর মধ্যে বাছাই করতে সস্তা),
-  // কিন্তু চূড়ান্ত/দেখানো দূরত্বের জন্য সবচেয়ে কাছের প্রার্থীর জন্যই একবার
-  // Google Distance Matrix দিয়ে আসল রোড-ডিস্ট্যান্স আনা হয় (কম খরচে)
-  const roadDist = await getRoadDistanceKm(storeLoc.lat, storeLoc.lng, nearest.liveLocation.lat, nearest.liveLocation.lng);
-  nearest.distanceKm = roadDist.distanceKm;
-
   const dropAddress = await reverseGeocode(callData.customerLocation.lat, callData.customerLocation.lng);
   const estimatedCharge = callData.estimatedCharge || 0;
   const riderIncome = Math.round(estimatedCharge * RIDER_SHARE * 100) / 100;
@@ -217,7 +160,7 @@ async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds)
 
 /* ---------- ট্রিগার ১: নতুন ডেলিভারি কল তৈরি হলে ---------- */
 exports.onDeliveryCall = onDocumentCreated(
-  { document: "shops/{shopId}/deliveryCalls/{callId}", secrets: [googleMapsApiKey] },
+  "shops/{shopId}/deliveryCalls/{callId}",
   async (event) => {
     const shopId = event.params.shopId;
     const callId = event.params.callId;
@@ -236,7 +179,7 @@ exports.onDeliveryCall = onDocumentCreated(
 
 /* ---------- ট্রিগার ২: রাইডার স্কিপ করলে বা অফার এক্সপায়ার হলে — পরের কাছের রাইডারকে পাঠানো ---------- */
 exports.onOfferResolved = onDocumentUpdated(
-  { document: "deliveryOffers/{offerId}", secrets: [googleMapsApiKey] },
+  "deliveryOffers/{offerId}",
   async (event) => {
     const before = event.data.before.data();
     const after = event.data.after.data();
@@ -309,8 +252,8 @@ exports.deleteAccount = onCall(async (request) => {
     }
 
     const { targetUid, accountType } = request.data || {};
-    if (!targetUid || !["shop", "agent", "rider", "driver"].includes(accountType)) {
-      throw new HttpsError("invalid-argument", "targetUid ও accountType (shop/agent/rider/driver) দিতে হবে।");
+    if (!targetUid || !["shop", "agent", "rider"].includes(accountType)) {
+      throw new HttpsError("invalid-argument", "targetUid ও accountType (shop/agent/rider) দিতে হবে।");
     }
 
     // ১. Firestore থেকে ডেটা মুছে ফেলা (সাব-কালেকশনসহ, recursiveDelete দিয়ে)
@@ -320,8 +263,6 @@ exports.deleteAccount = onCall(async (request) => {
       await db.recursiveDelete(db.collection("agents").doc(targetUid));
     } else if (accountType === "rider") {
       await db.recursiveDelete(db.collection("riders").doc(targetUid));
-    } else if (accountType === "driver") {
-      await db.recursiveDelete(db.collection("transportDrivers").doc(targetUid));
     }
     // users/{uid} — লগইন রোল-ডকুমেন্ট, সব ধরনের অ্যাকাউন্টের জন্যই থাকে
     await db.collection("users").doc(targetUid).delete().catch(() => {});
@@ -382,13 +323,6 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
   candidates.sort((a, b) => a.distanceKm - b.distanceKm);
   const nearest = candidates[0];
 
-  // 📏 Pickup→Drop-এর আসল রোড-ডিস্ট্যান্স দিয়ে ভাড়া রিফাইন করা হচ্ছে (ক্যাশ থাকায়
-  // বারবার রিঅ্যাসাইনমেন্টেও অতিরিক্ত API কল লাগে না — একই রুট ২ ঘণ্টা ক্যাশ থাকে)
-  const roadDist = await getRoadDistanceKm(tripData.pickupLat, tripData.pickupLng, tripData.dropLat, tripData.dropLng);
-  const distanceKm = Math.round(roadDist.distanceKm * 10) / 10;
-  const estimatedFare = Math.round((30 + distanceKm * 15) * 100) / 100; // বেস SAR 30 + প্রতি কিমি SAR 15
-  const driverEarning = Math.round(estimatedFare * 0.8 * 100) / 100;
-
   const expiresAt = Timestamp.fromMillis(Date.now() + 60 * 1000);
   const offerRef = await db.collection("tripOffers").add({
     tripId,
@@ -396,7 +330,9 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
     status: "pending",
     pickupAddress: tripData.pickupAddress || null,
     dropAddress: tripData.dropAddress || null,
-    distanceKm, estimatedFare, driverEarning,
+    distanceKm: tripData.distanceKm || null,
+    estimatedFare: tripData.estimatedFare || null,
+    driverEarning: tripData.driverEarning || null,
     createdAt: FieldValue.serverTimestamp(),
     expiresAt,
   });
@@ -404,7 +340,6 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
   await db.collection("trips").doc(tripId).set({
     offeredDriverIds: FieldValue.arrayUnion(nearest.id),
     currentOfferId: offerRef.id,
-    distanceKm, estimatedFare, driverEarning, // রোড-ডিস্ট্যান্স অনুযায়ী রিফাইন করা মান — কাস্টমারের স্ক্রিনেও আপডেট হবে
   }, { merge: true });
 
   console.log(`ট্রিপ অফার পাঠানো হয়েছে — driverId: ${nearest.id}, দূরত্ব: ${nearest.distanceKm.toFixed(1)} কিমি`);
@@ -412,7 +347,7 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
 }
 
 exports.onTripRequested = onDocumentCreated(
-  { document: "trips/{tripId}", secrets: [googleMapsApiKey] },
+  "trips/{tripId}",
   async (event) => {
     const tripId = event.params.tripId;
     const tripData = event.data.data();
@@ -422,7 +357,7 @@ exports.onTripRequested = onDocumentCreated(
 );
 
 exports.onTripOfferResolved = onDocumentUpdated(
-  { document: "tripOffers/{offerId}", secrets: [googleMapsApiKey] },
+  "tripOffers/{offerId}",
   async (event) => {
     const before = event.data.before.data();
     const after = event.data.after.data();
