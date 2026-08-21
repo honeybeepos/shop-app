@@ -789,6 +789,12 @@
     <p id="dmRadarHint" style="font-size:11px; color:#a8d9c0; margin:8px 0 0;">Online থাকলে এখানে কাছাকাছি অপেক্ষমাণ যাত্রীদের পিন দেখাবে — পিনে ট্যাপ করে Pick Up করা যাবে।</p>
   </div>
 
+  <!-- 🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট — ভাড়া অফার করা -->
+  <div class="dmCard" id="dmTripRequestsCard">
+    <h3 style="margin:0 0 10px; font-size:14px; color:#4ade80;">🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট</h3>
+    <div id="dmTripRequestsList" style="font-size:12px; color:#a8d9c0;">Online থাকলে এখানে যাত্রীদের গন্তব্য-ভিত্তিক রিকোয়েস্ট দেখাবে — ভাড়া অফার করতে পারবেন।</div>
+  </div>
+
   <!-- চলমান ট্রিপ কার্ড -->
   <div class="dmCard" id="dmCurrentTripCard" style="display:none;">
     <h3 style="margin:0 0 10px; font-size:14px; color:#4ade80;">🧭 বর্তমান ট্রিপ</h3>
@@ -885,6 +891,11 @@
     <h3 style="margin:0 0 10px; font-size:14px;">📡 কাছের যাত্রী</h3>
     <div id="rmRadarMapEl" style="width:100%; height:240px; border-radius:12px; overflow:hidden; background:#111;"></div>
     <p id="rmRadarHint" style="font-size:11px; color:#a8a8a8; margin:8px 0 0;"></p>
+  </div>
+
+  <div class="rmCard" id="rmTripRequestsCard" style="display:none;">
+    <h3 style="margin:0 0 10px; font-size:14px;">🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট</h3>
+    <div id="rmTripRequestsList" style="font-size:12px; color:#a8a8a8;"></div>
   </div>
 
   <div class="rmStatsGrid">
@@ -11511,7 +11522,14 @@ async function initDriverMode(uid){
   dmListenForOffers();
   dmCheckOngoingTrip();
   dmInitRadarMap();
-  if(__dmDriver.driverStatus === "online"){ dmStartRadar(); }
+  if(__dmDriver.driverStatus === "online"){
+    dmStartRadar();
+    dmListenTripRequests();
+    // আগে থেকে কোনো on_waiting/on_trip অবস্থা থাকলে (রিফ্রেশ/পুনরায় লগইন করলে) সেটা পুনরায় দেখানো
+    if((__dmDriver.currentStatus === "on_waiting" || __dmDriver.currentStatus === "on_trip") && __dmDriver.activeTripId){
+      dmWatchActiveTrip(__dmDriver.activeTripId);
+    }
+  }
 
   document.getElementById("dmLogoutBtn").addEventListener("click", ()=> auth.signOut());
 }
@@ -11534,8 +11552,157 @@ document.getElementById("dmStatusSwitch").addEventListener("click", async ()=>{
   dmRefreshStatusUi(next);
   try{ await db.collection("transportDrivers").doc(__dmDriverId).update({ driverStatus: next }); }
   catch(e){ console.warn(e); }
-  if(next === "online"){ dmStartGps(); dmStartRadar(); } else{ dmStopGps(); dmStopRadar(); }
+  if(next === "online"){ dmStartGps(); dmStartRadar(); dmListenTripRequests(); } else{ dmStopGps(); dmStopRadar(); dmStopTripRequests(); }
 });
+
+/* ==================== 🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট — ভাড়া অফার করা ====================
+   যাত্রী destination + vehicleType দিয়ে বুক করলে trips/{tripId} (status:'searching')
+   তৈরি হয়। ড্রাইভার এখানে ভাড়া+ETA অফার করে waitingList-এ যোগ হন — যাত্রী নিজে
+   বেছে নেন, তাই দুইজন ড্রাইভার একসাথে দাবি করার সমস্যা হয় না। */
+let dmTripRequestsUnsub = null;
+
+function dmListenTripRequests(){
+  if(dmTripRequestsUnsub) return;
+  dmTripRequestsUnsub = db.collection("trips")
+    .where("status", "in", ["searching", "waiting_selection"])
+    .onSnapshot((qs)=>{
+      const trips = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+      dmRenderTripRequests(trips);
+    }, (err)=> console.warn("trip requests listener error:", err));
+}
+function dmStopTripRequests(){
+  if(dmTripRequestsUnsub){ dmTripRequestsUnsub(); dmTripRequestsUnsub = null; }
+  document.getElementById("dmTripRequestsList").innerHTML = "Online থাকলে এখানে যাত্রীদের গন্তব্য-ভিত্তিক রিকোয়েস্ট দেখাবে — ভাড়া অফার করতে পারবেন।";
+}
+
+function dmRenderTripRequests(trips){
+  // ড্রাইভার ইতিমধ্যে কোনো ট্রিপের অপেক্ষায় থাকলে বা ট্রিপে থাকলে নতুন
+  // রিকোয়েস্ট দেখানো হয় না — dmRenderActiveTripStatus সেই কার্ড দেখাচ্ছে
+  if(__dmDriver.currentStatus === "on_waiting" || __dmDriver.currentStatus === "on_trip") return;
+
+  const relevant = trips.filter(t=>
+    !(t.rejectedDrivers||[]).includes(__dmDriverId) &&
+    !(t.waitingList||[]).some(o=> o.driverId === __dmDriverId)
+  );
+  const listEl = document.getElementById("dmTripRequestsList");
+  if(relevant.length === 0){
+    listEl.innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
+    return;
+  }
+  listEl.innerHTML = relevant.map(t=> `
+    <div style="background:#173a29; border:1px solid rgba(74,222,128,0.2); border-radius:12px; padding:12px; margin-bottom:10px;">
+      <div style="font-weight:700; font-size:13px; color:#eafff2;">📍 ${escapeHtmlDm(t.destination||"—")}</div>
+      <div style="font-size:11px; color:#a8d9c0; margin:2px 0 8px;">🚗 ${escapeHtmlDm(t.vehicleType||"")} · ${(t.waitingList||[]).length} জন ইতিমধ্যে অফার করেছেন</div>
+      <div style="display:flex; gap:8px;">
+        <button class="dmTripRejectBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#444; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ Reject</button>
+        <button class="dmTripOfferBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#16a34a; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">💰 ভাড়া অফার করুন</button>
+      </div>
+    </div>`).join("");
+
+  listEl.querySelectorAll(".dmTripRejectBtn").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      try{ await db.collection("trips").doc(btn.dataset.trip).update({ rejectedDrivers: firebase.firestore.FieldValue.arrayUnion(__dmDriverId) }); }
+      catch(e){ alert("রিজেক্ট করা যায়নি: " + e.message); }
+    });
+  });
+  listEl.querySelectorAll(".dmTripOfferBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=> dmOfferTripFare(btn.dataset.trip));
+  });
+}
+
+async function dmOfferTripFare(tripId){
+  const fareInput = prompt("কত ভাড়া অফার করবেন? (SAR)", "");
+  if(fareInput === null) return;
+  const fare = Number(fareInput);
+  if(!fare || fare <= 0){ alert("সঠিক ভাড়া দিন।"); return; }
+  const etaInput = prompt("কত মিনিটে পৌঁছাতে পারবেন? (শুধু সংখ্যা)", "5") || "5";
+  const v = __dmDriver.vehicle || {};
+  const offer = {
+    driverId: __dmDriverId,
+    driverName: __dmDriver.name || "ড্রাইভার",
+    driverPhone: __dmDriver.phone || "",
+    vehicleModel: v.model || v.type || "",
+    offeredFare: fare,
+    eta: etaInput + " min",
+    waitingStartedAt: Timestamp_now(),
+  };
+  try{
+    await db.collection("trips").doc(tripId).update({
+      waitingList: firebase.firestore.FieldValue.arrayUnion(offer),
+      status: "waiting_selection"
+    });
+    // 🔵 ড্রাইভারের নিজস্ব স্ট্যাটাস আপডেট — এখন "on_waiting", তাই তাকে আর
+    // নতুন ট্রিপ রিকোয়েস্ট দেখানো হবে না যতক্ষণ না এটার একটা সমাধান হয়
+    __dmDriver.currentStatus = "on_waiting"; __dmDriver.activeTripId = tripId;
+    await db.collection("transportDrivers").doc(__dmDriverId).update({
+      currentStatus: "on_waiting", activeTripId: tripId
+    });
+    dmWatchActiveTrip(tripId);
+    alert("✅ আপনার অফার পাঠানো হয়েছে — যাত্রী বেছে নিলে জানানো হবে।");
+  }catch(e){ alert("অফার পাঠানো যায়নি: " + e.message); }
+}
+function Timestamp_now(){ return firebase.firestore.Timestamp.now(); }
+
+/* ---------- 🔵 ড্রাইভারের নিজস্ব স্ট্যাটাস (available/on_waiting/on_trip) ----------
+   একবার কোনো ট্রিপে অফার দিলে বা কনফার্ম হলে, নতুন ট্রিপ-রিকোয়েস্টের তালিকার
+   বদলে এই সক্রিয় ট্রিপের কার্ড দেখানো হয় — যতক্ষণ না যাত্রী অন্য কাউকে বেছে
+   নেয় (ফিরে available), অথবা ড্রাইভার নিজে "ট্রিপ শেষ করুন" চাপে। */
+let dmActiveTripUnsub = null;
+
+function dmWatchActiveTrip(tripId){
+  if(dmActiveTripUnsub) dmActiveTripUnsub();
+  dmActiveTripUnsub = db.collection("trips").doc(tripId).onSnapshot((doc)=>{
+    if(!doc.exists) return;
+    const trip = doc.data();
+    dmRenderActiveTripStatus(trip, tripId);
+  });
+}
+
+async function dmRenderActiveTripStatus(trip, tripId){
+  const listEl = document.getElementById("dmTripRequestsList");
+  if(trip.status === "confirmed"){
+    if(trip.confirmedDriver && trip.confirmedDriver.driverId === __dmDriverId){
+      // 🚗 আমার অফারই বেছে নেওয়া হয়েছে — এখন ট্রিপে
+      __dmDriver.currentStatus = "on_trip";
+      await db.collection("transportDrivers").doc(__dmDriverId).update({ currentStatus: "on_trip", activeTripId: tripId });
+      listEl.innerHTML = `
+        <div style="background:#173a29; border:1px solid #4ade80; border-radius:12px; padding:14px;">
+          <div style="font-weight:700; font-size:13.5px; color:#4ade80;">🚗 সক্রিয় ট্রিপ চলছে</div>
+          <div style="font-size:12px; color:#eafff2; margin:4px 0 2px;">📍 গন্তব্য: ${escapeHtmlDm(trip.destination||"—")}</div>
+          <div style="font-size:12px; color:#a8d9c0; margin-bottom:10px;">💰 ভাড়া: SAR ${trip.confirmedDriver.finalFare}</div>
+          <button id="dmCompleteTripBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ট্রিপ শেষ করুন</button>
+        </div>`;
+      document.getElementById("dmCompleteTripBtn").addEventListener("click", ()=> dmCompleteTrip(tripId));
+    }else{
+      // অন্য কোনো ড্রাইভার বেছে নেওয়া হয়েছে — আমি আবার "available"
+      await dmResetActiveTripStatus();
+    }
+  }else if(trip.status === "expired" || trip.status === "cancelled"){
+    await dmResetActiveTripStatus();
+  }else{
+    // এখনো waiting_selection — যাত্রীর সিদ্ধান্তের অপেক্ষা
+    listEl.innerHTML = `
+      <div style="background:#173a29; border:1px solid rgba(74,222,128,0.2); border-radius:12px; padding:14px; text-align:center;">
+        <div style="font-size:12.5px; color:#a8d9c0;">⏳ "${escapeHtmlDm(trip.destination||"")}"-এর জন্য অফার দেওয়া হয়েছে</div>
+        <div style="font-size:11px; color:#a8d9c0; margin-top:4px;">যাত্রীর সিদ্ধান্তের অপেক্ষায়...</div>
+      </div>`;
+  }
+}
+
+async function dmResetActiveTripStatus(){
+  if(dmActiveTripUnsub){ dmActiveTripUnsub(); dmActiveTripUnsub = null; }
+  __dmDriver.currentStatus = "available"; __dmDriver.activeTripId = null;
+  try{ await db.collection("transportDrivers").doc(__dmDriverId).update({ currentStatus: "available", activeTripId: null }); }catch(e){}
+  document.getElementById("dmTripRequestsList").innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
+}
+
+async function dmCompleteTrip(tripId){
+  try{
+    await db.collection("trips").doc(tripId).update({ status: "completed" });
+    await dmResetActiveTripStatus();
+    alert("✅ ট্রিপ সম্পন্ন হয়েছে।");
+  }catch(e){ alert("ট্রিপ শেষ করা যায়নি: " + e.message); }
+}
 
 /* ---------- লাইভ GPS (প্রতি ১-২ সেকেন্ডে, শুধু Online/Busy অবস্থায়) ---------- */
 function dmStartGps(){
@@ -12104,6 +12271,7 @@ document.getElementById("rmTransportModeSwitch").addEventListener("click", async
   document.getElementById("rmTmOffLbl").classList.toggle("on", !rmTransportModeOn);
   document.getElementById("rmTmOnLbl").classList.toggle("on", rmTransportModeOn);
   document.getElementById("rmRadarCard").style.display = rmTransportModeOn ? "block" : "none";
+  document.getElementById("rmTripRequestsCard").style.display = rmTransportModeOn ? "block" : "none";
   try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ transportModeOn: rmTransportModeOn }); }catch(e){}
 
   if(rmTransportModeOn){
@@ -12113,10 +12281,146 @@ document.getElementById("rmTransportModeSwitch").addEventListener("click", async
       rmStartGps();
     }
     rmTmStartRadar();
+    rmListenTripRequests();
+    if((rmCurrentRider.currentStatus === "on_waiting" || rmCurrentRider.currentStatus === "on_trip") && rmCurrentRider.activeTripId){
+      rmWatchActiveTrip(rmCurrentRider.activeTripId);
+    }
   }else{
     rmTmStopRadar();
+    rmStopTripRequests();
   }
 });
+
+/* ---------- 🚕 Rider Mode-এর ভেতরে গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট ---------- */
+let rmTripRequestsUnsub = null;
+
+function rmListenTripRequests(){
+  if(rmTripRequestsUnsub) return;
+  rmTripRequestsUnsub = db.collection("trips")
+    .where("status", "in", ["searching", "waiting_selection"])
+    .onSnapshot((qs)=>{
+      const trips = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+      rmRenderTripRequests(trips);
+    }, (err)=> console.warn("rm trip requests listener error:", err));
+}
+function rmStopTripRequests(){
+  if(rmTripRequestsUnsub){ rmTripRequestsUnsub(); rmTripRequestsUnsub = null; }
+  document.getElementById("rmTripRequestsList").innerHTML = "";
+}
+
+function rmRenderTripRequests(trips){
+  if(rmCurrentRider.currentStatus === "on_waiting" || rmCurrentRider.currentStatus === "on_trip") return;
+
+  const relevant = trips.filter(t=>
+    !(t.rejectedDrivers||[]).includes(rmCurrentRider.uid) &&
+    !(t.waitingList||[]).some(o=> o.driverId === rmCurrentRider.uid)
+  );
+  const listEl = document.getElementById("rmTripRequestsList");
+  if(relevant.length === 0){
+    listEl.innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
+    return;
+  }
+  listEl.innerHTML = relevant.map(t=> `
+    <div style="background:#2b2b2b; border:1px solid rgba(255,193,7,0.25); border-radius:12px; padding:12px; margin-bottom:10px;">
+      <div style="font-weight:700; font-size:13px; color:#fff;">📍 ${escapeHtml(t.destination||"—")}</div>
+      <div style="font-size:11px; color:#a8a8a8; margin:2px 0 8px;">🚗 ${escapeHtml(t.vehicleType||"")} · ${(t.waitingList||[]).length} জন ইতিমধ্যে অফার করেছেন</div>
+      <div style="display:flex; gap:8px;">
+        <button class="rmTripRejectBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#444; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ Reject</button>
+        <button class="rmTripOfferBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#FFC107; color:#1a1a1a; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">💰 ভাড়া অফার করুন</button>
+      </div>
+    </div>`).join("");
+
+  listEl.querySelectorAll(".rmTripRejectBtn").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      try{ await db.collection("trips").doc(btn.dataset.trip).update({ rejectedDrivers: firebase.firestore.FieldValue.arrayUnion(rmCurrentRider.uid) }); }
+      catch(e){ alert("রিজেক্ট করা যায়নি: " + e.message); }
+    });
+  });
+  listEl.querySelectorAll(".rmTripOfferBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=> rmOfferTripFare(btn.dataset.trip));
+  });
+}
+
+async function rmOfferTripFare(tripId){
+  const fareInput = prompt("কত ভাড়া অফার করবেন? (SAR)", "");
+  if(fareInput === null) return;
+  const fare = Number(fareInput);
+  if(!fare || fare <= 0){ alert("সঠিক ভাড়া দিন।"); return; }
+  const etaInput = prompt("কত মিনিটে পৌঁছাতে পারবেন? (শুধু সংখ্যা)", "5") || "5";
+  const offer = {
+    driverId: rmCurrentRider.uid,
+    driverName: rmCurrentRider.name || "রাইডার",
+    driverPhone: rmCurrentRider.phone || "",
+    vehicleModel: rmCurrentRider.vehicleType || "",
+    offeredFare: fare,
+    eta: etaInput + " min",
+    waitingStartedAt: firebase.firestore.Timestamp.now(),
+  };
+  try{
+    await db.collection("trips").doc(tripId).update({
+      waitingList: firebase.firestore.FieldValue.arrayUnion(offer),
+      status: "waiting_selection"
+    });
+    rmCurrentRider.currentStatus = "on_waiting"; rmCurrentRider.activeTripId = tripId;
+    await db.collection("riders").doc(rmCurrentRider.uid).update({ currentStatus: "on_waiting", activeTripId: tripId });
+    rmWatchActiveTrip(tripId);
+    alert("✅ আপনার অফার পাঠানো হয়েছে — যাত্রী বেছে নিলে জানানো হবে।");
+  }catch(e){ alert("অফার পাঠানো যায়নি: " + e.message); }
+}
+
+/* ---------- 🔵 রাইডারের নিজস্ব ট্রিপ স্ট্যাটাস (available/on_waiting/on_trip) ---------- */
+let rmActiveTripUnsub = null;
+
+function rmWatchActiveTrip(tripId){
+  if(rmActiveTripUnsub) rmActiveTripUnsub();
+  rmActiveTripUnsub = db.collection("trips").doc(tripId).onSnapshot((doc)=>{
+    if(!doc.exists) return;
+    rmRenderActiveTripStatus(doc.data(), tripId);
+  });
+}
+
+async function rmRenderActiveTripStatus(trip, tripId){
+  const listEl = document.getElementById("rmTripRequestsList");
+  if(trip.status === "confirmed"){
+    if(trip.confirmedDriver && trip.confirmedDriver.driverId === rmCurrentRider.uid){
+      rmCurrentRider.currentStatus = "on_trip";
+      await db.collection("riders").doc(rmCurrentRider.uid).update({ currentStatus: "on_trip", activeTripId: tripId });
+      listEl.innerHTML = `
+        <div style="background:#2b2b2b; border:1px solid #FFC107; border-radius:12px; padding:14px;">
+          <div style="font-weight:700; font-size:13.5px; color:#FFC107;">🚗 সক্রিয় ট্রিপ চলছে</div>
+          <div style="font-size:12px; color:#fff; margin:4px 0 2px;">📍 গন্তব্য: ${escapeHtml(trip.destination||"—")}</div>
+          <div style="font-size:12px; color:#a8a8a8; margin-bottom:10px;">💰 ভাড়া: SAR ${trip.confirmedDriver.finalFare}</div>
+          <button id="rmCompleteTripBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ট্রিপ শেষ করুন</button>
+        </div>`;
+      document.getElementById("rmCompleteTripBtn").addEventListener("click", ()=> rmCompleteTrip(tripId));
+    }else{
+      await rmResetActiveTripStatus();
+    }
+  }else if(trip.status === "expired" || trip.status === "cancelled"){
+    await rmResetActiveTripStatus();
+  }else{
+    listEl.innerHTML = `
+      <div style="background:#2b2b2b; border:1px solid rgba(255,193,7,0.2); border-radius:12px; padding:14px; text-align:center;">
+        <div style="font-size:12.5px; color:#a8a8a8;">⏳ "${escapeHtml(trip.destination||"")}"-এর জন্য অফার দেওয়া হয়েছে</div>
+        <div style="font-size:11px; color:#a8a8a8; margin-top:4px;">যাত্রীর সিদ্ধান্তের অপেক্ষায়...</div>
+      </div>`;
+  }
+}
+
+async function rmResetActiveTripStatus(){
+  if(rmActiveTripUnsub){ rmActiveTripUnsub(); rmActiveTripUnsub = null; }
+  rmCurrentRider.currentStatus = "available"; rmCurrentRider.activeTripId = null;
+  try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ currentStatus: "available", activeTripId: null }); }catch(e){}
+  document.getElementById("rmTripRequestsList").innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
+}
+
+async function rmCompleteTrip(tripId){
+  try{
+    await db.collection("trips").doc(tripId).update({ status: "completed" });
+    await rmResetActiveTripStatus();
+    alert("✅ ট্রিপ সম্পন্ন হয়েছে।");
+  }catch(e){ alert("ট্রিপ শেষ করা যায়নি: " + e.message); }
+}
 
 function rmTmInitMap(){
   if(rmTmMap) return;

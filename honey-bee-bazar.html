@@ -284,9 +284,45 @@
   <!-- ==================== 🚑 Honey Bee Transport — বুকিং ==================== -->
   <div id="screenTransport">
     <button class="backBtn" id="backToHomeFromTransport">← হোমে ফিরে যান</button>
+
+    <!-- ==================== 🚕 গন্তব্য দিয়ে বুক করুন — একাধিক ড্রাইভারের অফার থেকে বেছে নিন ==================== -->
+    <div class="card" id="tripBookCard">
+      <div style="text-align:center; margin-bottom:14px;">
+        <div style="font-size:32px;">🚕</div>
+        <div style="font-size:14px; font-weight:700;">গন্তব্য দিয়ে বুক করুন</div>
+      </div>
+      <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">যানবাহনের ধরন</label>
+      <select id="tripVehicleType" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+        <option value="CNG">🛺 CNG/অটো</option>
+        <option value="Car">🚗 কার</option>
+        <option value="Bike">🏍️ বাইক</option>
+        <option value="Bus">🚌 বাস</option>
+      </select>
+      <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">গন্তব্য</label>
+      <input type="text" id="tripDestination" placeholder="যেমনঃ হাজীগঞ্জ" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px;">
+      <button id="tripSearchBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1);">🔍 ড্রাইভার খুঁজুন</button>
+    </div>
+
+    <!-- ট্রিপ খোঁজা/অফার তালিকা/নিশ্চিত হওয়া — লাইভ স্ট্যাটাস -->
+    <div class="card" id="tripStatusCard" style="display:none;">
+      <div id="tripStatusHeader" style="text-align:center; margin-bottom:12px;">
+        <div style="font-size:32px;" id="tripStatusIcon">🔍</div>
+        <div style="font-size:14px; font-weight:700;" id="tripStatusTitle">ড্রাইভার খোঁজা হচ্ছে...</div>
+        <div style="font-size:11.5px; color:var(--muted);" id="tripStatusSub"></div>
+        <div id="tripCountdownTxt" style="font-size:11px; color:#fb923c; margin-top:4px; font-family:'Space Mono',monospace;"></div>
+      </div>
+      <div id="tripOffersList"></div>
+      <div id="tripConfirmedBox" style="display:none; text-align:left; padding-top:10px; border-top:1px solid var(--border);">
+        <div style="font-weight:700; font-size:14px;" id="tripConfirmedName">—</div>
+        <div style="font-size:11.5px; color:var(--muted);" id="tripConfirmedMeta">—</div>
+      </div>
+      <button id="tripCancelBtn" style="width:100%; padding:11px; margin-top:12px; border-radius:10px; font-weight:800; cursor:pointer; font-family:inherit; background:transparent; border:1px solid var(--border); color:var(--muted);">✕ বাতিল করুন</button>
+    </div>
+
+    <!-- ==================== 🟢 তাৎক্ষণিক (Zero Interaction) — দরদাম ছাড়া, দ্রুত ==================== -->
     <div class="card" style="text-align:center; padding:24px 18px;">
-      <div style="font-size:38px; margin-bottom:10px;">🚕</div>
-      <div style="font-size:14px; font-weight:700; margin-bottom:14px;">Honey Bee Transport</div>
+      <div style="font-size:38px; margin-bottom:10px;">🐝</div>
+      <div style="font-size:14px; font-weight:700; margin-bottom:14px;">তাৎক্ষণিক (কাছের যেকোনো গাড়ি)</div>
 
       <button id="tpWaitToggleBtn" style="width:100%; padding:15px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff; margin-bottom:16px;">
         🟢 I Am Waiting On Road
@@ -870,6 +906,146 @@ async function resolveAllImages(products){
 }
 
 loadMarkets();
+
+/* ==================== 🚕 গন্তব্য দিয়ে বুক করুন — একাধিক ড্রাইভারের অফার থেকে বেছে নেওয়া ====================
+   trips/{tripId} ডকুমেন্ট তৈরি হয় (status:'searching')। ড্রাইভাররা স্বেচ্ছায়
+   তাদের ভাড়া/ETA-সহ waitingList-এ নিজেদের যোগ করে (system স্বয়ংক্রিয়ভাবে
+   একজনকে বেছে দেয় না) — যাত্রী নিজে সবচেয়ে ভালো অফারটা বেছে confirmedDriver
+   সেট করে। এতে দুইজন ড্রাইভার একসাথে দাবি করার সমস্যা (race condition) হয় না। */
+let tripCurrentId = null, tripUnsub = null, tripCountdownInterval = null;
+
+function tripGetUserId(){
+  if(currentCustomer && currentCustomer.uid) return currentCustomer.uid;
+  if(typeof __sessionId !== "undefined") return __sessionId;
+  return "guest_" + Date.now();
+}
+
+$("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
+  const vehicleType = $("tripVehicleType").value;
+  const destination = $("tripDestination").value.trim();
+  if(!destination){ alert("গন্তব্য লিখুন।"); return; }
+
+  $("tripSearchBtn").disabled = true; $("tripSearchBtn").textContent = "খোঁজা হচ্ছে...";
+  try{
+    const now = Date.now();
+    const tripRef = await db.collection("trips").add({
+      passengerId: tripGetUserId(),
+      passengerName: (currentCustomer && currentCustomer.name) || "যাত্রী",
+      vehicleType, destination,
+      status: "searching",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      sessionExpiresAt: firebase.firestore.Timestamp.fromMillis(now + 6*60*1000), // ৬ মিনিটের মাস্টার টাইমার
+      rejectedDrivers: [],
+      waitingList: [],
+      confirmedDriver: { driverId: null, finalFare: 0 }
+    });
+    tripCurrentId = tripRef.id;
+    $("tripBookCard").style.display = "none";
+    $("tripStatusCard").style.display = "block";
+    tripWatchTrip(tripRef.id);
+  }catch(e){
+    alert("বুক করা যায়নি: " + e.message);
+  }finally{
+    $("tripSearchBtn").disabled = false; $("tripSearchBtn").textContent = "🔍 ড্রাইভার খুঁজুন";
+  }
+});
+
+function tripWatchTrip(tripId){
+  if(tripUnsub) tripUnsub();
+  tripUnsub = db.collection("trips").doc(tripId).onSnapshot((doc)=>{
+    if(!doc.exists) return;
+    const trip = doc.data();
+    tripRenderStatus(trip);
+  });
+
+  if(tripCountdownInterval) clearInterval(tripCountdownInterval);
+  tripCountdownInterval = setInterval(()=>{
+    db.collection("trips").doc(tripId).get().then(doc=>{
+      if(!doc.exists) return;
+      const trip = doc.data();
+      if(!trip.sessionExpiresAt) return;
+      const msLeft = trip.sessionExpiresAt.toMillis() - Date.now();
+      if(msLeft <= 0){
+        $("tripCountdownTxt").textContent = "⏱️ সময় শেষ হয়ে গেছে";
+        if(trip.status === "searching" || trip.status === "waiting_selection"){
+          db.collection("trips").doc(tripId).update({ status: "expired" }).catch(()=>{});
+        }
+        clearInterval(tripCountdownInterval);
+      }else{
+        const m = Math.floor(msLeft/60000), s = Math.floor((msLeft%60000)/1000);
+        $("tripCountdownTxt").textContent = `⏱️ ${m}:${String(s).padStart(2,'0')} বাকি`;
+      }
+    });
+  }, 1000);
+}
+
+function tripRenderStatus(trip){
+  const list = trip.waitingList || [];
+  if(trip.status === "searching"){
+    $("tripStatusIcon").textContent = "🔍";
+    $("tripStatusTitle").textContent = "ড্রাইভার খোঁজা হচ্ছে...";
+    $("tripStatusSub").textContent = "একটু অপেক্ষা করুন";
+    $("tripOffersList").innerHTML = "";
+    $("tripConfirmedBox").style.display = "none";
+  }else if(trip.status === "waiting_selection"){
+    $("tripStatusIcon").textContent = "💰";
+    $("tripStatusTitle").textContent = `${list.length}টা অফার এসেছে!`;
+    $("tripStatusSub").textContent = "যেকোনো একটা বেছে নিন";
+    $("tripConfirmedBox").style.display = "none";
+    $("tripOffersList").innerHTML = list.map((o, idx)=> `
+      <div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:12px; margin-top:10px; text-align:left;">
+        <div style="font-weight:700; font-size:13.5px;">${escapeHtml(o.driverName||"ড্রাইভার")}</div>
+        <div style="font-size:11.5px; color:var(--muted); margin:2px 0 8px;">${escapeHtml(o.vehicleModel||"")} ${o.eta ? "· ETA: "+escapeHtml(o.eta) : ""}</div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="font-weight:800; color:var(--amber); font-size:15px;">SAR ${o.offeredFare}</div>
+          <button data-offer-idx="${idx}" class="tripSelectOfferBtn" style="margin-left:auto; padding:8px 14px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✅ এটা নিন</button>
+        </div>
+      </div>`).join("");
+    document.querySelectorAll(".tripSelectOfferBtn").forEach(btn=>{
+      btn.addEventListener("click", ()=> tripConfirmOffer(list[Number(btn.dataset.offerIdx)]));
+    });
+  }else if(trip.status === "confirmed"){
+    $("tripStatusIcon").textContent = "✅";
+    $("tripStatusTitle").textContent = "ড্রাইভার নিশ্চিত হয়েছে!";
+    $("tripStatusSub").textContent = "";
+    $("tripOffersList").innerHTML = "";
+    const chosen = list.find(o=> o.driverId === trip.confirmedDriver.driverId) || {};
+    $("tripConfirmedBox").style.display = "block";
+    $("tripConfirmedName").textContent = chosen.driverName || "ড্রাইভার";
+    $("tripConfirmedMeta").textContent = `${chosen.vehicleModel||""} · ভাড়া: SAR ${trip.confirmedDriver.finalFare}`;
+  }else if(trip.status === "expired"){
+    $("tripStatusIcon").textContent = "⏱️";
+    $("tripStatusTitle").textContent = "সময় শেষ হয়ে গেছে, কোনো ড্রাইভার পাওয়া যায়নি";
+    $("tripStatusSub").textContent = "";
+    $("tripOffersList").innerHTML = "";
+  }else if(trip.status === "cancelled"){
+    $("tripStatusIcon").textContent = "✕";
+    $("tripStatusTitle").textContent = "বাতিল করা হয়েছে";
+    $("tripStatusSub").textContent = "";
+  }
+}
+
+async function tripConfirmOffer(offer){
+  if(!tripCurrentId || !offer) return;
+  try{
+    await db.collection("trips").doc(tripCurrentId).update({
+      status: "confirmed",
+      confirmedDriver: { driverId: offer.driverId, finalFare: offer.offeredFare }
+    });
+  }catch(e){ alert("নিশ্চিত করা যায়নি: " + e.message); }
+}
+
+$("tripCancelBtn") && $("tripCancelBtn").addEventListener("click", async ()=>{
+  if(tripCurrentId){
+    try{ await db.collection("trips").doc(tripCurrentId).update({ status: "cancelled" }); }catch(e){}
+  }
+  if(tripCountdownInterval) clearInterval(tripCountdownInterval);
+  if(tripUnsub) tripUnsub();
+  tripCurrentId = null;
+  $("tripStatusCard").style.display = "none";
+  $("tripBookCard").style.display = "block";
+  $("tripDestination").value = "";
+});
 
 /* ==================== 🚑 Passenger View — Zero Interaction UI ====================
    টগল ON করলে GPS থেকে lat/lng নিয়ে passenger_waiting_queue কালেকশনে
