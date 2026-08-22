@@ -766,6 +766,16 @@
     <button id="dmLogoutBtn" style="margin-left:auto; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#a8d9c0; padding:7px 12px; border-radius:8px; font-size:11px; cursor:pointer; font-family:inherit;">লগআউট</button>
   </div>
 
+  <!-- 🐝 Bee Ringtone সেটিংস -->
+  <div class="dmCard" style="display:flex; align-items:center; gap:10px; padding:12px 16px;">
+    <div style="flex:1;">
+      <div style="font-size:12.5px; font-weight:700;">🐝 Bee Ringtone</div>
+      <div style="font-size:10.5px; color:#a8d9c0;">নতুন রিকোয়েস্ট এলে শব্দ+ভাইব্রেশন</div>
+    </div>
+    <div class="dmSwitch" id="dmRingtoneSwitch" style="flex-shrink:0;"><div class="dmKnob"></div></div>
+    <button id="dmRingtoneTestBtn" style="flex-shrink:0; padding:7px 12px; border:1px solid rgba(255,255,255,0.2); background:transparent; color:#a8d9c0; border-radius:8px; font-size:11px; cursor:pointer; font-family:inherit;">🔊 টেস্ট</button>
+  </div>
+
   <div class="dmCard">
     <div class="dmToggleRow">
       <div class="dmSwitch" id="dmStatusSwitch"><div class="dmKnob"></div></div>
@@ -870,6 +880,16 @@
       <div style="font-size:10.5px; color:#a8a8a8; text-transform:uppercase; letter-spacing:1px;">Rider Mode</div>
     </div>
     <button id="rmLogoutBtn" style="margin-left:auto; background:transparent; border:1px solid rgba(255,193,7,0.25); color:#a8a8a8; padding:7px 12px; border-radius:8px; font-size:11px; cursor:pointer; font-family:inherit;">লগআউট</button>
+  </div>
+
+  <!-- 🐝 Bee Ringtone সেটিংস -->
+  <div class="rmCard" style="display:flex; align-items:center; gap:10px; padding:12px 16px;">
+    <div style="flex:1;">
+      <div style="font-size:12.5px; font-weight:700;">🐝 Bee Ringtone</div>
+      <div style="font-size:10.5px; color:#a8a8a8;">নতুন রিকোয়েস্ট এলে শব্দ+ভাইব্রেশন</div>
+    </div>
+    <div class="rmSwitch" id="rmRingtoneSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
+    <button id="rmRingtoneTestBtn" style="flex-shrink:0; padding:7px 12px; border:1px solid rgba(255,193,7,0.25); background:transparent; color:#a8a8a8; border-radius:8px; font-size:11px; cursor:pointer; font-family:inherit;">🔊 টেস্ট</button>
   </div>
 
   <div class="rmToggleRow">
@@ -11532,6 +11552,7 @@ async function initDriverMode(uid){
   }
 
   document.getElementById("dmLogoutBtn").addEventListener("click", ()=> auth.signOut());
+  refreshRingtoneSwitchUi();
 }
 
 /* ---------- Online/Busy/Offline টগল ---------- */
@@ -11577,6 +11598,7 @@ function dmStopTripRequests(){
 }
 
 let __dmKnownTripIds = new Set();
+let __dmTripReqInitialized = false;
 function dmRenderTripRequests(trips){
   // ড্রাইভার ইতিমধ্যে কোনো ট্রিপের অপেক্ষায় থাকলে বা ট্রিপে থাকলে নতুন
   // রিকোয়েস্ট দেখানো হয় না — dmRenderActiveTripStatus সেই কার্ড দেখাচ্ছে
@@ -11591,7 +11613,12 @@ function dmRenderTripRequests(trips){
   // ভাইব্রেশন + Bee Tone
   const currentIds = new Set(relevant.map(t=> t.id));
   const hasNew = [...currentIds].some(id=> !__dmKnownTripIds.has(id));
-  if(hasNew && __dmKnownTripIds.size > 0) playBeeAlert(); // প্রথমবার লোড হওয়ার সময় বাজবে না, শুধু নতুন আসলে
+  // 🔧 আগে এখানে "__dmKnownTripIds.size > 0" চেক করা হতো, যেটা একটা বাগ
+  // ছিল — তালিকা খালি অবস্থায় প্রথম যে রিকোয়েস্টটা আসত সেটা "নতুন" হিসেবে
+  // ধরাই পড়ত না। এখন আলাদা একটা "initialized" ফ্ল্যাগ দিয়ে ঠিক করা হয়েছে —
+  // প্রথম স্ন্যাপশটের পর থেকে যেকোনো নতুন ট্রিপেই এলার্ম বাজবে।
+  if(hasNew && __dmTripReqInitialized) playBeeAlert();
+  __dmTripReqInitialized = true;
   __dmKnownTripIds = currentIds;
 
   const listEl = document.getElementById("dmTripRequestsList");
@@ -11964,7 +11991,45 @@ document.addEventListener("visibilitychange", ()=>{
 document.addEventListener("click", ()=>{ if(__beeAudioCtx) unlockBeeAudio(); }, { passive: true });
 document.addEventListener("touchstart", ()=>{ if(__beeAudioCtx) unlockBeeAudio(); }, { passive: true });
 
-function playBeeAlert(){
+function isBeeRingtoneEnabled(){
+  const v = localStorage.getItem("hb_bee_ringtone_enabled");
+  return v === null ? true : v === "true"; // ডিফল্ট: চালু
+}
+function setBeeRingtoneEnabled(on){
+  localStorage.setItem("hb_bee_ringtone_enabled", on ? "true" : "false");
+}
+function refreshRingtoneSwitchUi(){
+  const on = isBeeRingtoneEnabled();
+  const dmSw = document.getElementById("dmRingtoneSwitch");
+  if(dmSw) dmSw.classList.toggle("on", on);
+  const rmSw = document.getElementById("rmRingtoneSwitch");
+  if(rmSw) rmSw.classList.toggle("on", on);
+}
+document.getElementById("dmRingtoneSwitch") && document.getElementById("dmRingtoneSwitch").addEventListener("click", ()=>{
+  unlockBeeAudio();
+  setBeeRingtoneEnabled(!isBeeRingtoneEnabled());
+  refreshRingtoneSwitchUi();
+});
+document.getElementById("rmRingtoneSwitch") && document.getElementById("rmRingtoneSwitch").addEventListener("click", ()=>{
+  unlockBeeAudio();
+  setBeeRingtoneEnabled(!isBeeRingtoneEnabled());
+  refreshRingtoneSwitchUi();
+});
+document.getElementById("dmRingtoneTestBtn") && document.getElementById("dmRingtoneTestBtn").addEventListener("click", ()=>{
+  unlockBeeAudio();
+  playBeeAlert(true); // টেস্টে সবসময় বাজবে, সেটিং অফ থাকলেও
+});
+document.getElementById("rmRingtoneTestBtn") && document.getElementById("rmRingtoneTestBtn").addEventListener("click", ()=>{
+  unlockBeeAudio();
+  playBeeAlert(true);
+});
+
+function playBeeAlert(forceTest){
+  if(!forceTest && !isBeeRingtoneEnabled()){
+    console.log("🐝 Bee Ringtone সেটিং বন্ধ আছে — শব্দ বাজছে না (শুধু ভাইব্রেশন)");
+    if(navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
+    return;
+  }
   console.log("🐝 Bee Alert চালু হচ্ছে... vibrate সাপোর্ট:", !!navigator.vibrate, "| AudioContext state:", __beeAudioCtx ? __beeAudioCtx.state : "তৈরি হয়নি এখনো");
   // ভাইব্রেশন (Android Chrome-এ কাজ করে, iOS Safari-তে সাপোর্ট নেই)
   if(navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
@@ -12022,6 +12087,7 @@ function dmHaversineKm(lat1, lng1, lat2, lng2){
 }
 
 let __dmKnownPassengerIds = new Set();
+let __dmRadarInitialized = false;
 async function dmRenderRadar(passengers){
   __dmRadarMarkers.forEach(m=> __dmRadarMap.removeLayer(m));
   __dmRadarMarkers = [];
@@ -12041,7 +12107,8 @@ async function dmRenderRadar(passengers){
   // 🐝 কাছের নতুন কোনো অপেক্ষমাণ যাত্রী প্রথমবার দেখা গেলে — Bee Alert
   const currentPassengerIds = new Set(nearby.map(p=> p.id));
   const hasNewPassenger = [...currentPassengerIds].some(id=> !__dmKnownPassengerIds.has(id));
-  if(hasNewPassenger && __dmKnownPassengerIds.size > 0) playBeeAlert();
+  if(hasNewPassenger && __dmRadarInitialized) playBeeAlert();
+  __dmRadarInitialized = true;
   __dmKnownPassengerIds = currentPassengerIds;
 
   // কাছাকাছি (~২০০ মিটার গ্রিড) যাত্রীদের একসাথে গ্রুপ করা
@@ -12359,6 +12426,7 @@ async function initRiderMode(uid){
   rmLoadTodayStats();
 
   document.getElementById("rmLogoutBtn").addEventListener("click", ()=> auth.signOut());
+  refreshRingtoneSwitchUi();
 }
 
 /* ---------- Online/Offline টগল ---------- */
@@ -12533,6 +12601,7 @@ function rmStopTripRequests(){
 }
 
 let __rmKnownTripIds = new Set();
+let __rmTripReqInitialized = false;
 function rmRenderTripRequests(trips){
   if(rmCurrentRider.currentStatus === "on_waiting" || rmCurrentRider.currentStatus === "on_trip") return;
 
@@ -12543,7 +12612,8 @@ function rmRenderTripRequests(trips){
 
   const currentIds = new Set(relevant.map(t=> t.id));
   const hasNew = [...currentIds].some(id=> !__rmKnownTripIds.has(id));
-  if(hasNew && __rmKnownTripIds.size > 0) playBeeAlert();
+  if(hasNew && __rmTripReqInitialized) playBeeAlert();
+  __rmTripReqInitialized = true;
   __rmKnownTripIds = currentIds;
 
   const listEl = document.getElementById("rmTripRequestsList");
@@ -12803,6 +12873,7 @@ async function rmTmLoadHotspots(){
 }
 
 let __rmKnownPassengerIds = new Set();
+let __rmRadarInitialized = false;
 async function rmTmRenderRadar(passengers){
   rmTmMarkers.forEach(m=> rmTmMap.removeLayer(m)); rmTmMarkers = [];
   if(!__rmMyLatLng) return;
@@ -12818,7 +12889,8 @@ async function rmTmRenderRadar(passengers){
 
   const currentPassengerIds = new Set(nearby.map(p=> p.id));
   const hasNewPassenger = [...currentPassengerIds].some(id=> !__rmKnownPassengerIds.has(id));
-  if(hasNewPassenger && __rmKnownPassengerIds.size > 0) playBeeAlert();
+  if(hasNewPassenger && __rmRadarInitialized) playBeeAlert();
+  __rmRadarInitialized = true;
   __rmKnownPassengerIds = currentPassengerIds;
 
   const clusters = {};
