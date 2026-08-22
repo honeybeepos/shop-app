@@ -764,8 +764,20 @@
       <div style="font-weight:800; font-size:15px;" id="dmDriverName">Honey Bee Transport</div>
       <div style="font-size:10.5px; color:#a8d9c0; text-transform:uppercase; letter-spacing:1px;">Driver Mode</div>
     </div>
-    <button id="dmSettingsBtn" title="সেটিংস" style="margin-left:auto; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#a8d9c0; width:32px; height:32px; border-radius:8px; font-size:14px; cursor:pointer; font-family:inherit;">⚙️</button>
+    <button id="dmHistoryBtn" title="হিস্ট্রি" style="margin-left:auto; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#a8d9c0; width:32px; height:32px; border-radius:8px; font-size:14px; cursor:pointer; font-family:inherit;">📋</button>
+    <button id="dmSettingsBtn" title="সেটিংস" style="background:transparent; border:1px solid rgba(255,255,255,0.2); color:#a8d9c0; width:32px; height:32px; border-radius:8px; font-size:14px; cursor:pointer; font-family:inherit;">⚙️</button>
     <button id="dmLogoutBtn" style="background:transparent; border:1px solid rgba(255,255,255,0.2); color:#a8d9c0; padding:7px 12px; border-radius:8px; font-size:11px; cursor:pointer; font-family:inherit;">লগআউট</button>
+  </div>
+
+  <!-- 📋 হিস্ট্রি প্যানেল -->
+  <div id="dmHistoryOverlay" style="display:none; position:fixed; inset:0; z-index:500; background:rgba(0,0,0,0.6); align-items:flex-end; justify-content:center;">
+    <div style="background:#173a29; border-top:1px solid rgba(74,222,128,0.25); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:70vh; overflow-y:auto;">
+      <div style="display:flex; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0; font-size:15px; color:#eafff2;">📋 হিস্ট্রি</h3>
+        <span id="dmCloseHistoryBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:#a8d9c0;">✕</span>
+      </div>
+      <div id="dmHistoryPanelList" style="font-size:12.5px; color:#a8d9c0;">লোড হচ্ছে...</div>
+    </div>
   </div>
 
   <!-- ⚙️ সেটিংস প্যানেল (⚙️ আইকনে চাপলে খুলবে) -->
@@ -12103,6 +12115,54 @@ document.getElementById("rmSettingsBtn") && document.getElementById("rmSettingsB
   panel.style.display = panel.style.display === "none" ? "block" : "none";
 });
 
+/* ---------- 📋 Driver Mode-এর হিস্ট্রি (ট্রিপ + রাস্তা থেকে পিক-আপ) ---------- */
+document.getElementById("dmHistoryBtn") && document.getElementById("dmHistoryBtn").addEventListener("click", dmOpenHistory);
+document.getElementById("dmCloseHistoryBtn") && document.getElementById("dmCloseHistoryBtn").addEventListener("click", ()=>{
+  document.getElementById("dmHistoryOverlay").style.display = "none";
+});
+async function dmOpenHistory(){
+  const listEl = document.getElementById("dmHistoryPanelList");
+  listEl.innerHTML = "লোড হচ্ছে...";
+  document.getElementById("dmHistoryOverlay").style.display = "flex";
+  try{
+    const [tripsSnap, pickupsSnap] = await Promise.all([
+      db.collection("trips").where("confirmedDriver.driverId","==",__dmDriverId).where("status","==","completed").limit(20).get().catch(()=>({docs:[]})),
+      db.collection("passenger_waiting_queue").where("picked_up_by","==",__dmDriverId).limit(20).get().catch(()=>({docs:[]}))
+    ]);
+    const items = [];
+    tripsSnap.docs.forEach(d=>{
+      const v = d.data();
+      items.push({ type:"trip", title: "🚕 " + (v.destination || "ট্রিপ"), fare: v.confirmedDriver ? v.confirmedDriver.finalFare : null, time: v.createdAt ? v.createdAt.toDate() : null });
+    });
+    pickupsSnap.docs.forEach(d=>{
+      const v = d.data();
+      if(v.status !== "PICKED_UP" && v.status !== "COMPLETED") return;
+      items.push({ type:"pickup", title: "🟢 রাস্তা থেকে যাত্রী তোলা", fare: v.fare, time: v.picked_up_at ? v.picked_up_at.toDate() : null });
+    });
+    items.sort((a,b)=> (b.time||0) - (a.time||0));
+
+    // 📅 শুধু গত ৭ দিনের রেকর্ডই দেখানো হয়
+    const sevenDaysAgoDm = new Date(Date.now() - 7*24*60*60*1000);
+    const filteredItemsDm = items.filter(it=> !it.time || it.time >= sevenDaysAgoDm);
+
+    if(filteredItemsDm.length === 0){
+      listEl.innerHTML = "গত ৭ দিনে কোনো সম্পন্ন ট্রিপ/পিক-আপ নেই।";
+      return;
+    }
+    listEl.innerHTML = filteredItemsDm.map(it=> `
+      <div style="padding:10px 0; border-bottom:1px solid rgba(74,222,128,0.1); display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="color:#eafff2;">${escapeHtmlDm(it.title)}</div>
+          <div style="font-size:10.5px; color:#6a9c85; margin-top:2px;">${it.time ? it.time.toLocaleDateString('bn-BD') + " " + it.time.toLocaleTimeString('bn-BD',{hour:'2-digit',minute:'2-digit'}) : ""}</div>
+        </div>
+        <div style="font-weight:800; color:#4ade80;">${it.fare != null ? "৳ " + it.fare : "নগদ"}</div>
+      </div>`).join("");
+  }catch(e){
+    console.error(e);
+    listEl.innerHTML = "হিস্ট্রি লোড করা যায়নি।";
+  }
+}
+
 function playBeeAlert(forceTest){
   if(!forceTest && !isBeeRingtoneEnabled()){
     console.log("🐝 Bee Ringtone সেটিং বন্ধ আছে — শব্দ বাজছে না (শুধু ভাইব্রেশন)");
@@ -12709,9 +12769,13 @@ async function rmOpenHistory(){
   listEl.innerHTML = "লোড হচ্ছে...";
   document.getElementById("rmHistoryOverlay").style.display = "flex";
   try{
-    const [deliveriesSnap, tripsSnap] = await Promise.all([
+    const [deliveriesSnap, tripsSnap, pickupsSnap] = await Promise.all([
       db.collection("deliveryOffers").where("riderId","==",rmCurrentRider.uid).where("status","==","delivered").orderBy("createdAt","desc").limit(20).get().catch(()=>({docs:[]})),
-      db.collection("trips").where("confirmedDriver.driverId","==",rmCurrentRider.uid).where("status","==","completed").limit(20).get().catch(()=>({docs:[]}))
+      db.collection("trips").where("confirmedDriver.driverId","==",rmCurrentRider.uid).where("status","==","completed").limit(20).get().catch(()=>({docs:[]})),
+      // 🟢 "I Am Waiting On Road" (Zero Interaction) থেকে Pick Up করা যাত্রীরাও
+      // এখন হিস্ট্রিতে আসছে — আগে এগুলোর কোনো রেকর্ডই থাকত না, যেটা যাত্রী-
+      // ড্রাইভারের মধ্যে বিরোধ হলে প্রমাণের অভাব তৈরি করত
+      db.collection("passenger_waiting_queue").where("picked_up_by","==",rmCurrentRider.uid).limit(20).get().catch(()=>({docs:[]}))
     ]);
     const items = [];
     deliveriesSnap.docs.forEach(d=>{
@@ -12722,19 +12786,28 @@ async function rmOpenHistory(){
       const v = d.data();
       items.push({ type:"trip", title: "🚕 " + (v.destination || "ট্রিপ"), fare: v.confirmedDriver ? v.confirmedDriver.finalFare : null, time: v.createdAt ? v.createdAt.toDate() : null });
     });
+    pickupsSnap.docs.forEach(d=>{
+      const v = d.data();
+      if(v.status !== "PICKED_UP" && v.status !== "COMPLETED") return; // শুধু আসলেই পিক-আপ হওয়াগুলো
+      items.push({ type:"pickup", title: "🟢 রাস্তা থেকে যাত্রী তোলা", fare: v.fare, time: v.picked_up_at ? v.picked_up_at.toDate() : null });
+    });
     items.sort((a,b)=> (b.time||0) - (a.time||0));
 
-    if(items.length === 0){
-      listEl.innerHTML = "এখনো কোনো সম্পন্ন ডেলিভারি/ট্রিপ নেই।";
+    // 📅 শুধু গত ৭ দিনের রেকর্ডই দেখানো হয়
+    const sevenDaysAgoRm = new Date(Date.now() - 7*24*60*60*1000);
+    const filteredItemsRm = items.filter(it=> !it.time || it.time >= sevenDaysAgoRm);
+
+    if(filteredItemsRm.length === 0){
+      listEl.innerHTML = "গত ৭ দিনে কোনো সম্পন্ন ডেলিভারি/ট্রিপ/পিক-আপ নেই।";
       return;
     }
-    listEl.innerHTML = items.map(it=> `
+    listEl.innerHTML = filteredItemsRm.map(it=> `
       <div style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; justify-content:space-between; align-items:center;">
         <div>
-          <div style="color:#eee;">${it.type === "delivery" ? "📦" : "🚕"} ${escapeHtml(it.title)}</div>
-          <div style="font-size:10.5px; color:#777; margin-top:2px;">${it.time ? it.time.toLocaleDateString('bn-BD') : ""}</div>
+          <div style="color:#eee;">${it.type === "delivery" ? "📦" : it.type === "pickup" ? "🟢" : "🚕"} ${escapeHtml(it.title)}</div>
+          <div style="font-size:10.5px; color:#777; margin-top:2px;">${it.time ? it.time.toLocaleDateString('bn-BD') + " " + it.time.toLocaleTimeString('bn-BD',{hour:'2-digit',minute:'2-digit'}) : ""}</div>
         </div>
-        <div style="font-weight:800; color:#FFC107;">${it.fare != null ? "৳ " + it.fare : ""}</div>
+        <div style="font-weight:800; color:#FFC107;">${it.fare != null ? "৳ " + it.fare : "নগদ"}</div>
       </div>`).join("");
   }catch(e){
     console.error(e);
