@@ -11939,8 +11939,24 @@ function unlockBeeAudio(){
   try{
     if(!__beeAudioCtx) __beeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if(__beeAudioCtx.state === "suspended") __beeAudioCtx.resume();
+    // একটা প্রায়-নিঃশব্দ (অতি ক্ষীণ) টোন এখনই একবার বাজিয়ে "pipeline"
+    // পুরোপুরি জাগিয়ে রাখা হয় — কিছু ফোনে (বিশেষ করে Android) এটা ছাড়া
+    // পরে অটোমেটিক বাজানো নিঃশব্দই থেকে যায়
+    const silentOsc = __beeAudioCtx.createOscillator();
+    const silentGain = __beeAudioCtx.createGain();
+    silentGain.gain.setValueAtTime(0.00001, __beeAudioCtx.currentTime);
+    silentOsc.connect(silentGain); silentGain.connect(__beeAudioCtx.destination);
+    silentOsc.start(); silentOsc.stop(__beeAudioCtx.currentTime + 0.05);
   }catch(e){ console.warn("audio unlock failed:", e); }
 }
+
+// 📱 ট্যাব আবার সামনে আসলে (ব্যাকগ্রাউন্ড থেকে ফিরলে) AudioContext ব্রাউজার
+// নিজে থেকে বন্ধ করে দিতে পারে — তাই প্রতিবার visible হলে আবার resume() করা
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible" && __beeAudioCtx && __beeAudioCtx.state === "suspended"){
+    __beeAudioCtx.resume().catch(()=>{});
+  }
+});
 
 function playBeeAlert(){
   // ভাইব্রেশন (Android Chrome-এ কাজ করে, iOS Safari-তে সাপোর্ট নেই)
@@ -12196,6 +12212,7 @@ function dmListenForOffers(){
 }
 
 function dmShowOfferPopup(offerId, data){
+  playBeeAlert(); // 🐝 জরুরি ইনকামিং ট্রিপ — টোন + ভাইব্রেশন
   __dmCurrentOfferId = offerId;
   document.getElementById("dmOfferPickup").textContent = data.pickupAddress || "—";
   document.getElementById("dmOfferDrop").textContent = data.dropAddress || "—";
@@ -12386,6 +12403,7 @@ function rmListenForOffers(){
 }
 
 function rmShowOfferCard(offerId, data){
+  playBeeAlert(); // 🐝 জরুরি ডেলিভারি অর্ডার — টোন + ভাইব্রেশন
   rmCurrentOfferId = offerId;
   document.getElementById("rmOfferPickup").textContent = data.pickupName || "দোকান";
   document.getElementById("rmOfferDistance").textContent = data.distanceKm ? data.distanceKm.toFixed(1) + " কিমি দূরে" : "—";
