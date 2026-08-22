@@ -11720,6 +11720,13 @@ async function dmRenderActiveTripStatus(trip, tripId){
   }else if(trip.status === "expired" || trip.status === "cancelled"){
     await dmResetActiveTripStatus();
   }else{
+    // যাত্রী যদি নিজের অফারটাই বাতিল (Reject) করে দিয়ে থাকেন, waitingList
+    // থেকে বাদ পড়ে যাবেন — তখন আবার "available"-এ ফিরে যাওয়া দরকার
+    const stillWaiting = (trip.waitingList||[]).some(o=> o.driverId === __dmDriverId);
+    if(!stillWaiting){
+      await dmResetActiveTripStatus();
+      return;
+    }
     // এখনো waiting_selection — যাত্রীর সিদ্ধান্তের অপেক্ষা (লাইভ কাউন্টডাউনসহ)
     listEl.innerHTML = `
       <div style="background:#173a29; border:1px solid rgba(74,222,128,0.3); border-radius:12px; padding:16px; text-align:center;">
@@ -12545,6 +12552,11 @@ async function rmRenderActiveTripStatus(trip, tripId){
   }else if(trip.status === "expired" || trip.status === "cancelled"){
     await rmResetActiveTripStatus();
   }else{
+    const stillWaiting = (trip.waitingList||[]).some(o=> o.driverId === rmCurrentRider.uid);
+    if(!stillWaiting){
+      await rmResetActiveTripStatus();
+      return;
+    }
     listEl.innerHTML = `
       <div style="background:#2b2b2b; border:1px solid rgba(255,193,7,0.3); border-radius:12px; padding:16px; text-align:center;">
         <span style="background:rgba(255,193,7,0.15); color:#FFC107; font-size:11px; padding:4px 10px; border-radius:20px; font-weight:700;">🟡 অপেক্ষারত ট্রিপ (Waiting)</span>

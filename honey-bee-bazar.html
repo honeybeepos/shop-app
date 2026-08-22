@@ -1020,20 +1020,24 @@ function tripRenderStatus(trip){
     $("tripConfirmedBox").style.display = "none";
   }else if(trip.status === "waiting_selection"){
     $("tripStatusIcon").textContent = "💰";
-    $("tripStatusTitle").textContent = `${list.length}টা অফার এসেছে!`;
+    $("tripStatusTitle").textContent = `ওয়েটিং তালিকা (${list.length}/3)`;
     $("tripStatusSub").textContent = "যেকোনো একটা বেছে নিন";
     $("tripConfirmedBox").style.display = "none";
     $("tripOffersList").innerHTML = list.map((o, idx)=> `
       <div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:12px; margin-top:10px; text-align:left;">
         <div style="font-weight:700; font-size:13.5px;">${escapeHtml(o.driverName||"ড্রাইভার")}</div>
         <div style="font-size:11.5px; color:var(--muted); margin:2px 0 8px;">${escapeHtml(o.vehicleModel||"")} ${o.eta ? "· ETA: "+escapeHtml(o.eta) : ""}</div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div style="font-weight:800; color:var(--amber); font-size:15px;">৳ ${o.offeredFare}</div>
-          <button data-offer-idx="${idx}" class="tripSelectOfferBtn" style="margin-left:auto; padding:8px 14px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✅ এটা নিন</button>
+        <div style="font-weight:800; color:var(--amber); font-size:15px; margin-bottom:8px;">৳ ${o.offeredFare}</div>
+        <div style="display:flex; gap:8px;">
+          <button data-offer-idx="${idx}" class="tripRejectOfferBtn" style="flex:1; padding:8px 10px; border:none; border-radius:9px; background:rgba(220,38,38,0.15); border:1px solid rgba(220,38,38,0.4); color:#f87171; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ বাতিল করুন</button>
+          <button data-offer-idx="${idx}" class="tripSelectOfferBtn" style="flex:1; padding:8px 10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">✅ এটা নিন</button>
         </div>
       </div>`).join("");
     document.querySelectorAll(".tripSelectOfferBtn").forEach(btn=>{
       btn.addEventListener("click", ()=> tripConfirmOffer(list[Number(btn.dataset.offerIdx)]));
+    });
+    document.querySelectorAll(".tripRejectOfferBtn").forEach(btn=>{
+      btn.addEventListener("click", ()=> tripRejectOffer(list[Number(btn.dataset.offerIdx)]));
     });
   }else if(trip.status === "confirmed"){
     $("tripStatusIcon").textContent = "✅";
@@ -1064,6 +1068,25 @@ async function tripConfirmOffer(offer){
       confirmedDriver: { driverId: offer.driverId, finalFare: offer.offeredFare, confirmedAt: firebase.firestore.FieldValue.serverTimestamp() }
     });
   }catch(e){ alert("নিশ্চিত করা যায়নি: " + e.message); }
+}
+
+// ❌ যাত্রী কোনো নির্দিষ্ট ড্রাইভারের অফার বাতিল করলে — সেই অফারটা তালিকা
+// থেকে সরে যায় এবং ঐ ড্রাইভার এই ট্রিপের জন্য ব্লক হয়ে যান (স্থায়ী ব্লক না,
+// শুধু এই একটা ট্রিপের জন্য) — বাকি অফারগুলো/সার্চ চলতেই থাকে
+async function tripRejectOffer(offer){
+  if(!tripCurrentId || !offer) return;
+  if(!confirm(`${offer.driverName || "এই ড্রাইভারের"} অফারটা বাতিল করবেন?`)) return;
+  try{
+    const doc = await db.collection("trips").doc(tripCurrentId).get();
+    if(!doc.exists) return;
+    const trip = doc.data();
+    const updatedList = (trip.waitingList||[]).filter(o=> o.driverId !== offer.driverId);
+    await db.collection("trips").doc(tripCurrentId).update({
+      waitingList: updatedList,
+      rejectedDrivers: firebase.firestore.FieldValue.arrayUnion(offer.driverId),
+      status: updatedList.length > 0 ? "waiting_selection" : "searching"
+    });
+  }catch(e){ alert("বাতিল করা যায়নি: " + e.message); }
 }
 
 $("tripCancelBtn") && $("tripCancelBtn").addEventListener("click", async ()=>{
