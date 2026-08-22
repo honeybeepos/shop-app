@@ -11575,6 +11575,7 @@ function dmStopTripRequests(){
   document.getElementById("dmTripRequestsList").innerHTML = "Online থাকলে এখানে যাত্রীদের গন্তব্য-ভিত্তিক রিকোয়েস্ট দেখাবে — ভাড়া অফার করতে পারবেন।";
 }
 
+let __dmKnownTripIds = new Set();
 function dmRenderTripRequests(trips){
   // ড্রাইভার ইতিমধ্যে কোনো ট্রিপের অপেক্ষায় থাকলে বা ট্রিপে থাকলে নতুন
   // রিকোয়েস্ট দেখানো হয় না — dmRenderActiveTripStatus সেই কার্ড দেখাচ্ছে
@@ -11584,6 +11585,14 @@ function dmRenderTripRequests(trips){
     !(t.rejectedDrivers||[]).includes(__dmDriverId) &&
     !(t.waitingList||[]).some(o=> o.driverId === __dmDriverId)
   );
+
+  // 🐝 নতুন কোনো ট্রিপ আইডি প্রথমবার দেখা গেলে (আগে তালিকায় ছিল না) —
+  // ভাইব্রেশন + Bee Tone
+  const currentIds = new Set(relevant.map(t=> t.id));
+  const hasNew = [...currentIds].some(id=> !__dmKnownTripIds.has(id));
+  if(hasNew && __dmKnownTripIds.size > 0) playBeeAlert(); // প্রথমবার লোড হওয়ার সময় বাজবে না, শুধু নতুন আসলে
+  __dmKnownTripIds = currentIds;
+
   const listEl = document.getElementById("dmTripRequestsList");
   if(relevant.length === 0){
     listEl.innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
@@ -11917,6 +11926,47 @@ function escapeHtmlDm(str){
   return d.innerHTML;
 }
 
+/* ==================== 🐝 Bee Alert — Vibration + বাজ়িং টোন ====================
+   নতুন ট্রিপ রিকোয়েস্ট এলে ফোন পকেটে থাকলেও যেন টের পাওয়া যায় — কোনো
+   অডিও ফাইল ছাড়াই Web Audio API দিয়ে একটা মৌমাছির গুনগুন-এর মতো শব্দ
+   তৈরি করা হয় (কম্পমান ফ্রিকোয়েন্সি দিয়ে "বাজ়" ইফেক্ট)। */
+let __beeAudioCtx = null;
+function playBeeAlert(){
+  // ভাইব্রেশন (Android Chrome-এ কাজ করে, iOS Safari-তে সাপোর্ট নেই)
+  if(navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
+
+  // Bee Tone — দুটো অসিলেটর দিয়ে একটা গুনগুন শব্দ বানানো
+  try{
+    if(!__beeAudioCtx) __beeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = __beeAudioCtx;
+    const now = ctx.currentTime;
+    const duration = 0.9;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(220, now);
+
+    // কম্পমান ফ্রিকোয়েন্সি (vibrato) — "বাজ়িং" অনুভূতির জন্য
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.setValueAtTime(18, now); // দ্রুত কম্পন
+    lfoGain.gain.setValueAtTime(25, now);
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.15, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now); lfo.start(now);
+    osc.stop(now + duration); lfo.stop(now + duration);
+  }catch(e){ console.warn("bee tone play failed:", e); }
+}
+
 function dmHaversineKm(lat1, lng1, lat2, lng2){
   const R = 6371;
   const dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
@@ -11924,6 +11974,7 @@ function dmHaversineKm(lat1, lng1, lat2, lng2){
   return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+let __dmKnownPassengerIds = new Set();
 async function dmRenderRadar(passengers){
   __dmRadarMarkers.forEach(m=> __dmRadarMap.removeLayer(m));
   __dmRadarMarkers = [];
@@ -11939,6 +11990,12 @@ async function dmRenderRadar(passengers){
     p.__dist = dmHaversineKm(__dmMyLatLng[0], __dmMyLatLng[1], lat, lng);
     return p.__dist <= 2;
   });
+
+  // 🐝 কাছের নতুন কোনো অপেক্ষমাণ যাত্রী প্রথমবার দেখা গেলে — Bee Alert
+  const currentPassengerIds = new Set(nearby.map(p=> p.id));
+  const hasNewPassenger = [...currentPassengerIds].some(id=> !__dmKnownPassengerIds.has(id));
+  if(hasNewPassenger && __dmKnownPassengerIds.size > 0) playBeeAlert();
+  __dmKnownPassengerIds = currentPassengerIds;
 
   // কাছাকাছি (~২০০ মিটার গ্রিড) যাত্রীদের একসাথে গ্রুপ করা
   const clusters = {};
@@ -12424,6 +12481,7 @@ function rmStopTripRequests(){
   document.getElementById("rmTripRequestsList").innerHTML = "";
 }
 
+let __rmKnownTripIds = new Set();
 function rmRenderTripRequests(trips){
   if(rmCurrentRider.currentStatus === "on_waiting" || rmCurrentRider.currentStatus === "on_trip") return;
 
@@ -12431,6 +12489,12 @@ function rmRenderTripRequests(trips){
     !(t.rejectedDrivers||[]).includes(rmCurrentRider.uid) &&
     !(t.waitingList||[]).some(o=> o.driverId === rmCurrentRider.uid)
   );
+
+  const currentIds = new Set(relevant.map(t=> t.id));
+  const hasNew = [...currentIds].some(id=> !__rmKnownTripIds.has(id));
+  if(hasNew && __rmKnownTripIds.size > 0) playBeeAlert();
+  __rmKnownTripIds = currentIds;
+
   const listEl = document.getElementById("rmTripRequestsList");
   if(relevant.length === 0){
     listEl.innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
@@ -12687,6 +12751,7 @@ async function rmTmLoadHotspots(){
   }catch(e){ console.warn(e); }
 }
 
+let __rmKnownPassengerIds = new Set();
 async function rmTmRenderRadar(passengers){
   rmTmMarkers.forEach(m=> rmTmMap.removeLayer(m)); rmTmMarkers = [];
   if(!__rmMyLatLng) return;
@@ -12699,6 +12764,12 @@ async function rmTmRenderRadar(passengers){
     p.__dist = dmHaversineKm(__rmMyLatLng[0], __rmMyLatLng[1], lat, lng);
     return p.__dist <= 2;
   });
+
+  const currentPassengerIds = new Set(nearby.map(p=> p.id));
+  const hasNewPassenger = [...currentPassengerIds].some(id=> !__rmKnownPassengerIds.has(id));
+  if(hasNewPassenger && __rmKnownPassengerIds.size > 0) playBeeAlert();
+  __rmKnownPassengerIds = currentPassengerIds;
+
   const clusters = {};
   nearby.forEach(p=>{
     const key = p.__lat.toFixed(3) + "," + p.__lng.toFixed(3);
