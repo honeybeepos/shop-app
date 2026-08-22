@@ -11545,6 +11545,7 @@ function dmRefreshStatusUi(status){
 }
 
 document.getElementById("dmStatusSwitch").addEventListener("click", async ()=>{
+  unlockBeeAudio(); // 🔓 এই ট্যাপেই AudioContext আনলক হয়ে যাবে, পরে বাজানোর সময় আটকাবে না
   const current = __dmDriver.driverStatus || "offline";
   if(current === "busy"){ alert("এই মুহূর্তে ট্রিপে আছেন — ট্রিপ শেষ না হওয়া পর্যন্ত স্ট্যাটাস বদলানো যাবে না।"); return; }
   const next = current === "online" ? "offline" : "online";
@@ -11931,6 +11932,16 @@ function escapeHtmlDm(str){
    অডিও ফাইল ছাড়াই Web Audio API দিয়ে একটা মৌমাছির গুনগুন-এর মতো শব্দ
    তৈরি করা হয় (কম্পমান ফ্রিকোয়েন্সি দিয়ে "বাজ়" ইফেক্ট)। */
 let __beeAudioCtx = null;
+function unlockBeeAudio(){
+  // 🔓 ব্রাউজারের নিয়মে AudioContext প্রথমে "suspended" অবস্থায় শুরু হয় —
+  // ইউজার একবার ট্যাপ করলে (যেমন Online টগল করলে) সেটা "unlock" করে
+  // দেওয়া হয়, যাতে পরে অটোমেটিক বাজানোর সময় আর আটকে না থাকে
+  try{
+    if(!__beeAudioCtx) __beeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(__beeAudioCtx.state === "suspended") __beeAudioCtx.resume();
+  }catch(e){ console.warn("audio unlock failed:", e); }
+}
+
 function playBeeAlert(){
   // ভাইব্রেশন (Android Chrome-এ কাজ করে, iOS Safari-তে সাপোর্ট নেই)
   if(navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
@@ -11939,32 +11950,43 @@ function playBeeAlert(){
   try{
     if(!__beeAudioCtx) __beeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const ctx = __beeAudioCtx;
-    const now = ctx.currentTime;
-    const duration = 0.9;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(220, now);
-
-    // কম্পমান ফ্রিকোয়েন্সি (vibrato) — "বাজ়িং" অনুভূতির জন্য
-    const lfo = ctx.createOscillator();
-    const lfoGain = ctx.createGain();
-    lfo.frequency.setValueAtTime(18, now); // দ্রুত কম্পন
-    lfoGain.gain.setValueAtTime(25, now);
-    lfo.connect(lfoGain);
-    lfoGain.connect(osc.frequency);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.15, now + 0.05);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now); lfo.start(now);
-    osc.stop(now + duration); lfo.stop(now + duration);
+    // 🔧 আসল বাগ এখানে ছিল — নতুন AudioContext "suspended" অবস্থায় শুরু
+    // হয়, resume() না করলে কোনো শব্দই বাজে না (এমনকি অ্যাপ চালু/খোলা
+    // অবস্থায়ও)। প্রতিবার বাজানোর আগে নিশ্চিত করে নেওয়া হচ্ছে।
+    if(ctx.state === "suspended"){
+      ctx.resume().then(()=> playBeeTone(ctx));
+      return;
+    }
+    playBeeTone(ctx);
   }catch(e){ console.warn("bee tone play failed:", e); }
+}
+
+function playBeeTone(ctx){
+  const now = ctx.currentTime;
+  const duration = 0.9;
+
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(220, now);
+
+  // কম্পমান ফ্রিকোয়েন্সি (vibrato) — "বাজ়িং" অনুভূতির জন্য
+  const lfo = ctx.createOscillator();
+  const lfoGain = ctx.createGain();
+  lfo.frequency.setValueAtTime(18, now); // দ্রুত কম্পন
+  lfoGain.gain.setValueAtTime(25, now);
+  lfo.connect(lfoGain);
+  lfoGain.connect(osc.frequency);
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.15, now + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(now); lfo.start(now);
+  osc.stop(now + duration); lfo.stop(now + duration);
 }
 
 function dmHaversineKm(lat1, lng1, lat2, lng2){
@@ -12320,6 +12342,7 @@ function rmRefreshOnlineUi(){
   document.getElementById("rmOnlineLbl").classList.toggle("on", rmIsOnline);
 }
 document.getElementById("rmOnlineSwitch").addEventListener("click", async ()=>{
+  unlockBeeAudio();
   rmIsOnline = !rmIsOnline;
   rmRefreshOnlineUi();
   try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ online: rmIsOnline }); }catch(e){ console.warn(e); }
@@ -12439,6 +12462,7 @@ let rmTmMap = null, rmTmMarkers = [], rmTmHotspotMarkers = [], rmTmUnsub = null;
 let rmTmFullscreen = false;
 
 document.getElementById("rmTransportModeSwitch").addEventListener("click", async ()=>{
+  unlockBeeAudio();
   rmTransportModeOn = !rmTransportModeOn;
   document.getElementById("rmTransportModeSwitch").classList.toggle("on", rmTransportModeOn);
   document.getElementById("rmTmOffLbl").classList.toggle("on", !rmTransportModeOn);
