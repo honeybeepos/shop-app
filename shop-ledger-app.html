@@ -11958,7 +11958,14 @@ document.addEventListener("visibilitychange", ()=>{
   }
 });
 
+// 👆 অ্যাপের যেকোনো জায়গায় ট্যাপ করলেই (শুধু Online/Transport টগলে না)
+// audio unlock/resume আবার চেষ্টা করা হয় — যাতে ব্রাউজার background-এ
+// context বন্ধ করে দিলেও পরের যেকোনো ট্যাপেই সেটা আবার চালু হয়ে যায়
+document.addEventListener("click", ()=>{ if(__beeAudioCtx) unlockBeeAudio(); }, { passive: true });
+document.addEventListener("touchstart", ()=>{ if(__beeAudioCtx) unlockBeeAudio(); }, { passive: true });
+
 function playBeeAlert(){
+  console.log("🐝 Bee Alert চালু হচ্ছে... vibrate সাপোর্ট:", !!navigator.vibrate, "| AudioContext state:", __beeAudioCtx ? __beeAudioCtx.state : "তৈরি হয়নি এখনো");
   // ভাইব্রেশন (Android Chrome-এ কাজ করে, iOS Safari-তে সাপোর্ট নেই)
   if(navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
 
@@ -11970,11 +11977,13 @@ function playBeeAlert(){
     // হয়, resume() না করলে কোনো শব্দই বাজে না (এমনকি অ্যাপ চালু/খোলা
     // অবস্থায়ও)। প্রতিবার বাজানোর আগে নিশ্চিত করে নেওয়া হচ্ছে।
     if(ctx.state === "suspended"){
-      ctx.resume().then(()=> playBeeTone(ctx));
+      console.log("🐝 Context suspended ছিল, resume() চেষ্টা করা হচ্ছে...");
+      ctx.resume().then(()=>{ console.log("🐝 resume() সফল, state এখন:", ctx.state); playBeeTone(ctx); })
+        .catch((err)=> console.warn("🐝 resume() ব্যর্থ:", err));
       return;
     }
     playBeeTone(ctx);
-  }catch(e){ console.warn("bee tone play failed:", e); }
+  }catch(e){ console.warn("🐝 bee tone play failed:", e); }
 }
 
 function playBeeTone(ctx){
