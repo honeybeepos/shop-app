@@ -53,8 +53,10 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 
 // 📏 Google Distance Matrix API দিয়ে আসল রোড-ডিস্ট্যান্স/সময় বের করা —
 // প্রতিটা (origin, destination) জোড়া প্রায় ১০০ মিটার নির্ভুলতায় রাউন্ড করে
-// Firestore-এ ২ ঘণ্টার জন্য ক্যাশ করা হয়। API কল ব্যর্থ হলে সরলরেখার
-// (Haversine) দূরত্বে নিরাপদে ফলব্যাক করে।
+// Firestore-এ ২ ঘণ্টার জন্য ক্যাশ করা হয় (স্পেকের "Firebase Cache" নির্দেশনা
+// অনুযায়ী — Realtime Database-এর বদলে Firestore ব্যবহার করা হয়েছে, কারণ
+// এই প্রজেক্টে এখনো Realtime Database সেটআপ করা নেই, Firestore-ই যথেষ্ট)।
+// API কল ব্যর্থ হলে সরলরেখার (Haversine) দূরত্বে নিরাপদে ফলব্যাক করে।
 async function getRoadDistanceKm(originLat, originLng, destLat, destLng) {
   const cacheKey = `${originLat.toFixed(3)}_${originLng.toFixed(3)}_${destLat.toFixed(3)}_${destLng.toFixed(3)}`;
   const cacheRef = db.collection("distanceCache").doc(cacheKey);
@@ -89,9 +91,12 @@ async function getRoadDistanceKm(originLat, originLng, destLat, destLng) {
     }
   }
 
+  // ফলব্যাক — API key না থাকলে বা কল ব্যর্থ হলে সরলরেখার দূরত্ব
   return { distanceKm: haversineKm(originLat, originLng, destLat, destLng), durationMin: null, source: "haversine-fallback" };
 }
 
+// OpenStreetMap Nominatim দিয়ে ফ্রি রিভার্স-জিওকোডিং (key লাগে না) — ব্যর্থ
+// হলে শুধু কোঅর্ডিনেট স্ট্রিং হিসেবে ফলব্যাক করে, ফাংশন কখনো ভেঙে পড়বে না
 async function reverseGeocode(lat, lng) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
@@ -103,6 +108,7 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
+/* ---------- পুরনো সিস্টেম: legacy delivery-man-app.html ডিভাইসে পুশ ---------- */
 async function notifyLegacyDevices(shopId, shopName) {
   const devicesSnap = await db
     .collection("shops").doc(shopId)
@@ -139,6 +145,7 @@ async function notifyLegacyDevices(shopId, shopName) {
   );
 }
 
+/* ---------- নতুন সিস্টেম: সবচেয়ে কাছের অনলাইন রাইডারকে অফার পাঠানো ---------- */
 async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds) {
   const shopDoc = await db.collection("shops").doc(shopId).get();
   const shopData = shopDoc.exists ? shopDoc.data() : {};
@@ -150,6 +157,8 @@ async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds)
     return null;
   }
 
+  // সব অনলাইন, সক্রিয় রাইডার আনা হচ্ছে (এখনো market/agent-ভিত্তিক ফিল্টার
+  // করা হচ্ছে না, কারণ শপ রেজিস্ট্রেশনে এখনো বাজার নির্বাচন যুক্ত হয়নি)
   const ridersSnap = await db.collection("riders")
     .where("status", "==", "active")
     .where("online", "==", true)
@@ -171,6 +180,9 @@ async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds)
   candidates.sort((a, b) => a.distanceKm - b.distanceKm);
   const nearest = candidates[0];
 
+  // 📏 র‍্যাংকিং-এর জন্য সরলরেখা (দ্রুত, অনেক প্রার্থীর মধ্যে বাছাই করতে সস্তা),
+  // কিন্তু চূড়ান্ত/দেখানো দূরত্বের জন্য সবচেয়ে কাছের প্রার্থীর জন্যই একবার
+  // Google Distance Matrix দিয়ে আসল রোড-ডিস্ট্যান্স আনা হয় (কম খরচে)
   const roadDist = await getRoadDistanceKm(storeLoc.lat, storeLoc.lng, nearest.liveLocation.lat, nearest.liveLocation.lng);
   nearest.distanceKm = roadDist.distanceKm;
 
@@ -203,6 +215,7 @@ async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds)
   return offerRef.id;
 }
 
+/* ---------- ট্রিগার ১: নতুন ডেলিভারি কল তৈরি হলে ---------- */
 exports.onDeliveryCall = onDocumentCreated(
   { document: "shops/{shopId}/deliveryCalls/{callId}", secrets: [googleMapsApiKey] },
   async (event) => {
@@ -213,18 +226,22 @@ exports.onDeliveryCall = onDocumentCreated(
     const shopDoc = await db.collection("shops").doc(shopId).get();
     const shopName = (shopDoc.exists && (shopDoc.data().name || shopDoc.data().shopName)) || "দোকান";
 
+    // পুরনো সিস্টেম (শপ-কোড কানেক্টেড ডিভাইস) — এখনো সাপোর্ট করা হচ্ছে
     await notifyLegacyDevices(shopId, shopName);
+
+    // নতুন সিস্টেম (Agent-নিবন্ধিত রাইডার, geo-dispatch)
     await dispatchToNearestRider(shopId, callId, callData, []);
   }
 );
 
+/* ---------- ট্রিগার ২: রাইডার স্কিপ করলে বা অফার এক্সপায়ার হলে — পরের কাছের রাইডারকে পাঠানো ---------- */
 exports.onOfferResolved = onDocumentUpdated(
   { document: "deliveryOffers/{offerId}", secrets: [googleMapsApiKey] },
   async (event) => {
     const before = event.data.before.data();
     const after = event.data.after.data();
 
-    if (before.status === after.status) return;
+    if (before.status === after.status) return; // স্ট্যাটাস আসলেই বদলায়নি
     if (after.status !== "skipped" && after.status !== "expired") return;
 
     const callRef = db.collection("shops").doc(after.shopId).collection("deliveryCalls").doc(after.callId);
@@ -232,13 +249,14 @@ exports.onOfferResolved = onDocumentUpdated(
     if (!callSnap.exists) return;
     const callData = callSnap.data();
 
-    if (callData.status === "delivered" || callData.assignedRiderId) return;
+    if (callData.status === "delivered" || callData.assignedRiderId) return; // ইতিমধ্যে অন্য কেউ নিয়ে নিয়েছে
 
     const excludeIds = callData.offeredRiderIds || [];
     await dispatchToNearestRider(after.shopId, after.callId, callData, excludeIds);
   }
 );
 
+/* ---------- ট্রিগার ৩: রাইডার অ্যাকসেপ্ট করলে কলের সাথে লিংক করা ---------- */
 exports.onOfferAccepted = onDocumentUpdated(
   "deliveryOffers/{offerId}",
   async (event) => {
@@ -253,6 +271,7 @@ exports.onOfferAccepted = onDocumentUpdated(
   }
 );
 
+/* ---------- ট্রিগার ৪ (সেফটি-নেট): অ্যাপ বন্ধ থাকলে বা ৬০ সেকেন্ড কেউ সাড়া না দিলে ---------- */
 exports.checkExpiredOffers = onSchedule("every 2 minutes", async () => {
   const now = Timestamp.now();
   const expiredSnap = await db.collection("deliveryOffers")
@@ -268,6 +287,13 @@ exports.checkExpiredOffers = onSchedule("every 2 minutes", async () => {
   console.log(`${expiredSnap.size}টা মেয়াদোত্তীর্ণ অফার আপডেট করা হয়েছে`);
 });
 
+/* ==================== 🗑️ অ্যাকাউন্ট ডিলিট + জিমেইল ফ্রি করা ====================
+   শুধু ক্লায়েন্ট থেকে Firestore ডকুমেন্ট মুছে দিলে Firebase Authentication-এ
+   ইমেইলটা "ব্যবহৃত" হিসেবেই থেকে যায় — তাই একই ইমেইল দিয়ে আবার সাইন-আপ করা
+   যায় না। এই ফাংশনটা (শুধু Admin SDK দিয়েই সম্ভব, ক্লায়েন্ট থেকে না):
+   ১. Firestore থেকে ইউজারের সব ডেটা (সাব-কালেকশনসহ) মুছে দেয়
+   ২. Firebase Authentication থেকে অ্যাকাউন্টটাই মুছে দেয় — এতে ইমেইলটা
+      সম্পূর্ণ ফ্রি হয়ে যায়, সাথে সাথে আবার রেজিস্ট্রেশনে ব্যবহার করা যাবে। */
 exports.deleteAccount = onCall(async (request) => {
   try {
     const callerUid = request.auth && request.auth.uid;
@@ -275,6 +301,8 @@ exports.deleteAccount = onCall(async (request) => {
       throw new HttpsError("unauthenticated", "লগইন করা নেই।");
     }
 
+    // কলার সত্যিই সুপার অ্যাডমিন কিনা যাচাই করা (Admin SDK দিয়ে, তাই নিরাপদ —
+    // ক্লায়েন্ট এখানে মিথ্যা দাবি করতে পারবে না)
     const superAdminDoc = await db.collection("superadmins").doc(callerUid).get();
     if (!superAdminDoc.exists) {
       throw new HttpsError("permission-denied", "শুধু সুপার অ্যাডমিন অ্যাকাউন্ট ডিলিট করতে পারবেন।");
@@ -285,6 +313,7 @@ exports.deleteAccount = onCall(async (request) => {
       throw new HttpsError("invalid-argument", "targetUid ও accountType (shop/agent/rider/driver) দিতে হবে।");
     }
 
+    // ১. Firestore থেকে ডেটা মুছে ফেলা (সাব-কালেকশনসহ, recursiveDelete দিয়ে)
     if (accountType === "shop") {
       await db.recursiveDelete(db.collection("shops").doc(targetUid));
     } else if (accountType === "agent") {
@@ -294,11 +323,15 @@ exports.deleteAccount = onCall(async (request) => {
     } else if (accountType === "driver") {
       await db.recursiveDelete(db.collection("transportDrivers").doc(targetUid));
     }
+    // users/{uid} — লগইন রোল-ডকুমেন্ট, সব ধরনের অ্যাকাউন্টের জন্যই থাকে
     await db.collection("users").doc(targetUid).delete().catch(() => {});
 
+    // ২. Firebase Authentication থেকে মুছে ফেলা — এতেই ইমেইল ফ্রি হয়
     try {
       await getAuth().deleteUser(targetUid);
     } catch (e) {
+      // অ্যাকাউন্ট আগে থেকেই Auth-এ না থাকলে (auth/user-not-found) সেটা সমস্যা না,
+      // Firestore ডেটা তো মুছে গেছে already — কিন্তু অন্য কোনো এরর হলে জানানো দরকার
       if (e.code !== "auth/user-not-found") {
         throw new HttpsError("internal", "Firestore ডেটা মুছে গেছে, কিন্তু Auth অ্যাকাউন্ট মুছতে সমস্যা হয়েছে: " + e.message);
       }
@@ -306,11 +339,20 @@ exports.deleteAccount = onCall(async (request) => {
 
     return { success: true, deletedUid: targetUid, accountType };
   } catch (err) {
+    // যেকোনো অপ্রত্যাশিত এরর হলেও (রিকার্সিভ-ডিলিট ব্যর্থ হওয়া, পারমিশন সমস্যা
+    // ইত্যাদি) আসল কারণটা ক্লায়েন্টে দেখানো হয়, যাতে "internal" এর মতো
+    // অস্পষ্ট মেসেজের বদলে ঠিক কী ভুল হয়েছে সেটা বোঝা যায়
     if (err instanceof HttpsError) throw err;
     console.error("deleteAccount ব্যর্থ হয়েছে:", err);
     throw new HttpsError("internal", "ডিলিট করা যায়নি — " + (err && err.message ? err.message : String(err)));
   }
 });
+
+/* ==================== 🚑 ট্রান্সপোর্ট ট্রিপ ডিসপ্যাচ ====================
+   কাস্টমার একটা trips ডকুমেন্ট (status:'requested') তৈরি করলে, এই ফাংশন
+   সবচেয়ে কাছের অনলাইন ড্রাইভারকে খুঁজে ৬০ সেকেন্ডের একটা "অফার" পাঠায়
+   (deliveryOffers-এর মতোই একই প্যাটার্ন)। Reject/timeout হলে পরের কাছের
+   ড্রাইভারকে অটো পাঠানো হয়। */
 
 async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
   if (tripData.pickupLat == null || tripData.pickupLng == null) {
@@ -340,9 +382,11 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
   candidates.sort((a, b) => a.distanceKm - b.distanceKm);
   const nearest = candidates[0];
 
+  // 📏 Pickup→Drop-এর আসল রোড-ডিস্ট্যান্স দিয়ে ভাড়া রিফাইন করা হচ্ছে (ক্যাশ থাকায়
+  // বারবার রিঅ্যাসাইনমেন্টেও অতিরিক্ত API কল লাগে না — একই রুট ২ ঘণ্টা ক্যাশ থাকে)
   const roadDist = await getRoadDistanceKm(tripData.pickupLat, tripData.pickupLng, tripData.dropLat, tripData.dropLng);
   const distanceKm = Math.round(roadDist.distanceKm * 10) / 10;
-  const estimatedFare = Math.round((30 + distanceKm * 15) * 100) / 100;
+  const estimatedFare = Math.round((30 + distanceKm * 15) * 100) / 100; // বেস ৳ 30 + প্রতি কিমি ৳ 15
   const driverEarning = Math.round(estimatedFare * 0.8 * 100) / 100;
 
   const expiresAt = Timestamp.fromMillis(Date.now() + 60 * 1000);
@@ -360,7 +404,7 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
   await db.collection("trips").doc(tripId).set({
     offeredDriverIds: FieldValue.arrayUnion(nearest.id),
     currentOfferId: offerRef.id,
-    distanceKm, estimatedFare, driverEarning,
+    distanceKm, estimatedFare, driverEarning, // রোড-ডিস্ট্যান্স অনুযায়ী রিফাইন করা মান — কাস্টমারের স্ক্রিনেও আপডেট হবে
   }, { merge: true });
 
   console.log(`ট্রিপ অফার পাঠানো হয়েছে — driverId: ${nearest.id}, দূরত্ব: ${nearest.distanceKm.toFixed(1)} কিমি`);
@@ -388,7 +432,7 @@ exports.onTripOfferResolved = onDocumentUpdated(
     const tripSnap = await db.collection("trips").doc(after.tripId).get();
     if (!tripSnap.exists) return;
     const tripData = tripSnap.data();
-    if (tripData.status !== "requested") return;
+    if (tripData.status !== "requested") return; // ইতিমধ্যে অন্য কেউ Accept করে নিয়েছে বা বাতিল হয়েছে
 
     const excludeIds = tripData.offeredDriverIds || [];
     await dispatchTripToNearestDriver(after.tripId, tripData, excludeIds);
@@ -418,4 +462,39 @@ exports.checkExpiredTripOffers = onSchedule("every 2 minutes", async () => {
   if (expiredSnap.empty) return;
   await Promise.all(expiredSnap.docs.map((doc) => doc.ref.update({ status: "expired" })));
   console.log(`${expiredSnap.size}টা মেয়াদোত্তীর্ণ ট্রিপ অফার আপডেট করা হয়েছে`);
+});
+
+/* ==================== 🗑️ ৭ দিনের বেশি পুরনো হিস্ট্রি স্বয়ংক্রিয়ভাবে মুছে ফেলা ====================
+   প্রতিদিন একবার চলে — সম্পন্ন হয়ে যাওয়া ট্রিপ, ডেলিভারি, ও রাস্তা থেকে
+   পিক-আপের রেকর্ড ৭ দিনের পুরনো হয়ে গেলে Firestore থেকে স্থায়ীভাবে মুছে
+   দেওয়া হয় (স্টোরেজ খরচ বাঁচাতে ও ডেটাবেজ পরিষ্কার রাখতে)। */
+exports.cleanupOldHistory = onSchedule("every 24 hours", async () => {
+  const sevenDaysAgo = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  let totalDeleted = 0;
+
+  // ১. সম্পন্ন ডেলিভারি অফার
+  const oldDeliveries = await db.collection("deliveryOffers")
+    .where("status", "==", "delivered")
+    .where("createdAt", "<", sevenDaysAgo)
+    .get();
+  await Promise.all(oldDeliveries.docs.map((doc) => doc.ref.delete()));
+  totalDeleted += oldDeliveries.size;
+
+  // ২. সম্পন্ন গন্তব্য-ভিত্তিক ট্রিপ
+  const oldTrips = await db.collection("trips")
+    .where("status", "==", "completed")
+    .where("createdAt", "<", sevenDaysAgo)
+    .get();
+  await Promise.all(oldTrips.docs.map((doc) => doc.ref.delete()));
+  totalDeleted += oldTrips.size;
+
+  // ৩. রাস্তা থেকে পিক-আপ করা যাত্রী (Zero Interaction) — created_at দিয়ে চেক
+  const oldPickups = await db.collection("passenger_waiting_queue")
+    .where("status", "in", ["PICKED_UP", "COMPLETED"])
+    .where("created_at", "<", sevenDaysAgo)
+    .get();
+  await Promise.all(oldPickups.docs.map((doc) => doc.ref.delete()));
+  totalDeleted += oldPickups.size;
+
+  console.log(`🗑️ ৭ দিনের পুরনো ${totalDeleted}টা হিস্ট্রি রেকর্ড মুছে ফেলা হয়েছে`);
 });
