@@ -11589,15 +11589,19 @@ function dmRenderTripRequests(trips){
     listEl.innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
     return;
   }
-  listEl.innerHTML = relevant.map(t=> `
+  listEl.innerHTML = relevant.map(t=>{
+    const waitCount = (t.waitingList||[]).length;
+    const isFull = waitCount >= 3;
+    return `
     <div style="background:#173a29; border:1px solid rgba(74,222,128,0.2); border-radius:12px; padding:12px; margin-bottom:10px;">
       <div style="font-weight:700; font-size:13px; color:#eafff2;">📍 ${escapeHtmlDm(t.destination||"—")}</div>
-      <div style="font-size:11px; color:#a8d9c0; margin:2px 0 8px;">🚗 ${escapeHtmlDm(t.vehicleType||"")} · ${(t.waitingList||[]).length} জন ইতিমধ্যে অফার করেছেন</div>
+      <div style="font-size:11px; color:#a8d9c0; margin:2px 0 8px;">🚗 ${escapeHtmlDm(t.vehicleType||"")} · ${waitCount}/3 জন ইতিমধ্যে অফার করেছেন</div>
       <div style="display:flex; gap:8px;">
         <button class="dmTripRejectBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#444; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ Reject</button>
-        <button class="dmTripOfferBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#16a34a; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">💰 ভাড়া অফার করুন</button>
+        <button class="dmTripOfferBtn" data-trip="${t.id}" ${isFull ? "disabled" : ""} style="flex:1; padding:8px; border:none; border-radius:8px; background:${isFull ? "#333" : "#16a34a"}; color:${isFull ? "#888" : "#fff"}; font-weight:800; font-size:11.5px; cursor:${isFull ? "not-allowed" : "pointer"}; font-family:inherit;">${isFull ? "🔒 ৩ জন পূর্ণ" : "💰 ভাড়া অফার করুন"}</button>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   listEl.querySelectorAll(".dmTripRejectBtn").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
@@ -11619,13 +11623,18 @@ async function dmOfferTripFare(tripId){
   const v = __dmDriver.vehicle || {};
 
   // 🔵 এই অফারের নিজস্ব timerExpiresAt — মাস্টার সেশন-টাইমার ও নিজের
-  // ৬-মিনিটের মধ্যে যেটা আগে শেষ হবে সেটাই (ট্রিপ ডকুমেন্ট থেকে
-  // sessionExpiresAt এনে হিসাব করা হয়)
+  // ৬-মিনিটের মধ্যে যেটা আগে শেষ হবে সেটাই। একই সাথে সর্বোচ্চ ৩ জন
+  // ড্রাইভারের ওয়েটিং-লিস্ট সীমাও এখানে চেক করা হয়।
   let timerExpiresAt = Timestamp_now();
   try{
     const tripDoc = await db.collection("trips").doc(tripId).get();
-    const masterExpiresMs = tripDoc.exists && tripDoc.data().sessionExpiresAt
-      ? tripDoc.data().sessionExpiresAt.toMillis() : (Date.now() + 6*60*1000);
+    if(!tripDoc.exists){ alert("এই ট্রিপটা আর নেই।"); return; }
+    const tripData = tripDoc.data();
+    if((tripData.waitingList||[]).length >= 3){
+      alert("দুঃখিত, এই ট্রিপে ইতিমধ্যে ৩ জন ড্রাইভার অফার করে ফেলেছেন — যাত্রী এখন তাদের মধ্যে বেছে নিচ্ছেন।");
+      return;
+    }
+    const masterExpiresMs = tripData.sessionExpiresAt ? tripData.sessionExpiresAt.toMillis() : (Date.now() + 6*60*1000);
     const driver6MinMs = Date.now() + 6*60*1000;
     timerExpiresAt = firebase.firestore.Timestamp.fromMillis(Math.min(masterExpiresMs, driver6MinMs));
   }catch(e){ console.warn("timerExpiresAt হিসাব করা যায়নি, ডিফল্ট ৬ মিনিট ব্যবহার হচ্ছে:", e); }
@@ -11682,13 +11691,28 @@ async function dmRenderActiveTripStatus(trip, tripId){
       listEl.innerHTML = `
         <div style="background:#173a29; border:1px solid #4ade80; border-radius:12px; padding:14px;">
           <div style="font-weight:700; font-size:13.5px; color:#4ade80;">🚗 সক্রিয় ট্রিপ চলছে</div>
-          <div style="font-size:12px; color:#eafff2; margin:4px 0 2px;">👤 যাত্রী: ${escapeHtmlDm(trip.passengerName||"—")}${trip.passengerPhone ? ' · 📞 <a href="tel:'+escapeHtmlDm(trip.passengerPhone)+'" style="color:#4ade80;">'+escapeHtmlDm(trip.passengerPhone)+'</a>' : ''}</div>
+          <div style="font-size:12px; color:#eafff2; margin:4px 0 2px;">👤 যাত্রী: ${escapeHtmlDm(trip.passengerName||"—")}</div>
           <div style="font-size:12px; color:#eafff2; margin:2px 0;">📍 পিকআপ: ${escapeHtmlDm((trip.pickupLocation && trip.pickupLocation.address) || "জানা নেই")}</div>
           <div style="font-size:12px; color:#eafff2; margin:2px 0;">🏁 গন্তব্য: ${escapeHtmlDm(trip.destination||"—")}</div>
           <div style="font-size:12px; color:#a8d9c0; margin-bottom:10px;">💰 ভাড়া: ৳ ${trip.confirmedDriver.finalFare}</div>
+          <div id="dmTripRouteMapEl" style="width:100%; height:160px; border-radius:10px; overflow:hidden; background:#111; margin-bottom:10px; display:${trip.pickupLocation && trip.pickupLocation.lat ? "block" : "none"};"></div>
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <button id="dmNavigateBtn" style="flex:1; padding:10px; border:none; border-radius:9px; background:#2563eb; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">🧭 Navigate</button>
+            <button id="dmCallPassengerBtn" style="flex:1; padding:10px; border:none; border-radius:9px; background:#f59e0b; color:#1a1206; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">📞 Call Passenger</button>
+          </div>
           <button id="dmCompleteTripBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ট্রিপ শেষ করুন</button>
         </div>`;
       document.getElementById("dmCompleteTripBtn").addEventListener("click", ()=> dmCompleteTrip(tripId));
+      document.getElementById("dmNavigateBtn").addEventListener("click", ()=>{
+        const loc = trip.pickupLocation;
+        if(loc && loc.lat != null) window.open(`https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`, "_blank");
+        else alert("যাত্রীর সঠিক লোকেশন পাওয়া যায়নি।");
+      });
+      document.getElementById("dmCallPassengerBtn").addEventListener("click", ()=>{
+        if(trip.passengerPhone) window.location.href = "tel:" + trip.passengerPhone;
+        else alert("যাত্রীর ফোন নম্বর পাওয়া যায়নি।");
+      });
+      dmDrawTripRoute(trip);
     }else{
       // অন্য কোনো ড্রাইভার বেছে নেওয়া হয়েছে — আমি আবার "available"
       await dmResetActiveTripStatus();
@@ -11758,6 +11782,27 @@ async function dmResetActiveTripStatus(){
   __dmDriver.currentStatus = "available"; __dmDriver.activeTripId = null;
   try{ await db.collection("transportDrivers").doc(__dmDriverId).update({ currentStatus: "available", activeTripId: null }); }catch(e){}
   document.getElementById("dmTripRequestsList").innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
+}
+
+// 🗺️ চালক ও পিকআপ লোকেশনের মধ্যে একটা সরলরেখা (straight line) দেখানো হয় —
+// এটা আসল turn-by-turn রুট না (সেটার জন্য পেইড রুটিং API লাগত), শুধু
+// দিকনির্দেশনার একটা visual ইঙ্গিত। আসল ন্যাভিগেশনের জন্য "🧭 Navigate"
+// বাটন থেকে Google Maps-এ পাঠানো হয়।
+let dmTripRouteMap = null;
+function dmDrawTripRoute(trip){
+  const loc = trip.pickupLocation;
+  if(!loc || loc.lat == null || !__dmMyLatLng) return;
+  const mapEl = document.getElementById("dmTripRouteMapEl");
+  if(!mapEl) return;
+  if(dmTripRouteMap){ dmTripRouteMap.remove(); dmTripRouteMap = null; }
+  dmTripRouteMap = L.map("dmTripRouteMapEl", { zoomControl:false, dragging:false, scrollWheelZoom:false }).setView(__dmMyLatLng, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(dmTripRouteMap);
+  const driverIcon = L.divIcon({ html: '<div style="font-size:22px;">🚗</div>', className:'', iconSize:[26,26] });
+  const pickupIcon = L.divIcon({ html: '<div style="font-size:22px;">📍</div>', className:'', iconSize:[26,26] });
+  L.marker(__dmMyLatLng, { icon: driverIcon }).addTo(dmTripRouteMap);
+  L.marker([loc.lat, loc.lng], { icon: pickupIcon }).addTo(dmTripRouteMap);
+  L.polyline([__dmMyLatLng, [loc.lat, loc.lng]], { color:'#2563eb', weight:3, dashArray:'6,6' }).addTo(dmTripRouteMap);
+  dmTripRouteMap.fitBounds([__dmMyLatLng, [loc.lat, loc.lng]], { padding:[24,24] });
 }
 
 async function dmCompleteTrip(tripId){
@@ -12384,15 +12429,19 @@ function rmRenderTripRequests(trips){
     listEl.innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
     return;
   }
-  listEl.innerHTML = relevant.map(t=> `
+  listEl.innerHTML = relevant.map(t=>{
+    const waitCount = (t.waitingList||[]).length;
+    const isFull = waitCount >= 3;
+    return `
     <div style="background:#2b2b2b; border:1px solid rgba(255,193,7,0.25); border-radius:12px; padding:12px; margin-bottom:10px;">
       <div style="font-weight:700; font-size:13px; color:#fff;">📍 ${escapeHtml(t.destination||"—")}</div>
-      <div style="font-size:11px; color:#a8a8a8; margin:2px 0 8px;">🚗 ${escapeHtml(t.vehicleType||"")} · ${(t.waitingList||[]).length} জন ইতিমধ্যে অফার করেছেন</div>
+      <div style="font-size:11px; color:#a8a8a8; margin:2px 0 8px;">🚗 ${escapeHtml(t.vehicleType||"")} · ${waitCount}/3 জন ইতিমধ্যে অফার করেছেন</div>
       <div style="display:flex; gap:8px;">
         <button class="rmTripRejectBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#444; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ Reject</button>
-        <button class="rmTripOfferBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#FFC107; color:#1a1a1a; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">💰 ভাড়া অফার করুন</button>
+        <button class="rmTripOfferBtn" data-trip="${t.id}" ${isFull ? "disabled" : ""} style="flex:1; padding:8px; border:none; border-radius:8px; background:${isFull ? "#3a3a3a" : "#FFC107"}; color:${isFull ? "#888" : "#1a1a1a"}; font-weight:800; font-size:11.5px; cursor:${isFull ? "not-allowed" : "pointer"}; font-family:inherit;">${isFull ? "🔒 ৩ জন পূর্ণ" : "💰 ভাড়া অফার করুন"}</button>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 
   listEl.querySelectorAll(".rmTripRejectBtn").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
@@ -12415,8 +12464,13 @@ async function rmOfferTripFare(tripId){
   let timerExpiresAt = firebase.firestore.Timestamp.now();
   try{
     const tripDoc = await db.collection("trips").doc(tripId).get();
-    const masterExpiresMs = tripDoc.exists && tripDoc.data().sessionExpiresAt
-      ? tripDoc.data().sessionExpiresAt.toMillis() : (Date.now() + 6*60*1000);
+    if(!tripDoc.exists){ alert("এই ট্রিপটা আর নেই।"); return; }
+    const tripData = tripDoc.data();
+    if((tripData.waitingList||[]).length >= 3){
+      alert("দুঃখিত, এই ট্রিপে ইতিমধ্যে ৩ জন ড্রাইভার অফার করে ফেলেছেন — যাত্রী এখন তাদের মধ্যে বেছে নিচ্ছেন।");
+      return;
+    }
+    const masterExpiresMs = tripData.sessionExpiresAt ? tripData.sessionExpiresAt.toMillis() : (Date.now() + 6*60*1000);
     const driver6MinMs = Date.now() + 6*60*1000;
     timerExpiresAt = firebase.firestore.Timestamp.fromMillis(Math.min(masterExpiresMs, driver6MinMs));
   }catch(e){ console.warn("timerExpiresAt হিসাব করা যায়নি, ডিফল্ট ৬ মিনিট ব্যবহার হচ্ছে:", e); }
@@ -12463,13 +12517,28 @@ async function rmRenderActiveTripStatus(trip, tripId){
       listEl.innerHTML = `
         <div style="background:#2b2b2b; border:1px solid #FFC107; border-radius:12px; padding:14px;">
           <div style="font-weight:700; font-size:13.5px; color:#FFC107;">🚗 সক্রিয় ট্রিপ চলছে</div>
-          <div style="font-size:12px; color:#fff; margin:4px 0 2px;">👤 যাত্রী: ${escapeHtml(trip.passengerName||"—")}${trip.passengerPhone ? ' · 📞 <a href="tel:'+escapeHtml(trip.passengerPhone)+'" style="color:#FFC107;">'+escapeHtml(trip.passengerPhone)+'</a>' : ''}</div>
+          <div style="font-size:12px; color:#fff; margin:4px 0 2px;">👤 যাত্রী: ${escapeHtml(trip.passengerName||"—")}</div>
           <div style="font-size:12px; color:#fff; margin:2px 0;">📍 পিকআপ: ${escapeHtml((trip.pickupLocation && trip.pickupLocation.address) || "জানা নেই")}</div>
           <div style="font-size:12px; color:#fff; margin:2px 0;">🏁 গন্তব্য: ${escapeHtml(trip.destination||"—")}</div>
           <div style="font-size:12px; color:#a8a8a8; margin-bottom:10px;">💰 ভাড়া: ৳ ${trip.confirmedDriver.finalFare}</div>
+          <div id="rmTripRouteMapEl" style="width:100%; height:160px; border-radius:10px; overflow:hidden; background:#111; margin-bottom:10px; display:${trip.pickupLocation && trip.pickupLocation.lat ? "block" : "none"};"></div>
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <button id="rmNavigateBtn" style="flex:1; padding:10px; border:none; border-radius:9px; background:#2563eb; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">🧭 Navigate</button>
+            <button id="rmCallPassengerBtn" style="flex:1; padding:10px; border:none; border-radius:9px; background:#FFC107; color:#1a1a1a; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">📞 Call Passenger</button>
+          </div>
           <button id="rmCompleteTripBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ট্রিপ শেষ করুন</button>
         </div>`;
       document.getElementById("rmCompleteTripBtn").addEventListener("click", ()=> rmCompleteTrip(tripId));
+      document.getElementById("rmNavigateBtn").addEventListener("click", ()=>{
+        const loc = trip.pickupLocation;
+        if(loc && loc.lat != null) window.open(`https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`, "_blank");
+        else alert("যাত্রীর সঠিক লোকেশন পাওয়া যায়নি।");
+      });
+      document.getElementById("rmCallPassengerBtn").addEventListener("click", ()=>{
+        if(trip.passengerPhone) window.location.href = "tel:" + trip.passengerPhone;
+        else alert("যাত্রীর ফোন নম্বর পাওয়া যায়নি।");
+      });
+      rmDrawTripRoute(trip);
     }else{
       await rmResetActiveTripStatus();
     }
@@ -12536,6 +12605,23 @@ async function rmResetActiveTripStatus(){
   rmCurrentRider.currentStatus = "available"; rmCurrentRider.activeTripId = null;
   try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ currentStatus: "available", activeTripId: null }); }catch(e){}
   document.getElementById("rmTripRequestsList").innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
+}
+
+let rmTripRouteMap = null;
+function rmDrawTripRoute(trip){
+  const loc = trip.pickupLocation;
+  if(!loc || loc.lat == null || !__rmMyLatLng) return;
+  const mapEl = document.getElementById("rmTripRouteMapEl");
+  if(!mapEl) return;
+  if(rmTripRouteMap){ rmTripRouteMap.remove(); rmTripRouteMap = null; }
+  rmTripRouteMap = L.map("rmTripRouteMapEl", { zoomControl:false, dragging:false, scrollWheelZoom:false }).setView(__rmMyLatLng, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(rmTripRouteMap);
+  const driverIcon = L.divIcon({ html: '<div style="font-size:22px;">🛵</div>', className:'', iconSize:[26,26] });
+  const pickupIcon = L.divIcon({ html: '<div style="font-size:22px;">📍</div>', className:'', iconSize:[26,26] });
+  L.marker(__rmMyLatLng, { icon: driverIcon }).addTo(rmTripRouteMap);
+  L.marker([loc.lat, loc.lng], { icon: pickupIcon }).addTo(rmTripRouteMap);
+  L.polyline([__rmMyLatLng, [loc.lat, loc.lng]], { color:'#FFC107', weight:3, dashArray:'6,6' }).addTo(rmTripRouteMap);
+  rmTripRouteMap.fitBounds([__rmMyLatLng, [loc.lat, loc.lng]], { padding:[24,24] });
 }
 
 async function rmCompleteTrip(tripId){
