@@ -188,7 +188,7 @@
     <p style="font-size:11.5px; color:var(--muted); margin:0 0 12px;">কাস্টমার/ড্রাইভার নগদ টাকা দিলে তার Wallet-এ যোগ করুন। কোনো পেমেন্ট গেটওয়ে নেই — এটা শুধু একটা ইন্টারনাল হিসাব-খাতা।</p>
     <label>ইউজারের UID</label>
     <input type="text" id="walletUid" placeholder="কাস্টমার/ড্রাইভারের UID (তার অ্যাপের Menu থেকে পাবে)">
-    <label>পরিমাণ (SAR)</label>
+    <label>পরিমাণ (৳)</label>
     <input type="number" id="walletAmount" placeholder="যেমনঃ 100">
     <label>নোট (ঐচ্ছিক)</label>
     <input type="text" id="walletNote" placeholder="যেমনঃ নগদ জমা - ফরিদ ভাই">
@@ -201,9 +201,9 @@
   <div class="tabPanel" id="tabCharge">
     <div class="card">
       <h2>💰 ডাইনামিক ডেলিভারি চার্জ</h2>
-      <label for="baseChargeInput">বেস চার্জ (SAR)</label>
+      <label for="baseChargeInput">বেস চার্জ (৳)</label>
       <input type="number" id="baseChargeInput" placeholder="যেমনঃ 5" min="0" step="0.5">
-      <label for="perKmInput">প্রতি কিমি অতিরিক্ত চার্জ (SAR)</label>
+      <label for="perKmInput">প্রতি কিমি অতিরিক্ত চার্জ (৳)</label>
       <input type="number" id="perKmInput" placeholder="যেমনঃ 1.5" min="0" step="0.5">
       <button class="btn" id="saveChargeBtn">✅ সেভ করুন</button>
       <p id="chargeSavedMsg" style="display:none; color:var(--ok); font-size:12px; margin:10px 0 0;">✅ সেভ হয়েছে!</p>
@@ -233,7 +233,7 @@
     </select>
     <label for="riderGuarantor">জামিনদারের নাম ও নম্বর</label>
     <input type="text" id="riderGuarantor" placeholder="নাম — মোবাইল নম্বর">
-    <label for="riderCashLimit">ক্যাশ হোল্ড লিমিট (SAR)</label>
+    <label for="riderCashLimit">ক্যাশ হোল্ড লিমিট (৳)</label>
     <input type="number" id="riderCashLimit" value="500" min="0" step="50">
     <button class="btn" id="saveRiderBtn">✅ রাইডার যোগ করুন</button>
     <p id="riderAddMsg" style="display:none; font-size:12.5px; margin:8px 0 0;"></p>
@@ -416,7 +416,7 @@ function listenRiders(){
           <div class="rowItem">
             <div class="info">
               <div class="name">${escapeHtml(r.name || "নাম নেই")} ${r.isVerified ? '<span title="Verified">🛡️</span>' : ''}</div>
-              <div class="meta">📱 ${escapeHtml(r.phone || "—")} · ক্যাশ লিমিট: SAR ${r.cashHoldLimit != null ? r.cashHoldLimit : "—"}</div>
+              <div class="meta">📱 ${escapeHtml(r.phone || "—")} · ক্যাশ লিমিট: ৳ ${r.cashHoldLimit != null ? r.cashHoldLimit : "—"}</div>
             </div>
             <span class="badge ${statusClass}">${statusText}</span>
           </div>
@@ -663,7 +663,7 @@ $("walletTopupBtn").addEventListener("click", async ()=>{
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     $("walletUid").value = ""; $("walletAmount").value = ""; $("walletNote").value = "";
-    msgEl.textContent = `✅ SAR ${amount} সফলভাবে যোগ হয়েছে।`;
+    msgEl.textContent = `✅ ৳ ${amount} সফলভাবে যোগ হয়েছে।`;
     msgEl.style.color = "#2fbf71"; msgEl.style.display = "block";
   }catch(e){
     msgEl.textContent = "⚠️ টপ-আপ করা যায়নি: " + e.message;

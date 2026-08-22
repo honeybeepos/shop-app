@@ -403,7 +403,7 @@ function renderAuthArea(){
     });
     db.collection("wallets").doc(currentCustomer.uid).onSnapshot((doc)=>{
       const el = document.getElementById("walletBalanceTxt");
-      if(el) el.textContent = "SAR " + (doc.exists ? (doc.data().balance || 0) : 0);
+      if(el) el.textContent = "৳ " + (doc.exists ? (doc.data().balance || 0) : 0);
     });
   }else{
     area.innerHTML = `<div class="googleLoginBtn" id="googleLoginBtn">🔵 Google দিয়ে লগইন</div>`;
@@ -845,8 +845,8 @@ function renderProducts(products){
     }
     const hasOffer = p.offerPrice != null && p.price != null && Number(p.offerPrice) < Number(p.price);
     const priceHtml = hasOffer
-      ? `<span style="text-decoration:line-through; color:var(--muted); margin-right:6px;">SAR ${p.price}</span><span style="color:#fb923c; font-weight:800;">SAR ${p.offerPrice}</span>`
-      : (p.price != null ? ("SAR " + p.price) : "");
+      ? `<span style="text-decoration:line-through; color:var(--muted); margin-right:6px;">৳ ${p.price}</span><span style="color:#fb923c; font-weight:800;">৳ ${p.offerPrice}</span>`
+      : (p.price != null ? ("৳ " + p.price) : "");
     const isFav = favs.includes(p.id);
     const outOfStock = stockClass === "out";
     return `
@@ -997,7 +997,7 @@ function tripRenderStatus(trip){
         <div style="font-weight:700; font-size:13.5px;">${escapeHtml(o.driverName||"ড্রাইভার")}</div>
         <div style="font-size:11.5px; color:var(--muted); margin:2px 0 8px;">${escapeHtml(o.vehicleModel||"")} ${o.eta ? "· ETA: "+escapeHtml(o.eta) : ""}</div>
         <div style="display:flex; align-items:center; gap:10px;">
-          <div style="font-weight:800; color:var(--amber); font-size:15px;">SAR ${o.offeredFare}</div>
+          <div style="font-weight:800; color:var(--amber); font-size:15px;">৳ ${o.offeredFare}</div>
           <button data-offer-idx="${idx}" class="tripSelectOfferBtn" style="margin-left:auto; padding:8px 14px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✅ এটা নিন</button>
         </div>
       </div>`).join("");
@@ -1012,7 +1012,7 @@ function tripRenderStatus(trip){
     const chosen = list.find(o=> o.driverId === trip.confirmedDriver.driverId) || {};
     $("tripConfirmedBox").style.display = "block";
     $("tripConfirmedName").textContent = chosen.driverName || "ড্রাইভার";
-    $("tripConfirmedMeta").textContent = `${chosen.vehicleModel||""} · ভাড়া: SAR ${trip.confirmedDriver.finalFare}`;
+    $("tripConfirmedMeta").textContent = `${chosen.vehicleModel||""} · ভাড়া: ৳ ${trip.confirmedDriver.finalFare}`;
   }else if(trip.status === "expired"){
     $("tripStatusIcon").textContent = "⏱️";
     $("tripStatusTitle").textContent = "সময় শেষ হয়ে গেছে, কোনো ড্রাইভার পাওয়া যায়নি";
