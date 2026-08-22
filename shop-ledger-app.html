@@ -752,8 +752,9 @@
       position:fixed; top:16px; right:16px; z-index:999; padding:10px 16px; border:none; border-radius:10px;
       background:rgba(0,0,0,0.75); color:#fff; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;
     }
-    #dmOfferOverlay{ display:none; position:fixed; inset:0; z-index:999; background:rgba(0,0,0,0.75); align-items:center; justify-content:center; padding:16px; }
-    #dmOfferOverlay .card{ background:#173a29; border:2px solid #4ade80; border-radius:18px; padding:20px; max-width:380px; width:100%; }
+    #dmOfferOverlay{ display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); align-items:center; justify-content:center; padding:16px; }
+    #dmOfferOverlay .card{ background:#173a29; border:2px solid #4ade80; border-radius:18px; padding:20px; max-width:380px; width:100%; animation: dmPopupPulse 1s ease-in-out infinite; }
+    @keyframes dmPopupPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(74,222,128,0.5); } 50%{ box-shadow:0 0 0 14px rgba(74,222,128,0); } }
     #dmOfferTimer{ text-align:center; font-size:34px; font-weight:800; color:#4ade80; margin:8px 0; font-family:'Space Mono',monospace; }
   </style>
 
@@ -868,8 +869,9 @@
     #riderModeApp .rmToolBtn .ic{ font-size:22px; display:block; margin-bottom:6px; }
     #rmRadarMapEl.rmMapFullscreen{ position:fixed; inset:0; z-index:998; width:100vw !important; height:100vh !important; border-radius:0; margin:0; }
     .rmRadarExitBtn{ position:fixed; top:16px; right:16px; z-index:999; padding:10px 16px; border:none; border-radius:10px; background:rgba(0,0,0,0.75); color:#fff; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit; }
-    #rmOfferOverlay{ display:none; position:fixed; inset:0; z-index:900; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; padding:16px; }
-    #rmOfferOverlay .card{ background:#2b2b2b; border:2px solid #FFC107; border-radius:20px; padding:22px; max-width:400px; width:100%; }
+    #rmOfferOverlay{ display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; padding:16px; }
+    #rmOfferOverlay .card{ background:#2b2b2b; border:2px solid #FFC107; border-radius:20px; padding:22px; max-width:400px; width:100%; animation: rmPopupPulse 1s ease-in-out infinite; }
+    @keyframes rmPopupPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(255,193,7,0.5); } 50%{ box-shadow:0 0 0 14px rgba(255,193,7,0); } }
     #rmOfferTimer{ text-align:center; font-size:32px; font-weight:800; color:#FFC107; margin:10px 0; font-family:'Space Mono',monospace; }
     .rmBottomNav{ position:fixed; bottom:0; left:0; right:0; background:#1a1a1a; border-top:1px solid rgba(255,193,7,0.25); display:flex; z-index:100; padding:6px 0; }
     .rmBottomNav .navItem{ flex:1; text-align:center; padding:6px 0; font-size:10.5px; color:#a8a8a8; cursor:pointer; }
@@ -890,13 +892,20 @@
   <!-- ⚙️ সেটিংস প্যানেল -->
   <div class="rmCard" id="rmSettingsPanel" style="display:none;">
     <h3 style="margin:0 0 12px; font-size:13px;">⚙️ সেটিংস</h3>
-    <div style="display:flex; align-items:center; gap:10px;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid rgba(255,193,7,0.15);">
       <div style="flex:1;">
         <div style="font-size:12.5px; font-weight:700;">🐝 Bee Ringtone</div>
         <div style="font-size:10.5px; color:#a8a8a8;">নতুন রিকোয়েস্ট এলে শব্দ+ভাইব্রেশন</div>
       </div>
       <div class="rmSwitch" id="rmRingtoneSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
       <button id="rmRingtoneTestBtn" style="flex-shrink:0; padding:7px 12px; border:1px solid rgba(255,193,7,0.25); background:transparent; color:#a8a8a8; border-radius:8px; font-size:11px; cursor:pointer; font-family:inherit;">🔊 টেস্ট</button>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div style="flex:1;">
+        <div style="font-size:12.5px; font-weight:700;" id="rmTmOffLbl">🚕 Transport Mode</div>
+        <div style="font-size:10.5px; color:#a8a8a8;" id="rmTmHintTxt">ফ্রি সময়ে রাস্তার যাত্রীও পিক করতে পারবেন</div>
+      </div>
+      <div class="rmSwitch" id="rmTransportModeSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
     </div>
   </div>
 
@@ -905,15 +914,7 @@
     <div class="rmSwitch" id="rmOnlineSwitch"><div class="rmKnob"></div></div>
     <span class="rmLbl on" id="rmOnlineLbl">🟢 Online</span>
   </div>
-  <p class="rmGpsStatus" id="rmGpsStatusTxt">📍 GPS বন্ধ আছে</p>
-
-  <!-- 🚕 Transport Mode Switcher -->
-  <div class="rmToggleRow" style="margin-top:-4px;">
-    <span class="rmLbl" id="rmTmOffLbl">📦 শুধু ডেলিভারি</span>
-    <div class="rmSwitch" id="rmTransportModeSwitch"><div class="rmKnob"></div></div>
-    <span class="rmLbl" id="rmTmOnLbl">🚕 Transport Mode</span>
-  </div>
-  <p class="rmGpsStatus" id="rmTmHintTxt" style="margin-bottom:14px;">Transport Mode অন করলে ফ্রি সময়ে রাস্তার যাত্রীও পিক করতে পারবেন।</p>
+  <p class="rmGpsStatus" id="rmGpsStatusTxt" style="margin-bottom:14px;">📍 GPS বন্ধ আছে</p>
 
   <div class="rmCard" id="rmRadarCard" style="display:none;">
     <h3 style="margin:0 0 10px; font-size:14px;">📡 কাছের যাত্রী</h3>
@@ -12594,8 +12595,6 @@ document.getElementById("rmTransportModeSwitch").addEventListener("click", async
   unlockBeeAudio();
   rmTransportModeOn = !rmTransportModeOn;
   document.getElementById("rmTransportModeSwitch").classList.toggle("on", rmTransportModeOn);
-  document.getElementById("rmTmOffLbl").classList.toggle("on", !rmTransportModeOn);
-  document.getElementById("rmTmOnLbl").classList.toggle("on", rmTransportModeOn);
   document.getElementById("rmRadarCard").style.display = rmTransportModeOn ? "block" : "none";
   document.getElementById("rmTripRequestsCard").style.display = rmTransportModeOn ? "block" : "none";
   try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ transportModeOn: rmTransportModeOn }); }catch(e){}
