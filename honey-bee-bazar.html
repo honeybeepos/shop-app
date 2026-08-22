@@ -291,6 +291,8 @@
         <div style="font-size:32px;">🚕</div>
         <div style="font-size:14px; font-weight:700;">গন্তব্য দিয়ে বুক করুন</div>
       </div>
+      <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">আপনার মোবাইল নম্বর</label>
+      <input type="text" id="tripPassengerPhone" placeholder="05XXXXXXXX" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
       <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">যানবাহনের ধরন</label>
       <select id="tripVehicleType" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
         <option value="CNG">🛺 CNG/অটো</option>
@@ -299,7 +301,8 @@
         <option value="Bus">🚌 বাস</option>
       </select>
       <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">গন্তব্য</label>
-      <input type="text" id="tripDestination" placeholder="যেমনঃ হাজীগঞ্জ" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px;">
+      <input type="text" id="tripDestination" placeholder="যেমনঃ হাজীগঞ্জ" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:8px;">
+      <p id="tripPickupStatus" style="font-size:11px; color:var(--muted); margin:0 0 14px;">📍 পিকআপ লোকেশন স্বয়ংক্রিয়ভাবে (GPS দিয়ে) নেওয়া হবে</p>
       <button id="tripSearchBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1);">🔍 ড্রাইভার খুঁজুন</button>
     </div>
 
@@ -923,21 +926,27 @@ function tripGetUserId(){
 $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
   const vehicleType = $("tripVehicleType").value;
   const destination = $("tripDestination").value.trim();
+  const passengerPhone = $("tripPassengerPhone").value.trim();
   if(!destination){ alert("গন্তব্য লিখুন।"); return; }
+  if(!passengerPhone){ alert("আপনার মোবাইল নম্বর লিখুন — ড্রাইভার এই নম্বরে যোগাযোগ করবেন।"); return; }
 
-  $("tripSearchBtn").disabled = true; $("tripSearchBtn").textContent = "খোঁজা হচ্ছে...";
+  $("tripSearchBtn").disabled = true; $("tripSearchBtn").textContent = "লোকেশন খোঁজা হচ্ছে...";
   try{
+    const pickupLocation = await tripGetPickupLocation();
+    $("tripSearchBtn").textContent = "খোঁজা হচ্ছে...";
     const now = Date.now();
     const tripRef = await db.collection("trips").add({
       passengerId: tripGetUserId(),
       passengerName: (currentCustomer && currentCustomer.name) || "যাত্রী",
+      passengerPhone,
+      pickupLocation,
       vehicleType, destination,
       status: "searching",
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       sessionExpiresAt: firebase.firestore.Timestamp.fromMillis(now + 6*60*1000), // ৬ মিনিটের মাস্টার টাইমার
       rejectedDrivers: [],
       waitingList: [],
-      confirmedDriver: { driverId: null, finalFare: 0 }
+      confirmedDriver: { driverId: null, finalFare: 0, confirmedAt: null }
     });
     tripCurrentId = tripRef.id;
     $("tripBookCard").style.display = "none";
@@ -949,6 +958,28 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
     $("tripSearchBtn").disabled = false; $("tripSearchBtn").textContent = "🔍 ড্রাইভার খুঁজুন";
   }
 });
+
+// 📍 নিঃশব্দে (কোনো ম্যাপ না দেখিয়ে, Zero Interaction স্টাইলেই) GPS থেকে
+// পিকআপ লোকেশন + ঠিকানা নেওয়া হয় — ব্যর্থ হলেও বুকিং আটকায় না, শুধু
+// ঠিকানা "লোকেশন পাওয়া যায়নি" দেখাবে
+async function tripGetPickupLocation(){
+  if(!navigator.geolocation) return { address: "লোকেশন পাওয়া যায়নি", lat: null, lng: null };
+  try{
+    const pos = await new Promise((resolve, reject)=>{
+      navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy:true, timeout:10000 });
+    });
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    let address = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    try{
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { "Accept-Language": "bn" } });
+      const data = await res.json();
+      if(data && data.display_name) address = data.display_name;
+    }catch(e){ /* রিভার্স-জিওকোড ব্যর্থ হলেও কোঅর্ডিনেট দিয়ে চালিয়ে যাওয়া হয় */ }
+    return { address, lat, lng };
+  }catch(e){
+    return { address: "লোকেশন পাওয়া যায়নি (GPS পারমিশন লাগবে)", lat: null, lng: null };
+  }
+}
 
 function tripWatchTrip(tripId){
   if(tripUnsub) tripUnsub();
@@ -1030,7 +1061,7 @@ async function tripConfirmOffer(offer){
   try{
     await db.collection("trips").doc(tripCurrentId).update({
       status: "confirmed",
-      confirmedDriver: { driverId: offer.driverId, finalFare: offer.offeredFare }
+      confirmedDriver: { driverId: offer.driverId, finalFare: offer.offeredFare, confirmedAt: firebase.firestore.FieldValue.serverTimestamp() }
     });
   }catch(e){ alert("নিশ্চিত করা যায়নি: " + e.message); }
 }

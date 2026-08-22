@@ -11617,6 +11617,19 @@ async function dmOfferTripFare(tripId){
   if(!fare || fare <= 0){ alert("সঠিক ভাড়া দিন।"); return; }
   const etaInput = prompt("কত মিনিটে পৌঁছাতে পারবেন? (শুধু সংখ্যা)", "5") || "5";
   const v = __dmDriver.vehicle || {};
+
+  // 🔵 এই অফারের নিজস্ব timerExpiresAt — মাস্টার সেশন-টাইমার ও নিজের
+  // ৬-মিনিটের মধ্যে যেটা আগে শেষ হবে সেটাই (ট্রিপ ডকুমেন্ট থেকে
+  // sessionExpiresAt এনে হিসাব করা হয়)
+  let timerExpiresAt = Timestamp_now();
+  try{
+    const tripDoc = await db.collection("trips").doc(tripId).get();
+    const masterExpiresMs = tripDoc.exists && tripDoc.data().sessionExpiresAt
+      ? tripDoc.data().sessionExpiresAt.toMillis() : (Date.now() + 6*60*1000);
+    const driver6MinMs = Date.now() + 6*60*1000;
+    timerExpiresAt = firebase.firestore.Timestamp.fromMillis(Math.min(masterExpiresMs, driver6MinMs));
+  }catch(e){ console.warn("timerExpiresAt হিসাব করা যায়নি, ডিফল্ট ৬ মিনিট ব্যবহার হচ্ছে:", e); }
+
   const offer = {
     driverId: __dmDriverId,
     driverName: __dmDriver.name || "ড্রাইভার",
@@ -11625,6 +11638,7 @@ async function dmOfferTripFare(tripId){
     offeredFare: fare,
     eta: etaInput + " min",
     waitingStartedAt: Timestamp_now(),
+    timerExpiresAt,
   };
   try{
     await db.collection("trips").doc(tripId).update({
@@ -11668,7 +11682,9 @@ async function dmRenderActiveTripStatus(trip, tripId){
       listEl.innerHTML = `
         <div style="background:#173a29; border:1px solid #4ade80; border-radius:12px; padding:14px;">
           <div style="font-weight:700; font-size:13.5px; color:#4ade80;">🚗 সক্রিয় ট্রিপ চলছে</div>
-          <div style="font-size:12px; color:#eafff2; margin:4px 0 2px;">📍 গন্তব্য: ${escapeHtmlDm(trip.destination||"—")}</div>
+          <div style="font-size:12px; color:#eafff2; margin:4px 0 2px;">👤 যাত্রী: ${escapeHtmlDm(trip.passengerName||"—")}${trip.passengerPhone ? ' · 📞 <a href="tel:'+escapeHtmlDm(trip.passengerPhone)+'" style="color:#4ade80;">'+escapeHtmlDm(trip.passengerPhone)+'</a>' : ''}</div>
+          <div style="font-size:12px; color:#eafff2; margin:2px 0;">📍 পিকআপ: ${escapeHtmlDm((trip.pickupLocation && trip.pickupLocation.address) || "জানা নেই")}</div>
+          <div style="font-size:12px; color:#eafff2; margin:2px 0;">🏁 গন্তব্য: ${escapeHtmlDm(trip.destination||"—")}</div>
           <div style="font-size:12px; color:#a8d9c0; margin-bottom:10px;">💰 ভাড়া: ৳ ${trip.confirmedDriver.finalFare}</div>
           <button id="dmCompleteTripBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ট্রিপ শেষ করুন</button>
         </div>`;
@@ -12395,6 +12411,16 @@ async function rmOfferTripFare(tripId){
   const fare = Number(fareInput);
   if(!fare || fare <= 0){ alert("সঠিক ভাড়া দিন।"); return; }
   const etaInput = prompt("কত মিনিটে পৌঁছাতে পারবেন? (শুধু সংখ্যা)", "5") || "5";
+
+  let timerExpiresAt = firebase.firestore.Timestamp.now();
+  try{
+    const tripDoc = await db.collection("trips").doc(tripId).get();
+    const masterExpiresMs = tripDoc.exists && tripDoc.data().sessionExpiresAt
+      ? tripDoc.data().sessionExpiresAt.toMillis() : (Date.now() + 6*60*1000);
+    const driver6MinMs = Date.now() + 6*60*1000;
+    timerExpiresAt = firebase.firestore.Timestamp.fromMillis(Math.min(masterExpiresMs, driver6MinMs));
+  }catch(e){ console.warn("timerExpiresAt হিসাব করা যায়নি, ডিফল্ট ৬ মিনিট ব্যবহার হচ্ছে:", e); }
+
   const offer = {
     driverId: rmCurrentRider.uid,
     driverName: rmCurrentRider.name || "রাইডার",
@@ -12403,6 +12429,7 @@ async function rmOfferTripFare(tripId){
     offeredFare: fare,
     eta: etaInput + " min",
     waitingStartedAt: firebase.firestore.Timestamp.now(),
+    timerExpiresAt,
   };
   try{
     await db.collection("trips").doc(tripId).update({
@@ -12436,7 +12463,9 @@ async function rmRenderActiveTripStatus(trip, tripId){
       listEl.innerHTML = `
         <div style="background:#2b2b2b; border:1px solid #FFC107; border-radius:12px; padding:14px;">
           <div style="font-weight:700; font-size:13.5px; color:#FFC107;">🚗 সক্রিয় ট্রিপ চলছে</div>
-          <div style="font-size:12px; color:#fff; margin:4px 0 2px;">📍 গন্তব্য: ${escapeHtml(trip.destination||"—")}</div>
+          <div style="font-size:12px; color:#fff; margin:4px 0 2px;">👤 যাত্রী: ${escapeHtml(trip.passengerName||"—")}${trip.passengerPhone ? ' · 📞 <a href="tel:'+escapeHtml(trip.passengerPhone)+'" style="color:#FFC107;">'+escapeHtml(trip.passengerPhone)+'</a>' : ''}</div>
+          <div style="font-size:12px; color:#fff; margin:2px 0;">📍 পিকআপ: ${escapeHtml((trip.pickupLocation && trip.pickupLocation.address) || "জানা নেই")}</div>
+          <div style="font-size:12px; color:#fff; margin:2px 0;">🏁 গন্তব্য: ${escapeHtml(trip.destination||"—")}</div>
           <div style="font-size:12px; color:#a8a8a8; margin-bottom:10px;">💰 ভাড়া: ৳ ${trip.confirmedDriver.finalFare}</div>
           <button id="rmCompleteTripBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ট্রিপ শেষ করুন</button>
         </div>`;
