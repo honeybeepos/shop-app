@@ -883,7 +883,7 @@
     <div style="font-size:30px;">🐝</div>
     <div>
       <div style="font-weight:800; font-size:15px;" id="rmGreetingTxt">শুভ সকাল, রাইডার! 👋</div>
-      <div style="font-size:10.5px; color:#a8a8a8; text-transform:uppercase; letter-spacing:1px;">Rider Mode</div>
+      <div id="rmCurrentModeTxt" style="font-size:11px; font-weight:800; color:#a8a8a8; margin-top:2px;">📦 Delivery Mode</div>
     </div>
     <button id="rmSettingsBtn" title="সেটিংস" style="margin-left:auto; background:transparent; border:1px solid rgba(255,193,7,0.25); color:#a8a8a8; width:32px; height:32px; border-radius:8px; font-size:14px; cursor:pointer; font-family:inherit;">⚙️</button>
     <button id="rmLogoutBtn" style="background:transparent; border:1px solid rgba(255,193,7,0.25); color:#a8a8a8; padding:7px 12px; border-radius:8px; font-size:11px; cursor:pointer; font-family:inherit;">লগআউট</button>
@@ -12457,11 +12457,35 @@ async function initRiderMode(uid){
   rmRefreshOnlineUi();
   if(rmIsOnline) rmStartGps();
 
+  // 🔧 আসল বাগ এখানে ছিল — rmTransportModeOn সবসময় false দিয়ে শুরু হতো,
+  // Firestore-এ সেভ করা থাকলেও পেজ রিফ্রেশ/পুনরায় লগইনের পর মনে থাকত না।
+  // এখন আগের অবস্থা ঠিকভাবে পুনরুদ্ধার করা হচ্ছে।
+  rmTransportModeOn = !!rmCurrentRider.transportModeOn;
+  document.getElementById("rmTransportModeSwitch").classList.toggle("on", rmTransportModeOn);
+  document.getElementById("rmRadarCard").style.display = rmTransportModeOn ? "block" : "none";
+  document.getElementById("rmTripRequestsCard").style.display = rmTransportModeOn ? "block" : "none";
+  rmRefreshModeLabel();
+  if(rmTransportModeOn && rmIsOnline){
+    rmTmStartRadar();
+    rmListenTripRequests();
+    if((rmCurrentRider.currentStatus === "on_waiting" || rmCurrentRider.currentStatus === "on_trip") && rmCurrentRider.activeTripId){
+      rmWatchActiveTrip(rmCurrentRider.activeTripId);
+    }
+  }
+
   rmListenForOffers();
   rmLoadTodayStats();
 
   document.getElementById("rmLogoutBtn").addEventListener("click", ()=> auth.signOut());
   refreshRingtoneSwitchUi();
+}
+
+// 📦/🚕 বর্তমানে ঠিক কোন মোডে আছেন তা স্পষ্টভাবে দেখানো হয়
+function rmRefreshModeLabel(){
+  const el = document.getElementById("rmCurrentModeTxt");
+  if(!el) return;
+  el.textContent = rmTransportModeOn ? "🚕 Transport Mode" : "📦 Delivery Mode";
+  el.style.color = rmTransportModeOn ? "#FFC107" : "#a8a8a8";
 }
 
 /* ---------- Online/Offline টগল ---------- */
@@ -12597,6 +12621,7 @@ document.getElementById("rmTransportModeSwitch").addEventListener("click", async
   document.getElementById("rmTransportModeSwitch").classList.toggle("on", rmTransportModeOn);
   document.getElementById("rmRadarCard").style.display = rmTransportModeOn ? "block" : "none";
   document.getElementById("rmTripRequestsCard").style.display = rmTransportModeOn ? "block" : "none";
+  rmRefreshModeLabel();
   try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ transportModeOn: rmTransportModeOn }); }catch(e){}
 
   if(rmTransportModeOn){
