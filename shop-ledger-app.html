@@ -11550,6 +11550,23 @@ let __dmDriverId = null, __dmDriver = null, __dmGpsWatchId = null;
 let __dmOffersUnsub = null, __dmCurrentOfferId = null, __dmOfferTimerInterval = null;
 let __dmCurrentTripId = null, __dmTripUnsub = null, __dmTripMap = null, __dmTripMarkers = {};
 
+/* ==================== 🔙 মোবাইল Back বাটন গার্ড ====================
+   Driver/Rider Mode-এ থাকা অবস্থায় ফোনের Back বাটন চাপলে সরাসরি অ্যাপ
+   থেকে বের হয়ে যায় না (তাহলে Online/GPS ট্র্যাকিং হঠাৎ বন্ধ হয়ে যেত) —
+   বরং একটা নিশ্চিতকরণ পপ-আপ আসে: থাকতে চান নাকি বের হতে চান। */
+function enableModeBackGuard(){
+  history.pushState(null, "", location.href); // একটা বাড়তি হিস্ট্রি-এন্ট্রি, "বাফার" হিসেবে
+  window.addEventListener("popstate", modeBackGuardHandler);
+}
+function modeBackGuardHandler(){
+  const wantExit = confirm("আপনি কি অ্যাপ থেকে বের হতে চান?\n\nOK = হ্যাঁ, বের হন (Online/GPS ট্র্যাকিং বন্ধ হয়ে যাবে)\nCancel = না, এখানেই থাকুন");
+  if(!wantExit){
+    // "থাকতে চান" — আবার একটা এন্ট্রি push করে Back-কে "আটকে" রাখা হচ্ছে
+    history.pushState(null, "", location.href);
+  }
+  // "বের হতে চান" হলে কিছু করার দরকার নেই — ব্রাউজার ইতিমধ্যে এক ধাপ পিছিয়ে গেছে
+}
+
 async function initDriverMode(uid){
   __dmDriverId = uid;
   try{
@@ -11588,6 +11605,7 @@ async function initDriverMode(uid){
 
   document.getElementById("dmLogoutBtn").addEventListener("click", ()=> auth.signOut());
   refreshRingtoneSwitchUi();
+  enableModeBackGuard();
 }
 
 /* ---------- Online/Busy/Offline টগল ---------- */
@@ -12504,6 +12522,7 @@ async function initRiderMode(uid){
 
   document.getElementById("rmLogoutBtn").addEventListener("click", ()=> auth.signOut());
   refreshRingtoneSwitchUi();
+  enableModeBackGuard();
 }
 
 // 📦/🚕 বর্তমানে ঠিক কোন মোডে আছেন তা স্পষ্টভাবে দেখানো হয়
