@@ -947,10 +947,36 @@
 </div>
 
 <div class="rmBottomNav" id="rmBottomNav" style="display:none;">
-  <div class="navItem active"><span class="ic">🏠</span>হোম</div>
+  <div class="navItem active" id="rmNavHomeBtn"><span class="ic">🏠</span>হোম</div>
+  <div class="navItem" id="rmNavNotifBtn" style="position:relative;">
+    <span class="ic">🔔</span>নোটিফিকেশন
+    <span id="rmNotifBadge" style="display:none; position:absolute; top:2px; right:22%; background:#e0433c; color:#fff; font-size:9px; font-weight:800; min-width:15px; height:15px; border-radius:8px; line-height:15px; text-align:center; padding:0 3px;">0</span>
+  </div>
   <div class="navItem" id="rmNavHistoryBtn"><span class="ic">📋</span>হিস্ট্রি</div>
   <div class="navItem" id="rmNavSupportBtn"><span class="ic">📞</span>সাপোর্ট</div>
   <div class="navItem" id="rmNavProfileBtn"><span class="ic">👤</span>প্রোফাইল</div>
+</div>
+
+<!-- 🔔 নোটিফিকেশন প্যানেল -->
+<div class="menuOverlay" id="rmNotifOverlay" style="display:none; position:fixed; inset:0; z-index:500; background:rgba(0,0,0,0.6); align-items:flex-end; justify-content:center;">
+  <div style="background:#1a1a1a; border-top:1px solid rgba(255,193,7,0.25); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:70vh; overflow-y:auto;">
+    <div style="display:flex; align-items:center; margin-bottom:14px;">
+      <h3 style="margin:0; font-size:15px; color:#fff;">🔔 নোটিফিকেশন</h3>
+      <span id="rmCloseNotifBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:#a8a8a8;">✕</span>
+    </div>
+    <div id="rmNotifList" style="font-size:12.5px; color:#a8a8a8;">এখনো কোনো নোটিফিকেশন নেই।</div>
+  </div>
+</div>
+
+<!-- 📋 হিস্ট্রি প্যানেল -->
+<div class="menuOverlay" id="rmHistoryOverlay" style="display:none; position:fixed; inset:0; z-index:500; background:rgba(0,0,0,0.6); align-items:flex-end; justify-content:center;">
+  <div style="background:#1a1a1a; border-top:1px solid rgba(255,193,7,0.25); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:70vh; overflow-y:auto;">
+    <div style="display:flex; align-items:center; margin-bottom:14px;">
+      <h3 style="margin:0; font-size:15px; color:#fff;">📋 হিস্ট্রি</h3>
+      <span id="rmCloseHistoryBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:#a8a8a8;">✕</span>
+    </div>
+    <div id="rmHistoryList" style="font-size:12.5px; color:#a8a8a8;">লোড হচ্ছে...</div>
+  </div>
 </div>
 
 <div id="rmOfferOverlay">
@@ -12540,6 +12566,7 @@ function rmListenForOffers(){
 
 function rmShowOfferCard(offerId, data){
   playBeeAlert(); // 🐝 জরুরি ডেলিভারি অর্ডার — টোন + ভাইব্রেশন
+  rmAddNotification(`📦 নতুন ডেলিভারি অর্ডার — ${data.pickupName || "দোকান"}`);
   rmCurrentOfferId = offerId;
   document.getElementById("rmOfferPickup").textContent = data.pickupName || "দোকান";
   document.getElementById("rmOfferDistance").textContent = data.distanceKm ? data.distanceKm.toFixed(1) + " কিমি দূরে" : "—";
@@ -12601,9 +12628,102 @@ document.getElementById("rmRouteToolBtn").addEventListener("click", (e)=>{
 });
 document.getElementById("rmCallSupportBtn").addEventListener("click", ()=> alert("কাস্টমার সাপোর্টের নম্বর এখনো সেট করা হয়নি।"));
 document.getElementById("rmNavSupportBtn").addEventListener("click", ()=> document.getElementById("rmCallSupportBtn").click());
-document.getElementById("rmNavHistoryBtn").addEventListener("click", ()=> alert("ডেলিভারি হিস্ট্রি স্ক্রিন শীঘ্রই আসছে।"));
+document.getElementById("rmNavHistoryBtn").addEventListener("click", ()=> rmOpenHistory());
 document.getElementById("rmNavProfileBtn").addEventListener("click", ()=>{
   if(rmCurrentRider) alert(`👤 ${rmCurrentRider.name}\n📱 ${rmCurrentRider.phone}\n🏍️ ${rmCurrentRider.vehicleType || '—'}\n📍 জোন: ${rmCurrentRider.zone || '—'}`);
+});
+document.getElementById("rmNavHomeBtn") && document.getElementById("rmNavHomeBtn").addEventListener("click", ()=>{
+  document.querySelectorAll(".rmBottomNav .navItem").forEach(el=> el.classList.remove("active"));
+  document.getElementById("rmNavHomeBtn").classList.add("active");
+});
+
+/* ==================== 🔔 নোটিফিকেশন ====================
+   ডেলিভারি অর্ডার/ট্রিপ রিকোয়েস্ট/কাছের যাত্রী — যেকোনো Bee Alert-এর
+   সাথে এখানে একটা এন্ট্রিও যোগ হয়। এই সেশনের জন্যই থাকে (রিফ্রেশ করলে
+   মুছে যায় — Firestore-এ স্থায়ীভাবে সেভ করা হয়নি)। */
+let rmNotifications = [];
+let rmUnreadNotifCount = 0;
+
+function rmAddNotification(message){
+  rmNotifications.unshift({ message, time: new Date() });
+  if(rmNotifications.length > 30) rmNotifications.pop(); // বেশি জমতে না দেওয়া
+  rmUnreadNotifCount++;
+  rmRefreshNotifBadge();
+}
+
+function rmRefreshNotifBadge(){
+  const badge = document.getElementById("rmNotifBadge");
+  if(!badge) return;
+  if(rmUnreadNotifCount > 0){
+    badge.textContent = rmUnreadNotifCount > 9 ? "9+" : rmUnreadNotifCount;
+    badge.style.display = "block";
+  }else{
+    badge.style.display = "none";
+  }
+}
+
+function rmOpenNotifications(){
+  rmUnreadNotifCount = 0;
+  rmRefreshNotifBadge();
+  const listEl = document.getElementById("rmNotifList");
+  if(rmNotifications.length === 0){
+    listEl.innerHTML = "এখনো কোনো নোটিফিকেশন নেই।";
+  }else{
+    listEl.innerHTML = rmNotifications.map(n=> `
+      <div style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#eee;">${escapeHtml(n.message)}</div>
+        <div style="font-size:10.5px; color:#777; margin-top:2px;">${n.time.toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'})}</div>
+      </div>`).join("");
+  }
+  document.getElementById("rmNotifOverlay").style.display = "flex";
+}
+document.getElementById("rmNavNotifBtn") && document.getElementById("rmNavNotifBtn").addEventListener("click", rmOpenNotifications);
+document.getElementById("rmCloseNotifBtn") && document.getElementById("rmCloseNotifBtn").addEventListener("click", ()=>{
+  document.getElementById("rmNotifOverlay").style.display = "none";
+});
+
+/* ==================== 📋 হিস্ট্রি ====================
+   এই রাইডারের সাম্প্রতিক সম্পন্ন ডেলিভারি ও ট্রিপ — দুটো কালেকশন থেকেই
+   টেনে একসাথে সময় অনুযায়ী সাজিয়ে দেখানো হয়। */
+async function rmOpenHistory(){
+  const listEl = document.getElementById("rmHistoryList");
+  listEl.innerHTML = "লোড হচ্ছে...";
+  document.getElementById("rmHistoryOverlay").style.display = "flex";
+  try{
+    const [deliveriesSnap, tripsSnap] = await Promise.all([
+      db.collection("deliveryOffers").where("riderId","==",rmCurrentRider.uid).where("status","==","delivered").orderBy("createdAt","desc").limit(20).get().catch(()=>({docs:[]})),
+      db.collection("trips").where("confirmedDriver.driverId","==",rmCurrentRider.uid).where("status","==","completed").limit(20).get().catch(()=>({docs:[]}))
+    ]);
+    const items = [];
+    deliveriesSnap.docs.forEach(d=>{
+      const v = d.data();
+      items.push({ type:"delivery", title: v.pickupName || "ডেলিভারি", fare: v.riderIncome, time: v.createdAt ? v.createdAt.toDate() : null });
+    });
+    tripsSnap.docs.forEach(d=>{
+      const v = d.data();
+      items.push({ type:"trip", title: "🚕 " + (v.destination || "ট্রিপ"), fare: v.confirmedDriver ? v.confirmedDriver.finalFare : null, time: v.createdAt ? v.createdAt.toDate() : null });
+    });
+    items.sort((a,b)=> (b.time||0) - (a.time||0));
+
+    if(items.length === 0){
+      listEl.innerHTML = "এখনো কোনো সম্পন্ন ডেলিভারি/ট্রিপ নেই।";
+      return;
+    }
+    listEl.innerHTML = items.map(it=> `
+      <div style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="color:#eee;">${it.type === "delivery" ? "📦" : "🚕"} ${escapeHtml(it.title)}</div>
+          <div style="font-size:10.5px; color:#777; margin-top:2px;">${it.time ? it.time.toLocaleDateString('bn-BD') : ""}</div>
+        </div>
+        <div style="font-weight:800; color:#FFC107;">${it.fare != null ? "৳ " + it.fare : ""}</div>
+      </div>`).join("");
+  }catch(e){
+    console.error(e);
+    listEl.innerHTML = "হিস্ট্রি লোড করা যায়নি।";
+  }
+}
+document.getElementById("rmCloseHistoryBtn") && document.getElementById("rmCloseHistoryBtn").addEventListener("click", ()=>{
+  document.getElementById("rmHistoryOverlay").style.display = "none";
 });
 
 /* ==================== 🚕 Rider Mode-এর ভেতরে Transport Mode Switcher ====================
@@ -12683,7 +12803,10 @@ function rmRenderTripRequests(trips){
 
   const currentIds = new Set(relevant.map(t=> t.id));
   const hasNew = [...currentIds].some(id=> !__rmKnownTripIds.has(id));
-  if(hasNew && __rmTripReqInitialized) playBeeAlert();
+  if(hasNew && __rmTripReqInitialized){
+    playBeeAlert();
+    rmAddNotification("🚕 নতুন ট্রিপ রিকোয়েস্ট এসেছে");
+  }
   __rmTripReqInitialized = true;
   __rmKnownTripIds = currentIds;
 
