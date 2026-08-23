@@ -630,6 +630,12 @@
           <p id="hmWelcomeTxt" style="margin-top:6px; color:var(--amber); font-size:13px; font-weight:700;"></p>
         </div>
 
+        <!-- 📥 ইনকামিং Friend Request -->
+        <div id="hmRequestsSection" style="display:none; margin-bottom:16px;">
+          <div style="font-size:13px; font-weight:700; color:var(--muted); margin:0 4px 8px;">📥 ফ্রেন্ড রিকোয়েস্ট</div>
+          <div id="hmRequestsList"></div>
+        </div>
+
         <!-- 🔍 ইউজারনেম দিয়ে নতুন চ্যাট শুরু করা -->
         <div style="display:flex; gap:8px; margin-bottom:14px;">
           <input type="text" id="hmSearchUsername" placeholder="🔍 ইউজারনেম দিয়ে খুঁজুন..." style="flex:1; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13.5px;">
@@ -924,6 +930,7 @@ async function hmInitMessengerTab(){
       $("hmProfileReady").style.display = "block";
       $("hmWelcomeTxt").textContent = `স্বাগতম, ${doc.data().fullName || doc.data().username}!`;
       hmListenChatList();
+      hmListenFriendRequests();
     }else{
       $("hmProfileReady").style.display = "none";
       $("hmProfileSetup").style.display = "block";
@@ -935,7 +942,86 @@ async function hmInitMessengerTab(){
   }
 }
 
-/* ==================== 🔍 ইউজারনেম দিয়ে খোঁজা ও নতুন চ্যাট শুরু করা ==================== */
+/* ==================== 👥 Friend Request সিস্টেম ====================
+   messengerFriendRequests/{pairId} — pairId = দুইজনের UID সাজানো
+   (chatId-এর মতোই), তাই দুইজনের মাঝে সবসময় একটাই রিকোয়েস্ট-ডকুমেন্ট
+   থাকে (ডুপ্লিকেট রিকোয়েস্ট হওয়ার সুযোগ নেই)। */
+function hmPairId(uid1, uid2){
+  return [uid1, uid2].sort().join("_");
+}
+
+async function hmGetFriendStatus(otherUid){
+  try{
+    const doc = await db.collection("messengerFriendRequests").doc(hmPairId(currentCustomer.uid, otherUid)).get();
+    if(!doc.exists) return { state: "none" };
+    const d = doc.data();
+    if(d.status === "accepted") return { state: "friends" };
+    if(d.status === "pending" && d.fromUid === currentCustomer.uid) return { state: "pending_sent" };
+    if(d.status === "pending" && d.toUid === currentCustomer.uid) return { state: "pending_received", requestId: doc.id, fromUsername: d.fromUsername, fromName: d.fromName };
+    return { state: "rejected" }; // rejected হলে আবার নতুন করে পাঠানো যাবে
+  }catch(e){ return { state: "none" }; }
+}
+
+async function hmSendFriendRequest(otherUid, otherUsername, otherName){
+  try{
+    await db.collection("messengerFriendRequests").doc(hmPairId(currentCustomer.uid, otherUid)).set({
+      fromUid: currentCustomer.uid, fromUsername: __hmMyProfile.username, fromName: __hmMyProfile.fullName,
+      toUid: otherUid, toUsername: otherUsername, toName: otherName,
+      status: "pending",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    hmSearchUser(); // বাটনের অবস্থা রিফ্রেশ করতে আবার সার্চ চালানো
+  }catch(e){ alert("রিকোয়েস্ট পাঠানো যায়নি: " + e.message); }
+}
+
+let hmRequestsUnsub = null;
+function hmListenFriendRequests(){
+  if(hmRequestsUnsub) return;
+  hmRequestsUnsub = db.collection("messengerFriendRequests")
+    .where("toUid","==",currentCustomer.uid).where("status","==","pending")
+    .onSnapshot((qs)=>{
+      const sectionEl = $("hmRequestsSection");
+      const listEl = $("hmRequestsList");
+      if(qs.empty){
+        sectionEl.style.display = "none";
+        return;
+      }
+      sectionEl.style.display = "block";
+      listEl.innerHTML = qs.docs.map(d=>{
+        const r = d.data();
+        return `
+          <div class="card" style="display:flex; align-items:center; gap:12px; padding:12px 14px;">
+            <div style="width:40px; height:40px; border-radius:50%; background:var(--amber); color:var(--bg1); font-weight:800; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${escapeHtml((r.fromName||r.fromUsername||"?")[0].toUpperCase())}</div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:700; font-size:13px;">${escapeHtml(r.fromName||r.fromUsername)}</div>
+              <div style="font-size:10.5px; color:var(--muted);">@${escapeHtml(r.fromUsername)}</div>
+            </div>
+            <button class="hmAcceptBtn" data-rid="${d.id}" data-uid="${r.fromUid}" data-uname="${escapeHtml(r.fromUsername)}" data-name="${escapeHtml(r.fromName||"")}" style="padding:8px 12px; border:none; border-radius:8px; background:#16a34a; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">✅</button>
+            <button class="hmRejectBtn" data-rid="${d.id}" style="padding:8px 12px; border:none; border-radius:8px; background:rgba(220,38,38,0.15); color:#f87171; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌</button>
+          </div>`;
+      }).join("");
+      listEl.querySelectorAll(".hmAcceptBtn").forEach(btn=>{
+        btn.addEventListener("click", ()=> hmAcceptRequest(btn.dataset.rid, btn.dataset.uid, btn.dataset.uname, btn.dataset.name));
+      });
+      listEl.querySelectorAll(".hmRejectBtn").forEach(btn=>{
+        btn.addEventListener("click", ()=> hmRejectRequest(btn.dataset.rid));
+      });
+    }, (err)=> console.warn("friend requests listener error:", err));
+}
+
+async function hmAcceptRequest(requestId, fromUid, fromUsername, fromName){
+  try{
+    await db.collection("messengerFriendRequests").doc(requestId).update({ status: "accepted" });
+    // ✅ গ্রহণ করার সাথে সাথেই চ্যাট-থ্রেড তৈরি/খোলা হয়
+    hmOpenChat(fromUid, fromUsername, fromName);
+  }catch(e){ alert("গ্রহণ করা যায়নি: " + e.message); }
+}
+async function hmRejectRequest(requestId){
+  try{ await db.collection("messengerFriendRequests").doc(requestId).update({ status: "rejected" }); }
+  catch(e){ alert("বাতিল করা যায়নি: " + e.message); }
+}
+
+/* ==================== 🔍 ইউজারনেম দিয়ে খোঁজা ও ফ্রেন্ড রিকোয়েস্ট পাঠানো ==================== */
 $("hmSearchBtn").addEventListener("click", hmSearchUser);
 $("hmSearchUsername").addEventListener("keypress", (e)=>{ if(e.key === "Enter") hmSearchUser(); });
 
@@ -957,6 +1043,19 @@ async function hmSearchUser(){
     }
     const otherDoc = await db.collection("messengerUsers").doc(otherUid).get();
     const other = otherDoc.data();
+    const status = await hmGetFriendStatus(otherUid);
+
+    let actionBtnHtml;
+    if(status.state === "friends"){
+      actionBtnHtml = `<button id="hmActionBtn" data-action="chat" style="flex-shrink:0; padding:9px 14px; border:none; border-radius:9px; background:var(--amber); color:var(--bg1); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">💬 চ্যাট করুন</button>`;
+    }else if(status.state === "pending_sent"){
+      actionBtnHtml = `<span style="flex-shrink:0; padding:9px 14px; border-radius:9px; background:rgba(255,255,255,0.06); color:var(--muted); font-weight:800; font-size:11.5px;">⏳ অপেক্ষমাণ</span>`;
+    }else if(status.state === "pending_received"){
+      actionBtnHtml = `<span style="flex-shrink:0; padding:9px 14px; border-radius:9px; background:rgba(255,255,255,0.06); color:var(--amber); font-weight:800; font-size:11px;">📥 উপরে দেখুন</span>`;
+    }else{
+      actionBtnHtml = `<button id="hmActionBtn" data-action="request" style="flex-shrink:0; padding:9px 14px; border:none; border-radius:9px; background:var(--amber); color:var(--bg1); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">➕ Add</button>`;
+    }
+
     resultEl.innerHTML = `
       <div class="card" style="display:flex; align-items:center; gap:12px; padding:12px 14px;">
         <div style="width:42px; height:42px; border-radius:50%; background:var(--amber); color:var(--bg1); font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${escapeHtml((other.fullName||other.username||"?")[0].toUpperCase())}</div>
@@ -964,9 +1063,16 @@ async function hmSearchUser(){
           <div style="font-weight:700; font-size:13.5px;">${escapeHtml(other.fullName||other.username)}</div>
           <div style="font-size:11px; color:var(--muted);">@${escapeHtml(other.username)}</div>
         </div>
-        <button id="hmStartChatBtn" style="flex-shrink:0; padding:9px 14px; border:none; border-radius:9px; background:var(--amber); color:var(--bg1); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">💬 চ্যাট করুন</button>
+        ${actionBtnHtml}
       </div>`;
-    $("hmStartChatBtn").addEventListener("click", ()=> hmOpenChat(otherUid, other.username, other.fullName));
+
+    const actionBtn = $("hmActionBtn");
+    if(actionBtn){
+      actionBtn.addEventListener("click", ()=>{
+        if(actionBtn.dataset.action === "chat") hmOpenChat(otherUid, other.username, other.fullName);
+        else hmSendFriendRequest(otherUid, other.username, other.fullName);
+      });
+    }
   }catch(e){
     resultEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">খোঁজা যায়নি।</div>';
   }
