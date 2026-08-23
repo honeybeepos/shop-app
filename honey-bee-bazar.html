@@ -647,6 +647,12 @@ auth.onAuthStateChanged(async (user)=>{
     currentCustomer = { uid: user.uid, name: user.displayName, favoriteShops: [] };
   }
   renderAuthArea();
+  // 🩸 Blood Bank স্ক্রিনে থাকা অবস্থায় লগইন সম্পন্ন হলে প্রোফাইল কার্ডটা
+  // নিজে থেকেই রিফ্রেশ হয় — আগে লগইন resolve হওয়ার আগেই স্ক্রিনে ঢুকলে
+  // কার্ড খালি/ভুল অবস্থায় আটকে থাকত
+  if(document.getElementById("screenBloodBank") && document.getElementById("screenBloodBank").classList.contains("active")){
+    initBloodBankScreen();
+  }
 });
 
 renderAuthArea();
@@ -1199,6 +1205,11 @@ async function initBloodBankScreen(){
     return;
   }
   $("bloodProfileLoggedOut").style.display = "none";
+  // 🔧 আসল বাগ এখানে ছিল — নিচের try ব্লকে এরর (নেটওয়ার্ক/পারমিশন/ইত্যাদি)
+  // হলে কার্ডটা সম্পূর্ণ খালি থেকে যেত, কারণ catch ব্লকে শুধু কনসোলে লগ
+  // হতো, কিন্তু কোনো UI-ই দেখানো হতো না। এখন এরর হলেও অন্তত পুরো ফর্মটা
+  // দেখানো হবে, যাতে ইউজার নিবন্ধন করার চেষ্টা করতে পারেন।
+  $("bloodProfileForm").style.display = "block";
 
   try{
     const doc = await db.collection("bloodDonors").doc(currentCustomer.uid).get();
@@ -1218,7 +1229,11 @@ async function initBloodBankScreen(){
       $("bloodProfileCompact").style.display = "none";
       $("bloodProfileForm").style.display = "block"; // প্রথমবার — সরাসরি পুরো ফর্ম
     }
-  }catch(e){ console.warn("blood profile load failed:", e); }
+  }catch(e){
+    console.warn("blood profile load failed:", e);
+    // এরর হলেও ফর্মটাই দেখানো থাকবে (আগে থেকেই display:block করা আছে উপরে) —
+    // যাতে অন্তত সেভ করার চেষ্টা করা যায়, কার্ড খালি না থাকে
+  }
 }
 
 // 📋 নিবন্ধিত দাতার জন্য কমপ্যাক্ট স্ট্যাটাস-বার দেখানো ও পূরণ করা
