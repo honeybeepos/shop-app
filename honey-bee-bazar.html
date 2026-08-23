@@ -167,8 +167,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport{ display:none; }
-  #screenHome.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active{ display:block; }
+  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active{ display:block; }
 </style>
 <script src="bd-locations.js"></script>
 </head>
@@ -223,7 +223,12 @@
         <div class="lbl">আপনার পছন্দের বাজারে যান</div>
       </div>
     </div>
+  </div>
 
+  <!-- 🏪 বাজার খোঁজা/তালিকা — আলাদা স্ক্রিন (আগে হোমেই থাকত, এখন Market/আপনার
+       পছন্দের বাজারে যান কার্ডে চাপলে এখানে আসবে) -->
+  <div id="screenMarkets">
+    <button class="backBtn" id="backToHomeFromMarkets">← হোমে ফিরে যান</button>
     <div id="marketFilterSection">
       <div id="gpsStatusBanner" style="font-size:11.5px; color:var(--muted); margin-bottom:10px;"></div>
 
@@ -461,7 +466,7 @@ let currentMarketId = null, currentShopId = null;
 let userLatLng = null;
 
 function showScreen(id){
-  ["screenHome","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 }
 
@@ -470,9 +475,8 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
   card.addEventListener("click", ()=>{
     const svc = card.dataset.svc;
     if(svc === "market" || svc === "favmarket"){
-      // ফিল্টার+বাজার তালিকা এখন হোমস্ক্রিনেই আছে (আলাদা স্ক্রিন না) —
-      // তাই শুধু smooth scroll করে সেই সেকশনে নিয়ে যাওয়া হয়
-      $("marketFilterSection").scrollIntoView({ behavior: "smooth", block: "start" });
+      // 🏪 এখন বাজার-তালিকা আলাদা স্ক্রিনে (আগে হোমেই দেখাত)
+      showScreen("screenMarkets");
     }else if(svc === "transport"){
       showScreen("screenTransport");
     }else{
@@ -480,6 +484,7 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
     }
   });
 });
+document.getElementById("backToHomeFromMarkets") && document.getElementById("backToHomeFromMarkets").addEventListener("click", ()=> showScreen("screenHome"));
 
 /* ---------- নিচের ফুটার নেভিগেশন ---------- */
 $("footerNavHome").addEventListener("click", ()=>{
