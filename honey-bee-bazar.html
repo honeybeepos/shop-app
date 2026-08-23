@@ -48,6 +48,21 @@
   }
   .serviceCard:active{ transform:scale(0.96); }
   .serviceCard .ic{ font-size:32px; margin-bottom:6px; }
+
+  /* 🚗 Transport কার্ডের জন্য SVG-ভিত্তিক 3D-অ্যানিমেটেড গাড়ি —
+     সত্যিকারের 3D মডেল/ভিডিও না (এই পরিবেশে বানানো সম্ভব না), কিন্তু
+     perspective + rotateY + বাউন্স দিয়ে একটা বাস্তবসম্মত, ঘুরন্ত/ভাসমান
+     ইফেক্ট তৈরি করা হয়েছে */
+  .car3dWrap{ perspective:220px; height:38px; display:flex; align-items:center; justify-content:center; }
+  .car3d{ width:52px; height:auto; animation: car3dFloat 2.4s ease-in-out infinite; transform-style:preserve-3d; filter:drop-shadow(0 3px 3px rgba(0,0,0,0.35)); }
+  @keyframes car3dFloat{
+    0%,100%{ transform: rotateY(-18deg) rotateX(4deg) translateY(0); }
+    50%{ transform: rotateY(18deg) rotateX(4deg) translateY(-3px); }
+  }
+  .carShadow{ fill:rgba(0,0,0,0.28); animation: car3dShadow 2.4s ease-in-out infinite; }
+  @keyframes car3dShadow{ 0%,100%{ opacity:0.5; } 50%{ opacity:0.25; } }
+  .car3d .wheel{ transform-origin:center; animation: car3dSpin 0.6s linear infinite; }
+  @keyframes car3dSpin{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
   .serviceCard .lbl{ font-size:11.5px; font-weight:700; color:#fff8e8; }
   .serviceCard.soon{ opacity:0.55; }
   .serviceCard.soon .soonBadge{
@@ -195,7 +210,28 @@
         <div class="lbl">Market</div>
       </div>
       <div class="serviceCard" data-svc="transport">
-        <div class="ic">🚑</div>
+        <div class="ic car3dWrap">
+          <svg class="car3d" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+            <ellipse class="carShadow" cx="50" cy="52" rx="34" ry="5"/>
+            <g class="carBody">
+              <path d="M12 38 Q14 22 30 20 L38 12 Q42 8 50 8 L64 8 Q70 8 74 13 L82 20 Q92 21 92 34 L92 38 Z" fill="url(#carPaint)"/>
+              <path d="M38 12 L34 20 L70 20 L64 13 Q60 10 56 10 L44 10 Q40 10 38 12 Z" fill="#bfe3ff" opacity="0.85"/>
+              <rect x="12" y="34" width="80" height="8" rx="3" fill="#8a1f1f"/>
+              <circle class="wheel" cx="30" cy="46" r="9" fill="#1a1a1a"/>
+              <circle cx="30" cy="46" r="4" fill="#c9c9c9"/>
+              <circle class="wheel" cx="74" cy="46" r="9" fill="#1a1a1a"/>
+              <circle cx="74" cy="46" r="4" fill="#c9c9c9"/>
+              <circle cx="18" cy="30" r="2.4" fill="#fff7cc"/>
+              <circle cx="86" cy="30" r="2.2" fill="#ff5252"/>
+            </g>
+            <defs>
+              <linearGradient id="carPaint" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ff5252"/>
+                <stop offset="100%" stop-color="#c62828"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
         <div class="lbl">Transport</div>
       </div>
       <div class="serviceCard soon" data-svc="worker">
@@ -221,6 +257,11 @@
       <div class="serviceCard" data-svc="favmarket" id="favMarketCard">
         <div class="ic" id="favMarketIcon">🚶‍♂️🛍️</div>
         <div class="lbl">আপনার পছন্দের বাজারে যান</div>
+      </div>
+      <div class="serviceCard soon" data-svc="jibontori" id="jibonToriCard">
+        <img src="jibontori-icon-192.png" alt="জীবন তরী" style="width:36px; height:36px; border-radius:10px; margin-bottom:6px; object-fit:cover;">
+        <div class="lbl">জীবন তরী</div>
+        <div class="soonBadge">শীঘ্রই আসছে</div>
       </div>
     </div>
   </div>
