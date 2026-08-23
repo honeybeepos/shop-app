@@ -11610,11 +11610,15 @@ async function initDriverMode(uid){
   dmCheckOngoingTrip();
   dmInitRadarMap();
   if(__dmDriver.driverStatus === "online"){
-    dmStartRadar();
-    dmListenTripRequests();
-    // আগে থেকে কোনো on_waiting/on_trip অবস্থা থাকলে (রিফ্রেশ/পুনরায় লগইন করলে) সেটা পুনরায় দেখানো
-    if((__dmDriver.currentStatus === "on_waiting" || __dmDriver.currentStatus === "on_trip") && __dmDriver.activeTripId){
-      dmWatchActiveTrip(__dmDriver.activeTripId);
+    if(__dmDriver.canReceivePassengerRequests){
+      dmStartRadar();
+      dmListenTripRequests();
+      // আগে থেকে কোনো on_waiting/on_trip অবস্থা থাকলে (রিফ্রেশ/পুনরায় লগইন করলে) সেটা পুনরায় দেখানো
+      if((__dmDriver.currentStatus === "on_waiting" || __dmDriver.currentStatus === "on_trip") && __dmDriver.activeTripId){
+        dmWatchActiveTrip(__dmDriver.activeTripId);
+      }
+    }else{
+      dmShowPassengerFeatureLockedMsg();
     }
   }
 
@@ -11642,8 +11646,26 @@ document.getElementById("dmStatusSwitch").addEventListener("click", async ()=>{
   dmRefreshStatusUi(next);
   try{ await db.collection("transportDrivers").doc(__dmDriverId).update({ driverStatus: next }); }
   catch(e){ console.warn(e); }
-  if(next === "online"){ dmStartGps(); dmStartRadar(); dmListenTripRequests(); } else{ dmStopGps(); dmStopRadar(); dmStopTripRequests(); }
+  if(next === "online"){
+    dmStartGps();
+    if(__dmDriver.canReceivePassengerRequests){
+      dmStartRadar();
+      dmListenTripRequests();
+    }else{
+      dmShowPassengerFeatureLockedMsg();
+    }
+  }else{ dmStopGps(); dmStopRadar(); dmStopTripRequests(); }
 });
+
+// 🔒 যাত্রী-রিকোয়েস্ট ফিচার এখনো চালু করা হয়নি এমন (এজেন্ট ছাড়া নিজে-নিবন্ধিত)
+// ড্রাইভারদের জন্য — রাডার/ট্রিপ-রিকোয়েস্ট কার্ডে একটা ব্যাখ্যা দেখানো হয়
+function dmShowPassengerFeatureLockedMsg(){
+  const lockedMsg = "🔒 এই সুবিধা এখনো চালু করা হয়নি। আপনার এলাকার এজেন্টের সাথে যোগাযোগ করুন — তারা এক ক্লিকে চালু করে দিতে পারবেন।";
+  const radarHint = document.getElementById("dmRadarHint");
+  if(radarHint) radarHint.textContent = lockedMsg;
+  const tripList = document.getElementById("dmTripRequestsList");
+  if(tripList) tripList.textContent = lockedMsg;
+}
 
 /* ==================== 🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট — ভাড়া অফার করা ====================
    যাত্রী destination + vehicleType দিয়ে বুক করলে trips/{tripId} (status:'searching')

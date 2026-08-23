@@ -552,6 +552,11 @@ function listenDrivers(){
           <div class="rowActions" style="margin:-6px 0 10px;">
             <button class="btn small ${toggleClass}" onclick="toggleDriverStatus('${doc.id}','${d.status}')">${toggleLabel}</button>
             ${d.isVerified ? '<span class="badge active">🛡️ Verified</span>' : `<button class="btn small ok" onclick="openVerifyModal('driver','${doc.id}','${escapeHtml(d.name || 'ড্রাইভার').replace(/'/g,"")}')">🛡️ ভেরিফাই করুন</button>`}
+          </div>
+          <div class="rowActions" style="margin:-6px 0 14px;">
+            <button class="btn small ${d.canReceivePassengerRequests ? 'danger' : 'ok'}" onclick="togglePassengerAccess('${doc.id}', ${!!d.canReceivePassengerRequests})">
+              ${d.canReceivePassengerRequests ? '🔒 যাত্রী-রিকোয়েস্ট বন্ধ করুন' : '🔓 যাত্রী-রিকোয়েস্ট চালু করুন'}
+            </button>
           </div>`;
       }).join("");
     }, (err)=>{
@@ -565,6 +570,14 @@ window.toggleDriverStatus = async function(driverId, currentStatus){
   try{
     await db.collection("transportDrivers").doc(driverId).update({ status: newStatus });
   }catch(e){ alert("স্ট্যাটাস বদলানো যায়নি: " + e.message); }
+};
+
+// 🔓 এজেন্ট এক ক্লিকে সেলফ-রেজিস্টার্ড ড্রাইভারের জন্য যাত্রী-রিকোয়েস্ট
+// (গন্তব্য-ভিত্তিক + রাস্তার যাত্রী) সুবিধা চালু/বন্ধ করতে পারেন
+window.togglePassengerAccess = async function(driverId, currentlyEnabled){
+  try{
+    await db.collection("transportDrivers").doc(driverId).update({ canReceivePassengerRequests: !currentlyEnabled });
+  }catch(e){ alert("পরিবর্তন করা যায়নি: " + e.message); }
 };
 
 /* ---------- শপ লিস্ট (রিয়েলটাইম) ---------- */
