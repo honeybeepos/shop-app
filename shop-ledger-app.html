@@ -11847,7 +11847,7 @@ async function dmRenderActiveTripStatus(trip, tripId){
           </div>
           <button id="dmCompleteTripBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ট্রিপ শেষ করুন</button>
         </div>`;
-      document.getElementById("dmCompleteTripBtn").addEventListener("click", ()=> dmCompleteTrip(tripId));
+      attachHoldToConfirm(document.getElementById("dmCompleteTripBtn"), ()=> dmCompleteTrip(tripId));
       document.getElementById("dmNavigateBtn").addEventListener("click", ()=>{
         const loc = trip.pickupLocation;
         if(loc && loc.lat != null) window.open(`https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`, "_blank");
@@ -12188,6 +12188,74 @@ async function dmOpenHistory(){
   }
 }
 
+/* ==================== 🤏 চেপে ধরে কনফার্ম করুন (Hold-to-Confirm) ====================
+   গুরুত্বপূর্ণ/অপরিবর্তনীয় কাজে (ট্রিপ শেষ করা, যাত্রী Pick Up করা) ভুলবশত
+   এক-ট্যাপে হয়ে যাওয়া ঠেকাতে — ৩ সেকেন্ড চেপে ধরে রাখতে হবে, সাথে
+   ভাইব্রেশন ও একটা ভরে-ওঠা প্রোগ্রেস বার (React Native-এর ধারণাটা এখানে
+   ভ্যানিলা JS দিয়ে বানানো হয়েছে, যেহেতু এই অ্যাপ React Native না)। */
+function attachHoldToConfirm(buttonEl, onComplete, holdMs){
+  holdMs = holdMs || 3000;
+  const originalHTML = buttonEl.innerHTML;
+  buttonEl.innerHTML = ""; // আগের কনটেন্ট মুছে ফেলা হচ্ছে, নাহলে টেক্সট দুইবার দেখাবে
+  buttonEl.style.position = "relative";
+  buttonEl.style.overflow = "hidden";
+  buttonEl.style.touchAction = "none";
+
+  const progressBar = document.createElement("div");
+  progressBar.style.cssText = "position:absolute; top:0; left:0; height:100%; width:0%; background:rgba(255,255,255,0.35); pointer-events:none; z-index:0;";
+  buttonEl.appendChild(progressBar);
+
+  const label = document.createElement("span");
+  label.style.cssText = "position:relative; z-index:1;";
+  label.innerHTML = originalHTML;
+  buttonEl.appendChild(label);
+
+  let startTs = null, rafId = null, vibrateInterval = null;
+
+  function tick(ts){
+    if(!startTs) startTs = ts;
+    const elapsed = ts - startTs;
+    const pct = Math.min(100, (elapsed/holdMs)*100);
+    progressBar.style.width = pct + "%";
+    if(elapsed < holdMs){
+      rafId = requestAnimationFrame(tick);
+    }else{
+      cleanup();
+      if(navigator.vibrate) navigator.vibrate([100,50,100]); // কনফার্মেশনের ভাইব্রেশন
+      onComplete();
+    }
+  }
+
+  function cleanup(){
+    if(rafId) cancelAnimationFrame(rafId);
+    if(vibrateInterval) clearInterval(vibrateInterval);
+    rafId = null; startTs = null; vibrateInterval = null;
+    progressBar.style.width = "0%";
+  }
+
+  function start(e){
+    e.preventDefault();
+    cleanup();
+    rafId = requestAnimationFrame(tick);
+    // চেপে ধরে থাকা অবস্থায় হালকা রিমাইন্ডার ভাইব্রেশন
+    if(navigator.vibrate){
+      navigator.vibrate(30);
+      vibrateInterval = setInterval(()=> navigator.vibrate(15), 350);
+    }
+  }
+  function cancelHold(){
+    if(navigator.vibrate) navigator.vibrate(0); // ছেড়ে দিলে ভাইব্রেশন থেমে যায়
+    cleanup();
+  }
+
+  buttonEl.addEventListener("mousedown", start);
+  buttonEl.addEventListener("touchstart", start, { passive:false });
+  buttonEl.addEventListener("mouseup", cancelHold);
+  buttonEl.addEventListener("mouseleave", cancelHold);
+  buttonEl.addEventListener("touchend", cancelHold);
+  buttonEl.addEventListener("touchcancel", cancelHold);
+}
+
 function playBeeAlert(forceTest){
   if(!forceTest && !isBeeRingtoneEnabled()){
     console.log("🐝 Bee Ringtone সেটিং বন্ধ আছে — শব্দ বাজছে না (শুধু ভাইব্রেশন)");
@@ -12348,8 +12416,8 @@ function dmBuildRadarPopup(group){
     row.innerHTML = `<div style="font-size:11.5px; margin-bottom:4px;">🚕 চায়: ${vTxt} · ~${p.__dist.toFixed(1)} কিমি দূরে</div>`;
     const btn = document.createElement("button");
     btn.className = "radarPopupBtn";
-    btn.textContent = "✅ Pick Up";
-    btn.onclick = ()=> dmPickUpPassenger(p);
+    btn.textContent = "✅ Pick Up (চেপে ধরুন)";
+    attachHoldToConfirm(btn, ()=> dmPickUpPassenger(p));
     row.appendChild(btn);
     wrap.appendChild(row);
   });
@@ -13034,7 +13102,7 @@ async function rmRenderActiveTripStatus(trip, tripId){
           </div>
           <button id="rmCompleteTripBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ট্রিপ শেষ করুন</button>
         </div>`;
-      document.getElementById("rmCompleteTripBtn").addEventListener("click", ()=> rmCompleteTrip(tripId));
+      attachHoldToConfirm(document.getElementById("rmCompleteTripBtn"), ()=> rmCompleteTrip(tripId));
       document.getElementById("rmNavigateBtn").addEventListener("click", ()=>{
         const loc = trip.pickupLocation;
         if(loc && loc.lat != null) window.open(`https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`, "_blank");
@@ -13260,6 +13328,23 @@ function rmTmFocusFullscreen(latLng){
   }
 }
 
+async function rmDoPickUp(p){
+  const fareInput = prompt("ভাড়া কত নেবেন? (৳) — যাত্রীর Wallet-এ ব্যালেন্স থাকলে সেখান থেকে কাটা হবে, না থাকলে নগদ নিন।", "");
+  if(fareInput === null) return;
+  const fare = Number(fareInput) || 0;
+  try{
+    await db.collection("passenger_waiting_queue").doc(p.id).update({
+      status:"PICKED_UP", picked_up_by: rmCurrentRider.uid, picked_up_at: fbNow(), fare: fare || null
+    });
+    if(fare > 0){
+      const result = await walletChargeFare(p.user_id, rmCurrentRider.uid, fare);
+      if(result.success) alert(`✅ Pick Up সম্পন্ন — Wallet থেকে ৳ ${fare} কাটা হয়েছে।`);
+      else alert(`✅ Pick Up সম্পন্ন — Wallet থেকে কাটা যায়নি, নগদ ৳ ${fare} নিন।`);
+    }
+    rmTmMap.closePopup();
+  }catch(e){ alert("Pick Up করা যায়নি: " + e.message); }
+}
+
 function rmTmBuildPopup(group){
   const wrap = document.createElement("div");
   wrap.style.minWidth = "160px";
@@ -13271,23 +13356,8 @@ function rmTmBuildPopup(group){
     row.innerHTML = `<div style="font-size:11.5px; margin-bottom:4px;">🚕 চায়: ${vTxt} · ~${p.__dist.toFixed(1)} কিমি দূরে</div>`;
     const btn = document.createElement("button");
     btn.className = "radarPopupBtn";
-    btn.textContent = "✅ Pick Up";
-    btn.onclick = async ()=>{
-      const fareInput = prompt("ভাড়া কত নেবেন? (৳) — যাত্রীর Wallet-এ ব্যালেন্স থাকলে সেখান থেকে কাটা হবে, না থাকলে নগদ নিন।", "");
-      if(fareInput === null) return;
-      const fare = Number(fareInput) || 0;
-      try{
-        await db.collection("passenger_waiting_queue").doc(p.id).update({
-          status:"PICKED_UP", picked_up_by: rmCurrentRider.uid, picked_up_at: fbNow(), fare: fare || null
-        });
-        if(fare > 0){
-          const result = await walletChargeFare(p.user_id, rmCurrentRider.uid, fare);
-          if(result.success) alert(`✅ Pick Up সম্পন্ন — Wallet থেকে ৳ ${fare} কাটা হয়েছে।`);
-          else alert(`✅ Pick Up সম্পন্ন — Wallet থেকে কাটা যায়নি, নগদ ৳ ${fare} নিন।`);
-        }
-        rmTmMap.closePopup();
-      }catch(e){ alert("Pick Up করা যায়নি: " + e.message); }
-    };
+    btn.textContent = "✅ Pick Up (চেপে ধরুন)";
+    attachHoldToConfirm(btn, ()=> rmDoPickUp(p));
     row.appendChild(btn);
     wrap.appendChild(row);
   });

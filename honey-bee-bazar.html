@@ -716,6 +716,70 @@ $("closeMenuBtn").addEventListener("click", ()=> $("menuOverlay").classList.remo
 
 document.getElementById("backToHomeFromTransport") && document.getElementById("backToHomeFromTransport").addEventListener("click", ()=> showScreen("screenHome"));
 
+/* ==================== 🤏 চেপে ধরে কনফার্ম করুন (Hold-to-Confirm) ====================
+   গুরুত্বপূর্ণ/অপরিবর্তনীয় কাজে (যেমন "রক্ত পেয়ে গেছি", "আজ রক্ত দিয়েছি")
+   ভুলবশত এক-ট্যাপে হয়ে যাওয়া ঠেকাতে — ৩ সেকেন্ড চেপে ধরে রাখতে হবে,
+   সাথে ভাইব্রেশন ও একটা ভরে-ওঠা প্রোগ্রেস বার। */
+function attachHoldToConfirm(buttonEl, onComplete, holdMs){
+  holdMs = holdMs || 3000;
+  const originalHTML = buttonEl.innerHTML;
+  buttonEl.innerHTML = "";
+  buttonEl.style.position = "relative";
+  buttonEl.style.overflow = "hidden";
+  buttonEl.style.touchAction = "none";
+
+  const progressBar = document.createElement("div");
+  progressBar.style.cssText = "position:absolute; top:0; left:0; height:100%; width:0%; background:rgba(255,255,255,0.35); pointer-events:none; z-index:0;";
+  buttonEl.appendChild(progressBar);
+
+  const label = document.createElement("span");
+  label.style.cssText = "position:relative; z-index:1;";
+  label.innerHTML = originalHTML;
+  buttonEl.appendChild(label);
+
+  let startTs = null, rafId = null, vibrateInterval = null;
+
+  function tick(ts){
+    if(!startTs) startTs = ts;
+    const elapsed = ts - startTs;
+    const pct = Math.min(100, (elapsed/holdMs)*100);
+    progressBar.style.width = pct + "%";
+    if(elapsed < holdMs){
+      rafId = requestAnimationFrame(tick);
+    }else{
+      cleanup();
+      if(navigator.vibrate) navigator.vibrate([100,50,100]);
+      onComplete();
+    }
+  }
+  function cleanup(){
+    if(rafId) cancelAnimationFrame(rafId);
+    if(vibrateInterval) clearInterval(vibrateInterval);
+    rafId = null; startTs = null; vibrateInterval = null;
+    progressBar.style.width = "0%";
+  }
+  function start(e){
+    e.preventDefault();
+    cleanup();
+    rafId = requestAnimationFrame(tick);
+    if(navigator.vibrate){
+      navigator.vibrate(30);
+      vibrateInterval = setInterval(()=> navigator.vibrate(15), 350);
+    }
+  }
+  function cancelHold(){
+    if(navigator.vibrate) navigator.vibrate(0);
+    cleanup();
+  }
+
+  buttonEl.addEventListener("mousedown", start);
+  buttonEl.addEventListener("touchstart", start, { passive:false });
+  buttonEl.addEventListener("mouseup", cancelHold);
+  buttonEl.addEventListener("mouseleave", cancelHold);
+  buttonEl.addEventListener("touchend", cancelHold);
+  buttonEl.addEventListener("touchcancel", cancelHold);
+}
+
 function escapeHtml(str){
   const d = document.createElement("div");
   d.textContent = str == null ? "" : String(str);
@@ -1176,7 +1240,7 @@ async function initBloodBankScreen(){
       $("bloodAvailableSwitch").classList.toggle("on");
     });
     $("bloodSaveBtn").addEventListener("click", bloodSaveProfile);
-    $("bloodMarkDonatedBtn").addEventListener("click", bloodMarkDonatedToday);
+    attachHoldToConfirm($("bloodMarkDonatedBtn"), bloodMarkDonatedToday);
     $("bloodSearchBtn").addEventListener("click", bloodApplyFilter);
     $("bloodClearFilterBtn").addEventListener("click", bloodClearFilter);
     $("bloodGoogleLoginBtn") && $("bloodGoogleLoginBtn").addEventListener("click", async ()=>{
@@ -1188,7 +1252,7 @@ async function initBloodBankScreen(){
       $("bloodProfileCompact").style.display = "none";
       $("bloodProfileForm").style.display = "block";
     });
-    $("bloodCompactDonatedBtn").addEventListener("click", bloodMarkDonatedToday);
+    attachHoldToConfirm($("bloodCompactDonatedBtn"), bloodMarkDonatedToday);
     // 🆘🔍 দুটো ফর্ম-টগল বাটন — একটা খুললে অন্যটা বন্ধ (ড্যাশবোর্ড পরিষ্কার রাখতে)
     $("toggleReqFormBtn").addEventListener("click", ()=>{
       const isOpen = $("bloodReqFormCard").style.display === "block";
@@ -1332,7 +1396,15 @@ async function bloodMarkDonatedToday(){
   // এই ফাংশনটা দুই জায়গা থেকে ডাকা হতে পারে (কমপ্যাক্ট বার বা পুরো ফর্ম) —
   // যে বাটনেই চাপ দেওয়া হোক, দুটোরই লোডিং-স্টেট দেখানো হয়
   const btns = [$("bloodMarkDonatedBtn"), $("bloodCompactDonatedBtn")].filter(Boolean);
-  btns.forEach(b=>{ b.disabled = true; b.dataset.origText = b.textContent; b.textContent = "সেভ হচ্ছে..."; });
+  // 🔧 চেপে-ধরে-কনফার্ম বাটনগুলোর আসল টেক্সট একটা ভেতরের <span>-এ থাকে
+  // (প্রোগ্রেস-বার স্ট্রাকচার ভেঙে না ফেলতে) — তাই button.textContent সরাসরি
+  // বদলানো হয় না, ভেতরের span-টাই খুঁজে বদলানো হয়
+  btns.forEach(b=>{
+    const labelEl = b.querySelector("span") || b;
+    b.disabled = true;
+    b.dataset.origText = labelEl.textContent;
+    labelEl.textContent = "সেভ হচ্ছে...";
+  });
   try{
     const savedData = {
       uid: currentCustomer.uid,
@@ -1358,7 +1430,11 @@ async function bloodMarkDonatedToday(){
   }catch(e){
     alert("সেভ করা যায়নি: " + e.message);
   }finally{
-    btns.forEach(b=>{ b.disabled = false; b.textContent = b.dataset.origText || "✅ আজ রক্ত দিয়েছি"; });
+    btns.forEach(b=>{
+      b.disabled = false;
+      const labelEl = b.querySelector("span") || b;
+      labelEl.textContent = b.dataset.origText || "✅ আজ রক্ত দিয়েছি";
+    });
   }
 }
 
@@ -1417,7 +1493,7 @@ function renderBloodFeed(){
   listEl.innerHTML = items.map(it=> it.kind === "request" ? bloodRequestCardHtml(it) : bloodDonorCardHtml(it)).join("");
 
   listEl.querySelectorAll(".reqFulfilledBtn").forEach(btn=>{
-    btn.addEventListener("click", async ()=>{
+    attachHoldToConfirm(btn, async ()=>{
       try{ await db.collection("bloodRequests").doc(btn.dataset.req).update({ status: "fulfilled" }); }
       catch(e){ alert("আপডেট করা যায়নি: " + e.message); }
     });
@@ -1440,7 +1516,7 @@ function bloodRequestCardHtml(r){
       <div style="font-size:12px; color:var(--muted); margin-bottom:10px;">📍 ${escapeHtml(r.upazila||"")}${r.upazila?", ":""}${escapeHtml(r.district||"")}</div>
       <div style="display:flex; gap:8px;">
         <a href="tel:${escapeHtml(r.contactPhone||"")}" style="flex:1; text-align:center; padding:10px; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; text-decoration:none;">📞 কল করুন</a>
-        ${isMine ? `<button class="reqFulfilledBtn" data-req="${r.id}" style="flex:1; padding:10px; border:none; border-radius:9px; background:rgba(255,255,255,0.08); color:var(--muted); font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ রক্ত পেয়ে গেছি</button>` : ""}
+        ${isMine ? `<button class="reqFulfilledBtn" data-req="${r.id}" style="flex:1; padding:10px; border:none; border-radius:9px; background:rgba(255,255,255,0.08); color:var(--muted); font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ রক্ত পেয়ে গেছি (চেপে ধরুন)</button>` : ""}
       </div>
     </div>`;
 }
