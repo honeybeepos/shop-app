@@ -111,6 +111,15 @@
   .rmSwitch.on{ background:#16a34a; }
   .rmKnob{ width:20px; height:20px; border-radius:50%; background:#fff; position:absolute; top:3px; left:3px; transition:left .2s; }
   .rmSwitch.on .rmKnob{ left:25px; }
+
+  /* 🚨 জরুরি রক্তের অনুরোধে কল বাটন লাল-সবুজ পালস করে — চোখে সহজে পড়ার জন্য */
+  .emergencyCallPulse{
+    animation: emergencyPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes emergencyPulse{
+    0%, 100%{ background:#dc2626; box-shadow:0 0 0 0 rgba(220,38,38,0.5); }
+    50%{ background:#16a34a; box-shadow:0 0 0 8px rgba(22,163,74,0); }
+  }
 </style>
 <style>
   :root{
@@ -1502,9 +1511,15 @@ function renderBloodFeed(){
 
 function bloodRequestCardHtml(r){
   const isMine = currentCustomer && r.requesterUid === currentCustomer.uid;
-  const urgencyBadge = r.urgency === "Emergency"
+  const isEmergency = r.urgency === "Emergency";
+  const urgencyBadge = isEmergency
     ? '<span style="background:rgba(220,38,38,0.2); color:#f87171; padding:3px 8px; border-radius:12px; font-size:10px; font-weight:800;">🆘 জরুরি</span>'
     : '<span style="background:rgba(255,255,255,0.08); color:var(--muted); padding:3px 8px; border-radius:12px; font-size:10px; font-weight:800;">🕐 স্বাভাবিক</span>';
+  // 🚨 জরুরি পোস্টের কল বাটন লাল-সবুজ পালস করে — মানুষের চোখে সহজে পড়ার জন্য
+  const callBtnClass = isEmergency ? "emergencyCallPulse" : "";
+  const callBtnStyle = isEmergency
+    ? "flex:1; text-align:center; padding:10px; border-radius:9px; color:#fff; font-weight:800; font-size:12.5px; text-decoration:none;"
+    : "flex:1; text-align:center; padding:10px; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; text-decoration:none;";
   return `
     <div class="card" style="padding:14px;">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
@@ -1515,7 +1530,7 @@ function bloodRequestCardHtml(r){
       <div style="font-size:12px; color:var(--muted); margin-bottom:3px;">🏥 ${escapeHtml(r.hospitalName||"—")}</div>
       <div style="font-size:12px; color:var(--muted); margin-bottom:10px;">📍 ${escapeHtml(r.upazila||"")}${r.upazila?", ":""}${escapeHtml(r.district||"")}</div>
       <div style="display:flex; gap:8px;">
-        <a href="tel:${escapeHtml(r.contactPhone||"")}" style="flex:1; text-align:center; padding:10px; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; text-decoration:none;">📞 কল করুন</a>
+        <a href="tel:${escapeHtml(r.contactPhone||"")}" class="${callBtnClass}" style="${callBtnStyle}">📞 কল করুন</a>
         ${isMine ? `<button class="reqFulfilledBtn" data-req="${r.id}" style="flex:1; padding:10px; border:none; border-radius:9px; background:rgba(255,255,255,0.08); color:var(--muted); font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ রক্ত পেয়ে গেছি (চেপে ধরুন)</button>` : ""}
       </div>
     </div>`;
