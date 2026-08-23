@@ -426,7 +426,11 @@
 
     <!-- নিজের রক্তদাতা প্রোফাইল (লগইন লাগবে) -->
     <div class="card" id="bloodProfileCard">
-      <h3 style="margin:0 0 10px; font-size:14px; color:var(--amber);">🩸 আপনার রক্তদাতা প্রোফাইল</h3>
+      <h3 id="bloodProfileToggleHeading" style="margin:0 0 10px; font-size:14px; color:var(--amber); cursor:pointer; display:flex; align-items:center; justify-content:space-between; user-select:none;">
+        <span>🩸 আপনার রক্তদাতা প্রোফাইল</span>
+        <span id="bloodProfileChevron" style="font-size:12px; transition:transform .2s;">▲</span>
+      </h3>
+      <div id="bloodProfileBody">
       <div id="bloodProfileLoggedOut" style="display:none; text-align:center; padding:10px 0;">
         <p style="font-size:12.5px; color:var(--muted); margin-bottom:12px;">রক্তদাতা হিসেবে নিবন্ধন করতে Google দিয়ে লগইন করুন</p>
         <div class="googleLoginBtn" id="bloodGoogleLoginBtn">🔵 Google দিয়ে লগইন</div>
@@ -476,6 +480,7 @@
 
         <button id="bloodSaveBtn" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); margin-bottom:8px;">💾 প্রোফাইল সেভ করুন</button>
         <button id="bloodMarkDonatedBtn" style="width:100%; padding:11px; border:1px solid rgba(220,38,38,0.4); border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:rgba(220,38,38,0.1); color:#f87171;">✅ আজ রক্ত দিয়েছি (এক-ক্লিকে সেভ)</button>
+      </div>
       </div>
     </div>
 
@@ -1194,6 +1199,14 @@ async function initBloodBankScreen(){
       const isOpen = $("bloodFilterCard").style.display === "block";
       $("bloodFilterCard").style.display = isOpen ? "none" : "block";
       $("bloodReqFormCard").style.display = "none";
+    });
+    // 🩸 "আপনার রক্তদাতা প্রোফাইল" শিরোনামে ক্লিক করলে ভেতরের অংশ লুকায়/দেখায়
+    $("bloodProfileToggleHeading").addEventListener("click", ()=>{
+      const body = $("bloodProfileBody");
+      const chevron = $("bloodProfileChevron");
+      const isHidden = body.style.display === "none";
+      body.style.display = isHidden ? "block" : "none";
+      chevron.textContent = isHidden ? "▲" : "▼";
     });
     __bloodScreenInitialized = true;
   }
