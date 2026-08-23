@@ -105,6 +105,12 @@
     color:var(--muted); font-size:12.5px; font-weight:700; cursor:pointer; transition:.15s;
   }
   .tpChip.active{ background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); border-color:var(--amber); }
+
+  /* ---------- 🩸 Blood Bank উপলব্ধতা টগল ---------- */
+  .rmSwitch{ width:48px; height:26px; border-radius:20px; background:#444; position:relative; cursor:pointer; transition:background .2s; }
+  .rmSwitch.on{ background:#16a34a; }
+  .rmKnob{ width:20px; height:20px; border-radius:50%; background:#fff; position:absolute; top:3px; left:3px; transition:left .2s; }
+  .rmSwitch.on .rmKnob{ left:25px; }
 </style>
 <style>
   :root{
@@ -182,8 +188,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active{ display:block; }
+  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active{ display:block; }
 </style>
 <script src="bd-locations.js"></script>
 </head>
@@ -258,10 +264,9 @@
         <div class="ic" id="favMarketIcon">🚶‍♂️🛍️</div>
         <div class="lbl">আপনার পছন্দের বাজারে যান</div>
       </div>
-      <div class="serviceCard soon" data-svc="jibontori" id="jibonToriCard">
+      <div class="serviceCard" data-svc="jibontori" id="jibonToriCard">
         <img src="jibontori-icon-192.png" alt="জীবন তরী" style="width:36px; height:36px; border-radius:10px; margin-bottom:6px; object-fit:cover;">
         <div class="lbl">জীবন তরী</div>
-        <div class="soonBadge">শীঘ্রই আসছে</div>
       </div>
     </div>
   </div>
@@ -394,6 +399,152 @@
     </div>
   </div>
 
+  <!-- 🕊️ জীবন তরী — হাব স্ক্রিন, ভেতরে একাধিক সাব-অপশন থাকবে -->
+  <div id="screenJibonTori">
+    <button class="backBtn" id="backToHomeFromJibonTori">← হোমে ফিরে যান</button>
+    <div class="card" style="text-align:center; padding:20px 16px;">
+      <img src="jibontori-icon-192.png" alt="জীবন তরী" style="width:72px; height:72px; border-radius:16px; object-fit:cover; margin-bottom:10px;">
+      <div style="font-size:17px; font-weight:800;">জীবন তরী</div>
+      <div style="font-size:12px; color:var(--muted); margin-top:2px;">বিপদের দিনে স্নেহের পরশ</div>
+    </div>
+    <div class="serviceCardGrid">
+      <div class="serviceCard" data-svc="bloodbank">
+        <div class="ic">🩸</div>
+        <div class="lbl">Blood Bank</div>
+      </div>
+      <div class="serviceCard soon" data-svc="ambulance">
+        <div class="ic">🚑</div>
+        <div class="lbl">অ্যাম্বুলেন্স</div>
+        <div class="soonBadge">শীঘ্রই আসছে</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🩸 Blood Bank -->
+  <div id="screenBloodBank">
+    <button class="backBtn" id="backToJibonToriFromBlood">← জীবন তরী-তে ফিরে যান</button>
+
+    <!-- নিজের রক্তদাতা প্রোফাইল (লগইন লাগবে) -->
+    <div class="card" id="bloodProfileCard">
+      <h3 style="margin:0 0 10px; font-size:14px; color:var(--amber);">🩸 আপনার রক্তদাতা প্রোফাইল</h3>
+      <div id="bloodProfileLoggedOut" style="display:none; text-align:center; padding:10px 0;">
+        <p style="font-size:12.5px; color:var(--muted); margin-bottom:12px;">রক্তদাতা হিসেবে নিবন্ধন করতে Google দিয়ে লগইন করুন</p>
+        <div class="googleLoginBtn" id="bloodGoogleLoginBtn">🔵 Google দিয়ে লগইন</div>
+      </div>
+
+      <!-- 📋 কমপ্যাক্ট স্ট্যাটাস-বার — ইতিমধ্যে নিবন্ধিত দাতাদের জন্য (থিম একই, শুধু লেআউট ছোট) -->
+      <div id="bloodProfileCompact" style="display:none; align-items:center; gap:10px;">
+        <img id="bloodCompactAvatar" src="" style="width:40px; height:40px; border-radius:50%; border:1px solid var(--amber); object-fit:cover; flex-shrink:0;">
+        <div style="flex:1; min-width:0;">
+          <div id="bloodCompactName" style="font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+          <div id="bloodCompactGroup" style="font-size:11px; color:#f87171; font-weight:800;">—</div>
+        </div>
+        <button id="bloodCompactDonatedBtn" style="flex-shrink:0; padding:8px 10px; border:1px solid rgba(220,38,38,0.4); border-radius:9px; background:rgba(220,38,38,0.1); color:#f87171; font-weight:800; font-size:10.5px; cursor:pointer; font-family:inherit;">✅ আজ দিয়েছি</button>
+        <button id="bloodCompactEditBtn" style="flex-shrink:0; padding:8px 10px; border:1px solid var(--border); border-radius:9px; background:transparent; color:var(--muted); font-weight:800; font-size:10.5px; cursor:pointer; font-family:inherit;">✏️ এডিট</button>
+      </div>
+
+      <div id="bloodProfileForm" style="display:none;">
+        <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">মোবাইল নম্বর</label>
+        <input type="text" id="bloodPhone" placeholder="017XXXXXXXX" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+
+        <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">রক্তের গ্রুপ</label>
+        <select id="bloodGroup" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+          <option value="">বেছে নিন</option>
+          <option>A+</option><option>A-</option>
+          <option>B+</option><option>B-</option>
+          <option>AB+</option><option>AB-</option>
+          <option>O+</option><option>O-</option>
+        </select>
+
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <select id="bloodDistrict" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+            <option value="">জেলা বেছে নিন</option>
+          </select>
+          <select id="bloodUpazila" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;" disabled>
+            <option value="">উপজেলা</option>
+          </select>
+        </div>
+
+        <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">শেষ কবে রক্ত দিয়েছেন (না দিয়ে থাকলে ফাঁকা রাখুন)</label>
+        <input type="date" id="bloodLastDonated" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+        <p id="bloodEligibilityHint" style="font-size:11px; color:var(--muted); margin:-8px 0 12px;"></p>
+
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:10px;">
+          <div style="flex:1; font-size:12.5px; font-weight:700;">আমি এখন রক্ত দিতে ইচ্ছুক</div>
+          <div class="rmSwitch" id="bloodAvailableSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
+        </div>
+
+        <button id="bloodSaveBtn" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); margin-bottom:8px;">💾 প্রোফাইল সেভ করুন</button>
+        <button id="bloodMarkDonatedBtn" style="width:100%; padding:11px; border:1px solid rgba(220,38,38,0.4); border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:rgba(220,38,38,0.1); color:#f87171;">✅ আজ রক্ত দিয়েছি (এক-ক্লিকে সেভ)</button>
+      </div>
+    </div>
+
+    <!-- রক্তদাতা খুঁজুন -->
+    <!-- 🆘 দুটো ছোট বাটন — ফর্ম দুটো লুকানো থাকে, দরকার হলেই খোলে (ড্যাশবোর্ড পরিষ্কার রাখতে) -->
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <button id="toggleReqFormBtn" style="flex:1; padding:12px; border:none; border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:#dc2626; color:#fff;">🆘 রক্ত লাগবে</button>
+      <button id="toggleFilterBtn" style="flex:1; padding:12px; border:none; border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:rgba(255,255,255,0.08); color:var(--muted);">🔍 ফিল্টার</button>
+    </div>
+
+    <!-- 🆘 রক্তের জন্য অনুরোধ করুন (লুকানো, বাটনে চাপলে খোলে) -->
+    <div class="card" id="bloodReqFormCard" style="display:none;">
+      <h3 style="margin:0 0 10px; font-size:14px; color:#f87171;">🆘 রক্তের জন্য অনুরোধ করুন</h3>
+      <div id="bloodReqFormWrap">
+        <input type="text" id="reqPatientName" placeholder="রোগীর নাম" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:10px;">
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <select id="reqBloodGroup" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+            <option value="">রক্তের গ্রুপ</option>
+            <option>A+</option><option>A-</option>
+            <option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option>
+            <option>O+</option><option>O-</option>
+          </select>
+          <input type="number" id="reqBagsNeeded" placeholder="ব্যাগ সংখ্যা" min="1" value="1" style="width:90px; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+        </div>
+        <input type="text" id="reqHospitalName" placeholder="হাসপাতাল/ক্লিনিকের নাম" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:10px;">
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <select id="reqDistrict" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+            <option value="">জেলা</option>
+          </select>
+          <select id="reqUpazila" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;" disabled>
+            <option value="">উপজেলা</option>
+          </select>
+        </div>
+        <input type="text" id="reqContactPhone" placeholder="যোগাযোগের মোবাইল নম্বর" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:10px;">
+        <select id="reqUrgency" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px;">
+          <option value="Emergency">🆘 জরুরি (Emergency)</option>
+          <option value="Normal">🕐 স্বাভাবিক (Normal)</option>
+        </select>
+        <button id="reqSubmitBtn" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:#dc2626; color:#fff;">🆘 অনুরোধ পোস্ট করুন</button>
+      </div>
+    </div>
+
+    <!-- 🔍 ফিল্টার (লুকানো, বাটনে চাপলে খোলে) -->
+    <div class="card" id="bloodFilterCard" style="display:none;">
+      <h3 style="margin:0 0 10px; font-size:14px; color:var(--amber);">🔍 ফিড ফিল্টার করুন</h3>
+      <select id="bloodSearchGroup" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:10px;">
+        <option value="">যেকোনো গ্রুপ</option>
+        <option>A+</option><option>A-</option>
+        <option>B+</option><option>B-</option>
+        <option>AB+</option><option>AB-</option>
+        <option>O+</option><option>O-</option>
+      </select>
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <select id="bloodSearchDistrict" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+          <option value="">সব জেলা</option>
+        </select>
+        <select id="bloodSearchUpazila" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;" disabled>
+          <option value="">সব উপজেলা</option>
+        </select>
+      </div>
+      <button id="bloodSearchBtn" style="width:100%; padding:12px; border:none; border-radius:10px; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit; background:#dc2626; color:#fff;">প্রয়োগ করুন</button>
+      <button id="bloodClearFilterBtn" style="width:100%; padding:10px; margin-top:8px; border:1px solid var(--border); border-radius:10px; font-weight:700; font-size:12px; cursor:pointer; font-family:inherit; background:transparent; color:var(--muted);">✕ ফিল্টার মুছুন</button>
+    </div>
+
+    <!-- 📰 ফিড — রক্তের অনুরোধ ও উপলব্ধ দাতা দুটোই একসাথে, সময় অনুযায়ী সাজানো -->
+    <div id="bloodFeedList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+  </div>
+
 </div>
 
 <!-- ==================== নিচের ফুটার নেভিগেশন ==================== -->
@@ -507,7 +658,7 @@ let currentMarketId = null, currentShopId = null;
 let userLatLng = null;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 }
 
@@ -520,12 +671,19 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
       showScreen("screenMarkets");
     }else if(svc === "transport"){
       showScreen("screenTransport");
+    }else if(svc === "jibontori"){
+      showScreen("screenJibonTori");
+    }else if(svc === "bloodbank"){
+      showScreen("screenBloodBank");
+      initBloodBankScreen();
     }else{
       alert("এই সার্ভিসটা শীঘ্রই আসছে — এখনো প্রস্তুত হয়নি।");
     }
   });
 });
 document.getElementById("backToHomeFromMarkets") && document.getElementById("backToHomeFromMarkets").addEventListener("click", ()=> showScreen("screenHome"));
+document.getElementById("backToHomeFromJibonTori") && document.getElementById("backToHomeFromJibonTori").addEventListener("click", ()=> showScreen("screenHome"));
+document.getElementById("backToJibonToriFromBlood") && document.getElementById("backToJibonToriFromBlood").addEventListener("click", ()=> showScreen("screenJibonTori"));
 
 /* ---------- নিচের ফুটার নেভিগেশন ---------- */
 $("footerNavHome").addEventListener("click", ()=>{
@@ -967,6 +1125,363 @@ loadMarkets();
    একজনকে বেছে দেয় না) — যাত্রী নিজে সবচেয়ে ভালো অফারটা বেছে confirmedDriver
    সেট করে। এতে দুইজন ড্রাইভার একসাথে দাবি করার সমস্যা (race condition) হয় না। */
 let tripCurrentId = null, tripUnsub = null, tripCountdownInterval = null;
+
+/* ==================== 🩸 Blood Bank ====================
+   Collection: bloodDonors/{uid} — Google-লগইন করা কাস্টমাররাই রক্তদাতা
+   হিসেবে নিবন্ধন করতে পারেন (uid দিয়েই ডকুমেন্ট আইডি, একজনের একটাই প্রোফাইল)।
+   ⚠️ সততার সাথে বলা দরকার: পরবর্তী রক্তদানের যোগ্য তারিখ (nextEligibleDate)
+   হিসাব করা হয়েছে "শেষ রক্তদানের ৯০ দিন পর" এই সাধারণ নিয়ম ধরে — এটা একটা
+   প্রচলিত সর্বনিম্ন সীমা, কিন্তু ডাক্তারি পরামর্শ বা রক্তদান কেন্দ্রের
+   নির্দিষ্ট নিয়ম এর চেয়ে ভিন্ন হতে পারে। এটা কোনো চূড়ান্ত মেডিকেল পরামর্শ
+   না, শুধু একটা সাধারণ হিসাব। */
+const BLOOD_ELIGIBILITY_DAYS = 90;
+let __bloodOwnProfile = null;
+
+function bloodPopulateDistrictSelect(selectEl, upazilaSelEl, onchange){
+  selectEl.innerHTML = '<option value="">জেলা বেছে নিন</option>' + getAllDistricts().map(d=>`<option value="${d}">${d}</option>`).join("");
+  selectEl.addEventListener("change", (e)=>{
+    const district = e.target.value;
+    if(!district){
+      upazilaSelEl.innerHTML = '<option value="">উপজেলা</option>';
+      upazilaSelEl.disabled = true;
+    }else{
+      upazilaSelEl.disabled = false;
+      upazilaSelEl.innerHTML = '<option value="">উপজেলা বেছে নিন</option>' + getUpazilasForDistrict(district).map(u=>`<option value="${u}">${u}</option>`).join("");
+    }
+    if(onchange) onchange();
+  });
+}
+
+let __bloodScreenInitialized = false;
+async function initBloodBankScreen(){
+  if(!__bloodScreenInitialized){
+    bloodPopulateDistrictSelect($("bloodDistrict"), $("bloodUpazila"));
+    bloodPopulateDistrictSelect($("bloodSearchDistrict"), $("bloodSearchUpazila"));
+    bloodPopulateDistrictSelect($("reqDistrict"), $("reqUpazila"));
+    listenBloodFeed();
+    $("reqSubmitBtn").addEventListener("click", bloodSubmitRequest);
+    $("bloodLastDonated").addEventListener("change", bloodRefreshEligibilityHint);
+    $("bloodAvailableSwitch").addEventListener("click", ()=>{
+      $("bloodAvailableSwitch").classList.toggle("on");
+    });
+    $("bloodSaveBtn").addEventListener("click", bloodSaveProfile);
+    $("bloodMarkDonatedBtn").addEventListener("click", bloodMarkDonatedToday);
+    $("bloodSearchBtn").addEventListener("click", bloodApplyFilter);
+    $("bloodClearFilterBtn").addEventListener("click", bloodClearFilter);
+    $("bloodGoogleLoginBtn") && $("bloodGoogleLoginBtn").addEventListener("click", async ()=>{
+      try{ await auth.signInWithPopup(googleProvider); }
+      catch(e){ if(e.code === "auth/popup-blocked") auth.signInWithRedirect(googleProvider); }
+    });
+    // 📋 কমপ্যাক্ট স্ট্যাটাস-বার-এর বাটন দুটো
+    $("bloodCompactEditBtn").addEventListener("click", ()=>{
+      $("bloodProfileCompact").style.display = "none";
+      $("bloodProfileForm").style.display = "block";
+    });
+    $("bloodCompactDonatedBtn").addEventListener("click", bloodMarkDonatedToday);
+    // 🆘🔍 দুটো ফর্ম-টগল বাটন — একটা খুললে অন্যটা বন্ধ (ড্যাশবোর্ড পরিষ্কার রাখতে)
+    $("toggleReqFormBtn").addEventListener("click", ()=>{
+      const isOpen = $("bloodReqFormCard").style.display === "block";
+      $("bloodReqFormCard").style.display = isOpen ? "none" : "block";
+      $("bloodFilterCard").style.display = "none";
+    });
+    $("toggleFilterBtn").addEventListener("click", ()=>{
+      const isOpen = $("bloodFilterCard").style.display === "block";
+      $("bloodFilterCard").style.display = isOpen ? "none" : "block";
+      $("bloodReqFormCard").style.display = "none";
+    });
+    __bloodScreenInitialized = true;
+  }
+
+  if(!currentCustomer){
+    $("bloodProfileLoggedOut").style.display = "block";
+    $("bloodProfileCompact").style.display = "none";
+    $("bloodProfileForm").style.display = "none";
+    return;
+  }
+  $("bloodProfileLoggedOut").style.display = "none";
+
+  try{
+    const doc = await db.collection("bloodDonors").doc(currentCustomer.uid).get();
+    if(doc.exists){
+      __bloodOwnProfile = doc.data();
+      $("bloodPhone").value = __bloodOwnProfile.phone || "";
+      $("bloodGroup").value = __bloodOwnProfile.bloodGroup || "";
+      $("bloodDistrict").value = __bloodOwnProfile.district || "";
+      $("bloodDistrict").dispatchEvent(new Event("change"));
+      setTimeout(()=>{ $("bloodUpazila").value = __bloodOwnProfile.upazila || ""; }, 50);
+      $("bloodLastDonated").value = __bloodOwnProfile.lastDonatedDate || "";
+      $("bloodAvailableSwitch").classList.toggle("on", !!__bloodOwnProfile.isAvailable);
+      bloodRefreshEligibilityHint();
+      bloodShowCompactProfile(); // ইতিমধ্যে নিবন্ধিত — কমপ্যাক্ট ভিউ দেখানো হয়
+    }else{
+      __bloodOwnProfile = null;
+      $("bloodProfileCompact").style.display = "none";
+      $("bloodProfileForm").style.display = "block"; // প্রথমবার — সরাসরি পুরো ফর্ম
+    }
+  }catch(e){ console.warn("blood profile load failed:", e); }
+}
+
+// 📋 নিবন্ধিত দাতার জন্য কমপ্যাক্ট স্ট্যাটাস-বার দেখানো ও পূরণ করা
+function bloodShowCompactProfile(){
+  if(!__bloodOwnProfile) return;
+  $("bloodProfileForm").style.display = "none";
+  $("bloodProfileCompact").style.display = "flex";
+  $("bloodCompactAvatar").src = __bloodOwnProfile.photoURL || currentCustomer.photoURL || "";
+  $("bloodCompactName").textContent = __bloodOwnProfile.name || "দাতা";
+  const availTxt = __bloodOwnProfile.isAvailable ? "🟢 দিতে ইচ্ছুক" : "🔴 এখন ইচ্ছুক না";
+  $("bloodCompactGroup").textContent = `${__bloodOwnProfile.bloodGroup || "—"} · ${availTxt}`;
+}
+
+function bloodCalcNextEligible(lastDonatedDateStr){
+  if(!lastDonatedDateStr) return null;
+  const last = new Date(lastDonatedDateStr);
+  const next = new Date(last.getTime() + BLOOD_ELIGIBILITY_DAYS*24*60*60*1000);
+  return next;
+}
+
+function bloodRefreshEligibilityHint(){
+  const val = $("bloodLastDonated").value;
+  const hint = $("bloodEligibilityHint");
+  if(!val){ hint.textContent = ""; return; }
+  const next = bloodCalcNextEligible(val);
+  const today = new Date();
+  if(next > today){
+    hint.textContent = `⏳ পরবর্তী রক্তদানের জন্য যোগ্য হবেন: ${next.toLocaleDateString('bn-BD')} (একটা সাধারণ হিসাব, ডাক্তারি পরামর্শ নয়)`;
+  }else{
+    hint.textContent = `✅ আপনি এখন রক্তদানের জন্য যোগ্য (সাধারণ হিসাব অনুযায়ী)`;
+  }
+}
+
+async function bloodSaveProfile(){
+  if(!currentCustomer){ alert("লগইন করুন।"); return; }
+  const phone = $("bloodPhone").value.trim();
+  const bloodGroup = $("bloodGroup").value;
+  const district = $("bloodDistrict").value;
+  const upazila = $("bloodUpazila").value;
+  const lastDonatedDate = $("bloodLastDonated").value || null;
+  const isAvailable = $("bloodAvailableSwitch").classList.contains("on");
+
+  if(!phone || !bloodGroup || !district){
+    alert("মোবাইল নম্বর, রক্তের গ্রুপ ও জেলা দিতে হবে।");
+    return;
+  }
+
+  const nextEligible = bloodCalcNextEligible(lastDonatedDate);
+  const btn = $("bloodSaveBtn");
+  btn.disabled = true; btn.textContent = "সেভ হচ্ছে...";
+  try{
+    const savedData = {
+      uid: currentCustomer.uid,
+      name: currentCustomer.name || "দাতা",
+      email: currentCustomer.email || null,
+      photoURL: currentCustomer.photoURL || null,
+      phone, bloodGroup, district, upazila: upazila || null,
+      isAvailable,
+      lastDonatedDate: lastDonatedDate || null,
+      nextEligibleDate: nextEligible ? nextEligible.toISOString().slice(0,10) : null,
+      createdAt: __bloodOwnProfile ? __bloodOwnProfile.createdAt : firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await db.collection("bloodDonors").doc(currentCustomer.uid).set(savedData, { merge: true });
+    __bloodOwnProfile = { ...savedData };
+    bloodShowCompactProfile(); // সেভের পর কমপ্যাক্ট ভিউতে ফিরিয়ে নেওয়া
+    alert("✅ প্রোফাইল সেভ হয়েছে — ধন্যবাদ রক্তদাতা হওয়ার জন্য!");
+  }catch(e){
+    alert("সেভ করা যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "💾 প্রোফাইল সেভ করুন";
+  }
+}
+
+// ✅ "আজ রক্ত দিয়েছি" — এক ক্লিকে আজকের তারিখ বসিয়ে, availability বন্ধ
+// করে, ৯০ দিনের জন্য প্রোফাইল "পজ" করে দেয় — প্রতিবার ম্যানুয়ালি তারিখ
+// বেছে সেভ করার ঝামেলা এড়াতে
+async function bloodMarkDonatedToday(){
+  if(!currentCustomer){ alert("লগইন করুন।"); return; }
+  if(!confirm("আজকের তারিখেই রক্ত দিয়েছেন বলে সেভ করবেন? এতে আপনার প্রোফাইল ৯০ দিনের জন্য 'রক্ত দিতে অনিচ্ছুক' হয়ে যাবে।")) return;
+
+  const today = new Date().toISOString().slice(0,10);
+  const nextEligible = bloodCalcNextEligible(today);
+  // এই ফাংশনটা দুই জায়গা থেকে ডাকা হতে পারে (কমপ্যাক্ট বার বা পুরো ফর্ম) —
+  // যে বাটনেই চাপ দেওয়া হোক, দুটোরই লোডিং-স্টেট দেখানো হয়
+  const btns = [$("bloodMarkDonatedBtn"), $("bloodCompactDonatedBtn")].filter(Boolean);
+  btns.forEach(b=>{ b.disabled = true; b.dataset.origText = b.textContent; b.textContent = "সেভ হচ্ছে..."; });
+  try{
+    const savedData = {
+      uid: currentCustomer.uid,
+      name: currentCustomer.name || "দাতা",
+      email: currentCustomer.email || null,
+      photoURL: currentCustomer.photoURL || null,
+      phone: __bloodOwnProfile ? __bloodOwnProfile.phone : null,
+      bloodGroup: __bloodOwnProfile ? __bloodOwnProfile.bloodGroup : null,
+      district: __bloodOwnProfile ? __bloodOwnProfile.district : null,
+      upazila: __bloodOwnProfile ? __bloodOwnProfile.upazila : null,
+      isAvailable: false,
+      lastDonatedDate: today,
+      nextEligibleDate: nextEligible.toISOString().slice(0,10),
+      createdAt: __bloodOwnProfile ? __bloodOwnProfile.createdAt : firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await db.collection("bloodDonors").doc(currentCustomer.uid).set(savedData, { merge: true });
+    __bloodOwnProfile = { ...__bloodOwnProfile, ...savedData };
+    $("bloodLastDonated").value = today;
+    $("bloodAvailableSwitch").classList.remove("on");
+    bloodRefreshEligibilityHint();
+    bloodShowCompactProfile();
+    alert("✅ ধন্যবাদ! আপনার প্রোফাইল ৯০ দিনের জন্য পজ করা হয়েছে।");
+  }catch(e){
+    alert("সেভ করা যায়নি: " + e.message);
+  }finally{
+    btns.forEach(b=>{ b.disabled = false; b.textContent = b.dataset.origText || "✅ আজ রক্ত দিয়েছি"; });
+  }
+}
+
+/* ==================== 📰 রক্তের ফিড — অনুরোধ + উপলব্ধ দাতা একসাথে ====================
+   Facebook-এর ফিড ধারণাটা অনুসরণ করা হয়েছে (কপি না) — মানুষ যেভাবে সহজে
+   স্ক্রল করে পোস্ট দেখে, ঠিক সেভাবেই "রক্ত লাগবে" ও "রক্ত দিতে ইচ্ছুক" —
+   দুই ধরনের পোস্টই একসাথে, সময় অনুযায়ী সাজানো একটাই ফিডে দেখানো হয়।
+   ড্যাশবোর্ডে ফর্ম দুটো (অনুরোধ করা/ফিল্টার) লুকানো থাকে, দরকার হলেই খোলে। */
+let bloodRequestsUnsub = null, bloodDonorsUnsub = null;
+let __bloodFeedRequests = [], __bloodFeedDonors = [];
+let __bloodFeedFilter = { group: "", district: "", upazila: "" };
+
+function listenBloodFeed(){
+  if(!bloodRequestsUnsub){
+    bloodRequestsUnsub = db.collection("bloodRequests").where("status","==","active")
+      .onSnapshot((qs)=>{
+        __bloodFeedRequests = qs.docs.map(d=> ({ id: d.id, kind:"request", ...d.data() }));
+        renderBloodFeed();
+      }, (err)=> console.warn("blood requests listener error:", err));
+  }
+  if(!bloodDonorsUnsub){
+    bloodDonorsUnsub = db.collection("bloodDonors").where("isAvailable","==",true)
+      .onSnapshot((qs)=>{
+        __bloodFeedDonors = qs.docs.map(d=> ({ id: d.id, kind:"donor", ...d.data() }));
+        renderBloodFeed();
+      }, (err)=> console.warn("blood donors listener error:", err));
+  }
+}
+
+function renderBloodFeed(){
+  const listEl = $("bloodFeedList");
+  const today = new Date();
+  let items = [...__bloodFeedRequests, ...__bloodFeedDonors.filter(d=> !d.nextEligibleDate || new Date(d.nextEligibleDate) <= today)];
+
+  // 🔍 ফিল্টার প্রয়োগ (যদি সেট করা থাকে)
+  const f = __bloodFeedFilter;
+  if(f.group) items = items.filter(it=> it.bloodGroup === f.group);
+  if(f.district) items = items.filter(it=> it.district === f.district);
+  if(f.upazila) items = items.filter(it=> it.upazila === f.upazila);
+
+  // জরুরি অনুরোধ সবার আগে, তারপর সময় অনুযায়ী নতুন-থেকে-পুরনো
+  items.sort((a,b)=>{
+    const aUrgent = a.kind === "request" && a.urgency === "Emergency" ? 1 : 0;
+    const bUrgent = b.kind === "request" && b.urgency === "Emergency" ? 1 : 0;
+    if(aUrgent !== bUrgent) return bUrgent - aUrgent;
+    const aTime = a.createdAt ? a.createdAt.toMillis() : 0;
+    const bTime = b.createdAt ? b.createdAt.toMillis() : 0;
+    return bTime - aTime;
+  });
+
+  if(items.length === 0){
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এই মুহূর্তে কোনো পোস্ট নেই।</div>';
+    return;
+  }
+
+  listEl.innerHTML = items.map(it=> it.kind === "request" ? bloodRequestCardHtml(it) : bloodDonorCardHtml(it)).join("");
+
+  listEl.querySelectorAll(".reqFulfilledBtn").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      try{ await db.collection("bloodRequests").doc(btn.dataset.req).update({ status: "fulfilled" }); }
+      catch(e){ alert("আপডেট করা যায়নি: " + e.message); }
+    });
+  });
+}
+
+function bloodRequestCardHtml(r){
+  const isMine = currentCustomer && r.requesterUid === currentCustomer.uid;
+  const urgencyBadge = r.urgency === "Emergency"
+    ? '<span style="background:rgba(220,38,38,0.2); color:#f87171; padding:3px 8px; border-radius:12px; font-size:10px; font-weight:800;">🆘 জরুরি</span>'
+    : '<span style="background:rgba(255,255,255,0.08); color:var(--muted); padding:3px 8px; border-radius:12px; font-size:10px; font-weight:800;">🕐 স্বাভাবিক</span>';
+  return `
+    <div class="card" style="padding:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+        <div style="font-weight:800; font-size:14px;">🆘 ${escapeHtml(r.patientName||"রোগী")} <span style="color:#dc2626;">(${escapeHtml(r.bloodGroup)})</span></div>
+        ${urgencyBadge}
+      </div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:3px;">🩸 প্রয়োজন: ${r.bagsNeeded || 1} ব্যাগ</div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:3px;">🏥 ${escapeHtml(r.hospitalName||"—")}</div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:10px;">📍 ${escapeHtml(r.upazila||"")}${r.upazila?", ":""}${escapeHtml(r.district||"")}</div>
+      <div style="display:flex; gap:8px;">
+        <a href="tel:${escapeHtml(r.contactPhone||"")}" style="flex:1; text-align:center; padding:10px; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; text-decoration:none;">📞 কল করুন</a>
+        ${isMine ? `<button class="reqFulfilledBtn" data-req="${r.id}" style="flex:1; padding:10px; border:none; border-radius:9px; background:rgba(255,255,255,0.08); color:var(--muted); font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ রক্ত পেয়ে গেছি</button>` : ""}
+      </div>
+    </div>`;
+}
+
+function bloodDonorCardHtml(d){
+  return `
+    <div class="card" style="display:flex; align-items:center; gap:12px; padding:12px 14px;">
+      <div style="width:44px; height:44px; border-radius:50%; background:#16a34a; color:#fff; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${escapeHtml(d.bloodGroup)}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:13.5px;">🩸 ${escapeHtml(d.name||"দাতা")} <span style="font-weight:500; color:var(--muted); font-size:11px;">রক্ত দিতে ইচ্ছুক</span></div>
+        <div style="font-size:11px; color:var(--muted);">📍 ${escapeHtml(d.upazila||"")}${d.upazila?", ":""}${escapeHtml(d.district||"")}</div>
+      </div>
+      <a href="tel:${escapeHtml(d.phone||"")}" style="flex-shrink:0; padding:9px 14px; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12px; text-decoration:none;">📞 কল</a>
+    </div>`;
+}
+
+async function bloodSubmitRequest(){
+  if(!currentCustomer){ alert("অনুরোধ পোস্ট করতে Google দিয়ে লগইন করুন।"); return; }
+  const patientName = $("reqPatientName").value.trim();
+  const bloodGroup = $("reqBloodGroup").value;
+  const bagsNeeded = Number($("reqBagsNeeded").value) || 1;
+  const hospitalName = $("reqHospitalName").value.trim();
+  const district = $("reqDistrict").value;
+  const upazila = $("reqUpazila").value;
+  const contactPhone = $("reqContactPhone").value.trim();
+  const urgency = $("reqUrgency").value;
+
+  if(!patientName || !bloodGroup || !hospitalName || !district || !contactPhone){
+    alert("রোগীর নাম, রক্তের গ্রুপ, হাসপাতাল, জেলা ও যোগাযোগ নম্বর দিতে হবে।");
+    return;
+  }
+
+  const btn = $("reqSubmitBtn");
+  btn.disabled = true; btn.textContent = "পোস্ট হচ্ছে...";
+  try{
+    await db.collection("bloodRequests").add({
+      requesterUid: currentCustomer.uid,
+      patientName, bloodGroup, bagsNeeded, hospitalName,
+      district, upazila: upazila || null, contactPhone, urgency,
+      status: "active",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    alert("✅ অনুরোধ পোস্ট হয়েছে — ফিডে সবাই এখন এটা দেখতে পাবেন।");
+    $("reqPatientName").value = ""; $("reqBloodGroup").value = ""; $("reqBagsNeeded").value = "1";
+    $("reqHospitalName").value = ""; $("reqContactPhone").value = "";
+    $("bloodReqFormCard").style.display = "none";
+  }catch(e){
+    alert("পোস্ট করা যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "🆘 অনুরোধ পোস্ট করুন";
+  }
+}
+
+function bloodApplyFilter(){
+  __bloodFeedFilter = {
+    group: $("bloodSearchGroup").value,
+    district: $("bloodSearchDistrict").value,
+    upazila: $("bloodSearchUpazila").value
+  };
+  renderBloodFeed();
+  $("bloodFilterCard").style.display = "none";
+}
+
+function bloodClearFilter(){
+  __bloodFeedFilter = { group:"", district:"", upazila:"" };
+  $("bloodSearchGroup").value = ""; $("bloodSearchDistrict").value = "";
+  $("bloodSearchUpazila").innerHTML = '<option value="">সব উপজেলা</option>'; $("bloodSearchUpazila").disabled = true;
+  renderBloodFeed();
+}
 
 function tripGetUserId(){
   if(currentCustomer && currentCustomer.uid) return currentCustomer.uid;
