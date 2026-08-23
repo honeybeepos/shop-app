@@ -487,6 +487,8 @@
           <div class="rmSwitch" id="bloodAvailableSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
         </div>
 
+        <textarea id="bloodMessage" placeholder="মন্তব্য লিখুন (ঐচ্ছিক) — যেমনঃ কখন যোগাযোগ করা যাবে..." rows="2" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px; resize:vertical;"></textarea>
+
         <button id="bloodSaveBtn" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); margin-bottom:8px;">💾 প্রোফাইল সেভ করুন</button>
         <button id="bloodMarkDonatedBtn" style="width:100%; padding:11px; border:1px solid rgba(220,38,38,0.4); border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:rgba(220,38,38,0.1); color:#f87171;">✅ আজ রক্ত দিয়েছি (এক-ক্লিকে সেভ)</button>
       </div>
@@ -525,10 +527,11 @@
           </select>
         </div>
         <input type="text" id="reqContactPhone" placeholder="যোগাযোগের মোবাইল নম্বর" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:10px;">
-        <select id="reqUrgency" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px;">
+        <select id="reqUrgency" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:10px;">
           <option value="Emergency">🆘 জরুরি (Emergency)</option>
           <option value="Normal">🕐 স্বাভাবিক (Normal)</option>
         </select>
+        <textarea id="reqMessage" placeholder="মন্তব্য লিখুন (ঐচ্ছিক) — যেমনঃ রোগীর অবস্থা, বিশেষ কোনো তথ্য..." rows="3" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px; resize:vertical;"></textarea>
         <button id="reqSubmitBtn" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:#dc2626; color:#fff;">🆘 অনুরোধ পোস্ট করুন</button>
       </div>
     </div>
@@ -557,6 +560,21 @@
 
     <!-- 📰 ফিড — রক্তের অনুরোধ ও উপলব্ধ দাতা দুটোই একসাথে, সময় অনুযায়ী সাজানো -->
     <div id="bloodFeedList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- 💬 মন্তব্য প্যানেল (যেকোনো পোস্টে "মন্তব্য" চাপলে খুলবে) -->
+  <div id="bloodCommentsOverlay" style="display:none; position:fixed; inset:0; z-index:600; background:rgba(0,0,0,0.65); align-items:flex-end; justify-content:center;">
+    <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:18px; width:100%; max-width:480px; max-height:75vh; display:flex; flex-direction:column;">
+      <div style="display:flex; align-items:center; margin-bottom:12px; flex-shrink:0;">
+        <h3 style="margin:0; font-size:14.5px; color:#fff;">💬 মন্তব্য</h3>
+        <span id="bloodCloseCommentsBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
+      </div>
+      <div id="bloodCommentsList" style="flex:1; overflow-y:auto; font-size:12.5px; color:#eee; margin-bottom:12px;">লোড হচ্ছে...</div>
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <input type="text" id="bloodCommentInput" placeholder="মন্তব্য লিখুন..." style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+        <button id="bloodCommentSubmitBtn" style="padding:11px 16px; border:none; border-radius:10px; background:var(--amber); color:var(--bg1); font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;">পাঠান</button>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -1281,6 +1299,13 @@ async function initBloodBankScreen(){
       body.style.display = isHidden ? "block" : "none";
       chevron.textContent = isHidden ? "▲" : "▼";
     });
+    // 💬 মন্তব্য প্যানেল বন্ধ/পাঠানোর বাটন
+    $("bloodCloseCommentsBtn").addEventListener("click", ()=>{
+      $("bloodCommentsOverlay").style.display = "none";
+      if(__bloodCommentsUnsub){ __bloodCommentsUnsub(); __bloodCommentsUnsub = null; }
+    });
+    $("bloodCommentSubmitBtn").addEventListener("click", bloodSubmitComment);
+    $("bloodCommentInput").addEventListener("keypress", (e)=>{ if(e.key === "Enter") bloodSubmitComment(); });
     __bloodScreenInitialized = true;
   }
 
@@ -1307,6 +1332,7 @@ async function initBloodBankScreen(){
       $("bloodDistrict").dispatchEvent(new Event("change"));
       setTimeout(()=>{ $("bloodUpazila").value = __bloodOwnProfile.upazila || ""; }, 50);
       $("bloodLastDonated").value = __bloodOwnProfile.lastDonatedDate || "";
+      $("bloodMessage").value = __bloodOwnProfile.message || "";
       $("bloodAvailableSwitch").classList.toggle("on", !!__bloodOwnProfile.isAvailable);
       bloodRefreshEligibilityHint();
       bloodShowCompactProfile(); // ইতিমধ্যে নিবন্ধিত — কমপ্যাক্ট ভিউ দেখানো হয়
@@ -1361,6 +1387,7 @@ async function bloodSaveProfile(){
   const upazila = $("bloodUpazila").value;
   const lastDonatedDate = $("bloodLastDonated").value || null;
   const isAvailable = $("bloodAvailableSwitch").classList.contains("on");
+  const message = $("bloodMessage").value.trim();
 
   if(!phone || !bloodGroup || !district){
     alert("মোবাইল নম্বর, রক্তের গ্রুপ ও জেলা দিতে হবে।");
@@ -1378,6 +1405,7 @@ async function bloodSaveProfile(){
       photoURL: currentCustomer.photoURL || null,
       phone, bloodGroup, district, upazila: upazila || null,
       isAvailable,
+      message: message || null,
       lastDonatedDate: lastDonatedDate || null,
       nextEligibleDate: nextEligible ? nextEligible.toISOString().slice(0,10) : null,
       createdAt: __bloodOwnProfile ? __bloodOwnProfile.createdAt : firebase.firestore.FieldValue.serverTimestamp()
@@ -1507,6 +1535,13 @@ function renderBloodFeed(){
       catch(e){ alert("আপডেট করা যায়নি: " + e.message); }
     });
   });
+
+  listEl.querySelectorAll(".bloodCommentBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=> bloodOpenComments(btn.dataset.type, btn.dataset.id));
+  });
+  listEl.querySelectorAll(".bloodShareBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=> bloodSharePost(btn.dataset.kind, btn.dataset.title, btn.dataset.group));
+  });
 }
 
 function bloodRequestCardHtml(r){
@@ -1520,6 +1555,7 @@ function bloodRequestCardHtml(r){
   const callBtnStyle = isEmergency
     ? "flex:1; text-align:center; padding:10px; border-radius:9px; color:#fff; font-weight:800; font-size:12.5px; text-decoration:none;"
     : "flex:1; text-align:center; padding:10px; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; text-decoration:none;";
+  const messageHtml = r.message ? `<div style="font-size:12.5px; color:#eee; background:rgba(255,255,255,0.04); padding:8px 10px; border-radius:8px; margin:8px 0; white-space:pre-wrap;">${escapeHtml(r.message)}</div>` : "";
   return `
     <div class="card" style="padding:14px;">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
@@ -1528,24 +1564,110 @@ function bloodRequestCardHtml(r){
       </div>
       <div style="font-size:12px; color:var(--muted); margin-bottom:3px;">🩸 প্রয়োজন: ${r.bagsNeeded || 1} ব্যাগ</div>
       <div style="font-size:12px; color:var(--muted); margin-bottom:3px;">🏥 ${escapeHtml(r.hospitalName||"—")}</div>
-      <div style="font-size:12px; color:var(--muted); margin-bottom:10px;">📍 ${escapeHtml(r.upazila||"")}${r.upazila?", ":""}${escapeHtml(r.district||"")}</div>
-      <div style="display:flex; gap:8px;">
+      <div style="font-size:12px; color:var(--muted); margin-bottom:${r.message?"3":"10"}px;">📍 ${escapeHtml(r.upazila||"")}${r.upazila?", ":""}${escapeHtml(r.district||"")}</div>
+      ${messageHtml}
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
         <a href="tel:${escapeHtml(r.contactPhone||"")}" class="${callBtnClass}" style="${callBtnStyle}">📞 কল করুন</a>
         ${isMine ? `<button class="reqFulfilledBtn" data-req="${r.id}" style="flex:1; padding:10px; border:none; border-radius:9px; background:rgba(255,255,255,0.08); color:var(--muted); font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ রক্ত পেয়ে গেছি (চেপে ধরুন)</button>` : ""}
       </div>
+      ${bloodPostFooterHtml("request", r.id, r.patientName, r.bloodGroup)}
     </div>`;
 }
 
 function bloodDonorCardHtml(d){
+  const messageHtml = d.message ? `<div style="font-size:12.5px; color:#eee; background:rgba(255,255,255,0.04); padding:8px 10px; border-radius:8px; margin:8px 0; white-space:pre-wrap;">${escapeHtml(d.message)}</div>` : "";
   return `
-    <div class="card" style="display:flex; align-items:center; gap:12px; padding:12px 14px;">
-      <div style="width:44px; height:44px; border-radius:50%; background:#16a34a; color:#fff; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${escapeHtml(d.bloodGroup)}</div>
-      <div style="flex:1; min-width:0;">
-        <div style="font-weight:700; font-size:13.5px;">🩸 ${escapeHtml(d.name||"দাতা")} <span style="font-weight:500; color:var(--muted); font-size:11px;">রক্ত দিতে ইচ্ছুক</span></div>
-        <div style="font-size:11px; color:var(--muted);">📍 ${escapeHtml(d.upazila||"")}${d.upazila?", ":""}${escapeHtml(d.district||"")}</div>
+    <div class="card" style="padding:14px;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:${d.message?"0":"8"}px;">
+        <div style="width:44px; height:44px; border-radius:50%; background:#16a34a; color:#fff; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${escapeHtml(d.bloodGroup)}</div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:700; font-size:13.5px;">🩸 ${escapeHtml(d.name||"দাতা")} <span style="font-weight:500; color:var(--muted); font-size:11px;">রক্ত দিতে ইচ্ছুক</span></div>
+          <div style="font-size:11px; color:var(--muted);">📍 ${escapeHtml(d.upazila||"")}${d.upazila?", ":""}${escapeHtml(d.district||"")}</div>
+        </div>
+        <a href="tel:${escapeHtml(d.phone||"")}" style="flex-shrink:0; padding:9px 14px; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12px; text-decoration:none;">📞 কল</a>
       </div>
-      <a href="tel:${escapeHtml(d.phone||"")}" style="flex-shrink:0; padding:9px 14px; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12px; text-decoration:none;">📞 কল</a>
+      ${messageHtml}
+      ${bloodPostFooterHtml("donor", d.uid, d.name, d.bloodGroup)}
     </div>`;
+}
+
+// 💬🔗 প্রতিটা পোস্টের নিচে ফেসবুক-পোস্টের মতো ফুটার — মন্তব্য ও শেয়ার
+function bloodPostFooterHtml(postType, postId, title, bloodGroup){
+  return `
+    <div style="display:flex; gap:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.06); margin-top:6px;">
+      <button class="bloodCommentBtn" data-type="${postType}" data-id="${postId}" style="flex:1; padding:8px; border:none; border-radius:8px; background:transparent; color:var(--muted); font-weight:700; font-size:11.5px; cursor:pointer; font-family:inherit;">💬 মন্তব্য</button>
+      <button class="bloodShareBtn" data-kind="${postType}" data-title="${escapeHtml(title||"")}" data-group="${escapeHtml(bloodGroup||"")}" style="flex:1; padding:8px; border:none; border-radius:8px; background:transparent; color:var(--muted); font-weight:700; font-size:11.5px; cursor:pointer; font-family:inherit;">🔗 শেয়ার করুন</button>
+    </div>`;
+}
+
+/* ---------- 💬 মন্তব্য সিস্টেম — bloodRequests/{id}/comments বা bloodDonors/{id}/comments ---------- */
+let __bloodCommentsUnsub = null;
+let __bloodCommentsCurrentType = null, __bloodCommentsCurrentId = null;
+
+function bloodCollectionFor(type){
+  return type === "request" ? "bloodRequests" : "bloodDonors";
+}
+
+function bloodOpenComments(type, id){
+  __bloodCommentsCurrentType = type;
+  __bloodCommentsCurrentId = id;
+  $("bloodCommentsOverlay").style.display = "flex";
+  $("bloodCommentsList").innerHTML = "লোড হচ্ছে...";
+  if(__bloodCommentsUnsub) __bloodCommentsUnsub();
+  __bloodCommentsUnsub = db.collection(bloodCollectionFor(type)).doc(id).collection("comments")
+    .orderBy("createdAt", "asc")
+    .onSnapshot((qs)=>{
+      const comments = qs.docs.map(d=> d.data());
+      if(comments.length === 0){
+        $("bloodCommentsList").innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px 0;">এখনো কোনো মন্তব্য নেই — প্রথম মন্তব্যটা করুন।</div>';
+      }else{
+        $("bloodCommentsList").innerHTML = comments.map(c=> `
+          <div style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+            <div style="font-weight:700; font-size:12px; color:var(--amber);">${escapeHtml(c.name||"একজন")}</div>
+            <div style="margin-top:2px;">${escapeHtml(c.text||"")}</div>
+          </div>`).join("");
+      }
+    }, (err)=>{
+      console.warn("comments listener error:", err);
+      $("bloodCommentsList").innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px 0;">মন্তব্য লোড করা যায়নি।</div>';
+    });
+}
+
+async function bloodSubmitComment(){
+  if(!currentCustomer){ alert("মন্তব্য করতে Google দিয়ে লগইন করুন।"); return; }
+  const text = $("bloodCommentInput").value.trim();
+  if(!text || !__bloodCommentsCurrentId) return;
+  const btn = $("bloodCommentSubmitBtn");
+  btn.disabled = true;
+  try{
+    await db.collection(bloodCollectionFor(__bloodCommentsCurrentType)).doc(__bloodCommentsCurrentId).collection("comments").add({
+      uid: currentCustomer.uid,
+      name: currentCustomer.name || "একজন",
+      text,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    $("bloodCommentInput").value = "";
+  }catch(e){ alert("মন্তব্য পাঠানো যায়নি: " + e.message); }
+  finally{ btn.disabled = false; }
+}
+
+/* ---------- 🔗 শেয়ার করুন — মোবাইলে নেটিভ শেয়ার শিট (Facebook/WhatsApp সহ), না থাকলে ক্লিপবোর্ডে কপি ---------- */
+function bloodSharePost(kind, title, group){
+  const shareText = kind === "request"
+    ? `🆘 ${title || "একজন রোগীর"} জন্য জরুরি ${group || ""} রক্ত দরকার। Honey Bee Bazar-এর "জীবন তরী"-তে বিস্তারিত দেখুন ও সাহায্য করুন।`
+    : `🩸 ${title || "একজন দাতা"} ${group || ""} রক্ত দিতে ইচ্ছুক। Honey Bee Bazar-এর "জীবন তরী"-তে দেখুন।`;
+  const shareUrl = location.href;
+  if(navigator.share){
+    navigator.share({ title: "🩸 জীবন তরী", text: shareText, url: shareUrl }).catch(()=>{});
+  }else if(navigator.clipboard){
+    navigator.clipboard.writeText(shareText + "\n" + shareUrl).then(()=>{
+      alert("✅ লেখাটা কপি হয়েছে — এখন Facebook/WhatsApp-এ পেস্ট করে শেয়ার করতে পারবেন।");
+    }).catch(()=>{
+      alert("শেয়ার করা যায়নি — আপনার ব্রাউজার এটা সাপোর্ট করে না।");
+    });
+  }else{
+    alert("এই ব্রাউজারে শেয়ার ফিচারটা সাপোর্ট করে না।");
+  }
 }
 
 async function bloodSubmitRequest(){
@@ -1558,6 +1680,7 @@ async function bloodSubmitRequest(){
   const upazila = $("reqUpazila").value;
   const contactPhone = $("reqContactPhone").value.trim();
   const urgency = $("reqUrgency").value;
+  const message = $("reqMessage").value.trim();
 
   if(!patientName || !bloodGroup || !hospitalName || !district || !contactPhone){
     alert("রোগীর নাম, রক্তের গ্রুপ, হাসপাতাল, জেলা ও যোগাযোগ নম্বর দিতে হবে।");
@@ -1571,12 +1694,13 @@ async function bloodSubmitRequest(){
       requesterUid: currentCustomer.uid,
       patientName, bloodGroup, bagsNeeded, hospitalName,
       district, upazila: upazila || null, contactPhone, urgency,
+      message: message || null,
       status: "active",
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     alert("✅ অনুরোধ পোস্ট হয়েছে — ফিডে সবাই এখন এটা দেখতে পাবেন।");
     $("reqPatientName").value = ""; $("reqBloodGroup").value = ""; $("reqBagsNeeded").value = "1";
-    $("reqHospitalName").value = ""; $("reqContactPhone").value = "";
+    $("reqHospitalName").value = ""; $("reqContactPhone").value = ""; $("reqMessage").value = "";
     $("bloodReqFormCard").style.display = "none";
   }catch(e){
     alert("পোস্ট করা যায়নি: " + e.message);
