@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>দোকানের হিসাব খাতা - V2 (English SMS)</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#1f4a48">
+<meta name="theme-color" content="#d4a017">
 <link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -13,41 +13,44 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{
-    --ink:#1c1a17;
-    --paper:#f6f1e7;
-    --paper-2:#efe7d6;
-    --line:#d8cbb0;
-    --copper:#b5652f;
-    --copper-dark:#8f4c1f;
-    --teal:#1f4a48;
-    --teal-2:#2c625f;
+    --ink:#2b2308;
+    --paper:#fdf6e3;
+    --paper-2:#faedc4;
+    --line:#e8c96b;
+    --copper:#d4a017;
+    --copper-dark:#a67c0a;
+    --teal:#c8960a;
+    --teal-2:#e0ac1a;
     --due:#a3372c;
     --paid:#27633f;
-    --card:#fffdf8;
+    --card:rgba(255,251,235,0.65);
     --whatsapp:#25d366;
+    --glass-blur: blur(14px);
   }
   *{box-sizing:border-box;}
   body{
     margin:0;
-    background:var(--paper);
-    background-image:radial-gradient(circle at 1px 1px, rgba(28,26,23,0.06) 1px, transparent 0);
-    background-size:18px 18px;
+    background:linear-gradient(160deg, #fff9e6, #ffedb0 40%, #ffe082 100%);
+    background-attachment:fixed;
     font-family:'Noto Sans Bengali','Space Mono',sans-serif;
     color:var(--ink);
     min-height:100vh;
     padding-bottom:40px;
   }
   header{
-    background:var(--teal);
-    color:var(--paper);
+    background:linear-gradient(120deg, rgba(212,160,23,0.75), rgba(224,172,26,0.55));
+    backdrop-filter:var(--glass-blur);
+    -webkit-backdrop-filter:var(--glass-blur);
+    color:#2b2308;
     padding:12px 18px 14px;
     position:relative;
     overflow:hidden;
-    border-bottom:4px solid var(--copper);
+    border-bottom:2px solid rgba(255,255,255,0.4);
+    box-shadow:0 4px 24px rgba(212,160,23,0.25);
   }
   header::after{
     content:""; position:absolute; right:-30px; top:-30px; width:140px; height:140px; border-radius:50%;
-    background:radial-gradient(circle, rgba(181,101,47,0.35), transparent 70%);
+    background:radial-gradient(circle, rgba(255,255,255,0.35), transparent 70%);
   }
   header h1{ margin:0; font-size:22px; font-weight:500; letter-spacing:0.3px; }
   header p{ margin:6px 0 0; font-size:13px; opacity:0.85; font-family:'Space Mono',monospace; letter-spacing:0.5px; }
@@ -56,7 +59,7 @@
   .wrap{ max-width:520px; margin:0 auto; padding:16px; }
   .summary{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:-16px 4px 16px; }
   .summary .stat.profit{ grid-column:1 / -1; }
-  .stat{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; box-shadow:0 2px 0 var(--line); }
+  .stat{ background:var(--card); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); border:1px solid rgba(255,255,255,0.5); border-radius:14px; padding:12px 14px; box-shadow:0 4px 16px rgba(212,160,23,0.15); }
   .stat .label{ font-size:11px; text-transform:uppercase; letter-spacing:0.8px; color:#8a7f6c; font-family:'Space Mono',monospace; }
   .stat .val{ font-family:'Space Mono',monospace; font-size:19px; font-weight:700; margin-top:4px; }
   .stat.due .val{color:var(--due);}
@@ -77,7 +80,7 @@
   .suggest-item .snm{font-weight:700;}
   .suggest-item .sph{color:#8a7f6c; font-family:'Space Mono',monospace; font-size:12px;}
 
-  .panel{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 3px 0 var(--line); }
+  .panel{ background:var(--card); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); border:1px solid rgba(255,255,255,0.5); border-radius:16px; padding:16px; margin-bottom:16px; box-shadow:0 4px 20px rgba(212,160,23,0.15); }
   .panel h2{ font-size:15px; margin:0 0 12px; display:flex; align-items:center; gap:8px; color:var(--teal); }
   .panel h2 .num{
     font-family:'Space Mono',monospace; background:var(--copper); color:#fff; width:20px; height:20px;
@@ -190,7 +193,7 @@
     border:1px solid rgba(255,255,255,0.7);
     border-radius:20px; padding:6px;
     margin:-16px 4px 16px;
-    box-shadow:0 12px 26px rgba(31,59,77,0.14), inset 0 1px 0 rgba(255,255,255,0.85);
+    box-shadow:0 12px 26px rgba(212,160,23,0.18), inset 0 1px 0 rgba(255,255,255,0.85);
     position:relative; z-index:2;
   }
   .tab-btn{
@@ -200,14 +203,14 @@
   }
   .tab-btn:active{ transform:scale(0.92); }
   .tab-btn.active{
-    background:linear-gradient(135deg,#2c5364,#34d399);
-    color:#fff;
+    background:linear-gradient(135deg,#e0ac1a,#ffd54f);
+    color:#2b2308;
     transform:translateY(-3px) scale(1.06);
     animation: tabGlow3d 2.6s ease-in-out infinite;
   }
   @keyframes tabGlow3d{
-    0%,100%{ box-shadow:0 10px 18px rgba(52,211,153,0.38), inset 0 1px 0 rgba(255,255,255,0.3); }
-    50%{ box-shadow:0 15px 26px rgba(52,211,153,0.55), inset 0 1px 0 rgba(255,255,255,0.45); }
+    0%,100%{ box-shadow:0 10px 18px rgba(255,193,7,0.38), inset 0 1px 0 rgba(255,255,255,0.3); }
+    50%{ box-shadow:0 15px 26px rgba(255,193,7,0.55), inset 0 1px 0 rgba(255,255,255,0.45); }
   }
   .tab-panel{display:none;}
   .tab-panel.active{display:block;}
@@ -265,7 +268,7 @@
   }
   @keyframes dashPop{ from{ opacity:0; transform:translateY(10px) scale(0.98); } to{ opacity:1; transform:translateY(0) scale(1); } }
   @keyframes bgShift{ 0%,100%{ background-position:0% 50%; } 50%{ background-position:100% 50%; } }
-  .dash-panel.due{ background-image:linear-gradient(120deg,#fff3e4,#ffe4d6,#ffe9c7,#fff3e4); border:1px solid #ffd9ad; }
+  .dash-panel.due{ background-image:linear-gradient(120deg, rgba(255,224,130,0.55), rgba(255,193,7,0.35), rgba(255,224,130,0.55)); border:1px solid rgba(255,255,255,0.55); }
   .dash-panel.report{ background-image:linear-gradient(120deg,#eaf3ff,#e6f7ff,#eef0ff,#eaf3ff); border:1px solid #c7e3ff; }
   .dash-panel h2 .num{ display:inline-flex; animation: pulseIcon 2.4s ease-in-out infinite; }
   @keyframes pulseIcon{ 0%,100%{ transform:scale(1) rotate(0deg); } 50%{ transform:scale(1.2) rotate(-8deg); } }
