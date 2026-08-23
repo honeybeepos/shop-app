@@ -197,8 +197,15 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active{ display:block; }
+  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active{ display:block; }
+
+  /* 💬 Honey Messenger — সম্পূর্ণ ফুল-ভিউপোর্ট, Bazar-এর সীমাবদ্ধ width-এর
+     বাইরে গিয়ে সম্পূর্ণ আলাদা একটা অ্যাপের মতো খোলে */
+  #screenHoneyMessenger.active{
+    position:fixed; inset:0; z-index:800; background:var(--bg1);
+    overflow-y:auto; padding:16px; max-width:none;
+  }
 </style>
 <script src="bd-locations.js"></script>
 </head>
@@ -566,6 +573,117 @@
     <div id="bloodFeedList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
   </div>
 
+  <!-- 💬 Honey Messenger — এখন খালি, ভবিষ্যতে এখানে কাজ শুরু হবে -->
+  <div id="screenHoneyMessenger">
+    <button class="backBtn" id="backFromHoneyMessenger">← হোমে ফিরে যান</button>
+
+    <!-- তিনটা ট্যাব পাশাপাশি -->
+    <div style="display:flex; gap:8px; margin-bottom:16px;">
+      <button class="hmTabBtn active" id="hmTabMessengerBtn" style="flex:1; padding:12px 6px; border:none; border-radius:10px; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1);">💬 Honey Messenger</button>
+      <button class="hmTabBtn" id="hmTabComplaintBtn" style="flex:1; padding:12px 6px; border:none; border-radius:10px; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; background:rgba(255,255,255,0.06); color:var(--muted);">⚠️ অভিযোগ কেন্দ্র</button>
+      <button class="hmTabBtn" id="hmTabThirdBtn" style="flex:1; padding:12px 6px; border:none; border-radius:10px; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; background:rgba(255,255,255,0.06); color:var(--muted); opacity:0.55;">🔜 শীঘ্রই আসছে</button>
+    </div>
+
+    <!-- ১. Honey Messenger — খালি -->
+    <div id="hmPanelMessenger">
+      <!-- 👤 লগইন করা নেই -->
+      <div id="hmLoggedOut" style="display:none; text-align:center; padding-top:60px;">
+        <h2 style="margin:0; font-size:19px; font-weight:800; color:#fff8e8;">💬 Honey Messenger</h2>
+        <p style="margin-top:14px; color:var(--muted); font-size:13px; padding:0 24px;">শুরু করতে নিচের <b style="color:#fff8e8;">☰ Menu</b> থেকে Google দিয়ে লগইন করে আবার এখানে ফিরে আসুন।</p>
+      </div>
+
+      <!-- 📝 প্রোফাইল সেটআপ (প্রথমবার/অসম্পূর্ণ থাকলে) -->
+      <div id="hmProfileSetup" style="display:none;">
+        <div class="card">
+          <h3 style="margin:0 0 4px; font-size:15px; color:#fff8e8;">💬 Honey Messenger-এ স্বাগতম</h3>
+          <p style="font-size:12px; color:var(--muted); margin:0 0 16px;">মেসেজ পাঠানো শুরু করার আগে একটা ছোট প্রোফাইল তৈরি করুন।</p>
+
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">ইউজারনেম (ইউনিক)</label>
+          <input type="text" id="hmUsername" placeholder="যেমনঃ ariful_88" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:4px;">
+          <p id="hmUsernameStatus" style="font-size:11px; margin:0 0 12px; min-height:14px;"></p>
+
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">পুরো নাম</label>
+          <input type="text" id="hmFullName" placeholder="আপনার পুরো নাম" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">মোবাইল নম্বর</label>
+          <input type="text" id="hmPhone" placeholder="017XXXXXXXX" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <input type="text" id="hmVillage" placeholder="গ্রাম/এলাকা" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+            <input type="text" id="hmWardNo" placeholder="ওয়ার্ড নং" style="width:100px; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+          </div>
+
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">পরিবারের কর্তার নাম (ঐচ্ছিক)</label>
+          <input type="text" id="hmMemberName" placeholder="যেমনঃ পিতা/স্বামীর নাম" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">স্থানীয় পরিচিতি/ঠিকানা (ঐচ্ছিক)</label>
+          <input type="text" id="hmLocalReference" placeholder="যেমনঃ মাস্টার বাড়ি" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:16px;">
+
+          <button id="hmSaveProfileBtn" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1);">💾 প্রোফাইল তৈরি করুন</button>
+        </div>
+      </div>
+
+      <!-- ✅ প্রোফাইল সম্পূর্ণ — মেসেজিং ফিচার এখনো নির্মাণাধীন -->
+      <div id="hmProfileReady" style="display:none;">
+        <div style="text-align:center; margin-bottom:16px;">
+          <h2 style="margin:0; font-size:19px; font-weight:800; color:#fff8e8;">💬 Honey Messenger</h2>
+          <p id="hmWelcomeTxt" style="margin-top:6px; color:var(--amber); font-size:13px; font-weight:700;"></p>
+        </div>
+
+        <!-- 🔍 ইউজারনেম দিয়ে নতুন চ্যাট শুরু করা -->
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <input type="text" id="hmSearchUsername" placeholder="🔍 ইউজারনেম দিয়ে খুঁজুন..." style="flex:1; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13.5px;">
+          <button id="hmSearchBtn" style="padding:12px 16px; border:none; border-radius:10px; background:var(--amber); color:var(--bg1); font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;">খুঁজুন</button>
+        </div>
+        <div id="hmSearchResult" style="margin-bottom:16px;"></div>
+
+        <!-- 📋 চ্যাট-লিস্ট -->
+        <div style="font-size:13px; font-weight:700; color:var(--muted); margin:0 4px 8px;">সাম্প্রতিক চ্যাট</div>
+        <div id="hmChatList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+      </div>
+    </div>
+
+    <!-- 💬 চ্যাট থ্রেড — নিজস্ব ফুল-স্ক্রিন প্যানেল -->
+    <div id="hmChatThread" style="display:none; position:fixed; inset:0; z-index:850; background:var(--bg1); flex-direction:column;">
+      <div style="display:flex; align-items:center; gap:10px; padding:16px; border-bottom:1px solid var(--border); flex-shrink:0;">
+        <span id="hmChatThreadBack" style="font-size:22px; cursor:pointer; color:var(--muted);">←</span>
+        <div>
+          <div id="hmChatThreadName" style="font-weight:800; font-size:15px; color:#fff8e8;">—</div>
+          <div id="hmChatThreadUsername" style="font-size:11px; color:var(--muted);">—</div>
+        </div>
+      </div>
+      <div id="hmChatMessages" style="flex:1; overflow-y:auto; padding:16px;"></div>
+      <div style="display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--border); flex-shrink:0;">
+        <input type="text" id="hmChatInput" placeholder="মেসেজ লিখুন..." style="flex:1; padding:12px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:14px;">
+        <button id="hmChatSendBtn" style="width:44px; height:44px; border-radius:50%; border:none; background:var(--amber); color:var(--bg1); font-size:17px; cursor:pointer; font-family:inherit; flex-shrink:0;">➤</button>
+      </div>
+    </div>
+
+    <!-- ২. অভিযোগ কেন্দ্র -->
+    <div id="hmPanelComplaint" style="display:none;">
+      <div class="card">
+        <h3 style="margin:0 0 10px; font-size:14px; color:#f87171;">⚠️ অভিযোগ কেন্দ্র</h3>
+        <p style="font-size:11.5px; color:var(--muted); margin:0 0 14px;">যেকোনো ব্যক্তি/দোকান/ড্রাইভার/এজেন্টের বিরুদ্ধে অভিযোগ জানাতে পারেন। এটা সুপার এডমিন, এজেন্ট, ও দোকানদারের কাছে পৌঁছাবে।</p>
+
+        <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">কার বিরুদ্ধে অভিযোগ?</label>
+        <input type="text" id="complaintAgainst" placeholder="নাম/দোকানের নাম/ফোন নম্বর লিখুন" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+
+        <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">অভিযোগের বিস্তারিত</label>
+        <textarea id="complaintDetails" placeholder="কী ঘটেছে বিস্তারিত লিখুন..." rows="5" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px; resize:vertical;"></textarea>
+
+        <button id="complaintSubmitBtn" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:#dc2626; color:#fff;">⚠️ অভিযোগ পাঠান</button>
+      </div>
+
+      <div style="font-size:13px; font-weight:700; color:var(--muted); margin:16px 4px 8px;">📋 আমার পাঠানো অভিযোগসমূহ</div>
+      <div id="myComplaintsList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+    </div>
+
+    <!-- ৩. পরে নাম আসবে -->
+    <div id="hmPanelThird" style="display:none;">
+      <div style="text-align:center; padding-top:60px; color:var(--muted); font-size:13px;">এই অংশটা শীঘ্রই আসছে।</div>
+    </div>
+  </div>
+
   <!-- 💬 মন্তব্য প্যানেল (যেকোনো পোস্টে "মন্তব্য" চাপলে খুলবে) -->
   <div id="bloodCommentsOverlay" style="display:none; position:fixed; inset:0; z-index:600; background:rgba(0,0,0,0.65); align-items:flex-end; justify-content:center;">
     <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:18px; width:100%; max-width:480px; max-height:75vh; display:flex; flex-direction:column;">
@@ -588,6 +706,10 @@
   <div class="footerNavItem active" id="footerNavHome">
     <div class="ic">🏠</div>
     <div class="lbl">Home</div>
+  </div>
+  <div class="footerNavItem" id="footerNavSms">
+    <div class="ic">💬</div>
+    <div class="lbl">SMS</div>
   </div>
   <div class="footerNavItem" id="footerNavNotif">
     <div class="ic">🔔</div>
@@ -689,6 +811,13 @@ auth.onAuthStateChanged(async (user)=>{
   if(document.getElementById("screenBloodBank") && document.getElementById("screenBloodBank").classList.contains("active")){
     initBloodBankScreen();
   }
+  // 💬 Honey Messenger ট্যাবে থাকা অবস্থায় ☰ Menu দিয়ে লগইন করলে এখানেও
+  // নিজে থেকেই রিফ্রেশ হয় (আলাদা লগইন বাটন নেই, তাই এই হুকটাই ভরসা)
+  const hmScreen = document.getElementById("screenHoneyMessenger");
+  const hmPanel = document.getElementById("hmPanelMessenger");
+  if(hmScreen && hmScreen.classList.contains("active") && hmPanel && hmPanel.style.display !== "none"){
+    hmInitMessengerTab();
+  }
 });
 
 renderAuthArea();
@@ -700,8 +829,17 @@ let currentMarketId = null, currentShopId = null;
 let userLatLng = null;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
+
+  // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
+  // খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন লুকিয়ে যায়, যাতে
+  // পুরোপুরি আলাদা একটা অ্যাপের মতো লাগে
+  const isMessenger = id === "screenHoneyMessenger";
+  const headerEl = document.querySelector("header");
+  if(headerEl) headerEl.style.display = isMessenger ? "none" : "";
+  const footerEl = document.querySelector(".footerNav");
+  if(footerEl) footerEl.style.display = isMessenger ? "none" : "";
 }
 
 /* ==================== 🏠 হোমস্ক্রিন — সার্ভিস কার্ড ==================== */
@@ -733,6 +871,367 @@ $("footerNavHome").addEventListener("click", ()=>{
   $("footerNavHome").classList.add("active");
   showScreen("screenHome");
 });
+$("footerNavSms").addEventListener("click", ()=>{
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavSms").classList.add("active");
+  showScreen("screenHoneyMessenger");
+});
+$("backFromHoneyMessenger").addEventListener("click", ()=>{
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavHome").classList.add("active");
+  showScreen("screenHome");
+});
+
+/* ==================== 💬⚠️ Honey Messenger ড্যাশবোর্ড — তিনটা ট্যাব ==================== */
+function hmSwitchTab(tab){
+  const tabs = { messenger: ["hmTabMessengerBtn","hmPanelMessenger"], complaint: ["hmTabComplaintBtn","hmPanelComplaint"], third: ["hmTabThirdBtn","hmPanelThird"] };
+  Object.keys(tabs).forEach(key=>{
+    const [btnId, panelId] = tabs[key];
+    const isActive = key === tab;
+    $(panelId).style.display = isActive ? "block" : "none";
+    $(btnId).style.background = isActive ? "linear-gradient(135deg, var(--amber), var(--gold))" : "rgba(255,255,255,0.06)";
+    $(btnId).style.color = isActive ? "var(--bg1)" : "var(--muted)";
+  });
+  if(tab === "complaint") hmLoadMyComplaints();
+  if(tab === "messenger") hmInitMessengerTab();
+}
+$("hmTabMessengerBtn").addEventListener("click", ()=> hmSwitchTab("messenger"));
+$("hmTabComplaintBtn").addEventListener("click", ()=> hmSwitchTab("complaint"));
+$("hmTabThirdBtn").addEventListener("click", ()=> hmSwitchTab("third"));
+
+/* ==================== 💬 Honey Messenger — ইউজারনেম-ভিত্তিক প্রোফাইল সেটআপ ====================
+   ⚠️ কালেকশনের নাম ইচ্ছাকৃতভাবে "messengerUsers"/"messengerUsernames" —
+   পুরনো "users" কালেকশনের সাথে (যেটা POS/Agent/Driver লগইন-রাউটিং-এ
+   ব্যবহৃত হয়) সংঘর্ষ এড়াতে।
+   লগইন বাটন এখানে আলাদা করে নেই — ☰ Menu-এর লগইনটাই পুরো অ্যাপ জুড়ে
+   কাজ করে (currentCustomer একটাই গ্লোবাল ভ্যারিয়েবল), তাই দুই জায়গায়
+   আলাদা লগইন বাটন দেখানো অপ্রয়োজনীয়। */
+
+let __hmMyProfile = null;
+async function hmInitMessengerTab(){
+  if(!currentCustomer){
+    $("hmLoggedOut").style.display = "block";
+    $("hmProfileSetup").style.display = "none";
+    $("hmProfileReady").style.display = "none";
+    return;
+  }
+  $("hmLoggedOut").style.display = "none";
+  try{
+    const doc = await db.collection("messengerUsers").doc(currentCustomer.uid).get();
+    if(doc.exists && doc.data().profileCompleted){
+      __hmMyProfile = doc.data();
+      $("hmProfileSetup").style.display = "none";
+      $("hmProfileReady").style.display = "block";
+      $("hmWelcomeTxt").textContent = `স্বাগতম, ${doc.data().fullName || doc.data().username}!`;
+      hmListenChatList();
+    }else{
+      $("hmProfileReady").style.display = "none";
+      $("hmProfileSetup").style.display = "block";
+    }
+  }catch(e){
+    console.warn("messenger profile load failed:", e);
+    $("hmProfileReady").style.display = "none";
+    $("hmProfileSetup").style.display = "block"; // এরর হলেও ফর্মটাই দেখানো থাকবে, খালি না থেকে
+  }
+}
+
+/* ==================== 🔍 ইউজারনেম দিয়ে খোঁজা ও নতুন চ্যাট শুরু করা ==================== */
+$("hmSearchBtn").addEventListener("click", hmSearchUser);
+$("hmSearchUsername").addEventListener("keypress", (e)=>{ if(e.key === "Enter") hmSearchUser(); });
+
+async function hmSearchUser(){
+  const raw = hmCleanUsername($("hmSearchUsername").value);
+  const resultEl = $("hmSearchResult");
+  if(!raw){ resultEl.innerHTML = ""; return; }
+  resultEl.innerHTML = '<div class="loadingMsg">খোঁজা হচ্ছে...</div>';
+  try{
+    const unameDoc = await db.collection("messengerUsernames").doc(raw).get();
+    if(!unameDoc.exists){
+      resultEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এই নামে কেউ নেই।</div>';
+      return;
+    }
+    const otherUid = unameDoc.data().uid;
+    if(otherUid === currentCustomer.uid){
+      resultEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এটা আপনারই ইউজারনেম।</div>';
+      return;
+    }
+    const otherDoc = await db.collection("messengerUsers").doc(otherUid).get();
+    const other = otherDoc.data();
+    resultEl.innerHTML = `
+      <div class="card" style="display:flex; align-items:center; gap:12px; padding:12px 14px;">
+        <div style="width:42px; height:42px; border-radius:50%; background:var(--amber); color:var(--bg1); font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${escapeHtml((other.fullName||other.username||"?")[0].toUpperCase())}</div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:700; font-size:13.5px;">${escapeHtml(other.fullName||other.username)}</div>
+          <div style="font-size:11px; color:var(--muted);">@${escapeHtml(other.username)}</div>
+        </div>
+        <button id="hmStartChatBtn" style="flex-shrink:0; padding:9px 14px; border:none; border-radius:9px; background:var(--amber); color:var(--bg1); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">💬 চ্যাট করুন</button>
+      </div>`;
+    $("hmStartChatBtn").addEventListener("click", ()=> hmOpenChat(otherUid, other.username, other.fullName));
+  }catch(e){
+    resultEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">খোঁজা যায়নি।</div>';
+  }
+}
+
+/* ==================== 📋 চ্যাট-লিস্ট ==================== */
+function hmChatId(uid1, uid2){
+  return [uid1, uid2].sort().join("_"); // দুইজনের UID সাজিয়ে একটা নির্দিষ্ট, দুইজনের জন্যই একই chatId
+}
+
+let hmChatListUnsub = null;
+function hmListenChatList(){
+  if(hmChatListUnsub) return;
+  hmChatListUnsub = db.collection("messengerChats")
+    .where("participants", "array-contains", currentCustomer.uid)
+    .orderBy("lastMessageAt", "desc")
+    .onSnapshot((qs)=>{
+      const listEl = $("hmChatList");
+      if(qs.empty){
+        listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এখনো কোনো চ্যাট নেই — ওপরে ইউজারনেম খুঁজে শুরু করুন।</div>';
+        return;
+      }
+      listEl.innerHTML = qs.docs.map(d=>{
+        const c = d.data();
+        const otherUid = c.participants.find(p=> p !== currentCustomer.uid);
+        const otherInfo = c.participantInfo ? c.participantInfo[otherUid] : null;
+        const otherName = otherInfo ? (otherInfo.fullName || otherInfo.username) : "একজন";
+        const otherUsername = otherInfo ? otherInfo.username : "";
+        const timeTxt = c.lastMessageAt ? c.lastMessageAt.toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'}) : "";
+        const preview = c.lastMessage ? (c.lastMessage.length > 40 ? c.lastMessage.slice(0,40)+"…" : c.lastMessage) : "";
+        return `
+          <div class="hmChatListItem" data-uid="${otherUid}" data-username="${escapeHtml(otherUsername)}" data-name="${escapeHtml(otherName)}" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid rgba(255,255,255,0.06); cursor:pointer;">
+            <div style="width:42px; height:42px; border-radius:50%; background:var(--amber); color:var(--bg1); font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${escapeHtml((otherName||"?")[0].toUpperCase())}</div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:700; font-size:13.5px;">${escapeHtml(otherName)}</div>
+              <div style="font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(preview)}</div>
+            </div>
+            <div style="font-size:10px; color:var(--muted); flex-shrink:0;">${timeTxt}</div>
+          </div>`;
+      }).join("");
+      listEl.querySelectorAll(".hmChatListItem").forEach(item=>{
+        item.addEventListener("click", ()=> hmOpenChat(item.dataset.uid, item.dataset.username, item.dataset.name));
+      });
+    }, (err)=>{
+      console.warn("chat list listener error:", err);
+      $("hmChatList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">চ্যাট-লিস্ট লোড করা যায়নি।</div>';
+    });
+}
+
+/* ==================== 💬 চ্যাট থ্রেড ==================== */
+let hmMessagesUnsub = null;
+let hmCurrentChatId = null, hmCurrentOtherUid = null;
+
+async function hmOpenChat(otherUid, otherUsername, otherName){
+  hmCurrentOtherUid = otherUid;
+  hmCurrentChatId = hmChatId(currentCustomer.uid, otherUid);
+  $("hmChatThreadName").textContent = otherName || otherUsername;
+  $("hmChatThreadUsername").textContent = "@" + otherUsername;
+  $("hmChatThread").style.display = "flex";
+  $("hmChatMessages").innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
+
+  // 🔗 চ্যাটের প্যারেন্ট ডকুমেন্ট না থাকলে তৈরি করা (দুইজনের তথ্যসহ)
+  const chatRef = db.collection("messengerChats").doc(hmCurrentChatId);
+  try{
+    const chatDoc = await chatRef.get();
+    if(!chatDoc.exists){
+      await chatRef.set({
+        participants: [currentCustomer.uid, otherUid],
+        participantInfo: {
+          [currentCustomer.uid]: { username: __hmMyProfile.username, fullName: __hmMyProfile.fullName },
+          [otherUid]: { username: otherUsername, fullName: otherName }
+        },
+        lastMessage: "", lastMessageAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
+  }catch(e){ console.warn("chat init failed:", e); }
+
+  if(hmMessagesUnsub) hmMessagesUnsub();
+  hmMessagesUnsub = chatRef.collection("messages").orderBy("timestamp","asc")
+    .onSnapshot((qs)=>{
+      const messagesEl = $("hmChatMessages");
+      if(qs.empty){
+        messagesEl.innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px 0; font-size:12.5px;">এখনো কোনো মেসেজ নেই — প্রথম মেসেজটা পাঠান।</div>';
+      }else{
+        messagesEl.innerHTML = qs.docs.map(d=>{
+          const m = d.data();
+          const isMine = m.senderUid === currentCustomer.uid;
+          const timeTxt = m.timestamp ? m.timestamp.toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'}) : "";
+          return `
+            <div style="display:flex; justify-content:${isMine ? "flex-end" : "flex-start"}; margin-bottom:10px;">
+              <div style="max-width:75%; background:${isMine ? "var(--amber)" : "rgba(255,255,255,0.08)"}; color:${isMine ? "var(--bg1)" : "#eee"}; padding:9px 13px; border-radius:16px; ${isMine ? "border-bottom-right-radius:4px;" : "border-bottom-left-radius:4px;"}">
+                <div style="font-size:14px; line-height:1.4;">${escapeHtml(m.text||"")}</div>
+                <div style="font-size:9.5px; opacity:0.7; margin-top:3px; text-align:right;">${timeTxt}</div>
+              </div>
+            </div>`;
+        }).join("");
+      }
+      requestAnimationFrame(()=>{ messagesEl.scrollTop = messagesEl.scrollHeight; });
+    }, (err)=>{
+      console.warn("messages listener error:", err);
+      $("hmChatMessages").innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px 0; font-size:12.5px;">মেসেজ লোড করা যায়নি।</div>';
+    });
+}
+
+$("hmChatThreadBack").addEventListener("click", ()=>{
+  $("hmChatThread").style.display = "none";
+  if(hmMessagesUnsub){ hmMessagesUnsub(); hmMessagesUnsub = null; }
+});
+
+async function hmSendMessage(){
+  const text = $("hmChatInput").value.trim();
+  if(!text || !hmCurrentChatId) return;
+  $("hmChatInput").value = "";
+  const chatRef = db.collection("messengerChats").doc(hmCurrentChatId);
+  try{
+    await chatRef.collection("messages").add({
+      senderUid: currentCustomer.uid,
+      text,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await chatRef.set({
+      lastMessage: text,
+      lastMessageAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  }catch(e){
+    alert("মেসেজ পাঠানো যায়নি: " + e.message);
+  }
+}
+$("hmChatSendBtn").addEventListener("click", hmSendMessage);
+$("hmChatInput").addEventListener("keypress", (e)=>{ if(e.key === "Enter") hmSendMessage(); });
+
+// 🔤 ইউজারনেম পরিষ্কার করা — শুধু ছোট হাতের অক্ষর, সংখ্যা, আন্ডারস্কোর
+function hmCleanUsername(raw){
+  return (raw || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+}
+
+let hmUsernameCheckTimer = null;
+$("hmUsername") && $("hmUsername").addEventListener("input", ()=>{
+  clearTimeout(hmUsernameCheckTimer);
+  const statusEl = $("hmUsernameStatus");
+  const clean = hmCleanUsername($("hmUsername").value);
+  if(!clean){ statusEl.textContent = ""; return; }
+  if(clean.length < 3){ statusEl.textContent = "কমপক্ষে ৩ অক্ষর দিন"; statusEl.style.color = "#f87171"; return; }
+  statusEl.textContent = "চেক করা হচ্ছে...";
+  statusEl.style.color = "var(--muted)";
+  hmUsernameCheckTimer = setTimeout(async ()=>{
+    try{
+      const doc = await db.collection("messengerUsernames").doc(clean).get();
+      if(!doc.exists || doc.data().uid === currentCustomer.uid){
+        statusEl.textContent = "✅ এই নামটা পাওয়া যাচ্ছে";
+        statusEl.style.color = "#4ade80";
+      }else{
+        statusEl.textContent = "❌ এই নামটা আগে থেকেই নেওয়া হয়ে গেছে";
+        statusEl.style.color = "#f87171";
+      }
+    }catch(e){ statusEl.textContent = ""; }
+  }, 500);
+});
+
+$("hmSaveProfileBtn") && $("hmSaveProfileBtn").addEventListener("click", async ()=>{
+  if(!currentCustomer){ alert("লগইন করুন।"); return; }
+  const username = hmCleanUsername($("hmUsername").value);
+  const fullName = $("hmFullName").value.trim();
+  const phone = $("hmPhone").value.trim();
+  const village = $("hmVillage").value.trim();
+  const wardNo = $("hmWardNo").value.trim();
+  const memberName = $("hmMemberName").value.trim();
+  const localReference = $("hmLocalReference").value.trim();
+
+  if(username.length < 3 || !fullName || !phone || !village){
+    alert("ইউজারনেম (কমপক্ষে ৩ অক্ষর), পুরো নাম, মোবাইল নম্বর ও গ্রাম/এলাকা — এই চারটা লিখতে হবে।");
+    return;
+  }
+
+  const btn = $("hmSaveProfileBtn");
+  btn.disabled = true; btn.textContent = "সেভ হচ্ছে...";
+  try{
+    // 🔒 ইউজারনেম-ইউনিকনেস নিশ্চিত করতে transaction ব্যবহার করা হয়েছে —
+    // দুজন একই সময়ে একই নাম নিতে চেষ্টা করলে যেন একজনই সফল হন
+    await db.runTransaction(async (t)=>{
+      const usernameRef = db.collection("messengerUsernames").doc(username);
+      const usernameDoc = await t.get(usernameRef);
+      if(usernameDoc.exists && usernameDoc.data().uid !== currentCustomer.uid){
+        throw new Error("এই ইউজারনেমটা ইতিমধ্যে অন্য কেউ নিয়ে নিয়েছেন, অন্য একটা বেছে নিন।");
+      }
+      t.set(usernameRef, { uid: currentCustomer.uid });
+      t.set(db.collection("messengerUsers").doc(currentCustomer.uid), {
+        uid: currentCustomer.uid,
+        email: currentCustomer.email || null,
+        username, fullName, phone, village,
+        wardNo: wardNo || null,
+        memberName: memberName || null,
+        localReference: localReference || null,
+        profileCompleted: true,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    hmInitMessengerTab();
+  }catch(e){
+    alert(e.message || "সেভ করা যায়নি।");
+  }finally{
+    btn.disabled = false; btn.textContent = "💾 প্রোফাইল তৈরি করুন";
+  }
+});
+
+$("complaintSubmitBtn").addEventListener("click", async ()=>{
+  if(!currentCustomer){ alert("অভিযোগ পাঠাতে Google দিয়ে লগইন করুন।"); return; }
+  const against = $("complaintAgainst").value.trim();
+  const details = $("complaintDetails").value.trim();
+  if(!against || !details){ alert("কার বিরুদ্ধে ও বিস্তারিত — দুটোই লিখতে হবে।"); return; }
+
+  const btn = $("complaintSubmitBtn");
+  btn.disabled = true; btn.textContent = "পাঠানো হচ্ছে...";
+  try{
+    await db.collection("complaints").add({
+      complainantUid: currentCustomer.uid,
+      complainantName: currentCustomer.name || "একজন ইউজার",
+      against, details,
+      status: "open",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    alert("✅ আপনার অভিযোগ পাঠানো হয়েছে — সুপার এডমিন, এজেন্ট ও দোকানদার এটা দেখতে পাবেন।");
+    $("complaintAgainst").value = ""; $("complaintDetails").value = "";
+    hmLoadMyComplaints();
+  }catch(e){
+    alert("পাঠানো যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "⚠️ অভিযোগ পাঠান";
+  }
+});
+
+async function hmLoadMyComplaints(){
+  const listEl = $("myComplaintsList");
+  if(!currentCustomer){
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">দেখতে লগইন করুন।</div>';
+    return;
+  }
+  listEl.innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
+  try{
+    const qs = await db.collection("complaints").where("complainantUid","==",currentCustomer.uid)
+      .orderBy("createdAt","desc").limit(20).get();
+    if(qs.empty){
+      listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এখনো কোনো অভিযোগ পাঠাননি।</div>';
+      return;
+    }
+    const statusLabel = { open: "🟡 বিচারাধীন", resolved: "✅ সমাধান হয়েছে", dismissed: "❌ বাতিল হয়েছে" };
+    listEl.innerHTML = qs.docs.map(d=>{
+      const c = d.data();
+      const time = c.createdAt ? c.createdAt.toDate().toLocaleDateString('bn-BD') : "";
+      return `
+        <div class="card" style="padding:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+            <div style="font-weight:700; font-size:13.5px;">বিরুদ্ধে: ${escapeHtml(c.against||"")}</div>
+            <span style="font-size:11px; color:var(--muted); font-weight:700;">${statusLabel[c.status]||c.status}</span>
+          </div>
+          <div style="font-size:12.5px; color:#ddd; margin-bottom:6px; white-space:pre-wrap;">${escapeHtml(c.details||"")}</div>
+          <div style="font-size:10.5px; color:var(--muted);">${time}</div>
+        </div>`;
+    }).join("");
+  }catch(e){
+    console.error(e);
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">লোড করা যায়নি।</div>';
+  }
+}
+
 $("footerNavNotif").addEventListener("click", ()=>{
   document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
   $("footerNavNotif").classList.add("active");
