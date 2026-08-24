@@ -1509,6 +1509,35 @@ function hmShowChatModeModal(otherUid, otherUsername, otherName, chatId){
   overlay.querySelector("#hmModeCancelBtn").addEventListener("click", ()=> overlay.remove());
 }
 
+let hmPrivacyCleanupInterval = null;
+
+// 🔐 ⚠️ Cloud Function ডিপ্লয় করা হয়নি বলে, এর বদলে ক্লায়েন্ট-সাইড থেকেই
+// মেয়াদোত্তীর্ণ প্রাইভেসি-মোড মেসেজ মুছে ফেলা হয় — চ্যাট খোলা থাকা অবস্থায়
+// প্রতি ১৫ সেকেন্ডে চেক করে। এর মানে: কেউ যদি সেই চ্যাটটা না খোলেন,
+// মেসেজ ততক্ষণ Firestore-এ থেকেই যাবে (ঠিক সময়ে মুছবে না) — কেউ চ্যাটটা
+// খুললেই তখন মুছে যাবে। সম্পূর্ণ নির্ভরযোগ্য/রিয়েল-টাইম মোছার জন্য
+// Cloud Function ডিপ্লয় করাই সঠিক উপায়, কিন্তু এটা ছাড়াই এখন কাজ করবে।
+function hmStartPrivacyCleanup(chatId){
+  hmStopPrivacyCleanup();
+  const sweep = async ()=>{
+    try{
+      const now = firebase.firestore.Timestamp.now();
+      const expiredSnap = await db.collection("messengerChats").doc(chatId).collection("messages")
+        .where("expiresAt","<",now).get();
+      if(!expiredSnap.empty){
+        const batch = db.batch();
+        expiredSnap.docs.forEach(d=> batch.delete(d.ref));
+        await batch.commit();
+      }
+    }catch(e){ console.warn("privacy cleanup sweep failed:", e); }
+  };
+  sweep();
+  hmPrivacyCleanupInterval = setInterval(sweep, 15000);
+}
+function hmStopPrivacyCleanup(){
+  if(hmPrivacyCleanupInterval){ clearInterval(hmPrivacyCleanupInterval); hmPrivacyCleanupInterval = null; }
+}
+
 function hmActuallyOpenChat(otherUid, otherUsername, otherName, chatId){
   hmCurrentOtherUid = otherUid;
   hmCurrentChatId = chatId;
@@ -1516,6 +1545,7 @@ function hmActuallyOpenChat(otherUid, otherUsername, otherName, chatId){
   $("hmChatThreadUsername").textContent = "@" + otherUsername + (hmCurrentChatMode === "privacy" ? ` · প্রাইভেসি মোড, ${hmDurationLabel(hmCurrentPrivacyDuration)} পর অটো-মুছে যায়` : "");
   $("hmChatThread").style.display = "flex";
   $("hmChatMessages").innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
+  hmStartPrivacyCleanup(chatId);
 
   const chatRef = db.collection("messengerChats").doc(chatId);
   if(hmMessagesUnsub) hmMessagesUnsub();
@@ -1569,6 +1599,7 @@ function hmActuallyOpenChat(otherUid, otherUsername, otherName, chatId){
 $("hmChatThreadBack").addEventListener("click", ()=>{
   $("hmChatThread").style.display = "none";
   if(hmMessagesUnsub){ hmMessagesUnsub(); hmMessagesUnsub = null; }
+  hmStopPrivacyCleanup();
 });
 
 /* ==================== ⚙️ চ্যাট সেটিংস — Clear/Block/Appear Offline ==================== */
