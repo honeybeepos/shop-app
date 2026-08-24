@@ -868,8 +868,30 @@
 <!-- 🛒 Cart স্ক্রিন — সম্পূর্ণ নতুন করে বানানো, পুরনো কোনো ID/CSS পুনর্ব্যবহার করা হয়নি -->
 <div id="hbCartScreen" style="display:none; position:fixed; inset:0; z-index:850; background:var(--bg1); overflow-y:auto; padding:14px 16px 100px;">
 
+  <button id="hbOrderTrackingOpenBtn" style="width:100%; display:flex; align-items:center; gap:10px; padding:14px 16px; border:1px solid var(--border); border-radius:14px; background:var(--card); color:#fff8e8; cursor:pointer; font-family:inherit; margin-bottom:16px;">
+    <span style="font-size:20px;">🚚</span>
+    <span style="flex:1; text-align:left; font-weight:800; font-size:14px;">Order Tracking</span>
+    <span style="color:var(--muted); font-size:16px;">›</span>
+  </button>
+
+  <div style="font-size:15px; font-weight:800; margin:8px 4px 8px;">🛒 আপনার Cart</div>
+  <div id="hbCartItemsList"></div>
+  <div id="hbCartSummary" style="display:none;">
+    <div class="card" style="padding:16px;">
+      <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; color:var(--amber); margin-bottom:14px;"><span>সর্বমোট</span><span id="hbCartTotalTxt">৳ 0</span></div>
+      <button id="hbCartCheckoutBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
+    </div>
+  </div>
+</div>
+
+<!-- 🚚 Order Tracking — নিজস্ব ফুল-স্ক্রিন ড্যাশবোর্ড, Cart থেকে আলাদা -->
+<div id="hbOrderTrackingScreen" style="display:none; position:fixed; inset:0; z-index:880; background:var(--bg1); overflow-y:auto; padding:14px 16px 40px;">
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+    <span id="hbOrderTrackingBackBtn" style="font-size:22px; cursor:pointer; color:var(--muted);">←</span>
+    <div style="font-weight:800; font-size:16px;">🚚 Order Tracking</div>
+  </div>
+
   <div class="card" style="padding:16px 4px 14px;">
-    <div style="font-size:15px; font-weight:800; margin:0 10px 12px;">🚚 Order Tracking</div>
     <div id="hbCartTrackMini" style="display:none; margin:0 10px 14px;"></div>
     <div style="display:flex; justify-content:space-around; text-align:center;">
       <div class="hbCartStatusIcon" data-status="pending" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
@@ -900,15 +922,6 @@
     <span id="hbCartOrdersFilterClear" style="display:none; margin-left:auto; font-size:11px; color:var(--amber); cursor:pointer;">সব দেখুন ✕</span>
   </div>
   <div id="hbCartOrdersList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
-
-  <div style="font-size:15px; font-weight:800; margin:22px 4px 8px;">🛒 আপনার Cart</div>
-  <div id="hbCartItemsList"></div>
-  <div id="hbCartSummary" style="display:none;">
-    <div class="card" style="padding:16px;">
-      <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; color:var(--amber); margin-bottom:14px;"><span>সর্বমোট</span><span id="hbCartTotalTxt">৳ 0</span></div>
-      <button id="hbCartCheckoutBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
-    </div>
-  </div>
 </div>
 
 <!-- 🚚 অর্ডার ট্র্যাকার — এনিমেটেড ধাপে ধাপে অগ্রগতি -->
@@ -1019,9 +1032,9 @@ auth.onAuthStateChanged(async (user)=>{
   if(hmScreen && hmScreen.classList.contains("active") && hmPanel && hmPanel.style.display !== "none"){
     hmInitMessengerTab();
   }
-  // 📦 Cart খোলা অবস্থায় লগইন সম্পন্ন হলে "আমার অর্ডার"-ও রিফ্রেশ হয়
-  const cartScreenEl2 = document.getElementById("hbCartScreen");
-  if(cartScreenEl2 && cartScreenEl2.style.display === "block" && typeof hbOrdersListen === "function"){
+  // 🚚 Order Tracking ড্যাশবোর্ড খোলা অবস্থায় লগইন সম্পন্ন হলে "আমার অর্ডার"-ও রিফ্রেশ হয়
+  const trackingScreenEl2 = document.getElementById("hbOrderTrackingScreen");
+  if(trackingScreenEl2 && trackingScreenEl2.style.display === "block" && typeof hbOrdersListen === "function"){
     hbOrdersListen();
   }
 });
@@ -1069,6 +1082,15 @@ window.addEventListener("popstate", ()=>{
   if(chatThread && chatThread.style.display === "flex"){
     document.getElementById("hmChatThreadBack").click();
     history.pushState({ hbScreen: "hmChatOpen" }, "", location.href); // আবার guard বসানো
+    __hbNavigatingViaPopstate = false;
+    return;
+  }
+
+  // 🚚 Order Tracking ড্যাশবোর্ড খোলা থাকলে আগে সেটাই বন্ধ করা হয় (Cart-এ ফিরে যাওয়া)
+  const trackingScreenEl = document.getElementById("hbOrderTrackingScreen");
+  if(trackingScreenEl && trackingScreenEl.style.display === "block"){
+    hbCloseOrderTracking();
+    history.pushState({ hbScreen: "cartOpen" }, "", location.href); // Cart-এর guard আবার বসানো
     __hbNavigatingViaPopstate = false;
     return;
   }
@@ -2648,17 +2670,30 @@ function hbOpenCart(){
   $("hbCartScreen").style.display = "block";
   history.pushState({ hbScreen: "cartOpen" }, "", location.href);
   hbCartRenderItems();
-  if(currentCustomer) hbOrdersListen();
-  else{
-    $("hbCartOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার দেখতে ☰ Menu থেকে লগইন করুন।</div>';
-    $("hbCartTrackMini").style.display = "none";
-  }
 }
 function hbCloseCart(){
   $("hbCartScreen").style.display = "none";
   document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
   $("footerNavHome").classList.add("active");
 }
+
+/* ---------- 🚚 Order Tracking — নিজস্ব ফুল-স্ক্রিন ড্যাশবোর্ড, Cart থেকে খোলা হয় ---------- */
+function hbOpenOrderTracking(){
+  $("hbCartScreen").style.display = "none"; // Cart-এর ওপর থেকে খোলা, তাই সেটা লুকানো
+  $("hbOrderTrackingScreen").style.display = "block";
+  history.pushState({ hbScreen: "orderTrackingOpen" }, "", location.href);
+  if(currentCustomer) hbOrdersListen();
+  else{
+    $("hbCartOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার দেখতে ☰ Menu থেকে লগইন করুন।</div>';
+    $("hbCartTrackMini").style.display = "none";
+  }
+}
+function hbCloseOrderTracking(){
+  $("hbOrderTrackingScreen").style.display = "none";
+  $("hbCartScreen").style.display = "block"; // Cart-এ ফিরে যাওয়া, একদম Home-এ না
+}
+$("hbOrderTrackingOpenBtn").addEventListener("click", hbOpenOrderTracking);
+$("hbOrderTrackingBackBtn").addEventListener("click", hbCloseOrderTracking);
 
 /* ---------- 📦🚚 আমার অর্ডারসমূহ + এনিমেটেড ট্র্যাকার ---------- */
 const HB_STATUS_LABEL = {
