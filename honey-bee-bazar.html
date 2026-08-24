@@ -766,6 +766,14 @@
           <div class="rmSwitch" id="hmAppearOfflineSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
         </div>
 
+        <div style="display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div style="flex:1;">
+            <div style="font-weight:700; font-size:13px;">🔐 প্রাইভেসি মোড (Auto Wipe)</div>
+            <div id="hmPrivacyModeHint" style="font-size:10.5px; color:var(--muted); margin-top:2px;">অন করলে নতুন মেসেজ ১ মিনিট পর নিজে থেকে মুছে যাবে</div>
+          </div>
+          <div class="rmSwitch" id="hmPrivacyModeSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
+        </div>
+
         <button id="hmClearChatBtn" style="width:100%; text-align:left; padding:14px 0; border:none; border-bottom:1px solid rgba(255,255,255,0.06); background:transparent; color:#fff8e8; font-size:13.5px; cursor:pointer; font-family:inherit;">🗑️ চ্যাট ক্লিয়ার করুন</button>
         <button id="hmBlockBtn" style="width:100%; text-align:left; padding:14px 0; border:none; background:transparent; color:#f87171; font-size:13.5px; cursor:pointer; font-family:inherit;">🚫 ব্লক করুন</button>
       </div>
@@ -1545,8 +1553,30 @@ $("hmChatSettingsBtn").addEventListener("click", async ()=>{
     const list = (myDoc.exists && myDoc.data().appearOfflineTo) || [];
     $("hmAppearOfflineSwitch").classList.toggle("on", list.includes(hmCurrentOtherUid));
   }catch(e){ console.warn("appear-offline status load failed:", e); }
+  // 🔐 এই চ্যাট এখন প্রাইভেসি মোডে আছে কিনা দেখিয়ে দেওয়া
+  $("hmPrivacyModeSwitch").classList.toggle("on", hmCurrentChatMode === "privacy");
 });
 $("hmChatSettingsCloseBtn").addEventListener("click", ()=> $("hmChatSettingsOverlay").style.display = "none");
+
+$("hmPrivacyModeSwitch").addEventListener("click", async ()=>{
+  const willBeOn = !$("hmPrivacyModeSwitch").classList.contains("on");
+  $("hmPrivacyModeSwitch").classList.toggle("on", willBeOn);
+  const newMode = willBeOn ? "privacy" : "regular";
+  try{
+    await db.collection("messengerChats").doc(hmCurrentChatId).update({ mode: newMode });
+    hmCurrentChatMode = newMode;
+    // হেডারে 🔐 আইকন/সাব-টেক্সট আপডেট করা
+    const nameEl = $("hmChatThreadName");
+    const baseName = nameEl.textContent.replace(" 🔐", "");
+    nameEl.textContent = baseName + (willBeOn ? " 🔐" : "");
+    const unameEl = $("hmChatThreadUsername");
+    const baseUname = unameEl.textContent.split(" · ")[0];
+    unameEl.textContent = baseUname + (willBeOn ? " · প্রাইভেসি মোড, ১ মিনিটে অটো-মুছে যায়" : "");
+  }catch(e){
+    alert("মোড বদলানো যায়নি: " + e.message);
+    $("hmPrivacyModeSwitch").classList.toggle("on", !willBeOn);
+  }
+});
 
 $("hmAppearOfflineSwitch").addEventListener("click", async ()=>{
   const willBeOn = !$("hmAppearOfflineSwitch").classList.contains("on");
