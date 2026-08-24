@@ -972,13 +972,16 @@ async function hmGetFriendStatus(otherUid){
 async function hmSendFriendRequest(otherUid, otherUsername, otherName){
   try{
     await db.collection("messengerFriendRequests").doc(hmPairId(currentCustomer.uid, otherUid)).set({
-      fromUid: currentCustomer.uid, fromUsername: __hmMyProfile.username, fromName: __hmMyProfile.fullName,
-      toUid: otherUid, toUsername: otherUsername, toName: otherName,
+      fromUid: currentCustomer.uid, fromUsername: __hmMyProfile.username || "", fromName: __hmMyProfile.fullName || __hmMyProfile.username || "একজন",
+      toUid: otherUid, toUsername: otherUsername || "", toName: otherName || otherUsername || "একজন",
       status: "pending",
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     hmSearchUser(); // বাটনের অবস্থা রিফ্রেশ করতে আবার সার্চ চালানো
-  }catch(e){ alert("রিকোয়েস্ট পাঠানো যায়নি: " + e.message); }
+  }catch(e){
+    console.error("hmSendFriendRequest failed:", e);
+    alert("রিকোয়েস্ট পাঠানো যায়নি: " + e.message);
+  }
 }
 
 let hmRequestsUnsub = null;
