@@ -197,8 +197,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
+  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders, #screenCart{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active, #screenCart.active{ display:block; }
 
   /* 💬 Honey Messenger — সম্পূর্ণ ফুল-ভিউপোর্ট, Bazar-এর সীমাবদ্ধ width-এর
      বাইরে গিয়ে সম্পূর্ণ আলাদা একটা অ্যাপের মতো খোলে */
@@ -331,20 +331,18 @@
 
   <!-- ধাপ ৪: সাব-ক্যাটাগরি -->
   <div id="screenSubcategories">
-    <button class="backBtn" id="backToCategories">← ক্যাটাগরিতে ফিরে যান</button>
-    <div class="card" style="text-align:center; padding:12px;">
-      <div style="font-size:13px; color:var(--muted);">ক্যাটাগরি</div>
-      <div style="font-size:16px; font-weight:800; color:var(--amber);" id="currentCategoryName">—</div>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+      <button class="backBtn" id="backToCategories" style="margin-bottom:0; flex-shrink:0;">← ক্যাটাগরিতে ফিরে যান</button>
+      <div id="currentCategoryName" style="font-size:14px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
     </div>
     <div class="serviceCardGrid" id="subcategoriesGrid"></div>
   </div>
 
   <!-- ধাপ ৫: প্রোডাক্ট/স্টক -->
   <div id="screenProducts">
-    <button class="backBtn" id="backToShops">← পেছনে ফিরে যান</button>
-    <div class="card" style="text-align:center; padding:12px;">
-      <div style="font-size:13px; color:var(--muted);">দোকান</div>
-      <div style="font-size:16px; font-weight:800; color:var(--amber);" id="currentShopName">—</div>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+      <button class="backBtn" id="backToShops" style="margin-bottom:0; flex-shrink:0;">← পেছনে ফিরে যান</button>
+      <div id="currentShopName" style="font-size:14px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
       <div id="productsList"><div class="loadingMsg">স্টক লোড হচ্ছে...</div></div>
@@ -837,6 +835,11 @@
     <div class="ic">🏠</div>
     <div class="lbl">Home</div>
   </div>
+  <div class="footerNavItem" id="footerNavCart" style="position:relative;">
+    <div class="ic">🛒</div>
+    <div class="lbl">Cart</div>
+    <span id="cartBadge" style="display:none; position:absolute; top:2px; right:22%; background:#e0433c; color:#fff; font-size:9px; font-weight:800; min-width:15px; height:15px; border-radius:8px; line-height:15px; text-align:center; padding:0 3px;">0</span>
+  </div>
   <div class="footerNavItem" id="footerNavSms">
     <div class="ic">💬</div>
     <div class="lbl">SMS</div>
@@ -848,6 +851,19 @@
   <div class="footerNavItem" id="footerNavMenu">
     <div class="ic">☰</div>
     <div class="lbl">Menu</div>
+  </div>
+</div>
+
+<!-- 🛒 Cart স্ক্রিন -->
+<div id="screenCart">
+  <button class="backBtn" id="backFromCart">← হোমে ফিরে যান</button>
+  <div style="font-size:16px; font-weight:800; margin-bottom:14px;">🛒 আপনার Cart</div>
+  <div id="cartItemsList"></div>
+  <div id="cartSummary" style="display:none;">
+    <div class="card" style="padding:16px;">
+      <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; color:var(--amber); margin-bottom:14px;"><span>সর্বমোট</span><span id="cartTotalTxt">৳ 0</span></div>
+      <button id="cartCheckoutBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
+    </div>
   </div>
 </div>
 
@@ -961,7 +977,7 @@ let userLatLng = null;
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders","screenCart"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 
   // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
@@ -1044,6 +1060,17 @@ document.getElementById("backFromMedEqOrders") && document.getElementById("backF
 
 /* ---------- নিচের ফুটার নেভিগেশন ---------- */
 $("footerNavHome").addEventListener("click", ()=>{
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavHome").classList.add("active");
+  showScreen("screenHome");
+});
+$("footerNavCart").addEventListener("click", ()=>{
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavCart").classList.add("active");
+  showScreen("screenCart");
+  cartRenderScreen();
+});
+$("backFromCart").addEventListener("click", ()=>{
   document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
   $("footerNavHome").classList.add("active");
   showScreen("screenHome");
@@ -2408,8 +2435,8 @@ function renderProducts(products){
           <span class="favHeart" style="font-size:16px;" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
           <span class="stockBadge ${stockClass}">${stockLabel}</span>
         </div>
-        <button class="orderNowBtn" ${outOfStock ? "disabled" : ""} onclick="orderProductNow('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}')">
-          ${outOfStock ? "স্টক নেই" : "🛒 অর্ডার করুন"}
+        <button class="orderNowBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${hasOffer ? p.offerPrice : (p.price!=null?p.price:0)})">
+          ${outOfStock ? "স্টক নেই" : "🛒 Cart-এ যোগ করুন"}
         </button>
       </div>`;
   }).join("");
@@ -2428,19 +2455,128 @@ window.toggleFavoriteProduct = async function(ev, productId){
   }catch(e){ console.warn("favorite product save failed:", e); }
 };
 
-window.orderProductNow = async function(productId, productName){
+/* ==================== 🛒 Cart সিস্টেম ====================
+   ⚠️ Cart এই ফোনেই (localStorage-এ) সেভ থাকে — অন্য ফোনে সিঙ্ক হয় না।
+   "Cart-এ যোগ করুন" চাপলে সরাসরি অর্ডার হয় না, Cart-এ জমা হয়। Cart
+   স্ক্রিন থেকে "✅ অর্ডার নিশ্চিত করুন" চাপলেই তখন আসল orderRequests
+   তৈরি হয় (আগে যেভাবে সরাসরি হতো)। */
+const CART_STORAGE_KEY = "hb_cart_v1";
+
+function cartGetItems(){
+  try{ return JSON.parse(localStorage.getItem(CART_STORAGE_KEY)) || []; }
+  catch(e){ return []; }
+}
+function cartSaveItems(items){
+  try{ localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items)); }catch(e){}
+  cartUpdateBadge();
+}
+function cartUpdateBadge(){
+  const items = cartGetItems();
+  const totalQty = items.reduce((sum,it)=> sum + it.qty, 0);
+  const badge = $("cartBadge");
+  if(totalQty > 0){ badge.textContent = totalQty > 9 ? "9+" : totalQty; badge.style.display = "block"; }
+  else{ badge.style.display = "none"; }
+}
+
+window.addToCart = function(productId, productName, price){
+  if(!currentCustomer){ alert("Cart-এ যোগ করতে আগে Google দিয়ে লগইন করুন (☰ Menu থেকে)।"); return; }
+  const shopId = currentShopId;
+  const shopName = $("currentShopName").textContent || "দোকান";
+  const items = cartGetItems();
+  const existing = items.find(it=> it.productId === productId && it.shopId === shopId);
+  if(existing) existing.qty += 1;
+  else items.push({ shopId, shopName, productId, productName, price: Number(price)||0, qty: 1 });
+  cartSaveItems(items);
+  alert(`✅ "${productName}" Cart-এ যোগ হয়েছে।`);
+};
+
+function cartChangeQty(shopId, productId, delta){
+  const items = cartGetItems();
+  const item = items.find(it=> it.productId === productId && it.shopId === shopId);
+  if(!item) return;
+  item.qty += delta;
+  const finalItems = item.qty <= 0 ? items.filter(it=> it !== item) : items;
+  cartSaveItems(finalItems);
+  cartRenderScreen();
+}
+function cartRemoveItem(shopId, productId){
+  const items = cartGetItems().filter(it=> !(it.productId === productId && it.shopId === shopId));
+  cartSaveItems(items);
+  cartRenderScreen();
+}
+
+function cartRenderScreen(){
+  const items = cartGetItems();
+  const listEl = $("cartItemsList");
+  if(items.length === 0){
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px; padding:30px 16px;">🛒 Cart খালি — কোনো দোকানের প্রোডাক্ট থেকে "Cart-এ যোগ করুন" চাপুন।</div>';
+    $("cartSummary").style.display = "none";
+    return;
+  }
+  // দোকান অনুযায়ী গ্রুপ করে দেখানো হয় (একাধিক দোকানের প্রোডাক্ট একসাথে থাকতে পারে)
+  const byShop = {};
+  items.forEach(it=>{ (byShop[it.shopId] = byShop[it.shopId] || []).push(it); });
+
+  let total = 0;
+  listEl.innerHTML = Object.keys(byShop).map(shopId=>{
+    const shopItems = byShop[shopId];
+    const shopName = shopItems[0].shopName;
+    const rows = shopItems.map(it=>{
+      const lineTotal = it.price * it.qty;
+      total += lineTotal;
+      return `
+        <div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:13px; font-weight:700;">${escapeHtml(it.productName)}</div>
+            <div style="font-size:11.5px; color:var(--muted);">৳${it.price} × ${it.qty} = ৳${lineTotal}</div>
+          </div>
+          <button class="cartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-delta="-1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">−</button>
+          <span style="font-weight:800; font-size:13px; min-width:18px; text-align:center;">${it.qty}</span>
+          <button class="cartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-delta="1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">+</button>
+          <span class="cartRemoveBtn" data-shop="${shopId}" data-pid="${it.productId}" style="color:#f87171; font-size:16px; cursor:pointer; padding:0 4px;">✕</span>
+        </div>`;
+    }).join("");
+    return `
+      <div class="card" style="padding:14px;">
+        <div style="font-weight:800; font-size:13.5px; color:var(--amber); margin-bottom:6px;">🏪 ${escapeHtml(shopName)}</div>
+        ${rows}
+      </div>`;
+  }).join("");
+
+  $("cartTotalTxt").textContent = "৳ " + total;
+  $("cartSummary").style.display = "block";
+
+  listEl.querySelectorAll(".cartQtyBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=> cartChangeQty(btn.dataset.shop, btn.dataset.pid, Number(btn.dataset.delta)));
+  });
+  listEl.querySelectorAll(".cartRemoveBtn").forEach(el=>{
+    el.addEventListener("click", ()=> cartRemoveItem(el.dataset.shop, el.dataset.pid));
+  });
+}
+
+$("cartCheckoutBtn").addEventListener("click", async ()=>{
   if(!currentCustomer){ alert("অর্ডার করতে আগে Google দিয়ে লগইন করুন (☰ Menu থেকে)।"); return; }
+  const items = cartGetItems();
+  if(items.length === 0) return;
+  const btn = $("cartCheckoutBtn");
+  btn.disabled = true; btn.textContent = "অর্ডার হচ্ছে...";
   try{
-    await db.collection("orderRequests").add({
-      shopId: currentShopId, productId, productName,
+    await Promise.all(items.map(it=> db.collection("orderRequests").add({
+      shopId: it.shopId, productId: it.productId, productName: it.productName,
       customerUid: currentCustomer.uid, customerName: currentCustomer.name || "কাস্টমার",
-      qty: 1, status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    alert(`✅ "${productName}"-এর জন্য অর্ডার রিকোয়েস্ট পাঠানো হয়েছে — দোকান শীঘ্রই যোগাযোগ করবে।`);
+      qty: it.qty, status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    })));
+    cartSaveItems([]);
+    cartRenderScreen();
+    alert("✅ আপনার অর্ডার(গুলো) পাঠানো হয়েছে — দোকান(গুলো) শীঘ্রই যোগাযোগ করবে।");
   }catch(e){
     alert("অর্ডার পাঠানো যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "✅ অর্ডার নিশ্চিত করুন";
   }
-};
+});
+
+cartUpdateBadge(); // পেজ লোড হওয়ার সাথে সাথেই আগের সেভ করা Cart-এর ব্যাজ দেখানো
 
 async function resolveAllImages(products){
   for(const p of products){
