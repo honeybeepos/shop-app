@@ -197,8 +197,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active{ display:block; }
+  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
 
   /* 💬 Honey Messenger — সম্পূর্ণ ফুল-ভিউপোর্ট, Bazar-এর সীমাবদ্ধ width-এর
      বাইরে গিয়ে সম্পূর্ণ আলাদা একটা অ্যাপের মতো খোলে */
@@ -432,10 +432,9 @@
         <div class="ic">🚑</div>
         <div class="lbl">অ্যাম্বুলেন্স</div>
       </div>
-      <div class="serviceCard soon" data-svc="medicalequipment">
+      <div class="serviceCard" data-svc="medicalequipment">
         <div class="ic">🩼</div>
         <div class="lbl">মেডিকেল ইকুইপমেন্ট</div>
-        <div class="soonBadge">শীঘ্রই আসছে</div>
       </div>
     </div>
   </div>
@@ -593,14 +592,59 @@
       </select>
       <select id="ambTypeFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
         <option value="">সব ধরন</option>
-        <option value="AC">AC</option>
-        <option value="Non-AC">Non-AC</option>
-        <option value="ICU">ICU</option>
-        <option value="Freezer">Freezer (মরদেহ বহনকারী)</option>
+        <option value="ambulance_ac">AC</option>
+        <option value="ambulance_non_ac">Non-AC</option>
+        <option value="ambulance_icu">ICU</option>
       </select>
     </div>
 
     <div id="ambulanceList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- 🩼 মেডিকেল ইকুইপমেন্ট — ক্যাটাগরি → তালিকা → ভাড়া/ক্রয় ফ্লো -->
+  <div id="screenMedicalEquipment">
+    <button class="backBtn" id="backToJibonToriFromMedEq">← জীবন তরী-তে ফিরে যান</button>
+
+    <!-- Panel A: ক্যাটাগরি গ্রিড -->
+    <div id="medEqCategoryPanel">
+      <div class="card" style="text-align:center; padding:16px;">
+        <div style="font-size:28px; margin-bottom:4px;">🩼</div>
+        <div style="font-size:15px; font-weight:800;">মেডিকেল ইকুইপমেন্ট</div>
+        <div style="font-size:11.5px; color:var(--muted); margin-top:4px;">ভাড়া নিন অথবা কিনুন</div>
+      </div>
+      <button id="medEqMyOrdersBtn" style="width:100%; padding:11px; margin-top:10px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,0.05); color:var(--muted); font-weight:700; font-size:12.5px; cursor:pointer; font-family:inherit;">📦 আমার অর্ডারসমূহ</button>
+      <div class="serviceCardGrid" id="medEqCategoryGrid" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- Panel B: নির্দিষ্ট ক্যাটাগরির ইকুইপমেন্ট তালিকা -->
+    <div id="medEqListPanel" style="display:none;">
+      <button id="medEqBackToCategories" style="background:transparent; border:1px solid var(--border); color:var(--muted); padding:8px 14px; border-radius:9px; font-size:12px; cursor:pointer; font-family:inherit; margin-bottom:12px;">← সব ক্যাটাগরি</button>
+      <div id="medEqListTitle" style="font-size:15px; font-weight:800; margin-bottom:10px;"></div>
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <select id="medEqDistrictFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+          <option value="">সব জেলা</option>
+        </select>
+      </div>
+      <div id="medEqList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+    </div>
+  </div>
+
+  <!-- 🛒 অর্ডার ফ্লো — Rent (৩ ধাপ) / Buy — মডাল -->
+  <div id="medEqOrderModal" style="display:none; position:fixed; inset:0; z-index:950; background:rgba(0,0,0,0.75); align-items:flex-end; justify-content:center;">
+    <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:85vh; overflow-y:auto;">
+      <div style="display:flex; align-items:center; margin-bottom:14px;">
+        <h3 id="medEqOrderTitle" style="margin:0; font-size:15px; color:#fff8e8;">অর্ডার</h3>
+        <span id="medEqOrderCloseBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
+      </div>
+      <div id="medEqOrderBody"></div>
+    </div>
+  </div>
+
+  <!-- 📦 আমার মেডিকেল ইকুইপমেন্ট অর্ডার -->
+  <div id="screenMedEqOrders">
+    <button class="backBtn" id="backFromMedEqOrders">← জীবন তরী-তে ফিরে যান</button>
+    <div style="font-size:15px; font-weight:800; margin-bottom:12px;">📦 আমার অর্ডারসমূহ</div>
+    <div id="medEqOrdersList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
   </div>
 
   <!-- 💬 Honey Messenger — এখন খালি, ভবিষ্যতে এখানে কাজ শুরু হবে -->
@@ -877,7 +921,7 @@ let userLatLng = null;
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 
   // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
@@ -943,6 +987,9 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
     }else if(svc === "ambulance"){
       showScreen("screenAmbulance");
       initAmbulanceScreen();
+    }else if(svc === "medicalequipment"){
+      showScreen("screenMedicalEquipment");
+      initMedEqScreen();
     }else{
       alert("এই সার্ভিসটা শীঘ্রই আসছে — এখনো প্রস্তুত হয়নি।");
     }
@@ -952,6 +999,8 @@ document.getElementById("backToHomeFromMarkets") && document.getElementById("bac
 document.getElementById("backToHomeFromJibonTori") && document.getElementById("backToHomeFromJibonTori").addEventListener("click", ()=> showScreen("screenHome"));
 document.getElementById("backToJibonToriFromBlood") && document.getElementById("backToJibonToriFromBlood").addEventListener("click", ()=> showScreen("screenJibonTori"));
 document.getElementById("backToJibonToriFromAmbulance") && document.getElementById("backToJibonToriFromAmbulance").addEventListener("click", ()=> showScreen("screenJibonTori"));
+document.getElementById("backToJibonToriFromMedEq") && document.getElementById("backToJibonToriFromMedEq").addEventListener("click", ()=> showScreen("screenJibonTori"));
+document.getElementById("backFromMedEqOrders") && document.getElementById("backFromMedEqOrders").addEventListener("click", ()=> showScreen("screenJibonTori"));
 
 /* ---------- নিচের ফুটার নেভিগেশন ---------- */
 $("footerNavHome").addEventListener("click", ()=>{
@@ -2183,15 +2232,23 @@ let __bloodOwnProfile = null;
    Firestore: ambulances/{id} — {driverName, phone, ambulanceType(AC/Non-AC/ICU/Freezer),
    standArea, district, upazila, available:true/false, ambulanceId}
    Firestore: ambulance_call_logs/{id} — {customerGoogleId, ambulanceId, driverName,
-   driverPhone, ambulanceType, customerArea, callStartedAt, callStatus}
+/* ==================== 🚑 অ্যাম্বুলেন্স — GPS Discovery + Hold-to-Call ====================
+   ⚠️ সংশোধন — আগে এখানে আলাদা "ambulances" কালেকশন বানানো হয়েছিল, যেটা
+   ভুল ছিল। অ্যাম্বুলেন্স আসলে বিদ্যমান "🚑 Transport Driver" নিবন্ধনেরই
+   একটা ভেহিকল-টাইপ (login.html-এ "🚑 অ্যাম্বুলেন্স (AC/Non-AC/ICU)" নামে
+   আগে থেকেই আছে) — তাই এখন সরাসরি transportDrivers কালেকশন থেকেই
+   vehicle.type == ambulance_* ফিল্টার করে দেখানো হচ্ছে, আলাদা কোনো
+   রেজিস্ট্রেশন/কালেকশন লাগেনি।
 
-   ⚠️ রেজিস্ট্রেশনের UI এখনো বানানো হয়নি (POS/Agent সাইড, পরে হবে) — তাই
-   টেস্ট করতে Firebase Console-এ ম্যানুয়ালি ambulances কালেকশনে
-   available:true সহ কিছু ডকুমেন্ট বসাতে হবে। */
+   Firestore: ambulance_call_logs/{id} — {customerGoogleId, driverUid,
+   driverName, driverPhone, ambulanceType, customerArea, callStartedAt, callStatus} */
+const AMB_VEHICLE_TYPES = ["ambulance_ac","ambulance_non_ac","ambulance_icu"];
+const AMB_TYPE_LABELS = { ambulance_ac: "🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac: "🚑 অ্যাম্বুলেন্স (Non-AC)", ambulance_icu: "🚑 অ্যাম্বুলেন্স (ICU)" };
+
 let __ambScreenInitialized = false;
 let __ambCustomerDistrict = null;
 let __ambListUnsub = null;
-let __ambLastCallTime = {}; // ambulanceId -> শেষ কল করার সময় (ডাবল-কল ঠেকাতে)
+let __ambLastCallTime = {}; // driverUid -> শেষ কল করার সময় (ডাবল-কল ঠেকাতে)
 
 async function initAmbulanceScreen(){
   if(!__ambScreenInitialized){
@@ -2241,62 +2298,65 @@ async function ambDetectLocation(){
 function ambListenList(){
   if(__ambListUnsub){ __ambListUnsub(); __ambListUnsub = null; }
   const district = $("ambDistrictFilter").value;
-  let query = db.collection("ambulances").where("available","==",true);
+  const typeFilter = $("ambTypeFilter").value;
+  // 🟢 "Available" মানে এখানে driverStatus === "online" (ড্রাইভার নিজে
+  // অনলাইন করেছেন) — আলাদা কোনো available বুলিয়ান ফিল্ড নেই
+  let query = db.collection("transportDrivers")
+    .where("vehicle.type","in", typeFilter ? [typeFilter] : AMB_VEHICLE_TYPES)
+    .where("driverStatus","==","online");
   if(district) query = query.where("district","==",district);
 
   __ambListUnsub = query.onSnapshot((qs)=>{
-    let ambulances = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
-    const typeFilter = $("ambTypeFilter").value;
-    if(typeFilter) ambulances = ambulances.filter(a=> a.ambulanceType === typeFilter);
-    ambRenderList(ambulances, !district && __ambCustomerDistrict);
+    const ambulances = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+    ambRenderList(ambulances);
   }, (err)=>{
     console.warn("ambulance list error:", err);
     $("ambulanceList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">তালিকা লোড করা যায়নি।</div>';
   });
 }
 
-function ambRenderList(ambulances, showFallbackNote){
+function ambRenderList(ambulances){
   const listEl = $("ambulanceList");
   if(ambulances.length === 0){
-    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এই মুহূর্তে কোনো Available অ্যাম্বুলেন্স নেই।</div>';
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এই মুহূর্তে কোনো অনলাইন অ্যাম্বুলেন্স নেই।</div>';
     return;
   }
   listEl.innerHTML = ambulances.map(a=> `
     <div class="card" style="padding:14px;">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-        <div style="font-weight:800; font-size:14.5px;">🚑 ${escapeHtml(a.ambulanceType||"অ্যাম্বুলেন্স")}</div>
-        <span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 9px; border-radius:12px; font-size:10.5px; font-weight:800;">🟢 Available</span>
+        <div style="font-weight:800; font-size:14.5px;">${AMB_TYPE_LABELS[a.vehicle && a.vehicle.type] || "🚑 অ্যাম্বুলেন্স"}</div>
+        <span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 9px; border-radius:12px; font-size:10.5px; font-weight:800;">🟢 অনলাইন</span>
       </div>
-      <div style="font-size:12.5px; color:#ddd; margin-bottom:3px;">📍 ${escapeHtml(a.standArea||"")}${a.standArea?", ":""}${escapeHtml(a.district||"")}</div>
-      <div style="font-size:11px; color:var(--muted); margin-bottom:12px;">🆔 ${escapeHtml(a.ambulanceId||a.id)}</div>
-      <button class="ambCallBtn" data-aid="${a.id}" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; background:#dc2626; color:#fff;">📞 কল করুন (৩ সেকেন্ড চেপে ধরুন)</button>
+      <div style="font-size:12.5px; color:#ddd; margin-bottom:3px;">📍 ${escapeHtml(a.upazila||"")}${a.upazila?", ":""}${escapeHtml(a.district||"")}</div>
+      ${a.vehicle && a.vehicle.regNumber ? `<div style="font-size:11px; color:var(--muted); margin-bottom:12px;">🔖 ${escapeHtml(a.vehicle.regNumber)}</div>` : '<div style="margin-bottom:12px;"></div>'}
+      <button class="ambCallBtn" data-uid="${a.id}" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; background:#dc2626; color:#fff;">📞 কল করুন (৩ সেকেন্ড চেপে ধরুন)</button>
     </div>`).join("");
 
   listEl.querySelectorAll(".ambCallBtn").forEach(btn=>{
-    attachHoldToConfirm(btn, ()=> ambInitiateCall(btn.dataset.aid));
+    attachHoldToConfirm(btn, ()=> ambInitiateCall(btn.dataset.uid));
   });
 }
 
-async function ambInitiateCall(ambulanceId){
-  // ১. ডাবল-কল প্রোটেকশন — ৮ সেকেন্ডের মধ্যে একই অ্যাম্বুলেন্সে আবার কল
+async function ambInitiateCall(driverUid){
+  // ১. ডাবল-কল প্রোটেকশন — ৮ সেকেন্ডের মধ্যে একই ড্রাইভারকে আবার কল
   // করার চেষ্টা করলে সেটাকে ব্লক করা হয়
-  const lastCall = __ambLastCallTime[ambulanceId];
+  const lastCall = __ambLastCallTime[driverUid];
   if(lastCall && (Date.now() - lastCall) < 8000){
     return; // চুপচাপ উপেক্ষা — একই কল দুইবার লগ হবে না
   }
-  __ambLastCallTime[ambulanceId] = Date.now();
+  __ambLastCallTime[driverUid] = Date.now();
 
-  // ২. Availability রি-চেক — ৩ সেকেন্ড Hold করার সময়ও যদি অ্যাম্বুলেন্সটা
-  // POS/Agent থেকে অফ-ডিউটি হয়ে যায়, কল করার আগে আরেকবার যাচাই করা হয়
-  let ambDoc;
-  try{ ambDoc = await db.collection("ambulances").doc(ambulanceId).get(); }
+  // ২. Availability রি-চেক — ৩ সেকেন্ড Hold করার সময়ও যদি ড্রাইভার
+  // অফলাইন হয়ে যান, কল করার আগে আরেকবার যাচাই করা হয়
+  let driverDoc;
+  try{ driverDoc = await db.collection("transportDrivers").doc(driverUid).get(); }
   catch(e){ alert("যাচাই করা যায়নি — আবার চেষ্টা করুন।"); return; }
 
-  if(!ambDoc.exists || !ambDoc.data().available){
-    alert("⚠️ দুঃখিত, এই মুহূর্তে এই অ্যাম্বুলেন্সটি Available নেই।");
+  if(!driverDoc.exists || driverDoc.data().driverStatus !== "online"){
+    alert("⚠️ দুঃখিত, এই মুহূর্তে এই অ্যাম্বুলেন্সটি অনলাইনে নেই।");
     return;
   }
-  const amb = ambDoc.data();
+  const driver = driverDoc.data();
 
   if(!currentCustomer){
     alert("কল করার আগে Google দিয়ে লগইন করুন।");
@@ -2308,10 +2368,10 @@ async function ambInitiateCall(ambulanceId){
   try{
     logRef = await db.collection("ambulance_call_logs").add({
       customerGoogleId: currentCustomer.uid,
-      ambulanceId,
-      driverName: amb.driverName || null,
-      driverPhone: amb.phone || null,
-      ambulanceType: amb.ambulanceType || null,
+      driverUid,
+      driverName: driver.name || null,
+      driverPhone: driver.phone || null,
+      ambulanceType: driver.vehicle ? driver.vehicle.type : null,
       customerArea: $("ambDistrictFilter").value || __ambCustomerDistrict || null,
       callStartedAt: firebase.firestore.FieldValue.serverTimestamp(),
       callStatus: "CALL_INITIATED"
@@ -2320,13 +2380,311 @@ async function ambInitiateCall(ambulanceId){
 
   // ৪. নেটিভ ডায়ালার খোলা — ফোন নম্বর সরাসরি স্ক্রিনে দেখানো হয় না,
   // শুধু tel: লিংক ব্যবহার করা হয় (Driver Privacy)
-  if(amb.phone){
-    window.location.href = "tel:" + amb.phone;
+  if(driver.phone){
+    window.location.href = "tel:" + driver.phone;
     if(logRef){
       logRef.update({ callStatus: "DIALER_OPENED" }).catch(()=>{});
     }
   }else{
     alert("এই অ্যাম্বুলেন্সের কোনো নম্বর পাওয়া যায়নি।");
+  }
+}
+
+/* ==================== 🩼 মেডিকেল ইকুইপমেন্ট ====================
+   Firestore: medicalEquipment/{id} — {shopId, title, category, description,
+   serviceType:"RENT_ONLY"|"SALE_ONLY"|"RENT_AND_SALE", rent:{perDay,
+   securityDeposit,minimumDays}, sale:{price}, stock:{total,available},
+   delivery:{available,deliveryCharge}, district, upazila, imageUrl, isActive}
+   — shopId দিয়ে বিদ্যমান ফার্মেসি দোকানের (shops/{shopId}) সাথে যুক্ত,
+   দোকানের নাম/ফোন আলাদা করে ডুপ্লিকেট রাখা হয় না।
+
+   ⚠️ POS-সাইড "Add Equipment" UI এখনো বানানো হয়নি (পরের ধাপে) — টেস্ট
+   করতে Firebase Console থেকে ম্যানুয়ালি medicalEquipment-এ ডেটা বসাতে হবে।
+
+   Firestore: medicalEquipmentOrders/{id} — {customerGoogleId, equipmentId,
+   shopId, equipmentTitle, orderType:"RENT"|"SALE", days, dailyRate,
+   securityDeposit, deliveryCharge, deliveryType, deliveryAddress, salePrice,
+   totalCost, status, createdAt} */
+
+const MED_EQ_CATEGORIES = [
+  { id:"Oxygen", icon:"🫁", label:"Oxygen Equipment" },
+  { id:"Wheelchair", icon:"♿", label:"Wheelchair" },
+  { id:"HospitalBed", icon:"🛏️", label:"Hospital Bed" },
+  { id:"Suction", icon:"🫧", label:"Suction Machine" },
+  { id:"Nebulizer", icon:"💨", label:"Nebulizer" },
+  { id:"PatientMonitor", icon:"❤️", label:"Patient Monitor" },
+  { id:"Walker", icon:"🩼", label:"Walker / Crutches" },
+  { id:"AirMattress", icon:"🛌", label:"Air Mattress" },
+  { id:"OxygenConcentrator", icon:"🔋", label:"Oxygen Concentrator" },
+  { id:"Other", icon:"🧰", label:"অন্যান্য" }
+];
+const MED_EQ_STATUS_LABEL = {
+  REQUEST_SENT: "🟡 Request Sent", CONFIRMED: "🔵 Confirmed", PREPARING: "🟣 Preparing",
+  OUT_FOR_DELIVERY: "🚚 Out for Delivery", DELIVERED: "🟢 Delivered",
+  CANCELLED: "🔴 Cancelled", RETURNED: "⚫ Returned"
+};
+
+let __medEqScreenInitialized = false;
+let __medEqCurrentCategory = null;
+let __medEqListUnsub = null;
+let __medEqCurrentItem = null; // অর্ডার-মডালে যে আইটেমটা নিয়ে কাজ চলছে
+
+function initMedEqScreen(){
+  if(!__medEqScreenInitialized){
+    $("medEqCategoryGrid").innerHTML = MED_EQ_CATEGORIES.map(c=> `
+      <div class="serviceCard medEqCatCard" data-cat="${c.id}">
+        <div class="ic">${c.icon}</div>
+        <div class="lbl" style="font-size:10.5px;">${escapeHtml(c.label)}</div>
+      </div>`).join("");
+    $("medEqCategoryGrid").querySelectorAll(".medEqCatCard").forEach(card=>{
+      card.addEventListener("click", ()=> medEqOpenCategory(card.dataset.cat));
+    });
+    $("medEqDistrictFilter").innerHTML += getAllDistricts().map(d=>`<option value="${d}">${d}</option>`).join("");
+    $("medEqDistrictFilter").addEventListener("change", ()=> medEqListenEquipment(__medEqCurrentCategory));
+    $("medEqBackToCategories").addEventListener("click", ()=>{
+      if(__medEqListUnsub){ __medEqListUnsub(); __medEqListUnsub = null; }
+      $("medEqListPanel").style.display = "none";
+      $("medEqCategoryPanel").style.display = "block";
+    });
+    $("medEqOrderCloseBtn").addEventListener("click", ()=> $("medEqOrderModal").style.display = "none");
+    $("medEqMyOrdersBtn").addEventListener("click", ()=>{
+      showScreen("screenMedEqOrders");
+      medEqLoadMyOrders();
+    });
+    __medEqScreenInitialized = true;
+  }
+  $("medEqListPanel").style.display = "none";
+  $("medEqCategoryPanel").style.display = "block";
+}
+
+function medEqOpenCategory(catId){
+  __medEqCurrentCategory = catId;
+  const cat = MED_EQ_CATEGORIES.find(c=> c.id === catId);
+  $("medEqListTitle").textContent = `${cat.icon} ${cat.label}`;
+  $("medEqCategoryPanel").style.display = "none";
+  $("medEqListPanel").style.display = "block";
+  medEqListenEquipment(catId);
+}
+
+function medEqListenEquipment(catId){
+  if(__medEqListUnsub){ __medEqListUnsub(); __medEqListUnsub = null; }
+  const district = $("medEqDistrictFilter").value;
+  let query = db.collection("medicalEquipment").where("category","==",catId).where("isActive","==",true);
+  if(district) query = query.where("district","==",district);
+
+  __medEqListUnsub = query.onSnapshot((qs)=>{
+    const items = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+    medEqRenderList(items);
+  }, (err)=>{
+    console.warn("medical equipment list error:", err);
+    $("medEqList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">তালিকা লোড করা যায়নি।</div>';
+  });
+}
+
+function medEqRenderList(items){
+  const listEl = $("medEqList");
+  if(items.length === 0){
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এই মুহূর্তে এই ক্যাটাগরিতে কিছু নেই।</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(it=>{
+    const avail = it.stock ? it.stock.available : 0;
+    const canRent = (it.serviceType === "RENT_ONLY" || it.serviceType === "RENT_AND_SALE") && it.rent && it.rent.available;
+    const canSale = (it.serviceType === "SALE_ONLY" || it.serviceType === "RENT_AND_SALE") && it.sale && it.sale.available;
+    return `
+      <div class="card" style="padding:14px;">
+        ${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" style="width:100%; height:140px; object-fit:cover; border-radius:10px; margin-bottom:10px;">` : ""}
+        <div style="font-weight:800; font-size:14.5px; margin-bottom:3px;">${escapeHtml(it.title||"")}</div>
+        ${it.description ? `<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">${escapeHtml(it.description)}</div>` : ""}
+        <div style="font-size:12px; color:#ddd; margin-bottom:3px;">📍 ${escapeHtml(it.upazila||"")}${it.upazila?", ":""}${escapeHtml(it.district||"")}</div>
+        <div style="font-size:12px; color:${avail>0?"#4ade80":"#f87171"}; font-weight:700; margin-bottom:10px;">${avail>0 ? `🟢 ${avail}টি Available` : "🔴 এই মুহূর্তে নেই"}</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+          ${canRent ? `<span style="background:rgba(212,160,23,0.15); color:var(--amber); padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:700;">🔄 ৳${it.rent.perDay} / দিন</span>` : ""}
+          ${canSale ? `<span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:700;">🛒 ৳${it.sale.price} ক্রয়</span>` : ""}
+        </div>
+        <div style="display:flex; gap:8px;">
+          ${canRent ? `<button class="medEqRentBtn" data-id="${it.id}" ${avail<1?"disabled":""} style="flex:1; padding:11px; border:none; border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:${avail<1?"rgba(255,255,255,0.06)":"var(--amber)"}; color:${avail<1?"var(--muted)":"var(--bg1)"};">🔄 ভাড়া নিন</button>` : ""}
+          ${canSale ? `<button class="medEqBuyBtn" data-id="${it.id}" ${avail<1?"disabled":""} style="flex:1; padding:11px; border:none; border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:${avail<1?"rgba(255,255,255,0.06)":"#16a34a"}; color:${avail<1?"var(--muted)":"#fff"};">🛒 কিনুন</button>` : ""}
+        </div>
+      </div>`;
+  }).join("");
+
+  const itemsById = {}; items.forEach(it=> itemsById[it.id] = it);
+  listEl.querySelectorAll(".medEqRentBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=> medEqOpenRentFlow(itemsById[btn.dataset.id]));
+  });
+  listEl.querySelectorAll(".medEqBuyBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=> medEqOpenBuyFlow(itemsById[btn.dataset.id]));
+  });
+}
+
+/* ---------- 🔄 ভাড়ার ফ্লো — ৩ ধাপ ---------- */
+function medEqOpenRentFlow(item){
+  if(!currentCustomer){ alert("অর্ডার করতে Google দিয়ে লগইন করুন।"); return; }
+  __medEqCurrentItem = item;
+  $("medEqOrderTitle").textContent = "🔄 ভাড়া নিন — Step 1";
+  $("medEqOrderBody").innerHTML = `
+    <p style="font-size:13px; color:#ddd; margin-bottom:14px;">কয় দিনের জন্য "${escapeHtml(item.title)}" প্রয়োজন?</p>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+      <button class="medEqDaysBtn" data-days="1" style="flex:1; min-width:70px; padding:12px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">১ দিন</button>
+      <button class="medEqDaysBtn" data-days="3" style="flex:1; min-width:70px; padding:12px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">৩ দিন</button>
+      <button class="medEqDaysBtn" data-days="7" style="flex:1; min-width:70px; padding:12px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">৭ দিন</button>
+    </div>
+    <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">অথবা নিজে লিখুন (দিন)</label>
+    <input type="number" id="medEqCustomDays" min="${item.rent.minimumDays||1}" placeholder="যেমনঃ ১০" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:16px;">
+    <button id="medEqDaysNextBtn" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:var(--amber); color:var(--bg1);">পরবর্তী ধাপ →</button>
+  `;
+  $("medEqOrderModal").style.display = "flex";
+
+  let selectedDays = null;
+  $("medEqOrderBody").querySelectorAll(".medEqDaysBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      selectedDays = Number(btn.dataset.days);
+      $("medEqCustomDays").value = "";
+      $("medEqOrderBody").querySelectorAll(".medEqDaysBtn").forEach(b=> b.style.background = "rgba(255,255,255,0.06)");
+      btn.style.background = "var(--amber)";
+    });
+  });
+  $("medEqCustomDays").addEventListener("input", ()=>{ selectedDays = null; $("medEqOrderBody").querySelectorAll(".medEqDaysBtn").forEach(b=> b.style.background = "rgba(255,255,255,0.06)"); });
+  $("medEqDaysNextBtn").addEventListener("click", ()=>{
+    const days = selectedDays || Number($("medEqCustomDays").value) || 0;
+    if(days < (item.rent.minimumDays || 1)){ alert(`কমপক্ষে ${item.rent.minimumDays || 1} দিনের জন্য নিতে হবে।`); return; }
+    medEqRentStep2Delivery(item, days);
+  });
+}
+
+function medEqRentStep2Delivery(item, days){
+  $("medEqOrderTitle").textContent = "🚚 ভাড়া নিন — Step 2";
+  $("medEqOrderBody").innerHTML = `
+    <p style="font-size:13px; color:#ddd; margin-bottom:14px;">কোথায় Equipment পৌঁছে দিতে হবে?</p>
+    <select id="medEqDeliveryType" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13.5px; margin-bottom:12px;">
+      <option value="current">📍 বর্তমান লোকেশন</option>
+      <option value="home">🏠 বাসার ঠিকানা</option>
+      <option value="hospital">🏥 হাসপাতাল</option>
+      <option value="other">📌 অন্য ঠিকানা</option>
+    </select>
+    <textarea id="medEqDeliveryAddress" placeholder="বিস্তারিত ঠিকানা লিখুন..." rows="3" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:16px; resize:vertical;"></textarea>
+    <button id="medEqDeliveryNextBtn" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:var(--amber); color:var(--bg1);">পরবর্তী ধাপ →</button>
+  `;
+  $("medEqDeliveryNextBtn").addEventListener("click", ()=>{
+    const deliveryType = $("medEqDeliveryType").value;
+    const deliveryAddress = $("medEqDeliveryAddress").value.trim();
+    if(!deliveryAddress){ alert("ঠিকানা লিখুন।"); return; }
+    medEqRentStep3Summary(item, days, deliveryType, deliveryAddress);
+  });
+}
+
+function medEqRentStep3Summary(item, days, deliveryType, deliveryAddress){
+  const rentTotal = item.rent.perDay * days;
+  const deposit = item.rent.securityDeposit || 0;
+  const deliveryCharge = (item.delivery && item.delivery.available) ? (item.delivery.deliveryCharge || 0) : 0;
+  const total = rentTotal + deposit + deliveryCharge;
+
+  $("medEqOrderTitle").textContent = "🧾 ভাড়া নিন — Step 3";
+  $("medEqOrderBody").innerHTML = `
+    <div class="card" style="padding:14px; margin-bottom:16px;">
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>Equipment Rent</span><span>৳${item.rent.perDay} × ${days} দিন = ৳${rentTotal}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>Security Deposit</span><span>৳${deposit}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:10px;"><span>Delivery Charge</span><span>৳${deliveryCharge}</span></div>
+      <div style="border-top:1px solid var(--border); padding-top:10px; display:flex; justify-content:space-between; font-weight:800; font-size:15px; color:var(--amber);"><span>Total</span><span>৳${total}</span></div>
+    </div>
+    <p style="font-size:11px; color:var(--muted); margin-bottom:14px;">⚠️ Security Deposit ফেরতযোগ্য — ইকুইপমেন্ট ফেরত দেওয়ার সময় ক্ষতি না থাকলে ফেরত পাবেন (ফেরত-প্রক্রিয়া দোকানদার নিশ্চিত করবেন)।</p>
+    <button id="medEqConfirmRentBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
+  `;
+  $("medEqConfirmRentBtn").addEventListener("click", async ()=>{
+    const btn = $("medEqConfirmRentBtn");
+    btn.disabled = true; btn.textContent = "অর্ডার হচ্ছে...";
+    try{
+      await db.collection("medicalEquipmentOrders").add({
+        customerGoogleId: currentCustomer.uid,
+        equipmentId: item.id, shopId: item.shopId, equipmentTitle: item.title,
+        orderType: "RENT", days, dailyRate: item.rent.perDay, securityDeposit: deposit,
+        deliveryCharge, deliveryType, deliveryAddress, totalCost: total,
+        status: "REQUEST_SENT",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      $("medEqOrderModal").style.display = "none";
+      alert("✅ আপনার ভাড়ার অনুরোধ পাঠানো হয়েছে — দোকানদার নিশ্চিত করলে জানানো হবে।");
+    }catch(e){
+      alert("অর্ডার করা যায়নি: " + e.message);
+      btn.disabled = false; btn.textContent = "✅ অর্ডার নিশ্চিত করুন";
+    }
+  });
+}
+
+/* ---------- 🛒 কেনার ফ্লো — সহজ, এক ধাপে ---------- */
+function medEqOpenBuyFlow(item){
+  if(!currentCustomer){ alert("অর্ডার করতে Google দিয়ে লগইন করুন।"); return; }
+  const deliveryCharge = (item.delivery && item.delivery.available) ? (item.delivery.deliveryCharge || 0) : 0;
+  const total = item.sale.price + deliveryCharge;
+
+  $("medEqOrderTitle").textContent = "🛒 কিনুন";
+  $("medEqOrderBody").innerHTML = `
+    <p style="font-size:13px; color:#ddd; margin-bottom:12px;">"${escapeHtml(item.title)}" কিনতে চান?</p>
+    <textarea id="medEqBuyAddress" placeholder="ডেলিভারি ঠিকানা লিখুন..." rows="3" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px; resize:vertical;"></textarea>
+    <div class="card" style="padding:14px; margin-bottom:16px;">
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>Equipment মূল্য</span><span>৳${item.sale.price}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:10px;"><span>Delivery Charge</span><span>৳${deliveryCharge}</span></div>
+      <div style="border-top:1px solid var(--border); padding-top:10px; display:flex; justify-content:space-between; font-weight:800; font-size:15px; color:var(--amber);"><span>Total</span><span>৳${total}</span></div>
+    </div>
+    <button id="medEqConfirmBuyBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
+  `;
+  $("medEqOrderModal").style.display = "flex";
+
+  $("medEqConfirmBuyBtn").addEventListener("click", async ()=>{
+    const deliveryAddress = $("medEqBuyAddress").value.trim();
+    if(!deliveryAddress){ alert("ঠিকানা লিখুন।"); return; }
+    const btn = $("medEqConfirmBuyBtn");
+    btn.disabled = true; btn.textContent = "অর্ডার হচ্ছে...";
+    try{
+      await db.collection("medicalEquipmentOrders").add({
+        customerGoogleId: currentCustomer.uid,
+        equipmentId: item.id, shopId: item.shopId, equipmentTitle: item.title,
+        orderType: "SALE", salePrice: item.sale.price, deliveryCharge, deliveryAddress, totalCost: total,
+        status: "REQUEST_SENT",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      $("medEqOrderModal").style.display = "none";
+      alert("✅ আপনার অর্ডার পাঠানো হয়েছে — দোকানদার নিশ্চিত করলে জানানো হবে।");
+    }catch(e){
+      alert("অর্ডার করা যায়নি: " + e.message);
+      btn.disabled = false; btn.textContent = "✅ অর্ডার নিশ্চিত করুন";
+    }
+  });
+}
+
+/* ---------- 📦 আমার অর্ডারসমূহ ---------- */
+async function medEqLoadMyOrders(){
+  const listEl = $("medEqOrdersList");
+  if(!currentCustomer){
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">দেখতে লগইন করুন।</div>';
+    return;
+  }
+  listEl.innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
+  try{
+    const qs = await db.collection("medicalEquipmentOrders").where("customerGoogleId","==",currentCustomer.uid)
+      .orderBy("createdAt","desc").limit(30).get();
+    if(qs.empty){
+      listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এখনো কোনো অর্ডার নেই।</div>';
+      return;
+    }
+    listEl.innerHTML = qs.docs.map(d=>{
+      const o = d.data();
+      const time = o.createdAt ? o.createdAt.toDate().toLocaleDateString('bn-BD') : "";
+      return `
+        <div class="card" style="padding:14px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <div style="font-weight:700; font-size:13.5px;">${o.orderType === "RENT" ? "🔄" : "🛒"} ${escapeHtml(o.equipmentTitle||"")}</div>
+            <span style="font-size:11px; font-weight:700;">${MED_EQ_STATUS_LABEL[o.status]||o.status}</span>
+          </div>
+          <div style="font-size:12px; color:var(--muted); margin-bottom:3px;">${o.orderType === "RENT" ? `${o.days} দিনের ভাড়া` : "ক্রয়"}</div>
+          <div style="font-size:13px; color:var(--amber); font-weight:800;">৳ ${o.totalCost}</div>
+          <div style="font-size:10.5px; color:var(--muted); margin-top:4px;">${time}</div>
+        </div>`;
+    }).join("");
+  }catch(e){
+    console.error(e);
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">লোড করা যায়নি।</div>';
   }
 }
 
