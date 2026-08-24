@@ -11574,6 +11574,24 @@ function enableModeBackGuard(){
   window.addEventListener("popstate", modeBackGuardHandler);
 }
 function modeBackGuardHandler(){
+  // 🔙 আগে খোলা কোনো ওভারলে/প্যানেল থাকলে (সেটিংস, হিস্ট্রি) সেটাই আগে
+  // বন্ধ করা হয় — সরাসরি "বের হবেন কিনা" জিজ্ঞেস করা হয় না, ঠিক যেভাবে
+  // Bazar অ্যাপে ব্যাক বাটন স্তরে স্তরে পেছনে যায়
+  const openPanels = [
+    { id: "dmHistoryOverlay", close: ()=>{ document.getElementById("dmHistoryOverlay").style.display = "none"; } },
+    { id: "dmSettingsPanel", close: ()=>{ document.getElementById("dmSettingsPanel").style.display = "none"; } },
+    { id: "rmHistoryOverlay", close: ()=>{ document.getElementById("rmHistoryOverlay").style.display = "none"; } },
+    { id: "rmSettingsPanel", close: ()=>{ document.getElementById("rmSettingsPanel").style.display = "none"; } }
+  ];
+  for(const panel of openPanels){
+    const el = document.getElementById(panel.id);
+    if(el && (el.style.display === "flex" || el.style.display === "block")){
+      panel.close();
+      history.pushState(null, "", location.href); // আবার guard বসিয়ে দেওয়া, পরের ব্যাক-এ যেন আসল এক্সিট-কনফার্ম কাজ করে
+      return;
+    }
+  }
+
   const wantExit = confirm("আপনি কি অ্যাপ থেকে বের হতে চান?\n\nOK = হ্যাঁ, বের হন (Online/GPS ট্র্যাকিং বন্ধ হয়ে যাবে)\nCancel = না, এখানেই থাকুন");
   if(!wantExit){
     // "থাকতে চান" — আবার একটা এন্ট্রি push করে Back-কে "আটকে" রাখা হচ্ছে
