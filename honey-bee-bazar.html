@@ -737,15 +737,37 @@
     <div id="hmChatThread" style="display:none; position:fixed; inset:0; z-index:850; background:var(--bg1); flex-direction:column;">
       <div style="display:flex; align-items:center; gap:10px; padding:16px; border-bottom:1px solid var(--border); flex-shrink:0;">
         <span id="hmChatThreadBack" style="font-size:22px; cursor:pointer; color:var(--muted);">←</span>
-        <div>
+        <div style="flex:1; min-width:0;">
           <div id="hmChatThreadName" style="font-weight:800; font-size:15px; color:#fff8e8;">—</div>
           <div id="hmChatThreadUsername" style="font-size:11px; color:var(--muted);">—</div>
         </div>
+        <span id="hmChatSettingsBtn" style="font-size:18px; cursor:pointer; color:var(--muted); padding:6px; flex-shrink:0;">⚙️</span>
       </div>
       <div id="hmChatMessages" style="flex:1; overflow-y:auto; padding:16px;"></div>
       <div style="display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--border); flex-shrink:0;">
         <input type="text" id="hmChatInput" placeholder="মেসেজ লিখুন..." style="flex:1; padding:12px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:14px;">
         <button id="hmChatSendBtn" style="width:44px; height:44px; border-radius:50%; border:none; background:var(--amber); color:var(--bg1); font-size:17px; cursor:pointer; font-family:inherit; flex-shrink:0;">➤</button>
+      </div>
+    </div>
+
+    <!-- ⚙️ চ্যাট সেটিংস প্যানেল -->
+    <div id="hmChatSettingsOverlay" style="display:none; position:fixed; inset:0; z-index:960; background:rgba(0,0,0,0.7); align-items:flex-end; justify-content:center;">
+      <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px;">
+        <div style="display:flex; align-items:center; margin-bottom:16px;">
+          <h3 style="margin:0; font-size:15px; color:#fff8e8;">⚙️ চ্যাট সেটিংস</h3>
+          <span id="hmChatSettingsCloseBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div style="flex:1;">
+            <div style="font-weight:700; font-size:13px;">👻 এই বন্ধুর কাছে অফলাইন থাকুন</div>
+            <div style="font-size:10.5px; color:var(--muted); margin-top:2px;">চ্যাট স্বাভাবিক থাকবে, শুধু আপনার অনলাইন স্ট্যাটাস এই বন্ধু দেখতে পাবেন না</div>
+          </div>
+          <div class="rmSwitch" id="hmAppearOfflineSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
+        </div>
+
+        <button id="hmClearChatBtn" style="width:100%; text-align:left; padding:14px 0; border:none; border-bottom:1px solid rgba(255,255,255,0.06); background:transparent; color:#fff8e8; font-size:13.5px; cursor:pointer; font-family:inherit;">🗑️ চ্যাট ক্লিয়ার করুন</button>
+        <button id="hmBlockBtn" style="width:100%; text-align:left; padding:14px 0; border:none; background:transparent; color:#f87171; font-size:13.5px; cursor:pointer; font-family:inherit;">🚫 ব্লক করুন</button>
       </div>
     </div>
 
@@ -1216,12 +1238,16 @@ function hmStartPresenceHeartbeat(){
 function hmStopPresenceHeartbeat(){
   if(hmHeartbeatInterval){ clearInterval(hmHeartbeatInterval); hmHeartbeatInterval = null; }
 }
-function hmIsOnline(lastSeen){
+function hmIsOnline(lastSeen, appearOfflineTo){
   if(!lastSeen) return false;
+  // 👻 প্রোফাইল-মালিক যদি আমাকে (বর্তমান লগইন করা ইউজারকে) নিজের
+  // "appearOfflineTo" তালিকায় রেখে থাকেন, তাহলে তিনি আসলে অনলাইন
+  // থাকলেও আমার কাছে সবসময় অফলাইন দেখাবে
+  if(appearOfflineTo && currentCustomer && appearOfflineTo.includes(currentCustomer.uid)) return false;
   return (Date.now() - lastSeen.toMillis()) < HM_ONLINE_THRESHOLD_MS;
 }
-function hmOnlineDotHtml(lastSeen){
-  const online = hmIsOnline(lastSeen);
+function hmOnlineDotHtml(lastSeen, appearOfflineTo){
+  const online = hmIsOnline(lastSeen, appearOfflineTo);
   return `<span style="position:absolute; bottom:0; right:0; width:11px; height:11px; border-radius:50%; background:${online?"#22c55e":"#6b7280"}; border:2px solid var(--bg1);"></span>`;
 }
 
@@ -1262,11 +1288,11 @@ async function hmRenderFriendsList(){
       <div class="hmFriendItem" data-uid="${f.uid}" data-username="${escapeHtml(f.username)}" data-name="${escapeHtml(f.name||"")}" style="display:flex; align-items:center; gap:12px; padding:10px 14px; cursor:pointer;">
         <div style="position:relative; flex-shrink:0;">
           <div style="width:38px; height:38px; border-radius:50%; background:var(--amber); color:var(--bg1); font-weight:800; font-size:14px; display:flex; align-items:center; justify-content:center;">${escapeHtml((f.name||f.username||"?")[0].toUpperCase())}</div>
-          ${hmOnlineDotHtml(p ? p.lastSeen : null)}
+          ${hmOnlineDotHtml(p ? p.lastSeen : null, p ? p.appearOfflineTo : null)}
         </div>
         <div style="flex:1; min-width:0;">
           <div style="font-weight:700; font-size:12.5px;">${escapeHtml(f.name||f.username)}</div>
-          <div style="font-size:10.5px; color:var(--muted);">${hmIsOnline(p ? p.lastSeen : null) ? "🟢 অনলাইন" : "⚪ অফলাইন"}</div>
+          <div style="font-size:10.5px; color:var(--muted);">${hmIsOnline(p ? p.lastSeen : null, p ? p.appearOfflineTo : null) ? "🟢 অনলাইন" : "⚪ অফলাইন"}</div>
         </div>
       </div>`;
   }).join("");
@@ -1510,6 +1536,57 @@ $("hmChatThreadBack").addEventListener("click", ()=>{
   if(hmMessagesUnsub){ hmMessagesUnsub(); hmMessagesUnsub = null; }
 });
 
+/* ==================== ⚙️ চ্যাট সেটিংস — Clear/Block/Appear Offline ==================== */
+$("hmChatSettingsBtn").addEventListener("click", async ()=>{
+  $("hmChatSettingsOverlay").style.display = "flex";
+  // 👻 নিজের প্রোফাইল থেকে চেক করা হয় এই বন্ধুর জন্য "অফলাইন থাকুন" আগে থেকে অন কিনা
+  try{
+    const myDoc = await db.collection("messengerUsers").doc(currentCustomer.uid).get();
+    const list = (myDoc.exists && myDoc.data().appearOfflineTo) || [];
+    $("hmAppearOfflineSwitch").classList.toggle("on", list.includes(hmCurrentOtherUid));
+  }catch(e){ console.warn("appear-offline status load failed:", e); }
+});
+$("hmChatSettingsCloseBtn").addEventListener("click", ()=> $("hmChatSettingsOverlay").style.display = "none");
+
+$("hmAppearOfflineSwitch").addEventListener("click", async ()=>{
+  const willBeOn = !$("hmAppearOfflineSwitch").classList.contains("on");
+  $("hmAppearOfflineSwitch").classList.toggle("on", willBeOn); // সাথে সাথেই UI বদলে দেওয়া (দ্রুত প্রতিক্রিয়া)
+  try{
+    await db.collection("messengerUsers").doc(currentCustomer.uid).update({
+      appearOfflineTo: willBeOn
+        ? firebase.firestore.FieldValue.arrayUnion(hmCurrentOtherUid)
+        : firebase.firestore.FieldValue.arrayRemove(hmCurrentOtherUid)
+    });
+  }catch(e){
+    alert("পরিবর্তন করা যায়নি: " + e.message);
+    $("hmAppearOfflineSwitch").classList.toggle("on", !willBeOn); // ব্যর্থ হলে UI ফিরিয়ে নেওয়া
+  }
+});
+
+$("hmClearChatBtn").addEventListener("click", async ()=>{
+  if(!confirm("এই চ্যাটের সব মেসেজ স্থায়ীভাবে মুছে ফেলবেন? এটা আর ফেরত আনা যাবে না।")) return;
+  $("hmChatSettingsOverlay").style.display = "none";
+  try{
+    const msgsSnap = await db.collection("messengerChats").doc(hmCurrentChatId).collection("messages").get();
+    const batch = db.batch();
+    msgsSnap.docs.forEach(d=> batch.delete(d.ref));
+    await batch.commit();
+    await db.collection("messengerChats").doc(hmCurrentChatId).update({ lastMessage: "", lastMessageAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }catch(e){ alert("চ্যাট মুছে ফেলা যায়নি: " + e.message); }
+});
+
+$("hmBlockBtn").addEventListener("click", async ()=>{
+  if(!confirm("এই বন্ধুকে ব্লক করবেন? ব্লক করলে তিনি আপনাকে আর মেসেজ পাঠাতে পারবেন না।")) return;
+  $("hmChatSettingsOverlay").style.display = "none";
+  try{
+    await db.collection("messengerUsers").doc(currentCustomer.uid).update({
+      blockedUsers: firebase.firestore.FieldValue.arrayUnion(hmCurrentOtherUid)
+    });
+    alert("✅ ব্লক করা হয়েছে।");
+    $("hmChatThreadBack").click();
+  }catch(e){ alert("ব্লক করা যায়নি: " + e.message); }
+});
+
 // ❤️ মেসেজে রিয়েকশন দেওয়া — চেপে ধরলে ছোট ইমোজি-প্যানেল ভেসে ওঠে
 const HM_REACTION_EMOJIS = ["❤️","😂","😮","😢","👍","🙏"];
 function hmShowReactionPicker(messageId, bubbleEl){
@@ -1549,6 +1626,25 @@ async function hmSetReaction(messageId, emoji){
 async function hmSendMessage(){
   const text = $("hmChatInput").value.trim();
   if(!text || !hmCurrentChatId) return;
+
+  // 🚫 কেউ ব্লক করা থাকলে (যেকোনো পাশ থেকেই) মেসেজ পাঠানো আটকানো হয়
+  try{
+    const [myDoc, otherDoc] = await Promise.all([
+      db.collection("messengerUsers").doc(currentCustomer.uid).get(),
+      db.collection("messengerUsers").doc(hmCurrentOtherUid).get()
+    ]);
+    const myBlocked = (myDoc.exists && myDoc.data().blockedUsers) || [];
+    const otherBlocked = (otherDoc.exists && otherDoc.data().blockedUsers) || [];
+    if(myBlocked.includes(hmCurrentOtherUid)){
+      alert("আপনি এই বন্ধুকে ব্লক করেছেন — মেসেজ পাঠাতে হলে আগে আনব্লক করুন।");
+      return;
+    }
+    if(otherBlocked.includes(currentCustomer.uid)){
+      alert("এই ব্যবহারকারী আপনাকে ব্লক করেছেন, তাই মেসেজ পাঠানো যাচ্ছে না।");
+      return;
+    }
+  }catch(e){ console.warn("block check failed:", e); /* চেক ব্যর্থ হলেও পাঠাতে দেওয়া হয়, ব্লক না-থাকাটাই ডিফল্ট */ }
+
   $("hmChatInput").value = "";
   const chatRef = db.collection("messengerChats").doc(hmCurrentChatId);
   try{
