@@ -874,6 +874,8 @@ let allShops = [];
 let currentMarketId = null, currentShopId = null;
 let userLatLng = null;
 
+let __hbNavigatingViaPopstate = false;
+
 function showScreen(id){
   ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
@@ -886,7 +888,43 @@ function showScreen(id){
   if(headerEl) headerEl.style.display = isMessenger ? "none" : "";
   const footerEl = document.querySelector(".footerNav");
   if(footerEl) footerEl.style.display = isMessenger ? "none" : "";
+
+  // 🔙 মোবাইলের ব্যাক বাটন — Home ছাড়া অন্য কোনো স্ক্রিনে গেলে একটা
+  // হিস্ট্রি-এন্ট্রি যোগ হয়, যাতে ফোনের ব্যাক বাটন চাপলে সরাসরি অ্যাপ
+  // থেকে বেরিয়ে না গিয়ে ওপরের "← ফিরে যান" বাটনের মতোই আগের স্ক্রিনে
+  // ফিরে আসে। popstate হ্যান্ডলার থেকে ডাকা হলে আবার push করা হয় না
+  // (নাহলে হিস্ট্রি স্ট্যাক এলোমেলো হয়ে যাবে)
+  if(id !== "screenHome" && !__hbNavigatingViaPopstate){
+    history.pushState({ hbScreen: id }, "", location.href);
+  }
+  __hbNavigatingViaPopstate = false;
 }
+
+window.addEventListener("popstate", ()=>{
+  __hbNavigatingViaPopstate = true;
+
+  // চ্যাট থ্রেড খোলা থাকলে আগে সেটাই বন্ধ করা হয় (মেসেঞ্জার লিস্টে ফিরে আসা)
+  const chatThread = document.getElementById("hmChatThread");
+  if(chatThread && chatThread.style.display === "flex"){
+    document.getElementById("hmChatThreadBack").click();
+    history.pushState({ hbScreen: "hmChatOpen" }, "", location.href); // আবার guard বসানো
+    __hbNavigatingViaPopstate = false;
+    return;
+  }
+
+  // বর্তমানে সক্রিয় স্ক্রিনের ভেতরের "← ফিরে যান" বাটনেই ক্লিক করানো হয় —
+  // এতে প্রতিটা স্ক্রিনের নিজস্ব ব্যাক-লজিক (যেমন প্রোডাক্ট স্ক্রিনের
+  // স্মার্ট ব্যাক — সাব-ক্যাটাগরি/ক্যাটাগরি/শপ-লিস্ট ভেদে) নতুন করে
+  // বানাতে হয় না, যা আছে তাই পুনর্ব্যবহার হয়
+  const activeScreen = document.querySelector('[id^="screen"].active');
+  if(!activeScreen || activeScreen.id === "screenHome"){
+    __hbNavigatingViaPopstate = false;
+    return; // হোমে থাকলে স্বাভাবিকভাবে অ্যাপ থেকে বের হতে দেওয়া হয়
+  }
+  const backBtn = activeScreen.querySelector(".backBtn");
+  if(backBtn) backBtn.click();
+  else showScreen("screenHome");
+});
 
 /* ==================== 🏠 হোমস্ক্রিন — সার্ভিস কার্ড ==================== */
 document.querySelectorAll(".serviceCard").forEach(card=>{
