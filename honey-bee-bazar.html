@@ -649,6 +649,10 @@
         </div>
         <div id="hmSearchResult" style="margin-bottom:16px;"></div>
 
+        <!-- 👥 বন্ধু তালিকা — সব Accept-হওয়া বন্ধু, অনলাইন/অফলাইন স্ট্যাটাসসহ -->
+        <div style="font-size:13px; font-weight:700; color:var(--muted); margin:0 4px 8px;">👥 বন্ধু তালিকা</div>
+        <div id="hmFriendsList" style="margin-bottom:16px;"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+
         <!-- 📋 চ্যাট-লিস্ট -->
         <div style="font-size:13px; font-weight:700; color:var(--muted); margin:0 4px 8px;">সাম্প্রতিক চ্যাট</div>
         <div id="hmChatList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
@@ -892,6 +896,7 @@ $("backFromHoneyMessenger").addEventListener("click", ()=>{
   document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
   $("footerNavHome").classList.add("active");
   showScreen("screenHome");
+  hmStopPresenceHeartbeat(); // মেসেঞ্জার ছেড়ে গেলে হার্টবিট বন্ধ — অন্যরা আর "অনলাইন" দেখবে না
 });
 
 /* ==================== 💬⚠️ Honey Messenger ড্যাশবোর্ড — তিনটা ট্যাব ==================== */
@@ -938,6 +943,8 @@ async function hmInitMessengerTab(){
       hmListenChatList();
       hmListenFriendRequests();
       hmListenSentRequests();
+      hmListenFriendsList();
+      hmStartPresenceHeartbeat();
     }else{
       $("hmProfileReady").style.display = "none";
       $("hmProfileSetup").style.display = "block";
@@ -1063,6 +1070,88 @@ function hmListenSentRequests(){
           </div>`;
       }).join("");
     }, (err)=> console.warn("sent requests listener error:", err));
+}
+
+/* ==================== 🟢 অনলাইন/অফলাইন উপস্থিতি ====================
+   Firestore-এ কোনো "disconnect" ইভেন্ট নেই (Realtime Database-এর মতো),
+   তাই একটা "হার্টবিট" পদ্ধতি ব্যবহার করা হয়েছে — Honey Messenger খোলা
+   থাকা অবস্থায় প্রতি ৩০ সেকেন্ডে lastSeen আপডেট হয়। কারো lastSeen যদি
+   গত ৯০ সেকেন্ডের মধ্যে হয়, তাকে "অনলাইন" ধরা হয় — এটা একটা approximation,
+   একদম ইনস্ট্যান্ট/নিখুঁত রিয়েল-টাইম উপস্থিতি না (ব্রাউজার হঠাৎ বন্ধ হলে
+   পরের ৯০ সেকেন্ড পর্যন্ত "অনলাইন" দেখাতে পারে)। */
+const HM_ONLINE_THRESHOLD_MS = 90 * 1000;
+let hmHeartbeatInterval = null;
+
+function hmStartPresenceHeartbeat(){
+  if(hmHeartbeatInterval) return;
+  const beat = ()=>{
+    db.collection("messengerUsers").doc(currentCustomer.uid).update({
+      lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(()=>{});
+  };
+  beat();
+  hmHeartbeatInterval = setInterval(beat, 30000);
+}
+function hmStopPresenceHeartbeat(){
+  if(hmHeartbeatInterval){ clearInterval(hmHeartbeatInterval); hmHeartbeatInterval = null; }
+}
+function hmIsOnline(lastSeen){
+  if(!lastSeen) return false;
+  return (Date.now() - lastSeen.toMillis()) < HM_ONLINE_THRESHOLD_MS;
+}
+function hmOnlineDotHtml(lastSeen){
+  const online = hmIsOnline(lastSeen);
+  return `<span style="position:absolute; bottom:0; right:0; width:11px; height:11px; border-radius:50%; background:${online?"#22c55e":"#6b7280"}; border:2px solid var(--bg1);"></span>`;
+}
+
+/* ==================== 👥 বন্ধু তালিকা ====================
+   messengerFriendRequests-এ status=="accepted" এমন সব রেকর্ড — আমি
+   fromUid হতে পারি বা toUid, তাই দুটো আলাদা লাইভ কোয়েরি চালিয়ে
+   একসাথে মিলিয়ে দেখানো হয়। */
+let hmFriendsUnsubA = null, hmFriendsUnsubB = null;
+let hmFriendsFrom = [], hmFriendsTo = [];
+
+function hmListenFriendsList(){
+  if(hmFriendsUnsubA) return;
+  hmFriendsUnsubA = db.collection("messengerFriendRequests")
+    .where("fromUid","==",currentCustomer.uid).where("status","==","accepted")
+    .onSnapshot((qs)=>{ hmFriendsFrom = qs.docs.map(d=> d.data()); hmRenderFriendsList(); },
+      (err)=> console.warn("friends list (from) error:", err));
+  hmFriendsUnsubB = db.collection("messengerFriendRequests")
+    .where("toUid","==",currentCustomer.uid).where("status","==","accepted")
+    .onSnapshot((qs)=>{ hmFriendsTo = qs.docs.map(d=> d.data()); hmRenderFriendsList(); },
+      (err)=> console.warn("friends list (to) error:", err));
+}
+
+async function hmRenderFriendsList(){
+  const listEl = $("hmFriendsList");
+  const friends = [
+    ...hmFriendsFrom.map(r=> ({ uid: r.toUid, username: r.toUsername, name: r.toName })),
+    ...hmFriendsTo.map(r=> ({ uid: r.fromUid, username: r.fromUsername, name: r.fromName }))
+  ];
+  if(friends.length === 0){
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এখনো কোনো বন্ধু যোগ হয়নি — ওপরে ইউজারনেম খুঁজে Add করুন।</div>';
+    return;
+  }
+  // 🟢 প্রতিটা বন্ধুর সর্বশেষ lastSeen একসাথে লোড করা হয় (উপস্থিতি দেখানোর জন্য)
+  const profiles = await Promise.all(friends.map(f=> db.collection("messengerUsers").doc(f.uid).get().catch(()=>null)));
+  listEl.innerHTML = friends.map((f, idx)=>{
+    const p = profiles[idx] && profiles[idx].exists ? profiles[idx].data() : null;
+    return `
+      <div class="hmFriendItem" data-uid="${f.uid}" data-username="${escapeHtml(f.username)}" data-name="${escapeHtml(f.name||"")}" style="display:flex; align-items:center; gap:12px; padding:10px 14px; cursor:pointer;">
+        <div style="position:relative; flex-shrink:0;">
+          <div style="width:38px; height:38px; border-radius:50%; background:var(--amber); color:var(--bg1); font-weight:800; font-size:14px; display:flex; align-items:center; justify-content:center;">${escapeHtml((f.name||f.username||"?")[0].toUpperCase())}</div>
+          ${hmOnlineDotHtml(p ? p.lastSeen : null)}
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:700; font-size:12.5px;">${escapeHtml(f.name||f.username)}</div>
+          <div style="font-size:10.5px; color:var(--muted);">${hmIsOnline(p ? p.lastSeen : null) ? "🟢 অনলাইন" : "⚪ অফলাইন"}</div>
+        </div>
+      </div>`;
+  }).join("");
+  listEl.querySelectorAll(".hmFriendItem").forEach(item=>{
+    item.addEventListener("click", ()=> hmOpenChat(item.dataset.uid, item.dataset.username, item.dataset.name));
+  });
 }
 
 /* ==================== 🔍 ইউজারনেম দিয়ে খোঁজা ও ফ্রেন্ড রিকোয়েস্ট পাঠানো ==================== */
@@ -1580,6 +1669,7 @@ function attachHoldToConfirm(buttonEl, onComplete, holdMs){
 // যায় না (মেসেজ/প্রোফাইল/ইত্যাদি ক্লাউডেই থাকে), শুধু এই ব্রাউজারে
 // সেভ থাকা ক্যাশ/ড্রাফট (localStorage/sessionStorage) পরিষ্কার হয়
 async function hmPurgeAndLogout(){
+  hmStopPresenceHeartbeat();
   try{ await auth.signOut(); }catch(e){ console.warn("signOut failed:", e); }
   try{ localStorage.clear(); sessionStorage.clear(); }catch(e){}
   window.location.reload();
