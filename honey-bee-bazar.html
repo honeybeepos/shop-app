@@ -208,8 +208,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders, #screenCart{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active, #screenCart.active{ display:block; }
+  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
 
   /* 💬 Honey Messenger — সম্পূর্ণ ফুল-ভিউপোর্ট, Bazar-এর সীমাবদ্ধ width-এর
      বাইরে গিয়ে সম্পূর্ণ আলাদা একটা অ্যাপের মতো খোলে */
@@ -849,7 +849,7 @@
   <div class="footerNavItem" id="footerNavCart" style="position:relative;">
     <div class="ic">🛒</div>
     <div class="lbl">Cart</div>
-    <span id="cartBadge" style="display:none; position:absolute; top:2px; right:22%; background:#e0433c; color:#fff; font-size:9px; font-weight:800; min-width:15px; height:15px; border-radius:8px; line-height:15px; text-align:center; padding:0 3px;">0</span>
+    <span id="hbCartBadge" style="display:none; position:absolute; top:2px; right:22%; background:#e0433c; color:#fff; font-size:9px; font-weight:800; min-width:15px; height:15px; border-radius:8px; line-height:15px; text-align:center; padding:0 3px;">0</span>
   </div>
   <div class="footerNavItem" id="footerNavSms">
     <div class="ic">💬</div>
@@ -865,66 +865,61 @@
   </div>
 </div>
 
-<!-- 🛒 Cart স্ক্রিন -->
-<div id="screenCart">
-  <!-- 🚚 Order Tracking — সবার ওপরে, সাম্প্রতিক অর্ডারের মিনি-ট্র্যাকার -->
-  <div style="display:flex; align-items:center; margin:10px 4px 10px;">
-    <div style="font-size:16px; font-weight:800;">🚚 Order Tracking</div>
-  </div>
-  <div id="latestOrderTrackCard" style="display:none; margin-bottom:16px;"></div>
+<!-- 🛒 Cart স্ক্রিন — সম্পূর্ণ নতুন করে বানানো, পুরনো কোনো ID/CSS পুনর্ব্যবহার করা হয়নি -->
+<div id="hbCartScreen" style="display:none; position:fixed; inset:0; z-index:850; background:var(--bg1); overflow-y:auto; padding:14px 16px 100px;">
 
-  <!-- 📊 স্ট্যাটাস আইকন রো — ট্যাপ করলে নিচের তালিকা সেই স্ট্যাটাস দিয়ে ফিল্টার হয় -->
+  <div style="font-size:15px; font-weight:800; margin:6px 0 10px;">🚚 Order Tracking</div>
+  <div id="hbCartTrackMini" style="display:none; margin-bottom:14px;"></div>
+
   <div class="card" style="padding:14px 4px;">
     <div style="display:flex; justify-content:space-around; text-align:center;">
-      <div class="orderStatusIcon" data-status="pending" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
+      <div class="hbCartStatusIcon" data-status="pending" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
         <div style="font-size:20px;">🕐</div>
         <div style="font-size:9.5px; color:var(--muted); margin-top:2px;">পেন্ডিং</div>
       </div>
-      <div class="orderStatusIcon" data-status="preparing" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
+      <div class="hbCartStatusIcon" data-status="preparing" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
         <div style="font-size:20px;">📦</div>
         <div style="font-size:9.5px; color:var(--muted); margin-top:2px;">প্রস্তুত হচ্ছে</div>
       </div>
-      <div class="orderStatusIcon" data-status="shipped" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
+      <div class="hbCartStatusIcon" data-status="shipped" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
         <div style="font-size:20px;">🚚</div>
         <div style="font-size:9.5px; color:var(--muted); margin-top:2px;">পথে আছে</div>
       </div>
-      <div class="orderStatusIcon" data-status="delivered" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
+      <div class="hbCartStatusIcon" data-status="delivered" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
         <div style="font-size:20px;">✅</div>
         <div style="font-size:9.5px; color:var(--muted); margin-top:2px;">ডেলিভার্ড</div>
       </div>
-      <div class="orderStatusIcon" data-status="cancelled" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
+      <div class="hbCartStatusIcon" data-status="cancelled" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
         <div style="font-size:20px;">❌</div>
         <div style="font-size:9.5px; color:var(--muted); margin-top:2px;">বাতিল</div>
       </div>
     </div>
   </div>
 
-  <!-- 📦 আমার অর্ডারসমূহ -->
   <div style="display:flex; align-items:center; margin:16px 4px 8px;">
     <div style="font-weight:800; font-size:14px;">📦 আমার অর্ডারসমূহ</div>
-    <span id="myOrdersFilterClear" style="display:none; margin-left:auto; font-size:11px; color:var(--amber); cursor:pointer;">সব দেখুন ✕</span>
+    <span id="hbCartOrdersFilterClear" style="display:none; margin-left:auto; font-size:11px; color:var(--amber); cursor:pointer;">সব দেখুন ✕</span>
   </div>
-  <div id="myOrdersList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+  <div id="hbCartOrdersList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
 
-  <!-- 🛒 Cart -->
   <div style="font-size:15px; font-weight:800; margin:22px 4px 8px;">🛒 আপনার Cart</div>
-  <div id="cartItemsList"></div>
-  <div id="cartSummary" style="display:none; margin-bottom:80px;">
+  <div id="hbCartItemsList"></div>
+  <div id="hbCartSummary" style="display:none;">
     <div class="card" style="padding:16px;">
-      <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; color:var(--amber); margin-bottom:14px;"><span>সর্বমোট</span><span id="cartTotalTxt">৳ 0</span></div>
-      <button id="cartCheckoutBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
+      <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; color:var(--amber); margin-bottom:14px;"><span>সর্বমোট</span><span id="hbCartTotalTxt">৳ 0</span></div>
+      <button id="hbCartCheckoutBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
     </div>
   </div>
 </div>
 
 <!-- 🚚 অর্ডার ট্র্যাকার — এনিমেটেড ধাপে ধাপে অগ্রগতি -->
-<div id="orderTrackerModal" style="display:none; position:fixed; inset:0; z-index:950; background:rgba(0,0,0,0.75); align-items:flex-end; justify-content:center;">
+<div id="hbTrackerModal" style="display:none; position:fixed; inset:0; z-index:950; background:rgba(0,0,0,0.75); align-items:flex-end; justify-content:center;">
   <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:22px 20px; width:100%; max-width:480px;">
     <div style="display:flex; align-items:center; margin-bottom:18px;">
-      <h3 id="trackerTitle" style="margin:0; font-size:14.5px; color:#fff8e8;">অর্ডার ট্র্যাকিং</h3>
-      <span id="trackerCloseBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
+      <h3 id="hbTrackerTitle" style="margin:0; font-size:14.5px; color:#fff8e8;">অর্ডার ট্র্যাকিং</h3>
+      <span id="hbTrackerCloseBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
     </div>
-    <div id="trackerSteps"></div>
+    <div id="hbTrackerSteps"></div>
   </div>
 </div>
 
@@ -1025,10 +1020,10 @@ auth.onAuthStateChanged(async (user)=>{
   if(hmScreen && hmScreen.classList.contains("active") && hmPanel && hmPanel.style.display !== "none"){
     hmInitMessengerTab();
   }
-  // 📦 Cart স্ক্রিনে থাকা অবস্থায় লগইন সম্পন্ন হলে "আমার অর্ডার"-ও রিফ্রেশ হয়
-  const cartScreen = document.getElementById("screenCart");
-  if(cartScreen && cartScreen.classList.contains("active") && typeof myOrdersListen === "function"){
-    myOrdersListen();
+  // 📦 Cart খোলা অবস্থায় লগইন সম্পন্ন হলে "আমার অর্ডার"-ও রিফ্রেশ হয়
+  const cartScreenEl2 = document.getElementById("hbCartScreen");
+  if(cartScreenEl2 && cartScreenEl2.style.display === "block" && typeof hbOrdersListen === "function"){
+    hbOrdersListen();
   }
 });
 
@@ -1043,13 +1038,14 @@ let userLatLng = null;
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders","screenCart"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 
-  // 💬🛒 Honey Messenger ও Cart — দুটোই সম্পূর্ণ আলাদা, ফুল-স্ক্রিন
-  // অভিজ্ঞতা হিসেবে খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন
-  // লুকিয়ে যায়, মোবাইলের ব্যাক বাটনই বন্ধ করার একমাত্র উপায়
-  const isFullScreen = id === "screenHoneyMessenger" || id === "screenCart";
+  // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
+  // খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন লুকিয়ে যায়, যাতে
+  // পুরোপুরি আলাদা একটা অ্যাপের মতো লাগে (Cart এখন hbCartScreen নিজস্ব
+  // fixed overlay হিসেবে আলাদাভাবে ম্যানেজ হয়, showScreen()-এর অংশ না)
+  const isFullScreen = id === "screenHoneyMessenger";
   const headerEl = document.querySelector("header");
   if(headerEl) headerEl.style.display = isFullScreen ? "none" : "";
   const footerEl = document.querySelector(".footerNav");
@@ -1074,6 +1070,14 @@ window.addEventListener("popstate", ()=>{
   if(chatThread && chatThread.style.display === "flex"){
     document.getElementById("hmChatThreadBack").click();
     history.pushState({ hbScreen: "hmChatOpen" }, "", location.href); // আবার guard বসানো
+    __hbNavigatingViaPopstate = false;
+    return;
+  }
+
+  // 🛒 Cart খোলা থাকলে সেটাই বন্ধ করা হয় (নিজস্ব fixed overlay, showScreen()-এর অংশ না)
+  const cartScreenEl = document.getElementById("hbCartScreen");
+  if(cartScreenEl && cartScreenEl.style.display === "block"){
+    hbCloseCart();
     __hbNavigatingViaPopstate = false;
     return;
   }
@@ -1134,17 +1138,7 @@ $("footerNavHome").addEventListener("click", ()=>{
   $("footerNavHome").classList.add("active");
   showScreen("screenHome");
 });
-$("footerNavCart").addEventListener("click", ()=>{
-  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
-  $("footerNavCart").classList.add("active");
-  showScreen("screenCart");
-  cartRenderScreen();
-  if(currentCustomer) myOrdersListen();
-  else{
-    $("myOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার দেখতে ☰ Menu থেকে লগইন করুন।</div>';
-    $("latestOrderTrackCard").style.display = "none";
-  }
-});
+$("footerNavCart").addEventListener("click", hbOpenCart);
 $("footerNavSms").addEventListener("click", ()=>{
   document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
   $("footerNavSms").classList.add("active");
@@ -2525,25 +2519,26 @@ window.toggleFavoriteProduct = async function(ev, productId){
   }catch(e){ console.warn("favorite product save failed:", e); }
 };
 
-/* ==================== 🛒 Cart সিস্টেম ====================
+/* ==================== 🛒🚚 Cart + Order Tracking — সম্পূর্ণ নতুন করে বানানো ====================
    ⚠️ Cart এই ফোনেই (localStorage-এ) সেভ থাকে — অন্য ফোনে সিঙ্ক হয় না।
-   "Cart-এ যোগ করুন" চাপলে সরাসরি অর্ডার হয় না, Cart-এ জমা হয়। Cart
-   স্ক্রিন থেকে "✅ অর্ডার নিশ্চিত করুন" চাপলেই তখন আসল orderRequests
-   তৈরি হয় (আগে যেভাবে সরাসরি হতো)। */
-const CART_STORAGE_KEY = "hb_cart_v1";
+   ⚠️ অর্ডার-স্ট্যাটাস (preparing/shipped/delivered) এখনো দোকানদার POS
+   থেকে বদলাতে পারেন না — তাই বাস্তবে সব অর্ডার সবসময় "পেন্ডিং" দেখাবে,
+   যতক্ষণ না POS-সাইড স্ট্যাটাস-আপডেট প্যানেল বানানো হয়। */
+const HB_CART_KEY = "hb_cart_v2";
 
-function cartGetItems(){
-  try{ return JSON.parse(localStorage.getItem(CART_STORAGE_KEY)) || []; }
+function hbCartGet(){
+  try{ return JSON.parse(localStorage.getItem(HB_CART_KEY)) || []; }
   catch(e){ return []; }
 }
-function cartSaveItems(items){
-  try{ localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items)); }catch(e){}
-  cartUpdateBadge();
+function hbCartSet(items){
+  try{ localStorage.setItem(HB_CART_KEY, JSON.stringify(items)); }catch(e){}
+  hbCartBadgeUpdate();
 }
-function cartUpdateBadge(){
-  const items = cartGetItems();
+function hbCartBadgeUpdate(){
+  const items = hbCartGet();
   const totalQty = items.reduce((sum,it)=> sum + it.qty, 0);
-  const badge = $("cartBadge");
+  const badge = $("hbCartBadge");
+  if(!badge) return;
   if(totalQty > 0){ badge.textContent = totalQty > 9 ? "9+" : totalQty; badge.style.display = "block"; }
   else{ badge.style.display = "none"; }
 }
@@ -2552,38 +2547,37 @@ window.addToCart = function(productId, productName, price){
   if(!currentCustomer){ alert("Cart-এ যোগ করতে আগে Google দিয়ে লগইন করুন (☰ Menu থেকে)।"); return; }
   const shopId = currentShopId;
   const shopName = $("currentShopName").textContent || "দোকান";
-  const items = cartGetItems();
+  const items = hbCartGet();
   const existing = items.find(it=> it.productId === productId && it.shopId === shopId);
   if(existing) existing.qty += 1;
   else items.push({ shopId, shopName, productId, productName, price: Number(price)||0, qty: 1 });
-  cartSaveItems(items);
+  hbCartSet(items);
   alert(`✅ "${productName}" Cart-এ যোগ হয়েছে।`);
 };
 
-function cartChangeQty(shopId, productId, delta){
-  const items = cartGetItems();
+function hbCartQtyChange(shopId, productId, delta){
+  const items = hbCartGet();
   const item = items.find(it=> it.productId === productId && it.shopId === shopId);
   if(!item) return;
   item.qty += delta;
   const finalItems = item.qty <= 0 ? items.filter(it=> it !== item) : items;
-  cartSaveItems(finalItems);
-  cartRenderScreen();
+  hbCartSet(finalItems);
+  hbCartRenderItems();
 }
-function cartRemoveItem(shopId, productId){
-  const items = cartGetItems().filter(it=> !(it.productId === productId && it.shopId === shopId));
-  cartSaveItems(items);
-  cartRenderScreen();
+function hbCartRemove(shopId, productId){
+  const items = hbCartGet().filter(it=> !(it.productId === productId && it.shopId === shopId));
+  hbCartSet(items);
+  hbCartRenderItems();
 }
 
-function cartRenderScreen(){
-  const items = cartGetItems();
-  const listEl = $("cartItemsList");
+function hbCartRenderItems(){
+  const items = hbCartGet();
+  const listEl = $("hbCartItemsList");
   if(items.length === 0){
     listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px; padding:30px 16px;">🛒 Cart খালি — কোনো দোকানের প্রোডাক্ট থেকে "Cart-এ যোগ করুন" চাপুন।</div>';
-    $("cartSummary").style.display = "none";
+    $("hbCartSummary").style.display = "none";
     return;
   }
-  // দোকান অনুযায়ী গ্রুপ করে দেখানো হয় (একাধিক দোকানের প্রোডাক্ট একসাথে থাকতে পারে)
   const byShop = {};
   items.forEach(it=>{ (byShop[it.shopId] = byShop[it.shopId] || []).push(it); });
 
@@ -2600,10 +2594,10 @@ function cartRenderScreen(){
             <div style="font-size:13px; font-weight:700;">${escapeHtml(it.productName)}</div>
             <div style="font-size:11.5px; color:var(--muted);">৳${it.price} × ${it.qty} = ৳${lineTotal}</div>
           </div>
-          <button class="cartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-delta="-1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">−</button>
+          <button class="hbCartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-delta="-1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">−</button>
           <span style="font-weight:800; font-size:13px; min-width:18px; text-align:center;">${it.qty}</span>
-          <button class="cartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-delta="1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">+</button>
-          <span class="cartRemoveBtn" data-shop="${shopId}" data-pid="${it.productId}" style="color:#f87171; font-size:16px; cursor:pointer; padding:0 4px;">✕</span>
+          <button class="hbCartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-delta="1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">+</button>
+          <span class="hbCartRemoveBtn" data-shop="${shopId}" data-pid="${it.productId}" style="color:#f87171; font-size:16px; cursor:pointer; padding:0 4px;">✕</span>
         </div>`;
     }).join("");
     return `
@@ -2613,22 +2607,22 @@ function cartRenderScreen(){
       </div>`;
   }).join("");
 
-  $("cartTotalTxt").textContent = "৳ " + total;
-  $("cartSummary").style.display = "block";
+  $("hbCartTotalTxt").textContent = "৳ " + total;
+  $("hbCartSummary").style.display = "block";
 
-  listEl.querySelectorAll(".cartQtyBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=> cartChangeQty(btn.dataset.shop, btn.dataset.pid, Number(btn.dataset.delta)));
+  listEl.querySelectorAll(".hbCartQtyBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=> hbCartQtyChange(btn.dataset.shop, btn.dataset.pid, Number(btn.dataset.delta)));
   });
-  listEl.querySelectorAll(".cartRemoveBtn").forEach(el=>{
-    el.addEventListener("click", ()=> cartRemoveItem(el.dataset.shop, el.dataset.pid));
+  listEl.querySelectorAll(".hbCartRemoveBtn").forEach(el=>{
+    el.addEventListener("click", ()=> hbCartRemove(el.dataset.shop, el.dataset.pid));
   });
 }
 
-$("cartCheckoutBtn").addEventListener("click", async ()=>{
+$("hbCartCheckoutBtn").addEventListener("click", async ()=>{
   if(!currentCustomer){ alert("অর্ডার করতে আগে Google দিয়ে লগইন করুন (☰ Menu থেকে)।"); return; }
-  const items = cartGetItems();
+  const items = hbCartGet();
   if(items.length === 0) return;
-  const btn = $("cartCheckoutBtn");
+  const btn = $("hbCartCheckoutBtn");
   btn.disabled = true; btn.textContent = "অর্ডার হচ্ছে...";
   try{
     await Promise.all(items.map(it=> db.collection("orderRequests").add({
@@ -2636,8 +2630,8 @@ $("cartCheckoutBtn").addEventListener("click", async ()=>{
       customerUid: currentCustomer.uid, customerName: currentCustomer.name || "কাস্টমার",
       qty: it.qty, status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp()
     })));
-    cartSaveItems([]);
-    cartRenderScreen();
+    hbCartSet([]);
+    hbCartRenderItems();
     alert("✅ আপনার অর্ডার(গুলো) পাঠানো হয়েছে — দোকান(গুলো) শীঘ্রই যোগাযোগ করবে।");
   }catch(e){
     alert("অর্ডার পাঠানো যায়নি: " + e.message);
@@ -2646,19 +2640,33 @@ $("cartCheckoutBtn").addEventListener("click", async ()=>{
   }
 });
 
-cartUpdateBadge(); // পেজ লোড হওয়ার সাথে সাথেই আগের সেভ করা Cart-এর ব্যাজ দেখানো
+hbCartBadgeUpdate(); // পেজ লোড হওয়ার সাথে সাথেই আগের সেভ করা Cart-এর ব্যাজ দেখানো
 
-/* ==================== 📦 আমার অর্ডারসমূহ — লাইভ তালিকা + এনিমেটেড ট্র্যাকার ====================
-   ⚠️ সততার সাথে বলা দরকার: স্ট্যাটাস (preparing/shipped/delivered) এখনো
-   দোকানদার POS থেকে আপডেট করতে পারেন না (সেই প্যানেলটা এখনো বানানো হয়নি)
-   — তাই বাস্তবে সব অর্ডার আপাতত সবসময় "🕐 পেন্ডিং"-এই দেখাবে। ট্র্যাকার
-   UI-টা সম্পূর্ণ প্রস্তুত, POS-সাইড স্ট্যাটাস-আপডেট তৈরি হলেই কাজ শুরু
-   করবে। */
-const ORDER_STATUS_LABEL = {
+/* ---------- 🛒 Cart পুরো স্ক্রিন — নিজস্ব fixed overlay, showScreen()-এর বাইরে ---------- */
+function hbOpenCart(){
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavCart").classList.add("active");
+  $("hbCartScreen").style.display = "block";
+  history.pushState({ hbScreen: "cartOpen" }, "", location.href);
+  hbCartRenderItems();
+  if(currentCustomer) hbOrdersListen();
+  else{
+    $("hbCartOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার দেখতে ☰ Menu থেকে লগইন করুন।</div>';
+    $("hbCartTrackMini").style.display = "none";
+  }
+}
+function hbCloseCart(){
+  $("hbCartScreen").style.display = "none";
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavHome").classList.add("active");
+}
+
+/* ---------- 📦🚚 আমার অর্ডারসমূহ + এনিমেটেড ট্র্যাকার ---------- */
+const HB_STATUS_LABEL = {
   pending: "🕐 পেন্ডিং", preparing: "📦 প্রস্তুত হচ্ছে", shipped: "🚚 পথে আছে",
   delivered: "✅ ডেলিভার্ড", cancelled: "❌ বাতিল"
 };
-const ORDER_STATUS_STEPS = [
+const HB_STATUS_STEPS = [
   { key:"pending", icon:"🛒", label:"অর্ডার দেওয়া হয়েছে" },
   { key:"accepted", icon:"🏪", label:"দোকানদার গ্রহণ করেছেন" },
   { key:"preparing", icon:"📦", label:"প্রস্তুত হচ্ছে" },
@@ -2666,121 +2674,113 @@ const ORDER_STATUS_STEPS = [
   { key:"delivered", icon:"🎉", label:"ডেলিভার্ড হয়েছে" }
 ];
 
-let __myOrdersUnsub = null;
-let __myOrdersData = [];
-let __myOrdersFilter = null;
+let __hbOrdersUnsub = null;
+let __hbOrdersData = [];
+let __hbOrdersFilter = null;
 
-function myOrdersListen(){
-  if(__myOrdersUnsub || !currentCustomer) return;
-  __myOrdersUnsub = db.collection("orderRequests").where("customerUid","==",currentCustomer.uid)
+function hbOrdersListen(){
+  if(__hbOrdersUnsub || !currentCustomer) return;
+  __hbOrdersUnsub = db.collection("orderRequests").where("customerUid","==",currentCustomer.uid)
     .orderBy("createdAt","desc").limit(30)
     .onSnapshot((qs)=>{
-      __myOrdersData = qs.docs.map(d=> ({ id:d.id, ...d.data() }));
-      myOrdersRender();
-      renderLatestOrderTrackCard();
+      __hbOrdersData = qs.docs.map(d=> ({ id:d.id, ...d.data() }));
+      hbOrdersRender();
+      hbTrackMiniRender();
     }, (err)=>{
-      console.warn("my orders listener error:", err);
-      $("myOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার লোড করা যায়নি।</div>';
+      console.warn("orders listener error:", err);
+      $("hbCartOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার লোড করা যায়নি।</div>';
     });
 }
 
-// 🚚 Cart স্ক্রিনের একদম ওপরে — সবচেয়ে সাম্প্রতিক (বাতিল-না-হওয়া) অর্ডারের
-// একটা ছোট, দ্রুত-দেখার মিনি-ট্র্যাকার — ট্যাপ করলে পুরো বিস্তারিত ট্র্যাকার খোলে
-function renderLatestOrderTrackCard(){
-  const cardEl = $("latestOrderTrackCard");
-  const latest = __myOrdersData.find(o=> (o.status||"pending") !== "cancelled");
-  if(!latest){
-    cardEl.style.display = "none";
-    return;
-  }
+function hbTrackMiniRender(){
+  const cardEl = $("hbCartTrackMini");
+  const latest = __hbOrdersData.find(o=> (o.status||"pending") !== "cancelled");
+  if(!latest){ cardEl.style.display = "none"; return; }
   const status = latest.status || "pending";
-  const stepIndex = Math.max(0, ORDER_STATUS_STEPS.findIndex(s=> s.key === status));
-  const dots = ORDER_STATUS_STEPS.map((s, idx)=>{
+  const stepIndex = Math.max(0, HB_STATUS_STEPS.findIndex(s=> s.key === status));
+  const dots = HB_STATUS_STEPS.map((s, idx)=>{
     const state = idx < stepIndex ? "done" : (idx === stepIndex ? "active" : "pending");
     return `<div class="trackerDot ${state}" style="width:16px; height:16px; font-size:8px;">${state==="done"?"✓":""}</div>
-      ${idx < ORDER_STATUS_STEPS.length-1 ? `<div style="flex:1; height:2px; background:${idx<stepIndex?"#16a34a":"rgba(255,255,255,0.1)"};"></div>` : ""}`;
+      ${idx < HB_STATUS_STEPS.length-1 ? `<div style="flex:1; height:2px; background:${idx<stepIndex?"#16a34a":"rgba(255,255,255,0.1)"};"></div>` : ""}`;
   }).join("");
 
   cardEl.innerHTML = `
-    <div class="card" style="padding:14px; cursor:pointer;" id="latestOrderTrackClickable">
+    <div class="card" style="padding:14px; cursor:pointer;" id="hbTrackMiniClickable">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
         <div style="font-weight:800; font-size:13.5px;">📦 ${escapeHtml(latest.productName||"অর্ডার")}</div>
-        <span style="font-size:11px; font-weight:800; color:var(--amber);">${ORDER_STATUS_STEPS[stepIndex] ? ORDER_STATUS_STEPS[stepIndex].label : ""}</span>
+        <span style="font-size:11px; font-weight:800; color:var(--amber);">${HB_STATUS_STEPS[stepIndex] ? HB_STATUS_STEPS[stepIndex].label : ""}</span>
       </div>
       <div style="display:flex; align-items:center; gap:2px;">${dots}</div>
       <div style="text-align:center; margin-top:8px; font-size:11px; color:var(--muted);">বিস্তারিত দেখতে ট্যাপ করুন ›</div>
     </div>`;
   cardEl.style.display = "block";
-  $("latestOrderTrackClickable").addEventListener("click", ()=> openOrderTracker(latest));
+  $("hbTrackMiniClickable").addEventListener("click", ()=> hbOpenTracker(latest));
 }
 
-function myOrdersRender(){
-  const listEl = $("myOrdersList");
-  let orders = __myOrdersData;
-  if(__myOrdersFilter) orders = orders.filter(o=> (o.status||"pending") === __myOrdersFilter);
+function hbOrdersRender(){
+  const listEl = $("hbCartOrdersList");
+  let orders = __hbOrdersData;
+  if(__hbOrdersFilter) orders = orders.filter(o=> (o.status||"pending") === __hbOrdersFilter);
 
   if(orders.length === 0){
-    listEl.innerHTML = `<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">${__myOrdersFilter ? "এই স্ট্যাটাসে কোনো অর্ডার নেই।" : "এখনো কোনো অর্ডার নেই।"}</div>`;
+    listEl.innerHTML = `<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">${__hbOrdersFilter ? "এই স্ট্যাটাসে কোনো অর্ডার নেই।" : "এখনো কোনো অর্ডার নেই।"}</div>`;
     return;
   }
   listEl.innerHTML = orders.map(o=>{
     const status = o.status || "pending";
     const time = o.createdAt ? o.createdAt.toDate().toLocaleDateString('bn-BD') : "";
     return `
-      <div class="orderCard" data-oid="${o.id}" style="display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px; background:var(--card); border:1px solid var(--border); border-radius:12px; cursor:pointer;">
+      <div class="hbOrderCard" data-oid="${o.id}" style="display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px; background:var(--card); border:1px solid var(--border); border-radius:12px; cursor:pointer;">
         <div style="flex:1; min-width:0;">
           <div style="font-weight:700; font-size:13px;">${escapeHtml(o.productName||"প্রোডাক্ট")}</div>
           <div style="font-size:11px; color:var(--muted);">পরিমাণ: ${o.qty||1} · ${time}</div>
         </div>
-        <span style="font-size:11px; font-weight:800; flex-shrink:0;">${ORDER_STATUS_LABEL[status]||status}</span>
+        <span style="font-size:11px; font-weight:800; flex-shrink:0;">${HB_STATUS_LABEL[status]||status}</span>
         <span style="color:var(--muted); font-size:14px;">›</span>
       </div>`;
   }).join("");
 
-  listEl.querySelectorAll(".orderCard").forEach(card=>{
+  listEl.querySelectorAll(".hbOrderCard").forEach(card=>{
     card.addEventListener("click", ()=>{
       const order = orders.find(o=> o.id === card.dataset.oid);
-      if(order) openOrderTracker(order);
+      if(order) hbOpenTracker(order);
     });
   });
 }
 
-document.querySelectorAll(".orderStatusIcon").forEach(icon=>{
+document.querySelectorAll(".hbCartStatusIcon").forEach(icon=>{
   icon.addEventListener("click", ()=>{
     const status = icon.dataset.status;
-    __myOrdersFilter = __myOrdersFilter === status ? null : status;
-    document.querySelectorAll(".orderStatusIcon").forEach(i=> i.style.background = "transparent");
-    if(__myOrdersFilter) icon.style.background = "rgba(212,160,23,0.15)";
-    $("myOrdersFilterClear").style.display = __myOrdersFilter ? "inline" : "none";
-    myOrdersRender();
+    __hbOrdersFilter = __hbOrdersFilter === status ? null : status;
+    document.querySelectorAll(".hbCartStatusIcon").forEach(i=> i.style.background = "transparent");
+    if(__hbOrdersFilter) icon.style.background = "rgba(212,160,23,0.15)";
+    $("hbCartOrdersFilterClear").style.display = __hbOrdersFilter ? "inline" : "none";
+    hbOrdersRender();
   });
 });
-$("myOrdersFilterClear").addEventListener("click", ()=>{
-  __myOrdersFilter = null;
-  document.querySelectorAll(".orderStatusIcon").forEach(i=> i.style.background = "transparent");
-  $("myOrdersFilterClear").style.display = "none";
-  myOrdersRender();
+$("hbCartOrdersFilterClear").addEventListener("click", ()=>{
+  __hbOrdersFilter = null;
+  document.querySelectorAll(".hbCartStatusIcon").forEach(i=> i.style.background = "transparent");
+  $("hbCartOrdersFilterClear").style.display = "none";
+  hbOrdersRender();
 });
 
-function openOrderTracker(order){
-  $("trackerTitle").textContent = `📦 ${order.productName || "অর্ডার"}`;
+function hbOpenTracker(order){
+  $("hbTrackerTitle").textContent = `📦 ${order.productName || "অর্ডার"}`;
   const status = order.status || "pending";
 
   if(status === "cancelled"){
-    $("trackerSteps").innerHTML = `
+    $("hbTrackerSteps").innerHTML = `
       <div style="text-align:center; padding:20px 0;">
         <div style="font-size:36px; margin-bottom:10px;">❌</div>
         <div style="font-weight:800; color:#f87171;">এই অর্ডারটি বাতিল হয়ে গেছে</div>
       </div>`;
   }else{
-    // "pending" স্ট্যাটাসকে ORDER_STATUS_STEPS-এর ইনডেক্সে ম্যাপ করা — POS
-    // থেকে স্ট্যাটাস আপডেট করার সিস্টেম এখনো নেই, তাই বাস্তবে সবসময় ধাপ ০-তেই থাকবে
-    const stepIndex = ORDER_STATUS_STEPS.findIndex(s=> s.key === status);
-    const currentIdx = stepIndex >= 0 ? stepIndex : 0;
-
-    $("trackerSteps").innerHTML = ORDER_STATUS_STEPS.map((s, idx)=>{
+    const stepIndex0 = HB_STATUS_STEPS.findIndex(s=> s.key === status);
+    const currentIdx = stepIndex0 >= 0 ? stepIndex0 : 0;
+    $("hbTrackerSteps").innerHTML = HB_STATUS_STEPS.map((s, idx)=>{
       const state = idx < currentIdx ? "done" : (idx === currentIdx ? "active" : "pending");
-      const isLast = idx === ORDER_STATUS_STEPS.length - 1;
+      const isLast = idx === HB_STATUS_STEPS.length - 1;
       return `
         <div class="trackerStep">
           <div class="trackerStepLine">
@@ -2794,9 +2794,10 @@ function openOrderTracker(order){
         </div>`;
     }).join("");
   }
-  $("orderTrackerModal").style.display = "flex";
+  $("hbTrackerModal").style.display = "flex";
 }
-$("trackerCloseBtn").addEventListener("click", ()=> $("orderTrackerModal").style.display = "none");
+$("hbTrackerCloseBtn").addEventListener("click", ()=> $("hbTrackerModal").style.display = "none");
+
 
 async function resolveAllImages(products){
   for(const p of products){
