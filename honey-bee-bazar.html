@@ -774,7 +774,7 @@ function renderAuthArea(){
         <div style="font-size:10px; color:var(--muted); margin-top:3px;">UID: ${currentCustomer.uid}</div>
       </div>`;
     document.getElementById("userChipBtn").addEventListener("click", ()=>{
-      if(confirm("লগআউট করবেন?")) auth.signOut();
+      if(confirm("লগআউট করবেন?")) hmPurgeAndLogout();
     });
     db.collection("wallets").doc(currentCustomer.uid).onSnapshot((doc)=>{
       const el = document.getElementById("walletBalanceTxt");
@@ -1167,30 +1167,86 @@ function hmListenChatList(){
 let hmMessagesUnsub = null;
 let hmCurrentChatId = null, hmCurrentOtherUid = null;
 
-async function hmOpenChat(otherUid, otherUsername, otherName){
-  hmCurrentOtherUid = otherUid;
-  hmCurrentChatId = hmChatId(currentCustomer.uid, otherUid);
-  $("hmChatThreadName").textContent = otherName || otherUsername;
-  $("hmChatThreadUsername").textContent = "@" + otherUsername;
-  $("hmChatThread").style.display = "flex";
-  $("hmChatMessages").innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
+let hmCurrentChatMode = "regular";
 
-  // 🔗 চ্যাটের প্যারেন্ট ডকুমেন্ট না থাকলে তৈরি করা (দুইজনের তথ্যসহ)
-  const chatRef = db.collection("messengerChats").doc(hmCurrentChatId);
-  try{
-    const chatDoc = await chatRef.get();
-    if(!chatDoc.exists){
-      await chatRef.set({
+async function hmOpenChat(otherUid, otherUsername, otherName){
+  const chatId = hmChatId(currentCustomer.uid, otherUid);
+  const chatRef = db.collection("messengerChats").doc(chatId);
+  let chatDoc;
+  try{ chatDoc = await chatRef.get(); }catch(e){ console.warn("chat check failed:", e); chatDoc = null; }
+
+  if(chatDoc && chatDoc.exists){
+    // ✅ চ্যাট আগে থেকেই আছে — আগের বেছে নেওয়া মোডেই সরাসরি খোলে, পপ-আপ দেখায় না
+    hmCurrentChatMode = chatDoc.data().mode || "regular";
+    hmActuallyOpenChat(otherUid, otherUsername, otherName, chatId);
+  }else{
+    // 🆕 প্রথমবার — "কীভাবে কথা বলতে চান?" পপ-আপ দেখানো হয়
+    hmShowChatModeModal(otherUid, otherUsername, otherName, chatId);
+  }
+}
+
+function hmShowChatModeModal(otherUid, otherUsername, otherName, chatId){
+  document.querySelectorAll(".hmModeModal").forEach(el=> el.remove());
+  const overlay = document.createElement("div");
+  overlay.className = "hmModeModal";
+  overlay.style.cssText = "position:fixed; inset:0; z-index:950; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; padding:16px;";
+  overlay.innerHTML = `
+    <div style="background:#1a1206; border:1px solid var(--border); border-radius:20px; padding:22px; max-width:340px; width:100%; text-align:center;">
+      <div style="width:56px; height:56px; border-radius:50%; background:var(--amber); color:var(--bg1); font-size:24px; display:flex; align-items:center; justify-content:center; margin:0 auto 12px; font-weight:800;">${escapeHtml((otherName||otherUsername||"?")[0].toUpperCase())}</div>
+      <div style="font-weight:800; font-size:15px; color:#fff8e8;">${escapeHtml(otherName||otherUsername)}</div>
+      <div style="font-size:11.5px; color:var(--amber); margin-bottom:12px;">@${escapeHtml(otherUsername)}</div>
+      <p style="font-size:12.5px; color:var(--muted); margin-bottom:16px;">আপনি কীভাবে কথা বলতে চান?</p>
+
+      <button id="hmModeRegularBtn" style="width:100%; text-align:left; display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--border); border-radius:14px; background:rgba(255,255,255,0.04); color:#fff8e8; cursor:pointer; font-family:inherit; margin-bottom:10px;">
+        <span style="font-size:20px;">💬</span>
+        <span>
+          <div style="font-weight:800; font-size:12.5px;">রেগুলার চ্যাট</div>
+          <div style="font-size:10px; color:var(--muted);">মেসেজ সবসময়ের জন্য থাকবে</div>
+        </span>
+      </button>
+
+      <button id="hmModePrivacyBtn" style="width:100%; text-align:left; display:flex; align-items:center; gap:10px; padding:12px; border:1px solid rgba(220,38,38,0.4); border-radius:14px; background:rgba(220,38,38,0.08); color:#fca5a5; cursor:pointer; font-family:inherit; margin-bottom:14px;">
+        <span style="font-size:20px;">🔐</span>
+        <span>
+          <div style="font-weight:800; font-size:12.5px; color:#f87171;">প্রাইভেসি মোড (Auto Wipe)</div>
+          <div style="font-size:10px; color:#fca5a5;">প্রতিটা মেসেজ ১ মিনিট পর নিজে থেকে মুছে যাবে</div>
+        </span>
+      </button>
+
+      <span id="hmModeCancelBtn" style="font-size:11.5px; color:var(--muted); cursor:pointer;">বাতিল করুন</span>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const pick = async (mode)=>{
+    overlay.remove();
+    try{
+      await db.collection("messengerChats").doc(chatId).set({
         participants: [currentCustomer.uid, otherUid],
         participantInfo: {
           [currentCustomer.uid]: { username: __hmMyProfile.username, fullName: __hmMyProfile.fullName },
           [otherUid]: { username: otherUsername, fullName: otherName }
         },
+        mode,
         lastMessage: "", lastMessageAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
-    }
-  }catch(e){ console.warn("chat init failed:", e); }
+    }catch(e){ console.warn("chat create failed:", e); }
+    hmCurrentChatMode = mode;
+    hmActuallyOpenChat(otherUid, otherUsername, otherName, chatId);
+  };
+  overlay.querySelector("#hmModeRegularBtn").addEventListener("click", ()=> pick("regular"));
+  overlay.querySelector("#hmModePrivacyBtn").addEventListener("click", ()=> pick("privacy"));
+  overlay.querySelector("#hmModeCancelBtn").addEventListener("click", ()=> overlay.remove());
+}
 
+function hmActuallyOpenChat(otherUid, otherUsername, otherName, chatId){
+  hmCurrentOtherUid = otherUid;
+  hmCurrentChatId = chatId;
+  $("hmChatThreadName").textContent = (otherName || otherUsername) + (hmCurrentChatMode === "privacy" ? " 🔐" : "");
+  $("hmChatThreadUsername").textContent = "@" + otherUsername + (hmCurrentChatMode === "privacy" ? " · প্রাইভেসি মোড, ১ মিনিটে অটো-মুছে যায়" : "");
+  $("hmChatThread").style.display = "flex";
+  $("hmChatMessages").innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
+
+  const chatRef = db.collection("messengerChats").doc(chatId);
   if(hmMessagesUnsub) hmMessagesUnsub();
   hmMessagesUnsub = chatRef.collection("messages").orderBy("timestamp","asc")
     .onSnapshot((qs)=>{
@@ -1202,14 +1258,32 @@ async function hmOpenChat(otherUid, otherUsername, otherName){
           const m = d.data();
           const isMine = m.senderUid === currentCustomer.uid;
           const timeTxt = m.timestamp ? m.timestamp.toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'}) : "";
+          const reactionBadge = m.reaction ? `<div style="position:absolute; bottom:-9px; ${isMine?"left:-4px;":"right:-4px;"} background:#1a1206; border:1px solid var(--border); border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:11px;">${m.reaction}</div>` : "";
           return `
-            <div style="display:flex; justify-content:${isMine ? "flex-end" : "flex-start"}; margin-bottom:10px;">
-              <div style="max-width:75%; background:${isMine ? "var(--amber)" : "rgba(255,255,255,0.08)"}; color:${isMine ? "var(--bg1)" : "#eee"}; padding:9px 13px; border-radius:16px; ${isMine ? "border-bottom-right-radius:4px;" : "border-bottom-left-radius:4px;"}">
+            <div style="display:flex; justify-content:${isMine ? "flex-end" : "flex-start"}; margin-bottom:14px;">
+              <div class="hmMsgBubble" data-mid="${d.id}" style="position:relative; max-width:75%; background:${isMine ? "var(--amber)" : "rgba(255,255,255,0.08)"}; color:${isMine ? "var(--bg1)" : "#eee"}; padding:9px 13px; border-radius:16px; ${isMine ? "border-bottom-right-radius:4px;" : "border-bottom-left-radius:4px;"} user-select:none; -webkit-user-select:none;">
                 <div style="font-size:14px; line-height:1.4;">${escapeHtml(m.text||"")}</div>
                 <div style="font-size:9.5px; opacity:0.7; margin-top:3px; text-align:right;">${timeTxt}</div>
+                ${reactionBadge}
               </div>
             </div>`;
         }).join("");
+
+        // 🤏 মেসেজের ওপর চেপে ধরে রাখলে (long-press) একটা ছোট ইমোজি-রিয়েকশন
+        // প্যানেল ভেসে ওঠে — যেকোনো একটা ট্যাপ করলেই সেই মেসেজে বসে যায়
+        messagesEl.querySelectorAll(".hmMsgBubble").forEach(bubble=>{
+          let holdTimer = null;
+          const mid = bubble.dataset.mid;
+          const start = ()=>{ holdTimer = setTimeout(()=> hmShowReactionPicker(mid, bubble), 450); };
+          const cancel = ()=> clearTimeout(holdTimer);
+          bubble.addEventListener("touchstart", start, { passive:true });
+          bubble.addEventListener("touchend", cancel, { passive:true });
+          bubble.addEventListener("touchmove", cancel, { passive:true });
+          bubble.addEventListener("mousedown", start);
+          bubble.addEventListener("mouseup", cancel);
+          bubble.addEventListener("mouseleave", cancel);
+          bubble.addEventListener("contextmenu", (e)=> e.preventDefault());
+        });
       }
       requestAnimationFrame(()=>{ messagesEl.scrollTop = messagesEl.scrollHeight; });
     }, (err)=>{
@@ -1223,19 +1297,61 @@ $("hmChatThreadBack").addEventListener("click", ()=>{
   if(hmMessagesUnsub){ hmMessagesUnsub(); hmMessagesUnsub = null; }
 });
 
+// ❤️ মেসেজে রিয়েকশন দেওয়া — চেপে ধরলে ছোট ইমোজি-প্যানেল ভেসে ওঠে
+const HM_REACTION_EMOJIS = ["❤️","😂","😮","😢","👍","🙏"];
+function hmShowReactionPicker(messageId, bubbleEl){
+  // আগে থেকে খোলা কোনো পিকার থাকলে সরিয়ে ফেলা
+  document.querySelectorAll(".hmReactionPicker").forEach(el=> el.remove());
+
+  const picker = document.createElement("div");
+  picker.className = "hmReactionPicker";
+  picker.style.cssText = "position:absolute; top:-42px; left:50%; transform:translateX(-50%); background:#1a1206; border:1px solid var(--border); border-radius:20px; padding:6px 8px; display:flex; gap:6px; z-index:10; box-shadow:0 4px 14px rgba(0,0,0,0.4);";
+  picker.innerHTML = HM_REACTION_EMOJIS.map(e=> `<span class="hmReactionOpt" style="font-size:18px; cursor:pointer;">${e}</span>`).join("");
+  bubbleEl.appendChild(picker);
+  if(navigator.vibrate) navigator.vibrate(25);
+
+  picker.querySelectorAll(".hmReactionOpt").forEach((span, idx)=>{
+    span.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      hmSetReaction(messageId, HM_REACTION_EMOJIS[idx]);
+      picker.remove();
+    });
+  });
+
+  // অন্য কোথাও ট্যাপ করলে পিকার বন্ধ হয়ে যায়
+  setTimeout(()=>{
+    document.addEventListener("click", function closeOnce(e){
+      if(!picker.contains(e.target)){ picker.remove(); document.removeEventListener("click", closeOnce); }
+    });
+  }, 50);
+}
+
+async function hmSetReaction(messageId, emoji){
+  if(!hmCurrentChatId) return;
+  try{
+    await db.collection("messengerChats").doc(hmCurrentChatId).collection("messages").doc(messageId).update({ reaction: emoji });
+  }catch(e){ console.warn("reaction set failed:", e); }
+}
+
 async function hmSendMessage(){
   const text = $("hmChatInput").value.trim();
   if(!text || !hmCurrentChatId) return;
   $("hmChatInput").value = "";
   const chatRef = db.collection("messengerChats").doc(hmCurrentChatId);
   try{
-    await chatRef.collection("messages").add({
+    const msgData = {
       senderUid: currentCustomer.uid,
       text,
       timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    };
+    // 🔐 প্রাইভেসি মোডে থাকলে ১ মিনিট পর মুছে ফেলার জন্য একটা সময়সীমা
+    // বসানো হয় — আসল মোছাটা একটা Cloud Function প্রতি মিনিটে চেক করে করবে
+    if(hmCurrentChatMode === "privacy"){
+      msgData.expiresAt = firebase.firestore.Timestamp.fromMillis(Date.now() + 60*1000);
+    }
+    await chatRef.collection("messages").add(msgData);
     await chatRef.set({
-      lastMessage: text,
+      lastMessage: hmCurrentChatMode === "privacy" ? "🔐 একটা মেসেজ" : text,
       lastMessageAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   }catch(e){
@@ -1455,6 +1571,15 @@ function attachHoldToConfirm(buttonEl, onComplete, holdMs){
   buttonEl.addEventListener("mouseleave", cancelHold);
   buttonEl.addEventListener("touchend", cancelHold);
   buttonEl.addEventListener("touchcancel", cancelHold);
+}
+
+// 🚪 লগআউট + সম্পূর্ণ লোকাল ডেটা মুছে ফেলা — Firestore-এর কোনো ডেটা মুছে
+// যায় না (মেসেজ/প্রোফাইল/ইত্যাদি ক্লাউডেই থাকে), শুধু এই ব্রাউজারে
+// সেভ থাকা ক্যাশ/ড্রাফট (localStorage/sessionStorage) পরিষ্কার হয়
+async function hmPurgeAndLogout(){
+  try{ await auth.signOut(); }catch(e){ console.warn("signOut failed:", e); }
+  try{ localStorage.clear(); sessionStorage.clear(); }catch(e){}
+  window.location.reload();
 }
 
 function escapeHtml(str){
