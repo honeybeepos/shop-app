@@ -498,3 +498,17 @@ exports.cleanupOldHistory = onSchedule("every 24 hours", async () => {
 
   console.log(`🗑️ ৭ দিনের পুরনো ${totalDeleted}টা হিস্ট্রি রেকর্ড মুছে ফেলা হয়েছে`);
 });
+
+/* ==================== 🔐 Honey Messenger — প্রাইভেসি মোডের মেসেজ অটো-মুছে ফেলা ====================
+   প্রতি মিনিটে চলে — যেসব মেসেজে expiresAt (মেসেজ পাঠানোর ১ মিনিট পর)
+   অতিক্রান্ত হয়ে গেছে, সেগুলো স্থায়ীভাবে মুছে ফেলা হয়। collectionGroup
+   দিয়ে সব চ্যাটের messages সাব-কালেকশন একসাথে চেক করা হয়। */
+exports.cleanupExpiredPrivacyMessages = onSchedule("every 1 minutes", async () => {
+  const now = Timestamp.now();
+  const expiredSnap = await db.collectionGroup("messages")
+    .where("expiresAt", "<", now)
+    .get();
+  if (expiredSnap.empty) return;
+  await Promise.all(expiredSnap.docs.map((doc) => doc.ref.delete()));
+  console.log(`🔐 প্রাইভেসি মোডের ${expiredSnap.size}টা মেয়াদোত্তীর্ণ মেসেজ মুছে ফেলা হয়েছে`);
+});
