@@ -99,6 +99,34 @@
   }
   .orderNowBtn:disabled{ background:rgba(255,255,255,0.08); color:var(--muted); cursor:not-allowed; }
 
+  /* 🛍️ প্রিমিয়াম প্রোডাক্ট গ্রিড — Market, Medical Equipment, পছন্দের বাজার সবখানে একই স্টাইল */
+  .pGrid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:2px; }
+  .pCard{
+    background:var(--card); border:1px solid var(--border); border-radius:16px; overflow:hidden;
+    box-shadow:0 6px 16px rgba(0,0,0,0.25); transition:transform 0.15s ease;
+  }
+  .pCard:active{ transform:scale(0.97); }
+  .pCardImgWrap{ position:relative; width:100%; aspect-ratio:1/1; background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center; font-size:44px; overflow:hidden; }
+  .pCardImgWrap img{ width:100%; height:100%; object-fit:cover; }
+  .pCardFav{ position:absolute; top:8px; right:8px; font-size:17px; cursor:pointer; background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+  .pCardOfferBadge{ position:absolute; top:8px; left:8px; background:#dc2626; color:#fff; font-size:9.5px; font-weight:800; padding:3px 8px; border-radius:8px; }
+  .pCardBody{ padding:10px 11px 12px; }
+  .pCardName{ font-size:12.5px; font-weight:700; line-height:1.3; margin-bottom:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:2.5em; }
+  .pCardPriceRow{ display:flex; align-items:baseline; gap:6px; margin-bottom:6px; }
+  .pCardPrice{ font-weight:800; font-size:14.5px; color:var(--amber); }
+  .pCardOldPrice{ font-size:11px; color:var(--muted); text-decoration:line-through; }
+  .pCardStock{ font-size:10px; font-weight:700; margin-bottom:8px; }
+  .pCardStock.in{ color:var(--ok); } .pCardStock.low{ color:var(--amber); } .pCardStock.out{ color:var(--danger); }
+  .pCardAddBtn{
+    width:100%; padding:8px; border-radius:9px; border:none; cursor:pointer; font-family:inherit;
+    background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:11.5px;
+  }
+  .pCardAddBtn:disabled{ background:rgba(255,255,255,0.08); color:var(--muted); cursor:not-allowed; }
+
+  /* 📄 প্রোডাক্ট বিস্তারিত পেজ */
+  .pDetailImgWrap{ width:100%; aspect-ratio:1/1; border-radius:18px; overflow:hidden; background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center; font-size:72px; margin-bottom:14px; }
+  .pDetailImgWrap img{ width:100%; height:100%; object-fit:cover; }
+
   /* 🚚 অর্ডার ট্র্যাকার — এনিমেটেড স্টেপ */
   .trackerStep{ display:flex; gap:14px; }
   .trackerStepLine{ display:flex; flex-direction:column; align-items:center; }
@@ -219,6 +247,7 @@
   }
 </style>
 <script src="bd-locations.js"></script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeufdK--qSX0a6-2m1JwQOrig7q4C8IGY"></script>
 </head>
 <body>
 <div class="wrap">
@@ -355,8 +384,16 @@
       <button class="backBtn" id="backToShops" style="margin-bottom:0; flex-shrink:0;">← পেছনে ফিরে যান</button>
       <div id="currentShopName" style="font-size:14px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
     </div>
-    <div class="card" style="padding:0; overflow:hidden;">
-      <div id="productsList"><div class="loadingMsg">স্টক লোড হচ্ছে...</div></div>
+    <div id="productsList" class="pGrid"><div class="loadingMsg">স্টক লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- 📄 প্রোডাক্ট বিস্তারিত — বটম-শিট -->
+  <div id="hbProductDetailModal" style="display:none; position:fixed; inset:0; z-index:960; background:rgba(0,0,0,0.75); align-items:flex-end; justify-content:center;">
+    <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:88vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
+        <span id="hbProductDetailCloseBtn" style="font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
+      </div>
+      <div id="hbProductDetailBody"></div>
     </div>
   </div>
 
@@ -926,11 +963,25 @@
 
 <!-- 🚚 অর্ডার ট্র্যাকার — এনিমেটেড ধাপে ধাপে অগ্রগতি -->
 <div id="hbTrackerModal" style="display:none; position:fixed; inset:0; z-index:950; background:rgba(0,0,0,0.75); align-items:flex-end; justify-content:center;">
-  <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:22px 20px; width:100%; max-width:480px;">
-    <div style="display:flex; align-items:center; margin-bottom:18px;">
-      <h3 id="hbTrackerTitle" style="margin:0; font-size:14.5px; color:#fff8e8;">অর্ডার ট্র্যাকিং</h3>
+  <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:22px 20px; width:100%; max-width:480px; max-height:85vh; overflow-y:auto;">
+    <div style="display:flex; align-items:flex-start; margin-bottom:16px;">
+      <div>
+        <h3 style="margin:0; font-size:16px; color:#fff8e8;">🚚 Order Tracking</h3>
+        <div id="hbTrackerOrderIdTxt" style="font-size:11px; color:var(--muted); margin-top:2px;">—</div>
+      </div>
       <span id="hbTrackerCloseBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
     </div>
+
+    <!-- 📦 Order Details — বড় প্রোডাক্ট-নাম কার্ড -->
+    <div id="hbTrackerOrderDetails" class="card" style="padding:14px; margin-bottom:18px;"></div>
+
+    <!-- 🗺️ Live Map — শুধু রাইডার এসাইন হলে দেখা যাবে -->
+    <div id="hbTrackerMapWrap" style="display:none; margin-bottom:18px;">
+      <div style="font-size:12.5px; font-weight:700; color:var(--amber); margin-bottom:8px;">🟢 Live Tracking</div>
+      <div id="hbTrackerMap" style="width:100%; height:220px; border-radius:14px; overflow:hidden; border:1px solid var(--border);"></div>
+      <div id="hbTrackerRiderInfo" style="font-size:11.5px; color:var(--muted); margin-top:8px;"></div>
+    </div>
+
     <div id="hbTrackerSteps"></div>
   </div>
 </div>
@@ -2493,7 +2544,10 @@ async function loadProducts(shopId){
   }
 }
 
+let __hbCurrentProductsList = []; // Product Details বটম-শিটে খোলার জন্য রেফারেন্স রাখা হয়
+
 function renderProducts(products){
+  __hbCurrentProductsList = products;
   const favs = (currentCustomer && currentCustomer.favoriteProducts) || [];
   $("productsList").innerHTML = products.map(p=>{
     const qty = Number(p.stockQty);
@@ -2504,28 +2558,75 @@ function renderProducts(products){
       else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
     }
     const hasOffer = p.offerPrice != null && p.price != null && Number(p.offerPrice) < Number(p.price);
-    const priceHtml = hasOffer
-      ? `<span style="text-decoration:line-through; color:var(--muted); margin-right:6px;">৳ ${p.price}</span><span style="color:#fb923c; font-weight:800;">৳ ${p.offerPrice}</span>`
-      : (p.price != null ? ("৳ " + p.price) : "");
+    const finalPrice = hasOffer ? p.offerPrice : (p.price!=null?p.price:0);
     const isFav = favs.includes(p.id);
     const outOfStock = stockClass === "out";
     return `
-      <div class="productCard2">
-        <div class="productRow">
-          <div class="productImgWrap" id="pimg-${p.id}">${guessCategoryIcon(p.name)}</div>
-          <div style="flex:1; margin:0 10px;">
-            <div class="pname">${escapeHtml(p.name || "প্রোডাক্ট")} ${hasOffer ? '<span style="font-size:10px; background:rgba(251,146,60,0.18); color:#fb923c; padding:2px 7px; border-radius:20px; margin-left:6px;">🔥 Special Offer</span>' : ''}</div>
-            <div class="pstock">${priceHtml}</div>
-          </div>
-          <span class="favHeart" style="font-size:16px;" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
-          <span class="stockBadge ${stockClass}">${stockLabel}</span>
+      <div class="pCard">
+        <div class="pCardImgWrap" id="pimg-${p.id}" onclick="hbOpenProductDetail('${p.id}')">
+          ${guessCategoryIcon(p.name)}
+          ${hasOffer ? '<span class="pCardOfferBadge">🔥 অফার</span>' : ''}
+          <span class="pCardFav" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
         </div>
-        <button class="orderNowBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${hasOffer ? p.offerPrice : (p.price!=null?p.price:0)})">
-          ${outOfStock ? "স্টক নেই" : "🛒 Cart-এ যোগ করুন"}
-        </button>
+        <div class="pCardBody">
+          <div class="pCardName" onclick="hbOpenProductDetail('${p.id}')">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
+          <div class="pCardPriceRow">
+            <span class="pCardPrice">৳${finalPrice}</span>
+            ${hasOffer ? `<span class="pCardOldPrice">৳${p.price}</span>` : ""}
+          </div>
+          <div class="pCardStock ${stockClass}">${stockLabel}</div>
+          <button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${finalPrice})">
+            ${outOfStock ? "স্টক নেই" : "🛒 Add to Cart"}
+          </button>
+        </div>
       </div>`;
   }).join("");
 }
+
+/* ---------- 📄 প্রোডাক্ট বিস্তারিত — বটম-শিট ---------- */
+window.hbOpenProductDetail = function(productId){
+  const p = __hbCurrentProductsList.find(x=> x.id === productId);
+  if(!p) return;
+  const qty = Number(p.stockQty);
+  let stockClass = "in", stockLabel = "স্টকে আছে";
+  if(!isNaN(qty)){
+    if(qty <= 0){ stockClass = "out"; stockLabel = "স্টক নেই"; }
+    else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
+    else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
+  }
+  const hasOffer = p.offerPrice != null && p.price != null && Number(p.offerPrice) < Number(p.price);
+  const finalPrice = hasOffer ? p.offerPrice : (p.price!=null?p.price:0);
+  const outOfStock = stockClass === "out";
+  const favs = (currentCustomer && currentCustomer.favoriteProducts) || [];
+  const isFav = favs.includes(p.id);
+
+  $("hbProductDetailBody").innerHTML = `
+    <div class="pDetailImgWrap" id="pdimg-${p.id}">${guessCategoryIcon(p.name)}</div>
+    <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;">
+      <div style="flex:1; font-size:17px; font-weight:800;">${escapeHtml(p.name||"প্রোডাক্ট")}</div>
+      <span class="pCardFav" style="position:static;" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
+    </div>
+    <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:8px;">
+      <span style="font-size:22px; font-weight:800; color:var(--amber);">৳${finalPrice}</span>
+      ${hasOffer ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">৳${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : ""}
+    </div>
+    <div class="pCardStock ${stockClass}" style="font-size:12px; margin-bottom:14px;">${stockLabel}</div>
+    ${p.description ? `<div style="font-size:13px; color:#ddd; line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
+    <div style="display:flex; gap:10px;">
+      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${finalPrice})" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🛒 Add to Cart</button>
+      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${finalPrice}); hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
+    </div>
+  `;
+  $("hbProductDetailModal").style.display = "flex";
+  // 🖼️ গ্রিড কার্ডে ছবি ইতিমধ্যে লোড হয়ে থাকলে সেটাই কপি করা হয় (আবার নেটওয়ার্ক কল না করে)
+  const gridImgEl = document.getElementById(`pimg-${p.id}`);
+  const detailImgEl = document.getElementById(`pdimg-${p.id}`);
+  if(gridImgEl && detailImgEl && gridImgEl.querySelector("img")){
+    detailImgEl.innerHTML = gridImgEl.innerHTML;
+  }
+};
+$("hbProductDetailCloseBtn").addEventListener("click", ()=> $("hbProductDetailModal").style.display = "none");
+
 
 window.toggleFavoriteProduct = async function(ev, productId){
   ev.stopPropagation();
@@ -2799,9 +2900,34 @@ $("hbCartOrdersFilterClear").addEventListener("click", ()=>{
   hbOrdersRender();
 });
 
+let __hbTrackerRiderUnsub = null;
+let __hbTrackerMapObj = null, __hbTrackerShopMarker = null, __hbTrackerRiderMarker = null, __hbTrackerRouteLine = null;
+
 function hbOpenTracker(order){
-  $("hbTrackerTitle").textContent = `📦 ${order.productName || "অর্ডার"}`;
   const status = order.status || "pending";
+  // 🆔 Order ID — নিজস্ব কোনো ফরম্যাটেড আইডি সেভ করা হয় না, তাই Firestore
+  // ডকুমেন্ট-আইডির শেষ অংশ থেকেই একটা সংক্ষিপ্ত রেফারেন্স নম্বর দেখানো হয়
+  $("hbTrackerOrderIdTxt").textContent = "Order ID: #" + (order.id ? order.id.slice(-6).toUpperCase() : "—");
+
+  const time = order.createdAt ? order.createdAt.toDate().toLocaleString('bn-BD', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : "";
+  $("hbTrackerOrderDetails").innerHTML = `
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="width:52px; height:52px; border-radius:12px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0;">${guessCategoryIcon(order.productName)}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:800; font-size:14.5px;">${escapeHtml(order.productName||"প্রোডাক্ট")}</div>
+        <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">পরিমাণ: ${order.qty||1}${time ? " · " + time : ""}</div>
+      </div>
+      <span style="font-size:11px; font-weight:800; flex-shrink:0;">${HB_STATUS_LABEL[status]||status}</span>
+    </div>`;
+
+  // 🗺️ Live Map — শুধু status "shipped" আর রাইডার এসাইন করা থাকলে দেখানো হয়
+  if(__hbTrackerRiderUnsub){ __hbTrackerRiderUnsub(); __hbTrackerRiderUnsub = null; }
+  if(status === "shipped" && order.assignedRiderId){
+    $("hbTrackerMapWrap").style.display = "block";
+    hbStartLiveTracking(order);
+  }else{
+    $("hbTrackerMapWrap").style.display = "none";
+  }
 
   if(status === "cancelled"){
     $("hbTrackerSteps").innerHTML = `
@@ -2824,13 +2950,77 @@ function hbOpenTracker(order){
           <div style="padding-bottom:${isLast?"0":"22"}px;">
             <div style="font-weight:${state==="pending"?"500":"800"}; font-size:13px; color:${state==="pending"?"var(--muted)":"#fff8e8"};">${s.label}</div>
             ${state === "active" ? '<div style="font-size:10.5px; color:var(--amber); margin-top:2px;">এই ধাপে আছে</div>' : ""}
+            ${idx === 0 && time ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${time}</div>` : ""}
           </div>
         </div>`;
     }).join("");
   }
   $("hbTrackerModal").style.display = "flex";
 }
-$("hbTrackerCloseBtn").addEventListener("click", ()=> $("hbTrackerModal").style.display = "none");
+/* ---------- 🗺️ Live Map — শপ + রাইডারের অবস্থান, রাইডার লাইভ-আপডেট হয় ----------
+   ⚠️ রাইডারের liveLocation ইতিমধ্যেই Rider Mode থেকে GPS দিয়ে Firestore-এ
+   সেভ হয় (POS-এর বিদ্যমান সিস্টেম) — এখানে শুধু সেটা পড়া হচ্ছে, নতুন কোনো
+   লোকেশন-ট্র্যাকিং কোড লেখা হয়নি। */
+async function hbStartLiveTracking(order){
+  $("hbTrackerRiderInfo").textContent = "রাইডারের লোকেশন লোড হচ্ছে...";
+  let shopLoc = null;
+  try{
+    const shopDoc = await db.collection("shops").doc(order.shopId).get();
+    if(shopDoc.exists && shopDoc.data().storeLocation) shopLoc = shopDoc.data().storeLocation;
+  }catch(e){ console.warn("shop location fetch failed:", e); }
+
+  __hbTrackerRiderUnsub = db.collection("riders").doc(order.assignedRiderId).onSnapshot((doc)=>{
+    if(!doc.exists || !doc.data().liveLocation){
+      $("hbTrackerRiderInfo").textContent = "রাইডারের লোকেশন এখনো পাওয়া যায়নি — তিনি হয়তো এখনো GPS চালু করেননি।";
+      return;
+    }
+    const riderLoc = doc.data().liveLocation;
+    const riderName = doc.data().name || "রাইডার";
+    $("hbTrackerRiderInfo").textContent = `🛵 ${riderName} — লোকেশন আপডেট হচ্ছে লাইভ`;
+    hbRenderTrackerMap(shopLoc, { lat: riderLoc.lat, lng: riderLoc.lng });
+  }, (err)=>{
+    console.warn("rider location listener error:", err);
+    $("hbTrackerRiderInfo").textContent = "রাইডারের লোকেশন লোড করা যায়নি।";
+  });
+}
+
+function hbRenderTrackerMap(shopLoc, riderLoc){
+  if(typeof google === "undefined" || !google.maps){
+    $("hbTrackerMap").innerHTML = '<div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--muted); font-size:12px;">ম্যাপ লোড করা যায়নি।</div>';
+    return;
+  }
+  const center = shopLoc ? { lat: (shopLoc.lat + riderLoc.lat)/2, lng: (shopLoc.lng + riderLoc.lng)/2 } : riderLoc;
+  if(!__hbTrackerMapObj){
+    __hbTrackerMapObj = new google.maps.Map($("hbTrackerMap"), {
+      center, zoom: 14, disableDefaultUI: true, zoomControl: true,
+      styles: [{ elementType: "geometry", stylers: [{ color: "#1a1206" }] }, { elementType: "labels.text.stroke", stylers: [{ color: "#1a1206" }] }, { elementType: "labels.text.fill", stylers: [{ color: "#8b8578" }] }, { featureType: "road", elementType: "geometry", stylers: [{ color: "#2c2211" }] }, { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f0c08" }] }]
+    });
+  }
+  if(shopLoc && !__hbTrackerShopMarker){
+    __hbTrackerShopMarker = new google.maps.Marker({ position: shopLoc, map: __hbTrackerMapObj, label: { text: "🏪", fontSize: "20px" } });
+  }
+  if(!__hbTrackerRiderMarker){
+    __hbTrackerRiderMarker = new google.maps.Marker({ position: riderLoc, map: __hbTrackerMapObj, label: { text: "🛵", fontSize: "20px" } });
+  }else{
+    __hbTrackerRiderMarker.setPosition(riderLoc); // 🔄 নতুন লোকেশন এলে মার্কার smoothly সরে যায়
+  }
+  if(shopLoc){
+    if(__hbTrackerRouteLine) __hbTrackerRouteLine.setMap(null);
+    __hbTrackerRouteLine = new google.maps.Polyline({
+      path: [shopLoc, riderLoc], geodesic: true, strokeColor: "#d4a017", strokeOpacity: 0.8, strokeWeight: 3, map: __hbTrackerMapObj
+    });
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend(shopLoc); bounds.extend(riderLoc);
+    __hbTrackerMapObj.fitBounds(bounds, 40);
+  }else{
+    __hbTrackerMapObj.setCenter(riderLoc);
+  }
+}
+
+$("hbTrackerCloseBtn").addEventListener("click", ()=>{
+  $("hbTrackerModal").style.display = "none";
+  if(__hbTrackerRiderUnsub){ __hbTrackerRiderUnsub(); __hbTrackerRiderUnsub = null; }
+});
 
 
 async function resolveAllImages(products){
@@ -3128,19 +3318,23 @@ function medEqRenderList(items){
     const canRent = (it.serviceType === "RENT_ONLY" || it.serviceType === "RENT_AND_SALE") && it.rent && it.rent.available;
     const canSale = (it.serviceType === "SALE_ONLY" || it.serviceType === "RENT_AND_SALE") && it.sale && it.sale.available;
     return `
-      <div class="card" style="padding:14px;">
-        ${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" style="width:100%; height:140px; object-fit:cover; border-radius:10px; margin-bottom:10px;">` : ""}
-        <div style="font-weight:800; font-size:14.5px; margin-bottom:3px;">${escapeHtml(it.title||"")}</div>
-        ${it.description ? `<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">${escapeHtml(it.description)}</div>` : ""}
-        <div style="font-size:12px; color:#ddd; margin-bottom:3px;">📍 ${escapeHtml(it.upazila||"")}${it.upazila?", ":""}${escapeHtml(it.district||"")}</div>
-        <div style="font-size:12px; color:${avail>0?"#4ade80":"#f87171"}; font-weight:700; margin-bottom:10px;">${avail>0 ? `🟢 ${avail}টি Available` : "🔴 এই মুহূর্তে নেই"}</div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-          ${canRent ? `<span style="background:rgba(212,160,23,0.15); color:var(--amber); padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:700;">🔄 ৳${it.rent.perDay} / দিন</span>` : ""}
-          ${canSale ? `<span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:700;">🛒 ৳${it.sale.price} ক্রয়</span>` : ""}
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div style="width:100%; aspect-ratio:16/9; background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center; overflow:hidden;">
+          ${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:44px;">🩼</span>`}
         </div>
-        <div style="display:flex; gap:8px;">
-          ${canRent ? `<button class="medEqRentBtn" data-id="${it.id}" ${avail<1?"disabled":""} style="flex:1; padding:11px; border:none; border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:${avail<1?"rgba(255,255,255,0.06)":"var(--amber)"}; color:${avail<1?"var(--muted)":"var(--bg1)"};">🔄 ভাড়া নিন</button>` : ""}
-          ${canSale ? `<button class="medEqBuyBtn" data-id="${it.id}" ${avail<1?"disabled":""} style="flex:1; padding:11px; border:none; border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:${avail<1?"rgba(255,255,255,0.06)":"#16a34a"}; color:${avail<1?"var(--muted)":"#fff"};">🛒 কিনুন</button>` : ""}
+        <div style="padding:14px;">
+          <div style="font-weight:800; font-size:14.5px; margin-bottom:3px;">${escapeHtml(it.title||"")}</div>
+          ${it.description ? `<div style="font-size:12px; color:var(--muted); margin-bottom:8px;">${escapeHtml(it.description)}</div>` : ""}
+          <div style="font-size:12px; color:#ddd; margin-bottom:3px;">📍 ${escapeHtml(it.upazila||"")}${it.upazila?", ":""}${escapeHtml(it.district||"")}</div>
+          <div style="font-size:12px; color:${avail>0?"#4ade80":"#f87171"}; font-weight:700; margin-bottom:10px;">${avail>0 ? `🟢 ${avail}টি Available` : "🔴 এই মুহূর্তে নেই"}</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+            ${canRent ? `<span style="background:rgba(212,160,23,0.15); color:var(--amber); padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:700;">🔄 ৳${it.rent.perDay} / দিন</span>` : ""}
+            ${canSale ? `<span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:700;">🛒 ৳${it.sale.price} ক্রয়</span>` : ""}
+          </div>
+          <div style="display:flex; gap:8px;">
+            ${canRent ? `<button class="medEqRentBtn" data-id="${it.id}" ${avail<1?"disabled":""} style="flex:1; padding:11px; border:none; border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:${avail<1?"rgba(255,255,255,0.06)":"var(--amber)"}; color:${avail<1?"var(--muted)":"var(--bg1)"};">🔄 ভাড়া নিন</button>` : ""}
+            ${canSale ? `<button class="medEqBuyBtn" data-id="${it.id}" ${avail<1?"disabled":""} style="flex:1; padding:11px; border:none; border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:${avail<1?"rgba(255,255,255,0.06)":"#16a34a"}; color:${avail<1?"var(--muted)":"#fff"};">🛒 কিনুন</button>` : ""}
+          </div>
         </div>
       </div>`;
   }).join("");

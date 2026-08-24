@@ -2047,6 +2047,14 @@
       </div>
       <div class="bizChevron">›</div>
     </div>
+    <div class="bizGlassCard bizNavCard" id="bizOrdersCard">
+      <div class="bizIconBadge" style="background:linear-gradient(135deg,#22c55e,#0ea5e9);">📦</div>
+      <div class="bizCardBody">
+        <div class="bizCardTitle">অর্ডার ব্যবস্থাপনা</div>
+        <div class="bizCardSub">ORDERS · RIDER ASSIGN · TRACKING</div>
+      </div>
+      <div class="bizChevron">›</div>
+    </div>
     <div class="bizGlassCard bizNavCard" id="bizHoneyBeeCard">
       <div class="bizIconBadge" style="background:linear-gradient(135deg,#ffd166,#fca311);">🐝</div>
       <div class="bizCardBody">
@@ -2130,6 +2138,33 @@
       <div class="eiCard"><div class="ic">🔁</div><div class="lbl">আজ কতবার বিক্রি হয়েছে</div><div class="val" id="eiStatTodaySales">0</div></div>
     </div>
   </div>
+</div>
+
+<!-- ==================== 📦 অর্ডার ব্যবস্থাপনা — Bazar-এর কাস্টমার অর্ডার + রাইডার এসাইন ==================== -->
+<div id="program-orders" style="display:none; position:fixed; inset:0; z-index:500; background:#0f1a14; flex-direction:column; overflow:auto;">
+  <style>
+    #program-orders .ordTopBar{ padding:16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid rgba(255,255,255,0.08); }
+    #program-orders .ordTopBar h1{ margin:0; font-size:17px; color:#fff; }
+    #program-orders .ordTopBar .sub{ font-size:10.5px; color:#8ec9a8; margin-top:2px; }
+    #program-orders .ordSubtabs{ display:flex; gap:8px; padding:12px 16px; overflow-x:auto; }
+    #program-orders .ordSubtab{ padding:8px 14px; border-radius:14px; font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer; color:#d8f5ea; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); }
+    #program-orders .ordSubtab.active{ background:#22c55e; color:#08130d; border-color:#22c55e; }
+    #program-orders .ordList{ padding:0 16px 24px; }
+    #program-orders .ordCard{ background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:14px; margin-bottom:12px; color:#fff; }
+    #program-orders .ordEmpty{ text-align:center; color:#8ec9a8; font-size:12.5px; padding:30px 16px; }
+  </style>
+  <div class="ordTopBar">
+    <button class="backBtn" id="backFromOrders" style="background:rgba(255,255,255,0.1); border:none; width:36px; height:36px; border-radius:10px; color:#fff; font-size:17px; cursor:pointer;">←</button>
+    <div><h1>📦 অর্ডার ব্যবস্থাপনা</h1><div class="sub">CUSTOMER ORDERS · RIDER ASSIGN</div></div>
+  </div>
+  <div class="ordSubtabs">
+    <div class="ordSubtab active" data-ostatus="pending">🟡 নতুন</div>
+    <div class="ordSubtab" data-ostatus="preparing">📦 প্রস্তুত হচ্ছে</div>
+    <div class="ordSubtab" data-ostatus="shipped">🚚 পথে আছে</div>
+    <div class="ordSubtab" data-ostatus="delivered">✅ ডেলিভার্ড</div>
+    <div class="ordSubtab" data-ostatus="cancelled">❌ বাতিল</div>
+  </div>
+  <div class="ordList" id="ordList"><div class="ordEmpty">লোড হচ্ছে...</div></div>
 </div>
 
 <div id="program-ops" style="display:none; position:fixed; inset:0; z-index:500; flex-direction:column; overflow:auto;
@@ -4103,6 +4138,148 @@ document.getElementById('bizReportCard').addEventListener('click', ()=>{
   repRenderAll();
 });
 document.getElementById('backFromReport').addEventListener('click', ()=> switchProgram('program-report', 'program-bizmgmt'));
+
+/* ==================== 📦 অর্ডার ব্যবস্থাপনা — Bazar কাস্টমার অর্ডার + রাইডার এসাইন ====================
+   Firestore: orderRequests/{orderId} (Bazar-এর 'হোম'/'পছন্দের বাজার' থেকে
+   কাস্টমার-অর্ডার) — status: pending→preparing→shipped→delivered/cancelled।
+   রাইডার এসাইন করলে riders/{riderId}-এর আগে থেকেই থাকা liveLocation
+   (Rider Mode চালু থাকলে) Bazar-এর Live Map-এ দেখা যাবে — নতুন কোনো
+   লোকেশন-ট্র্যাকিং কোড লাগেনি, বিদ্যমান Rider Mode-ই পুনর্ব্যবহার হচ্ছে। */
+let __ordCurrentStatus = "pending";
+let __ordUnsub = null;
+let __ordShopMarketId = null;
+
+async function ordGetShopMarketId(){
+  if(__ordShopMarketId) return __ordShopMarketId;
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId) return null;
+  const doc = await db.collection('shops').doc(session.shopId).get();
+  __ordShopMarketId = doc.exists ? doc.data().marketId : null;
+  return __ordShopMarketId;
+}
+
+function ordListen(){
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId) return;
+  if(__ordUnsub) __ordUnsub();
+  document.getElementById('ordList').innerHTML = '<div class="ordEmpty">লোড হচ্ছে...</div>';
+  __ordUnsub = db.collection('orderRequests')
+    .where('shopId','==',session.shopId).where('status','==',__ordCurrentStatus)
+    .orderBy('createdAt','desc').limit(50)
+    .onSnapshot((qs)=>{
+      const orders = qs.docs.map(d=> ({ id:d.id, ...d.data() }));
+      ordRender(orders);
+    }, (err)=>{
+      console.warn('order list error:', err);
+      document.getElementById('ordList').innerHTML = '<div class="ordEmpty">লোড করা যায়নি।</div>';
+    });
+}
+
+async function ordRender(orders){
+  const listEl = document.getElementById('ordList');
+  if(orders.length === 0){
+    listEl.innerHTML = '<div class="ordEmpty">এই ধাপে কোনো অর্ডার নেই।</div>';
+    return;
+  }
+  listEl.innerHTML = orders.map(o=>{
+    const time = o.createdAt ? o.createdAt.toDate().toLocaleString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+    let actionHtml = '';
+    if(__ordCurrentStatus === 'pending'){
+      actionHtml = `
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <button class="ordAcceptBtn" data-oid="${o.id}" style="flex:1; padding:10px; border:none; border-radius:9px; background:#22c55e; color:#08130d; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ গ্রহণ করুন</button>
+          <button class="ordRejectBtn" data-oid="${o.id}" style="flex:1; padding:10px; border:none; border-radius:9px; background:rgba(220,38,38,0.2); color:#fca5a5; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">❌ বাতিল করুন</button>
+        </div>`;
+    }else if(__ordCurrentStatus === 'preparing'){
+      actionHtml = `
+        <div style="margin-top:10px;">
+          <select class="ordRiderSelect" data-oid="${o.id}" style="width:100%; padding:9px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#fff; font-family:inherit; font-size:12px; margin-bottom:8px;">
+            <option value="">রাইডার বেছে নিন...</option>
+          </select>
+          <button class="ordAssignBtn" data-oid="${o.id}" style="width:100%; padding:10px; border:none; border-radius:9px; background:#0ea5e9; color:#04222f; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">🚚 রাইডার এসাইন করে পাঠান</button>
+        </div>`;
+    }else if(__ordCurrentStatus === 'shipped'){
+      actionHtml = `
+        <div style="margin-top:10px; font-size:11.5px; color:#8ec9a8;">🚚 রাইডার: ${o.assignedRiderName ? escapeAttr(o.assignedRiderName) : '—'}</div>
+        <button class="ordDeliveredBtn" data-oid="${o.id}" style="width:100%; margin-top:8px; padding:10px; border:none; border-radius:9px; background:#22c55e; color:#08130d; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ডেলিভারি সম্পন্ন হয়েছে</button>`;
+    }
+    return `
+      <div class="ordCard">
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <div style="font-weight:800; font-size:13.5px;">${escapeAttr(o.productName||'প্রোডাক্ট')}</div>
+          <div style="font-size:11px; color:#8ec9a8;">${time}</div>
+        </div>
+        <div style="font-size:12px; color:#c9c3f0;">কাস্টমার: ${escapeAttr(o.customerName||'—')} · পরিমাণ: ${o.qty||1}</div>
+        ${actionHtml}
+      </div>`;
+  }).join('');
+
+  // Accept/Reject
+  listEl.querySelectorAll('.ordAcceptBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=> ordUpdateStatus(btn.dataset.oid, 'preparing'));
+  });
+  listEl.querySelectorAll('.ordRejectBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ if(confirm('এই অর্ডারটা বাতিল করবেন?')) ordUpdateStatus(btn.dataset.oid, 'cancelled'); });
+  });
+  // Rider dropdown populate (preparing ট্যাবে)
+  if(__ordCurrentStatus === 'preparing'){
+    const marketId = await ordGetShopMarketId();
+    let riders = [];
+    if(marketId){
+      try{
+        const rSnap = await db.collection('riders').where('marketId','==',marketId).where('online','==',true).get();
+        riders = rSnap.docs.map(d=> ({ id:d.id, ...d.data() }));
+      }catch(e){ console.warn('riders fetch failed:', e); }
+    }
+    listEl.querySelectorAll('.ordRiderSelect').forEach(sel=>{
+      sel.innerHTML = '<option value="">রাইডার বেছে নিন...</option>' +
+        (riders.length ? riders.map(r=> `<option value="${r.id}">${escapeAttr(r.name)} (${escapeAttr(r.phone||'')})</option>`).join('')
+                        : '<option value="" disabled>🔴 এই মুহূর্তে কোনো রাইডার অনলাইনে নেই</option>');
+    });
+    listEl.querySelectorAll('.ordAssignBtn').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const sel = listEl.querySelector(`.ordRiderSelect[data-oid="${btn.dataset.oid}"]`);
+        const riderId = sel.value;
+        if(!riderId){ alert('আগে একজন রাইডার বেছে নিন।'); return; }
+        const rider = riders.find(r=> r.id === riderId);
+        try{
+          await db.collection('orderRequests').doc(btn.dataset.oid).update({
+            status: 'shipped', assignedRiderId: riderId, assignedRiderName: rider ? rider.name : null,
+            riderAssignedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }catch(e){ alert('এসাইন করা যায়নি: ' + e.message); }
+      });
+    });
+  }
+  listEl.querySelectorAll('.ordDeliveredBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=> ordUpdateStatus(btn.dataset.oid, 'delivered'));
+  });
+}
+
+async function ordUpdateStatus(orderId, newStatus){
+  try{ await db.collection('orderRequests').doc(orderId).update({ status: newStatus }); }
+  catch(e){ alert('আপডেট করা যায়নি: ' + e.message); }
+}
+
+function escapeAttr(str){
+  const d = document.createElement('div');
+  d.textContent = str == null ? '' : String(str);
+  return d.innerHTML;
+}
+
+document.getElementById('bizOrdersCard').addEventListener('click', ()=>{
+  switchProgram('program-bizmgmt', 'program-orders');
+  ordListen();
+});
+document.getElementById('backFromOrders').addEventListener('click', ()=> switchProgram('program-orders', 'program-bizmgmt'));
+document.querySelectorAll('#program-orders .ordSubtab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('#program-orders .ordSubtab').forEach(t=> t.classList.remove('active'));
+    tab.classList.add('active');
+    __ordCurrentStatus = tab.dataset.ostatus;
+    ordListen();
+  });
+});
 
 document.getElementById('bizHoneyBeeCard').addEventListener('click', ()=>{
   switchProgram('program-bizmgmt', 'program-honeybee');
@@ -8937,7 +9114,7 @@ document.getElementById('esAddItemBtn').addEventListener('click', ()=>{
    5) হোম ট্যাবে থাকলে — এখানেই থেমে থাকবে, ব্যাক বাটনে অ্যাপ কখনো বন্ধ হবে না
       (বিক্রি করার মাঝখানে ভুলবশত ব্যাক চেপে অ্যাপ থেকে বের হয়ে গেলে ডেটা হারানোর
       ঝুঁকি থাকে — তাই ইচ্ছা করেই এখানে এক্সিট করার কোনো পথ রাখা হয়নি) */
-const __BIZ_SUB_PROGRAMS = ['program-bcc', 'program-monitor', 'program-extraincome', 'program-ops', 'program-report'];
+const __BIZ_SUB_PROGRAMS = ['program-bcc', 'program-monitor', 'program-extraincome', 'program-ops', 'program-report', 'program-orders'];
 let __backStateCounter = 0;
 
 // প্রতিবার আলাদা hash দিয়ে state পুশ করা হয় — একই URL বারবার পুশ করলে কিছু
