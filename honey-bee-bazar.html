@@ -197,8 +197,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active{ display:block; }
+  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active{ display:block; }
 
   /* 💬 Honey Messenger — সম্পূর্ণ ফুল-ভিউপোর্ট, Bazar-এর সীমাবদ্ধ width-এর
      বাইরে গিয়ে সম্পূর্ণ আলাদা একটা অ্যাপের মতো খোলে */
@@ -428,10 +428,9 @@
         <div class="ic">🩸</div>
         <div class="lbl">Blood Bank</div>
       </div>
-      <div class="serviceCard soon" data-svc="ambulance">
+      <div class="serviceCard" data-svc="ambulance">
         <div class="ic">🚑</div>
         <div class="lbl">অ্যাম্বুলেন্স</div>
-        <div class="soonBadge">শীঘ্রই আসছে</div>
       </div>
       <div class="serviceCard soon" data-svc="medicalequipment">
         <div class="ic">🩼</div>
@@ -576,6 +575,32 @@
 
     <!-- 📰 ফিড — রক্তের অনুরোধ ও উপলব্ধ দাতা দুটোই একসাথে, সময় অনুযায়ী সাজানো -->
     <div id="bloodFeedList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- 🚑 অ্যাম্বুলেন্স — GPS-ভিত্তিক তালিকা + Hold-to-Call -->
+  <div id="screenAmbulance">
+    <button class="backBtn" id="backToJibonToriFromAmbulance">← জীবন তরী-তে ফিরে যান</button>
+
+    <div class="card" style="text-align:center; padding:18px 16px;">
+      <div style="font-size:32px; margin-bottom:6px;">🚑</div>
+      <div style="font-size:16px; font-weight:800;">জরুরি অ্যাম্বুলেন্স</div>
+      <div id="ambGpsStatus" style="font-size:11.5px; color:var(--muted); margin-top:6px;">📍 এলাকা খোঁজা হচ্ছে...</div>
+    </div>
+
+    <div style="display:flex; gap:8px; margin:14px 0;">
+      <select id="ambDistrictFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+        <option value="">সব জেলা</option>
+      </select>
+      <select id="ambTypeFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+        <option value="">সব ধরন</option>
+        <option value="AC">AC</option>
+        <option value="Non-AC">Non-AC</option>
+        <option value="ICU">ICU</option>
+        <option value="Freezer">Freezer (মরদেহ বহনকারী)</option>
+      </select>
+    </div>
+
+    <div id="ambulanceList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
   </div>
 
   <!-- 💬 Honey Messenger — এখন খালি, ভবিষ্যতে এখানে কাজ শুরু হবে -->
@@ -850,7 +875,7 @@ let currentMarketId = null, currentShopId = null;
 let userLatLng = null;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 
   // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
@@ -877,6 +902,9 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
     }else if(svc === "bloodbank"){
       showScreen("screenBloodBank");
       initBloodBankScreen();
+    }else if(svc === "ambulance"){
+      showScreen("screenAmbulance");
+      initAmbulanceScreen();
     }else{
       alert("এই সার্ভিসটা শীঘ্রই আসছে — এখনো প্রস্তুত হয়নি।");
     }
@@ -885,6 +913,7 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
 document.getElementById("backToHomeFromMarkets") && document.getElementById("backToHomeFromMarkets").addEventListener("click", ()=> showScreen("screenHome"));
 document.getElementById("backToHomeFromJibonTori") && document.getElementById("backToHomeFromJibonTori").addEventListener("click", ()=> showScreen("screenHome"));
 document.getElementById("backToJibonToriFromBlood") && document.getElementById("backToJibonToriFromBlood").addEventListener("click", ()=> showScreen("screenJibonTori"));
+document.getElementById("backToJibonToriFromAmbulance") && document.getElementById("backToJibonToriFromAmbulance").addEventListener("click", ()=> showScreen("screenJibonTori"));
 
 /* ---------- নিচের ফুটার নেভিগেশন ---------- */
 $("footerNavHome").addEventListener("click", ()=>{
@@ -2111,6 +2140,157 @@ let tripCurrentId = null, tripUnsub = null, tripCountdownInterval = null;
    না, শুধু একটা সাধারণ হিসাব। */
 const BLOOD_ELIGIBILITY_DAYS = 90;
 let __bloodOwnProfile = null;
+
+/* ==================== 🚑 অ্যাম্বুলেন্স — GPS Discovery + Hold-to-Call ====================
+   Firestore: ambulances/{id} — {driverName, phone, ambulanceType(AC/Non-AC/ICU/Freezer),
+   standArea, district, upazila, available:true/false, ambulanceId}
+   Firestore: ambulance_call_logs/{id} — {customerGoogleId, ambulanceId, driverName,
+   driverPhone, ambulanceType, customerArea, callStartedAt, callStatus}
+
+   ⚠️ রেজিস্ট্রেশনের UI এখনো বানানো হয়নি (POS/Agent সাইড, পরে হবে) — তাই
+   টেস্ট করতে Firebase Console-এ ম্যানুয়ালি ambulances কালেকশনে
+   available:true সহ কিছু ডকুমেন্ট বসাতে হবে। */
+let __ambScreenInitialized = false;
+let __ambCustomerDistrict = null;
+let __ambListUnsub = null;
+let __ambLastCallTime = {}; // ambulanceId -> শেষ কল করার সময় (ডাবল-কল ঠেকাতে)
+
+async function initAmbulanceScreen(){
+  if(!__ambScreenInitialized){
+    $("ambDistrictFilter").innerHTML += getAllDistricts().map(d=>`<option value="${d}">${d}</option>`).join("");
+    $("ambDistrictFilter").addEventListener("change", ambListenList);
+    $("ambTypeFilter").addEventListener("change", ambListenList);
+    __ambScreenInitialized = true;
+    ambDetectLocation();
+  }
+  ambListenList();
+}
+
+async function ambDetectLocation(){
+  const statusEl = $("ambGpsStatus");
+  if(!navigator.geolocation){
+    statusEl.textContent = "📍 GPS সাপোর্ট নেই — নিচে জেলা বেছে নিন";
+    return;
+  }
+  try{
+    const pos = await new Promise((resolve, reject)=>{
+      navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy:true, timeout:10000 });
+    });
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { "Accept-Language": "bn" } });
+    const data = await res.json();
+    const addr = data && data.address ? data.address : {};
+    const candidates = [addr.state_district, addr.county, addr.city].filter(Boolean);
+    const allDistricts = getAllDistricts();
+    let matched = null;
+    for(const c of candidates){
+      matched = allDistricts.find(d=> c.includes(d) || d.includes(c));
+      if(matched) break;
+    }
+    if(matched){
+      __ambCustomerDistrict = matched;
+      $("ambDistrictFilter").value = matched;
+      statusEl.textContent = `📍 আপনার এলাকা: ${matched} — কাছের Available অ্যাম্বুলেন্স দেখানো হচ্ছে`;
+      ambListenList();
+    }else{
+      statusEl.textContent = "📍 আপনার এলাকা স্বয়ংক্রিয়ভাবে শনাক্ত করা যায়নি — নিচে জেলা বেছে নিন";
+    }
+  }catch(e){
+    statusEl.textContent = "📍 লোকেশন পাওয়া যায়নি (GPS পারমিশন লাগবে) — নিচে জেলা বেছে নিন";
+  }
+}
+
+function ambListenList(){
+  if(__ambListUnsub){ __ambListUnsub(); __ambListUnsub = null; }
+  const district = $("ambDistrictFilter").value;
+  let query = db.collection("ambulances").where("available","==",true);
+  if(district) query = query.where("district","==",district);
+
+  __ambListUnsub = query.onSnapshot((qs)=>{
+    let ambulances = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+    const typeFilter = $("ambTypeFilter").value;
+    if(typeFilter) ambulances = ambulances.filter(a=> a.ambulanceType === typeFilter);
+    ambRenderList(ambulances, !district && __ambCustomerDistrict);
+  }, (err)=>{
+    console.warn("ambulance list error:", err);
+    $("ambulanceList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">তালিকা লোড করা যায়নি।</div>';
+  });
+}
+
+function ambRenderList(ambulances, showFallbackNote){
+  const listEl = $("ambulanceList");
+  if(ambulances.length === 0){
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এই মুহূর্তে কোনো Available অ্যাম্বুলেন্স নেই।</div>';
+    return;
+  }
+  listEl.innerHTML = ambulances.map(a=> `
+    <div class="card" style="padding:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+        <div style="font-weight:800; font-size:14.5px;">🚑 ${escapeHtml(a.ambulanceType||"অ্যাম্বুলেন্স")}</div>
+        <span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 9px; border-radius:12px; font-size:10.5px; font-weight:800;">🟢 Available</span>
+      </div>
+      <div style="font-size:12.5px; color:#ddd; margin-bottom:3px;">📍 ${escapeHtml(a.standArea||"")}${a.standArea?", ":""}${escapeHtml(a.district||"")}</div>
+      <div style="font-size:11px; color:var(--muted); margin-bottom:12px;">🆔 ${escapeHtml(a.ambulanceId||a.id)}</div>
+      <button class="ambCallBtn" data-aid="${a.id}" style="width:100%; padding:13px; border:none; border-radius:12px; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; background:#dc2626; color:#fff;">📞 কল করুন (৩ সেকেন্ড চেপে ধরুন)</button>
+    </div>`).join("");
+
+  listEl.querySelectorAll(".ambCallBtn").forEach(btn=>{
+    attachHoldToConfirm(btn, ()=> ambInitiateCall(btn.dataset.aid));
+  });
+}
+
+async function ambInitiateCall(ambulanceId){
+  // ১. ডাবল-কল প্রোটেকশন — ৮ সেকেন্ডের মধ্যে একই অ্যাম্বুলেন্সে আবার কল
+  // করার চেষ্টা করলে সেটাকে ব্লক করা হয়
+  const lastCall = __ambLastCallTime[ambulanceId];
+  if(lastCall && (Date.now() - lastCall) < 8000){
+    return; // চুপচাপ উপেক্ষা — একই কল দুইবার লগ হবে না
+  }
+  __ambLastCallTime[ambulanceId] = Date.now();
+
+  // ২. Availability রি-চেক — ৩ সেকেন্ড Hold করার সময়ও যদি অ্যাম্বুলেন্সটা
+  // POS/Agent থেকে অফ-ডিউটি হয়ে যায়, কল করার আগে আরেকবার যাচাই করা হয়
+  let ambDoc;
+  try{ ambDoc = await db.collection("ambulances").doc(ambulanceId).get(); }
+  catch(e){ alert("যাচাই করা যায়নি — আবার চেষ্টা করুন।"); return; }
+
+  if(!ambDoc.exists || !ambDoc.data().available){
+    alert("⚠️ দুঃখিত, এই মুহূর্তে এই অ্যাম্বুলেন্সটি Available নেই।");
+    return;
+  }
+  const amb = ambDoc.data();
+
+  if(!currentCustomer){
+    alert("কল করার আগে Google দিয়ে লগইন করুন।");
+    return;
+  }
+
+  // ৩. Firebase-এ Call Log তৈরি — CALL_INITIATED
+  let logRef;
+  try{
+    logRef = await db.collection("ambulance_call_logs").add({
+      customerGoogleId: currentCustomer.uid,
+      ambulanceId,
+      driverName: amb.driverName || null,
+      driverPhone: amb.phone || null,
+      ambulanceType: amb.ambulanceType || null,
+      customerArea: $("ambDistrictFilter").value || __ambCustomerDistrict || null,
+      callStartedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      callStatus: "CALL_INITIATED"
+    });
+  }catch(e){ console.warn("call log create failed:", e); }
+
+  // ৪. নেটিভ ডায়ালার খোলা — ফোন নম্বর সরাসরি স্ক্রিনে দেখানো হয় না,
+  // শুধু tel: লিংক ব্যবহার করা হয় (Driver Privacy)
+  if(amb.phone){
+    window.location.href = "tel:" + amb.phone;
+    if(logRef){
+      logRef.update({ callStatus: "DIALER_OPENED" }).catch(()=>{});
+    }
+  }else{
+    alert("এই অ্যাম্বুলেন্সের কোনো নম্বর পাওয়া যায়নি।");
+  }
+}
 
 function bloodPopulateDistrictSelect(selectEl, upazilaSelEl, onchange){
   selectEl.innerHTML = '<option value="">জেলা বেছে নিন</option>' + getAllDistricts().map(d=>`<option value="${d}">${d}</option>`).join("");
