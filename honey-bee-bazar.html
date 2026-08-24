@@ -868,7 +868,7 @@
 <!-- 🛒 Cart স্ক্রিন -->
 <div id="screenCart">
   <!-- 📊 স্ট্যাটাস আইকন রো — ট্যাপ করলে নিচের তালিকা সেই স্ট্যাটাস দিয়ে ফিল্টার হয় -->
-  <div class="card" style="padding:14px 4px;">
+  <div class="card" style="padding:14px 4px; margin-top:8px;">
     <div style="display:flex; justify-content:space-around; text-align:center;">
       <div class="orderStatusIcon" data-status="pending" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
         <div style="font-size:20px;">🕐</div>
@@ -892,8 +892,6 @@
       </div>
     </div>
   </div>
-
-  <button class="backBtn" id="backFromCart" style="margin-top:14px;">← হোমে ফিরে যান</button>
 
   <!-- 📦 আমার অর্ডারসমূহ -->
   <div style="display:flex; align-items:center; margin:16px 4px 8px;">
@@ -1042,14 +1040,14 @@ function showScreen(id){
   ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders","screenCart"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 
-  // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
-  // খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন লুকিয়ে যায়, যাতে
-  // পুরোপুরি আলাদা একটা অ্যাপের মতো লাগে
-  const isMessenger = id === "screenHoneyMessenger";
+  // 💬🛒 Honey Messenger ও Cart — দুটোই সম্পূর্ণ আলাদা, ফুল-স্ক্রিন
+  // অভিজ্ঞতা হিসেবে খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন
+  // লুকিয়ে যায়, মোবাইলের ব্যাক বাটনই বন্ধ করার একমাত্র উপায়
+  const isFullScreen = id === "screenHoneyMessenger" || id === "screenCart";
   const headerEl = document.querySelector("header");
-  if(headerEl) headerEl.style.display = isMessenger ? "none" : "";
+  if(headerEl) headerEl.style.display = isFullScreen ? "none" : "";
   const footerEl = document.querySelector(".footerNav");
-  if(footerEl) footerEl.style.display = isMessenger ? "none" : "";
+  if(footerEl) footerEl.style.display = isFullScreen ? "none" : "";
 
   // 🔙 মোবাইলের ব্যাক বাটন — Home ছাড়া অন্য কোনো স্ক্রিনে গেলে একটা
   // হিস্ট্রি-এন্ট্রি যোগ হয়, যাতে ফোনের ব্যাক বাটন চাপলে সরাসরি অ্যাপ
@@ -1085,7 +1083,11 @@ window.addEventListener("popstate", ()=>{
   }
   const backBtn = activeScreen.querySelector(".backBtn");
   if(backBtn) backBtn.click();
-  else showScreen("screenHome");
+  else{
+    showScreen("screenHome");
+    document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+    $("footerNavHome").classList.add("active");
+  }
 });
 
 /* ==================== 🏠 হোমস্ক্রিন — সার্ভিস কার্ড ==================== */
@@ -1133,11 +1135,6 @@ $("footerNavCart").addEventListener("click", ()=>{
   cartRenderScreen();
   if(currentCustomer) myOrdersListen();
   else $("myOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার দেখতে ☰ Menu থেকে লগইন করুন।</div>';
-});
-$("backFromCart").addEventListener("click", ()=>{
-  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
-  $("footerNavHome").classList.add("active");
-  showScreen("screenHome");
 });
 $("footerNavSms").addEventListener("click", ()=>{
   document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
