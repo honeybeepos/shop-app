@@ -867,8 +867,14 @@
 
 <!-- 🛒 Cart স্ক্রিন -->
 <div id="screenCart">
+  <!-- 🚚 Order Tracking — সবার ওপরে, সাম্প্রতিক অর্ডারের মিনি-ট্র্যাকার -->
+  <div style="display:flex; align-items:center; margin:10px 4px 10px;">
+    <div style="font-size:16px; font-weight:800;">🚚 Order Tracking</div>
+  </div>
+  <div id="latestOrderTrackCard" style="display:none; margin-bottom:16px;"></div>
+
   <!-- 📊 স্ট্যাটাস আইকন রো — ট্যাপ করলে নিচের তালিকা সেই স্ট্যাটাস দিয়ে ফিল্টার হয় -->
-  <div class="card" style="padding:14px 4px; margin-top:8px;">
+  <div class="card" style="padding:14px 4px;">
     <div style="display:flex; justify-content:space-around; text-align:center;">
       <div class="orderStatusIcon" data-status="pending" style="cursor:pointer; padding:4px 6px; border-radius:10px;">
         <div style="font-size:20px;">🕐</div>
@@ -1134,7 +1140,10 @@ $("footerNavCart").addEventListener("click", ()=>{
   showScreen("screenCart");
   cartRenderScreen();
   if(currentCustomer) myOrdersListen();
-  else $("myOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার দেখতে ☰ Menu থেকে লগইন করুন।</div>';
+  else{
+    $("myOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার দেখতে ☰ Menu থেকে লগইন করুন।</div>';
+    $("latestOrderTrackCard").style.display = "none";
+  }
 });
 $("footerNavSms").addEventListener("click", ()=>{
   document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
@@ -2668,10 +2677,41 @@ function myOrdersListen(){
     .onSnapshot((qs)=>{
       __myOrdersData = qs.docs.map(d=> ({ id:d.id, ...d.data() }));
       myOrdersRender();
+      renderLatestOrderTrackCard();
     }, (err)=>{
       console.warn("my orders listener error:", err);
       $("myOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার লোড করা যায়নি।</div>';
     });
+}
+
+// 🚚 Cart স্ক্রিনের একদম ওপরে — সবচেয়ে সাম্প্রতিক (বাতিল-না-হওয়া) অর্ডারের
+// একটা ছোট, দ্রুত-দেখার মিনি-ট্র্যাকার — ট্যাপ করলে পুরো বিস্তারিত ট্র্যাকার খোলে
+function renderLatestOrderTrackCard(){
+  const cardEl = $("latestOrderTrackCard");
+  const latest = __myOrdersData.find(o=> (o.status||"pending") !== "cancelled");
+  if(!latest){
+    cardEl.style.display = "none";
+    return;
+  }
+  const status = latest.status || "pending";
+  const stepIndex = Math.max(0, ORDER_STATUS_STEPS.findIndex(s=> s.key === status));
+  const dots = ORDER_STATUS_STEPS.map((s, idx)=>{
+    const state = idx < stepIndex ? "done" : (idx === stepIndex ? "active" : "pending");
+    return `<div class="trackerDot ${state}" style="width:16px; height:16px; font-size:8px;">${state==="done"?"✓":""}</div>
+      ${idx < ORDER_STATUS_STEPS.length-1 ? `<div style="flex:1; height:2px; background:${idx<stepIndex?"#16a34a":"rgba(255,255,255,0.1)"};"></div>` : ""}`;
+  }).join("");
+
+  cardEl.innerHTML = `
+    <div class="card" style="padding:14px; cursor:pointer;" id="latestOrderTrackClickable">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-weight:800; font-size:13.5px;">📦 ${escapeHtml(latest.productName||"অর্ডার")}</div>
+        <span style="font-size:11px; font-weight:800; color:var(--amber);">${ORDER_STATUS_STEPS[stepIndex] ? ORDER_STATUS_STEPS[stepIndex].label : ""}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:2px;">${dots}</div>
+      <div style="text-align:center; margin-top:8px; font-size:11px; color:var(--muted);">বিস্তারিত দেখতে ট্যাপ করুন ›</div>
+    </div>`;
+  cardEl.style.display = "block";
+  $("latestOrderTrackClickable").addEventListener("click", ()=> openOrderTracker(latest));
 }
 
 function myOrdersRender(){
