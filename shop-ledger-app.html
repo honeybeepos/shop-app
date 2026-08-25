@@ -2047,12 +2047,13 @@
       </div>
       <div class="bizChevron">›</div>
     </div>
-    <div class="bizGlassCard bizNavCard" id="bizOrdersCard">
+    <div class="bizGlassCard bizNavCard" id="bizOrdersCard" style="position:relative;">
       <div class="bizIconBadge" style="background:linear-gradient(135deg,#22c55e,#0ea5e9);">📦</div>
       <div class="bizCardBody">
         <div class="bizCardTitle">অর্ডার ব্যবস্থাপনা</div>
         <div class="bizCardSub">ORDERS · RIDER ASSIGN · TRACKING</div>
       </div>
+      <span id="ordNewBadge" style="display:none; position:absolute; top:10px; right:36px; background:#e0433c; color:#fff; font-size:11px; font-weight:800; min-width:20px; height:20px; border-radius:10px; line-height:20px; text-align:center; padding:0 5px;">0</span>
       <div class="bizChevron">›</div>
     </div>
     <div class="bizGlassCard bizNavCard" id="bizHoneyBeeCard">
@@ -4156,6 +4157,42 @@ async function ordGetShopMarketId(){
   const doc = await db.collection('shops').doc(session.shopId).get();
   __ordShopMarketId = doc.exists ? doc.data().marketId : null;
   return __ordShopMarketId;
+}
+
+/* ==================== 🔔 নতুন Bazar অর্ডার এলেই সাথে সাথে অ্যালার্ট ====================
+   POS চালু থাকা অবস্থায় ব্যাকগ্রাউন্ডে সবসময় চলে (Business Management-এ
+   না ঢুকলেও) — নতুন pending অর্ডার এলেই 🐝 Bee Alert শব্দ+ভাইব্রেশন বাজে
+   (বিদ্যমান playBeeAlert() পুনর্ব্যবহার করা হচ্ছে) এবং "📦 অর্ডার
+   ব্যবস্থাপনা" কার্ডে লাল ব্যাজ দেখায়। */
+let __ordNotifUnsub = null;
+let __ordNotifFirstLoad = true;
+
+function ordStartNotificationListener(){
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId || __ordNotifUnsub) return;
+  __ordNotifFirstLoad = true;
+  __ordNotifUnsub = db.collection('orderRequests')
+    .where('shopId','==',session.shopId).where('status','==','pending')
+    .onSnapshot((qs)=>{
+      const badge = document.getElementById('ordNewBadge');
+      if(badge){
+        const n = qs.size;
+        if(n > 0){ badge.textContent = n > 99 ? '99+' : n; badge.style.display = 'flex'; badge.style.alignItems='center'; badge.style.justifyContent='center'; }
+        else{ badge.style.display = 'none'; }
+      }
+      // 🐝 প্রথমবার লোড হওয়ার সময় (পেজ খোলার মুহূর্তে) অ্যালার্ট বাজে না —
+      // শুধু এরপর নতুন অর্ডার সত্যিই যোগ হলেই বাজবে, নাহলে POS খোলা
+      // মাত্রই আগের সব পেন্ডিং অর্ডারের জন্য একসাথে শব্দ বেজে উঠত
+      if(!__ordNotifFirstLoad){
+        qs.docChanges().forEach(change=>{
+          if(change.type === 'added'){
+            if(typeof playBeeAlert === 'function') playBeeAlert();
+            if(typeof toast === 'function') toast('📦 নতুন অর্ডার এসেছে — অর্ডার ব্যবস্থাপনায় দেখুন');
+          }
+        });
+      }
+      __ordNotifFirstLoad = false;
+    }, (err)=> console.warn('order notification listener error:', err));
 }
 
 function ordListen(){
@@ -13698,6 +13735,7 @@ auth.onAuthStateChanged(async (user)=>{
   });
   applyRoleRestrictions(session.role);
   initBackButtonHandling();
+  if(typeof ordStartNotificationListener === 'function') ordStartNotificationListener();
 
   document.getElementById("authGate").style.display = "none";
   loadSystemData();
