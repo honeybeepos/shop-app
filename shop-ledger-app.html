@@ -4245,7 +4245,8 @@ async function ordRender(orders){
         try{
           await db.collection('orderRequests').doc(btn.dataset.oid).update({
             status: 'shipped', assignedRiderId: riderId, assignedRiderName: rider ? rider.name : null,
-            riderAssignedAt: firebase.firestore.FieldValue.serverTimestamp()
+            riderAssignedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            shippedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
         }catch(e){ alert('এসাইন করা যায়নি: ' + e.message); }
       });
@@ -4257,7 +4258,13 @@ async function ordRender(orders){
 }
 
 async function ordUpdateStatus(orderId, newStatus){
-  try{ await db.collection('orderRequests').doc(orderId).update({ status: newStatus }); }
+  // 🕐 প্রতিটা ধাপের আসল সময় আলাদাভাবে সেভ করা হয় — Bazar-এর Order
+  // Tracking-এ প্রতিটা ধাপের নিচে সত্যিকারের সময় দেখানোর জন্য (কাল্পনিক
+  // সময় দেখানো হয় না)
+  const timeFieldMap = { preparing: 'preparingAt', shipped: 'shippedAt', delivered: 'deliveredAt', cancelled: 'cancelledAt' };
+  const update = { status: newStatus };
+  if(timeFieldMap[newStatus]) update[timeFieldMap[newStatus]] = firebase.firestore.FieldValue.serverTimestamp();
+  try{ await db.collection('orderRequests').doc(orderId).update(update); }
   catch(e){ alert('আপডেট করা যায়নি: ' + e.message); }
 }
 

@@ -127,7 +127,7 @@
   .pDetailImgWrap{ width:100%; aspect-ratio:1/1; border-radius:18px; overflow:hidden; background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center; font-size:72px; margin-bottom:14px; }
   .pDetailImgWrap img{ width:100%; height:100%; object-fit:cover; }
 
-  /* 🚚 অর্ডার ট্র্যাকার — এনিমেটেড স্টেপ */
+  /* 🚚 অর্ডার ট্র্যাকার — এনিমেটেড স্টেপ (পুরনো ভার্টিক্যাল, অন্য কোথাও ব্যবহার হলে রেখে দেওয়া) */
   .trackerStep{ display:flex; gap:14px; }
   .trackerStepLine{ display:flex; flex-direction:column; align-items:center; }
   .trackerDot{ width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
@@ -137,6 +137,19 @@
   @keyframes trackerPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(212,160,23,0.5); } 50%{ box-shadow:0 0 0 8px rgba(212,160,23,0); } }
   .trackerConnector{ width:2px; flex:1; min-height:26px; background:rgba(255,255,255,0.1); }
   .trackerConnector.done{ background:#16a34a; }
+
+  /* 🚚 প্রফেশনাল হরাইজন্টাল স্টেপার — গোলাকার আইকন + গ্রেডিয়েন্ট লাইন + প্রকৃত সময় */
+  .hStepperRow{ display:flex; align-items:flex-start; }
+  .hStepperItem{ flex:1; display:flex; flex-direction:column; align-items:center; text-align:center; min-width:0; }
+  .hStepperDot{ width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; box-shadow:0 3px 10px rgba(0,0,0,0.3); }
+  .hStepperDot.pending{ background:rgba(255,255,255,0.07); color:var(--muted); }
+  .hStepperDot.active{ animation: trackerPulse 1.4s ease-in-out infinite; }
+  .hStepperLine{ flex:1; height:3px; margin-top:19px; border-radius:2px; background:rgba(255,255,255,0.08); }
+  .hStepperLine.done{ background:linear-gradient(90deg, var(--lineFrom,#a78bfa), var(--lineTo,#818cf8)); }
+  .hStepperLabel{ font-size:10px; font-weight:800; color:#fff8e8; margin-top:6px; line-height:1.2; }
+  .hStepperLabel.pending{ color:var(--muted); font-weight:600; }
+  .hStepperTime{ font-size:9px; color:var(--muted); margin-top:2px; }
+  .hStepperLiveBadge{ font-size:8.5px; font-weight:800; color:#4ade80; background:rgba(74,222,128,0.15); padding:1px 7px; border-radius:8px; margin-top:3px; }
 
   /* ---------- 🚕 Passenger Waiting চিপ ---------- */
   .tpChip{
@@ -2802,11 +2815,10 @@ const HB_STATUS_LABEL = {
   delivered: "✅ ডেলিভার্ড", cancelled: "❌ বাতিল"
 };
 const HB_STATUS_STEPS = [
-  { key:"pending", icon:"🛒", label:"অর্ডার দেওয়া হয়েছে" },
-  { key:"accepted", icon:"🏪", label:"দোকানদার গ্রহণ করেছেন" },
-  { key:"preparing", icon:"📦", label:"প্রস্তুত হচ্ছে" },
-  { key:"shipped", icon:"🚚", label:"পথে আছে" },
-  { key:"delivered", icon:"🎉", label:"ডেলিভার্ড হয়েছে" }
+  { key:"pending", icon:"🛒", label:"অর্ডার দেওয়া হয়েছে", timeField:"createdAt", color:"#a78bfa" },
+  { key:"preparing", icon:"📦", label:"প্রস্তুত হচ্ছে", timeField:"preparingAt", color:"#818cf8" },
+  { key:"shipped", icon:"🚚", label:"পথে আছে", timeField:"shippedAt", color:"#38bdf8" },
+  { key:"delivered", icon:"🎉", label:"ডেলিভার্ড হয়েছে", timeField:"deliveredAt", color:"#34d399" }
 ];
 
 let __hbOrdersUnsub = null;
@@ -2938,22 +2950,25 @@ function hbOpenTracker(order){
   }else{
     const stepIndex0 = HB_STATUS_STEPS.findIndex(s=> s.key === status);
     const currentIdx = stepIndex0 >= 0 ? stepIndex0 : 0;
-    $("hbTrackerSteps").innerHTML = HB_STATUS_STEPS.map((s, idx)=>{
+    $("hbTrackerSteps").innerHTML = `<div class="hStepperRow">` + HB_STATUS_STEPS.map((s, idx)=>{
       const state = idx < currentIdx ? "done" : (idx === currentIdx ? "active" : "pending");
       const isLast = idx === HB_STATUS_STEPS.length - 1;
+      // 🕐 প্রতিটা ধাপের নিচে প্রকৃত সময় — POS থেকে সেভ হওয়া আসল টাইমস্ট্যাম্প, কাল্পনিক না
+      const stepTime = order[s.timeField] ? order[s.timeField].toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'}) : null;
+      const dotBg = state === "pending" ? "" : `background:${s.color};`;
+      // ➡️ শুধু ডানপাশের কানেক্টর-লাইন আঁকা হয় (বামপাশেরটা আগের আইটেমের ডানপাশেরই অংশ, দ্বিগুণ লাইন এড়াতে)
+      const rightLineDone = idx < currentIdx;
+      const rightLineBg = rightLineDone ? `background:linear-gradient(90deg, ${s.color}, ${HB_STATUS_STEPS[idx+1] ? HB_STATUS_STEPS[idx+1].color : s.color});` : "";
       return `
-        <div class="trackerStep">
-          <div class="trackerStepLine">
-            <div class="trackerDot ${state}">${state === "done" ? "✓" : s.icon}</div>
-            ${!isLast ? `<div class="trackerConnector ${idx < currentIdx ? "done" : ""}"></div>` : ""}
+        <div class="hStepperItem">
+          <div style="display:flex; align-items:center; width:100%;">
+            <div class="hStepperDot ${state}" style="${dotBg}">${state === "done" ? "✓" : s.icon}</div>
+            ${!isLast ? `<div class="hStepperLine ${rightLineDone ? "done" : ""}" style="${rightLineBg}"></div>` : ""}
           </div>
-          <div style="padding-bottom:${isLast?"0":"22"}px;">
-            <div style="font-weight:${state==="pending"?"500":"800"}; font-size:13px; color:${state==="pending"?"var(--muted)":"#fff8e8"};">${s.label}</div>
-            ${state === "active" ? '<div style="font-size:10.5px; color:var(--amber); margin-top:2px;">এই ধাপে আছে</div>' : ""}
-            ${idx === 0 && time ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${time}</div>` : ""}
-          </div>
+          <div class="hStepperLabel ${state}">${s.label}</div>
+          ${stepTime ? `<div class="hStepperTime">${stepTime}</div>` : (state==="active" ? `<div class="hStepperLiveBadge">Live</div>` : `<div class="hStepperTime">--:--</div>`)}
         </div>`;
-    }).join("");
+    }).join("") + `</div>`;
   }
   $("hbTrackerModal").style.display = "flex";
 }
