@@ -612,6 +612,9 @@
   <div class="left">
     <button id="subUserBtn" style="display:none;">+ সাব-ইউজার</button>
     <button id="shopSettingsBtn" title="সেটিং" style="padding:6px 10px; font-size:15px;">⚙️</button>
+    <button id="ordBellBtn" title="Bazar অর্ডার" style="position:relative; padding:6px 10px; font-size:15px;">
+      🔔<span id="ordBellBadge" style="display:none; position:absolute; top:-4px; right:-2px; background:#e0433c; color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:9px; line-height:16px; text-align:center; padding:0 3px; font-family:inherit;">0</span>
+    </button>
     <button id="hbBellBtn" title="অনলাইন অর্ডার" style="position:relative; padding:6px 10px; font-size:15px;">
       🔔<span id="hbBellBadge" style="display:none; position:absolute; top:-4px; right:-2px; background:#e0433c; color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:9px; line-height:16px; text-align:center; padding:0 3px; font-family:inherit;">0</span>
     </button>
@@ -619,6 +622,16 @@
   </div>
 </div>
 <div id="announceBar"></div>
+
+<!-- 🔔 Bazar অর্ডার নোটিফিকেশন প্যানেল — বেলে ক্লিক করলে খোলে, সরাসরি Accept করা যায় -->
+<div class="modal-overlay" id="ordBellModalOverlay">
+  <div class="modal-box" style="max-width:400px; text-align:left; max-height:85vh; overflow-y:auto; background:#0f1a14; color:#fff; border:1px solid rgba(34,197,94,0.3);">
+    <h3 style="margin:0 0 4px; color:#4ade80;">📦 নতুন Bazar অর্ডার</h3>
+    <p class="pin-desc" style="margin:0 0 14px; color:rgba(255,255,255,0.55);">গ্রহণ করলেই অর্ডার "প্রস্তুত হচ্ছে" ধাপে চলে যাবে।</p>
+    <div id="ordBellListArea"></div>
+    <button id="ordBellModalCloseBtn" style="width:100%; margin-top:14px; padding:11px; border-radius:10px; border:1px solid rgba(255,255,255,0.15); background:transparent; color:#fff; font-weight:700; cursor:pointer;">বন্ধ করুন</button>
+  </div>
+</div>
 
 <style>
   @keyframes hbBellShake{
@@ -629,6 +642,7 @@
   }
   #hbBellBtn.hbRinging{ animation:hbBellShake 1.1s ease-in-out infinite; animation-delay:0s; }
   #hbBellBtn.hbRinging{ animation-iteration-count: infinite; }
+  #ordBellBtn.hbRinging{ animation:hbBellShake 1.1s ease-in-out infinite; animation-delay:0s; }
 </style>
 
 <div class="modal-overlay" id="hbOrdersModalOverlay">
@@ -4167,6 +4181,8 @@ async function ordGetShopMarketId(){
 let __ordNotifUnsub = null;
 let __ordNotifFirstLoad = true;
 
+let __ordPendingOrders = []; // 🔔 বেল-এ ক্লিক করলে সরাসরি দেখানোর জন্য সবশেষ পেন্ডিং তালিকা মনে রাখা হয়
+
 function ordStartNotificationListener(){
   const session = (typeof getSession === 'function') ? getSession() : null;
   if(!session || !session.shopId || __ordNotifUnsub) return;
@@ -4174,20 +4190,31 @@ function ordStartNotificationListener(){
   __ordNotifUnsub = db.collection('orderRequests')
     .where('shopId','==',session.shopId).where('status','==','pending')
     .onSnapshot((qs)=>{
-      const badge = document.getElementById('ordNewBadge');
-      if(badge){
-        const n = qs.size;
+      __ordPendingOrders = qs.docs.map(d=> ({ id:d.id, ...d.data() }))
+        .sort((a,b)=> (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
+
+      // 🔔 হেডারের বেল + Business Management কার্ড — দুই জায়গাতেই একই কাউন্ট আপডেট হয়
+      const n = __ordPendingOrders.length;
+      [document.getElementById('ordBellBadge'), document.getElementById('ordNewBadge')].forEach(badge=>{
+        if(!badge) return;
         if(n > 0){ badge.textContent = n > 99 ? '99+' : n; badge.style.display = 'flex'; badge.style.alignItems='center'; badge.style.justifyContent='center'; }
         else{ badge.style.display = 'none'; }
-      }
-      // 🐝 প্রথমবার লোড হওয়ার সময় (পেজ খোলার মুহূর্তে) অ্যালার্ট বাজে না —
+      });
+      const bellBtn = document.getElementById('ordBellBtn');
+      if(bellBtn) bellBtn.classList.toggle('hbRinging', n > 0);
+
+      // অর্ডার ব্যবস্থাপনা প্যানেল "নতুন" ট্যাবে খোলা থাকলে সেটাও লাইভ রিফ্রেশ হয়
+      const ordersOpen = document.getElementById('program-orders') && document.getElementById('program-orders').style.display !== 'none';
+      if(ordersOpen && __ordCurrentStatus === 'pending') ordRender(__ordPendingOrders);
+
+      // 🐝 প্রথমবার লোড হওয়ার সময় (পেজ খোলার মুহূর্তে) অ্যালার্ম বাজে না —
       // শুধু এরপর নতুন অর্ডার সত্যিই যোগ হলেই বাজবে, নাহলে POS খোলা
       // মাত্রই আগের সব পেন্ডিং অর্ডারের জন্য একসাথে শব্দ বেজে উঠত
       if(!__ordNotifFirstLoad){
         qs.docChanges().forEach(change=>{
           if(change.type === 'added'){
             if(typeof playBeeAlert === 'function') playBeeAlert();
-            if(typeof toast === 'function') toast('📦 নতুন অর্ডার এসেছে — অর্ডার ব্যবস্থাপনায় দেখুন');
+            if(typeof toast === 'function') toast('📦 নতুন অর্ডার এসেছে — 🔔 বেলে চেপে দেখুন');
           }
         });
       }
@@ -4195,20 +4222,57 @@ function ordStartNotificationListener(){
     }, (err)=> console.warn('order notification listener error:', err));
 }
 
+function ordRenderBellList(){
+  const area = document.getElementById('ordBellListArea');
+  if(!__ordPendingOrders.length){
+    area.innerHTML = '<div class="hbEmpty">এখন কোনো নতুন অর্ডার নেই</div>';
+    return;
+  }
+  area.innerHTML = __ordPendingOrders.map(o=>{
+    const time = o.createdAt ? o.createdAt.toDate().toLocaleTimeString('bn-BD',{hour:'2-digit',minute:'2-digit'}) : '';
+    return `
+      <div class="hbOrderRow" style="flex-direction:column; align-items:stretch; gap:8px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
+        <div>
+          <div style="font-weight:800; font-size:13.5px;">${escapeAttr(o.productName||'প্রোডাক্ট')}</div>
+          <div style="font-size:11.5px; color:rgba(255,255,255,0.55);">কাস্টমার: ${escapeAttr(o.customerName||'—')} · পরিমাণ: ${o.qty||1} · ${time}</div>
+        </div>
+        <button class="ordBellAcceptBtn" data-oid="${o.id}" style="width:100%; padding:10px; border:none; border-radius:9px; background:#22c55e; color:#08130d; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ গ্রহণ করুন</button>
+      </div>`;
+  }).join('');
+  area.querySelectorAll('.ordBellAcceptBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=> ordUpdateStatus(btn.dataset.oid, 'preparing'));
+  });
+}
+
+document.getElementById('ordBellBtn').addEventListener('click', ()=>{
+  ordRenderBellList();
+  document.getElementById('ordBellModalOverlay').classList.add('show');
+});
+document.getElementById('ordBellModalCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('ordBellModalOverlay').classList.remove('show');
+});
+document.getElementById('ordBellModalOverlay').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'ordBellModalOverlay') document.getElementById('ordBellModalOverlay').classList.remove('show');
+});
+
 function ordListen(){
   const session = (typeof getSession === 'function') ? getSession() : null;
   if(!session || !session.shopId) return;
   if(__ordUnsub) __ordUnsub();
   document.getElementById('ordList').innerHTML = '<div class="ordEmpty">লোড হচ্ছে...</div>';
+  // ⚠️ শুধু shopId+status দিয়ে ফিল্টার করা হয় (orderBy বাদ) — দুটো
+  // equality-where-এর সাথে orderBy একসাথে দিলে Firestore-এ আলাদা
+  // composite index তৈরি করতে হয়, যেটা এখনো নেই। তাই ক্রম সাজানো
+  // হয় ক্লায়েন্ট-সাইডে (নিচে .sort())।
   __ordUnsub = db.collection('orderRequests')
     .where('shopId','==',session.shopId).where('status','==',__ordCurrentStatus)
-    .orderBy('createdAt','desc').limit(50)
     .onSnapshot((qs)=>{
-      const orders = qs.docs.map(d=> ({ id:d.id, ...d.data() }));
+      const orders = qs.docs.map(d=> ({ id:d.id, ...d.data() }))
+        .sort((a,b)=> (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
       ordRender(orders);
     }, (err)=>{
       console.warn('order list error:', err);
-      document.getElementById('ordList').innerHTML = '<div class="ordEmpty">লোড করা যায়নি।</div>';
+      document.getElementById('ordList').innerHTML = '<div class="ordEmpty">লোড করা যায়নি। এরর: ' + escapeAttr(err.message||'') + '</div>';
     });
 }
 
