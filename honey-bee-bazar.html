@@ -2349,12 +2349,13 @@ let shopsUnsub = null;
 function loadShops(marketId){
   $("shopsList").innerHTML = '<div class="loadingMsg">দোকানের তালিকা লোড হচ্ছে...</div>';
   if(shopsUnsub) shopsUnsub();
-  // রিয়েল-টাইম লিসেনার — দোকান নতুন অনুমোদন/আপডেট হলে সাথে সাথেই এখানে দেখাবে
-  // শুধু এজেন্ট কর্তৃক ভেরিফাইড (🛡️) দোকানই কাস্টমারদের দেখানো হয়
+  // ⚠️ ট্রায়াল পিরিয়ডের জন্য এজেন্ট-ভেরিফিকেশনের বাধ্যবাধকতা সাময়িকভাবে
+  // বন্ধ রাখা হয়েছে (.where("isVerified","==",true) সরানো হয়েছে) — এখন
+  // ভেরিফাই না-হওয়া দোকানও কাস্টমারদের দেখানো হবে। ট্রায়াল শেষ হলে এই
+  // লাইনটা আবার যোগ করে দিলেই আগের নিয়ম ফিরে আসবে।
   shopsUnsub = db.collection("shops")
     .where("marketId", "==", marketId)
     .where("status", "==", "active")
-    .where("isVerified", "==", true)
     .onSnapshot((qs)=>{
       allShops = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
       renderShops(getFilteredShops());
