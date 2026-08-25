@@ -928,6 +928,10 @@
   <div id="hbCartItemsList"></div>
   <div id="hbCartSummary" style="display:none;">
     <div class="card" style="padding:16px;">
+      <label style="display:block; font-size:11.5px; color:var(--muted); margin-bottom:6px; font-weight:700;">📍 ডেলিভারি ঠিকানা *</label>
+      <textarea id="hbCartAddressInput" placeholder="বিস্তারিত ঠিকানা লিখুন (গ্রাম/এলাকা, ওয়ার্ড, উপজেলা)..." rows="2" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px; resize:vertical;"></textarea>
+      <label style="display:block; font-size:11.5px; color:var(--muted); margin-bottom:6px; font-weight:700;">📞 যোগাযোগ নম্বর *</label>
+      <input type="tel" id="hbCartPhoneInput" placeholder="01XXXXXXXXX" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px;">
       <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; color:var(--amber); margin-bottom:14px;"><span>সর্বমোট</span><span id="hbCartTotalTxt">৳ 0</span></div>
       <button id="hbCartCheckoutBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
     </div>
@@ -2758,16 +2762,24 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
   if(!currentCustomer){ alert("অর্ডার করতে আগে Google দিয়ে লগইন করুন (☰ Menu থেকে)।"); return; }
   const items = hbCartGet();
   if(items.length === 0) return;
+
+  const deliveryAddress = $("hbCartAddressInput").value.trim();
+  const deliveryPhone = $("hbCartPhoneInput").value.trim();
+  if(!deliveryAddress){ alert("ডেলিভারি ঠিকানা লিখুন — রাইডার এই ঠিকানা দেখেই ডেলিভারি করবেন।"); return; }
+  if(!deliveryPhone){ alert("যোগাযোগ নম্বর লিখুন।"); return; }
+
   const btn = $("hbCartCheckoutBtn");
   btn.disabled = true; btn.textContent = "অর্ডার হচ্ছে...";
   try{
     await Promise.all(items.map(it=> db.collection("orderRequests").add({
       shopId: it.shopId, productId: it.productId, productName: it.productName,
       customerUid: currentCustomer.uid, customerName: currentCustomer.name || "কাস্টমার",
+      deliveryAddress, deliveryPhone,
       qty: it.qty, status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp()
     })));
     hbCartSet([]);
     hbCartRenderItems();
+    $("hbCartAddressInput").value = ""; $("hbCartPhoneInput").value = "";
     alert("✅ আপনার অর্ডার(গুলো) পাঠানো হয়েছে — দোকান(গুলো) শীঘ্রই যোগাযোগ করবে।");
   }catch(e){
     alert("অর্ডার পাঠানো যায়নি: " + e.message);

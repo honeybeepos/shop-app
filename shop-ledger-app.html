@@ -938,6 +938,12 @@
     </div>
   </div>
 
+  <!-- 🚚 Bazar থেকে এসাইন করা ডেলিভারি — এখানে সাথে সাথেই দেখা যাবে -->
+  <div class="rmCard" id="rmBazarDeliveryCard" style="display:none; border-color:rgba(34,197,94,0.4);">
+    <h3 style="margin:0 0 10px; font-size:13px; color:#4ade80;">🚚 আমার Bazar ডেলিভারি</h3>
+    <div id="rmBazarDeliveryList"></div>
+  </div>
+
   <div class="rmToggleRow">
     <span class="rmLbl" id="rmOfflineLbl">🔴 Offline</span>
     <div class="rmSwitch" id="rmOnlineSwitch"><div class="rmKnob"></div></div>
@@ -4235,6 +4241,7 @@ function ordRenderBellList(){
         <div>
           <div style="font-weight:800; font-size:13.5px;">${escapeAttr(o.productName||'প্রোডাক্ট')}</div>
           <div style="font-size:11.5px; color:rgba(255,255,255,0.55);">কাস্টমার: ${escapeAttr(o.customerName||'—')} · পরিমাণ: ${o.qty||1} · ${time}</div>
+          ${o.deliveryAddress ? `<div style="font-size:11px; color:#8ec9a8; margin-top:3px;">📍 ${escapeAttr(o.deliveryAddress)}${o.deliveryPhone ? ' · 📞 ' + escapeAttr(o.deliveryPhone) : ''}</div>` : ''}
         </div>
         <button class="ordBellAcceptBtn" data-oid="${o.id}" style="width:100%; padding:10px; border:none; border-radius:9px; background:#22c55e; color:#08130d; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ গ্রহণ করুন</button>
       </div>`;
@@ -4311,6 +4318,7 @@ async function ordRender(orders){
           <div style="font-size:11px; color:#8ec9a8;">${time}</div>
         </div>
         <div style="font-size:12px; color:#c9c3f0;">কাস্টমার: ${escapeAttr(o.customerName||'—')} · পরিমাণ: ${o.qty||1}</div>
+        ${o.deliveryAddress ? `<div style="font-size:11.5px; color:#8ec9a8; margin-top:3px;">📍 ${escapeAttr(o.deliveryAddress)}${o.deliveryPhone ? ' · 📞 ' + escapeAttr(o.deliveryPhone) : ''}</div>` : ''}
         ${actionHtml}
       </div>`;
   }).join('');
@@ -4324,9 +4332,10 @@ async function ordRender(orders){
   });
   // Rider dropdown populate (preparing ট্যাবে) — কাছের রাইডার আগে দেখানো হয়
   if(__ordCurrentStatus === 'preparing'){
+    const session = (typeof getSession === 'function') ? getSession() : null; // ⚠️ আগে এখানে session সংজ্ঞায়িত ছিল না, তাই দূরত্ব-হিসাব নীরবে ব্যর্থ হতো
     const marketId = await ordGetShopMarketId();
     let riders = [];
-    if(marketId){
+    if(marketId && session && session.shopId){
       try{
         const rSnap = await db.collection('riders').where('marketId','==',marketId).where('online','==',true).get();
         riders = rSnap.docs.map(d=> ({ id:d.id, ...d.data() }));
@@ -12996,10 +13005,67 @@ async function initRiderMode(uid){
 
   rmListenForOffers();
   rmLoadTodayStats();
+  rmStartBazarDeliveryListener(uid);
 
   document.getElementById("rmLogoutBtn").addEventListener("click", ()=> auth.signOut());
   refreshRingtoneSwitchUi();
   enableModeBackGuard();
+}
+
+/* ==================== 🚚 Bazar থেকে এসাইন করা ডেলিভারি — নোটিফিকেশন + তালিকা ====================
+   দোকানদার POS-এর "📦 অর্ডার ব্যবস্থাপনা"-তে যখন এই রাইডারকে এসাইন করেন,
+   orderRequests-এ assignedRiderId এই রাইডারের uid হয়ে যায় — সেটাই এখানে
+   লাইভ শোনা হচ্ছে। কাস্টমারের ঠিকানা/ফোন এখানেই দেখা যাবে, আলাদা করে
+   দোকানে ফোন করে জিজ্ঞেস করতে হবে না। */
+let __rmBazarDeliveryUnsub = null;
+let __rmBazarDeliveryFirstLoad = true;
+
+function rmStartBazarDeliveryListener(riderUid){
+  if(__rmBazarDeliveryUnsub) return;
+  __rmBazarDeliveryFirstLoad = true;
+  __rmBazarDeliveryUnsub = db.collection("orderRequests")
+    .where("assignedRiderId","==",riderUid).where("status","==","shipped")
+    .onSnapshot((qs)=>{
+      const orders = qs.docs.map(d=> ({ id:d.id, ...d.data() }))
+        .sort((a,b)=> (b.shippedAt ? b.shippedAt.toMillis() : 0) - (a.shippedAt ? a.shippedAt.toMillis() : 0));
+
+      const card = document.getElementById("rmBazarDeliveryCard");
+      const listEl = document.getElementById("rmBazarDeliveryList");
+      if(orders.length === 0){
+        card.style.display = "none";
+      }else{
+        card.style.display = "block";
+        listEl.innerHTML = orders.map(o=> `
+          <div style="background:#212121; border-radius:12px; padding:12px; margin-bottom:10px;">
+            <div style="font-weight:800; font-size:13px;">${escapeAttr(o.productName||'প্রোডাক্ট')}</div>
+            <div style="font-size:11.5px; color:#a8a8a8; margin-top:3px;">পরিমাণ: ${o.qty||1}</div>
+            ${o.deliveryAddress ? `<div style="font-size:12px; color:#fff; margin-top:6px;">📍 ${escapeAttr(o.deliveryAddress)}</div>` : '<div style="font-size:11px; color:#f87171; margin-top:6px;">⚠️ কাস্টমার কোনো ঠিকানা দেননি</div>'}
+            ${o.deliveryPhone ? `<a href="tel:${escapeAttr(o.deliveryPhone)}" style="display:inline-block; font-size:12px; color:#FFC107; margin-top:4px; text-decoration:none;">📞 ${escapeAttr(o.deliveryPhone)}</a>` : ''}
+            <button class="rmBazarDeliveredBtn" data-oid="${o.id}" style="width:100%; margin-top:10px; padding:10px; border:none; border-radius:9px; background:#2fbf71; color:#0a2416; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ডেলিভারি সম্পন্ন হয়েছে</button>
+          </div>`).join("");
+        listEl.querySelectorAll(".rmBazarDeliveredBtn").forEach(btn=>{
+          btn.addEventListener("click", async ()=>{
+            try{
+              await db.collection("orderRequests").doc(btn.dataset.oid).update({
+                status: "delivered", deliveredAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+            }catch(e){ alert("আপডেট করা যায়নি: " + e.message); }
+          });
+        });
+      }
+
+      // 🐝 প্রথমবার (পেজ খোলার মুহূর্তে) অ্যালার্ম বাজে না, শুধু নতুন
+      // এসাইনমেন্ট এলেই বাজবে
+      if(!__rmBazarDeliveryFirstLoad){
+        qs.docChanges().forEach(change=>{
+          if(change.type === "added"){
+            if(typeof playBeeAlert === 'function') playBeeAlert();
+            alert("🚚 নতুন একটা ডেলিভারি এসাইন করা হয়েছে আপনাকে! নিচে ঠিকানা দেখুন।");
+          }
+        });
+      }
+      __rmBazarDeliveryFirstLoad = false;
+    }, (err)=> console.warn("rider bazar delivery listener error:", err));
 }
 
 // 📦/🚕 বর্তমানে ঠিক কোন মোডে আছেন তা স্পষ্টভাবে দেখানো হয়
