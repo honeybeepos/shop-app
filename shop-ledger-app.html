@@ -4322,7 +4322,7 @@ async function ordRender(orders){
   listEl.querySelectorAll('.ordRejectBtn').forEach(btn=>{
     btn.addEventListener('click', ()=>{ if(confirm('এই অর্ডারটা বাতিল করবেন?')) ordUpdateStatus(btn.dataset.oid, 'cancelled'); });
   });
-  // Rider dropdown populate (preparing ট্যাবে)
+  // Rider dropdown populate (preparing ট্যাবে) — কাছের রাইডার আগে দেখানো হয়
   if(__ordCurrentStatus === 'preparing'){
     const marketId = await ordGetShopMarketId();
     let riders = [];
@@ -4330,11 +4330,32 @@ async function ordRender(orders){
       try{
         const rSnap = await db.collection('riders').where('marketId','==',marketId).where('online','==',true).get();
         riders = rSnap.docs.map(d=> ({ id:d.id, ...d.data() }));
+
+        // 📍 দোকানের লোকেশনের সাথে প্রতিটা রাইডারের দূরত্ব হিসাব করে কাছেরটা
+        // আগে দেখানো হয় — যাতে পিকআপের জন্য কাছের রাইডার সহজে বেছে নেওয়া যায়
+        const shopDoc = await db.collection('shops').doc(session.shopId).get();
+        const shopLoc = shopDoc.exists ? shopDoc.data().storeLocation : null;
+        if(shopLoc){
+          riders.forEach(r=>{
+            r.distanceKm = (r.liveLocation && r.liveLocation.lat != null)
+              ? dmHaversineKm(shopLoc.lat, shopLoc.lng, r.liveLocation.lat, r.liveLocation.lng)
+              : null;
+          });
+          riders.sort((a,b)=>{
+            if(a.distanceKm == null && b.distanceKm == null) return 0;
+            if(a.distanceKm == null) return 1; // লোকেশন না-জানা রাইডার সবার শেষে
+            if(b.distanceKm == null) return -1;
+            return a.distanceKm - b.distanceKm;
+          });
+        }
       }catch(e){ console.warn('riders fetch failed:', e); }
     }
     listEl.querySelectorAll('.ordRiderSelect').forEach(sel=>{
-      sel.innerHTML = '<option value="">রাইডার বেছে নিন...</option>' +
-        (riders.length ? riders.map(r=> `<option value="${r.id}">${escapeAttr(r.name)} (${escapeAttr(r.phone||'')})</option>`).join('')
+      sel.innerHTML = '<option value="">রাইডার বেছে নিন (কাছেরটা আগে)...</option>' +
+        (riders.length ? riders.map(r=>{
+          const distTxt = r.distanceKm != null ? ` — 📍 ${r.distanceKm.toFixed(1)} কিমি দূরে` : ' — 📍 লোকেশন জানা নেই';
+          return `<option value="${r.id}">${escapeAttr(r.name)} (${escapeAttr(r.phone||'')})${distTxt}</option>`;
+        }).join('')
                         : '<option value="" disabled>🔴 এই মুহূর্তে কোনো রাইডার অনলাইনে নেই</option>');
     });
     listEl.querySelectorAll('.ordAssignBtn').forEach(btn=>{
