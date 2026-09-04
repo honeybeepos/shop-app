@@ -45,6 +45,7 @@ const db = getFirestore();
 // (Rider Mode হিসেবে shop-ledger-app.html-এ একীভূত), তাই লিংকও সেভাবে ঠিক করা হলো।
 const APP_DOMAIN = "https://honeybeebazar.com"; // ✅ কাস্টম ডোমেইন (CNAME ফাইলে নিশ্চিত করা) — GitHub-এর ডিফল্ট subdomain-এর বদলে
 const RIDER_MODE_URL = `${APP_DOMAIN}/shop-ledger-app.html`;
+const BAZAR_APP_URL = `${APP_DOMAIN}/honey-bee-bazar.html`; // 🔔 Honey Messenger নোটিফিকেশনে ট্যাপ করলে এখানে যাবে
 
 // 🔑 Google Maps API key — এটা কোডে সরাসরি লেখা নেই, Firebase Secrets Manager-এ
 // রাখা হয় (`firebase functions:secrets:set GOOGLE_MAPS_API_KEY`), তাই এটা
@@ -188,6 +189,62 @@ async function sendFcmToRider(riderId, title, body, data) {
     return false;
   }
 }
+
+/* ==================== 🔔 Honey Messenger — নতুন মেসেজের পুশ নোটিফিকেশন ====================
+   ⚠️ sendFcmToRider()-এর থেকে ইচ্ছাকৃতভাবে সম্পূর্ণ আলাদা ফাংশন — যাতে
+   এই নতুন কোডের কোনো বাগ কখনো বিদ্যমান Rider-নোটিফিকেশন সিস্টেমকে
+   প্রভাবিত করতে না পারে। */
+async function sendFcmToMessengerUser(uid, title, body, data) {
+  try {
+    const userDoc = await db.collection("messengerUsers").doc(uid).get();
+    const token = userDoc.exists ? userDoc.data().fcmToken : null;
+    if (!token) return false;
+
+    await getMessaging().send({
+      token,
+      notification: { title, body },
+      data: Object.assign({ type: "messenger-message" }, data || {}),
+      webpush: { fcmOptions: { link: BAZAR_APP_URL } },
+    });
+    console.log(JSON.stringify({ event: "MESSENGER_FCM_SENT", uid }));
+    return true;
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "MESSENGER_FCM_FAILED", uid, error: String(e && e.message || e) }));
+    if (e && e.code === "messaging/registration-token-not-registered") {
+      await db.collection("messengerUsers").doc(uid).update({ fcmToken: FieldValue.delete() }).catch(() => {});
+    }
+    return false;
+  }
+}
+
+// 🎯 নতুন মেসেজ তৈরি হলেই ট্রিগার — প্রাপককে (প্রেরক বাদে participants-এর
+// বাকি সবাইকে) পুশ পাঠানো হয়। Privacy Mode চ্যাটে বার্তার কনটেন্ট
+// notification-এ কখনো পাঠানো হয় না (শুধু "🔐 একটা মেসেজ") — ঠিক
+// অ্যাপের নিজস্ব lastMessage-প্রদর্শনের নিয়মের সাথে মিলিয়ে।
+exports.onMessengerMessageCreated = onDocumentCreated(
+  "messengerChats/{chatId}/messages/{messageId}",
+  async (event) => {
+    const chatId = event.params.chatId;
+    const messageData = event.data.data();
+    const senderUid = messageData.senderUid;
+    if (!senderUid) return;
+
+    const chatDoc = await db.collection("messengerChats").doc(chatId).get();
+    if (!chatDoc.exists) return;
+    const chatData = chatDoc.data();
+    const participants = chatData.participants || [];
+    const recipientUid = participants.find((uid) => uid !== senderUid);
+    if (!recipientUid) return;
+
+    const senderDoc = await db.collection("messengerUsers").doc(senderUid).get();
+    const senderName = (senderDoc.exists && (senderDoc.data().fullName || senderDoc.data().username)) || "কেউ একজন";
+
+    const isPrivacy = chatData.mode === "privacy";
+    const body = isPrivacy ? "🔐 একটা মেসেজ পাঠিয়েছেন" : (messageData.text || "").slice(0, 100);
+
+    await sendFcmToMessengerUser(recipientUid, `💬 ${senderName}`, body, { chatId });
+  }
+);
 
 async function dispatchToNearestRider(shopId, callId, callData, excludeRiderIds) {
   const shopDoc = await db.collection("shops").doc(shopId).get();
