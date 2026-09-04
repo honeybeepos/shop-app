@@ -14,6 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <style>
   /* ==================== 🐝 Bee Flying Animation (ট্রান্সপোর্ট লাইভ ম্যাপে গাড়ির উপরে) ==================== */
   .beeCarWrap{ position:relative; width:34px; height:34px; }
@@ -279,6 +280,16 @@
 
   <!-- ==================== 🏠 হোমস্ক্রিন — ৬টা সার্ভিস কার্ড + ফিল্টার + বাজার তালিকা ==================== -->
   <div id="screenHome" class="active">
+    <!-- 🐝 Personal Shopping Assistant — প্রমিনেন্ট ব্যানার, Home খুললেই দেখা যায় -->
+    <div id="hbAssistantBanner" style="display:flex; align-items:center; gap:12px; padding:14px 16px; margin-bottom:14px; border-radius:16px; background:linear-gradient(135deg, rgba(212,160,23,0.18), rgba(212,160,23,0.06)); border:1px solid rgba(212,160,23,0.35); cursor:pointer;">
+      <div style="font-size:30px;">🐝</div>
+      <div style="flex:1;">
+        <div style="font-weight:800; font-size:13.5px; color:var(--amber);">Personal Shopping Assistant</div>
+        <div style="font-size:11px; color:var(--muted); margin-top:1px;">বলুন কী লাগবে — বাকিটা আমি গুছিয়ে দিচ্ছি</div>
+      </div>
+      <div style="color:var(--muted); font-size:16px;">›</div>
+    </div>
+
     <div class="serviceCardGrid">
       <div class="serviceCard" data-svc="market">
         <div class="ic">🏪</div>
@@ -916,6 +927,25 @@
 </div>
 
 <!-- 🛒 Cart স্ক্রিন — সম্পূর্ণ নতুন করে বানানো, পুরনো কোনো ID/CSS পুনর্ব্যবহার করা হয়নি -->
+<!-- 🐝 Personal Shopping Assistant — ফুল-স্ক্রিন প্যানেল -->
+<div id="hbAssistantScreen" style="display:none; position:fixed; inset:0; z-index:870; background:var(--bg1); flex-direction:column;">
+  <div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border);">
+    <span id="hbAssistantBackBtn" style="font-size:22px; cursor:pointer; color:var(--muted);">←</span>
+    <div style="font-weight:800; font-size:15px;">🐝 Shopping Assistant</div>
+  </div>
+
+  <div id="hbAssistantChatLog" style="flex:1; overflow-y:auto; padding:16px;"></div>
+
+  <div style="padding:12px 16px; border-top:1px solid var(--border);">
+    <div style="display:flex; gap:8px; align-items:center;">
+      <input type="text" id="hbAssistantTextInput" placeholder="যেমনঃ ২ কেজি চাল, ১ লিটার তেল লাগবে..." style="flex:1; padding:12px; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13.5px;">
+      <!-- 🎙️ ভয়েস — Step 2-এ শুধু UI, এখনো সচল না (পরের ধাপে যোগ হবে) -->
+      <span id="hbAssistantMicBtn" title="বলুন" style="width:42px; height:42px; border-radius:50%; background:rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; cursor:pointer;">🎙️</span>
+      <span id="hbAssistantSendBtn" style="width:42px; height:42px; border-radius:50%; background:var(--amber); color:var(--bg1); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; cursor:pointer;">➤</span>
+    </div>
+  </div>
+</div>
+
 <div id="hbCartScreen" style="display:none; position:fixed; inset:0; z-index:850; background:var(--bg1); overflow-y:auto; padding:14px 16px 100px;">
 
   <button id="hbOrderTrackingOpenBtn" style="width:100%; display:flex; align-items:center; gap:10px; padding:14px 16px; border:1px solid var(--border); border-radius:14px; background:var(--card); color:#fff8e8; cursor:pointer; font-family:inherit; margin-bottom:16px;">
@@ -1062,6 +1092,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
+const functionsInstance = firebase.functions(); // 🤖 Step 5 — Gemini AI Cloud Function কল করার জন্য
 
 let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], addresses:[] }
 
@@ -1189,6 +1220,14 @@ window.addEventListener("popstate", ()=>{
   if(chatThread && chatThread.style.display === "flex"){
     document.getElementById("hmChatThreadBack").click();
     history.pushState({ hbScreen: "hmChatOpen" }, "", location.href); // আবার guard বসানো
+    __hbNavigatingViaPopstate = false;
+    return;
+  }
+
+  // 🐝 Assistant খোলা থাকলে আগে সেটাই বন্ধ করা হয়
+  const assistantScreenEl = document.getElementById("hbAssistantScreen");
+  if(assistantScreenEl && assistantScreenEl.style.display === "flex"){
+    hbAssistantClose();
     __hbNavigatingViaPopstate = false;
     return;
   }
@@ -2312,6 +2351,490 @@ function escapeHtml(str){
   return d.innerHTML;
 }
 
+/* ==================== 🐝 Personal Shopping Assistant — Step 2 ====================
+   ⚠️ এই ধাপে কোনো বিদ্যমান Cart/Checkout/Firebase-স্ট্রাকচার বদলানো হয়নি —
+   এই সবগুলো ফাংশন existing addToCart()/hbCartQtyChange()/hbCartRemove()/
+   checkout-flow-এর ওপরেই বসানো, নতুন করে কিছু বানানো হয়নি। publicStock
+   থেকে শুধুই READ করা হয় (আগে থেকেই যেমন write-লক করা ছিল, সেটাই আছে)। */
+
+// 🔤 বাংলা/ইংরেজি টেক্সট নরমালাইজ — তুলনা করার আগে দুই লেখাকেই একই ফরম্যাটে আনা
+function hbNormalizeText(str){
+  return (str || "").toString().toLowerCase().trim().replace(/[.,!?।]/g, "").replace(/\s+/g, " ");
+}
+
+/* 🔍 searchProducts(query, options) — পুনর্ব্যবহারযোগ্য প্রোডাক্ট-সার্চ ফাংশন
+   options: { shopId, marketId, limit }
+   - shopId দিলে শুধু সেই দোকানেই খোঁজে
+   - না দিলে marketId (বা বর্তমান currentMarketId) দিয়ে সেই বাজারের সব
+     দোকানের publicStock খোঁজে
+   - name/description/barcode-এর সাথে মিলিয়ে একটা matchScore সহ রেজাল্ট
+     রিটার্ন করে (বেশি স্কোর = ভালো মিল), matchScore অনুযায়ী সাজানো
+   ⚠️ সততার সাথে: এটা Firestore-এর প্রকৃত ফুল-টেক্সট-সার্চ না (Firestore
+   নিজে থেকে এটা সাপোর্ট করে না) — ক্লায়েন্ট-সাইডে সব প্রোডাক্ট এনে
+   তুলনা করা হয়, তাই দোকান/বাজার অনেক বড় হলে এটা ধীর হতে পারে। */
+async function searchProducts(query, options = {}){
+  const limit = options.limit || 8;
+  const qNorm = hbNormalizeText(query);
+  if(!qNorm) return [];
+  const qWords = qNorm.split(" ").filter(Boolean);
+
+  // 🏪 কোন কোন দোকানে খোঁজা হবে তা ঠিক করা
+  let shopIds = [];
+  if(options.shopId) shopIds = [options.shopId];
+  else{
+    const marketId = options.marketId || currentMarketId;
+    shopIds = marketId
+      ? allShops.filter(s=> s.marketId === marketId).map(s=> s.id)
+      : allShops.map(s=> s.id); // মার্কেট-কনটেক্সট না থাকলে সব দোকান (fallback)
+  }
+  if(shopIds.length === 0) return [];
+
+  const allMatches = [];
+  await Promise.all(shopIds.map(async (shopId)=>{
+    try{
+      const qs = await db.collection("shops").doc(shopId).collection("publicStock").get();
+      const shop = allShops.find(s=> s.id === shopId);
+      const shopName = shop ? (shop.name || shop.shopName) : "দোকান";
+      qs.docs.forEach(doc=>{
+        const p = doc.data();
+        const nameNorm = hbNormalizeText(p.name);
+        const descNorm = hbNormalizeText(p.description);
+        const barcodeNorm = hbNormalizeText(p.barcode);
+
+        let score = 0;
+        if(barcodeNorm && barcodeNorm === qNorm) score += 100; // বারকোড হুবহু মিললে সর্বোচ্চ
+        if(nameNorm === qNorm) score += 50; // নাম হুবহু মিললে
+        else if(nameNorm.includes(qNorm)) score += 30; // পুরো কোয়েরিটাই নামের ভেতরে আছে
+        else{
+          // শব্দ-ভিত্তিক আংশিক মিল — কয়টা শব্দ নামে/বিবরণে পাওয়া গেছে
+          qWords.forEach(w=>{
+            if(w.length < 2) return;
+            if(nameNorm.includes(w)) score += 8;
+            else if(descNorm.includes(w)) score += 3;
+          });
+        }
+        if(score > 0){
+          allMatches.push({
+            id: doc.id, shopId, shopName,
+            name: p.name, price: p.price, offerPrice: p.offerPrice,
+            stockQty: p.stockQty, description: p.description,
+            matchScore: score,
+          });
+        }
+      });
+    }catch(e){ console.warn("searchProducts: shop", shopId, "কোয়েরি ব্যর্থ:", e); }
+  }));
+
+  allMatches.sort((a,b)=> b.matchScore - a.matchScore);
+  return allMatches.slice(0, limit);
+}
+
+/* ==================== 🧠 Assistant-এর "text-based brain" (নিয়ম-ভিত্তিক, কোনো AI key ছাড়াই) ====================
+   ⚠️ সততার সাথে: এটা কোনো সত্যিকারের AI/NLP মডেল না — এটা একটা সাধারণ
+   নিয়ম-ভিত্তিক (regex) পার্সার যেটা বাংলা সংখ্যা/একক/আইটেম-নাম আলাদা
+   করার চেষ্টা করে। এটা সরল বাক্যে ভালো কাজ করে ("২ কেজি চাল"), কিন্তু
+   জটিল/অস্পষ্ট বাক্যে ভুল হতে পারে — তখন Assistant confirmation-ধাপে
+   গিয়ে ইউজারকে দেখিয়ে নিশ্চিত হয়ে নেয় (নিচে hbAssistant-এর UI লজিকে)।
+   ভবিষ্যতে server-side secure AI যুক্ত হলে এই ফাংশনটাই সেই কলের ফলাফল
+   দিয়ে replace/augment করা যাবে — Assistant-এর বাকি অংশ (search→confirm→
+   cart) অপরিবর্তিত থাকবে, কন্ট্রাক্ট একই। */
+const HB_BANGLA_DIGIT_MAP = { "০":"0","১":"1","২":"2","৩":"3","৪":"4","৫":"5","৬":"6","৭":"7","৮":"8","৯":"9" };
+const HB_BANGLA_NUMBER_WORDS = {
+  "একটা":1,"একটি":1,"এক":1, "দুইটা":2,"দুটা":2,"দুটো":2,"দুই":2,
+  "তিনটা":3,"তিন":3, "চারটা":4,"চার":4, "পাঁচটা":5,"পাঁচ":5,
+  "ছয়টা":6,"ছয়":6, "সাতটা":7,"সাত":7, "আটটা":8,"আট":8,
+  "নয়টা":9,"নয়":9, "দশটা":10,"দশ":10,
+};
+const HB_UNIT_WORDS = ["কেজি","কেজি","গ্রাম","লিটার","পিস","পিছ","বোতল","প্যাকেট","হালি","ডজন","কৌটা","আঁটি"];
+const HB_FILLER_WORDS = ["লাগবে","দাও","চাই","নেব","লাগবেই","একটু","আমাকে","আমার","জন্য","দিন","হবে","ভাই","আজকে","আজ","বাসার","বাজার","করে","কিছু","প্লিজ","আরও","আরো","আরেকটু","বাড়াও","বাড়িয়ে","বাদ","মুছে","সরিয়ে","সরাও","আর","যোগ","করো","করুন","দরকার","নেই"];
+
+function hbBanglaToArabicDigits(str){
+  return str.replace(/[০-৯]/g, (d)=> HB_BANGLA_DIGIT_MAP[d] || d);
+}
+
+// একটা টুকরো বাক্য (যেমন "২ কেজি চাল") থেকে {qty, unit, itemQuery} বের করা
+function hbParseSegment(segment){
+  let text = hbBanglaToArabicDigits(segment.trim());
+  let qty = 1, unit = null;
+
+  // সংখ্যা (অঙ্কে) + ঐচ্ছিক একক
+  const digitMatch = text.match(/(\d+(?:\.\d+)?)\s*(কেজি|গ্রাম|লিটার|পিস|পিছ|বোতল|প্যাকেট|হালি|ডজন|কৌটা|আঁটি)?/);
+  if(digitMatch){
+    qty = parseFloat(digitMatch[1]);
+    unit = digitMatch[2] || null;
+    text = text.replace(digitMatch[0], " ");
+  }else{
+    // বাংলা সংখ্যা-শব্দ (এক, দুই, তিনটা...)
+    for(const word of Object.keys(HB_BANGLA_NUMBER_WORDS)){
+      if(text.includes(word)){
+        qty = HB_BANGLA_NUMBER_WORDS[word];
+        text = text.replace(word, " ");
+        const unitMatch = text.match(new RegExp("(" + HB_UNIT_WORDS.join("|") + ")"));
+        if(unitMatch){ unit = unitMatch[1]; text = text.replace(unitMatch[0], " "); }
+        break;
+      }
+    }
+  }
+
+  // ফিলার শব্দ সরিয়ে বাকি অংশটাই প্রোডাক্টের নাম
+  HB_FILLER_WORDS.forEach(w=>{ text = text.replace(new RegExp(w, "g"), " "); });
+  const itemQuery = text.replace(/\s+/g, " ").trim();
+
+  return { rawText: segment.trim(), qty, unit, itemQuery };
+}
+
+// পুরো বাক্য ("২ কেজি চাল, ১ কেজি ডাল আর ২ লিটার তেল লাগবে") ভেঙে
+// একাধিক আইটেমে ভাগ করা
+function hbParseShoppingText(text){
+  // ⚠️ "।"/"." (বাক্য শেষের চিহ্ন) দিয়েও ভাগ করা হয় — নাহলে "ভাই আজকে
+  // বাসার জন্য কিছু বাজার করে দাও। ৫ কেজি চাল..." এর মতো বাক্যে প্রথম
+  // sentence-টা ভুলভাবে প্রথম আইটেমের সাথে জুড়ে যেত
+  const segments = text.split(/[,،।.]|(?:\s+এবং\s+)|(?:\s+আর\s+)|(?:\s+ও\s+)|\n/).map(s=> s.trim()).filter(Boolean);
+  return segments.map(hbParseSegment).filter(s=> s.itemQuery.length > 0);
+}
+
+/* ==================== 🎙️ Voice Input/Output — Step 5 ====================
+   ⚠️ সততার সাথে: এগুলো ব্রাউজার-নেটিভ Web Speech API (SpeechRecognition/
+   speechSynthesis) — কোনো নতুন API-খরচ নেই, কিন্তু ব্রাউজার/ডিভাইস-ভেদে
+   সাপোর্ট ভিন্ন হতে পারে (বিশেষত বাংলা voice output — অনেক ফোনে বাংলা
+   TTS ভয়েস ইনস্টলই করা থাকে না, তখন speechSynthesis চুপচাপ কিছু বলবে
+   না বা ডিফল্ট ভয়েসে বলবে — এটা এড়ানোর উপায় নেই, ব্রাউজার/OS-নির্ভর)।
+   কোনোটাই না থাকলে অ্যাপ ভাঙবে না — feature-detect করে গ্রেসফুলি বাদ যায়। */
+
+function hbSpeak(text){
+  if(!("speechSynthesis" in window)) return;
+  try{
+    window.speechSynthesis.cancel(); // আগের কথা শেষ না হয়ে থাকলে থামিয়ে নতুনটা বলা
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "bn-BD";
+    utter.rate = 1.0;
+    const voices = window.speechSynthesis.getVoices();
+    const bnVoice = voices.find(v=> v.lang === "bn-BD" || v.lang === "bn-IN" || v.lang.startsWith("bn"));
+    if(bnVoice) utter.voice = bnVoice; // বাংলা voice না পেলে ব্রাউজারের ডিফল্ট voice-এই বলবে
+    window.speechSynthesis.speak(utter);
+  }catch(e){ console.warn("speechSynthesis ব্যর্থ:", e); }
+}
+
+const HB_SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let hbRecognition = null;
+let hbIsListening = false;
+
+function hbInitVoiceInput(){
+  if(!HB_SpeechRecognition){
+    // 🎙️ ব্রাউজারে ভয়েস সাপোর্ট নেই — বাটন থাকবে কিন্তু ক্লিকে জানিয়ে দেবে, অ্যাপ ভাঙবে না
+    $("hbAssistantMicBtn").addEventListener("click", ()=>{
+      hbAssistantAppendBubble("assistant", "🎙️ এই ব্রাউজারে ভয়েস সাপোর্ট নেই — টাইপ করে বলুন।");
+    });
+    return;
+  }
+  hbRecognition = new HB_SpeechRecognition();
+  hbRecognition.lang = "bn-BD";
+  hbRecognition.continuous = false;
+  hbRecognition.interimResults = false;
+
+  hbRecognition.onstart = ()=>{
+    hbIsListening = true;
+    $("hbAssistantMicBtn").style.background = "var(--amber)";
+    $("hbAssistantMicBtn").textContent = "🔴";
+  };
+  hbRecognition.onend = ()=>{
+    hbIsListening = false;
+    $("hbAssistantMicBtn").style.background = "rgba(255,255,255,0.06)";
+    $("hbAssistantMicBtn").textContent = "🎙️";
+  };
+  hbRecognition.onerror = (e)=>{
+    console.warn("SpeechRecognition এরর:", e.error);
+    hbAssistantAppendBubble("assistant", "🎙️ শুনতে সমস্যা হয়েছে। আবার চেষ্টা করুন বা টাইপ করুন।");
+  };
+  hbRecognition.onresult = (e)=>{
+    const result = e.results[0][0];
+    const transcript = result.transcript;
+    // confidence ব্রাউজার-ভেদে অনুপস্থিত/অনির্ভরযোগ্য হতে পারে (কিছু
+    // ব্রাউজারে সবসময় undefined) — তখন নিরাপদে "মাঝারি নিশ্চয়তা" ধরে নেওয়া হয়
+    const confidence = typeof result.confidence === "number" && result.confidence > 0 ? result.confidence : 0.7;
+
+    if(confidence < 0.5){
+      // ⚠️ কম-নিশ্চয়তার শোনা কথা অন্ধভাবে প্রসেস না করে আগে নিশ্চিত হওয়া হয়
+      hbAssistantAppendBubble("user", escapeHtml(transcript) + " <span style='opacity:0.6; font-size:11px;'>(শুনতে একটু অস্পষ্ট ছিল)</span>");
+      const confirmBubble = hbAssistantAppendBubble("assistant", `আমি ঠিক বুঝতে পারিনি। আপনি কি "<b>${escapeHtml(transcript)}</b>" বলতে চেয়েছেন?
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button id="hbVoiceConfirmYes" style="flex:1; padding:8px; border-radius:8px; border:none; background:#16a34a; color:#fff; font-family:inherit; cursor:pointer;">হ্যাঁ</button>
+          <button id="hbVoiceConfirmNo" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-family:inherit; cursor:pointer;">না, আবার বলি</button>
+        </div>`);
+      hbSpeak(`আমি ঠিক বুঝতে পারিনি। আপনি কি ${transcript} বলতে চেয়েছেন?`);
+      document.getElementById("hbVoiceConfirmYes").addEventListener("click", ()=>{
+        confirmBubble.querySelector("div").remove();
+        hbAssistantProcessText(transcript);
+      });
+      document.getElementById("hbVoiceConfirmNo").addEventListener("click", ()=>{
+        confirmBubble.querySelector("div").remove();
+        hbAssistantAppendBubble("assistant", "ঠিক আছে, আবার বলুন। 🎙️");
+      });
+      return;
+    }
+
+    hbAssistantAppendBubble("user", escapeHtml(transcript));
+    hbAssistantProcessText(transcript);
+  };
+
+  $("hbAssistantMicBtn").addEventListener("click", ()=>{
+    if(hbIsListening){ hbRecognition.stop(); return; }
+    try{ hbRecognition.start(); }
+    catch(e){ console.warn("recognition start ব্যর্থ:", e); }
+  });
+}
+hbInitVoiceInput();
+
+/* ==================== 💬 Assistant চ্যাট-ফ্লো — Step 3: বাস্তব Shopping Manager ====================
+   ⚠️ Cart-মিউটেশন সবসময় বিদ্যমান window.addToCart()/hbCartQtyChange()/
+   hbCartRemove() দিয়েই হয় — কোনো নতুন cart-প্রাইমিটিভ লেখা হয়নি।
+   Checkout এখনো ছোঁয়া হয়নি। */
+
+const HB_DOZEN_UNITS = { "ডজন": 12, "হালি": 4 };
+// টা/টি/খানা/গুলো ইত্যাদি প্রত্যয় সরিয়ে মূল প্রোডাক্টের নামটা বের করা
+// (যেমন "চালটা" → "চাল") — cart-এর বিদ্যমান আইটেমের সাথে মেলানোর জন্য দরকার
+function hbStripSuffix(str){
+  return str.replace(/(টা|টি|খানা|গুলো|গুলি)$/,"").trim();
+}
+
+function hbAssistantOpen(){
+  $("hbAssistantScreen").style.display = "flex";
+  history.pushState({ hbScreen: "assistantOpen" }, "", location.href);
+  if(!$("hbAssistantChatLog").dataset.greeted){
+    const greetingText = "🐝 Honey Bee Bazar থেকে আপনাকে স্বাগতম। আমি আপনার ব্যক্তিগত Shopping Assistant। আপনি শুধু বলুন কী কী লাগবে — বাকিটা আমি গুছিয়ে দিচ্ছি।";
+    hbAssistantAppendBubble("assistant", `
+      <div style="font-weight:700; margin-bottom:6px;">🐝 Honey Bee Bazar থেকে আপনাকে স্বাগতম।</div>
+      <div>আমি আপনার ব্যক্তিগত Shopping Assistant। আপনি শুধু বলুন কী কী লাগবে — বাকিটা আমি গুছিয়ে দিচ্ছি।</div>`);
+    hbSpeak(greetingText);
+    $("hbAssistantChatLog").dataset.greeted = "1";
+  }
+}
+function hbAssistantClose(){
+  $("hbAssistantScreen").style.display = "none";
+  if(hbIsListening && hbRecognition) hbRecognition.stop();
+  if("speechSynthesis" in window) window.speechSynthesis.cancel();
+}
+
+function hbAssistantAppendBubble(role, html){
+  const log = $("hbAssistantChatLog");
+  const isUser = role === "user";
+  const bubble = document.createElement("div");
+  bubble.style.cssText = `display:flex; justify-content:${isUser?"flex-end":"flex-start"}; margin-bottom:12px;`;
+  bubble.innerHTML = `<div style="max-width:85%; padding:11px 14px; border-radius:14px; font-size:13px; line-height:1.55; background:${isUser?"var(--amber)":"var(--card)"}; color:${isUser?"var(--bg1)":"#fff8e8"}; border:${isUser?"none":"1px solid var(--border)"};">${html}</div>`;
+  log.appendChild(bubble);
+  log.scrollTop = log.scrollHeight;
+  return bubble;
+}
+
+$("hbAssistantSendBtn").addEventListener("click", hbAssistantSendText);
+$("hbAssistantTextInput").addEventListener("keydown", (e)=>{ if(e.key === "Enter") hbAssistantSendText(); });
+
+function hbAssistantSendText(){
+  const input = $("hbAssistantTextInput");
+  const text = input.value.trim();
+  if(!text) return;
+  hbAssistantAppendBubble("user", escapeHtml(text));
+  input.value = "";
+  hbAssistantProcessText(text);
+}
+
+/* 🎯 আইটেম-লেভেল অ্যাকশন চেনা — যোগ (ডিফল্ট) / বাড়ানো / নির্দিষ্ট পরিমাণে
+   সেট করা / মুছে ফেলা। এটাও নিয়ম-ভিত্তিক (heuristic) — জটিল/অস্বাভাবিক
+   বাক্যে ভুল হতে পারে, সেক্ষেত্রে Assistant confirmation চেয়ে নেয়। */
+function hbDetectSegmentAction(segment){
+  if(/বাদ দাও|মুছে দাও|সরিয়ে দাও|লাগবে না|দরকার নেই|বাদ দিন/.test(segment)) return "remove";
+  if(/করে দাও|করে দিন/.test(segment)) return "set"; // "চাল ৫ কেজি করে দাও"
+  if(/আরও|আরো|আরেকটু|বাড়াও|বাড়িয়ে/.test(segment)) return "increase"; // "আরও ২ কেজি চাল দাও" / "চালটা আরও বাড়াও"
+  return "add";
+}
+
+// 🔎 cart-এর বিদ্যমান আইটেমগুলোর মধ্যে নাম দিয়ে মেলানো (নতুন ক্যাটালগ-সার্চ না,
+// শুধু cart-এর ভেতরেই) — "চালটা"/"চাল" উভয়ই cart-এর "মিনিকেট চাল ৫ কেজি"-র
+// সাথে মিলবে যদি শব্দ-মিল থাকে
+function hbFindCartItemByQuery(query){
+  const items = hbCartGet();
+  const qNorm = hbNormalizeText(hbStripSuffix(query));
+  if(!qNorm) return null;
+  let best = null, bestScore = 0;
+  items.forEach(it=>{
+    const nameNorm = hbNormalizeText(it.productName);
+    let score = 0;
+    if(nameNorm.includes(qNorm)) score = qNorm.length; // যত লম্বা মিল, তত ভালো
+    else{
+      qNorm.split(" ").forEach(w=>{ if(w.length>=2 && nameNorm.includes(w)) score += w.length; });
+    }
+    if(score > bestScore){ bestScore = score; best = it; }
+  });
+  return best;
+}
+
+// একটা প্রোডাক্টকে cart-এ ঠিক targetQty পরিমাণে নিয়ে যাওয়া — বিদ্যমান
+// addToCart()+hbCartQtyChange() একসাথে ব্যবহার করে (নতুন cart-ফাংশন না বানিয়ে)
+function hbAssistantSetCartQty(product, targetQty, shopOverride){
+  const items = hbCartGet();
+  const existing = items.find(it=> it.productId === product.id && it.shopId === (shopOverride?shopOverride.shopId:currentShopId));
+  if(!existing){
+    window.addToCart(product.id, product.name, product.offerPrice != null ? product.offerPrice : product.price, shopOverride);
+    if(targetQty > 1) hbCartQtyChange(shopOverride ? shopOverride.shopId : currentShopId, product.id, targetQty - 1);
+  }else{
+    const delta = targetQty - existing.qty;
+    if(delta !== 0) hbCartQtyChange(shopOverride ? shopOverride.shopId : currentShopId, product.id, delta);
+  }
+}
+
+// 📋 বর্তমান Cart-এর সারাংশ — বিদ্যমান hbCartGet() থেকেই, নতুন কোনো ডেটা-সোর্স না
+function hbAssistantCartSummaryHtml(){
+  const items = hbCartGet();
+  if(items.length === 0) return "আপনার বাজারের ব্যাগ এখনো খালি।";
+  let total = 0;
+  const lines = items.map(it=>{
+    total += it.price * it.qty;
+    return `✓ ${escapeHtml(it.productName)} — ${it.qty}টি (৳${it.price * it.qty})`;
+  }).join("<br>");
+  return `<b>আপনার বাজারের তালিকা</b><br><br>${lines}<br><br><b>মোট আনুমানিক: ৳${total}</b>`;
+}
+
+// 🤖 AI (Gemini, server-side secret দিয়ে) থেকে items আনার চেষ্টা — ব্যর্থ
+// হলে/খালি এলে স্বয়ংক্রিয়ভাবে বিদ্যমান নিয়ম-ভিত্তিক hbParseShoppingText
+// দিয়ে ফলব্যাক (Step 3-এর মতোই) — গ্রাহক কখনো "AI ডাউন" জাতীয় এরর দেখেন না
+async function hbGetShoppingItems(text){
+  try{
+    const callable = functionsInstance.httpsCallable("parseShoppingIntent");
+    const result = await callable({ text });
+    if(result.data && Array.isArray(result.data.items) && result.data.items.length > 0){
+      return { items: result.data.items, engine: result.data.engine || "ai" };
+    }
+  }catch(e){
+    console.warn("Gemini call ব্যর্থ, লোকাল পার্সার ব্যবহার হচ্ছে:", e);
+  }
+  return { items: hbParseShoppingText(text), engine: "local-fallback" };
+}
+
+async function hbAssistantProcessText(text){
+  // 🗣️ পুরো বাক্য "বাজারে কী আছে" ধরনের প্রশ্ন কিনা আগে দেখা হয়
+  if(/কী কী আছে|কি কি আছে|বাজারে কী|লিস্ট দেখাও|তালিকা দেখাও/.test(text)){
+    hbAssistantAppendBubble("assistant", hbAssistantCartSummaryHtml());
+    hbSpeak("আপনার বাজারের তালিকা বলছি।");
+    return;
+  }
+
+  // 🎯 পুরো বার্তার ওপর ভিত্তি করে একটাই অ্যাকশন ধরা হয় (যোগ/বাড়ানো/সেট/
+  // মোছা) — একই বার্তায় একাধিক ভিন্ন অ্যাকশন থাকার সম্ভাবনা কম বলে এটা
+  // সরল কিন্তু নির্ভরযোগ্য একটা সিদ্ধান্ত
+  const messageAction = hbDetectSegmentAction(text);
+
+  const thinkingBubble = hbAssistantAppendBubble("assistant", "🔍 খোঁজা হচ্ছে...");
+  const { items: parsedItems } = await hbGetShoppingItems(text);
+
+  if(parsedItems.length === 0){
+    thinkingBubble.remove();
+    hbAssistantAppendBubble("assistant", "বুঝতে পারিনি। আবার বলবেন?");
+    hbSpeak("বুঝতে পারিনি। আবার বলবেন?");
+    return;
+  }
+
+  let anyProcessed = false;
+
+  for(const item of parsedItems){
+    let qty = item.qty;
+    if(item.unit && HB_DOZEN_UNITS[item.unit]){ qty = item.qty * HB_DOZEN_UNITS[item.unit]; }
+
+    /* ---------- REMOVE: "তেলটা বাদ দাও" ---------- */
+    if(messageAction === "remove"){
+      const cartItem = hbFindCartItemByQuery(item.itemQuery);
+      if(!cartItem){
+        hbAssistantAppendBubble("assistant", `"<b>${escapeHtml(item.itemQuery)}</b>" আপনার বাজারে নেই।`);
+      }else{
+        hbCartRemove(cartItem.shopId, cartItem.productId);
+        const msg = `🗑️ ${cartItem.productName} বাদ দিলাম।`;
+        hbAssistantAppendBubble("assistant", msg);
+        hbSpeak(msg);
+      }
+      anyProcessed = true;
+      continue;
+    }
+
+    /* ---------- INCREASE/SET, যদি cart-এ আগে থেকেই থাকে ---------- */
+    if(messageAction === "increase" || messageAction === "set"){
+      const cartItem = hbFindCartItemByQuery(item.itemQuery);
+      if(cartItem){
+        const product = { id: cartItem.productId, name: cartItem.productName, price: cartItem.price, offerPrice: null };
+        const shopOv = { shopId: cartItem.shopId, shopName: cartItem.shopName };
+        const newQty = messageAction === "set" ? qty : cartItem.qty + qty;
+        hbAssistantSetCartQty(product, newQty, shopOv);
+        const msg = `🔄 ${cartItem.productName} এখন ${newQty}টি।`;
+        hbAssistantAppendBubble("assistant", msg);
+        hbSpeak(msg);
+        anyProcessed = true;
+        continue;
+      }
+      // cart-এ না থাকলে — নতুন আইটেম যোগ করার অনুরোধ হিসেবেই ট্রিট করা হয়
+    }
+
+    /* ---------- ADD (ডিফল্ট) — সার্চ→ম্যাচ→কার্ট ফ্লো ---------- */
+    const results = await searchProducts(item.itemQuery, {});
+
+    if(results.length === 0){
+      const msg = `এই পণ্যটি এখন খুঁজে পাচ্ছি না। অন্য কোনো পণ্য দিয়ে কি পরিবর্তন করব?`;
+      hbAssistantAppendBubble("assistant", msg);
+      hbSpeak(msg);
+      anyProcessed = true;
+      continue;
+    }
+
+    const top = results[0];
+    const second = results[1];
+    const isClearMatch = results.length === 1 || !second || top.matchScore >= second.matchScore * 1.5;
+
+    if(isClearMatch){
+      if(top.stockQty != null && Number(top.stockQty) <= 0){
+        const msg = `😔 ${top.name} এখন স্টকে নেই।`;
+        hbAssistantAppendBubble("assistant", msg);
+        hbSpeak(msg);
+        anyProcessed = true;
+        continue;
+      }
+      const shopOv = { shopId: top.shopId, shopName: top.shopName };
+      hbAssistantSetCartQty(top, qty, shopOv);
+      const qtyTxt = item.unit ? `${item.qty} ${item.unit}` : `${qty}টি`;
+      const msg = `জি, ${top.name} ${qtyTxt} যোগ করে দিলাম।`;
+      hbAssistantAppendBubble("assistant", `✅ ${escapeHtml(msg)}`);
+      hbSpeak(msg);
+    }else{
+      const options = results.slice(0, 4);
+      const optionsHtml = options.map((r,idx)=>
+        `<button class="hbAssistantOptionBtn" data-idx="${idx}" style="display:block; width:100%; text-align:left; padding:9px 12px; margin-top:6px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:#fff8e8; font-family:inherit; font-size:12.5px; cursor:pointer;">${escapeHtml(r.name)} — ৳${r.offerPrice != null ? r.offerPrice : r.price} <span style="color:var(--muted);">(${escapeHtml(r.shopName)})</span></button>`
+      ).join("");
+      const askMsg = `"${item.itemQuery}"-এ ${options.length} রকম পেলাম। কোনটা নেব?`;
+      const bubble = hbAssistantAppendBubble("assistant", `${escapeHtml(askMsg)}${optionsHtml}`);
+      hbSpeak(askMsg);
+      bubble.querySelectorAll(".hbAssistantOptionBtn").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const chosen = options[Number(btn.dataset.idx)];
+          const shopOv2 = { shopId: chosen.shopId, shopName: chosen.shopName };
+          hbAssistantSetCartQty(chosen, qty, shopOv2);
+          hbAssistantAppendBubble("user", escapeHtml(chosen.name));
+          const msg2 = `জি, ${chosen.name} যোগ করে দিলাম।`;
+          hbAssistantAppendBubble("assistant", `✅ ${escapeHtml(msg2)}`);
+          hbSpeak(msg2);
+          bubble.querySelectorAll(".hbAssistantOptionBtn").forEach(b=> b.disabled = true);
+        });
+      });
+    }
+    anyProcessed = true;
+  }
+  thinkingBubble.remove();
+
+  if(anyProcessed){
+    const summaryMsg = "আর কিছু লাগবে?";
+    hbAssistantAppendBubble("assistant", `${hbAssistantCartSummaryHtml()}<br><br>${summaryMsg}`);
+    hbSpeak(summaryMsg); // পুরো তালিকা বলে দেওয়া হয় না (দীর্ঘ voice বিরক্তিকর) — শুধু ছোট প্রশ্নটাই
+  }
+}
+
+$("hbAssistantBanner").addEventListener("click", hbAssistantOpen);
+$("hbAssistantBackBtn").addEventListener("click", hbAssistantClose);
+
 function haversineKm(lat1, lng1, lat2, lng2){
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -2768,16 +3291,20 @@ function hbCartBadgeUpdate(){
   else{ badge.style.display = "none"; }
 }
 
-window.addToCart = function(productId, productName, price){
+window.addToCart = function(productId, productName, price, shopOverride){
   if(!currentCustomer){ alert("Cart-এ যোগ করতে আগে Google দিয়ে লগইন করুন (☰ Menu থেকে)।"); return; }
-  const shopId = currentShopId;
-  const shopName = $("currentShopName").textContent || "দোকান";
+  // 🛒 shopOverride ঐচ্ছিক — না দিলে আগের মতোই currentShopId (বর্তমানে
+  // যে দোকানের পাতায় আছেন) ব্যবহার হয়, কোনো বিদ্যমান কল-সাইট প্রভাবিত হয়নি।
+  // Assistant মার্কেট-ব্যাপী খোঁজে বলে সঠিক shopId/shopName পাস করে দেয়,
+  // নাহলে ভুল দোকানের সাথে প্রোডাক্ট জুড়ে যেত।
+  const shopId = (shopOverride && shopOverride.shopId) || currentShopId;
+  const shopName = (shopOverride && shopOverride.shopName) || $("currentShopName").textContent || "দোকান";
   const items = hbCartGet();
   const existing = items.find(it=> it.productId === productId && it.shopId === shopId);
   if(existing) existing.qty += 1;
   else items.push({ shopId, shopName, productId, productName, price: Number(price)||0, qty: 1 });
   hbCartSet(items);
-  alert(`✅ "${productName}" Cart-এ যোগ হয়েছে।`);
+  if(!shopOverride) alert(`✅ "${productName}" Cart-এ যোগ হয়েছে।`); // Assistant নিজে চ্যাটে কনফার্ম করে, তাই alert ডুপ্লিকেট করা হয় না
 };
 
 function hbCartQtyChange(shopId, productId, delta){

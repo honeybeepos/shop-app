@@ -42,13 +42,18 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // ⚠️ delivery-man-app.html এখন আর আলাদা অ্যাপ না — Rider Mode হিসেবে
+      // shop-ledger-app.html-এ একীভূত, তাই ফোকাস/ওপেন দুটোই সেদিকেই যাবে।
+      // (পুরনো shop-code দিয়ে কানেক্ট করা কিছু ডিভাইস এখনো
+      // delivery-man-app.html-এই থাকতে পারে — সেগুলোর জন্য নিচের প্রথম
+      // চেকটা রাখা হলো, তবে নতুন সব রাইডারই shop-ledger-app.html ব্যবহার করেন)
       for (const client of clientList) {
-        if (client.url.includes("delivery-man-app.html") && "focus" in client) {
+        if ((client.url.includes("delivery-man-app.html") || client.url.includes("shop-ledger-app.html")) && "focus" in client) {
           return client.focus();
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow("delivery-man-app.html");
+        return clients.openWindow("shop-ledger-app.html");
       }
     })
   );

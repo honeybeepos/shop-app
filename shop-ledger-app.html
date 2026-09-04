@@ -602,6 +602,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="firebase-init.js"></script>
 
 <div id="authGate"><p>যাচাই করা হচ্ছে, একটু অপেক্ষা করুন...</p></div>
@@ -614,6 +616,9 @@
     <button id="shopSettingsBtn" title="সেটিং" style="padding:6px 10px; font-size:15px;">⚙️</button>
     <button id="ordBellBtn" title="Bazar অর্ডার" style="position:relative; padding:6px 10px; font-size:15px;">
       🔔<span id="ordBellBadge" style="display:none; position:absolute; top:-4px; right:-2px; background:#e0433c; color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:9px; line-height:16px; text-align:center; padding:0 3px; font-family:inherit;">0</span>
+    </button>
+    <button id="hbBellBtn" title="অনলাইন অর্ডার" style="position:relative; padding:6px 10px; font-size:15px;">
+      🔔<span id="hbBellBadge" style="display:none; position:absolute; top:-4px; right:-2px; background:#e0433c; color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:9px; line-height:16px; text-align:center; padding:0 3px; font-family:inherit;">0</span>
     </button>
     <button id="cloudLogoutBtn">লগআউট</button>
   </div>
@@ -637,8 +642,19 @@
     20%,40%,60%,80%{ transform:rotate(14deg); }
     90%{ transform:rotate(0deg); }
   }
+  #hbBellBtn.hbRinging{ animation:hbBellShake 1.1s ease-in-out infinite; animation-delay:0s; }
+  #hbBellBtn.hbRinging{ animation-iteration-count: infinite; }
   #ordBellBtn.hbRinging{ animation:hbBellShake 1.1s ease-in-out infinite; animation-delay:0s; }
 </style>
+
+<div class="modal-overlay" id="hbOrdersModalOverlay">
+  <div class="modal-box" style="max-width:400px; text-align:left; max-height:85vh; overflow-y:auto; background:#241605; color:#fff8e8; border:1px solid rgba(255,209,102,0.35);">
+    <h3 style="margin:0 0 4px; color:#ffd166;">🐝 অনলাইন অর্ডার</h3>
+    <p class="pin-desc" style="margin:0 0 14px; color:rgba(255,248,232,0.6);">প্রতিটা অর্ডার একসেপ্ট বা রিজেক্ট করতে পাসওয়ার্ড লাগবে।</p>
+    <div id="hbPendingListArea"></div>
+    <button id="hbOrdersModalCloseBtn" style="width:100%; margin-top:14px; padding:11px; border-radius:10px; border:1px solid rgba(255,209,102,0.35); background:transparent; color:#fff8e8; font-weight:700; cursor:pointer;">বন্ধ করুন</button>
+  </div>
+</div>
 
 <!-- 🗺️ লাইভ ম্যাপ — Honey Bee Network ডেলিভারি ট্র্যাকিং -->
 <div class="modal-overlay" id="hbLiveMapModalOverlay">
@@ -696,19 +712,6 @@
     <label style="display:block; font-size:12px; color:#8b7f6c; margin:0 0 4px;">📝 সাব-টাইটেল (ছোট বিবরণ, যেমনঃ কি কি সেল হয়)</label>
     <p id="shopSubtitle" contenteditable="true" spellcheck="false"
       style="outline:none; border:1px solid var(--line); border-radius:9px; padding:10px 12px; font-size:13.5px; margin:0 0 16px; background:#fff; min-height:18px;"></p>
-
-    <!-- 🏬 দোকানের বাজার — এটা সেট করা না থাকলে Bazar-এ দোকানটা কোনো
-         বাজারের নিচেই দেখা যায় না, আর POS থেকে রাইডার এসাইনও করা যায়
-         না (কারণ রাইডার খোঁজা হয় এই একই marketId দিয়ে) -->
-    <label style="display:block; font-size:12px; color:#8b7f6c; margin:0 0 4px;">🏬 দোকানের বাজার *</label>
-    <select id="shopMarketSelect" style="width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--line); background:#fff; font-family:inherit; font-size:13.5px; margin:0 0 6px;">
-      <option value="">লোড হচ্ছে...</option>
-    </select>
-    <p id="shopMarketHint" style="font-size:11px; color:#b45309; margin:0 0 16px;">⚠️ বাজার বেছে না দিলে কাস্টমাররা Bazar অ্যাপে আপনার দোকান খুঁজে পাবে না, এবং POS থেকে রাইডারও এসাইন করা যাবে না।</p>
-
-    <label style="display:block; font-size:12px; color:#8b7f6c; margin:0 0 4px;">📍 দোকানের সঠিক অবস্থান (GPS)</label>
-    <p style="font-size:11px; color:#666; margin:0 0 8px;">রাইডার-দূরত্ব হিসাব ও Live Map-এ শপের অবস্থান দেখাতে এটা দরকার।</p>
-    <button id="hbSetStoreLocationBtn" type="button" style="width:100%; padding:10px; border-radius:9px; border:1px solid var(--line); background:#f4f4f4; font-family:inherit; font-size:13px; cursor:pointer; margin:0 0 16px;">📍 দোকানের অবস্থান সেট করুন</button>
 
     <button class="btn" id="shopSettingsCloseBtn" style="width:100%;">✓ সম্পন্ন</button>
   </div>
@@ -1021,7 +1024,7 @@
     <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:10px; font-size:13.5px;"><span style="font-size:16px;">➡️</span><span>ড্রপ: <b id="rmOfferDrop">দোকান থেকে ঠিকানা</b></span></div>
     <div style="text-align:center; font-size:22px; font-weight:800; color:#2fbf71; margin:14px 0;">💰 আয়: ৳ <span id="rmOfferIncome">—</span></div>
     <div style="display:flex; gap:10px; margin-top:14px;">
-      <button style="flex:1; padding:13px; border:none; border-radius:11px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; background:#444; color:#fff;" id="rmOfferSkipBtn">❌ স্কিপ</button>
+      <button style="flex:1; padding:13px; border:none; border-radius:11px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; background:#444; color:#fff;" id="rmOfferSkipBtn">❌ গ্রহণ করব না</button>
       <button style="flex:1; padding:13px; border:none; border-radius:11px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; background:#2fbf71; color:#fff;" id="rmOfferAcceptBtn">🟢 একসেপ্ট করুন</button>
     </div>
   </div>
@@ -2076,10 +2079,10 @@
       <div class="bizChevron">›</div>
     </div>
     <div class="bizGlassCard bizNavCard" id="bizHoneyBeeCard">
-      <div class="bizIconBadge" style="background:linear-gradient(135deg,#ffd166,#fca311);">🔔</div>
+      <div class="bizIconBadge" style="background:linear-gradient(135deg,#ffd166,#fca311);">🐝</div>
       <div class="bizCardBody">
-        <div class="bizCardTitle">ডেলিভারি ম্যান কল</div>
-        <div class="bizCardSub">LEGACY DELIVERY DISPATCH</div>
+        <div class="bizCardTitle">Honey Bee Network</div>
+        <div class="bizCardSub">HIVE · NETWORK · GROWTH</div>
       </div>
       <div class="bizChevron">›</div>
     </div>
@@ -2959,12 +2962,33 @@
   #program-honeybee .hbEmpty{ text-align:center; font-size:12px; color:rgba(255,248,232,0.4); padding:16px 0; }
 </style>
 
+<div id="hbAddModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:340px; text-align:left; background:#241605; color:#fff8e8; border:1px solid rgba(255,209,102,0.35);">
+    <h3 style="margin:0 0 4px; color:var(--hb-amber, #ffd166);">🐝 নতুন অর্ডার যোগ করুন</h3>
+    <p class="pin-desc" style="margin:0 0 14px; color:rgba(255,248,232,0.6);">Honey Bee Network থেকে আসা একটা অনলাইন অর্ডার/ডেলিভারি লগ করুন</p>
+
+    <label style="display:block; font-size:12px; color:rgba(255,248,232,0.7); margin:0 0 4px;">অর্ডারের টাকা (৳)</label>
+    <input id="hbOrderAmount" type="number" inputmode="numeric" placeholder="০" style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid rgba(255,209,102,0.35); background:rgba(255,255,255,0.06); color:#fff8e8; font-size:15px; margin-bottom:12px;">
+
+    <label style="display:block; font-size:12px; color:rgba(255,248,232,0.7); margin:0 0 4px;">অতিরিক্ত আয় / কমিশন (৳)</label>
+    <input id="hbOrderIncome" type="number" inputmode="numeric" placeholder="০" style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid rgba(255,209,102,0.35); background:rgba(255,255,255,0.06); color:#fff8e8; font-size:15px; margin-bottom:12px;">
+
+    <label style="display:block; font-size:12px; color:rgba(255,248,232,0.7); margin:0 0 4px;">নোট (ঐচ্ছিক)</label>
+    <input id="hbOrderNote" type="text" placeholder="যেমনঃ কাস্টমারের এলাকা/আইটেম" style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid rgba(255,209,102,0.35); background:rgba(255,255,255,0.06); color:#fff8e8; font-size:14px; margin-bottom:16px;">
+
+    <div style="display:flex; gap:8px;">
+      <button id="hbOrderCancelBtn" style="flex:1; padding:11px; border-radius:10px; border:1px solid rgba(255,209,102,0.35); background:transparent; color:#fff8e8; font-weight:700; cursor:pointer;">বাতিল</button>
+      <button id="hbOrderSaveBtn" style="flex:1; padding:11px; border-radius:10px; border:none; background:linear-gradient(135deg,#ffd166,#fca311); color:#1a1206; font-weight:800; cursor:pointer;">✓ যোগ করুন</button>
+    </div>
+  </div>
+</div>
+
 <div id="program-honeybee" style="display:none; flex-direction:column; position:fixed; inset:0; z-index:500; overflow:auto;">
   <div class="hbHeader">
     <button id="backFromHoneyBee">←</button>
     <div>
-      <div class="hbHeaderTitle">🔔 ডেলিভারি ম্যান কল</div>
-      <div class="hbHeaderSub">লিগ্যাসি ডেলিভারি অ্যাপ ডিসপ্যাচ</div>
+      <div class="hbHeaderTitle">🐝 Honey Bee Network</div>
+      <div class="hbHeaderSub">Business Management</div>
     </div>
   </div>
 
@@ -2972,18 +2996,45 @@
     <div class="hbHiveWrap">
       <div class="hbHex">🐝</div>
     </div>
-    <div class="hbTitle">ডেলিভারি ম্যান ডাকুন</div>
-    <p class="hbTagline">যেসব শপ এখনো এজেন্ট/রাইডার সিস্টেমে যুক্ত হয়নি, তাদের জন্য — সরাসরি ডেলিভারি অ্যাপে রিং পাঠান।</p>
+    <div class="hbTitle">Honey Bee Network</div>
+    <p class="hbTagline">দোকানের সার্বিক লাইভ স্ট্যাটাস — আজকের অনলাইন অর্ডার, ডেলিভারি ও অতিরিক্ত আয় এক নজরে।</p>
   </div>
 
-  <button class="hbAddBtn" id="hbCallDeliveryBtn" style="background:linear-gradient(145deg,#16a34a,#0f7a3a);">🔔 ডেলিভারি ম্যান কে ডাকুন</button>
+  <div class="hbComb">
+    <div class="hbCard">
+      <div class="hbCardIcon">💰</div>
+      <div class="hbCardTitle">আজকের অনলাইন অর্ডার</div>
+      <div class="hbCardValue" id="hbTodayOrderAmount">৳ 0</div>
+    </div>
+    <div class="hbCard">
+      <div class="hbCardIcon">🛵</div>
+      <div class="hbCardTitle">মোট ডেলিভারি (আজ)</div>
+      <div class="hbCardValue" id="hbTodayDeliveryCount">0</div>
+    </div>
+    <div class="hbCard" style="grid-column:1 / -1;">
+      <div class="hbCardIcon">🍯</div>
+      <div class="hbCardTitle">অতিরিক্ত আয় (আজ)</div>
+      <div class="hbCardValue" id="hbTodayExtraIncome">৳ 0</div>
+    </div>
+  </div>
+
+  <button class="hbAddBtn" id="hbAddOrderBtn">➕ নতুন অর্ডার যোগ করুন</button>
+  <button class="hbAddBtn" id="hbCallDeliveryBtn" style="background:linear-gradient(145deg,#16a34a,#0f7a3a); margin-top:10px;">🔔 ডেলিভারি ম্যান কে ডাকুন</button>
   <div id="hbConnectCodeRow" style="text-align:center; margin-top:4px;">
     <span id="hbRingStatusLbl" style="font-size:11px; color:rgba(255,248,232,0.4);"></span>
     <span id="hbShowConnectCodeBtn" style="font-size:11px; color:var(--hb-amber); cursor:pointer; text-decoration:underline; margin-left:8px;">🔗 ডেলিভারি অ্যাপ কানেক্ট কোড দেখুন</span>
   </div>
-  <div style="text-align:center; margin-top:8px;">
-    <span id="hbOpenLiveMapBtn" style="font-size:11.5px; color:var(--hb-amber); cursor:pointer; text-decoration:underline;">📦 ডেলিভারি স্ট্যাটাস দেখুন/আপডেট করুন</span>
+  <div style="text-align:center; margin-top:8px; display:flex; gap:14px; justify-content:center; flex-wrap:wrap;">
+    <span id="hbSetStoreLocationBtn" style="font-size:11.5px; color:var(--hb-amber); cursor:pointer; text-decoration:underline;">📍 দোকানের অবস্থান সেট করুন</span>
+    <span id="hbOpenLiveMapBtn" style="font-size:11.5px; color:var(--hb-amber); cursor:pointer; text-decoration:underline;">🗺️ লাইভ ম্যাপ দেখুন</span>
   </div>
+
+  <div class="hbListWrap">
+    <div class="hbListTitle">📋 আজকের অর্ডার তালিকা</div>
+    <div id="hbOrderList"></div>
+  </div>
+
+  <p class="hbFootNote">🐝 প্রতিটা অনলাইন অর্ডার/ডেলিভারি হাতে যোগ করে রাখলে এখানে দৈনিক হিসাব স্বয়ংক্রিয়ভাবে দেখা যাবে।</p>
 </div>
 
 <div id="bccModalOverlay" style="display:none; position:fixed; inset:0; z-index:600; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
@@ -3616,7 +3667,6 @@ shopSubtitleEl.addEventListener('blur', ()=>{
 // সাব-ইউজার (সেলার) সবার জন্যই এই বাটন দেখা যাবে।
 document.getElementById('shopSettingsBtn').addEventListener('click', ()=>{
   document.getElementById('shopSettingsModalOverlay').classList.add('show');
-  shopMarketSelectorInit();
 });
 document.getElementById('shopSettingsCloseBtn').addEventListener('click', ()=>{
   shopTitleEl.blur();
@@ -3629,51 +3679,6 @@ document.getElementById('shopSettingsModalOverlay').addEventListener('click', (e
     shopSubtitleEl.blur();
     document.getElementById('shopSettingsModalOverlay').classList.remove('show');
   }
-});
-
-/* ==================== 🏬 দোকানের বাজার বেছে নেওয়া ====================
-   ⚠️ এটা আগে কোথাও সেট করার কোনো UI-ই ছিল না — দোকান কোনো marketId
-   ছাড়াই থেকে যেত, ফলে Bazar-এ বাজারের নিচে দোকান দেখাত না, আর
-   রাইডার-এসাইনও (যেটা এই একই marketId দিয়ে রাইডার খোঁজে) কখনো কাউকে
-   খুঁজে পেত না। এটাই ছিল আসল কারণ। */
-let __shopMarketsLoaded = false;
-async function shopMarketSelectorInit(){
-  const sel = document.getElementById('shopMarketSelect');
-  const session = (typeof getSession === 'function') ? getSession() : null;
-  if(!session || !session.shopId) return;
-
-  if(!__shopMarketsLoaded){
-    try{
-      const qs = await db.collection('markets').orderBy('name').get();
-      const markets = qs.docs.map(d=> ({ id:d.id, ...d.data() }));
-      sel.innerHTML = '<option value="">— বেছে নিন —</option>' +
-        markets.map(m=> `<option value="${m.id}">${(m.name||m.id).replace(/</g,'&lt;')}</option>`).join('');
-      __shopMarketsLoaded = true;
-    }catch(e){
-      sel.innerHTML = '<option value="">লোড করা যায়নি</option>';
-      console.warn('markets load failed:', e);
-      return;
-    }
-  }
-
-  try{
-    const shopDoc = await db.collection('shops').doc(session.shopId).get();
-    const currentMarketId = shopDoc.exists ? shopDoc.data().marketId : null;
-    sel.value = currentMarketId || '';
-    document.getElementById('shopMarketHint').style.display = currentMarketId ? 'none' : 'block';
-  }catch(e){ console.warn('shop market load failed:', e); }
-}
-
-document.getElementById('shopMarketSelect').addEventListener('change', async (ev)=>{
-  const session = (typeof getSession === 'function') ? getSession() : null;
-  if(!session || !session.shopId) return;
-  const marketId = ev.target.value;
-  try{
-    await db.collection('shops').doc(session.shopId).set({ marketId: marketId || null }, { merge: true });
-    document.getElementById('shopMarketHint').style.display = marketId ? 'none' : 'block';
-    __ordShopMarketId = null; // 🔄 ক্যাশ হয়ে থাকা পুরনো marketId মুছে দেওয়া, যাতে অর্ডার-ব্যবস্থাপনা সাথে সাথেই নতুনটা ব্যবহার করে
-    if(typeof toast === 'function') toast('✅ বাজার সেভ হয়েছে');
-  }catch(e){ alert('সেভ করা যায়নি: ' + e.message); }
 });
 
 document.getElementById('logoWrap').addEventListener('click', ()=> logoInputEl.click());
@@ -4286,6 +4291,14 @@ async function ordRender(orders){
     listEl.innerHTML = '<div class="ordEmpty">এই ধাপে কোনো অর্ডার নেই।</div>';
     return;
   }
+  // 🤖 dispatchState অনুযায়ী মানুষ-পড়ার-মতো লেবেল — অটো-ডিসপ্যাচ কোন
+  // ধাপে আছে তা দোকানদার এখান থেকেই বুঝবেন, আলাদা করে কিছু করতে হবে না
+  const DISPATCH_STATE_LABEL = {
+    searching_rider: '🤖 রাইডার খোঁজা হচ্ছে...',
+    offer_sent: '🤖 রাইডারকে অফার পাঠানো হয়েছে — সাড়ার অপেক্ষায় (সর্বোচ্চ ১ মিনিট)',
+    assigned: '✅ রাইডার এসাইন হয়ে গেছে',
+  };
+
   listEl.innerHTML = orders.map(o=>{
     const time = o.createdAt ? o.createdAt.toDate().toLocaleString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
     let actionHtml = '';
@@ -4296,13 +4309,25 @@ async function ordRender(orders){
           <button class="ordRejectBtn" data-oid="${o.id}" style="flex:1; padding:10px; border:none; border-radius:9px; background:rgba(220,38,38,0.2); color:#fca5a5; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">❌ বাতিল করুন</button>
         </div>`;
     }else if(__ordCurrentStatus === 'preparing'){
-      actionHtml = `
-        <div style="margin-top:10px;">
-          <select class="ordRiderSelect" data-oid="${o.id}" style="width:100%; padding:9px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#fff; font-family:inherit; font-size:12px; margin-bottom:8px;">
-            <option value="">রাইডার বেছে নিন...</option>
-          </select>
-          <button class="ordAssignBtn" data-oid="${o.id}" style="width:100%; padding:10px; border:none; border-radius:9px; background:#0ea5e9; color:#04222f; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">🚚 রাইডার এসাইন করে পাঠান</button>
-        </div>`;
+      // 🤖 স্বাভাবিক অবস্থায় (searching_rider/offer_sent/assigned) — অটো-ডিসপ্যাচ
+      // নিজে থেকেই কাজ করছে, দোকানদারকে রাইডার বাছতে বলা হয় না
+      if(o.dispatchState === 'searching_rider' || o.dispatchState === 'offer_sent' || o.dispatchState === 'assigned'){
+        actionHtml = `<div style="margin-top:10px; padding:9px 10px; border-radius:8px; background:rgba(14,165,233,0.12); color:#7dd3fc; font-size:12px; font-weight:700;">${DISPATCH_STATE_LABEL[o.dispatchState]}</div>`;
+      }
+      // ⚠️ dispatchState === 'waiting_for_rider' (কোনো এলিজিবল রাইডার নেই) —
+      // অথবা dispatchState একদমই নেই (পুরনো/legacy অর্ডার, অটো-ডিসপ্যাচ এখনো
+      // ট্রিগার হয়নি) — শুধু তখনই জরুরি ম্যানুয়াল ফলব্যাক দেখানো হয়
+      else{
+        actionHtml = `
+          ${o.dispatchState === 'waiting_for_rider' ? `<div style="margin-top:10px; padding:10px; border-radius:8px; background:rgba(234,179,8,0.12); color:#fbbf24; font-size:11.5px; font-weight:700; line-height:1.5;">⚠️ এই মুহূর্তে কোনো Delivery Rider Duty-তে নেই।<br>অর্ডারটি Delivery Queue-তে রাখা হয়েছে।<br>Rider available হলে System automatically assignment করবে।</div>` : ''}
+          <div style="margin-top:8px;">
+            <div style="font-size:10.5px; color:#8ec9a8; margin-bottom:4px;">${o.dispatchState === 'waiting_for_rider' ? '⚠️ জরুরি ম্যানুয়াল Assignment (ঐচ্ছিক)' : ''}</div>
+            <select class="ordRiderSelect" data-oid="${o.id}" style="width:100%; padding:9px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#fff; font-family:inherit; font-size:12px; margin-bottom:8px;">
+              <option value="">রাইডার বেছে নিন...</option>
+            </select>
+            <button class="ordAssignBtn" data-oid="${o.id}" style="width:100%; padding:10px; border:none; border-radius:9px; background:#0ea5e9; color:#04222f; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">🚚 রাইডার এসাইন করে পাঠান</button>
+          </div>`;
+      }
     }else if(__ordCurrentStatus === 'shipped'){
       actionHtml = `
         <div style="margin-top:10px; font-size:11.5px; color:#8ec9a8;">🚚 রাইডার: ${o.assignedRiderName ? escapeAttr(o.assignedRiderName) : '—'}</div>
@@ -4327,9 +4352,11 @@ async function ordRender(orders){
   listEl.querySelectorAll('.ordRejectBtn').forEach(btn=>{
     btn.addEventListener('click', ()=>{ if(confirm('এই অর্ডারটা বাতিল করবেন?')) ordUpdateStatus(btn.dataset.oid, 'cancelled'); });
   });
-  // Rider dropdown populate (preparing ট্যাবে) — কাছের রাইডার আগে দেখানো হয়
-  if(__ordCurrentStatus === 'preparing'){
-    const session = (typeof getSession === 'function') ? getSession() : null; // ⚠️ আগে এখানে session সংজ্ঞায়িত ছিল না, তাই দূরত্ব-হিসাব নীরবে ব্যর্থ হতো
+  // Rider dropdown populate — শুধু যেসব কার্ডে ম্যানুয়াল ফলব্যাক UI দেখানো
+  // হয়েছে (waiting_for_rider বা dispatchState-বিহীন পুরনো অর্ডার), সেগুলোতেই
+  // — স্বাভাবিক অটো-ডিসপ্যাচ চলাকালীন এই ড্রপডাউন একদমই রেন্ডার হয় না
+  if(__ordCurrentStatus === 'preparing' && listEl.querySelector('.ordRiderSelect')){
+    const session = (typeof getSession === 'function') ? getSession() : null;
     const marketId = await ordGetShopMarketId();
     let riders = [];
     if(marketId && session && session.shopId){
@@ -4374,7 +4401,8 @@ async function ordRender(orders){
           await db.collection('orderRequests').doc(btn.dataset.oid).update({
             status: 'shipped', assignedRiderId: riderId, assignedRiderName: rider ? rider.name : null,
             riderAssignedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            shippedAt: firebase.firestore.FieldValue.serverTimestamp()
+            shippedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            dispatchState: 'assigned' // ম্যানুয়ালি এসাইন করলেও dispatchState সমন্বিত থাকে
           });
         }catch(e){ alert('এসাইন করা যায়নি: ' + e.message); }
       });
@@ -4418,6 +4446,7 @@ document.querySelectorAll('#program-orders .ordSubtab').forEach(tab=>{
 
 document.getElementById('bizHoneyBeeCard').addEventListener('click', ()=>{
   switchProgram('program-bizmgmt', 'program-honeybee');
+  hbRenderDashboard();
 });
 document.getElementById('backFromHoneyBee').addEventListener('click', ()=> switchProgram('program-honeybee', 'program-bizmgmt'));
 
@@ -4766,6 +4795,170 @@ document.getElementById('hbCloseLiveMapBtn').addEventListener('click', ()=>{
    দোকানের বাইরে থেকে (Honey Bee Network-এর মাধ্যমে) আসা অনলাইন অর্ডার/ডেলিভারি হাতে
    লগ করে রাখার জায়গা — এখান থেকেই আজকের অর্ডার-টাকা, ডেলিভারি সংখ্যা ও অতিরিক্ত
    আয় স্বয়ংক্রিয়ভাবে হিসাব হয়ে দেখায়। */
+function hbLoadOrders(){ try{ return JSON.parse(localStorage.getItem('honeybee-orders')||'[]'); }catch(e){ return []; } }
+function hbSaveOrders(list){ localStorage.setItem('honeybee-orders', JSON.stringify(list)); }
+function hbIsToday(dateStr){
+  const d = new Date(dateStr), now = new Date();
+  return d.toDateString() === now.toDateString();
+}
+
+function hbRenderDashboard(){
+  const all = hbLoadOrders();
+  const todays = all.filter(o => hbIsToday(o.date)).sort((a,b)=> new Date(b.date) - new Date(a.date));
+
+  const totalOrderAmount = todays.reduce((s,o)=> s + (Number(o.amount)||0), 0);
+  const totalIncome = todays.reduce((s,o)=> s + (Number(o.income)||0), 0);
+
+  document.getElementById('hbTodayOrderAmount').textContent = `৳ ${fmt(totalOrderAmount)}`;
+  document.getElementById('hbTodayDeliveryCount').textContent = todays.length;
+  document.getElementById('hbTodayExtraIncome').textContent = `৳ ${fmt(totalIncome)}`;
+
+  const listEl = document.getElementById('hbOrderList');
+  if(!todays.length){
+    listEl.innerHTML = '<div class="hbEmpty">আজ এখনো কোনো অর্ডার যোগ করা হয়নি</div>';
+    return;
+  }
+  listEl.innerHTML = todays.map(o => `
+    <div class="hbOrderRow">
+      <div>
+        <div class="hbOrderInfo">💰 ৳ ${fmt(o.amount)}${o.income ? ` &nbsp;·&nbsp; 🍯 ৳ ${fmt(o.income)}` : ''}</div>
+        <div class="hbOrderMeta">${o.note ? escapeHtml(o.note) + ' — ' : ''}${new Date(o.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}</div>
+      </div>
+      <button class="hbOrderDel" onclick="hbDeleteOrder('${o.id}')">মুছুন</button>
+    </div>
+  `).join('');
+}
+
+function hbDeleteOrder(id){
+  const all = hbLoadOrders().filter(o => o.id !== id);
+  hbSaveOrders(all);
+  hbRenderDashboard();
+}
+
+document.getElementById('hbAddOrderBtn').addEventListener('click', ()=>{
+  document.getElementById('hbOrderAmount').value = '';
+  document.getElementById('hbOrderIncome').value = '';
+  document.getElementById('hbOrderNote').value = '';
+  document.getElementById('hbAddModal').classList.add('show');
+});
+document.getElementById('hbOrderCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('hbAddModal').classList.remove('show');
+});
+document.getElementById('hbAddModal').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'hbAddModal') document.getElementById('hbAddModal').classList.remove('show');
+});
+document.getElementById('hbOrderSaveBtn').addEventListener('click', ()=>{
+  const amount = Number(document.getElementById('hbOrderAmount').value) || 0;
+  const income = Number(document.getElementById('hbOrderIncome').value) || 0;
+  const note = document.getElementById('hbOrderNote').value.trim();
+  if(amount <= 0 && income <= 0){ toast('অর্ডারের টাকা বা অতিরিক্ত আয় — অন্তত একটা দিন'); return; }
+
+  // নতুন অর্ডার সরাসরি আজকের হিসাবে যোগ হয় না — আগে "পেন্ডিং" (অপেক্ষমাণ) তালিকায় যায়,
+  // ঘণ্টা আইকনে নোটিফিকেশন দেখায়, এবং একসেপ্ট করলে তবেই আজকের অর্ডারে যোগ হয়।
+  const pending = hbLoadPending();
+  pending.unshift({ id: genLineId(), amount, income, note, date: new Date().toISOString() });
+  hbSavePending(pending);
+  hbUpdateBellBadge();
+
+  document.getElementById('hbAddModal').classList.remove('show');
+  toast('🔔 নতুন অর্ডার এসেছে — ঘণ্টা আইকনে গিয়ে একসেপ্ট/রিজেক্ট করুন');
+});
+
+/* ==================== 🔔 অনলাইন অর্ডার নোটিফিকেশন (একসেপ্ট/রিজেক্ট) ====================
+   নতুন অর্ডার প্রথমে "পেন্ডিং" (অপেক্ষমাণ) থাকে — ঘণ্টা আইকনে কাঁপা অ্যানিমেশন ও কাউন্ট
+   ব্যাজ দেখায়। ঘণ্টায় ক্লিক করলে তালিকা আসে, প্রতিটার সাথে ✅ একসেপ্ট / ❌ রিজেক্ট বাটন
+   থাকে — দুটোতেই পাসওয়ার্ড লাগে, যাতে ভুলবশত ট্যাপ হয়ে গেলে কিছু বদলে না যায়।
+   একসেপ্ট করলে অর্ডারটা আজকের Honey Bee Network হিসাবে যোগ হয় এবং সাথে সাথে
+   প্রিন্ট শুরু হয়ে যায়। */
+function hbLoadPending(){ try{ return JSON.parse(localStorage.getItem('honeybee-pending-orders')||'[]'); }catch(e){ return []; } }
+function hbSavePending(list){ localStorage.setItem('honeybee-pending-orders', JSON.stringify(list)); }
+
+function hbUpdateBellBadge(){
+  const n = hbLoadPending().length;
+  const badge = document.getElementById('hbBellBadge');
+  const bell = document.getElementById('hbBellBtn');
+  if(n > 0){
+    badge.textContent = n > 99 ? '99+' : n;
+    badge.style.display = 'flex';
+    badge.style.alignItems = 'center';
+    badge.style.justifyContent = 'center';
+    bell.classList.add('hbRinging');
+  } else {
+    badge.style.display = 'none';
+    bell.classList.remove('hbRinging');
+  }
+}
+hbUpdateBellBadge();
+
+function hbRenderPendingList(){
+  const pending = hbLoadPending().sort((a,b)=> new Date(b.date) - new Date(a.date));
+  const area = document.getElementById('hbPendingListArea');
+  if(!pending.length){
+    area.innerHTML = '<div class="hbEmpty">এখন কোনো নতুন অর্ডার নেই</div>';
+    return;
+  }
+  area.innerHTML = pending.map(o => `
+    <div class="hbOrderRow" style="flex-direction:column; align-items:stretch; gap:8px;">
+      <div>
+        <div class="hbOrderInfo">💰 ৳ ${fmt(o.amount)}${o.income ? ` &nbsp;·&nbsp; 🍯 ৳ ${fmt(o.income)}` : ''}</div>
+        <div class="hbOrderMeta">${o.note ? escapeHtml(o.note) + ' — ' : ''}${new Date(o.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button onclick="hbAcceptOrder('${o.id}')" style="flex:1; padding:9px; border-radius:9px; border:none; background:linear-gradient(135deg,#4ade80,#16a34a); color:#fff; font-weight:800; cursor:pointer;">✅ একসেপ্ট</button>
+        <button onclick="hbRejectOrder('${o.id}')" style="flex:1; padding:9px; border-radius:9px; border:1px solid rgba(255,120,120,0.4); background:rgba(255,90,90,0.15); color:#ffb4b4; font-weight:800; cursor:pointer;">❌ রিজেক্ট</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('hbBellBtn').addEventListener('click', ()=>{
+  hbRenderPendingList();
+  document.getElementById('hbOrdersModalOverlay').classList.add('show');
+});
+document.getElementById('hbOrdersModalCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('hbOrdersModalOverlay').classList.remove('show');
+});
+document.getElementById('hbOrdersModalOverlay').addEventListener('click', (ev)=>{
+  if(ev.target.id === 'hbOrdersModalOverlay') document.getElementById('hbOrdersModalOverlay').classList.remove('show');
+});
+
+async function hbAcceptOrder(id){
+  const entered = await openPinModal('পাসওয়ার্ড দিন', 'অর্ডারটা একসেপ্ট করতে পাসওয়ার্ড দিন।');
+  if(entered === null) return;
+  if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, একসেপ্ট হয়নি'); return; }
+
+  const pending = hbLoadPending();
+  const idx = pending.findIndex(o => o.id === id);
+  if(idx === -1) return;
+  const order = pending[idx];
+  pending.splice(idx, 1);
+  hbSavePending(pending);
+
+  const accepted = hbLoadOrders();
+  accepted.unshift(order);
+  hbSaveOrders(accepted);
+
+  hbUpdateBellBadge();
+  hbRenderPendingList();
+  if(document.getElementById('program-honeybee').style.display !== 'none') hbRenderDashboard();
+  toast('✅ অর্ডার একসেপ্ট হয়েছে — আজকের হিসাবে যোগ হয়েছে');
+
+  // একসেপ্ট করার সাথে সাথেই অর্ডার প্রিন্ট শুরু হবে
+  const msg = `🐝 Honey Bee Network Order\n\nOrder Amount: ৳ ${order.amount}${order.income ? `\nExtra Income: ৳ ${order.income}` : ''}${order.note ? `\nNote: ${order.note}` : ''}\n\nTime: ${new Date(order.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}\nDate: ${new Date(order.date).toLocaleDateString('en-GB')}\n\nStatus: ✅ Accepted`;
+  printSaleReceipt('Honey Bee Network', '', msg);
+}
+
+async function hbRejectOrder(id){
+  const entered = await openPinModal('পাসওয়ার্ড দিন', 'অর্ডারটা রিজেক্ট করতে পাসওয়ার্ড দিন।');
+  if(entered === null) return;
+  if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, রিজেক্ট হয়নি'); return; }
+
+  const pending = hbLoadPending().filter(o => o.id !== id);
+  hbSavePending(pending);
+  hbUpdateBellBadge();
+  hbRenderPendingList();
+  toast('❌ অর্ডার রিজেক্ট করা হয়েছে');
+}
 
 /* ============================================================
    REPORT CENTER — সব হিসাব এক জায়গা থেকে, Date filter দিয়ে
@@ -6790,6 +6983,7 @@ async function bccSyncProductToBazar(p){
       barcode: p.code || null,
       catId: p.catId || null,
       subId: p.subId || null,
+      imageUrl: p.imageUrl || null, // 🖼️ Step 5 — Storage-এ আপলোড করা ছবি থাকলে Bazar-এও দেখা যাবে
       updatedAt: fbNow()
     });
   }catch(e){ console.warn('Bazar sync failed:', e); }
@@ -7356,6 +7550,10 @@ function bccQuickRestock(id){
 // --- product modal ---
 let bccEditingProductId = null;
 let bccPendingImage = '';
+let bccLastImageDuplicateCheck = null; // Step 3 — সবশেষ ছবির duplicate-check ফলাফল (তথ্যমূলক, ভবিষ্যতের Storage-ধাপের জন্য রেফারেন্স)
+let bccPendingImageIsNew = false;           // Step 5 — এই মোডাল-সেশনে সত্যিই নতুন ফাইল select করা হয়েছে কিনা
+let bccPendingImageProcessedResult = null;  // Step 5 — {blob, dataUrl, sizeBytes, width, height}
+let bccPendingImageDupCheck = null;         // Step 5 — hbCheckImageDuplicate()-এর ফলাফল
 function bccOpenProductModal(editId){
   bccEditingProductId = editId || null;
   const prods = bccLoadProducts();
@@ -7382,6 +7580,9 @@ function bccOpenProductModal(editId){
   document.getElementById('bccPNote').value = p ? (p.note||'') : '';
   document.getElementById('bccPImage').value = '';
   bccPendingImage = p ? (p.image||'') : '';
+  bccPendingImageIsNew = false; // 🖼️ Step 5 — মোডাল খোলার সময় রিসেট, নতুন ছবি select না করলে এটা false-ই থাকবে
+  bccPendingImageProcessedResult = null;
+  bccPendingImageDupCheck = null;
   document.getElementById('bccPNameResults').classList.remove('show');
   document.getElementById('bccPPublished').checked = p ? !!p.published : false;
   bccUpdatePublishStatusTxt();
@@ -7409,15 +7610,351 @@ function bccCheckMarginWarning(){
 document.getElementById('bccPBuy').addEventListener('input', bccCheckMarginWarning);
 document.getElementById('bccPSell').addEventListener('input', bccCheckMarginWarning);
 
+/* ==================== 🖼️ Product Image Processing Module — Phase 1 ====================
+   ⚠️ এই মডিউল শুধু browser-এর মধ্যেই কাজ করে (Canvas API) — কোনো
+   Firebase Storage/আপলোড/duplicate-detection এখানে নেই (ইচ্ছাকৃতভাবে,
+   এই ধাপে সেসব শুরু করতে বলা হয়নি)। এটা reusable — ভবিষ্যতে Storage
+   upload flow-এ এই একই ফাংশনের রেজাল্ট (blob) সরাসরি ব্যবহার করা যাবে।
+
+   Flow: File → Canvas-এ আঁকা (max 1200×1200-এ resize) → WebP-এ এক্সপোর্ট
+   → সাইজ ২০০KB-এর বেশি হলে ধাপে ধাপে quality কমানো → তাতেও না হলে
+   dimension কমিয়ে আবার চেষ্টা — কিন্তু একটা নিরাপদ floor-এর নিচে
+   (quality 0.4, dimension 400px) নামবে না, আর সর্বোচ্চ সীমিত কয়েকবার
+   চেষ্টা করে থামে (infinite loop হওয়ার কোনো সুযোগ নেই)। */
+const HB_IMG_TARGET_BYTES = 150 * 1024; // ~150KB পছন্দের লক্ষ্য
+const HB_IMG_MAX_BYTES = 200 * 1024;    // ২০০KB সর্বোচ্চ সীমা
+const HB_IMG_MAX_DIM = 1200;            // সর্বোচ্চ dimension
+const HB_IMG_MIN_DIM = 400;             // dimension floor — এর নিচে ছবি অচেনা হয়ে যাবে
+const HB_IMG_QUALITY_FLOOR = 0.4;       // quality floor — এর নিচে দৃশ্যমান মানের ক্ষতি হয়
+
+function hbLoadImageFromFile(file){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = ()=>{ URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = (e)=>{ URL.revokeObjectURL(url); reject(new Error("ছবি লোড করা যায়নি")); };
+    img.src = url;
+  });
+}
+function hbCanvasToWebpBlob(canvas, quality){
+  return new Promise((resolve)=>{
+    canvas.toBlob((blob)=> resolve(blob), "image/webp", quality);
+  });
+}
+function hbDrawResizedCanvas(img, width, height){
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, width, height);
+  return canvas;
+}
+
+/* 🎯 মূল ফাংশন — File নিয়ে {blob, dataUrl, sizeBytes, width, height} রিটার্ন করে */
+async function hbProcessProductImage(file){
+  if(!file || !file.type || !file.type.startsWith("image/")){
+    throw new Error("শুধু ছবি ফাইল সমর্থিত (JPEG/PNG/WebP)");
+  }
+  const img = await hbLoadImageFromFile(file);
+
+  // ধাপ ১ — প্রাথমিক resize (max 1200×1200, aspect ratio অক্ষত রেখে)
+  let width = img.naturalWidth || img.width;
+  let height = img.naturalHeight || img.height;
+  if(width > HB_IMG_MAX_DIM || height > HB_IMG_MAX_DIM){
+    const scale = HB_IMG_MAX_DIM / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  let canvas = hbDrawResizedCanvas(img, width, height);
+
+  // ধাপ ২ — quality ধীরে ধীরে কমিয়ে WebP এক্সপোর্ট (সর্বোচ্চ ৪টা ধাপ, bounded)
+  const qualitySteps = [0.85, 0.7, 0.55, HB_IMG_QUALITY_FLOOR];
+  let blob = null;
+  for(const q of qualitySteps){
+    blob = await hbCanvasToWebpBlob(canvas, q);
+    if(blob && blob.size <= HB_IMG_MAX_BYTES) break;
+  }
+
+  // ধাপ ৩ — quality floor-এও ২০০KB-এর বেশি হলে dimension কমিয়ে আবার
+  // চেষ্টা (সর্বোচ্চ ২ বার — infinite loop এড়াতে কড়া সীমা)
+  let attempts = 0;
+  while(blob && blob.size > HB_IMG_MAX_BYTES && attempts < 2 && width > HB_IMG_MIN_DIM){
+    width = Math.max(HB_IMG_MIN_DIM, Math.round(width * 0.8));
+    height = Math.max(HB_IMG_MIN_DIM, Math.round(height * 0.8));
+    canvas = hbDrawResizedCanvas(img, width, height);
+    blob = await hbCanvasToWebpBlob(canvas, HB_IMG_QUALITY_FLOOR);
+    attempts++;
+  }
+
+  if(!blob) throw new Error("ছবি প্রসেস করা যায়নি");
+
+  // ⚠️ সততার সাথে: চরম ক্ষেত্রে (অত্যন্ত জটিল/বড় ছবি) floor-এও ২০০KB-এর
+  // নিচে না-ও আসতে পারে — তখন যা পাওয়া গেছে সেটাই ব্যবহার হয় (দৃশ্যমান
+  // মানের সাথে আপস করে জোর করে আরও ছোট করা হয় না, যেমনটা নির্দেশনায় বলা)
+  const dataUrl = await new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+
+  return { blob, dataUrl, sizeBytes: blob.size, width, height };
+}
+
+/* ==================== 🔍 SHA-256 Duplicate Detection — Step 3 ====================
+   ⚠️ hash সবসময় FINAL PROCESSED WebP blob-এর ওপর তৈরি হয় (raw
+   5MB আসল ছবির ওপর না) — নাহলে একই ছবি সামান্য ভিন্ন কম্প্রেশন-সেটিংয়ে
+   দুইবার প্রসেস হলে ভিন্ন hash আসতে পারত এবং duplicate-detection ব্যর্থ হতো।
+
+   ⚠️ imageIndex কালেকশন বাস্তবে এখনো তৈরি হয়নি (আগের ধাপেই নিশ্চিত করা
+   হয়েছে) — তাই এই মুহূর্তে lookup করলে স্বাভাবিকভাবেই সবসময় "NEW_IMAGE"
+   আসবে (খালি কালেকশনে কিছুই match করবে না) — এটা বাগ না, প্রত্যাশিত। */
+
+// 🔐 Web Crypto API (crypto.subtle) দিয়ে SHA-256 — কোনো external library লাগে না
+async function hbComputeSha256(blob){
+  const buffer = await blob.arrayBuffer();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b=> b.toString(16).padStart(2, "0")).join("");
+}
+
+// 🔎 Firestore imageIndex-এ এই hash আগে থেকে আছে কিনা খোঁজা — একক-ফিল্ড
+// equality কোয়েরি (কোনো composite index লাগে না)
+async function hbLookupImageByHash(sha256){
+  try{
+    const qs = await db.collection("imageIndex").where("sha256","==",sha256).limit(1).get();
+    if(!qs.empty){
+      const doc = qs.docs[0];
+      const d = doc.data();
+      return {
+        status: "DUPLICATE",
+        imageId: d.imageId || doc.id,
+        sha256: d.sha256,
+        storagePath: d.storagePath,
+        imageUrl: d.imageUrl,
+        referenceCount: d.referenceCount || 0,
+      };
+    }
+  }catch(e){
+    console.warn("imageIndex lookup ব্যর্থ (কালেকশন না থাকলে এটা স্বাভাবিক):", e);
+  }
+  return { status: "NEW_IMAGE", sha256 };
+}
+
+// 🎯 মূল ফাংশন — processed blob নিয়ে hash বের করে lookup করে ফলাফল দেয়
+async function hbCheckImageDuplicate(blob){
+  const sha256 = await hbComputeSha256(blob);
+  const result = await hbLookupImageByHash(sha256);
+  return result;
+}
+
+/* ==================== ☁️ Real Firebase Storage Upload — Step 4 ====================
+   ⚠️ এই ফাংশনটা এখনো Product Save বাটনে যুক্ত করা হয়নি (পরের ধাপের কাজ) —
+   এখানে শুধু ফাংশনটা প্রস্তুত ও স্বতন্ত্রভাবে টেস্টযোগ্য করে রাখা হলো।
+   ছবি select করার সাথে সাথেই এটা ট্রিগার হয় না (orphan Storage file
+   এড়াতে) — শুধু ম্যানুয়ালি/টেস্ট থেকে কল করলেই আপলোড হবে। */
+async function hbUploadOrReuseProductImage(processedResult, dupCheckResult, shopId){
+  if(!storage) throw new Error("Firebase Storage SDK লোড হয়নি (firebase-storage-compat.js চেক করুন)");
+  if(!shopId) throw new Error("shopId প্রয়োজন (uploaderShopId-এর জন্য)");
+
+  const sha256 = dupCheckResult.sha256;
+  const storagePath = `product-images/${sha256}.webp`;
+
+  // 🔁 আগেই DUPLICATE ধরা পড়ে থাকলে upload-এর দরকারই নেই
+  if(dupCheckResult.status === "DUPLICATE"){
+    return dupCheckResult;
+  }
+
+  const storageRef = storage.ref(storagePath);
+
+  // ⚠️ রেস-কন্ডিশন সুরক্ষা #১ — আপলোডের ঠিক আগে এই deterministic path-এ
+  // ফাইল ইতিমধ্যে আছে কিনা আরেকবার যাচাই (অন্য কোনো ট্যাব/কাস্টমার
+  // একই মুহূর্তে একই ছবি আপলোড করে ফেলে থাকতে পারে) — থাকলে overwrite
+  // না করে বিদ্যমানটাই DUPLICATE হিসেবে ব্যবহার করা হয়
+  try{
+    const existingUrl = await storageRef.getDownloadURL();
+    const existingDoc = await db.collection("imageIndex").doc(sha256).get();
+    if(existingDoc.exists){
+      const d = existingDoc.data();
+      return { status: "DUPLICATE", imageId: d.imageId || sha256, sha256, storagePath: d.storagePath, imageUrl: d.imageUrl, referenceCount: d.referenceCount || 0 };
+    }
+    // ফাইল Storage-এ আছে কিন্তু imageIndex ডকুমেন্ট নেই (অস্বাভাবিক/অসামঞ্জস্যপূর্ণ অবস্থা) —
+    // তাও ফাইলের URL দিয়ে একটা নিরাপদ DUPLICATE-সদৃশ রেজাল্ট দেওয়া হচ্ছে, দ্বিতীয় ফাইল বানানো হয় না
+    return { status: "DUPLICATE", imageId: sha256, sha256, storagePath, imageUrl: existingUrl, referenceCount: 0 };
+  }catch(e){
+    if(e.code !== "storage/object-not-found"){
+      console.error("Storage existence-check ব্যর্থ:", e);
+      throw new Error("Storage যাচাই করা যায়নি: " + (e.message || e.code));
+    }
+    // object-not-found = স্বাভাবিক, ফাইল এখনো নেই, আপলোড করা যাবে
+  }
+
+  // 📤 আসল আপলোড
+  let uploadedUrl;
+  try{
+    await storageRef.put(processedResult.blob, { contentType: "image/webp" });
+    uploadedUrl = await storageRef.getDownloadURL();
+  }catch(e){
+    console.error("Storage upload ব্যর্থ:", e);
+    if(e.code === "storage/unauthorized"){
+      throw new Error("Storage আপলোডের অনুমতি নেই — Storage Rules-এ এই পাথে write অনুমোদিত কিনা চেক করুন");
+    }
+    throw new Error("ছবি আপলোড ব্যর্থ: " + (e.message || e.code || e));
+  }
+
+  // 📝 imageIndex ডকুমেন্ট তৈরি — রেস-কন্ডিশন সুরক্ষা #২ (লেখার ঠিক আগে আরেকবার চেক)
+  const imageIndexRef = db.collection("imageIndex").doc(sha256);
+  try{
+    const recheckDoc = await imageIndexRef.get();
+    if(recheckDoc.exists){
+      const d = recheckDoc.data();
+      return { status: "DUPLICATE", imageId: d.imageId || sha256, sha256, storagePath: d.storagePath, imageUrl: d.imageUrl, referenceCount: d.referenceCount || 0 };
+    }
+    await imageIndexRef.set({
+      imageId: sha256,
+      sha256,
+      storagePath,
+      imageUrl: uploadedUrl,
+      sizeBytes: processedResult.sizeBytes,
+      format: "webp",
+      referenceCount: 0,
+      // 🖼️ Step 6 — তৈরির মুহূর্তে referenceCount 0 (এখনো কোনো প্রোডাক্টে
+      // যুক্ত হয়নি), তাই সততার সাথে ORPHAN হিসেবেই শুরু হয় — bccIntegrateProductImage()
+      // সাথে সাথেই hbIncrementImageRef(+1) কল করে এটাকে ACTIVE-এ নিয়ে যাবে
+      cleanupStatus: "ORPHAN",
+      orphanedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      uploaderShopId: shopId,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  }catch(e){
+    console.error("imageIndex write ব্যর্থ:", e);
+    if(e.code === "permission-denied"){
+      throw new Error("imageIndex লেখার অনুমতি নেই — Firestore Rules চেক করুন");
+    }
+    throw new Error("ছবি Storage-এ আপলোড হয়েছে কিন্তু ইনডেক্স-এ লেখা যায়নি: " + (e.message || e.code));
+  }
+
+  return {
+    status: "NEW_IMAGE_UPLOADED",
+    imageId: sha256, sha256, storagePath, imageUrl: uploadedUrl,
+    sizeBytes: processedResult.sizeBytes, referenceCount: 0,
+  };
+}
+
+/* ==================== 🔢 referenceCount ও Product-Save Integration — Step 5 ==================== */
+
+// imageIndex/{imageId}.referenceCount-এ delta যোগ (+1/-1) — নীরবে ব্যর্থ হলেও
+// প্রোডাক্ট-সেভ আটকাবে না (best-effort), কিন্তু console-এ স্পষ্ট লগ থাকবে
+// যাতে ভবিষ্যতের cleanup/অডিট সিস্টেম এই অসামঞ্জস্য ধরতে পারে
+/* 🔢 referenceCount আপডেট + ORPHAN/ACTIVE মার্কিং — Step 6
+   ⚠️ Firestore transaction ব্যবহার করা হয় (blind increment না) কারণ
+   নতুন count-এর ওপর ভিত্তি করে cleanupStatus/orphanedAt ঠিক করতে হয় —
+   এটা read-modify-write, যা transaction ছাড়া race-condition-প্রবণ হতো
+   (একই সময়ে দুইটা প্রোডাক্ট সেভ/ডিলিট হলে)। count কখনো ঋণাত্মক হতে
+   দেওয়া হয় না (Math.max দিয়ে 0-তে ক্ল্যাম্প করা)। */
+async function hbIncrementImageRef(imageId, delta){
+  if(!imageId) return;
+  try{
+    await db.runTransaction(async (tx)=>{
+      const ref = db.collection("imageIndex").doc(imageId);
+      const doc = await tx.get(ref);
+      if(!doc.exists){
+        console.warn(`imageIndex/${imageId} পাওয়া যায়নি — referenceCount আপডেট স্কিপ করা হলো`);
+        return;
+      }
+      const currentCount = doc.data().referenceCount || 0;
+      const newCount = Math.max(0, currentCount + delta); // কখনো ঋণাত্মক না
+      const update = {
+        referenceCount: newCount,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+      if(newCount > 0){
+        update.cleanupStatus = "ACTIVE";
+        update.orphanedAt = null;
+      }else{
+        update.cleanupStatus = "ORPHAN";
+        update.orphanedAt = firebase.firestore.FieldValue.serverTimestamp();
+      }
+      tx.update(ref, update);
+    });
+  }catch(e){
+    console.error(`⚠️ imageIndex/${imageId}-এর referenceCount (${delta>0?'+':''}${delta}) আপডেট ব্যর্থ — ম্যানুয়াল অডিট লাগতে পারে:`, e);
+    hbLogOrphanImageEvent({ type: "REFCOUNT_UPDATE_FAILED", imageId, delta, error: String(e && e.message || e), at: Date.now() });
+  }
+}
+
+// 🗒️ orphan/অসামঞ্জস্যপূর্ণ ঘটনার হালকা লোকাল লগ — এখনো কোনো স্বয়ংক্রিয়
+// cleanup নেই (নিষিদ্ধ এই ধাপে), শুধু ভবিষ্যতের cleanup-সিস্টেমের জন্য
+// ট্র্যাক করে রাখা হচ্ছে যাতে কিছুই silently হারিয়ে না যায়
+function hbLogOrphanImageEvent(event){
+  try{
+    const key = "hb-orphan-image-log";
+    const log = JSON.parse(localStorage.getItem(key) || "[]");
+    log.push(event);
+    localStorage.setItem(key, JSON.stringify(log.slice(-100))); // সর্বশেষ ১০০টা রাখা যথেষ্ট
+  }catch(e){ /* লগ করাই না গেলেও প্রোডাক্ট-সেভ আটকাবে না */ }
+}
+
+/* 🎯 মূল ইন্টিগ্রেশন — Product Save-এর সময় কল হয়। এই মোডাল-সেশনে সত্যিই
+   নতুন ছবি select করা না থাকলে কিছুই করে না (বিদ্যমান imageId/imageUrl
+   অপরিবর্তিত থাকে, existing product editing অক্ষত)।
+
+   রিটার্ন করে: { imageId, imageUrl } (নতুন ছবি হলে) অথবা null (কিছু বদলায়নি) —
+   ব্যর্থ হলে throw করে, যাতে কলার Product-save-টা বন্ধ রাখতে পারে
+   ("Storage upload ব্যর্থ হলে Product একটা ভাঙা image-reference নিয়ে
+   সেভ হবে না" — এই নিশ্চয়তার জন্যই থ্রো করা)। */
+async function bccIntegrateProductImage(shopId){
+  if(!bccPendingImageIsNew) return null; // নতুন ছবি select করা হয়নি — কিছুই বদলাবে না
+
+  let dupCheck = bccPendingImageDupCheck;
+  if(!dupCheck && bccPendingImageProcessedResult){
+    // file-select-এর সময়কার duplicate-check ব্যর্থ হয়ে থাকলে Save-এর সময় আবার চেষ্টা
+    dupCheck = await hbCheckImageDuplicate(bccPendingImageProcessedResult.blob);
+  }
+  if(!bccPendingImageProcessedResult || !dupCheck){
+    throw new Error("ছবি প্রস্তুত নেই — আবার ছবি select করে চেষ্টা করুন");
+  }
+
+  const result = await hbUploadOrReuseProductImage(bccPendingImageProcessedResult, dupCheck, shopId);
+  await hbIncrementImageRef(result.imageId, +1); // নতুন হোক (0→1) বা reuse (N→N+1), সংযুক্তি-প্রতি +1
+  return { imageId: result.imageId, imageUrl: result.imageUrl };
+}
+
 document.getElementById('bccPCat').addEventListener('change', (e)=>{
   bccPopulateSubSelect(document.getElementById('bccPSub'), e.target.value, '');
 });
-document.getElementById('bccPImage').addEventListener('change', (e)=>{
+document.getElementById('bccPImage').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{ bccPendingImage = reader.result; };
-  reader.readAsDataURL(file);
+  const imgLabel = e.target.previousElementSibling; // "📷 Product Image (Optional)" লেবেল
+  const originalLabelText = imgLabel ? imgLabel.textContent : null;
+  if(imgLabel) imgLabel.textContent = "⏳ ছবি প্রসেস হচ্ছে...";
+  try{
+    const result = await hbProcessProductImage(file);
+    bccPendingImage = result.dataUrl; // 🔗 বিদ্যমান ফ্লো অপরিবর্তিত — এখান থেকেই data.image/dup.image-এ যায় (নিচে সেভ হ্যান্ডলারে)
+    bccPendingImageIsNew = true;              // 🖼️ Step 5 — এই সেশনে সত্যিই নতুন ফাইল select হয়েছে
+    bccPendingImageProcessedResult = result;  // Step 5 — Save-এর সময় Storage-এ আপলোড করতে লাগবে
+
+    // 🔍 Step 3 — duplicate-চেক (Step 5 থেকে এই ফলাফলটাই Save-এর সময় ব্যবহৃত হয়)
+    if(imgLabel) imgLabel.textContent = `📷 Product Image ✅ (${(result.sizeBytes/1024).toFixed(0)}KB, ${result.width}×${result.height}) — ডুপ্লিকেট চেক হচ্ছে...`;
+    try{
+      const dupCheck = await hbCheckImageDuplicate(result.blob);
+      bccLastImageDuplicateCheck = dupCheck;
+      bccPendingImageDupCheck = dupCheck; // Step 5 — Save-হ্যান্ডলার এটা পড়ে upload/reuse সিদ্ধান্ত নেয়
+      const dupTxt = dupCheck.status === "DUPLICATE"
+        ? `🔁 আগে থেকেই আছে (${dupCheck.referenceCount || 0} বার ব্যবহৃত)`
+        : "🆕 নতুন ছবি";
+      if(imgLabel) imgLabel.textContent = `📷 Product Image ✅ (${(result.sizeBytes/1024).toFixed(0)}KB, ${result.width}×${result.height}) — ${dupTxt}`;
+    }catch(dupErr){
+      console.warn('Duplicate check failed:', dupErr);
+      bccPendingImageDupCheck = null; // ⚠️ dup-check ব্যর্থ হলে Save-এর সময় hbComputeSha256 থেকে আবার চেষ্টা করা হবে (নিচে bccIntegrateProductImage-এ)
+    }
+  }catch(err){
+    console.warn('Image processing failed:', err);
+    toast('⚠️ ছবি প্রসেস করা যায়নি — ' + err.message);
+    if(imgLabel) imgLabel.textContent = originalLabelText || "📷 Product Image (Optional)";
+    e.target.value = '';
+  }
 });
 
 // প্রোডাক্টের নাম লেখার সময় আগে থেকে থাকা মিলে-যাওয়া প্রোডাক্টগুলো সাজেশন হিসেবে
@@ -7471,7 +8008,7 @@ function setupProductNameSuggest(inputId, resultsId, excludeIdFn){
 }
 setupProductNameSuggest('bccPName', 'bccPNameResults', ()=> bccEditingProductId);
 setupProductNameSuggest('bccQName', 'bccQNameResults', ()=> null);
-document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
+document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=>{
   const name = document.getElementById('bccPName').value.trim();
   if(!name){ toast('প্রোডাক্টের নাম দিন'); return; }
   const catId = document.getElementById('bccPCat').value;
@@ -7503,6 +8040,30 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     return;
   }
 
+  // 🖼️ Step 5 — নতুন ছবি select করা থাকলে Product save-এর আগেই Storage
+  // upload/reuse + referenceCount +1 সম্পন্ন করা হয়। ব্যর্থ হলে পুরো
+  // Product-save-ই বন্ধ রাখা হয় (ভাঙা image-reference নিয়ে কখনো সেভ হবে না)।
+  const saveBtn = document.getElementById('bccSaveProductBtn');
+  const originalBtnText = saveBtn.textContent;
+  let imageIntegrationResult = null;
+  if(bccPendingImageIsNew){
+    const session = (typeof getSession === 'function') ? getSession() : null;
+    if(!session || !session.shopId){
+      toast('⚠️ সেশন পাওয়া যায়নি — আবার লগইন করে চেষ্টা করুন');
+      return;
+    }
+    saveBtn.disabled = true; saveBtn.textContent = '⏳ ছবি Storage-এ পাঠানো হচ্ছে...';
+    try{
+      imageIntegrationResult = await bccIntegrateProductImage(session.shopId);
+    }catch(imgErr){
+      console.error('Product image integration ব্যর্থ:', imgErr);
+      saveBtn.disabled = false; saveBtn.textContent = originalBtnText;
+      toast('❌ Product সেভ হয়নি — ছবি আপলোড ব্যর্থ: ' + imgErr.message);
+      return; // ⚠️ Product data একদমই সেভ করা হচ্ছে না, যাতে অসম্পূর্ণ/ভাঙা অবস্থায় না থাকে
+    }
+    saveBtn.disabled = false; saveBtn.textContent = originalBtnText;
+  }
+
   // একই নামের প্রোডাক্ট আগে থেকেই আছে কিনা চেক করা হচ্ছে (নতুন প্রোডাক্ট এড করার সময়ই,
   // এডিট করার সময় নিজের সাথে নিজের মিল ধরা হবে না)
   const dup = bccFindExactProductByName(prods, name, bccEditingProductId);
@@ -7512,6 +8073,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
       `নতুন এন্ট্রি তৈরি না করে বর্তমান স্টকে ${enteredQty} পিস যোগ করা হবে। এগিয়ে যেতে চান?`
     );
     if(!ok) return;
+    const oldImageId = dup.imageId || null; // 🖼️ Step 5 — নতুন ছবি হলে পরে এই পুরনোটার refCount কমানো হবে
     dup.qty = (Number(dup.qty)||0) + enteredQty;
     if(enteredBuy) dup.buy = enteredBuy;
     if(enteredSell) dup.sell = enteredSell;
@@ -7531,6 +8093,10 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     const enteredCode = document.getElementById('bccPCode').value.trim();
     if(enteredCode) dup.code = enteredCode;
     if(bccPendingImage) dup.image = bccPendingImage;
+    if(imageIntegrationResult){ // 🖼️ Step 5 — নতুন ছবি হলে imageId/imageUrl বসানো, নাহলে dup-এর পুরনোটাই থাকে (অক্ষত)
+      dup.imageId = imageIntegrationResult.imageId;
+      dup.imageUrl = imageIntegrationResult.imageUrl;
+    }
     const enteredNote = document.getElementById('bccPNote').value.trim();
     if(enteredNote) dup.note = enteredNote;
     bccSaveProducts(prods);
@@ -7538,10 +8104,16 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     document.getElementById('bccProductModalOverlay').classList.remove('show');
     toast('একই প্রোডাক্ট পাওয়া গেছে — ডুপ্লিকেট না করে স্টক আপডেট করা হলো ✅');
     bccRenderProducts(); bccRenderOverview();
+    // 🖼️ Step 5 — পুরনো ছবি বদলে নতুন ছবি হলে, Product সফলভাবে সেভ হওয়ার পরই পুরনোটার refCount কমানো হয়
+    if(imageIntegrationResult && oldImageId && oldImageId !== imageIntegrationResult.imageId){
+      hbIncrementImageRef(oldImageId, -1);
+    }
+    bccPendingImageIsNew = false; bccPendingImageProcessedResult = null; bccPendingImageDupCheck = null;
     return;
   }
 
   const existingProduct = bccEditingProductId ? prods.find(x=>x.id===bccEditingProductId) : null;
+  const oldImageId = existingProduct ? (existingProduct.imageId || null) : null; // 🖼️ Step 5
   const data = {
     id: bccEditingProductId || bccUid(),
     name,
@@ -7563,6 +8135,10 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
     qty: enteredQty,
     min: Number(document.getElementById('bccPMin').value)||0,
     image: bccPendingImage,
+    // 🖼️ Step 5 — নতুন ছবি হলে নতুন imageId/imageUrl, নাহলে বিদ্যমান প্রোডাক্টেরটাই
+    // অক্ষত থাকে (existingProduct থেকে বহন করে আনা — নাহলে প্রতিবার এডিটে হারিয়ে যেত)
+    imageId: imageIntegrationResult ? imageIntegrationResult.imageId : (existingProduct ? (existingProduct.imageId || null) : null),
+    imageUrl: imageIntegrationResult ? imageIntegrationResult.imageUrl : (existingProduct ? (existingProduct.imageUrl || null) : null),
     note: document.getElementById('bccPNote').value.trim(),
   };
   const newBatchForData = bccMakeNewBatchEntry();
@@ -7578,17 +8154,30 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', ()=>{
   document.getElementById('bccProductModalOverlay').classList.remove('show');
   toast('প্রোডাক্ট সেভ হয়েছে ✅');
   bccRenderProducts(); bccRenderOverview();
+  // 🖼️ Step 5 — পুরনো ছবি বদলে নতুন ছবি হলে, Product সফলভাবে সেভ হওয়ার পরই পুরনোটার refCount কমানো হয়
+  if(imageIntegrationResult && oldImageId && oldImageId !== imageIntegrationResult.imageId){
+    hbIncrementImageRef(oldImageId, -1);
+  }
+  bccPendingImageIsNew = false; bccPendingImageProcessedResult = null; bccPendingImageDupCheck = null;
 });
 async function bccDeleteProduct(id){
   const entered = await openPinModal('পাসওয়ার্ড দিন', 'এই প্রোডাক্টটি ডিলিট করার জন্য পাসওয়ার্ড দিন।');
   if(entered === null) return;
   if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, ডিলিট হয়নি'); return; }
-  const prods = bccLoadProducts().filter(p=>p.id!==id);
+  const allProds = bccLoadProducts();
+  const deletedProduct = allProds.find(p=> p.id === id); // 🖼️ Step 6 — মোছার আগে imageId রেফারেন্স ধরে রাখা, refCount কমানোর জন্য
+  const prods = allProds.filter(p=>p.id!==id);
   bccSaveProducts(prods);
   bccUnpublishFromBazar(id); // Bazar-এ প্রকাশিত থাকলে সেখান থেকেও সরিয়ে ফেলা
   deletedProductIds.push(id);
   saveDeletedProductIds(deletedProductIds);
   bccRenderProducts(); bccRenderOverview();
+  // 🖼️ Step 6 — Product সফলভাবে মোছা হওয়ার পরই imageIndex-এর referenceCount কমানো হয়
+  // (Storage থেকে তৎক্ষণাৎ ডিলিট না — শুধু ORPHAN মার্ক হবে, চূড়ান্ত ডিলিট
+  // ২৪ ঘণ্টা পর নির্ধারিত Cloud Function-এর দায়িত্ব)
+  if(deletedProduct && deletedProduct.imageId){
+    hbIncrementImageRef(deletedProduct.imageId, -1);
+  }
 }
 
 // --- quick add modal ---
@@ -12838,10 +13427,50 @@ async function initRiderMode(uid){
   rmListenForOffers();
   rmLoadTodayStats();
   rmStartBazarDeliveryListener(uid);
+  rmSetupFcm(uid); // 🔔 ব্যাকগ্রাউন্ড/বন্ধ অবস্থাতেও নতুন ডেলিভারি অফারের পুশ নোটিফিকেশন পেতে
 
   document.getElementById("rmLogoutBtn").addEventListener("click", ()=> auth.signOut());
   refreshRingtoneSwitchUi();
   enableModeBackGuard();
+}
+
+/* ==================== 🔔 FCM — ব্যাকগ্রাউন্ড/বন্ধ অবস্থাতেও ডেলিভারি অফার নোটিফিকেশন ====================
+   ⚠️ কাজ করতে হলে Firebase Console → Project Settings → Cloud Messaging →
+   "Web configuration" থেকে একটা VAPID key generate করে নিচের
+   RM_FCM_VAPID_KEY-তে বসাতে হবে (এই একটা ধাপ ম্যানুয়ালি করা লাগবে,
+   এখানে অনুমান করে বসানো যাবে না)। এটা না করলে FCM নীরবে কাজ করবে না —
+   বাকি সব ফিচার (লাইভ অর্ডার তালিকা, Bee Alert শব্দ ইত্যাদি) স্বাভাবিক
+   চলবে, শুধু অ্যাপ/ট্যাব বন্ধ থাকলে পুশ নোটিফিকেশন আসবে না। */
+const RM_FCM_VAPID_KEY = "PASTE_YOUR_VAPID_KEY_HERE";
+
+async function rmSetupFcm(riderUid){
+  if(RM_FCM_VAPID_KEY === "PASTE_YOUR_VAPID_KEY_HERE"){
+    console.warn("FCM VAPID key বসানো হয়নি — ব্যাকগ্রাউন্ড পুশ নোটিফিকেশন কাজ করবে না। Firebase Console → Cloud Messaging থেকে key নিয়ে RM_FCM_VAPID_KEY-তে বসান।");
+    return;
+  }
+  if(!("Notification" in window) || !("serviceWorker" in navigator)) return;
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== "granted") return;
+
+    const registration = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({ vapidKey: RM_FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+    if(token){
+      await db.collection("riders").doc(riderUid).update({ fcmToken: token });
+    }
+
+    // অ্যাপ খোলা থাকা অবস্থায় ফোরগ্রাউন্ডে পুশ এলে (ব্যাকগ্রাউন্ড হ্যান্ডলার
+    // ফোরগ্রাউন্ডে চলে না) — Bee Alert শব্দ + একটা সাধারণ browser notification
+    messaging.onMessage((payload)=>{
+      if(typeof playBeeAlert === "function") playBeeAlert();
+      const title = (payload.notification && payload.notification.title) || "🚚 নতুন Delivery Order";
+      const body = (payload.notification && payload.notification.body) || "";
+      try{ new Notification(title, { body, icon: "icon-192.png" }); }catch(e){}
+    });
+  }catch(e){
+    console.warn("FCM সেটআপ ব্যর্থ হয়েছে:", e);
+  }
 }
 
 /* ==================== 🚚 Bazar থেকে এসাইন করা ডেলিভারি — নোটিফিকেশন + তালিকা ====================
@@ -12918,7 +13547,22 @@ document.getElementById("rmOnlineSwitch").addEventListener("click", async ()=>{
   unlockBeeAudio();
   rmIsOnline = !rmIsOnline;
   rmRefreshOnlineUi();
-  try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ online: rmIsOnline }); }catch(e){ console.warn(e); }
+
+  // 🔧 currentStatus fix — Delivery-only রাইডারের currentStatus আগে কখনো
+  // সেট হতো না (শুধু Transport/Trip ফ্লো থেকে সেট হতো), ফলে Bazar
+  // অর্ডার auto-dispatch তাদের এলিজিবল হিসেবে খুঁজেই পেত না। এখন Online
+  // টগলেই currentStatus সেট হয় — তবে রাইডার যদি ইতিমধ্যে সক্রিয় কোনো
+  // ট্রিপে (on_waiting/on_trip + activeTripId) থাকেন, সেই অবস্থাই
+  // অক্ষত থাকে, শুধু Offline/Online চাপার কারণে ওভাররাইট হয় না —
+  // Transport-এর বিদ্যমান লজিক ভাঙে না।
+  const inActiveTrip = (rmCurrentRider.currentStatus === "on_waiting" || rmCurrentRider.currentStatus === "on_trip") && rmCurrentRider.activeTripId;
+  const updatePayload = { online: rmIsOnline };
+  if(!inActiveTrip){
+    const newCurrentStatus = rmIsOnline ? "available" : "offline";
+    updatePayload.currentStatus = newCurrentStatus;
+    rmCurrentRider.currentStatus = newCurrentStatus; // লোকাল ক্যাশও সাথে সাথেই মিলিয়ে রাখা
+  }
+  try{ await db.collection("riders").doc(rmCurrentRider.uid).update(updatePayload); }catch(e){ console.warn(e); }
   if(rmIsOnline) rmStartGps(); else rmStopGps();
 });
 

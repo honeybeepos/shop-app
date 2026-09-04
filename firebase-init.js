@@ -19,6 +19,13 @@ const auth = firebase.auth();
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
 const db = firebase.firestore();
 
+/* 🖼️ Cloud Storage — শুধু shop-ledger-app.html-এ SDK লোড করা থাকে
+   (Product Image ফিচারের জন্য), login.html/admin.html-এ এই SDK নেই।
+   এই ফাইলটা তিনটা পেজেই শেয়ার হয় বলে conditional/নিরাপদভাবে init করা
+   হচ্ছে — SDK লোড না থাকলে storage = null থাকবে, কোনো এরর ছুড়বে না,
+   login.html/admin.html-এর কোনো ফাংশনালিটি প্রভাবিত হবে না। */
+const storage = (typeof firebase.storage === "function") ? firebase.storage() : null;
+
 /* অফলাইন-ফার্স্ট: ইন্টারনেট না থাকলেও অ্যাপ যেন সেল/এন্ট্রি বন্ধ না করে।
    এটা চালু থাকলে Firestore ডেটা ও পেন্ডিং রাইট মোবাইলের IndexedDB-তে
    জমা থাকে, এবং ইন্টারনেট ফিরলে নিজে থেকেই সার্ভারের সাথে সিঙ্ক হয়ে যায় —
