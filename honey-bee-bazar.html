@@ -15,6 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <style>
   /* ==================== 🐝 Bee Flying Animation (ট্রান্সপোর্ট লাইভ ম্যাপে গাড়ির উপরে) ==================== */
   .beeCarWrap{ position:relative; width:34px; height:34px; }
@@ -1153,6 +1154,7 @@ auth.onAuthStateChanged(async (user)=>{
     currentCustomer = { uid: user.uid, name: user.displayName, favoriteShops: [] };
   }
   renderAuthArea();
+  hmSetupFcm(user.uid); // 🔔 Honey Messenger — অ্যাপ বন্ধ/ব্যাকগ্রাউন্ডে থাকলেও নতুন মেসেজের পুশ নোটিফিকেশন পেতে
   // 🩸 Blood Bank স্ক্রিনে থাকা অবস্থায় লগইন সম্পন্ন হলে প্রোফাইল কার্ডটা
   // নিজে থেকেই রিফ্রেশ হয় — আগে লগইন resolve হওয়ার আগেই স্ক্রিনে ঢুকলে
   // কার্ড খালি/ভুল অবস্থায় আটকে থাকত
@@ -1334,6 +1336,39 @@ function hmSwitchTab(tab){
 $("hmTabMessengerBtn").addEventListener("click", ()=> hmSwitchTab("messenger"));
 $("hmTabComplaintBtn").addEventListener("click", ()=> hmSwitchTab("complaint"));
 $("hmTabThirdBtn").addEventListener("click", ()=> hmSwitchTab("third"));
+
+/* ==================== 🔔 Honey Messenger — FCM পুশ নোটিফিকেশন ====================
+   ⚠️ VAPID key rider Mode-এর সাথে একই (Firebase প্রজেক্ট-লেভেলে একটাই key,
+   একাধিক অ্যাপে পুনর্ব্যবহারযোগ্য) — নতুন করে জেনারেট করার দরকার নেই।
+   Token সেভ হয় messengerUsers/{uid}.fcmToken-এ (Cloud Function এখান
+   থেকেই পড়ে নতুন মেসেজ এলে পুশ পাঠায়)। */
+const HM_FCM_VAPID_KEY = "BCEdpLGNUIBG2IW9lTVGcaM7qbFrbaEnGg9N1CYGNCojCVUIruqqcWP4cdX3YietIJ1kWe1ZUulbCQpvSQXAIKg";
+
+async function hmSetupFcm(uid){
+  if(!("Notification" in window) || !("serviceWorker" in navigator)) return;
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== "granted") return;
+
+    const registration = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({ vapidKey: HM_FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+    if(token){
+      // 🔗 merge:true — messengerUsers-এ আগে থেকে থাকা username/profileCompleted
+      // অক্ষত থাকে, শুধু fcmToken যোগ হয় (এটা onboarding-চেককে প্রভাবিত করে না)
+      await db.collection("messengerUsers").doc(uid).set({ fcmToken: token }, { merge: true });
+    }
+
+    // অ্যাপ খোলা অবস্থায় (foreground) পুশ এলে — ছোট browser-notification + শব্দ
+    messaging.onMessage((payload)=>{
+      const title = (payload.notification && payload.notification.title) || "🔔 নতুন মেসেজ";
+      const body = (payload.notification && payload.notification.body) || "";
+      try{ new Notification(title, { body, icon: "bazar-icon-192.png" }); }catch(e){}
+    });
+  }catch(e){
+    console.warn("Messenger FCM সেটআপ ব্যর্থ হয়েছে:", e);
+  }
+}
 
 /* ==================== 💬 Honey Messenger — ইউজারনেম-ভিত্তিক প্রোফাইল সেটআপ ====================
    ⚠️ কালেকশনের নাম ইচ্ছাকৃতভাবে "messengerUsers"/"messengerUsernames" —

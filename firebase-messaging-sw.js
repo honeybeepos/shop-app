@@ -22,24 +22,36 @@ const messaging = firebase.messaging();
 
 // অ্যাপ ব্যাকগ্রাউন্ডে/বন্ধ থাকা অবস্থায় পুশ আসলে এখানে হ্যান্ডেল হয়
 messaging.onBackgroundMessage((payload) => {
+  const type = (payload.data && payload.data.type) || "delivery-offer";
   const title = (payload.notification && payload.notification.title) || "🔔 দোকান থেকে ডাকছে!";
   const body = (payload.notification && payload.notification.body) || "নতুন ডেলিভারি অর্ডার আছে — দোকানে যোগাযোগ করুন।";
+
+  // 🏷️ tag আলাদা রাখা হয় টাইপ+আইডি দিয়ে — নাহলে একজন ইউজারের কাছে
+  // একের-পর-এক ভিন্ন নোটিফিকেশন (যেমন দুটো ভিন্ন চ্যাটের মেসেজ) এলে
+  // ব্রাউজার আগেরটাকে নতুনটা দিয়ে চুপচাপ replace করে ফেলত, ইউজার
+  // প্রথমটা মিস করে যেতেন
+  const tagId = (payload.data && (payload.data.chatId || payload.data.offerId || payload.data.orderId)) || "general";
+  const tag = `honeybee-${type}-${tagId}`;
 
   self.registration.showNotification(title, {
     body,
     icon: "icon-192.png",
     badge: "icon-192.png",
     vibrate: [500, 200, 500, 200, 500],
-    requireInteraction: true,
-    tag: "honeybee-delivery-call",
+    requireInteraction: type !== "messenger-message", // মেসেজ-নোটিফিকেশন নিজে থেকেই কিছুক্ষণ পর সরে যাক, ডেলিভারি-কল জরুরি বলে থেকে যাবে
+    tag,
     renotify: true,
     data: payload.data || {}
   });
 });
 
-// নোটিফিকেশনে ট্যাপ করলে অ্যাপ খুলে যাবে
+// নোটিফিকেশনে ট্যাপ করলে অ্যাপ খুলে যাবে — কোন অ্যাপে যাবে তা নোটিফিকেশনের
+// টাইপ অনুযায়ী ঠিক হয় (মেসেঞ্জার হলে Bazar, ডেলিভারি হলে Rider Mode)
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+  const type = (event.notification.data && event.notification.data.type) || "delivery-offer";
+  const targetFile = type === "messenger-message" ? "honey-bee-bazar.html" : "shop-ledger-app.html";
+
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       // ⚠️ delivery-man-app.html এখন আর আলাদা অ্যাপ না — Rider Mode হিসেবে
@@ -48,12 +60,12 @@ self.addEventListener("notificationclick", (event) => {
       // delivery-man-app.html-এই থাকতে পারে — সেগুলোর জন্য নিচের প্রথম
       // চেকটা রাখা হলো, তবে নতুন সব রাইডারই shop-ledger-app.html ব্যবহার করেন)
       for (const client of clientList) {
-        if ((client.url.includes("delivery-man-app.html") || client.url.includes("shop-ledger-app.html")) && "focus" in client) {
+        if ((client.url.includes(targetFile) || (targetFile === "shop-ledger-app.html" && client.url.includes("delivery-man-app.html"))) && "focus" in client) {
           return client.focus();
         }
       }
       if (clients.openWindow) {
-        return clients.openWindow("shop-ledger-app.html");
+        return clients.openWindow(targetFile);
       }
     })
   );
