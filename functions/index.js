@@ -43,7 +43,7 @@ const db = getFirestore();
 // 🌐 GitHub Pages-এর আসল ডোমেইন — আগে এখানে "YOUR-DOMAIN-HERE" প্লেসহোল্ডার
 // ছিল, কখনো বসানো হয়নি। delivery-man-app.html এখন আর আলাদা অ্যাপ না
 // (Rider Mode হিসেবে shop-ledger-app.html-এ একীভূত), তাই লিংকও সেভাবে ঠিক করা হলো।
-const APP_DOMAIN = "https://honeybeepos.github.io/shop-app";
+const APP_DOMAIN = "https://honeybeebazar.com"; // ✅ কাস্টম ডোমেইন (CNAME ফাইলে নিশ্চিত করা) — GitHub-এর ডিফল্ট subdomain-এর বদলে
 const RIDER_MODE_URL = `${APP_DOMAIN}/shop-ledger-app.html`;
 
 // 🔑 Google Maps API key — এটা কোডে সরাসরি লেখা নেই, Firebase Secrets Manager-এ
