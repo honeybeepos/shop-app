@@ -7007,8 +7007,21 @@ async function bccSyncCategoriesToBazar(){
     const session = (typeof getSession === 'function') ? getSession() : null;
     if(!session || !session.shopId || typeof db === 'undefined') return;
     const cats = bccLoadCategories();
-    const batch = db.batch();
     const catsRef = db.collection('shops').doc(session.shopId).collection('publicCategories');
+
+    // 🧹 রিকনসিলিয়েশন (পুরনো বাগের জমে থাকা orphan সাফ করার জন্য) — আগে ক্যাটাগরি
+    // ডিলিট করলে Firestore ডকুমেন্ট আসলে কখনো মোছা হতো না, তাই বছরের পুরনো
+    // "ভুতুড়ে" ক্যাটাগরি Bazar-এ জমে থাকতে পারে। এখানে বর্তমান লোকাল লিস্টে
+    // নেই এমন যেকোনো Firestore ডকুমেন্ট পাওয়ামাত্র মুছে ফেলা হয় — POS-এর
+    // ক্যাটাগরি ট্যাব খোলা বা যেকোনো ক্যাটাগরি সেভ/ডিলিটেই এই সাফাই চলবে।
+    let staleIds = [];
+    try{
+      const existingSnap = await catsRef.get();
+      const localIds = new Set(cats.map(c=> c.id));
+      staleIds = existingSnap.docs.map(d=> d.id).filter(id=> !localIds.has(id));
+    }catch(e){ console.warn('Stale category lookup failed (skip cleanup this time):', e); }
+
+    const batch = db.batch();
     cats.forEach(c=>{
       batch.set(catsRef.doc(c.id), {
         name: c.name,
@@ -7017,6 +7030,7 @@ async function bccSyncCategoriesToBazar(){
         updatedAt: fbNow()
       });
     });
+    staleIds.forEach(id=> batch.delete(catsRef.doc(id)));
     await batch.commit();
   }catch(e){ console.warn('Category sync failed:', e); }
 }
@@ -7294,7 +7308,7 @@ document.querySelectorAll('#program-bcc .bccSubtab').forEach(t=>{
     document.getElementById('btab-'+t.dataset.btab).style.display='block';
     if(t.dataset.btab==='overview') bccRenderOverview();
     if(t.dataset.btab==='products') bccRenderProducts();
-    if(t.dataset.btab==='categories') bccRenderCategories();
+    if(t.dataset.btab==='categories'){ bccRenderCategories(); bccSyncCategoriesToBazar(); } // ট্যাব খোলামাত্রই Bazar-এর সাথে রিকনসাইল/সাফাই হবে, কোনো এডিট ছাড়াই
   });
 });
 
