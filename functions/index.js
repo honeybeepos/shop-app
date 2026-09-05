@@ -836,6 +836,89 @@ exports.parseShoppingIntent = onCall({ secrets: [geminiApiKey] }, async (request
   return { items, engine: "rule-based-fallback" };
 });
 
+/* ==================== 🐝 মৌ — Text Chat via Gemini (Development #2A) ====================
+   ⚠️ ইচ্ছাকৃতভাবে parseShoppingIntent থেকে সম্পূর্ণ আলাদা ফাংশন — উদ্দেশ্য
+   ভিন্ন (এটা সাধারণ কথোপকথন, ওটা structured shopping-list বের করা)।
+   একই GEMINI_API_KEY secret পুনর্ব্যবহার করা হচ্ছে (নতুন কোনো key/secret
+   তৈরি করা হয়নি)। কোনো conversation-history/memory পাঠানো হয় না —
+   প্রতিটা বার্তা স্বতন্ত্রভাবে প্রসেস হয় (Development #2A-এর সুযোগের মধ্যেই)। */
+async function mouGeminiReply(text, apiKey) {
+  const prompt = `তুমি "মৌ" — Honey Bee Bazar-এর একটা বন্ধুত্বপূর্ণ, উষ্ণ মৌমাছি সহকারী।
+নিয়ম:
+- শুধু বাংলায় উত্তর দেবে, ছোট (১-২ বাক্য), আন্তরিক ও সহজ ভাষায়।
+- মাঝেমধ্যে ইমোজি ব্যবহার করতে পারো (🐝 😊 ইত্যাদি), বেশি না।
+- তুমি কোনো প্রোডাক্টের দাম/স্টক বানিয়ে বলবে না (সেটা তোমার কাজ না, এখানে তুমি শুধু গল্প করছ)।
+- শুধু JSON রিটার্ন করবে, অন্য কোনো টেক্সট না।
+
+ফরম্যাট: {"reply": "তোমার উত্তর", "mood": "happy" অথবা "idle" অথবা "serious"}
+- সাধারণ/হাসিখুশি কথায় mood হবে "happy"
+- গুরুত্বপূর্ণ/সমস্যার কথায় mood হবে "serious"
+- বাকি সব ক্ষেত্রে "idle"
+
+গ্রাহকের কথা: "${text}"`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
+    }),
+  });
+  if (!res.ok) throw new Error(`Gemini API status ${res.status}`);
+  const data = await res.json();
+  const rawText = data.candidates && data.candidates[0] && data.candidates[0].content
+    && data.candidates[0].content.parts && data.candidates[0].content.parts[0]
+    && data.candidates[0].content.parts[0].text;
+  if (!rawText) throw new Error("Gemini থেকে খালি রেসপন্স");
+
+  const parsed = JSON.parse(rawText);
+  // ⚠️ AI-এর আউটপুট অন্ধভাবে বিশ্বাস করা হয় না — শুধু প্রত্যাশিত shape যাচাই করেই ব্যবহার হয়
+  const validMoods = ["happy", "idle", "serious"];
+  if (!parsed || typeof parsed.reply !== "string" || !parsed.reply.trim()) {
+    throw new Error("Gemini রেসপন্সে reply নেই");
+  }
+  return {
+    reply: parsed.reply.trim(),
+    mood: validMoods.includes(parsed.mood) ? parsed.mood : "idle",
+  };
+}
+
+exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
+  // 🔒 Security — সম্পূর্ণ open/anonymous কল আটকাতে অন্তত একটা বৈধ Firebase
+  // Auth সেশন লাগবে (anonymous sign-in-ও চলবে — customer-কে জোর করে
+  // লগইন করতে বলা হচ্ছে না, শুধু random/unauthenticated script যেন
+  // সরাসরি এই ফাংশন কল করতে না পারে)
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "চ্যাট করতে সেশন প্রয়োজন।");
+  }
+  const text = request.data && request.data.text;
+  if (!text || typeof text !== "string" || !text.trim()) {
+    throw new HttpsError("invalid-argument", "text (string) প্রয়োজন");
+  }
+  if (text.length > 500) {
+    throw new HttpsError("invalid-argument", "বার্তাটা একটু ছোট করে লিখুন।");
+  }
+
+  const apiKey = geminiApiKey.value();
+  if (!apiKey) {
+    // 🛟 key সেট করা না থাকলেও ফাংশনটা crash না করে পরিষ্কার fallback দেয়
+    console.warn(JSON.stringify({ event: "MOU_CHAT_NO_API_KEY" }));
+    return { reply: "আমি এখন একটু ব্যস্ত আছি, একটু পরে আবার চেষ্টা করুন। 🐝", mood: "idle", engine: "fallback" };
+  }
+
+  try {
+    const result = await mouGeminiReply(text.trim(), apiKey);
+    console.log(JSON.stringify({ event: "MOU_CHAT_REPLIED", uid: request.auth.uid }));
+    return { reply: result.reply, mood: result.mood, engine: "gemini-2.0-flash" };
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "MOU_CHAT_FAILED", error: String(e && e.message || e) }));
+    // 🛟 Step 7 — error হলেও গ্রাহক খালি হাতে ফেরত যান না, একটা উষ্ণ fallback বার্তা পান
+    return { reply: "দুঃখিত বন্ধু, এই মুহূর্তে ঠিক বুঝতে পারলাম না। আবার বলবেন? 🐝", mood: "idle", engine: "fallback" };
+  }
+});
+
 exports.deleteAccount = onCall(async (request) => {
   try {
     const callerUid = request.auth && request.auth.uid;
