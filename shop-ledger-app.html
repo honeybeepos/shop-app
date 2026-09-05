@@ -3475,6 +3475,7 @@
       <div class="bccModalHead"><h3 id="bccCategoryModalTitle">➕ নতুন Main Category</h3><button class="bccModalClose" id="bccCategoryModalClose">✕</button></div>
       <div class="bccModalBody">
         <label>Category Name</label><input id="bccCatNameInput" placeholder="যেমন: Samsung">
+        <label>🖼️ Category Image (Optional)</label><input type="file" id="bccCatImage" accept="image/*">
         <button class="bccBtnPrimary" id="bccSaveCategoryBtn" style="width:100%; margin-top:14px;">Save</button>
       </div>
     </div>
@@ -7012,6 +7013,7 @@ async function bccSyncCategoriesToBazar(){
       batch.set(catsRef.doc(c.id), {
         name: c.name,
         subs: (c.subs||[]).map(s=> ({ id: s.id, name: s.name })),
+        imageUrl: c.imageUrl || null, // 🖼️ POS থেকে আপলোড করা ক্যাটাগরি ছবি থাকলে Bazar-এও দেখা যাবে
         updatedAt: fbNow()
       });
     });
@@ -8267,40 +8269,134 @@ function bccRenderCategories(){
 }
 
 let bccEditingCatId = null;
+// 🖼️ ক্যাটাগরি-ছবি — প্রোডাক্ট-ছবির মতোই একই প্যাটার্ন (Save-এর সময়ই আসল আপলোড হয়)
+let bccPendingCatImageIsNew = false;
+let bccPendingCatImageProcessedResult = null;
+let bccPendingCatImageDupCheck = null;
 function bccOpenCategoryModal(editId){
   bccEditingCatId = editId || null;
   const cats = bccLoadCategories();
   const c = editId ? cats.find(x=>x.id===editId) : null;
   document.getElementById('bccCategoryModalTitle').textContent = c ? '✏️ Edit Category' : '➕ নতুন Main Category';
   document.getElementById('bccCatNameInput').value = c ? c.name : '';
+  const catImageInput = document.getElementById('bccCatImage');
+  catImageInput.value = '';
+  const catImgLabel = catImageInput.previousElementSibling;
+  if(catImgLabel) catImgLabel.textContent = (c && c.imageUrl) ? '🖼️ Category Image ✅ (আগে থেকে আপলোড করা আছে — বদলাতে চাইলে নতুন ছবি select করুন)' : '🖼️ Category Image (Optional)';
+  bccPendingCatImageIsNew = false;
+  bccPendingCatImageProcessedResult = null;
+  bccPendingCatImageDupCheck = null;
   document.getElementById('bccCategoryModalOverlay').classList.add('show');
 }
 document.getElementById('bccAddCategoryBtn').addEventListener('click', ()=> bccOpenCategoryModal(null));
 document.getElementById('bccCategoryModalClose').addEventListener('click', ()=> document.getElementById('bccCategoryModalOverlay').classList.remove('show'));
-document.getElementById('bccSaveCategoryBtn').addEventListener('click', ()=>{
+document.getElementById('bccSaveCategoryBtn').addEventListener('click', async ()=>{
   const name = document.getElementById('bccCatNameInput').value.trim();
   if(!name){ toast('ক্যাটাগরির নাম দিন'); return; }
   const cats = bccLoadCategories();
-  if(bccEditingCatId){
-    const c = cats.find(x=>x.id===bccEditingCatId);
-    if(c) c.name = name;
+  const existingCat = bccEditingCatId ? cats.find(x=>x.id===bccEditingCatId) : null;
+  const oldImageId = existingCat ? (existingCat.imageId || null) : null;
+
+  let imageIntegrationResult = null;
+  if(bccPendingCatImageIsNew){
+    const session = (typeof getSession === 'function') ? getSession() : null;
+    try{
+      imageIntegrationResult = await bccIntegrateCategoryImage(session ? session.shopId : null);
+    }catch(err){
+      console.error('Category image integration failed:', err);
+      toast('⚠️ ছবি আপলোড ব্যর্থ হয়েছে — ' + err.message);
+      return; // ছবি আপলোড ব্যর্থ হলে ক্যাটাগরিই সেভ হবে না, যাতে ভাঙা image-reference নিয়ে সেভ না হয়
+    }
+  }
+  const finalImageUrl = imageIntegrationResult ? imageIntegrationResult.imageUrl : (existingCat ? (existingCat.imageUrl || null) : null);
+  const finalImageId = imageIntegrationResult ? imageIntegrationResult.imageId : oldImageId;
+
+  if(existingCat){
+    existingCat.name = name;
+    existingCat.imageUrl = finalImageUrl;
+    existingCat.imageId = finalImageId;
   } else {
-    cats.push({id: bccUid(), name, subs:[]});
+    cats.push({id: bccUid(), name, subs:[], imageUrl: finalImageUrl, imageId: finalImageId});
   }
   bccSaveCategories(cats);
   document.getElementById('bccCategoryModalOverlay').classList.remove('show');
   toast('ক্যাটাগরি সেভ হয়েছে ✅');
   bccRenderCategories(); bccRenderOverview();
+  // 🖼️ পুরনো ছবি বদলে নতুন ছবি হলে, ক্যাটাগরি সফলভাবে সেভ হওয়ার পরই পুরনোটার refCount কমানো হয়
+  if(imageIntegrationResult && oldImageId && oldImageId !== imageIntegrationResult.imageId){
+    hbIncrementImageRef(oldImageId, -1);
+  }
+  bccPendingCatImageIsNew = false; bccPendingCatImageProcessedResult = null; bccPendingCatImageDupCheck = null;
 });
+document.getElementById('bccCatImage').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const imgLabel = e.target.previousElementSibling; // "🖼️ Category Image (Optional)" লেবেল
+  const originalLabelText = imgLabel ? imgLabel.textContent : null;
+  if(imgLabel) imgLabel.textContent = "⏳ ছবি প্রসেস হচ্ছে...";
+  try{
+    // 🔁 প্রোডাক্ট-ছবির জন্য বানানো একই resize/WebP/duplicate-detection পাইপলাইন এখানেও পুনঃব্যবহার করা হচ্ছে
+    const result = await hbProcessProductImage(file);
+    bccPendingCatImageIsNew = true;
+    bccPendingCatImageProcessedResult = result;
+    if(imgLabel) imgLabel.textContent = `🖼️ Category Image ✅ (${(result.sizeBytes/1024).toFixed(0)}KB, ${result.width}×${result.height}) — ডুপ্লিকেট চেক হচ্ছে...`;
+    try{
+      const dupCheck = await hbCheckImageDuplicate(result.blob);
+      bccPendingCatImageDupCheck = dupCheck;
+      const dupTxt = dupCheck.status === "DUPLICATE"
+        ? `🔁 আগে থেকেই আছে (${dupCheck.referenceCount || 0} বার ব্যবহৃত)`
+        : "🆕 নতুন ছবি";
+      if(imgLabel) imgLabel.textContent = `🖼️ Category Image ✅ (${(result.sizeBytes/1024).toFixed(0)}KB, ${result.width}×${result.height}) — ${dupTxt}`;
+    }catch(dupErr){
+      console.warn('Category image duplicate check failed:', dupErr);
+      bccPendingCatImageDupCheck = null;
+    }
+  }catch(err){
+    console.warn('Category image processing failed:', err);
+    toast('⚠️ ছবি প্রসেস করা যায়নি — ' + err.message);
+    if(imgLabel) imgLabel.textContent = originalLabelText || "🖼️ Category Image (Optional)";
+    e.target.value = '';
+  }
+});
+// 🎯 ক্যাটাগরি-ছবি ইন্টিগ্রেশন — bccIntegrateProductImage()-এর সমতুল্য, কিন্তু
+// ক্যাটাগরির নিজস্ব pending-state ভেরিয়েবল ব্যবহার করে (প্রোডাক্ট ফ্লো থেকে সম্পূর্ণ আলাদা)
+async function bccIntegrateCategoryImage(shopId){
+  if(!bccPendingCatImageIsNew) return null;
+  let dupCheck = bccPendingCatImageDupCheck;
+  if(!dupCheck && bccPendingCatImageProcessedResult){
+    dupCheck = await hbCheckImageDuplicate(bccPendingCatImageProcessedResult.blob);
+  }
+  if(!bccPendingCatImageProcessedResult || !dupCheck){
+    throw new Error("ছবি প্রস্তুত নেই — আবার ছবি select করে চেষ্টা করুন");
+  }
+  const result = await hbUploadOrReuseProductImage(bccPendingCatImageProcessedResult, dupCheck, shopId);
+  await hbIncrementImageRef(result.imageId, +1);
+  return { imageId: result.imageId, imageUrl: result.imageUrl };
+}
 async function bccDeleteCategory(id){
   const entered = await openPinModal('পাসওয়ার্ড দিন', 'এই ক্যাটাগরি ও এর সব সাব-ক্যাটাগরি ডিলিট করার জন্য পাসওয়ার্ড দিন।');
   if(entered === null) return;
   if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, ডিলিট হয়নি'); return; }
-  const cats = bccLoadCategories().filter(c=>c.id!==id);
+  const allCats = bccLoadCategories();
+  const deletedCat = allCats.find(c=>c.id===id); // 🖼️ ছবি থাকলে ডিলিটের পর refCount কমানোর জন্য আগেই ধরে রাখা
+  const cats = allCats.filter(c=>c.id!==id);
   bccSaveCategories(cats);
   deletedCategoryIds.push(id);
   saveDeletedCategoryIds(deletedCategoryIds);
+  bccDeleteCategoryFromBazar(id); // 🗑️ Bazar-এর publicCategories থেকেও ডকুমেন্টটা সরিয়ে ফেলা হচ্ছে — নাহলে ওখানে থেকেই যেত
+  if(deletedCat && deletedCat.imageId) hbIncrementImageRef(deletedCat.imageId, -1);
   bccRenderCategories(); bccRenderOverview();
+}
+
+// bccSyncCategoriesToBazar শুধু বর্তমান (এখনো টিকে থাকা) ক্যাটাগরিগুলো set/update করে —
+// লোকাল থেকে ডিলিট হওয়া ক্যাটাগরির Firestore ডকুমেন্ট নিজে থেকে মুছে যায় না।
+// তাই ক্যাটাগরি ডিলিটের সময় এই ফাংশনটা আলাদাভাবে ডাকতে হয়।
+async function bccDeleteCategoryFromBazar(id){
+  try{
+    const session = (typeof getSession === 'function') ? getSession() : null;
+    if(!session || !session.shopId || typeof db === 'undefined') return;
+    await db.collection('shops').doc(session.shopId).collection('publicCategories').doc(id).delete();
+  }catch(e){ console.warn('Category delete-from-bazar failed:', e); }
 }
 
 let bccPendingSubParentId = null;

@@ -110,6 +110,7 @@
   .pCard:active{ transform:scale(0.97); }
   .pCardImgWrap{ position:relative; width:100%; aspect-ratio:1/1; background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center; font-size:44px; overflow:hidden; }
   .pCardImgWrap img{ width:100%; height:100%; object-fit:cover; }
+  .pCardImgInner{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
   .pCardFav{ position:absolute; top:8px; right:8px; font-size:17px; cursor:pointer; background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
   .pCardOfferBadge{ position:absolute; top:8px; left:8px; background:#dc2626; color:#fff; font-size:9.5px; font-weight:800; padding:3px 8px; border-radius:8px; }
   .pCardBody{ padding:10px 11px 12px; }
@@ -3115,7 +3116,7 @@ async function loadCategories(shopId, shopName){
     const cats = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
     $("categoriesGrid").innerHTML = cats.map(c=> `
       <div class="serviceCard" onclick="selectCategory('${c.id}','${escapeHtml(c.name||'').replace(/'/g,"")}')">
-        <div class="ic">${catPlaceholderIcon(c.id)}</div>
+        <div class="ic">${c.imageUrl ? `<img src="${escapeHtml(c.imageUrl)}" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:8px;" onerror="this.parentElement.textContent='${catPlaceholderIcon(c.id)}'">` : catPlaceholderIcon(c.id)}</div>
         <div class="lbl">${escapeHtml(c.name || "ক্যাটাগরি")}</div>
       </div>`).join("");
     window.__catsCache = cats;
@@ -3234,7 +3235,7 @@ function renderProducts(products){
     return `
       <div class="pCard">
         <div class="pCardImgWrap" id="pimg-${p.id}" onclick="hbOpenProductDetail('${p.id}')">
-          ${guessCategoryIcon(p.name)}
+          <span class="pCardImgInner" id="pimgInner-${p.id}">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</span>
           ${hasOffer ? '<span class="pCardOfferBadge">🔥 অফার</span>' : ''}
           <span class="pCardFav" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
         </div>
@@ -3271,7 +3272,7 @@ window.hbOpenProductDetail = function(productId){
   const isFav = favs.includes(p.id);
 
   $("hbProductDetailBody").innerHTML = `
-    <div class="pDetailImgWrap" id="pdimg-${p.id}">${guessCategoryIcon(p.name)}</div>
+    <div class="pDetailImgWrap" id="pdimg-${p.id}">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
     <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;">
       <div style="flex:1; font-size:17px; font-weight:800;">${escapeHtml(p.name||"প্রোডাক্ট")}</div>
       <span class="pCardFav" style="position:static;" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
@@ -3292,7 +3293,8 @@ window.hbOpenProductDetail = function(productId){
   const gridImgEl = document.getElementById(`pimg-${p.id}`);
   const detailImgEl = document.getElementById(`pdimg-${p.id}`);
   if(gridImgEl && detailImgEl && gridImgEl.querySelector("img")){
-    detailImgEl.innerHTML = gridImgEl.innerHTML;
+    const innerEl = gridImgEl.querySelector(".pCardImgInner");
+    detailImgEl.innerHTML = innerEl ? innerEl.innerHTML : gridImgEl.innerHTML;
   }
 };
 $("hbProductDetailCloseBtn").addEventListener("click", ()=> $("hbProductDetailModal").style.display = "none");
@@ -3764,10 +3766,11 @@ $("hbTrackerCloseBtn").addEventListener("click", ()=>{
 
 async function resolveAllImages(products){
   for(const p of products){
+    if(p.imageUrl) continue; // 🖼️ দোকান নিজে POS থেকে ছবি আপলোড করে থাকলে renderProducts()-এই সেটা দেখানো হয়ে গেছে — বার্কোড লুকআপ লাগবে না
     if(!p.barcode) continue;
     const url = await resolveProductImage(p);
     if(url){
-      const el = document.getElementById(`pimg-${p.id}`);
+      const el = document.getElementById(`pimgInner-${p.id}`);
       if(el) el.innerHTML = `<img src="${url}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">`;
     }
   }
