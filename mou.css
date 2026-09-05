@@ -1,0 +1,218 @@
+/* ==================== 🐝 মৌ — Honey Bee Bazar Assistant (Development #1) ====================
+   শুধু UI + demo interaction — কোনো real AI/camera/mic/database এখানে নেই। */
+
+:root{
+  --bg1:#1a1206; --bg2:#3d2405; --gold:#ffb703; --amber:#ffd166;
+  --card:#241705; --border:rgba(255,209,102,0.22); --muted:rgba(255,248,232,0.55);
+  --cream:#fff8e8;
+}
+
+*{ box-sizing:border-box; }
+
+html, body{
+  margin:0; padding:0; height:100%;
+  background:var(--bg1);
+  color:var(--cream);
+  font-family:'Noto Sans Bengali','Space Mono',sans-serif;
+  overflow:hidden;
+}
+
+#mouScreen{
+  position:fixed; inset:0;
+  display:flex; flex-direction:column;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255,183,3,0.12), transparent 60%),
+    var(--bg1);
+}
+
+/* ---------- হেডার ---------- */
+.mouHeader{
+  display:flex; align-items:center; gap:10px;
+  padding:14px 16px;
+  flex-shrink:0;
+}
+.mouBackBtn{
+  width:36px; height:36px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(255,255,255,0.06); border:1px solid var(--border);
+  color:var(--cream); font-size:18px; cursor:pointer;
+  text-decoration:none;
+}
+.mouHeaderTitle{ font-weight:800; font-size:15px; }
+.mouHeaderSub{ font-size:11px; color:var(--muted); margin-top:1px; }
+
+/* ---------- মৌ-এর মঞ্চ ---------- */
+.mouStage{
+  flex:1; min-height:0;
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+  padding:10px 0 4px;
+}
+
+.mouGlow{
+  position:absolute;
+  width:220px; height:220px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(255,214,102,0.35), transparent 70%);
+  filter:blur(6px);
+  transition:all 0.6s ease;
+}
+#mouScreen[data-state="idle"] .mouGlow{ animation:mouGlowIdle 3.6s ease-in-out infinite; }
+#mouScreen[data-state="listening"] .mouGlow{
+  width:260px; height:260px;
+  background:radial-gradient(circle, rgba(255,183,3,0.55), transparent 70%);
+  animation:mouGlowListen 1.1s ease-in-out infinite;
+}
+#mouScreen[data-state="happy"] .mouGlow{
+  background:radial-gradient(circle, rgba(255,214,102,0.55), transparent 70%);
+  animation:mouGlowHappy 0.9s ease-in-out infinite;
+}
+#mouScreen[data-state="serious"] .mouGlow{
+  width:190px; height:190px;
+  background:radial-gradient(circle, rgba(255,183,3,0.22), transparent 70%);
+  animation:none;
+}
+
+@keyframes mouGlowIdle{ 0%,100%{ opacity:0.7; transform:scale(1); } 50%{ opacity:1; transform:scale(1.06); } }
+@keyframes mouGlowListen{ 0%,100%{ opacity:0.75; transform:scale(1); } 50%{ opacity:1; transform:scale(1.15); } }
+@keyframes mouGlowHappy{ 0%,100%{ transform:scale(1) rotate(0deg); } 50%{ transform:scale(1.08) rotate(2deg); } }
+
+/* ---------- মৌ চরিত্র (SVG) ---------- */
+.mouCharacter{
+  position:relative; z-index:1;
+  width:180px; height:180px;
+  transition:transform 0.4s ease;
+}
+#mouScreen[data-state="idle"] .mouCharacter{ animation:mouBobIdle 3.2s ease-in-out infinite; }
+#mouScreen[data-state="listening"] .mouCharacter{ animation:mouBobListen 0.9s ease-in-out infinite; }
+#mouScreen[data-state="happy"] .mouCharacter{ animation:mouBounceHappy 0.7s ease-in-out infinite; }
+#mouScreen[data-state="serious"] .mouCharacter{ animation:none; transform:translateY(0); }
+
+@keyframes mouBobIdle{ 0%,100%{ transform:translateY(0) rotate(0deg); } 50%{ transform:translateY(-6px) rotate(-1deg); } }
+@keyframes mouBobListen{ 0%,100%{ transform:translateY(0) scale(1); } 50%{ transform:translateY(-3px) scale(1.02); } }
+@keyframes mouBounceHappy{ 0%,100%{ transform:translateY(0) scale(1); } 50%{ transform:translateY(-14px) scale(1.05); } }
+
+.mouWingL, .mouWingR{ transform-origin:50% 90%; animation:mouWingFlap 1.8s ease-in-out infinite; }
+.mouWingR{ animation-delay:0.15s; }
+#mouScreen[data-state="listening"] .mouWingL, #mouScreen[data-state="listening"] .mouWingR{ animation-duration:0.5s; }
+#mouScreen[data-state="happy"] .mouWingL, #mouScreen[data-state="happy"] .mouWingR{ animation-duration:0.35s; }
+#mouScreen[data-state="serious"] .mouWingL, #mouScreen[data-state="serious"] .mouWingR{ animation-duration:3.2s; }
+@keyframes mouWingFlap{ 0%,100%{ transform:scaleY(1) rotate(0deg); } 50%{ transform:scaleY(0.75) rotate(-6deg); } }
+
+.mouAntennaL, .mouAntennaR{ transform-origin:50% 100%; animation:mouAntennaSway 2.6s ease-in-out infinite; }
+.mouAntennaR{ animation-delay:0.3s; }
+@keyframes mouAntennaSway{ 0%,100%{ transform:rotate(0deg); } 50%{ transform:rotate(4deg); } }
+
+/* চোখ — state-ভেদে ভিন্ন (JS ক্লাস টগল করে) */
+.mouEyeL, .mouEyeR{ transition:all 0.3s ease; }
+#mouScreen[data-state="happy"] .mouPupilL, #mouScreen[data-state="happy"] .mouPupilR{ ry:2; }
+#mouScreen[data-state="listening"] .mouPupilL, #mouScreen[data-state="listening"] .mouPupilR{
+  animation:mouPupilDart 1s ease-in-out infinite;
+}
+@keyframes mouPupilDart{ 0%,100%{ cx:0; } 50%{ cx:1.5; } }
+
+/* ভ্রু — SVG path, JS state-অনুযায়ী d বদলায় (fallback CSS না লাগলেও রাখা হলো) */
+.mouBrowL, .mouBrowR{ transition:all 0.3s ease; }
+
+/* মুখ — JS state-অনুযায়ী path d বদলায় */
+.mouMouth{ transition:all 0.3s ease; }
+
+/* ---------- স্ট্যাটাস চিপ ---------- */
+.mouStateChip{
+  position:absolute; bottom:6px; left:50%; transform:translateX(-50%);
+  font-size:11px; color:var(--muted);
+  background:rgba(0,0,0,0.25); padding:4px 12px; border-radius:20px;
+  border:1px solid var(--border);
+  white-space:nowrap;
+}
+
+/* ---------- কথোপকথন এলাকা ---------- */
+.mouChatArea{
+  flex-shrink:0;
+  max-height:34vh;
+  overflow-y:auto;
+  padding:8px 16px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.mouBubble{
+  max-width:82%;
+  padding:10px 14px;
+  border-radius:16px;
+  font-size:13.5px;
+  line-height:1.5;
+}
+.mouBubble.mou{
+  align-self:flex-start;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-bottom-left-radius:4px;
+}
+.mouBubble.user{
+  align-self:flex-end;
+  background:linear-gradient(135deg, var(--amber), var(--gold));
+  color:var(--bg1);
+  font-weight:600;
+  border-bottom-right-radius:4px;
+}
+
+/* ---------- ইনপুট এলাকা (মোবাইল, one-hand friendly) ---------- */
+.mouInputBar{
+  flex-shrink:0;
+  display:flex; align-items:center; gap:8px;
+  padding:12px 16px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--border);
+  background:rgba(36,23,5,0.5);
+}
+.mouTextInput{
+  flex:1;
+  padding:12px 14px;
+  border-radius:22px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,0.06);
+  color:var(--cream);
+  font-family:inherit;
+  font-size:13.5px;
+  outline:none;
+}
+.mouTextInput::placeholder{ color:var(--muted); }
+
+.mouIconBtn{
+  width:42px; height:42px; flex-shrink:0;
+  border-radius:50%;
+  border:none;
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px;
+  cursor:pointer;
+}
+.mouMicBtn{ background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--cream); position:relative; }
+.mouSendBtn{ background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); }
+
+.mouMicToast{
+  position:absolute; bottom:56px; left:50%; transform:translateX(-50%);
+  background:var(--card); border:1px solid var(--border);
+  color:var(--cream); font-size:11.5px;
+  padding:8px 14px; border-radius:10px;
+  white-space:nowrap;
+  opacity:0; pointer-events:none;
+  transition:opacity 0.25s ease;
+}
+.mouMicToast.show{ opacity:1; }
+
+/* ---------- ডেমো স্টেট-বাটন (এই ধাপেই টেস্ট করার জন্য) ---------- */
+.mouDemoRow{
+  flex-shrink:0;
+  display:flex; gap:6px; justify-content:center; flex-wrap:wrap;
+  padding:0 16px 8px;
+}
+.mouDemoBtn{
+  font-size:10.5px; padding:5px 10px; border-radius:12px;
+  border:1px solid var(--border); background:rgba(255,255,255,0.04);
+  color:var(--muted); cursor:pointer; font-family:inherit;
+}
+.mouDemoBtn.active{ background:var(--amber); color:var(--bg1); border-color:var(--amber); font-weight:700; }
+
+/* ---------- ছোট স্ক্রিনে নিরাপত্তা ---------- */
+@media (max-height:640px){
+  .mouCharacter{ width:140px; height:140px; }
+  .mouGlow{ width:170px; height:170px; }
+}

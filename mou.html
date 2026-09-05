@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>মৌ — Honey Bee Bazar Assistant</title>
+<link rel="stylesheet" href="mou.css">
+</head>
+<body>
+
+<!-- 🐝 মৌ — Development #1: শুধু UI + demo interaction, কোনো real AI/mic/camera/DB নেই -->
+<div id="mouScreen" data-state="idle">
+
+  <div class="mouHeader">
+    <a href="honey-bee-bazar.html" class="mouBackBtn" id="mouBackBtn" aria-label="ফিরে যান">←</a>
+    <div>
+      <div class="mouHeaderTitle">🐝 মৌ</div>
+      <div class="mouHeaderSub">আপনার Honey Bee Bazar সঙ্গী</div>
+    </div>
+  </div>
+
+  <div class="mouStage">
+    <div class="mouGlow"></div>
+
+    <svg class="mouCharacter" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <!-- পাখা (শরীরের পেছনে) -->
+      <ellipse class="mouWingL" cx="62" cy="118" rx="26" ry="16" fill="#fff8e8" opacity="0.55" transform="rotate(-18 62 118)"/>
+      <ellipse class="mouWingR" cx="138" cy="118" rx="26" ry="16" fill="#fff8e8" opacity="0.55" transform="rotate(18 138 118)"/>
+
+      <!-- অ্যান্টেনা -->
+      <g class="mouAntennaL">
+        <path d="M 86 42 Q 78 22 72 14" stroke="#3d2405" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <circle cx="72" cy="14" r="5" fill="#ffb703"/>
+      </g>
+      <g class="mouAntennaR">
+        <path d="M 114 42 Q 122 22 128 14" stroke="#3d2405" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <circle cx="128" cy="14" r="5" fill="#ffb703"/>
+      </g>
+
+      <!-- শরীর -->
+      <ellipse cx="100" cy="138" rx="46" ry="50" fill="url(#mouBodyGrad)"/>
+      <path d="M 56 118 Q 100 128 144 118 Q 148 132 144 146 Q 100 156 56 146 Q 52 132 56 118 Z" fill="#3d2405" opacity="0.85"/>
+      <path d="M 58 152 Q 100 162 142 152 Q 140 166 132 176 Q 100 186 68 176 Q 60 166 58 152 Z" fill="#3d2405" opacity="0.85"/>
+
+      <!-- মাথা -->
+      <circle cx="100" cy="76" r="40" fill="url(#mouBodyGrad)"/>
+
+      <!-- ভ্রু -->
+      <path class="mouBrowL" id="mouBrowL" d="M 74 58 Q 82 52 90 57" stroke="#3d2405" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path class="mouBrowR" id="mouBrowR" d="M 110 57 Q 118 52 126 58" stroke="#3d2405" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+
+      <!-- চোখ -->
+      <ellipse class="mouEyeL" cx="84" cy="72" rx="13" ry="15" fill="#fff8e8"/>
+      <ellipse class="mouEyeR" cx="116" cy="72" rx="13" ry="15" fill="#fff8e8"/>
+      <circle class="mouPupilL" id="mouPupilL" cx="86" cy="74" r="6.5" fill="#241705"/>
+      <circle class="mouPupilR" id="mouPupilR" cx="114" cy="74" r="6.5" fill="#241705"/>
+      <circle cx="88.5" cy="71.5" r="1.8" fill="#fff8e8"/>
+      <circle cx="116.5" cy="71.5" r="1.8" fill="#fff8e8"/>
+
+      <!-- গাল -->
+      <ellipse cx="70" cy="88" rx="7" ry="4.5" fill="#e2543d" opacity="0.35"/>
+      <ellipse cx="130" cy="88" rx="7" ry="4.5" fill="#e2543d" opacity="0.35"/>
+
+      <!-- মুখ -->
+      <path class="mouMouth" id="mouMouth" d="M 90 94 Q 100 101 110 94" stroke="#3d2405" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+      <defs>
+        <linearGradient id="mouBodyGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffd166"/>
+          <stop offset="100%" stop-color="#ffb703"/>
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <div class="mouStateChip" id="mouStateChip">শান্ত আছি 🐝</div>
+  </div>
+
+  <!-- 🧪 এই ধাপেই state যাচাই করার জন্য ডেমো বাটন (voice/AI ছাড়াই) -->
+  <div class="mouDemoRow" id="mouDemoRow">
+    <button class="mouDemoBtn" data-state="idle">Idle</button>
+    <button class="mouDemoBtn" data-state="listening">Listening</button>
+    <button class="mouDemoBtn" data-state="happy">Happy</button>
+    <button class="mouDemoBtn" data-state="serious">Serious</button>
+  </div>
+
+  <div class="mouChatArea" id="mouChatArea">
+    <div class="mouBubble mou">হ্যালো! আমি মৌ 🐝<br>বলুন বন্ধু, কী করতে পারি?</div>
+  </div>
+
+  <div class="mouInputBar">
+    <button class="mouIconBtn mouMicBtn" id="mouMicBtn" aria-label="ভয়েস">
+      🎙️
+      <span class="mouMicToast" id="mouMicToast">Voice coming in next development</span>
+    </button>
+    <input type="text" class="mouTextInput" id="mouTextInput" placeholder="মৌকে কিছু বলুন...">
+    <button class="mouIconBtn mouSendBtn" id="mouSendBtn" aria-label="পাঠান">➤</button>
+  </div>
+
+</div>
+
+<script src="mou-state.js"></script>
+<script src="mou.js"></script>
+</body>
+</html>
