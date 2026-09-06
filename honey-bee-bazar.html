@@ -263,6 +263,7 @@
   }
 </style>
 <script src="bd-locations.js"></script>
+<script src="hb-currency.js"></script>
 <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeufdK--qSX0a6-2m1JwQOrig7q4C8IGY"></script>
 </head>
 <body>
@@ -1195,6 +1196,9 @@ function $(id){ return document.getElementById(id); }
 let allMarkets = [];
 let allShops = [];
 let currentMarketId = null, currentShopId = null;
+// 🌍 বর্তমানে খোলা দোকানের মুদ্রা-চিহ্ন — যে দোকান খোলা আছে সেই দোকান অনুযায়ী পরিবর্তন হয়
+// (selectShop()-এ সেট হয়), পুরনো দোকান বা মুদ্রা সেট না থাকলে ডিফল্ট টাকা (৳)।
+let HB_CUR = '৳';
 let userLatLng = null;
 
 let __hbNavigatingViaPopstate = false;
@@ -2734,9 +2738,9 @@ function hbAssistantCartSummaryHtml(){
   let total = 0;
   const lines = items.map(it=>{
     total += it.price * it.qty;
-    return `✓ ${escapeHtml(it.productName)} — ${it.qty}টি (৳${it.price * it.qty})`;
+    return `✓ ${escapeHtml(it.productName)} — ${it.qty}টি (${HB_CUR}${it.price * it.qty})`;
   }).join("<br>");
-  return `<b>আপনার বাজারের তালিকা</b><br><br>${lines}<br><br><b>মোট আনুমানিক: ৳${total}</b>`;
+  return `<b>আপনার বাজারের তালিকা</b><br><br>${lines}<br><br><b>মোট আনুমানিক: ${HB_CUR}${total}</b>`;
 }
 
 // 🤖 AI (Gemini, server-side secret দিয়ে) থেকে items আনার চেষ্টা — ব্যর্থ
@@ -2848,7 +2852,7 @@ async function hbAssistantProcessText(text){
     }else{
       const options = results.slice(0, 4);
       const optionsHtml = options.map((r,idx)=>
-        `<button class="hbAssistantOptionBtn" data-idx="${idx}" style="display:block; width:100%; text-align:left; padding:9px 12px; margin-top:6px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:#fff8e8; font-family:inherit; font-size:12.5px; cursor:pointer;">${escapeHtml(r.name)} — ৳${r.offerPrice != null ? r.offerPrice : r.price} <span style="color:var(--muted);">(${escapeHtml(r.shopName)})</span></button>`
+        `<button class="hbAssistantOptionBtn" data-idx="${idx}" style="display:block; width:100%; text-align:left; padding:9px 12px; margin-top:6px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:#fff8e8; font-family:inherit; font-size:12.5px; cursor:pointer;">${escapeHtml(r.name)} — ${HB_CUR}${r.offerPrice != null ? r.offerPrice : r.price} <span style="color:var(--muted);">(${escapeHtml(r.shopName)})</span></button>`
       ).join("");
       const askMsg = `"${item.itemQuery}"-এ ${options.length} রকম পেলাম। কোনটা নেব?`;
       const bubble = hbAssistantAppendBubble("assistant", `${escapeHtml(askMsg)}${optionsHtml}`);
@@ -3086,6 +3090,10 @@ window.selectShop = function(shopId){
   const shop = allShops.find(s=> s.id === shopId);
   const shopName = shop ? (shop.name || shop.shopName || shopId) : shopId;
   $("currentShopNameCat").textContent = shopName;
+  // 🌍 এই দোকানের মুদ্রা-চিহ্ন — সাইনআপে country/currency সেট করা থাকলে সেটাই দেখানো হবে
+  HB_CUR = (shop && shop.currencySymbol)
+    || (shop && shop.currencyCode && typeof window.hbGetCurrencySymbol === 'function' ? window.hbGetCurrencySymbol(shop.currencyCode) : null)
+    || '৳';
   loadCategories(shopId, shopName);
 };
 
@@ -3242,8 +3250,8 @@ function renderProducts(products){
         <div class="pCardBody">
           <div class="pCardName" onclick="hbOpenProductDetail('${p.id}')">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
           <div class="pCardPriceRow">
-            <span class="pCardPrice">৳${finalPrice}</span>
-            ${hasOffer ? `<span class="pCardOldPrice">৳${p.price}</span>` : ""}
+            <span class="pCardPrice">${HB_CUR}${finalPrice}</span>
+            ${hasOffer ? `<span class="pCardOldPrice">${HB_CUR}${p.price}</span>` : ""}
           </div>
           <div class="pCardStock ${stockClass}">${stockLabel}</div>
           <button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${finalPrice})">
@@ -3278,8 +3286,8 @@ window.hbOpenProductDetail = function(productId){
       <span class="pCardFav" style="position:static;" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
     </div>
     <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:8px;">
-      <span style="font-size:22px; font-weight:800; color:var(--amber);">৳${finalPrice}</span>
-      ${hasOffer ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">৳${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : ""}
+      <span style="font-size:22px; font-weight:800; color:var(--amber);">${HB_CUR}${finalPrice}</span>
+      ${hasOffer ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${HB_CUR}${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : ""}
     </div>
     <div class="pCardStock ${stockClass}" style="font-size:12px; margin-bottom:14px;">${stockLabel}</div>
     ${p.description ? `<div style="font-size:13px; color:#ddd; line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
@@ -3390,7 +3398,7 @@ function hbCartRenderItems(){
         <div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
           <div style="flex:1; min-width:0;">
             <div style="font-size:13px; font-weight:700;">${escapeHtml(it.productName)}</div>
-            <div style="font-size:11.5px; color:var(--muted);">৳${it.price} × ${it.qty} = ৳${lineTotal}</div>
+            <div style="font-size:11.5px; color:var(--muted);">${HB_CUR}${it.price} × ${it.qty} = ${HB_CUR}${lineTotal}</div>
           </div>
           <button class="hbCartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-delta="-1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">−</button>
           <span style="font-weight:800; font-size:13px; min-width:18px; text-align:center;">${it.qty}</span>
@@ -3405,7 +3413,7 @@ function hbCartRenderItems(){
       </div>`;
   }).join("");
 
-  $("hbCartTotalTxt").textContent = "৳ " + total;
+  $("hbCartTotalTxt").textContent = HB_CUR + ' ' + total;
   $("hbCartSummary").style.display = "block";
 
   listEl.querySelectorAll(".hbCartQtyBtn").forEach(btn=>{
@@ -4070,8 +4078,8 @@ function medEqRenderList(items){
           <div style="font-size:12px; color:#ddd; margin-bottom:3px;">📍 ${escapeHtml(it.upazila||"")}${it.upazila?", ":""}${escapeHtml(it.district||"")}</div>
           <div style="font-size:12px; color:${avail>0?"#4ade80":"#f87171"}; font-weight:700; margin-bottom:10px;">${avail>0 ? `🟢 ${avail}টি Available` : "🔴 এই মুহূর্তে নেই"}</div>
           <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-            ${canRent ? `<span style="background:rgba(212,160,23,0.15); color:var(--amber); padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:700;">🔄 ৳${it.rent.perDay} / দিন</span>` : ""}
-            ${canSale ? `<span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:700;">🛒 ৳${it.sale.price} ক্রয়</span>` : ""}
+            ${canRent ? `<span style="background:rgba(212,160,23,0.15); color:var(--amber); padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:700;">🔄 ${HB_CUR}${it.rent.perDay} / দিন</span>` : ""}
+            ${canSale ? `<span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 9px; border-radius:10px; font-size:11.5px; font-weight:700;">🛒 ${HB_CUR}${it.sale.price} ক্রয়</span>` : ""}
           </div>
           <div style="display:flex; gap:8px;">
             ${canRent ? `<button class="medEqRentBtn" data-id="${it.id}" ${avail<1?"disabled":""} style="flex:1; padding:11px; border:none; border-radius:10px; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; background:${avail<1?"rgba(255,255,255,0.06)":"var(--amber)"}; color:${avail<1?"var(--muted)":"var(--bg1)"};">🔄 ভাড়া নিন</button>` : ""}
@@ -4155,10 +4163,10 @@ function medEqRentStep3Summary(item, days, deliveryType, deliveryAddress){
   $("medEqOrderTitle").textContent = "🧾 ভাড়া নিন — Step 3";
   $("medEqOrderBody").innerHTML = `
     <div class="card" style="padding:14px; margin-bottom:16px;">
-      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>Equipment Rent</span><span>৳${item.rent.perDay} × ${days} দিন = ৳${rentTotal}</span></div>
-      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>Security Deposit</span><span>৳${deposit}</span></div>
-      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:10px;"><span>Delivery Charge</span><span>৳${deliveryCharge}</span></div>
-      <div style="border-top:1px solid var(--border); padding-top:10px; display:flex; justify-content:space-between; font-weight:800; font-size:15px; color:var(--amber);"><span>Total</span><span>৳${total}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>Equipment Rent</span><span>${HB_CUR}${item.rent.perDay} × ${days} দিন = ${HB_CUR}${rentTotal}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>Security Deposit</span><span>${HB_CUR}${deposit}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:10px;"><span>Delivery Charge</span><span>${HB_CUR}${deliveryCharge}</span></div>
+      <div style="border-top:1px solid var(--border); padding-top:10px; display:flex; justify-content:space-between; font-weight:800; font-size:15px; color:var(--amber);"><span>Total</span><span>${HB_CUR}${total}</span></div>
     </div>
     <p style="font-size:11px; color:var(--muted); margin-bottom:14px;">⚠️ Security Deposit ফেরতযোগ্য — ইকুইপমেন্ট ফেরত দেওয়ার সময় ক্ষতি না থাকলে ফেরত পাবেন (ফেরত-প্রক্রিয়া দোকানদার নিশ্চিত করবেন)।</p>
     <button id="medEqConfirmRentBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
@@ -4195,9 +4203,9 @@ function medEqOpenBuyFlow(item){
     <p style="font-size:13px; color:#ddd; margin-bottom:12px;">"${escapeHtml(item.title)}" কিনতে চান?</p>
     <textarea id="medEqBuyAddress" placeholder="ডেলিভারি ঠিকানা লিখুন..." rows="3" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px; resize:vertical;"></textarea>
     <div class="card" style="padding:14px; margin-bottom:16px;">
-      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>Equipment মূল্য</span><span>৳${item.sale.price}</span></div>
-      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:10px;"><span>Delivery Charge</span><span>৳${deliveryCharge}</span></div>
-      <div style="border-top:1px solid var(--border); padding-top:10px; display:flex; justify-content:space-between; font-weight:800; font-size:15px; color:var(--amber);"><span>Total</span><span>৳${total}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>Equipment মূল্য</span><span>${HB_CUR}${item.sale.price}</span></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:10px;"><span>Delivery Charge</span><span>${HB_CUR}${deliveryCharge}</span></div>
+      <div style="border-top:1px solid var(--border); padding-top:10px; display:flex; justify-content:space-between; font-weight:800; font-size:15px; color:var(--amber);"><span>Total</span><span>${HB_CUR}${total}</span></div>
     </div>
     <button id="medEqConfirmBuyBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
   `;
@@ -4250,7 +4258,7 @@ async function medEqLoadMyOrders(){
             <span style="font-size:11px; font-weight:700;">${MED_EQ_STATUS_LABEL[o.status]||o.status}</span>
           </div>
           <div style="font-size:12px; color:var(--muted); margin-bottom:3px;">${o.orderType === "RENT" ? `${o.days} দিনের ভাড়া` : "ক্রয়"}</div>
-          <div style="font-size:13px; color:var(--amber); font-weight:800;">৳ ${o.totalCost}</div>
+          <div style="font-size:13px; color:var(--amber); font-weight:800;">${HB_CUR} ${o.totalCost}</div>
           <div style="font-size:10.5px; color:var(--muted); margin-top:4px;">${time}</div>
         </div>`;
     }).join("");
@@ -4950,7 +4958,7 @@ function tripRenderStatus(trip){
       <div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:12px; margin-top:10px; text-align:left;">
         <div style="font-weight:700; font-size:13.5px;">${escapeHtml(o.driverName||"ড্রাইভার")}</div>
         <div style="font-size:11.5px; color:var(--muted); margin:2px 0 8px;">${escapeHtml(o.vehicleModel||"")} ${o.eta ? "· ETA: "+escapeHtml(o.eta) : ""}</div>
-        <div style="font-weight:800; color:var(--amber); font-size:15px; margin-bottom:8px;">৳ ${o.offeredFare}</div>
+        <div style="font-weight:800; color:var(--amber); font-size:15px; margin-bottom:8px;">${HB_CUR} ${o.offeredFare}</div>
         <div style="display:flex; gap:8px;">
           <button data-offer-idx="${idx}" class="tripRejectOfferBtn" style="flex:1; padding:8px 10px; border:none; border-radius:9px; background:rgba(220,38,38,0.15); border:1px solid rgba(220,38,38,0.4); color:#f87171; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ বাতিল করুন</button>
           <button data-offer-idx="${idx}" class="tripSelectOfferBtn" style="flex:1; padding:8px 10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">✅ এটা নিন</button>
@@ -4970,7 +4978,7 @@ function tripRenderStatus(trip){
     const chosen = list.find(o=> o.driverId === trip.confirmedDriver.driverId) || {};
     $("tripConfirmedBox").style.display = "block";
     $("tripConfirmedName").textContent = chosen.driverName || "ড্রাইভার";
-    $("tripConfirmedMeta").textContent = `${chosen.vehicleModel||""} · ভাড়া: ৳ ${trip.confirmedDriver.finalFare}`;
+    $("tripConfirmedMeta").textContent = `${chosen.vehicleModel||""} · ভাড়া: ${HB_CUR} ${trip.confirmedDriver.finalFare}`;
     const callBtn = $("tripCallDriverBtn");
     if(chosen.driverPhone){
       callBtn.href = "tel:" + chosen.driverPhone;

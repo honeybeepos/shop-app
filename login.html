@@ -86,15 +86,23 @@
       <option value="other">🟡 অন্যান্য (সাধারণ মোড)</option>
     </select>
 
-    <label>জেলা</label>
-    <select id="suDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
-    <label>উপজেলা/থানা <span style="font-weight:400; color:#a89e8c;">(ঐচ্ছিক)</span></label>
-    <select id="suUpazila" disabled><option value="">-- আগে জেলা নির্বাচন করুন --</option></select>
-    <label>বাজার <span style="font-weight:400; color:#a89e8c;">(ঐচ্ছিক)</span></label>
-    <select id="suMarket" disabled><option value="">-- আগে উপজেলা নির্বাচন করুন --</option></select>
-    <label>এজেন্ট <span style="font-weight:400; color:#a89e8c;">(এই বাজারে এজেন্ট থাকলে বেছে নিন, ঐচ্ছিক)</span></label>
-    <select id="suAgent" disabled><option value="">-- বাজার নির্বাচন করুন --</option></select>
-    <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:-6px;">⚠️ উপজেলা/বাজার নির্বাচন না করলে দোকানটি শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে কাজ করবে — Honey Bee Bazar-এ কাস্টমাররা অনলাইনে দেখতে/অর্ডার করতে পারবে না।</p>
+    <label>দেশ (Country)</label>
+    <select id="suCountry"></select>
+    <label>মুদ্রা (Currency) <span style="font-weight:400; color:#a89e8c;">(দেশ অনুযায়ী অটো-সিলেক্ট হয়, চাইলে বদলে দিন)</span></label>
+    <select id="suCurrency"></select>
+
+    <div id="suBdLocationFields">
+      <label>জেলা</label>
+      <select id="suDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
+      <label>উপজেলা/থানা <span style="font-weight:400; color:#a89e8c;">(ঐচ্ছিক)</span></label>
+      <select id="suUpazila" disabled><option value="">-- আগে জেলা নির্বাচন করুন --</option></select>
+      <label>বাজার <span style="font-weight:400; color:#a89e8c;">(ঐচ্ছিক)</span></label>
+      <select id="suMarket" disabled><option value="">-- আগে উপজেলা নির্বাচন করুন --</option></select>
+      <label>এজেন্ট <span style="font-weight:400; color:#a89e8c;">(এই বাজারে এজেন্ট থাকলে বেছে নিন, ঐচ্ছিক)</span></label>
+      <select id="suAgent" disabled><option value="">-- বাজার নির্বাচন করুন --</option></select>
+      <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:-6px;">⚠️ উপজেলা/বাজার নির্বাচন না করলে দোকানটি শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে কাজ করবে — Honey Bee Bazar-এ কাস্টমাররা অনলাইনে দেখতে/অর্ডার করতে পারবে না।</p>
+    </div>
+    <p class="msg" id="suNonBdNotice" style="display:none; font-size:11.5px; color:#a89e8c; margin-top:-6px;">🌍 বাংলাদেশের বাইরের দোকান — এটি শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে কাজ করবে, Honey Bee Bazar এখনো শুধু বাংলাদেশে চালু আছে।</p>
 
     <button class="btn" id="signupBtn">দোকান তৈরি করুন</button>
     <div class="msg" id="signupMsg"></div>
@@ -150,6 +158,7 @@
 </div>
 
 <script src="bd-locations.js"></script>
+<script src="hb-currency.js"></script>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -190,6 +199,43 @@ function getUpazilasForDistrict(district){
   Object.values(BD_LOCATIONS).forEach(div => { if(div[district]) found = div[district]; });
   return found.slice().sort((a,b)=> a.localeCompare(b, 'bn'));
 }
+
+/* ==================== দেশ → মুদ্রা (Country → Currency) ==================== */
+(function initCountryCurrency(){
+  const countrySel = document.getElementById("suCountry");
+  const currencySel = document.getElementById("suCurrency");
+  const bdFields = document.getElementById("suBdLocationFields");
+  const nonBdNotice = document.getElementById("suNonBdNotice");
+
+  countrySel.innerHTML = (window.HB_COUNTRIES || []).map(c =>
+    `<option value="${c.code}" data-currency="${c.currency}">${c.name}</option>`).join("");
+
+  // সব মুদ্রা কারেন্সি ড্রপডাউনে দেখানো — ব্যবহারকারী চাইলে দেশের ডিফল্ট মুদ্রা বদলে দিতে পারবেন
+  const currencyCodes = Object.keys(window.HB_CURRENCIES || {}).sort();
+  currencySel.innerHTML = currencyCodes.map(code => {
+    const c = window.HB_CURRENCIES[code];
+    return `<option value="${code}">${code} — ${c.name} (${c.symbol})</option>`;
+  }).join("");
+
+  function applyCountry(code){
+    const isBd = (code === "BD");
+    bdFields.style.display = isBd ? "" : "none";
+    nonBdNotice.style.display = isBd ? "none" : "block";
+    if(!isBd){
+      // বাংলাদেশ ছাড়া অন্য দেশে এখনো বাজার/এজেন্ট নেটওয়ার্ক নেই — ফিল্ডগুলো রিসেট করে দেওয়া হচ্ছে
+      document.getElementById("suDistrict").value = "";
+      document.getElementById("suUpazila").innerHTML = '<option value="">-- আগে জেলা নির্বাচন করুন --</option>'; document.getElementById("suUpazila").disabled = true;
+      document.getElementById("suMarket").innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; document.getElementById("suMarket").disabled = true;
+      document.getElementById("suAgent").innerHTML = '<option value="">-- বাজার নির্বাচন করুন --</option>'; document.getElementById("suAgent").disabled = true;
+    }
+    const defaultCurrency = window.hbGetCurrencyForCountry(code);
+    if(defaultCurrency) currencySel.value = defaultCurrency;
+  }
+
+  countrySel.value = "BD";
+  applyCountry("BD");
+  countrySel.addEventListener("change", (e)=> applyCountry(e.target.value));
+})();
 
 document.getElementById("suDistrict").innerHTML += getAllDistricts().map(d=>`<option value="${d}">${d}</option>`).join("");
 
@@ -464,10 +510,15 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   const email = document.getElementById("suEmail").value.trim();
   const pass = document.getElementById("suPass").value;
   const category = document.getElementById("suCategory").value;
-  const district = document.getElementById("suDistrict").value;
-  const upazila = document.getElementById("suUpazila").value;
-  const marketId = document.getElementById("suMarket").value;
-  const assignedAgentId = document.getElementById("suAgent").value || null;
+  const countryCode = document.getElementById("suCountry").value;
+  const countryName = (document.getElementById("suCountry").selectedOptions[0] || {}).textContent || countryCode;
+  const currencyCode = document.getElementById("suCurrency").value;
+  const currencySymbol = window.hbGetCurrencySymbol(currencyCode);
+  const isBdShop = (countryCode === "BD");
+  const district = isBdShop ? document.getElementById("suDistrict").value : "";
+  const upazila = isBdShop ? document.getElementById("suUpazila").value : "";
+  const marketId = isBdShop ? document.getElementById("suMarket").value : "";
+  const assignedAgentId = isBdShop ? (document.getElementById("suAgent").value || null) : null;
 
   // দোকানের ক্যাটাগরি অনুযায়ী POS-এর "মোড" ঠিক হয় — এই মোড অনুযায়ী POS-এ
   // কোন ফিচার (ওজন-হিসাব, মেয়াদ-ট্র্যাকিং, সিরিয়াল/IMEI ইত্যাদি) দেখাবে
@@ -484,14 +535,16 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   if(!shopName || !name || !email || pass.length < 6){
     showMsg("signupMsg","সব ঘর সঠিকভাবে পূরণ করুন (পাসওয়ার্ড কমপক্ষে ৬ অক্ষর)",false); return;
   }
-  if(!district){
+  if(isBdShop && !district){
     showMsg("signupMsg","জেলা নির্বাচন করুন।",false); return;
   }
   // 🔌 উপজেলা/বাজার ঐচ্ছিক — না দিলে দোকানটা শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে
   // কাজ করবে, Bazar-এ কোনো বাজারের অধীনে দেখা যাবে না (marketId খালি থাকায়
   // honey-bee-bazar.html-এর loadShops() কখনো এই দোকান খুঁজেই পাবে না — সাথে
-  // onlineEnabled ফ্ল্যাগটাও স্পষ্টভাবে রাখা হচ্ছে, ভবিষ্যতে কোথাও দরকার হলে)
-  if(!marketId){
+  // onlineEnabled ফ্ল্যাগটাও স্পষ্টভাবে রাখা হচ্ছে, ভবিষ্যতে কোথাও দরকার হলে)।
+  // বাংলাদেশের বাইরের দোকান (isBdShop=false) স্বয়ংক্রিয়ভাবেই অফলাইন — আলাদা করে
+  // জিজ্ঞাসা করার দরকার নেই, কারণ Bazar এখনো শুধু বাংলাদেশে চালু।
+  if(isBdShop && !marketId){
     const proceedOffline = confirm("আপনি উপজেলা/বাজার নির্বাচন করেননি — এই দোকানটি শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে কাজ করবে এবং Honey Bee Bazar-এ অনলাইনে দেখা যাবে না। এভাবেই এগিয়ে যেতে চান?");
     if(!proceedOffline) return;
   }
@@ -504,8 +557,9 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
     await db.collection("shops").doc(uid).set({
       shopId: uid, ownerUid: uid, shopName, ownerName: name, ownerEmail: email,
       status: "active",
-      district, upazila: upazila || null, marketId: marketId || null, assignedAgentId,
+      district: district || null, upazila: upazila || null, marketId: marketId || null, assignedAgentId,
       onlineEnabled: !!marketId, // 🔌 বাজার ছাড়া নিবন্ধন করলে false — POS/অফলাইন-শুধু দোকান, Bazar-এ দেখা যাবে না
+      country: countryName, countryCode, currencyCode, currencySymbol, // 🌍 আন্তর্জাতিক দোকান সাপোর্ট — country/currency
       storeCategory: category, appMode,
       features: { reports:true, extraIncome:true, ops:true, monitor:true, whatsapp:true },
       createdAt: fbNow(), updatedAt: fbNow()

@@ -615,6 +615,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script src="hb-currency.js"></script>
 <script src="firebase-init.js"></script>
 
 <div id="authGate"><p>যাচাই করা হচ্ছে, একটু অপেক্ষা করুন...</p></div>
@@ -3597,6 +3598,13 @@ setTimeout(()=>{
   }
 }, 20000);
 
+// 🌍 এই দোকানের মুদ্রা-চিহ্ন (currency symbol) — সাইনআপে country/currency সেট করা থাকলে
+// সেটাই দেখানো হবে (যেমন সৌদি আরবের দোকান হলে "SR"), নাহলে ডিফল্ট টাকা (৳)।
+// পেজ লোড হওয়ার সাথে সাথেই localStorage-এর ক্যাশ থেকে সিঙ্ক্রোনাসভাবে পড়া হচ্ছে (নিচে
+// appMode fetch করার সময় এই ক্যাশ Firestore থেকে রিফ্রেশ করে রাখা হয়) — যাতে প্রতিটা
+// স্ক্রিন সাথে সাথেই সঠিক মুদ্রা-চিহ্ন দেখাতে পারে, Firestore fetch শেষ হওয়ার অপেক্ষা না করে।
+let HB_CUR = localStorage.getItem('shop-currency-symbol') || '৳';
+
 let retailEntries = [];
 let shopCustomers = [];
 // "ডিলিট করা কিছু যেন ফিরে না আসে" — মাল্টি-ডিভাইস ক্লাউড সিঙ্কের কারণে মাঝে মাঝে ডিলিট করা
@@ -3776,7 +3784,7 @@ logoInputEl.addEventListener('change', (e)=>{
   reader.readAsDataURL(file);
 });
 
-function fmt(n){ return '৳ ' + (Number(n)||0).toLocaleString('en-US'); }
+function fmt(n){ return HB_CUR + ' ' + (Number(n)||0).toLocaleString('en-US'); }
 
 /* ---- Phone country-code handling ----
    সমস্যা: আগে নাম্বার শুধু লোকাল ফরম্যাটে (যেমনঃ 01712345678) সেভ হতো, তাই
@@ -4595,7 +4603,7 @@ document.getElementById('hbCallDeliveryBtn').addEventListener('click', async ()=
       if(storeLatLng){
         const straightKm = hbHaversineKm(storeLatLng[0], storeLatLng[1], __hbPickedLatLng[0], __hbPickedLatLng[1]);
         document.getElementById('hbPickLocationDistanceTxt').textContent =
-          `দূরত্ব (আনুমানিক): ${straightKm.toFixed(1)} কিমি · সম্ভাব্য চার্জ: ৳ ${hbEstimateCharge(straightKm).toFixed(1)}`;
+          `দূরত্ব (আনুমানিক): ${straightKm.toFixed(1)} কিমি · সম্ভাব্য চার্জ: ${HB_CUR} ${hbEstimateCharge(straightKm).toFixed(1)}`;
       }
     });
   }, 60);
@@ -4758,7 +4766,7 @@ document.getElementById('hbOpenLiveMapBtn').addEventListener('click', async ()=>
             document.getElementById('hbMapDistanceRow').style.display = 'block';
             const straightKm = hbHaversineKm(storeLatLng[0], storeLatLng[1], custLatLng[0], custLatLng[1]);
             document.getElementById('hbMapDistanceVal').textContent = straightKm.toFixed(1) + ' কিমি (সরলরেখা)';
-            document.getElementById('hbMapChargeVal').textContent = '৳ ' + hbEstimateCharge(straightKm).toFixed(1);
+            document.getElementById('hbMapChargeVal').textContent = HB_CUR + ' ' + hbEstimateCharge(straightKm).toFixed(1);
 
             hbFetchOsrmRoute(storeLatLng[0], storeLatLng[1], custLatLng[0], custLatLng[1]).then(route=>{
               if(route && __hbLiveMap){
@@ -4766,7 +4774,7 @@ document.getElementById('hbOpenLiveMapBtn').addEventListener('click', async ()=>
                 __hbLiveRoute = L.polyline(route.coords, { color:'#ffb703', weight:4 }).addTo(__hbLiveMap);
                 __hbLiveMap.fitBounds(__hbLiveRoute.getBounds(), { padding:[24,24] });
                 document.getElementById('hbMapDistanceVal').textContent = route.distanceKm.toFixed(1) + ' কিমি (রোড রুট, ~' + Math.round(route.durationMin) + ' মিনিট)';
-                document.getElementById('hbMapChargeVal').textContent = '৳ ' + hbEstimateCharge(route.distanceKm).toFixed(1);
+                document.getElementById('hbMapChargeVal').textContent = HB_CUR + ' ' + hbEstimateCharge(route.distanceKm).toFixed(1);
               }
             });
           }
@@ -4844,9 +4852,9 @@ function hbRenderDashboard(){
   const totalOrderAmount = todays.reduce((s,o)=> s + (Number(o.amount)||0), 0);
   const totalIncome = todays.reduce((s,o)=> s + (Number(o.income)||0), 0);
 
-  document.getElementById('hbTodayOrderAmount').textContent = `৳ ${fmt(totalOrderAmount)}`;
+  document.getElementById('hbTodayOrderAmount').textContent = `${HB_CUR} ${fmt(totalOrderAmount)}`;
   document.getElementById('hbTodayDeliveryCount').textContent = todays.length;
-  document.getElementById('hbTodayExtraIncome').textContent = `৳ ${fmt(totalIncome)}`;
+  document.getElementById('hbTodayExtraIncome').textContent = `${HB_CUR} ${fmt(totalIncome)}`;
 
   const listEl = document.getElementById('hbOrderList');
   if(!todays.length){
@@ -4856,7 +4864,7 @@ function hbRenderDashboard(){
   listEl.innerHTML = todays.map(o => `
     <div class="hbOrderRow">
       <div>
-        <div class="hbOrderInfo">💰 ৳ ${fmt(o.amount)}${o.income ? ` &nbsp;·&nbsp; 🍯 ৳ ${fmt(o.income)}` : ''}</div>
+        <div class="hbOrderInfo">💰 ${HB_CUR} ${fmt(o.amount)}${o.income ? ` &nbsp;·&nbsp; 🍯 ${HB_CUR} ${fmt(o.income)}` : ''}</div>
         <div class="hbOrderMeta">${o.note ? escapeHtml(o.note) + ' — ' : ''}${new Date(o.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}</div>
       </div>
       <button class="hbOrderDel" onclick="hbDeleteOrder('${o.id}')">মুছুন</button>
@@ -4935,7 +4943,7 @@ function hbRenderPendingList(){
   area.innerHTML = pending.map(o => `
     <div class="hbOrderRow" style="flex-direction:column; align-items:stretch; gap:8px;">
       <div>
-        <div class="hbOrderInfo">💰 ৳ ${fmt(o.amount)}${o.income ? ` &nbsp;·&nbsp; 🍯 ৳ ${fmt(o.income)}` : ''}</div>
+        <div class="hbOrderInfo">💰 ${HB_CUR} ${fmt(o.amount)}${o.income ? ` &nbsp;·&nbsp; 🍯 ${HB_CUR} ${fmt(o.income)}` : ''}</div>
         <div class="hbOrderMeta">${o.note ? escapeHtml(o.note) + ' — ' : ''}${new Date(o.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}</div>
       </div>
       <div style="display:flex; gap:8px;">
@@ -4979,7 +4987,7 @@ async function hbAcceptOrder(id){
   toast('✅ অর্ডার একসেপ্ট হয়েছে — আজকের হিসাবে যোগ হয়েছে');
 
   // একসেপ্ট করার সাথে সাথেই অর্ডার প্রিন্ট শুরু হবে
-  const msg = `🐝 Honey Bee Network Order\n\nOrder Amount: ৳ ${order.amount}${order.income ? `\nExtra Income: ৳ ${order.income}` : ''}${order.note ? `\nNote: ${order.note}` : ''}\n\nTime: ${new Date(order.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}\nDate: ${new Date(order.date).toLocaleDateString('en-GB')}\n\nStatus: ✅ Accepted`;
+  const msg = `🐝 Honey Bee Network Order\n\nOrder Amount: ${HB_CUR} ${order.amount}${order.income ? `\nExtra Income: ${HB_CUR} ${order.income}` : ''}${order.note ? `\nNote: ${order.note}` : ''}\n\nTime: ${new Date(order.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}\nDate: ${new Date(order.date).toLocaleDateString('en-GB')}\n\nStatus: ✅ Accepted`;
   printSaleReceipt('Honey Bee Network', '', msg);
 }
 
@@ -7305,17 +7313,17 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
     const lines = [`Item ${idx + 1}`, `Product : ${model}`];
     if(category) lines.push(`Category: ${category}`);
     lines.push(it.weightLabel ? `Quantity: ${it.weightLabel}` : `Quantity: ${it.qty}`);
-    lines.push(`Unit Price: ৳ ${it.unitPrice}${it.weightLabel ? '/kg' : ''}`);
-    lines.push(`Amount: ৳ ${it.price}`);
+    lines.push(`Unit Price: ${HB_CUR} ${it.unitPrice}${it.weightLabel ? '/kg' : ''}`);
+    lines.push(`Amount: ${HB_CUR} ${it.price}`);
     if(it.serialNumber) lines.push(`IMEI/Serial: ${it.serialNumber}`);
     if(it.warrantyMonths) lines.push(`Warranty: ${it.warrantyMonths} Month(s) (expires: ${it.warrantyExpiry})`);
     lines.push(`Time: ${formatInvoiceTime(it.date || now)} (${formatInvoiceDate(it.date || now)})`);
     return lines.join('\n');
   }).join(`\n\n${DIVIDER}\n\n`);
 
-  let msg = `🧾 SALES INVOICE\n\n${shopName}${shopSubtitle ? `\n_${shopSubtitle}_` : ''}\n\nInvoice No: ${invoiceNo || nextInvoiceNumber()}\nDate: ${dateStr}\nTime: ${timeStr}\n\nCustomer Name: ${name}\nPhone: ${phone || '-'}\n\n${DIVIDER}\n\n${itemBlocks}\n\n${DIVIDER}\n\nTotal Bill : ৳ ${billTotalPrice}\nReceived   : ৳ ${paid}\nPrevious Due : ৳ ${previousDue}`;
+  let msg = `🧾 SALES INVOICE\n\n${shopName}${shopSubtitle ? `\n_${shopSubtitle}_` : ''}\n\nInvoice No: ${invoiceNo || nextInvoiceNumber()}\nDate: ${dateStr}\nTime: ${timeStr}\n\nCustomer Name: ${name}\nPhone: ${phone || '-'}\n\n${DIVIDER}\n\n${itemBlocks}\n\n${DIVIDER}\n\nTotal Bill : ${HB_CUR} ${billTotalPrice}\nReceived   : ${HB_CUR} ${paid}\nPrevious Due : ${HB_CUR} ${previousDue}`;
 
-  msg += `\n\n${DIVIDER}\n\nCurrent Due : ৳ ${currentDue}\n\nThank you for shopping with us.\n${shopName}`;
+  msg += `\n\n${DIVIDER}\n\nCurrent Due : ${HB_CUR} ${currentDue}\n\nThank you for shopping with us.\n${shopName}`;
 
   msg += isCleared
     ? `\n\n✅ Your balance has been fully paid. Thank you so much for doing business with us!`
@@ -8731,7 +8739,7 @@ document.getElementById('qiSellCompleteBtn').addEventListener('click', async ()=
   toast(change>0 ? `✅ ${prod.name} বিক্রি সম্পূর্ণ (${methodLabel}) — গ্রাহককে ফেরত দিন ${fmt(change)}` : `✅ ${prod.name} — ${fmt(amount)} বিক্রি সম্পূর্ণ (${methodLabel})`);
   render();
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
-  const qiMsg = `🧾 SALES RECEIPT\n${shopName}\n\nInvoice No: ${retailEntries[0].invoiceNo}\nDate: ${new Date().toLocaleDateString('en-GB')}\n\nItem: ${prod.name}\nQty: 1\nPrice: ৳ ${amount}\nPaid: ৳ ${amount} (${methodLabel})${change>0?`\nChange Due: ৳ ${change}`:''}\n\nThank you!`;
+  const qiMsg = `🧾 SALES RECEIPT\n${shopName}\n\nInvoice No: ${retailEntries[0].invoiceNo}\nDate: ${new Date().toLocaleDateString('en-GB')}\n\nItem: ${prod.name}\nQty: 1\nPrice: ${HB_CUR} ${amount}\nPaid: ${HB_CUR} ${amount} (${methodLabel})${change>0?`\nChange Due: ${HB_CUR} ${change}`:''}\n\nThank you!`;
   openShareModal('নগদ কাস্টমার', '', qiMsg);
 });
 
@@ -10090,7 +10098,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     if(cashBack === 'yes' && value > 0 && typeof opsCheckSufficientBalance === 'function' && !opsCheckSufficientBalance('cash', value)) return;
     const rtQty = readRequiredQty('rtQty');
     if(rtQty === null) return;
-    let extraNote = (cashBack==='yes' ? `Cash return: ৳ ${value}` : `৳ ${value} deducted from balance.`) + (condition==='bad' ? ' [খারাপ/নষ্ট মাল — স্টকে যোগ হয়নি]' : ' [ভালো মাল — স্টকে যোগ হয়েছে]');
+    let extraNote = (cashBack==='yes' ? `Cash return: ${HB_CUR} ${value}` : `${HB_CUR} ${value} deducted from balance.`) + (condition==='bad' ? ' [খারাপ/নষ্ট মাল — স্টকে যোগ হয়নি]' : ' [ভালো মাল — স্টকে যোগ হয়েছে]');
     if(cashBack === 'no' && value>0){ allocateDuePayment(name, phone, value); }
 
     const rtNewEntry = { id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, returnValue: value, cashBack, note: (note ? note+' — ' : '')+extraNote, status, condition, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() };
@@ -10107,10 +10115,10 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     const isCleared = isCustomerFullyPaid(name, phone);
     let msg = "";
     if(isCleared) {
-      msg = `Dear ${name},\n\nYour returned item (${item}) has been processed.\n\nYour balance has been fully paid (Previous Due: ৳ ${previousDue}). Thank you so much for doing business with us. Have a great day! — Mumen Electronics.`;
+      msg = `Dear ${name},\n\nYour returned item (${item}) has been processed.\n\nYour balance has been fully paid (Previous Due: ${HB_CUR} ${previousDue}). Thank you so much for doing business with us. Have a great day! — Mumen Electronics.`;
     } else {
       const currentDue = getCustomerTotalDue(name, phone);
-      msg = `Dear ${name},\n\nYour returned item (${item}) has been processed.\n\nPrevious Due: ৳ ${previousDue}\nTotal Due Now: ৳ ${currentDue}\n\nPlease clear your due balance soon. Thank you — Mumen Electronics.`;
+      msg = `Dear ${name},\n\nYour returned item (${item}) has been processed.\n\nPrevious Due: ${HB_CUR} ${previousDue}\nTotal Due Now: ${HB_CUR} ${currentDue}\n\nPlease clear your due balance soon. Thank you — Mumen Electronics.`;
     }
     await finishAndMaybeShare(name, phone, msg);
 
@@ -10138,7 +10146,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
 
     allocateDuePayment(name, phone, amount);
     
-    const dpNewEntry = { id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, depositAmount: amount, paymentMethod: depositMethod, note: (note?note+' — ':'')+`৳ ${amount} deposited`, status, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() };
+    const dpNewEntry = { id: Date.now().toString(36), name, item:'Deposit Received', phone, cost:0, price:0, paid:0, depositAmount: amount, paymentMethod: depositMethod, note: (note?note+' — ':'')+`${HB_CUR} ${amount} deposited`, status, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() };
     retailEntries.unshift(dpNewEntry);
     backupRecentSaleEntries([dpNewEntry]);
     
@@ -10146,10 +10154,10 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     const changeBack = Math.max(amount - previousDue, 0);
     let msg = "";
     if(isCleared) {
-      msg = `Dear ${name},\n\nWe have received your payment of ৳ ${amount}.\n\nYour balance has been fully paid (Previous Due: ৳ ${previousDue}).` + (changeBack > 0 ? `\n\nExcess amount refunded/payable to you: ৳ ${changeBack}` : '') + `\n\nThank you so much for doing business with us. Have a great day! — Mumen Electronics.`;
+      msg = `Dear ${name},\n\nWe have received your payment of ${HB_CUR} ${amount}.\n\nYour balance has been fully paid (Previous Due: ${HB_CUR} ${previousDue}).` + (changeBack > 0 ? `\n\nExcess amount refunded/payable to you: ${HB_CUR} ${changeBack}` : '') + `\n\nThank you so much for doing business with us. Have a great day! — Mumen Electronics.`;
     } else {
       const currentDue = getCustomerTotalDue(name, phone);
-      msg = `Dear ${name},\n\nWe have received your payment of ৳ ${amount}.\n\nPrevious Due: ৳ ${previousDue}\nRemaining Due: ৳ ${currentDue}\n\nThank you — Mumen Electronics.`;
+      msg = `Dear ${name},\n\nWe have received your payment of ${HB_CUR} ${amount}.\n\nPrevious Due: ${HB_CUR} ${previousDue}\nRemaining Due: ${HB_CUR} ${currentDue}\n\nThank you — Mumen Electronics.`;
     }
     await finishAndMaybeShare(name, phone, msg);
   }
@@ -10686,17 +10694,17 @@ function openMultiEditModal(billKey){
         <input class="meItemInput" data-id="${e.id}" data-field="qty" type="number" inputmode="numeric" min="1" step="1" value="${e.qty||1}">
       </div>
       <div>
-        <label>মোট কেনা দাম (৳)</label>
+        <label>মোট কেনা দাম (${HB_CUR})</label>
         <input class="meItemInput" data-id="${e.id}" data-field="cost" type="number" inputmode="numeric" value="${e.cost||0}">
       </div>
     </div>
     <div class="row">
       <div>
-        <label>মোট বিক্রি দাম (৳)</label>
+        <label>মোট বিক্রি দাম (${HB_CUR})</label>
         <input class="meItemInput" data-id="${e.id}" data-field="price" type="number" inputmode="numeric" value="${e.price||0}">
       </div>
       <div>
-        <label>জমা (৳)</label>
+        <label>জমা (${HB_CUR})</label>
         <input class="meItemInput" data-id="${e.id}" data-field="paid" type="number" inputmode="numeric" value="${e.paid||0}">
       </div>
     </div>
@@ -10808,10 +10816,10 @@ function handleWaMiniClickBill(billKey){
   const totalPrice = items.reduce((s,e)=>s+(e.price||0),0);
   const totalPaid = items.reduce((s,e)=>s+(e.paid||0),0);
   const itemLines = items.map(e=>{
-    const qtyLine = e.qty && e.qty>1 ? ` (${e.qty} pcs x ৳ ${getUnitPrice(e)}/pc)` : '';
-    return `- ${e.item}${qtyLine}: ৳ ${e.price}`;
+    const qtyLine = e.qty && e.qty>1 ? ` (${e.qty} pcs x ${HB_CUR} ${getUnitPrice(e)}/pc)` : '';
+    return `- ${e.item}${qtyLine}: ${HB_CUR} ${e.price}`;
   }).join('\n');
-  const text = `Dear ${first.name},\nYour statement summary:\n${itemLines}\nTotal Price: ৳ ${totalPrice}\nReceived: ৳ ${totalPaid}\nTotal Due Balance: ৳ ${currentDue}`;
+  const text = `Dear ${first.name},\nYour statement summary:\n${itemLines}\nTotal Price: ${HB_CUR} ${totalPrice}\nReceived: ${HB_CUR} ${totalPaid}\nTotal Due Balance: ${HB_CUR} ${currentDue}`;
   window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, '_blank');
 }
 
@@ -10988,7 +10996,7 @@ function renderStatement(name, list){
   if(phone) {
     waPrintBtn.style.display = 'block';
     let digits = phone.replace(/\D/g,'');
-    waPrintBtn.href = `https://wa.me/${digits}?text=${encodeURIComponent(`Dear ${name},\nYour total balance due is: ৳ ${totalDue}. Thank you — Mumen Electronics.`)}`;
+    waPrintBtn.href = `https://wa.me/${digits}?text=${encodeURIComponent(`Dear ${name},\nYour total balance due is: ${HB_CUR} ${totalDue}. Thank you — Mumen Electronics.`)}`;
   } else { waPrintBtn.style.display = 'none'; }
 }
 
@@ -11038,13 +11046,13 @@ function handleWaMiniClick(id) {
   let text;
   if(e.status === 'ফেরত'){
     const qtyText = e.qty && e.qty>1 ? ` (${e.qty} pcs)` : '';
-    text = `Dear ${e.name},\nYour returned item has been recorded.\nItem: ${e.item}${qtyText}\nTotal Due Balance: ৳ ${currentDue}\n— Mumen Electronics`;
+    text = `Dear ${e.name},\nYour returned item has been recorded.\nItem: ${e.item}${qtyText}\nTotal Due Balance: ${HB_CUR} ${currentDue}\n— Mumen Electronics`;
   } else if(e.status === 'বদলি'){
-    const qtyLine = e.qty && e.qty>1 ? `\nQty: ${e.qty} pcs x ৳ ${getUnitPrice(e)}/pc = ৳ ${e.price}` : '';
-    text = `Dear ${e.name},\nYour item exchange has been recorded.\nNew Item: ${e.item}${qtyLine}\nTotal Price: ৳ ${e.price}\nReceived: ৳ ${e.paid}\nTotal Due Balance: ৳ ${currentDue}\n— Mumen Electronics`;
+    const qtyLine = e.qty && e.qty>1 ? `\nQty: ${e.qty} pcs x ${HB_CUR} ${getUnitPrice(e)}/pc = ${HB_CUR} ${e.price}` : '';
+    text = `Dear ${e.name},\nYour item exchange has been recorded.\nNew Item: ${e.item}${qtyLine}\nTotal Price: ${HB_CUR} ${e.price}\nReceived: ${HB_CUR} ${e.paid}\nTotal Due Balance: ${HB_CUR} ${currentDue}\n— Mumen Electronics`;
   } else {
-    const qtyLine = e.qty && e.qty>1 ? `\nQty: ${e.qty} pcs x ৳ ${getUnitPrice(e)}/pc = ৳ ${e.price}` : '';
-    text = `Dear ${e.name},\nYour statement summary:\nItem: ${e.item}${qtyLine}\nTotal Price: ৳ ${e.price}\nReceived: ৳ ${e.paid}\nTotal Due Balance: ৳ ${currentDue}`;
+    const qtyLine = e.qty && e.qty>1 ? `\nQty: ${e.qty} pcs x ${HB_CUR} ${getUnitPrice(e)}/pc = ${HB_CUR} ${e.price}` : '';
+    text = `Dear ${e.name},\nYour statement summary:\nItem: ${e.item}${qtyLine}\nTotal Price: ${HB_CUR} ${e.price}\nReceived: ${HB_CUR} ${e.paid}\nTotal Due Balance: ${HB_CUR} ${currentDue}`;
   }
   window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, '_blank');
 }
@@ -11097,7 +11105,7 @@ function render(showSecureInfo = false){
     let waIcon = '';
     if(ph) {
       let digits = ph.replace(/\D/g,'');
-      waIcon = `<a href="https://wa.me/${digits}?text=${encodeURIComponent(`Dear ${nm},\nYour total balance due is: ৳ ${amt}. Thank you — Mumen Electronics.`)}" target="_blank" style="text-decoration:none; font-size:16px; margin-left:6px;">💬</a>`;
+      waIcon = `<a href="https://wa.me/${digits}?text=${encodeURIComponent(`Dear ${nm},\nYour total balance due is: ${HB_CUR} ${amt}. Thank you — Mumen Electronics.`)}" target="_blank" style="text-decoration:none; font-size:16px; margin-left:6px;">💬</a>`;
     }
     const items = getCustomerDueItems(nm, ph);
     const detailHtml = items.length
@@ -11915,7 +11923,7 @@ function buildDetailShareMessage(){
   const labelMap = { sales: 'Sales Summary', today: "Today's Sales List" };
   const label = labelMap[mode] || 'Full Account Summary';
   const itemsBlock = (shareLines && shareLines.length) ? shareLines.join('\n\n') + '\n\n' : '';
-  return `Dear ${name},\n\n${label}\n\n${itemsBlock}Total Price: ৳ ${totalPrice}\nTotal Received: ৳ ${totalPaid}\nTotal Due: ৳ ${totalDue}\n\nPlease clear your due balance soon. Thank you — Mumen Electronics.`;
+  return `Dear ${name},\n\n${label}\n\n${itemsBlock}Total Price: ${HB_CUR} ${totalPrice}\nTotal Received: ${HB_CUR} ${totalPaid}\nTotal Due: ${HB_CUR} ${totalDue}\n\nPlease clear your due balance soon. Thank you — Mumen Electronics.`;
 }
 
 document.getElementById('cdWhatsapp').addEventListener('click', ()=>{
@@ -12371,7 +12379,7 @@ function renderWeeklySalesChart(){
     data: {
       labels,
       datasets: [{
-        label: 'বিক্রি (৳)',
+        label: `বিক্রি (${HB_CUR})`,
         data,
         backgroundColor: grad,
         borderColor: 'rgba(167,243,208,0.9)',
@@ -12629,7 +12637,7 @@ async function initDriverMode(uid){
     pickup:"🛻 পিকআপ", ambulance_ac:"🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac:"🚑 অ্যাম্বুলেন্স (Non-AC)", ambulance_icu:"🚑 অ্যাম্বুলেন্স (ICU)", easy_bike:"🛺✨ ইজি বাইক" }[v.type] || v.type || "";
   document.getElementById("dmVehicleInfo").textContent =
     [vLabel, v.model, v.regNumber, v.color, v.seatCount ? v.seatCount+" সিট" : ""].filter(Boolean).join(" · ") || "গাড়ির তথ্য নেই";
-  document.getElementById("dmTodayEarning").textContent = "৳ " + (__dmDriver.todayEarning || 0);
+  document.getElementById("dmTodayEarning").textContent = HB_CUR + ' ' + (__dmDriver.todayEarning || 0);
   document.getElementById("dmTodayTrips").textContent = __dmDriver.todayTripCount || 0;
 
   dmRefreshStatusUi(__dmDriver.driverStatus || "offline");
@@ -12789,7 +12797,7 @@ function dmRenderTripRequests(trips){
 }
 
 async function dmOfferTripFare(tripId){
-  const fareInput = prompt("কত ভাড়া অফার করবেন? (৳)", "");
+  const fareInput = prompt(`কত ভাড়া অফার করবেন? (${HB_CUR})`, "");
   if(fareInput === null) return;
   const fare = Number(fareInput);
   if(!fare || fare <= 0){ alert("সঠিক ভাড়া দিন।"); return; }
@@ -12868,7 +12876,7 @@ async function dmRenderActiveTripStatus(trip, tripId){
           <div style="font-size:12px; color:#eafff2; margin:4px 0 2px;">👤 যাত্রী: ${escapeHtmlDm(trip.passengerName||"—")}</div>
           <div style="font-size:12px; color:#eafff2; margin:2px 0;">📍 পিকআপ: ${escapeHtmlDm((trip.pickupLocation && trip.pickupLocation.address) || "জানা নেই")}</div>
           <div style="font-size:12px; color:#eafff2; margin:2px 0;">🏁 গন্তব্য: ${escapeHtmlDm(trip.destination||"—")}</div>
-          <div style="font-size:12px; color:#a8d9c0; margin-bottom:10px;">💰 ভাড়া: ৳ ${trip.confirmedDriver.finalFare}</div>
+          <div style="font-size:12px; color:#a8d9c0; margin-bottom:10px;">💰 ভাড়া: ${HB_CUR} ${trip.confirmedDriver.finalFare}</div>
           <div id="dmTripRouteMapEl" style="width:100%; height:160px; border-radius:10px; overflow:hidden; background:#111; margin-bottom:10px; display:${trip.pickupLocation && trip.pickupLocation.lat ? "block" : "none"};"></div>
           <div style="display:flex; gap:8px; margin-bottom:8px;">
             <button id="dmNavigateBtn" style="flex:1; padding:10px; border:none; border-radius:9px; background:#2563eb; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">🧭 Navigate</button>
@@ -13209,7 +13217,7 @@ async function dmOpenHistory(){
           <div style="color:#eafff2;">${escapeHtmlDm(it.title)}</div>
           <div style="font-size:10.5px; color:#6a9c85; margin-top:2px;">${it.time ? it.time.toLocaleDateString('bn-BD') + " " + it.time.toLocaleTimeString('bn-BD',{hour:'2-digit',minute:'2-digit'}) : ""}</div>
         </div>
-        <div style="font-weight:800; color:#4ade80;">${it.fare != null ? "৳ " + it.fare : "নগদ"}</div>
+        <div style="font-weight:800; color:#4ade80;">${it.fare != null ? HB_CUR + ' ' + it.fare : "নগদ"}</div>
       </div>`).join("");
   }catch(e){
     console.error(e);
@@ -13499,7 +13507,7 @@ async function walletChargeFare(passengerUserId, driverUid, fare){
 }
 
 async function dmPickUpPassenger(passenger){
-  const fareInput = prompt("ভাড়া কত নেবেন? (৳) — যাত্রীর Wallet-এ ব্যালেন্স থাকলে সেখান থেকে কাটা হবে, না থাকলে নগদ নিন।", "");
+  const fareInput = prompt(`ভাড়া কত নেবেন? (${HB_CUR}) — যাত্রীর Wallet-এ ব্যালেন্স থাকলে সেখান থেকে কাটা হবে, না থাকলে নগদ নিন।`, "");
   if(fareInput === null) return; // বাতিল করলে Pick Up-ও হবে না
   const fare = Number(fareInput) || 0;
   try{
@@ -13508,9 +13516,9 @@ async function dmPickUpPassenger(passenger){
     });
     if(fare > 0){
       const result = await walletChargeFare(passenger.user_id, __dmDriverId, fare);
-      if(result.success) alert(`✅ Pick Up সম্পন্ন — Wallet থেকে ৳ ${fare} কাটা হয়েছে।`);
-      else if(result.reason === "insufficient_balance") alert(`✅ Pick Up সম্পন্ন — যাত্রীর Wallet-এ পর্যাপ্ত ব্যালেন্স নেই, নগদ ৳ ${fare} নিন।`);
-      else if(result.reason === "no_wallet") alert(`✅ Pick Up সম্পন্ন — যাত্রী লগইন করা নেই (কোনো Wallet নেই), নগদ ৳ ${fare} নিন।`);
+      if(result.success) alert(`✅ Pick Up সম্পন্ন — Wallet থেকে ${HB_CUR} ${fare} কাটা হয়েছে।`);
+      else if(result.reason === "insufficient_balance") alert(`✅ Pick Up সম্পন্ন — যাত্রীর Wallet-এ পর্যাপ্ত ব্যালেন্স নেই, নগদ ${HB_CUR} ${fare} নিন।`);
+      else if(result.reason === "no_wallet") alert(`✅ Pick Up সম্পন্ন — যাত্রী লগইন করা নেই (কোনো Wallet নেই), নগদ ${HB_CUR} ${fare} নিন।`);
       else alert("✅ Pick Up সম্পন্ন — তবে Wallet থেকে কাটা যায়নি, নগদ নিন।");
     }
     __dmRadarMap.closePopup();
@@ -13637,7 +13645,7 @@ document.getElementById("dmEndTripBtn").addEventListener("click", async ()=>{
     __dmDriver.todayEarning = (__dmDriver.todayEarning || 0) + fare;
     __dmDriver.todayTripCount = (__dmDriver.todayTripCount || 0) + 1;
     __dmDriver.driverStatus = "online";
-    document.getElementById("dmTodayEarning").textContent = "৳ " + __dmDriver.todayEarning;
+    document.getElementById("dmTodayEarning").textContent = HB_CUR + ' ' + __dmDriver.todayEarning;
     document.getElementById("dmTodayTrips").textContent = __dmDriver.todayTripCount;
     dmRefreshStatusUi("online");
     if(__dmTripMap){ __dmTripMap.remove(); __dmTripMap = null; __dmTripMarkers = {}; }
@@ -13928,7 +13936,7 @@ async function rmLoadTodayStats(){
     document.getElementById("rmStatTransit").textContent = transit;
     document.getElementById("rmStatPending").textContent = Math.max(0, total-transit-completed);
     document.getElementById("rmStatCompleted").textContent = completed;
-    document.getElementById("rmCashIncome").textContent = "৳ " + income.toFixed(0);
+    document.getElementById("rmCashIncome").textContent = HB_CUR + ' ' + income.toFixed(0);
   }catch(e){ console.warn("rm stats load failed:", e); }
 }
 
@@ -14041,7 +14049,7 @@ async function rmOpenHistory(){
           <div style="color:#eee;">${it.type === "delivery" ? "📦" : it.type === "pickup" ? "🟢" : "🚕"} ${escapeHtml(it.title)}</div>
           <div style="font-size:10.5px; color:#777; margin-top:2px;">${it.time ? it.time.toLocaleDateString('bn-BD') + " " + it.time.toLocaleTimeString('bn-BD',{hour:'2-digit',minute:'2-digit'}) : ""}</div>
         </div>
-        <div style="font-weight:800; color:#FFC107;">${it.fare != null ? "৳ " + it.fare : "নগদ"}</div>
+        <div style="font-weight:800; color:#FFC107;">${it.fare != null ? HB_CUR + ' ' + it.fare : "নগদ"}</div>
       </div>`).join("");
   }catch(e){
     console.error(e);
@@ -14170,7 +14178,7 @@ function rmRenderTripRequests(trips){
 }
 
 async function rmOfferTripFare(tripId){
-  const fareInput = prompt("কত ভাড়া অফার করবেন? (৳)", "");
+  const fareInput = prompt(`কত ভাড়া অফার করবেন? (${HB_CUR})`, "");
   if(fareInput === null) return;
   const fare = Number(fareInput);
   if(!fare || fare <= 0){ alert("সঠিক ভাড়া দিন।"); return; }
@@ -14235,7 +14243,7 @@ async function rmRenderActiveTripStatus(trip, tripId){
           <div style="font-size:12px; color:#fff; margin:4px 0 2px;">👤 যাত্রী: ${escapeHtml(trip.passengerName||"—")}</div>
           <div style="font-size:12px; color:#fff; margin:2px 0;">📍 পিকআপ: ${escapeHtml((trip.pickupLocation && trip.pickupLocation.address) || "জানা নেই")}</div>
           <div style="font-size:12px; color:#fff; margin:2px 0;">🏁 গন্তব্য: ${escapeHtml(trip.destination||"—")}</div>
-          <div style="font-size:12px; color:#a8a8a8; margin-bottom:10px;">💰 ভাড়া: ৳ ${trip.confirmedDriver.finalFare}</div>
+          <div style="font-size:12px; color:#a8a8a8; margin-bottom:10px;">💰 ভাড়া: ${HB_CUR} ${trip.confirmedDriver.finalFare}</div>
           <div id="rmTripRouteMapEl" style="width:100%; height:160px; border-radius:10px; overflow:hidden; background:#111; margin-bottom:10px; display:${trip.pickupLocation && trip.pickupLocation.lat ? "block" : "none"};"></div>
           <div style="display:flex; gap:8px; margin-bottom:8px;">
             <button id="rmNavigateBtn" style="flex:1; padding:10px; border:none; border-radius:9px; background:#2563eb; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">🧭 Navigate</button>
@@ -14470,7 +14478,7 @@ function rmTmFocusFullscreen(latLng){
 }
 
 async function rmDoPickUp(p){
-  const fareInput = prompt("ভাড়া কত নেবেন? (৳) — যাত্রীর Wallet-এ ব্যালেন্স থাকলে সেখান থেকে কাটা হবে, না থাকলে নগদ নিন।", "");
+  const fareInput = prompt(`ভাড়া কত নেবেন? (${HB_CUR}) — যাত্রীর Wallet-এ ব্যালেন্স থাকলে সেখান থেকে কাটা হবে, না থাকলে নগদ নিন।`, "");
   if(fareInput === null) return;
   const fare = Number(fareInput) || 0;
   try{
@@ -14479,8 +14487,8 @@ async function rmDoPickUp(p){
     });
     if(fare > 0){
       const result = await walletChargeFare(p.user_id, rmCurrentRider.uid, fare);
-      if(result.success) alert(`✅ Pick Up সম্পন্ন — Wallet থেকে ৳ ${fare} কাটা হয়েছে।`);
-      else alert(`✅ Pick Up সম্পন্ন — Wallet থেকে কাটা যায়নি, নগদ ৳ ${fare} নিন।`);
+      if(result.success) alert(`✅ Pick Up সম্পন্ন — Wallet থেকে ${HB_CUR} ${fare} কাটা হয়েছে।`);
+      else alert(`✅ Pick Up সম্পন্ন — Wallet থেকে কাটা যায়নি, নগদ ${HB_CUR} ${fare} নিন।`);
     }
     rmTmMap.closePopup();
   }catch(e){ alert("Pick Up করা যায়নি: " + e.message); }
@@ -14576,6 +14584,17 @@ auth.onAuthStateChanged(async (user)=>{
     const mode = (shopDoc.exists && shopDoc.data().appMode) || 'standard';
     localStorage.setItem('shop-app-mode', mode);
     if(typeof bccApplyAppMode === 'function') bccApplyAppMode();
+
+    // 🌍 দোকানের মুদ্রা-চিহ্ন — সাইনআপে সেভ করা currencySymbol/currencyCode থাকলে সেটা
+    // ব্যবহার করা হয়, নাহলে ডিফল্ট টাকা (৳) — পুরনো দোকানগুলোর (যাদের এই ফিল্ড নেই) জন্য
+    // আগের মতোই টাকা চিহ্ন দেখাবে, কোনো পরিবর্তন হবে না।
+    const shopInfo = shopDoc.exists ? shopDoc.data() : {};
+    const curSymbol = shopInfo.currencySymbol
+      || (typeof window.hbGetCurrencySymbol === 'function' ? window.hbGetCurrencySymbol(shopInfo.currencyCode) : null)
+      || '৳';
+    HB_CUR = curSymbol;
+    localStorage.setItem('shop-currency-symbol', curSymbol);
+    if(shopInfo.currencyCode) localStorage.setItem('shop-currency-code', shopInfo.currencyCode);
   }catch(e){ console.warn('appMode fetch failed:', e); }
 
   function updateNetLabel(){
