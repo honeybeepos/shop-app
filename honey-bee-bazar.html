@@ -242,7 +242,45 @@
     position:absolute; bottom:8px; right:8px; width:32px; height:32px; border-radius:50%; border:none;
     background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-size:15px;
     display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 3px 8px rgba(0,0,0,0.25);
+    transform-style:preserve-3d; perspective:60px; transition:box-shadow .2s ease;
   }
+  /* 🛒 Cart-এ যোগ হওয়ার "3D" কনফার্মেশন এনিমেশন — ক্লিক করলে বোঝা যায় যোগ হয়েছে */
+  @keyframes mfCartPop{
+    0%{ transform:scale(1) rotate3d(1,1,0,0deg); }
+    28%{ transform:scale(1.45) rotate3d(1,1,0,-25deg); box-shadow:0 8px 20px rgba(22,163,74,0.55); }
+    55%{ transform:scale(0.85) rotate3d(1,1,0,15deg); }
+    78%{ transform:scale(1.18) rotate3d(1,1,0,-8deg); }
+    100%{ transform:scale(1) rotate3d(1,1,0,0deg); }
+  }
+  .mfCartBtn.mfAdded{
+    animation: mfCartPop 0.6s cubic-bezier(.34,1.56,.64,1);
+    background:linear-gradient(135deg,#4ade80,#16a34a) !important;
+    color:#0b2e18 !important;
+  }
+  @keyframes mfFlyPlusOne{
+    0%{ opacity:1; transform:translateY(0) scale(0.8) rotate(0deg); }
+    35%{ opacity:1; transform:translateY(-14px) scale(1.25) rotate(-8deg); }
+    100%{ opacity:0; transform:translateY(-38px) scale(1.05) rotate(6deg); }
+  }
+  .mfPlusOne{
+    position:absolute; right:10px; bottom:42px; font-size:13px; font-weight:800; color:#4ade80;
+    text-shadow:0 1px 4px rgba(0,0,0,0.6); pointer-events:none; z-index:5;
+    animation: mfFlyPlusOne 0.75s ease-out forwards;
+  }
+  @keyframes mfCartIconBounce{
+    0%, 100%{ transform:translateY(0) scale(1); }
+    30%{ transform:translateY(-7px) scale(1.25) rotate(-10deg); }
+    55%{ transform:translateY(1px) scale(0.92) rotate(6deg); }
+    75%{ transform:translateY(-3px) scale(1.08); }
+  }
+  #footerNavCart.mfBounce .ic{ animation: mfCartIconBounce 0.55s ease; display:inline-block; }
+  @keyframes mfAddFlash{
+    0%{ transform:scale(1); filter:brightness(1); }
+    30%{ transform:scale(0.95); filter:brightness(1.35); }
+    60%{ transform:scale(1.035); }
+    100%{ transform:scale(1); filter:brightness(1); }
+  }
+  .mfAddPulse{ animation: mfAddFlash 0.5s ease; }
 
   @keyframes mfCardIn{ from{ opacity:0; transform:translateY(14px) scale(0.96); } to{ opacity:1; transform:translateY(0) scale(1); } }
   .mfCard{ animation: mfCardIn 0.42s cubic-bezier(.2,.8,.3,1) both; }
@@ -3462,6 +3500,57 @@ window.mfToggleFavoriteProduct = async function(ev, productId){
   }catch(e){ console.warn("favorite product save failed:", e); }
 };
 
+/* 🛒 Cart-এ যোগ হওয়ার সময় নিরব না থেকে ছোট একটা "3D" কনফার্মেশন এনিমেশন দেখানো হয় —
+   বাটন পপ+ঘোরা+সবুজ রঙ, একটা উড়ে-যাওয়া "+1", আর ফুটার Cart আইকনের বাউন্স —
+   যাতে ট্যাপ করলে বোঝা যায় সত্যিই কার্টে যোগ হয়েছে (আগে একদম নিঃশব্দে হতো)। */
+function mfPlayAddAnim(btn){
+  if(!btn) return;
+  const isCircularCartBtn = btn.classList.contains("mfCartBtn");
+  const originalHTML = btn.innerHTML;
+  if(isCircularCartBtn){
+    btn.classList.remove("mfAdded");
+    void btn.offsetWidth; // রিস্টার্ট এনিমেশন, দ্রুত পরপর ট্যাপ করলেও যেন কাজ করে
+    btn.classList.add("mfAdded");
+    btn.innerHTML = "✔";
+    const wrap = btn.closest(".pCardImgWrap") || btn.parentElement;
+    if(wrap){
+      const plus = document.createElement("span");
+      plus.className = "mfPlusOne";
+      plus.textContent = "+1";
+      wrap.appendChild(plus);
+      setTimeout(()=> plus.remove(), 800);
+    }
+    setTimeout(()=>{
+      btn.classList.remove("mfAdded");
+      btn.innerHTML = originalHTML;
+    }, 620);
+  }else{
+    btn.classList.remove("mfAddPulse");
+    void btn.offsetWidth;
+    btn.classList.add("mfAddPulse");
+    btn.innerHTML = "✔ যোগ হয়েছে";
+    setTimeout(()=>{
+      btn.classList.remove("mfAddPulse");
+      btn.innerHTML = originalHTML;
+    }, 750);
+  }
+}
+
+function mfBounceCartIcon(){
+  const el = document.getElementById("footerNavCart");
+  if(!el) return;
+  el.classList.remove("mfBounce");
+  void el.offsetWidth;
+  el.classList.add("mfBounce");
+  setTimeout(()=> el.classList.remove("mfBounce"), 600);
+}
+
+window.mfAddToCartAnimated = function(btn, productId, productName, price, shopId, shopName){
+  addToCart(productId, productName, price, { shopId, shopName });
+  mfPlayAddAnim(btn);
+  mfBounceCartIcon();
+};
+
 function mfCardHTML(p, idx){
   const om = hbGetOfferMeta(p);
   const qty = Number(p.stockQty);
@@ -3484,7 +3573,7 @@ function mfCardHTML(p, idx){
           ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
         </div>
         <span class="pCardFav" onclick="mfToggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
-        <button class="mfCartBtn" ${outOfStock ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''} onclick="event.stopPropagation(); addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'})">🛒</button>
+        <button class="mfCartBtn" ${outOfStock ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''} onclick="event.stopPropagation(); mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}')">🛒</button>
       </div>
       <div class="pCardBody">
         <div class="pCardName" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
@@ -3537,8 +3626,8 @@ window.hbOpenMarketProductDetail = function(shopId, productId){
     <div class="pCardStock ${stockClass}" style="font-size:12px; margin-bottom:14px;">${stockLabel}</div>
     ${p.description ? `<div style="font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
     <div style="display:flex; gap:10px;">
-      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'})" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🛒 Add to Cart</button>
-      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'}); hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
+      <button ${outOfStock ? "disabled" : ""} onclick="mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}')" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🛒 Add to Cart</button>
+      <button ${outOfStock ? "disabled" : ""} onclick="mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}'); setTimeout(hbOpenCart, 260);" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
     </div>
   `;
   $("hbProductDetailModal").style.display = "flex";
