@@ -193,40 +193,82 @@
     50%{ background:#16a34a; box-shadow:0 0 0 8px rgba(22,163,74,0); }
   }
 
-  /* 🐝 Market Feed — ক্রস-শপ প্রোডাক্ট ফিড (Phase 2): এক মার্কেটের সব দোকানের
-     প্রোডাক্ট একসাথে, Highlight/Offer অনুযায়ী সাজানো, ৩D-স্টাইল এনিমেটেড কার্ড */
-  .mfTopBar{ display:flex; gap:8px; margin-bottom:14px; }
-  .mfTopBarBtn{
-    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 6px;
-    border-radius:14px; border:1px solid var(--border); background:rgba(255,255,255,0.05);
-    color:#fff8e8; cursor:pointer; font-family:inherit; transition:transform .15s ease, box-shadow .15s ease;
+  /* 🐝 Market Feed v2 — ক্রস-শপ প্রোডাক্ট ফিড: এক মার্কেটের সব দোকানের প্রোডাক্ট
+     একসাথে, Highlight/Offer অনুযায়ী সাজানো, হালকা(লাইট) থিম + এনিমেটেড কার্ড।
+     এই লাইট থিম শুধু #screenMarkets ও #screenMarketFeed-এ চালু হয় (body.mfLight
+     ক্লাস, showScreen() থেকে টগল হয়) — বাকি পুরো অ্যাপ আগের ডার্ক থিমেই থাকে। */
+  body.mfLight{
+    --bg1:#fdf6ea; --bg2:#faecd2; --card:#ffffff; --border:#efe2c9; --sheet:#ffffff;
+    --muted:#9c8a6d; --danger:#e63946; --ok:#16a34a;
+    color:#2b2115;
+    background: linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 100%);
   }
-  .mfTopBarBtn:active{ transform:scale(0.95); }
-  .mfTopBarBtn .mfIc{ font-size:19px; }
-  .mfTopBarBtn .mfLbl{ font-size:10px; font-weight:700; color:var(--muted); }
+  body.mfLight header{ display:none; }
+  body.mfLight .searchBox{ background:#ffffff; color:#2b2115; box-shadow:0 2px 10px rgba(120,90,30,0.08); }
+  body.mfLight .mfThemedSelect{ background:#ffffff !important; }
+  body.mfLight .mfThemedSelect option{ color:#2b2115; }
+  body.mfLight .pCardImgWrap{ background:#f5ecd8; }
+  body.mfLight .card{ box-shadow:0 4px 14px rgba(120,90,30,0.08); }
+  body.mfLight .pCard{ box-shadow:0 4px 14px rgba(120,90,30,0.10); }
+  body.mfLight ::placeholder{ color:#b4a483; }
 
-  .mfMarketHeader{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
-  .mfMarketHeader .name{ font-size:15px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .mfChangeAreaBtn{
-    flex-shrink:0; font-size:10.5px; font-weight:700; color:var(--muted); background:transparent;
-    border:1px solid var(--border); border-radius:10px; padding:5px 9px; cursor:pointer; font-family:inherit;
+  .mfTopBar2{ display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+  .mfTopIconBtn{
+    width:42px; height:42px; flex-shrink:0; border-radius:50%; border:1px solid var(--border);
+    background:var(--card); display:flex; align-items:center; justify-content:center; font-size:17px;
+    cursor:pointer; position:relative; box-shadow:0 2px 8px rgba(120,90,30,0.1); font-family:inherit;
   }
+  .mfTopIconBtn:active{ transform:scale(0.93); }
+  .mfOfferDot{ position:absolute; top:6px; right:7px; width:7px; height:7px; border-radius:50%; background:var(--danger); }
+  .mfLocationPill{
+    flex:1; min-width:0; display:flex; align-items:center; gap:5px; padding:0 12px; height:42px;
+    border-radius:21px; border:1px solid var(--border); background:var(--card); cursor:pointer;
+    box-shadow:0 2px 8px rgba(120,90,30,0.1); font-family:inherit;
+  }
+  .mfLocationPill .mfLocTxt{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12.5px; font-weight:700; text-align:left; color:inherit; }
+  .mfLocationPill .mfChev{ font-size:10px; color:var(--muted); }
 
-  .mfShopTag{ font-size:9.5px; font-weight:700; color:var(--muted); margin-bottom:3px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mfBannerCarousel{ display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:2px; margin-bottom:8px; -webkit-overflow-scrolling:touch; }
+  .mfBannerCarousel::-webkit-scrollbar{ display:none; }
+  .mfBannerCard{
+    scroll-snap-align:start; flex:0 0 82%; min-height:76px; border-radius:16px; padding:14px 16px;
+    display:flex; flex-direction:column; justify-content:center; color:#fff; cursor:pointer;
+  }
+  .mfBannerCard .big{ font-size:14.5px; font-weight:800; margin-bottom:2px; }
+  .mfBannerCard .small{ font-size:11px; opacity:0.9; }
+  .mfBannerDots{ display:flex; justify-content:center; gap:5px; margin-bottom:16px; }
+  .mfBannerDots .dot{ width:6px; height:6px; border-radius:50%; background:var(--border); transition:.2s; }
+  .mfBannerDots .dot.on{ background:var(--gold); width:16px; border-radius:4px; }
+
+  .mfSectionHead{ display:flex; align-items:center; justify-content:space-between; margin:6px 0 10px; }
+  .mfSectionHead span:first-child{ font-size:14px; font-weight:800; }
+  .mfSeeAll{ font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; }
+
+  .mfHRow{ display:flex; gap:12px; overflow-x:auto; padding-bottom:6px; margin-bottom:6px; -webkit-overflow-scrolling:touch; }
+  .mfHRow::-webkit-scrollbar{ display:none; }
+  .mfHRow .pCard{ flex:0 0 148px; }
+
+  .mfShopTag{ font-size:9.5px; font-weight:700; color:var(--muted); margin-bottom:2px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mfCardArea{ font-size:9px; color:var(--muted); display:flex; align-items:center; gap:3px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mfCartBtn{
+    position:absolute; bottom:8px; right:8px; width:32px; height:32px; border-radius:50%; border:none;
+    background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-size:15px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 3px 8px rgba(0,0,0,0.25);
+  }
 
   @keyframes mfCardIn{ from{ opacity:0; transform:translateY(14px) scale(0.96); } to{ opacity:1; transform:translateY(0) scale(1); } }
   .mfCard{ animation: mfCardIn 0.42s cubic-bezier(.2,.8,.3,1) both; }
-  .mfCard.mfGlow{ box-shadow:0 6px 16px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,183,3,0.35); animation: mfCardIn 0.42s cubic-bezier(.2,.8,.3,1) both, mfGlowPulse 2.6s ease-in-out infinite; }
+  .mfCard.mfGlow{ box-shadow:0 6px 16px rgba(0,0,0,0.14), 0 0 0 1px rgba(255,183,3,0.45); animation: mfCardIn 0.42s cubic-bezier(.2,.8,.3,1) both, mfGlowPulse 2.6s ease-in-out infinite; }
   @keyframes mfGlowPulse{
-    0%, 100%{ box-shadow:0 6px 16px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,183,3,0.35); }
-    50%{ box-shadow:0 6px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,183,3,0.7), 0 0 16px rgba(255,183,3,0.35); }
+    0%, 100%{ box-shadow:0 6px 16px rgba(0,0,0,0.14), 0 0 0 1px rgba(255,183,3,0.45); }
+    50%{ box-shadow:0 6px 20px rgba(0,0,0,0.16), 0 0 0 1px rgba(255,183,3,0.8), 0 0 16px rgba(255,183,3,0.35); }
   }
 
   .mfEmpty{ text-align:center; padding:40px 16px; color:var(--muted); font-size:13px; grid-column:1/-1; }
 
   .mfSheetOverlay{ display:none; position:fixed; inset:0; z-index:970; background:rgba(0,0,0,0.75); align-items:flex-end; justify-content:center; }
   .mfSheetOverlay.show{ display:flex; }
-  .mfSheetBox{ background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:18px; width:100%; max-width:640px; max-height:85vh; overflow-y:auto; box-sizing:border-box; }
+  .mfSheetBox{ background:var(--sheet); border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:18px; width:100%; max-width:640px; max-height:85vh; overflow-y:auto; box-sizing:border-box; }
   .mfSheetHead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
   .mfSheetHead .t{ font-size:15px; font-weight:800; color:var(--amber); }
   .mfSheetClose{ font-size:20px; cursor:pointer; color:var(--muted); }
@@ -236,19 +278,25 @@
     padding:8px 13px; border-radius:20px; border:1px solid var(--border); background:transparent;
     color:var(--muted); font-size:12px; font-weight:700; cursor:pointer; transition:.15s; font-family:inherit;
   }
-  .mfChip.active{ background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); border-color:var(--amber); }
+  .mfChip.active{ background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; border-color:var(--amber); }
 
-  .mfMenuActionBtn{
-    width:100%; text-align:left; padding:13px 14px; border-radius:12px; border:1px solid var(--border);
-    background:rgba(255,255,255,0.05); color:#fff8e8; font-size:13px; font-weight:700; cursor:pointer;
-    font-family:inherit; margin-bottom:16px; display:flex; align-items:center; gap:8px;
+  .mfMenuRow{
+    width:100%; display:flex; align-items:center; gap:12px; padding:13px 14px; margin-bottom:14px;
+    border-radius:14px; border:1px solid var(--border); background:var(--card); cursor:pointer;
+    font-family:inherit; box-shadow:0 2px 8px rgba(120,90,30,0.08); text-align:left; color:inherit;
   }
+  .mfMenuRowIcon{ width:34px; height:34px; border-radius:10px; background:rgba(255,183,3,0.18); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .mfMenuRowBody{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .mfMenuRowBody .t{ font-size:13px; font-weight:800; }
+  .mfMenuRowBody .d{ font-size:11px; color:var(--muted); margin-top:1px; }
+  .mfMenuRowChev{ color:var(--muted); font-size:16px; }
   .mfMenuSectionLabel{ font-size:11.5px; font-weight:800; color:var(--muted); margin-bottom:8px; }
 </style>
 <style>
   :root{
     --bg1:#1a1206; --bg2:#3d2405; --gold:#ffb703; --amber:#ffd166;
     --card:#241705; --border:rgba(255,209,102,0.22); --danger:#e2543d; --ok:#2fbf71; --muted:rgba(255,248,232,0.55);
+    --sheet:#1a1206;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{ height:100%; margin:0; }
@@ -478,10 +526,10 @@
       <div id="gpsStatusBanner" style="font-size:11.5px; color:var(--muted); margin-bottom:10px;"></div>
 
       <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <select id="districtFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+        <select id="districtFilter" class="mfThemedSelect" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); font-family:inherit; font-size:13px;">
           <option value="">সব জেলা</option>
         </select>
-        <select id="upazilaFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;" disabled>
+        <select id="upazilaFilter" class="mfThemedSelect" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); font-family:inherit; font-size:13px;" disabled>
           <option value="">সব উপজেলা</option>
         </select>
       </div>
@@ -492,21 +540,29 @@
     </div>
   </div>
 
-  <!-- 🐝 Market Feed — Phase 2: এক মার্কেটের সব দোকানের প্রোডাক্ট এক ফিডে,
-       Highlight/Offer অনুযায়ী সাজানো, অ্যানিমেটেড কার্ড (পুরনো দোকান→ক্যাটাগরি→
-       প্রোডাক্ট এই ধাপে-ধাপে যাওয়ার পুরনো ফ্লো এখন এখানে প্রতিস্থাপিত) -->
+  <!-- 🐝 Market Feed — এক মার্কেটের সব দোকানের প্রোডাক্ট এক ফিডে, Highlight/Offer
+       অনুযায়ী সাজানো, হালকা থিম + অ্যানিমেটেড কার্ড (পুরনো দোকান→ক্যাটাগরি→প্রোডাক্ট
+       ধাপে-ধাপে যাওয়ার ফ্লো এখানে প্রতিস্থাপিত; "Honey Bee Bazar" টাইটেল বার এই
+       স্ক্রিনে লুকানো থাকে — body.mfLight, showScreen() দ্রষ্টব্য) -->
   <div id="screenMarketFeed">
-    <button class="backBtn" id="backFromMarketFeed">← হোমে ফিরে যান</button>
-    <div class="mfMarketHeader">
-      <div class="name" id="mfMarketName">—</div>
-      <button class="mfChangeAreaBtn" id="mfChangeAreaBtn">📍 বাজার পরিবর্তন</button>
+    <div class="mfTopBar2">
+      <button class="mfTopIconBtn" id="mfSearchBtn" title="খুঁজুন">🔍</button>
+      <button class="mfTopIconBtn" id="mfOfferBtn" title="অফার">🎁<span class="mfOfferDot" id="mfOfferDot" style="display:none;"></span></button>
+      <button class="mfLocationPill" id="mfChangeAreaBtn"><span>📍</span><span class="mfLocTxt" id="mfMarketName">—</span><span class="mfChev">▾</span></button>
+      <button class="mfTopIconBtn" id="mfMenuBtn" title="মেনু">☰</button>
     </div>
-    <div class="mfTopBar">
-      <button class="mfTopBarBtn" id="mfSearchBtn"><span class="mfIc">🔍</span><span class="mfLbl">খুঁজুন</span></button>
-      <button class="mfTopBarBtn" id="mfOfferBtn"><span class="mfIc">🎁</span><span class="mfLbl">অফার</span></button>
-      <button class="mfTopBarBtn" id="mfMenuBtn"><span class="mfIc">☰</span><span class="mfLbl">মেনু</span></button>
-    </div>
+
+    <div id="mfBannerCarousel" class="mfBannerCarousel"></div>
+    <div id="mfBannerDots" class="mfBannerDots"></div>
+
     <div id="mfActiveFilterNote" style="display:none; font-size:11.5px; color:var(--amber); margin-bottom:10px;"></div>
+
+    <div id="mfFeaturedSection" style="display:none;">
+      <div class="mfSectionHead"><span>🔥 জনপ্রিয় ও ফিচার্ড পণ্য</span><span class="mfSeeAll" id="mfFeaturedSeeAll">সব দেখুন ›</span></div>
+      <div id="mfFeaturedRow" class="mfHRow"></div>
+    </div>
+
+    <div class="mfSectionHead"><span>🛍️ সব পণ্য</span></div>
     <div id="marketFeedGrid" class="pGrid"><div class="loadingMsg">প্রোডাক্ট লোড হচ্ছে...</div></div>
   </div>
 
@@ -537,11 +593,21 @@
   <div id="mfMenuSheet" class="mfSheetOverlay">
     <div class="mfSheetBox">
       <div class="mfSheetHead">
-        <div class="t">☰ ফিল্টার ও এলাকা</div>
+        <div class="t">☰ খুঁজুন ও ফিল্টার করুন</div>
         <span class="mfSheetClose" id="mfMenuCloseBtn">✕</span>
       </div>
-      <button class="mfMenuActionBtn" id="mfMenuChangeAreaBtn">📍 এলাকা/বাজার পরিবর্তন করুন</button>
-      <div class="mfMenuSectionLabel">🏪 দোকানের ধরন</div>
+      <button class="mfMenuRow" id="mfMenuChangeAreaBtn">
+        <span class="mfMenuRowIcon">📍</span>
+        <span class="mfMenuRowBody"><span class="t">এলাকা নির্বাচন করুন</span><span class="d">জেলা, উপজেলা, বাজার</span></span>
+        <span class="mfMenuRowChev">›</span>
+      </button>
+      <div class="mfMenuSectionLabel">⚡ দ্রুত ফিল্টার</div>
+      <div class="mfChipRow" id="mfQuickChips">
+        <button class="mfChip active" data-quick="">সব</button>
+        <button class="mfChip" data-quick="offer">🎁 আজকের অফার</button>
+        <button class="mfChip" data-quick="highlight">⭐ ফিচার্ড</button>
+      </div>
+      <div class="mfMenuSectionLabel" style="margin-top:14px;">🏪 দোকানের ধরন</div>
       <div class="mfChipRow" id="mfShopTypeChips"></div>
     </div>
   </div>
@@ -587,7 +653,7 @@
 
   <!-- 📄 প্রোডাক্ট বিস্তারিত — বটম-শিট -->
   <div id="hbProductDetailModal" style="display:none; position:fixed; inset:0; z-index:960; background:rgba(0,0,0,0.75); align-items:flex-end; justify-content:center;">
-    <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:88vh; overflow-y:auto;">
+    <div style="background:var(--sheet); border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:88vh; overflow-y:auto;">
       <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
         <span id="hbProductDetailCloseBtn" style="font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
       </div>
@@ -1368,6 +1434,11 @@ let __hbNavigatingViaPopstate = false;
 function showScreen(id){
   ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
+
+  // 🐝 Market Feed / Market তালিকা — হালকা (লাইট) থিম, "Honey Bee Bazar" টাইটেল
+  // বার লুকানো থাকে শুধু এই দুটো স্ক্রিনে (নিচের header/footer toggle এর
+  // display:"" রিসেট এই CSS ক্লাসকেই কাজ করতে দেয়, override করে না)
+  document.body.classList.toggle("mfLight", id === "screenMarketFeed" || id === "screenMarkets");
 
   // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
   // খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন লুকিয়ে যায়, যাতে
@@ -3179,11 +3250,15 @@ $("backToMarkets").addEventListener("click", ()=> showScreen("screenHome"));
    কোনো কুয়েরি সম্ভব না, তাই ক্লায়েন্ট-সাইডেই সব দোকান থেকে টেনে মেশানো হয়। */
 let marketFeedProducts = [];
 let mfShopTypeFilter = "";
+let mfQuickFilter = ""; // "" | "offer" | "highlight"
 
 function mfResetFilters(){
   mfShopTypeFilter = "";
+  mfQuickFilter = "";
   const note = $("mfActiveFilterNote");
   if(note){ note.style.display = "none"; note.textContent = ""; }
+  const quickWrap = $("mfQuickChips");
+  if(quickWrap) quickWrap.querySelectorAll(".mfChip").forEach(b=> b.classList.toggle("active", b.dataset.quick===""));
 }
 
 async function loadMarketFeedProducts(){
@@ -3192,6 +3267,9 @@ async function loadMarketFeedProducts(){
   if(allShops.length === 0){
     marketFeedProducts = [];
     gridEl.innerHTML = '<div class="mfEmpty">এই বাজারে এখনো কোনো সক্রিয় দোকান নেই।</div>';
+    $("mfFeaturedSection") && ($("mfFeaturedSection").style.display = "none");
+    $("mfBannerCarousel") && ($("mfBannerCarousel").innerHTML = "");
+    $("mfBannerDots") && ($("mfBannerDots").innerHTML = "");
     return;
   }
   gridEl.innerHTML = '<div class="loadingMsg">প্রোডাক্ট লোড হচ্ছে...</div>';
@@ -3207,6 +3285,7 @@ async function loadMarketFeedProducts(){
           __shopId: shop.id,
           __shopName: shop.name || shop.shopName || "দোকান",
           __shopCategory: shop.category || "",
+          __shopArea: shop.upazila || shop.district || "",
           __cur: cur
         }));
       }catch(e){ console.warn("Market feed: shop stock load failed", shop.id, e); return []; }
@@ -3218,8 +3297,54 @@ async function loadMarketFeedProducts(){
     return;
   }
   mfBuildShopTypeChips();
+  mfRenderBanners();
+  mfRenderFeatured();
   renderMarketFeed();
 }
+
+/* ---------- 🎯 প্রমো ব্যানার — বানানো/ভুয়া অফার না, বাস্তব সংখ্যা থেকে বানানো ---------- */
+function mfRenderBanners(){
+  const wrap = $("mfBannerCarousel"), dotsWrap = $("mfBannerDots");
+  if(!wrap || !dotsWrap) return;
+  const offerCount = marketFeedProducts.filter(p=> hbGetOfferMeta(p).hasOffer).length;
+  const highlightCount = marketFeedProducts.filter(p=> hbGetOfferMeta(p).highlight).length;
+  const shopCount = allShops.length;
+  const banners = [];
+  if(offerCount > 0) banners.push({ bg:'linear-gradient(135deg,#e63946,#ff8a5c)', big:`🔥 আজ ${offerCount}টি প্রোডাক্টে অফার চলছে`, small:'এখনই দেখুন, স্টক ফুরানোর আগে', action:'offer' });
+  if(highlightCount > 0) banners.push({ bg:'linear-gradient(135deg,#8b5cf6,#c084fc)', big:`⭐ ${highlightCount}টি ফিচার্ড প্রোডাক্ট`, small:'দোকানিদের বাছাই করা সেরা পণ্য', action:'featured' });
+  banners.push({ bg:'linear-gradient(135deg,#0d9488,#5eead4)', big:`🏪 ${shopCount}টি সক্রিয় দোকান`, small:'এই বাজারে এখন কেনাকাটার জন্য প্রস্তুত', action:'none' });
+  wrap.innerHTML = banners.map(b=> `<div class="mfBannerCard" style="background:${b.bg};" data-action="${b.action}"><div class="big">${b.big}</div><div class="small">${escapeHtml(b.small)}</div></div>`).join("");
+  dotsWrap.innerHTML = banners.map((_,i)=> `<span class="dot ${i===0?'on':''}"></span>`).join("");
+  wrap.querySelectorAll(".mfBannerCard").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const action = el.dataset.action;
+      if(action === "offer") $("mfOfferBtn").click();
+      else if(action === "featured") $("mfFeaturedSeeAll") && $("mfFeaturedSeeAll").click();
+    });
+  });
+  wrap.onscroll = ()=>{
+    const card = wrap.querySelector(".mfBannerCard");
+    if(!card) return;
+    const idx = Math.round(wrap.scrollLeft / (card.offsetWidth + 10));
+    dotsWrap.querySelectorAll(".dot").forEach((d,i)=> d.classList.toggle("on", i===idx));
+  };
+  $("mfOfferDot") && ($("mfOfferDot").style.display = offerCount > 0 ? "block" : "none");
+}
+
+/* ---------- ⭐ ফিচার্ড/জনপ্রিয় পণ্য — Highlight করা প্রোডাক্টের হরাইজন্টাল রো
+   (প্রকৃত "popularity"/sales-count এখনো ট্র্যাক করা হয় না, তাই Highlight-কেই
+   "জনপ্রিয়/ফিচার্ড" হিসেবে দেখানো হচ্ছে — দোকানিরা নিজেরাই বাছাই করে দেন) ---------- */
+function mfRenderFeatured(){
+  const sec = $("mfFeaturedSection"), row = $("mfFeaturedRow");
+  if(!sec || !row) return;
+  const list = mfSortList(marketFeedProducts.filter(p=> hbGetOfferMeta(p).highlight));
+  if(list.length === 0){ sec.style.display = "none"; return; }
+  sec.style.display = "block";
+  row.innerHTML = list.slice(0, 12).map((p,i)=> mfCardHTML(p,i)).join("");
+}
+$("mfFeaturedSeeAll") && $("mfFeaturedSeeAll").addEventListener("click", ()=>{
+  $("marketFeedGrid") && $("marketFeedGrid").scrollIntoView({ behavior:"smooth", block:"start" });
+});
 
 function mfBuildShopTypeChips(){
   const wrap = $("mfShopTypeChips");
@@ -3237,15 +3362,28 @@ function mfBuildShopTypeChips(){
       wrap.querySelectorAll(".mfChip").forEach(b=> b.classList.toggle("active", b===btn));
       mfUpdateFilterNote();
       renderMarketFeed();
-      $("mfMenuSheet").classList.remove("show");
     });
   });
 }
 
+/* ---------- ⚡ দ্রুত ফিল্টার চিপ (মেনু শিটে স্ট্যাটিক, তাই একবারই ওয়্যার করা হয়) ---------- */
+document.querySelectorAll("#mfQuickChips .mfChip").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    mfQuickFilter = btn.dataset.quick;
+    document.querySelectorAll("#mfQuickChips .mfChip").forEach(b=> b.classList.toggle("active", b===btn));
+    mfUpdateFilterNote();
+    renderMarketFeed();
+  });
+});
+
 function mfUpdateFilterNote(){
   const note = $("mfActiveFilterNote");
   if(!note) return;
-  if(mfShopTypeFilter){ note.style.display = "block"; note.textContent = `ফিল্টার: 🏪 ${mfShopTypeFilter} (মুছতে ☰ মেনু → সব)`; }
+  const parts = [];
+  if(mfQuickFilter === "offer") parts.push("🎁 আজকের অফার");
+  else if(mfQuickFilter === "highlight") parts.push("⭐ ফিচার্ড");
+  if(mfShopTypeFilter) parts.push(`🏪 ${mfShopTypeFilter}`);
+  if(parts.length){ note.style.display = "block"; note.textContent = "ফিল্টার: " + parts.join(" · ") + " (মুছতে ☰ মেনু → সব)"; }
   else{ note.style.display = "none"; note.textContent = ""; }
 }
 
@@ -3285,22 +3423,38 @@ function mfSortList(list){
 function mfGetFilteredSortedList(){
   let list = marketFeedProducts.slice();
   if(mfShopTypeFilter) list = list.filter(p=> p.__shopCategory === mfShopTypeFilter);
+  if(mfQuickFilter === "offer") list = list.filter(p=> hbGetOfferMeta(p).hasOffer);
+  else if(mfQuickFilter === "highlight") list = list.filter(p=> hbGetOfferMeta(p).highlight);
   return mfSortList(list);
 }
+
+window.mfToggleFavoriteProduct = async function(ev, productId){
+  ev.stopPropagation();
+  if(!currentCustomer){ alert("প্রোডাক্ট সেভ করতে আগে Google দিয়ে লগইন করুন (☰ Menu থেকে)।"); return; }
+  const favs = currentCustomer.favoriteProducts || [];
+  const isFav = favs.includes(productId);
+  const updated = isFav ? favs.filter(id=>id!==productId) : [...favs, productId];
+  currentCustomer.favoriteProducts = updated;
+  mfRenderFeatured();
+  renderMarketFeed();
+  try{
+    await db.collection("customers").doc(currentCustomer.uid).set({ favoriteProducts: updated }, { merge: true });
+  }catch(e){ console.warn("favorite product save failed:", e); }
+};
 
 function mfCardHTML(p, idx){
   const om = hbGetOfferMeta(p);
   const qty = Number(p.stockQty);
-  let stockClass = "in", stockLabel = "স্টকে আছে";
+  let outOfStock = false, stockLabel = "";
   if(!isNaN(qty)){
-    if(qty <= 0){ stockClass = "out"; stockLabel = "স্টক নেই"; }
-    else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
-    else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
+    if(qty <= 0){ outOfStock = true; stockLabel = "স্টক নেই"; }
+    else if(qty <= 5){ stockLabel = "কম আছে (" + qty + ")"; }
   }
-  const outOfStock = stockClass === "out";
   const cur = p.__cur || '৳';
   const safeName = escapeHtml(p.name||'').replace(/'/g,"");
   const safeShopName = escapeHtml(p.__shopName||'').replace(/'/g,"");
+  const favs = (currentCustomer && currentCustomer.favoriteProducts) || [];
+  const isFav = favs.includes(p.id);
   return `
     <div class="pCard mfCard ${om.highlight ? 'mfGlow' : ''}" style="animation-delay:${Math.min(idx,12)*0.035}s;">
       <div class="pCardImgWrap" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">
@@ -3309,18 +3463,18 @@ function mfCardHTML(p, idx){
           ${om.highlight ? '<span class="pCardHighlightBadge">⭐</span>' : ''}
           ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
         </div>
+        <span class="pCardFav" onclick="mfToggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
+        <button class="mfCartBtn" ${outOfStock ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''} onclick="event.stopPropagation(); addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'})">🛒</button>
       </div>
       <div class="pCardBody">
-        <span class="mfShopTag">🏪 ${escapeHtml(p.__shopName||"দোকান")}</span>
         <div class="pCardName" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
+        <span class="mfShopTag">🏪 ${escapeHtml(p.__shopName||"দোকান")}</span>
+        ${p.__shopArea ? `<div class="mfCardArea">📍 ${escapeHtml(p.__shopArea)}</div>` : ""}
         <div class="pCardPriceRow">
           <span class="pCardPrice">${cur}${om.finalPrice}</span>
           ${om.hasDiscount ? `<span class="pCardOldPrice">${cur}${p.price}</span>` : ""}
         </div>
-        <div class="pCardStock ${stockClass}">${stockLabel}</div>
-        <button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'})">
-          ${outOfStock ? "স্টক নেই" : "🛒 Add to Cart"}
-        </button>
+        ${stockLabel ? `<div class="pCardStock ${outOfStock?'out':'low'}">${stockLabel}</div>` : ""}
       </div>
     </div>`;
 }
@@ -3353,18 +3507,18 @@ window.hbOpenMarketProductDetail = function(shopId, productId){
   const safeShopName = escapeHtml(p.__shopName||'').replace(/'/g,"");
   $("hbProductDetailBody").innerHTML = `
     <div class="pDetailImgWrap">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
-    <div style="font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:4px;">🏪 ${escapeHtml(p.__shopName||"দোকান")}</div>
+    <div style="font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:4px;">🏪 ${escapeHtml(p.__shopName||"দোকান")}${p.__shopArea ? ' · 📍 '+escapeHtml(p.__shopArea) : ''}</div>
     <div style="font-size:17px; font-weight:800; margin-bottom:8px;">${om.highlight ? '<span style="color:#fbbf24;">⭐</span> ' : ''}${escapeHtml(p.name||"প্রোডাক্ট")}</div>
     <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">
       <span style="font-size:22px; font-weight:800; color:var(--amber);">${cur}${om.finalPrice}</span>
-      ${om.hasDiscount ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${cur}${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : (om.genericOffer ? `<span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">${om.badgeText}</span>` : "")}
+      ${om.hasDiscount ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${cur}${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#e2543d; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : (om.genericOffer ? `<span style="font-size:11px; background:rgba(220,38,38,0.15); color:#e2543d; padding:2px 8px; border-radius:8px; font-weight:800;">${om.badgeText}</span>` : "")}
     </div>
     ${om.genericOffer && om.offerNote ? `<div style="font-size:12.5px; color:var(--amber); margin-bottom:8px;">🎁 ${escapeHtml(om.offerNote)}</div>` : ""}
     <div class="pCardStock ${stockClass}" style="font-size:12px; margin-bottom:14px;">${stockLabel}</div>
-    ${p.description ? `<div style="font-size:13px; color:#ddd; line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
+    ${p.description ? `<div style="font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
     <div style="display:flex; gap:10px;">
       <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'})" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🛒 Add to Cart</button>
-      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'}); hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
+      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'}); hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
     </div>
   `;
   $("hbProductDetailModal").style.display = "flex";
@@ -3376,10 +3530,6 @@ function mfCloseAllSheets(){
   $("mfMenuSheet") && $("mfMenuSheet").classList.remove("show");
 }
 
-$("backFromMarketFeed") && $("backFromMarketFeed").addEventListener("click", ()=>{
-  mfCloseAllSheets();
-  showScreen("screenHome");
-});
 $("mfChangeAreaBtn") && $("mfChangeAreaBtn").addEventListener("click", ()=>{
   mfCloseAllSheets();
   showScreen("screenMarkets");
