@@ -65,6 +65,21 @@
   @keyframes car3dShadow{ 0%,100%{ opacity:0.5; } 50%{ opacity:0.25; } }
   .car3d .wheel{ transform-origin:center; animation: car3dSpin 0.6s linear infinite; }
   @keyframes car3dSpin{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
+
+  /* 🏪 Market কার্ডের জন্য SVG-ভিত্তিক 3D-অ্যানিমেটেড হানিকম্ব দোকান — Transport-এর
+     গাড়ির মতোই perspective + float ইফেক্ট, প্লাস একটা ছোট উড়ন্ত মৌমাছি */
+  .marketIconWrap{ perspective:220px; height:38px; display:flex; align-items:center; justify-content:center; }
+  .market3d{ width:54px; height:auto; animation: market3dFloat 2.8s ease-in-out infinite; transform-style:preserve-3d; filter:drop-shadow(0 3px 3px rgba(0,0,0,0.35)); }
+  @keyframes market3dFloat{
+    0%,100%{ transform: rotateY(-10deg) rotateX(3deg) translateY(0); }
+    50%{ transform: rotateY(10deg) rotateX(3deg) translateY(-3px); }
+  }
+  .marketShadow{ fill:rgba(0,0,0,0.28); animation: market3dShadow 2.8s ease-in-out infinite; }
+  @keyframes market3dShadow{ 0%,100%{ opacity:0.5; } 50%{ opacity:0.25; } }
+  .marketBee{ animation: marketBeeBob 1.6s ease-in-out infinite; }
+  @keyframes marketBeeBob{ 0%,100%{ transform:translate(0,0); } 50%{ transform:translate(2px,-3px); } }
+  .marketBee .beeWing{ animation: wingFlutter 0.35s linear infinite; }
+  .marketSign{ animation: glowPulse 1.8s ease-in-out infinite; }
   .serviceCard .lbl{ font-size:11.5px; font-weight:700; color:#fff8e8; }
   .serviceCard.soon{ opacity:0.55; }
   .serviceCard.soon .soonBadge{
@@ -177,6 +192,58 @@
     0%, 100%{ background:#dc2626; box-shadow:0 0 0 0 rgba(220,38,38,0.5); }
     50%{ background:#16a34a; box-shadow:0 0 0 8px rgba(22,163,74,0); }
   }
+
+  /* 🐝 Market Feed — ক্রস-শপ প্রোডাক্ট ফিড (Phase 2): এক মার্কেটের সব দোকানের
+     প্রোডাক্ট একসাথে, Highlight/Offer অনুযায়ী সাজানো, ৩D-স্টাইল এনিমেটেড কার্ড */
+  .mfTopBar{ display:flex; gap:8px; margin-bottom:14px; }
+  .mfTopBarBtn{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:10px 6px;
+    border-radius:14px; border:1px solid var(--border); background:rgba(255,255,255,0.05);
+    color:#fff8e8; cursor:pointer; font-family:inherit; transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .mfTopBarBtn:active{ transform:scale(0.95); }
+  .mfTopBarBtn .mfIc{ font-size:19px; }
+  .mfTopBarBtn .mfLbl{ font-size:10px; font-weight:700; color:var(--muted); }
+
+  .mfMarketHeader{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+  .mfMarketHeader .name{ font-size:15px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mfChangeAreaBtn{
+    flex-shrink:0; font-size:10.5px; font-weight:700; color:var(--muted); background:transparent;
+    border:1px solid var(--border); border-radius:10px; padding:5px 9px; cursor:pointer; font-family:inherit;
+  }
+
+  .mfShopTag{ font-size:9.5px; font-weight:700; color:var(--muted); margin-bottom:3px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  @keyframes mfCardIn{ from{ opacity:0; transform:translateY(14px) scale(0.96); } to{ opacity:1; transform:translateY(0) scale(1); } }
+  .mfCard{ animation: mfCardIn 0.42s cubic-bezier(.2,.8,.3,1) both; }
+  .mfCard.mfGlow{ box-shadow:0 6px 16px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,183,3,0.35); animation: mfCardIn 0.42s cubic-bezier(.2,.8,.3,1) both, mfGlowPulse 2.6s ease-in-out infinite; }
+  @keyframes mfGlowPulse{
+    0%, 100%{ box-shadow:0 6px 16px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,183,3,0.35); }
+    50%{ box-shadow:0 6px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,183,3,0.7), 0 0 16px rgba(255,183,3,0.35); }
+  }
+
+  .mfEmpty{ text-align:center; padding:40px 16px; color:var(--muted); font-size:13px; grid-column:1/-1; }
+
+  .mfSheetOverlay{ display:none; position:fixed; inset:0; z-index:970; background:rgba(0,0,0,0.75); align-items:flex-end; justify-content:center; }
+  .mfSheetOverlay.show{ display:flex; }
+  .mfSheetBox{ background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:18px; width:100%; max-width:640px; max-height:85vh; overflow-y:auto; box-sizing:border-box; }
+  .mfSheetHead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .mfSheetHead .t{ font-size:15px; font-weight:800; color:var(--amber); }
+  .mfSheetClose{ font-size:20px; cursor:pointer; color:var(--muted); }
+
+  .mfChipRow{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+  .mfChip{
+    padding:8px 13px; border-radius:20px; border:1px solid var(--border); background:transparent;
+    color:var(--muted); font-size:12px; font-weight:700; cursor:pointer; transition:.15s; font-family:inherit;
+  }
+  .mfChip.active{ background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); border-color:var(--amber); }
+
+  .mfMenuActionBtn{
+    width:100%; text-align:left; padding:13px 14px; border-radius:12px; border:1px solid var(--border);
+    background:rgba(255,255,255,0.05); color:#fff8e8; font-size:13px; font-weight:700; cursor:pointer;
+    font-family:inherit; margin-bottom:16px; display:flex; align-items:center; gap:8px;
+  }
+  .mfMenuSectionLabel{ font-size:11.5px; font-weight:800; color:var(--muted); margin-bottom:8px; }
 </style>
 <style>
   :root{
@@ -254,8 +321,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
+  #screenHome, #screenMarkets, #screenMarketFeed, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenMarketFeed.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
 
   /* 💬 Honey Messenger — সম্পূর্ণ ফুল-ভিউপোর্ট, Bazar-এর সীমাবদ্ধ width-এর
      বাইরে গিয়ে সম্পূর্ণ আলাদা একটা অ্যাপের মতো খোলে */
@@ -306,7 +373,45 @@
 
     <div class="serviceCardGrid">
       <div class="serviceCard" data-svc="market">
-        <div class="ic">🏪</div>
+        <div class="ic marketIconWrap">
+          <svg class="market3d" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg">
+            <ellipse class="marketShadow" cx="50" cy="62" rx="32" ry="5"/>
+            <g class="marketBody">
+              <polygon class="marketSign" points="50,2 60,8 60,18 50,24 40,18 40,8" fill="url(#honeyPaint)"/>
+              <text x="50" y="16" text-anchor="middle" font-size="11" fill="#5a3400">🐝</text>
+              <path d="M14 32 L50 20 L86 32 L86 37 L14 37 Z" fill="url(#awningPaint)"/>
+              <path d="M14 32 L23.4 32 L23.4 37 L14 37 Z" fill="#fff8e8"/>
+              <path d="M32.8 32 L42.2 32 L42.2 37 L32.8 37 Z" fill="#fff8e8"/>
+              <path d="M51.6 32 L61 32 L61 37 L51.6 37 Z" fill="#fff8e8"/>
+              <path d="M70.4 32 L79.8 32 L79.8 37 L70.4 37 Z" fill="#fff8e8"/>
+              <rect x="19" y="37" width="62" height="27" rx="4" fill="url(#storePaint)"/>
+              <rect x="25" y="43" width="13" height="11" rx="2" fill="#bfe3ff" opacity="0.85"/>
+              <rect x="62" y="43" width="13" height="11" rx="2" fill="#bfe3ff" opacity="0.85"/>
+              <rect x="43" y="46" width="14" height="18" rx="2" fill="#3d2405"/>
+              <circle cx="53" cy="55" r="1.4" fill="#ffd166"/>
+            </g>
+            <g class="marketBee">
+              <ellipse class="beeWing" cx="76" cy="12" rx="3.2" ry="2.2" fill="#fff8e8" opacity="0.85"/>
+              <ellipse class="beeWing" cx="81" cy="12" rx="3.2" ry="2.2" fill="#fff8e8" opacity="0.85"/>
+              <ellipse cx="78.5" cy="16" rx="4.5" ry="3.6" fill="#1a1206"/>
+              <path d="M74.5 16 h8" stroke="#ffb703" stroke-width="1.6"/>
+            </g>
+            <defs>
+              <linearGradient id="awningPaint" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ffd166"/>
+                <stop offset="100%" stop-color="#ffb703"/>
+              </linearGradient>
+              <linearGradient id="storePaint" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#3d2405"/>
+                <stop offset="100%" stop-color="#1a1206"/>
+              </linearGradient>
+              <linearGradient id="honeyPaint" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#ffe08a"/>
+                <stop offset="100%" stop-color="#ffb703"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
         <div class="lbl">Market</div>
       </div>
       <div class="serviceCard" data-svc="transport">
@@ -387,7 +492,62 @@
     </div>
   </div>
 
-  <!-- ধাপ ২: দোকানের তালিকা -->
+  <!-- 🐝 Market Feed — Phase 2: এক মার্কেটের সব দোকানের প্রোডাক্ট এক ফিডে,
+       Highlight/Offer অনুযায়ী সাজানো, অ্যানিমেটেড কার্ড (পুরনো দোকান→ক্যাটাগরি→
+       প্রোডাক্ট এই ধাপে-ধাপে যাওয়ার পুরনো ফ্লো এখন এখানে প্রতিস্থাপিত) -->
+  <div id="screenMarketFeed">
+    <button class="backBtn" id="backFromMarketFeed">← হোমে ফিরে যান</button>
+    <div class="mfMarketHeader">
+      <div class="name" id="mfMarketName">—</div>
+      <button class="mfChangeAreaBtn" id="mfChangeAreaBtn">📍 বাজার পরিবর্তন</button>
+    </div>
+    <div class="mfTopBar">
+      <button class="mfTopBarBtn" id="mfSearchBtn"><span class="mfIc">🔍</span><span class="mfLbl">খুঁজুন</span></button>
+      <button class="mfTopBarBtn" id="mfOfferBtn"><span class="mfIc">🎁</span><span class="mfLbl">অফার</span></button>
+      <button class="mfTopBarBtn" id="mfMenuBtn"><span class="mfIc">☰</span><span class="mfLbl">মেনু</span></button>
+    </div>
+    <div id="mfActiveFilterNote" style="display:none; font-size:11.5px; color:var(--amber); margin-bottom:10px;"></div>
+    <div id="marketFeedGrid" class="pGrid"><div class="loadingMsg">প্রোডাক্ট লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- 🔍 Market Feed — সার্চ ওভারলে -->
+  <div id="mfSearchOverlay" class="mfSheetOverlay" style="align-items:flex-start;">
+    <div class="mfSheetBox" style="border-radius:0; max-height:100vh; height:100%;">
+      <div class="mfSheetHead">
+        <div class="t">🔍 প্রোডাক্ট/দোকান খুঁজুন</div>
+        <span class="mfSheetClose" id="mfSearchCloseBtn">✕</span>
+      </div>
+      <input type="text" class="searchBox" id="mfSearchInput" placeholder="প্রোডাক্টের নাম বা দোকানের নাম...">
+      <div id="mfSearchGrid" class="pGrid"><div class="mfEmpty">প্রোডাক্ট বা দোকানের নাম লিখুন...</div></div>
+    </div>
+  </div>
+
+  <!-- 🎁 Market Feed — অফার বটম-শিট -->
+  <div id="mfOfferSheet" class="mfSheetOverlay">
+    <div class="mfSheetBox">
+      <div class="mfSheetHead">
+        <div class="t">🎁 চলমান অফার</div>
+        <span class="mfSheetClose" id="mfOfferCloseBtn">✕</span>
+      </div>
+      <div id="mfOfferGrid" class="pGrid"></div>
+    </div>
+  </div>
+
+  <!-- ☰ Market Feed — ফিল্টার/এলাকা মেনু বটম-শিট -->
+  <div id="mfMenuSheet" class="mfSheetOverlay">
+    <div class="mfSheetBox">
+      <div class="mfSheetHead">
+        <div class="t">☰ ফিল্টার ও এলাকা</div>
+        <span class="mfSheetClose" id="mfMenuCloseBtn">✕</span>
+      </div>
+      <button class="mfMenuActionBtn" id="mfMenuChangeAreaBtn">📍 এলাকা/বাজার পরিবর্তন করুন</button>
+      <div class="mfMenuSectionLabel">🏪 দোকানের ধরন</div>
+      <div class="mfChipRow" id="mfShopTypeChips"></div>
+    </div>
+  </div>
+
+  <!-- ধাপ ২: দোকানের তালিকা (এখন সরাসরি ব্যবহার হয় না — Market Feed থেকে "🏪 দোকান
+       দেখুন" এর মতো কোনো ভবিষ্যৎ লিংক থেকে আসতে পারে, তাই কোড রেখে দেওয়া হয়েছে) -->
   <div id="screenShops">
     <button class="backBtn" id="backToMarkets">← হোমে ফিরে যান</button>
     <div class="card" style="text-align:center; padding:12px;">
@@ -1206,7 +1366,7 @@ let userLatLng = null;
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
 
   // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
@@ -3000,14 +3160,270 @@ $("marketSearch").addEventListener("input", ()=>{
 window.selectMarket = function(marketId){
   currentMarketId = marketId;
   const market = allMarkets.find(m=> m.id === marketId);
-  $("currentMarketName").textContent = market ? (market.name || marketId) : marketId;
-  showScreen("screenShops");
+  const marketName = market ? (market.name || marketId) : marketId;
+  $("currentMarketName").textContent = marketName;
+  $("mfMarketName").textContent = marketName;
+  mfResetFilters();
+  showScreen("screenMarketFeed");
   loadShops(marketId);
 };
 
 $("backToMarkets").addEventListener("click", ()=> showScreen("screenHome"));
 
-/* ---------- ধাপ ২: দোকানের তালিকা ---------- */
+/* ==================== 🐝 Market Feed — Phase 2: ক্রস-শপ প্রোডাক্ট ফিড ====================
+   এক মার্কেটের ভেতরের সব দোকানের প্রকাশিত (publicStock) প্রোডাক্ট একত্র করে
+   Highlight+Offer > Highlight > Offer > অন্যান্য — এই ক্রমে সাজিয়ে, একই টায়ারে
+   একাধিক দোকান থাকলে পালাক্রমে (round-robin) মিশিয়ে দেখানো হয়, যাতে একটা
+   দোকান ফিডের উপরের দিকে একচেটিয়া দখল না করে। publicStock প্রতিটা দোকানের
+   নিজের সাব-কালেকশন হওয়ায় Firestore-এ সরাসরি "মার্কেটের সব প্রোডাক্ট" — এমন
+   কোনো কুয়েরি সম্ভব না, তাই ক্লায়েন্ট-সাইডেই সব দোকান থেকে টেনে মেশানো হয়। */
+let marketFeedProducts = [];
+let mfShopTypeFilter = "";
+
+function mfResetFilters(){
+  mfShopTypeFilter = "";
+  const note = $("mfActiveFilterNote");
+  if(note){ note.style.display = "none"; note.textContent = ""; }
+}
+
+async function loadMarketFeedProducts(){
+  const gridEl = $("marketFeedGrid");
+  if(!gridEl) return;
+  if(allShops.length === 0){
+    marketFeedProducts = [];
+    gridEl.innerHTML = '<div class="mfEmpty">এই বাজারে এখনো কোনো সক্রিয় দোকান নেই।</div>';
+    return;
+  }
+  gridEl.innerHTML = '<div class="loadingMsg">প্রোডাক্ট লোড হচ্ছে...</div>';
+  try{
+    const perShop = await Promise.all(allShops.map(async (shop)=>{
+      try{
+        const qs = await db.collection("shops").doc(shop.id).collection("publicStock").get();
+        const cur = shop.currencySymbol
+          || (shop.currencyCode && typeof window.hbGetCurrencySymbol === 'function' ? window.hbGetCurrencySymbol(shop.currencyCode) : null)
+          || '৳';
+        return qs.docs.map(d=> ({
+          ...d.data(), id: d.id,
+          __shopId: shop.id,
+          __shopName: shop.name || shop.shopName || "দোকান",
+          __shopCategory: shop.category || "",
+          __cur: cur
+        }));
+      }catch(e){ console.warn("Market feed: shop stock load failed", shop.id, e); return []; }
+    }));
+    marketFeedProducts = perShop.flat();
+  }catch(e){
+    console.error(e);
+    gridEl.innerHTML = '<div class="mfEmpty">প্রোডাক্ট লোড করা যায়নি।</div>';
+    return;
+  }
+  mfBuildShopTypeChips();
+  renderMarketFeed();
+}
+
+function mfBuildShopTypeChips(){
+  const wrap = $("mfShopTypeChips");
+  if(!wrap) return;
+  const types = [...new Set(allShops.map(s=> s.category).filter(Boolean))];
+  if(types.length === 0){
+    wrap.innerHTML = '<div style="font-size:11.5px; color:var(--muted);">কোনো দোকানের ধরন পাওয়া যায়নি।</div>';
+    return;
+  }
+  wrap.innerHTML = `<button class="mfChip ${mfShopTypeFilter===''?'active':''}" data-type="">সব</button>` +
+    types.map(t=> `<button class="mfChip ${mfShopTypeFilter===t?'active':''}" data-type="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("");
+  wrap.querySelectorAll(".mfChip").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      mfShopTypeFilter = btn.dataset.type;
+      wrap.querySelectorAll(".mfChip").forEach(b=> b.classList.toggle("active", b===btn));
+      mfUpdateFilterNote();
+      renderMarketFeed();
+      $("mfMenuSheet").classList.remove("show");
+    });
+  });
+}
+
+function mfUpdateFilterNote(){
+  const note = $("mfActiveFilterNote");
+  if(!note) return;
+  if(mfShopTypeFilter){ note.style.display = "block"; note.textContent = `ফিল্টার: 🏪 ${mfShopTypeFilter} (মুছতে ☰ মেনু → সব)`; }
+  else{ note.style.display = "none"; note.textContent = ""; }
+}
+
+function mfTier(p){
+  const om = hbGetOfferMeta(p);
+  if(om.highlight && om.hasOffer) return 0;
+  if(om.highlight) return 1;
+  if(om.hasOffer) return 2;
+  return 3;
+}
+
+function mfRoundRobinByShop(list){
+  const byShop = {}; const order = [];
+  list.forEach(p=>{
+    if(!byShop[p.__shopId]){ byShop[p.__shopId] = []; order.push(p.__shopId); }
+    byShop[p.__shopId].push(p);
+  });
+  const out = []; let more = true;
+  while(more){
+    more = false;
+    for(const sid of order){
+      const arr = byShop[sid];
+      if(arr.length){ out.push(arr.shift()); more = true; }
+    }
+  }
+  return out;
+}
+
+function mfSortList(list){
+  const tiers = [[],[],[],[]];
+  list.forEach(p=> tiers[mfTier(p)].push(p));
+  let out = [];
+  tiers.forEach(t=> out = out.concat(mfRoundRobinByShop(t)));
+  return out;
+}
+
+function mfGetFilteredSortedList(){
+  let list = marketFeedProducts.slice();
+  if(mfShopTypeFilter) list = list.filter(p=> p.__shopCategory === mfShopTypeFilter);
+  return mfSortList(list);
+}
+
+function mfCardHTML(p, idx){
+  const om = hbGetOfferMeta(p);
+  const qty = Number(p.stockQty);
+  let stockClass = "in", stockLabel = "স্টকে আছে";
+  if(!isNaN(qty)){
+    if(qty <= 0){ stockClass = "out"; stockLabel = "স্টক নেই"; }
+    else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
+    else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
+  }
+  const outOfStock = stockClass === "out";
+  const cur = p.__cur || '৳';
+  const safeName = escapeHtml(p.name||'').replace(/'/g,"");
+  const safeShopName = escapeHtml(p.__shopName||'').replace(/'/g,"");
+  return `
+    <div class="pCard mfCard ${om.highlight ? 'mfGlow' : ''}" style="animation-delay:${Math.min(idx,12)*0.035}s;">
+      <div class="pCardImgWrap" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">
+        <span class="pCardImgInner">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</span>
+        <div class="pCardBadges">
+          ${om.highlight ? '<span class="pCardHighlightBadge">⭐</span>' : ''}
+          ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
+        </div>
+      </div>
+      <div class="pCardBody">
+        <span class="mfShopTag">🏪 ${escapeHtml(p.__shopName||"দোকান")}</span>
+        <div class="pCardName" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
+        <div class="pCardPriceRow">
+          <span class="pCardPrice">${cur}${om.finalPrice}</span>
+          ${om.hasDiscount ? `<span class="pCardOldPrice">${cur}${p.price}</span>` : ""}
+        </div>
+        <div class="pCardStock ${stockClass}">${stockLabel}</div>
+        <button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'})">
+          ${outOfStock ? "স্টক নেই" : "🛒 Add to Cart"}
+        </button>
+      </div>
+    </div>`;
+}
+
+function renderMarketFeed(){
+  const gridEl = $("marketFeedGrid");
+  if(!gridEl) return;
+  const list = mfGetFilteredSortedList();
+  if(list.length === 0){
+    gridEl.innerHTML = '<div class="mfEmpty">😕 কোনো প্রোডাক্ট পাওয়া যায়নি।</div>';
+    return;
+  }
+  gridEl.innerHTML = list.map((p,i)=> mfCardHTML(p,i)).join("");
+}
+
+window.hbOpenMarketProductDetail = function(shopId, productId){
+  const p = marketFeedProducts.find(x=> x.id === productId && x.__shopId === shopId);
+  if(!p) return;
+  const om = hbGetOfferMeta(p);
+  const qty = Number(p.stockQty);
+  let stockClass = "in", stockLabel = "স্টকে আছে";
+  if(!isNaN(qty)){
+    if(qty <= 0){ stockClass = "out"; stockLabel = "স্টক নেই"; }
+    else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
+    else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
+  }
+  const outOfStock = stockClass === "out";
+  const cur = p.__cur || '৳';
+  const safeName = escapeHtml(p.name||'').replace(/'/g,"");
+  const safeShopName = escapeHtml(p.__shopName||'').replace(/'/g,"");
+  $("hbProductDetailBody").innerHTML = `
+    <div class="pDetailImgWrap">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
+    <div style="font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:4px;">🏪 ${escapeHtml(p.__shopName||"দোকান")}</div>
+    <div style="font-size:17px; font-weight:800; margin-bottom:8px;">${om.highlight ? '<span style="color:#fbbf24;">⭐</span> ' : ''}${escapeHtml(p.name||"প্রোডাক্ট")}</div>
+    <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">
+      <span style="font-size:22px; font-weight:800; color:var(--amber);">${cur}${om.finalPrice}</span>
+      ${om.hasDiscount ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${cur}${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : (om.genericOffer ? `<span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">${om.badgeText}</span>` : "")}
+    </div>
+    ${om.genericOffer && om.offerNote ? `<div style="font-size:12.5px; color:var(--amber); margin-bottom:8px;">🎁 ${escapeHtml(om.offerNote)}</div>` : ""}
+    <div class="pCardStock ${stockClass}" style="font-size:12px; margin-bottom:14px;">${stockLabel}</div>
+    ${p.description ? `<div style="font-size:13px; color:#ddd; line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
+    <div style="display:flex; gap:10px;">
+      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'})" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🛒 Add to Cart</button>
+      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'}); hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
+    </div>
+  `;
+  $("hbProductDetailModal").style.display = "flex";
+};
+
+function mfCloseAllSheets(){
+  $("mfSearchOverlay") && $("mfSearchOverlay").classList.remove("show");
+  $("mfOfferSheet") && $("mfOfferSheet").classList.remove("show");
+  $("mfMenuSheet") && $("mfMenuSheet").classList.remove("show");
+}
+
+$("backFromMarketFeed") && $("backFromMarketFeed").addEventListener("click", ()=>{
+  mfCloseAllSheets();
+  showScreen("screenHome");
+});
+$("mfChangeAreaBtn") && $("mfChangeAreaBtn").addEventListener("click", ()=>{
+  mfCloseAllSheets();
+  showScreen("screenMarkets");
+});
+$("mfMenuChangeAreaBtn") && $("mfMenuChangeAreaBtn").addEventListener("click", ()=>{
+  mfCloseAllSheets();
+  showScreen("screenMarkets");
+});
+
+/* ---------- Top bar বাটন: 🔍 খুঁজুন ---------- */
+$("mfSearchBtn") && $("mfSearchBtn").addEventListener("click", ()=>{
+  $("mfSearchInput").value = "";
+  $("mfSearchGrid").innerHTML = '<div class="mfEmpty">প্রোডাক্ট বা দোকানের নাম লিখুন...</div>';
+  $("mfSearchOverlay").classList.add("show");
+  setTimeout(()=> $("mfSearchInput").focus(), 50);
+});
+$("mfSearchCloseBtn") && $("mfSearchCloseBtn").addEventListener("click", ()=> $("mfSearchOverlay").classList.remove("show"));
+$("mfSearchInput") && $("mfSearchInput").addEventListener("input", (e)=>{
+  const q = e.target.value.trim().toLowerCase();
+  const grid = $("mfSearchGrid");
+  if(!q){ grid.innerHTML = '<div class="mfEmpty">প্রোডাক্ট বা দোকানের নাম লিখুন...</div>'; return; }
+  const results = mfSortList(marketFeedProducts.filter(p=> (p.name||"").toLowerCase().includes(q) || (p.__shopName||"").toLowerCase().includes(q)));
+  grid.innerHTML = results.length ? results.map((p,i)=> mfCardHTML(p,i)).join("") : '<div class="mfEmpty">😕 কিছু পাওয়া যায়নি।</div>';
+});
+
+/* ---------- Top bar বাটন: 🎁 অফার ---------- */
+$("mfOfferBtn") && $("mfOfferBtn").addEventListener("click", ()=>{
+  const grid = $("mfOfferGrid");
+  const results = mfSortList(marketFeedProducts.filter(p=> hbGetOfferMeta(p).hasOffer));
+  grid.innerHTML = results.length ? results.map((p,i)=> mfCardHTML(p,i)).join("") : '<div class="mfEmpty">🙁 এই মুহূর্তে কোনো অফার নেই।</div>';
+  $("mfOfferSheet").classList.add("show");
+});
+$("mfOfferCloseBtn") && $("mfOfferCloseBtn").addEventListener("click", ()=> $("mfOfferSheet").classList.remove("show"));
+
+/* ---------- Top bar বাটন: ☰ মেনু ---------- */
+$("mfMenuBtn") && $("mfMenuBtn").addEventListener("click", ()=>{
+  mfBuildShopTypeChips();
+  $("mfMenuSheet").classList.add("show");
+});
+$("mfMenuCloseBtn") && $("mfMenuCloseBtn").addEventListener("click", ()=> $("mfMenuSheet").classList.remove("show"));
+
+/* ---------- ধাপ ২: দোকানের তালিকা (আর সরাসরি Market থেকে ঢোকা যায় না, Market Feed
+   এটা প্রতিস্থাপন করেছে — ফাংশনগুলো নিচে রাখা হয়েছে যদি ভবিষ্যতে "এই দোকানের সব প্রোডাক্ট
+   দেখুন" জাতীয় কোনো ফিচারে আবার দরকার পড়ে) ---------- */
 let shopsUnsub = null;
 function loadShops(marketId){
   $("shopsList").innerHTML = '<div class="loadingMsg">দোকানের তালিকা লোড হচ্ছে...</div>';
@@ -3022,6 +3438,7 @@ function loadShops(marketId){
     .onSnapshot((qs)=>{
       allShops = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
       renderShops(getFilteredShops());
+      if($("screenMarketFeed") && $("screenMarketFeed").classList.contains("active")) loadMarketFeedProducts();
     }, (e)=>{
       console.error(e);
       $("shopsList").innerHTML = '<div class="emptyMsg">দোকানের তালিকা লোড করা যায়নি।</div>';
