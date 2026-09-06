@@ -3263,6 +3263,99 @@
     }
     #program-bcc .bccSubChip button{ background:none; border:none; color:#f87171; cursor:pointer; font-size:12px; }
 
+    /* ==================== 🐝 Market Products ড্যাশবোর্ড ==================== */
+    #program-bcc .bccMarketSummary{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px; }
+    #program-bcc .bccMarketSumCard{
+      border-radius:14px; padding:10px 6px; text-align:center;
+      background:linear-gradient(150deg,#20284a,#161c34); box-shadow:0 8px 16px rgba(0,0,0,0.3);
+    }
+    #program-bcc .bccMarketSumCard .val{ font-size:17px; font-weight:800; color:#fff; font-family:'Space Mono',monospace; }
+    #program-bcc .bccMarketSumCard .lbl{ font-size:9.5px; color:#8b94b8; margin-top:2px; }
+    #program-bcc .bccMarketGrid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; perspective:1000px; }
+    #program-bcc .bccMarketCard{
+      border-radius:16px; padding:10px; position:relative; cursor:pointer;
+      background:linear-gradient(150deg,#20284a,#161c34); box-shadow:0 10px 20px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.05);
+      animation: rowIn3d .35s ease both; transition:transform .25s ease, box-shadow .25s ease;
+    }
+    #program-bcc .bccMarketCard:active{ transform:scale(0.97) rotateX(2deg); }
+    #program-bcc .bccMarketCard .thumb{
+      width:100%; aspect-ratio:1/1; border-radius:12px; background:#0e1327; display:flex; align-items:center;
+      justify-content:center; font-size:30px; overflow:hidden; margin-bottom:8px; position:relative;
+    }
+    #program-bcc .bccMarketCard .thumb img{ width:100%; height:100%; object-fit:cover; }
+    #program-bcc .bccMarketCard .nm{ font-size:12.5px; font-weight:700; color:#eef1f7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #program-bcc .bccMarketCard .pr{ font-size:13px; font-weight:800; color:#4ade80; font-family:'Space Mono',monospace; margin-top:2px; }
+    #program-bcc .bccMarketCard .stBadges{ display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
+    #program-bcc .bccMkBadge{
+      font-size:9px; font-weight:800; padding:2px 6px; border-radius:20px; display:inline-flex; align-items:center; gap:2px;
+    }
+    #program-bcc .bccMkBadge.star{ background:rgba(251,191,36,0.2); color:#fbbf24; }
+    #program-bcc .bccMkBadge.fire{ background:rgba(251,146,60,0.2); color:#fb923c; }
+    #program-bcc .bccMkBadge.off{ background:rgba(148,163,184,0.15); color:#94a3b8; }
+    #program-bcc .bccMarketCard.glow{ box-shadow:0 0 0 1.5px rgba(251,191,36,0.55), 0 10px 22px rgba(251,191,36,0.18); }
+
+    /* Market Product Detail মোডাল */
+    #program-bcc .bccMkSection{
+      border-radius:14px; padding:14px; margin:12px 0;
+      background:linear-gradient(150deg,#181f38,#12172a); border:1px solid rgba(255,255,255,0.06);
+    }
+    #program-bcc .bccMkSection h4{ margin:0 0 4px; font-size:13.5px; color:#eef1f7; display:flex; align-items:center; gap:6px; }
+    #program-bcc .bccMkSection p.hint{ margin:2px 0 10px; font-size:11px; color:#8b94b8; line-height:1.5; }
+    #program-bcc .bccMkToggleRow{ display:flex; align-items:center; justify-content:space-between; }
+    #program-bcc .bccMkChips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+    #program-bcc .bccMkChip{
+      padding:7px 12px; border-radius:20px; font-size:11.5px; font-weight:700; cursor:pointer;
+      background:rgba(255,255,255,0.06); color:#c3cae0; border:1px solid rgba(255,255,255,0.08);
+    }
+    #program-bcc .bccMkChip.active{ background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; border-color:transparent; }
+    #program-bcc .bccMkOfferTypes{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+    #program-bcc .bccMkTypeBtn{
+      padding:10px 8px; border-radius:12px; font-size:11.5px; font-weight:700; text-align:center; cursor:pointer;
+      background:rgba(255,255,255,0.05); color:#c3cae0; border:1px solid rgba(255,255,255,0.08);
+    }
+    #program-bcc .bccMkTypeBtn.active{ background:linear-gradient(135deg,#7c3aed,#5b21b6); color:#fff; border-color:transparent; }
+    #program-bcc .bccMkPreviewBtn{
+      width:100%; padding:12px; margin-top:6px; border:1px solid rgba(255,255,255,0.15); border-radius:12px;
+      background:rgba(255,255,255,0.04); color:#eef1f7; font-weight:700; font-size:13px; cursor:pointer;
+    }
+    /* 👁 Market Preview — Bazar-এর আসল প্রোডাক্ট কার্ডের সাথে মেলানো (সোনালি/গাঢ় থিম) */
+    #bccMarketPreviewOverlay{
+      display:none; position:fixed; inset:0; z-index:900; background:rgba(6,8,16,0.75);
+      align-items:center; justify-content:center; padding:24px;
+    }
+    #bccMarketPreviewOverlay.show{ display:flex; }
+    #bccMarketPreviewOverlay .previewWrap{ width:100%; max-width:280px; animation: dashPop .3s ease both; }
+    #bccMarketPreviewOverlay .previewLabel{ text-align:center; color:#fbbf24; font-size:11.5px; font-weight:800; margin-bottom:10px; letter-spacing:0.5px; }
+    #bccMarketPreviewOverlay .pvCard{
+      border-radius:18px; padding:12px; background:linear-gradient(160deg,#1a1206,#3d2405);
+      border:1px solid rgba(255,209,102,0.25); box-shadow:0 20px 40px rgba(0,0,0,0.5);
+      animation: bccFloat 4.2s ease-in-out infinite;
+    }
+    #bccMarketPreviewOverlay .pvImg{
+      width:100%; aspect-ratio:1/1; border-radius:14px; background:rgba(255,255,255,0.05); overflow:hidden;
+      display:flex; align-items:center; justify-content:center; font-size:44px; position:relative; margin-bottom:10px;
+    }
+    #bccMarketPreviewOverlay .pvImg img{ width:100%; height:100%; object-fit:cover; }
+    #bccMarketPreviewOverlay .pvStar{ position:absolute; top:8px; left:8px; font-size:20px; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+    #bccMarketPreviewOverlay .pvOfferBadge{
+      position:absolute; top:8px; right:8px; background:rgba(220,38,38,0.85); color:#fff; font-size:10px;
+      font-weight:800; padding:3px 8px; border-radius:8px;
+    }
+    #bccMarketPreviewOverlay .pvName{ font-size:13.5px; font-weight:700; color:#fff8e8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #bccMarketPreviewOverlay .pvShop{ font-size:10.5px; color:#c9b899; margin-top:1px; }
+    #bccMarketPreviewOverlay .pvPriceRow{ display:flex; align-items:baseline; gap:7px; margin-top:6px; }
+    #bccMarketPreviewOverlay .pvPrice{ font-size:16px; font-weight:800; color:#ffb703; }
+    #bccMarketPreviewOverlay .pvOld{ font-size:12px; color:#8a7c63; text-decoration:line-through; }
+    #bccMarketPreviewOverlay .pvNote{ font-size:11px; color:#ffd166; margin-top:4px; }
+    #bccMarketPreviewOverlay .pvCartBtn{
+      width:100%; margin-top:10px; padding:10px; border:none; border-radius:10px; font-weight:800; font-size:12.5px;
+      background:linear-gradient(135deg,#ffb703,#ffd166); color:#1a1206;
+    }
+    #bccMarketPreviewOverlay .pvCloseBtn{
+      display:block; margin:16px auto 0; padding:9px 22px; border-radius:20px; border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.06); color:#eef1f7; font-size:12.5px; cursor:pointer;
+    }
+
     #program-bcc .bccModalOverlay{
       display:none; position:fixed; inset:0; z-index:800; background:rgba(6,8,16,0.68);
       align-items:center; justify-content:center; padding:20px;
@@ -3348,6 +3441,7 @@
       <div class="bccSubtab active" data-btab="overview">📊 ওভারভিউ</div>
       <div class="bccSubtab" data-btab="products">📦 প্রোডাক্ট</div>
       <div class="bccSubtab" data-btab="categories">🏷️ ক্যাটাগরি</div>
+      <div class="bccSubtab" data-btab="market">🐝 Market</div>
     </div>
 
     <div class="bccSubpanel" id="btab-overview">
@@ -3390,6 +3484,100 @@
     <div class="bccSubpanel" id="btab-categories" style="display:none;">
       <button class="bccBtnPrimary" id="bccAddCategoryBtn" style="width:100%; margin-bottom:14px;">➕ নতুন Main Category</button>
       <div id="bccCategoryList"></div>
+    </div>
+
+    <!-- 🐝 Market Products — POS-এর প্রোডাক্ট Honey Bee Bazar-এ কীভাবে দেখাবে তার Workspace।
+         এখানে নতুন করে কোনো Product তৈরি হয় না — POS-এর প্রোডাক্টই এখানে Automatic চলে আসে
+         (Master Data POS-এই থাকে, Market শুধু Highlight/Offer সেটিংস যোগ করে)। -->
+    <div class="bccSubpanel" id="btab-market" style="display:none;">
+      <div class="bccMarketSummary">
+        <div class="bccMarketSumCard"><div class="val" id="bccMkSumPublished">0</div><div class="lbl">Market Active</div></div>
+        <div class="bccMarketSumCard"><div class="val" id="bccMkSumHighlight">0</div><div class="lbl">⭐ Highlight</div></div>
+        <div class="bccMarketSumCard"><div class="val" id="bccMkSumOffer">0</div><div class="lbl">🔥 Offer চলছে</div></div>
+        <div class="bccMarketSumCard"><div class="val" id="bccMkSumTotal">0</div><div class="lbl">সব পণ্য</div></div>
+      </div>
+      <input class="bccSearchInput" id="bccMarketSearch" placeholder="🔍 পণ্য খুঁজুন...">
+      <p class="pin-desc" style="margin:-8px 0 12px; font-size:11px;">💡 POS-এ Bazar-এ "প্রকাশ" করা সব পণ্য এখানে দেখাবে। কোনো পণ্য এখানে না থাকলে সেটা এখনো Bazar-এ প্রকাশ করা হয়নি — প্রোডাক্ট ট্যাব থেকে Edit করে প্রকাশ করুন।</p>
+      <div class="bccMarketGrid" id="bccMarketGrid"></div>
+    </div>
+  </div>
+
+  <!-- Market Product Detail মোডাল — Highlight/Offer কন্ট্রোল -->
+  <div class="bccModalOverlay" id="bccMarketDetailOverlay">
+    <div class="bccModalBox">
+      <div class="bccModalHead"><h3>🐝 Market Settings</h3><button class="bccModalClose" id="bccMarketDetailClose">✕</button></div>
+      <div class="bccModalBody">
+        <div style="display:flex; gap:12px; align-items:center; margin-bottom:4px;">
+          <div id="bccMkDetailThumb" style="width:56px; height:56px; border-radius:12px; background:#0e1327; display:flex; align-items:center; justify-content:center; font-size:26px; overflow:hidden; flex-shrink:0;"></div>
+          <div style="min-width:0;">
+            <div id="bccMkDetailName" style="font-size:14.5px; font-weight:800; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+            <div id="bccMkDetailPrice" style="font-size:12.5px; color:#8b94b8; margin-top:2px;"></div>
+          </div>
+        </div>
+
+        <div class="bccMkSection">
+          <h4>⭐ Market-এ Highlight করুন</h4>
+          <p class="hint">Highlight করলে Customer-দের কাছে এই পণ্য বেশি গুরুত্ব দিয়ে (আগে) দেখানো হবে।</p>
+          <div class="bccMkToggleRow">
+            <span id="bccMkHighlightStatusTxt" style="font-size:12px; color:#9aa5c4;">বন্ধ আছে</span>
+            <label class="bccPublishSwitch"><input type="checkbox" id="bccMkHighlightToggle"><span></span></label>
+          </div>
+          <div class="bccMkChips" id="bccMkHighlightDuration">
+            <div class="bccMkChip" data-days="1">১ দিন</div>
+            <div class="bccMkChip" data-days="3">৩ দিন</div>
+            <div class="bccMkChip active" data-days="7">৭ দিন</div>
+            <div class="bccMkChip" data-days="0">সবসময়</div>
+          </div>
+        </div>
+
+        <div class="bccMkSection">
+          <h4>🎁 Offer যোগ করুন</h4>
+          <p class="hint">Offer চালু করলে Customer-রা Bazar-এ বিশেষ ব্যাজসহ এই পণ্য দেখবে। মেয়াদ শেষ হলে অটোমেটিক বন্ধ হয়ে যাবে (Product ডিলিট হবে না)।</p>
+          <div class="bccMkToggleRow">
+            <span id="bccMkOfferStatusTxt" style="font-size:12px; color:#9aa5c4;">বন্ধ আছে</span>
+            <label class="bccPublishSwitch"><input type="checkbox" id="bccMkOfferToggle"><span></span></label>
+          </div>
+          <div class="bccMkOfferTypes" id="bccMkOfferTypeRow">
+            <div class="bccMkTypeBtn active" data-type="discount">🔥 Discount</div>
+            <div class="bccMkTypeBtn" data-type="combo">🎁 Combo Offer</div>
+            <div class="bccMkTypeBtn" data-type="free_delivery">🚚 Free Delivery</div>
+            <div class="bccMkTypeBtn" data-type="new_arrival">🆕 New Arrival</div>
+          </div>
+          <p class="pin-desc" id="bccMkOfferPriceHint" style="margin:10px 0 0; font-size:11px;">💰 Discount Offer-এর দাম প্রোডাক্ট Edit ফর্মের "অফার/ডিসকাউন্ট মূল্য" ফিল্ড থেকে আসে।</p>
+          <div id="bccMkOfferNoteRow" style="display:none;">
+            <label>📝 Offer-এর বিবরণ (Customer-রা এটা দেখবে)</label>
+            <input id="bccMkOfferNote" placeholder="যেমনঃ ২টা কিনলে ১টা ফ্রি">
+          </div>
+          <div class="bccMkChips" id="bccMkOfferDuration" style="margin-top:14px;">
+            <div class="bccMkChip" data-days="1">১ দিন</div>
+            <div class="bccMkChip" data-days="3">৩ দিন</div>
+            <div class="bccMkChip active" data-days="7">৭ দিন</div>
+            <div class="bccMkChip" data-days="0">সবসময়</div>
+          </div>
+        </div>
+
+        <button class="bccMkPreviewBtn" id="bccMkPreviewBtn">👁 Market Preview — Customer যেভাবে দেখবে</button>
+        <button class="bccBtnPrimary" id="bccMkSaveBtn" style="width:100%; margin-top:12px;">✅ সেভ করুন</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 👁 Market Preview মোডাল -->
+  <div id="bccMarketPreviewOverlay">
+    <div class="previewWrap">
+      <div class="previewLabel">👁 CUSTOMER যেভাবে দেখবে</div>
+      <div class="pvCard">
+        <div class="pvImg" id="bccPvImg"></div>
+        <div class="pvName" id="bccPvName"></div>
+        <div class="pvShop" id="bccPvShop"></div>
+        <div class="pvPriceRow">
+          <span class="pvPrice" id="bccPvPrice"></span>
+          <span class="pvOld" id="bccPvOld" style="display:none;"></span>
+        </div>
+        <div class="pvNote" id="bccPvNote" style="display:none;"></div>
+        <button class="pvCartBtn">🛒 Add to Cart</button>
+      </div>
+      <button class="pvCloseBtn" id="bccPvCloseBtn">বন্ধ করুন</button>
     </div>
   </div>
 
@@ -7009,6 +7197,44 @@ function bccLoadProducts(){
 }
 function bccSaveProducts(prods){ localStorage.setItem('bcc-products', JSON.stringify(prods)); }
 
+/* ==================== 🐝 Market Products — Highlight/Offer ডেটা মডেল ====================
+   এখানে নতুন কোনো Product ডেটাবেজ তৈরি হয় না — POS-এর প্রোডাক্ট অবজেক্টেই একটা ছোট
+   `market` সাব-অবজেক্ট যোগ হয় (highlightOn/highlightEndAt/offerOn/offerType/offerNote/offerEndAt)।
+   পুরনো প্রোডাক্ট যাদের `market` নেই কিন্তু আগে থেকেই offerPrice সেট করা আছে, তাদের জন্য
+   lazy-migrate করে offerOn:true (discount) ধরে নেওয়া হয় — যাতে আগে থেকে চলা অফার হঠাৎ বন্ধ
+   হয়ে না যায়। */
+function bccGetMarketMeta(p){
+  if(!p.market){
+    p.market = {
+      highlightOn:false, highlightEndAt:null,
+      offerOn: !!p.offerPrice, offerType:'discount', offerNote:'', offerEndAt:null
+    };
+  }
+  return p.market;
+}
+function bccMarketIsLive(endAt){ return !endAt || new Date(endAt).getTime() > Date.now(); }
+function bccMarketHighlightActive(p){ const m = bccGetMarketMeta(p); return !!(m.highlightOn && bccMarketIsLive(m.highlightEndAt)); }
+function bccMarketOfferActive(p){ const m = bccGetMarketMeta(p); return !!(m.offerOn && bccMarketIsLive(m.offerEndAt)); }
+function bccMarketDurationToEndAt(days){
+  const d = Number(days) || 0;
+  if(!d) return null; // ০ = "সবসময়", কোনো মেয়াদ নেই
+  return new Date(Date.now() + d*24*60*60*1000).toISOString();
+}
+// POS-এর "Market" ট্যাব খোলার সময় একবার চালানো হয় — মেয়াদ শেষ হওয়া Highlight/Offer
+// অটোমেটিক বন্ধ করে দেয় (Product/ডেটা ডিলিট হয় না, শুধু Priority/ব্যাজ বন্ধ হয়) এবং
+// পরিবর্তিত প্রোডাক্টগুলো আবার Bazar-এ সিঙ্ক করে দেয়।
+async function bccMarketExpirySweep(){
+  const prods = bccLoadProducts();
+  let changed = false;
+  for(const p of prods){
+    if(!p.market) continue;
+    const m = p.market;
+    if(m.highlightOn && m.highlightEndAt && !bccMarketIsLive(m.highlightEndAt)){ m.highlightOn = false; changed = true; if(p.published) bccSyncProductToBazar(p); }
+    if(m.offerOn && m.offerEndAt && !bccMarketIsLive(m.offerEndAt)){ m.offerOn = false; changed = true; if(p.published) bccSyncProductToBazar(p); }
+  }
+  if(changed) bccSaveProducts(prods);
+}
+
 /* ==================== 🐝 Honey Bee Bazar — Publish/Unpublish সিঙ্ক ====================
    কোনো প্রোডাক্ট "প্রকাশ" (published:true) করা থাকলে সেটার পাবলিক-নিরাপদ তথ্য
    (নাম, দাম, স্টক, কোড, অফার প্রাইস — কখনো ক্রয়মূল্য না) shops/{shopId}/publicStock
@@ -7018,6 +7244,7 @@ async function bccSyncProductToBazar(p){
   try{
     const session = (typeof getSession === 'function') ? getSession() : null;
     if(!session || !session.shopId || typeof db === 'undefined') return;
+    const m = bccGetMarketMeta(p);
     await db.collection('shops').doc(session.shopId).collection('publicStock').doc(p.id).set({
       name: p.name,
       price: Number(p.sell) || 0,
@@ -7027,6 +7254,11 @@ async function bccSyncProductToBazar(p){
       catId: p.catId || null,
       subId: p.subId || null,
       imageUrl: p.imageUrl || null, // 🖼️ Step 5 — Storage-এ আপলোড করা ছবি থাকলে Bazar-এও দেখা যাবে
+      // 🐝 Market Products — Highlight/Offer স্ট্যাটাস (POS-এর "Market" ট্যাব থেকে কন্ট্রোল হয়)
+      highlight: bccMarketHighlightActive(p),
+      offerLive: bccMarketOfferActive(p),
+      offerType: bccMarketOfferActive(p) ? (m.offerType || 'discount') : null,
+      offerNote: bccMarketOfferActive(p) ? (m.offerNote || null) : null,
       updatedAt: fbNow()
     });
   }catch(e){ console.warn('Bazar sync failed:', e); }
@@ -7351,6 +7583,7 @@ document.querySelectorAll('#program-bcc .bccSubtab').forEach(t=>{
     if(t.dataset.btab==='overview') bccRenderOverview();
     if(t.dataset.btab==='products') bccRenderProducts();
     if(t.dataset.btab==='categories'){ bccRenderCategories(); bccSyncCategoriesToBazar(); } // ট্যাব খোলামাত্রই Bazar-এর সাথে রিকনসাইল/সাফাই হবে, কোনো এডিট ছাড়াই
+    if(t.dataset.btab==='market'){ bccMarketExpirySweep(); bccRenderMarket(); } // ট্যাব খোলামাত্রই মেয়াদ-শেষ Highlight/Offer অটো বন্ধ করে Bazar-এর সাথে রিসিঙ্ক
   });
 });
 
@@ -7577,6 +7810,177 @@ document.getElementById('bccBulkUnpublishBtn').addEventListener('click', async (
   toast(`🔴 ${count}টা প্রোডাক্ট লুকানো হয়েছে`);
   bccRenderProducts();
 });
+
+/* ==================== 🐝 Market Products — Dashboard/Highlight/Offer UI ====================
+   এখানে নতুন করে কোনো প্রোডাক্ট তৈরি হয় না — bccLoadProducts()-এর একই Master Data ব্যবহার
+   হয়, শুধু "প্রকাশ করা" (published:true) প্রোডাক্টগুলো ২-কলাম গ্রিডে দেখানো হয়, প্রতিটাতে
+   ট্যাপ করলে Highlight/Offer সেটিংস মোডাল খোলে। */
+let bccMkCurrentId = null;
+let bccMkFormHighlightOn = false, bccMkFormHighlightDays = 7;
+let bccMkFormOfferOn = false, bccMkFormOfferType = 'discount', bccMkFormOfferDays = 7;
+
+function bccRenderMarket(){
+  const q = (document.getElementById('bccMarketSearch').value||'').trim().toLowerCase();
+  const all = bccLoadProducts();
+  const published = all.filter(p=>p.published);
+  document.getElementById('bccMkSumPublished').textContent = published.length;
+  document.getElementById('bccMkSumHighlight').textContent = published.filter(bccMarketHighlightActive).length;
+  document.getElementById('bccMkSumOffer').textContent = published.filter(bccMarketOfferActive).length;
+  document.getElementById('bccMkSumTotal').textContent = all.length;
+
+  const list = published.filter(p=> !q || p.name.toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q));
+  const gridEl = document.getElementById('bccMarketGrid');
+  if(!list.length){
+    gridEl.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:#8b94b8; padding:30px 0; font-size:13px;">${published.length ? 'কোনো পণ্য পাওয়া যায়নি' : 'এখনো কোনো পণ্য Bazar-এ প্রকাশ করা হয়নি — প্রোডাক্ট ট্যাব থেকে Edit করে "Bazar-এ প্রকাশ" চালু করুন।'}</div>`;
+    return;
+  }
+  gridEl.innerHTML = list.map(p=>{
+    const hi = bccMarketHighlightActive(p);
+    const of = bccMarketOfferActive(p);
+    const thumb = p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}">` : '📦';
+    let badges = '';
+    if(hi) badges += '<span class="bccMkBadge star">⭐ Highlight</span>';
+    if(of) badges += '<span class="bccMkBadge fire">🔥 Offer</span>';
+    if(!hi && !of) badges += '<span class="bccMkBadge off">⚪ সাধারণ</span>';
+    return `<div class="bccMarketCard ${hi?'glow':''}" data-mkid="${p.id}">
+      <div class="thumb">${thumb}</div>
+      <div class="nm">${escapeHtml(p.name)}</div>
+      <div class="pr">${fmt(p.sell)}${p.unit==='kg' ? '/kg' : ''}</div>
+      <div class="stBadges">${badges}</div>
+    </div>`;
+  }).join('');
+  gridEl.querySelectorAll('[data-mkid]').forEach(el=> el.addEventListener('click', ()=> bccOpenMarketDetail(el.dataset.mkid)));
+}
+document.getElementById('bccMarketSearch').addEventListener('input', ()=> bccRenderMarket());
+
+function bccOpenMarketDetail(id){
+  const p = bccLoadProducts().find(x=>x.id===id);
+  if(!p) return;
+  const m = bccGetMarketMeta(p);
+  bccMkCurrentId = id;
+  bccMkFormHighlightOn = !!m.highlightOn;
+  bccMkFormHighlightDays = m.highlightEndAt ? Math.max(1, Math.round((new Date(m.highlightEndAt)-Date.now())/86400000)) : 7;
+  bccMkFormOfferOn = !!m.offerOn;
+  bccMkFormOfferType = m.offerType || 'discount';
+  bccMkFormOfferDays = m.offerEndAt ? Math.max(1, Math.round((new Date(m.offerEndAt)-Date.now())/86400000)) : 7;
+
+  document.getElementById('bccMkDetailThumb').innerHTML = p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" style="width:100%;height:100%;object-fit:cover;">` : '📦';
+  document.getElementById('bccMkDetailName').textContent = p.name;
+  document.getElementById('bccMkDetailPrice').textContent = fmt(p.sell) + (p.unit==='kg' ? '/kg' : '') + (p.offerPrice ? ` (অফার: ${fmt(p.offerPrice)})` : '');
+
+  document.getElementById('bccMkHighlightToggle').checked = bccMkFormHighlightOn;
+  document.getElementById('bccMkHighlightStatusTxt').textContent = bccMkFormHighlightOn ? '🟢 চালু আছে' : 'বন্ধ আছে';
+  document.querySelectorAll('#bccMkHighlightDuration .bccMkChip').forEach(c=> c.classList.remove('active'));
+  const hiSelectDays = m.highlightOn ? (m.highlightEndAt ? bccMkFormHighlightDays : 0) : 7;
+  const hiChip = document.querySelector(`#bccMkHighlightDuration .bccMkChip[data-days="${hiSelectDays}"]`);
+  (hiChip || document.querySelector('#bccMkHighlightDuration .bccMkChip[data-days="7"]')).classList.add('active');
+
+  document.getElementById('bccMkOfferToggle').checked = bccMkFormOfferOn;
+  document.getElementById('bccMkOfferStatusTxt').textContent = bccMkFormOfferOn ? '🟢 চালু আছে' : 'বন্ধ আছে';
+  document.querySelectorAll('#bccMkOfferTypeRow .bccMkTypeBtn').forEach(c=> c.classList.toggle('active', c.dataset.type===bccMkFormOfferType));
+  document.getElementById('bccMkOfferNote').value = m.offerNote || '';
+  document.getElementById('bccMkOfferNoteRow').style.display = bccMkFormOfferType==='discount' ? 'none' : 'block';
+  document.getElementById('bccMkOfferPriceHint').style.display = bccMkFormOfferType==='discount' ? 'block' : 'none';
+  document.querySelectorAll('#bccMkOfferDuration .bccMkChip').forEach(c=> c.classList.remove('active'));
+  const ofSelectDays = m.offerOn ? (m.offerEndAt ? bccMkFormOfferDays : 0) : 7;
+  const ofChip = document.querySelector(`#bccMkOfferDuration .bccMkChip[data-days="${ofSelectDays}"]`);
+  (ofChip || document.querySelector('#bccMkOfferDuration .bccMkChip[data-days="7"]')).classList.add('active');
+
+  document.getElementById('bccMarketDetailOverlay').classList.add('show');
+}
+document.getElementById('bccMarketDetailClose').addEventListener('click', ()=> document.getElementById('bccMarketDetailOverlay').classList.remove('show'));
+
+document.getElementById('bccMkHighlightToggle').addEventListener('change', (e)=>{
+  document.getElementById('bccMkHighlightStatusTxt').textContent = e.target.checked ? '🟢 চালু আছে' : 'বন্ধ আছে';
+});
+document.getElementById('bccMkOfferToggle').addEventListener('change', (e)=>{
+  document.getElementById('bccMkOfferStatusTxt').textContent = e.target.checked ? '🟢 চালু আছে' : 'বন্ধ আছে';
+});
+document.getElementById('bccMkHighlightDuration').addEventListener('click', (e)=>{
+  const chip = e.target.closest('.bccMkChip'); if(!chip) return;
+  document.querySelectorAll('#bccMkHighlightDuration .bccMkChip').forEach(c=> c.classList.remove('active'));
+  chip.classList.add('active');
+});
+document.getElementById('bccMkOfferDuration').addEventListener('click', (e)=>{
+  const chip = e.target.closest('.bccMkChip'); if(!chip) return;
+  document.querySelectorAll('#bccMkOfferDuration .bccMkChip').forEach(c=> c.classList.remove('active'));
+  chip.classList.add('active');
+});
+document.getElementById('bccMkOfferTypeRow').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.bccMkTypeBtn'); if(!btn) return;
+  document.querySelectorAll('#bccMkOfferTypeRow .bccMkTypeBtn').forEach(c=> c.classList.remove('active'));
+  btn.classList.add('active');
+  const isDiscount = btn.dataset.type === 'discount';
+  document.getElementById('bccMkOfferNoteRow').style.display = isDiscount ? 'none' : 'block';
+  document.getElementById('bccMkOfferPriceHint').style.display = isDiscount ? 'block' : 'none';
+});
+
+function bccReadMarketForm(){
+  const highlightOn = document.getElementById('bccMkHighlightToggle').checked;
+  const highlightDaysEl = document.querySelector('#bccMkHighlightDuration .bccMkChip.active');
+  const highlightDays = highlightDaysEl ? Number(highlightDaysEl.dataset.days) : 7;
+  const offerOn = document.getElementById('bccMkOfferToggle').checked;
+  const offerTypeEl = document.querySelector('#bccMkOfferTypeRow .bccMkTypeBtn.active');
+  const offerType = offerTypeEl ? offerTypeEl.dataset.type : 'discount';
+  const offerNote = document.getElementById('bccMkOfferNote').value.trim();
+  const offerDaysEl = document.querySelector('#bccMkOfferDuration .bccMkChip.active');
+  const offerDays = offerDaysEl ? Number(offerDaysEl.dataset.days) : 7;
+  return { highlightOn, highlightDays, offerOn, offerType, offerNote, offerDays };
+}
+
+document.getElementById('bccMkSaveBtn').addEventListener('click', async ()=>{
+  if(!bccMkCurrentId) return;
+  const prods = bccLoadProducts();
+  const p = prods.find(x=>x.id===bccMkCurrentId);
+  if(!p) return;
+  const m = bccGetMarketMeta(p);
+  const f = bccReadMarketForm();
+
+  if(f.offerOn && f.offerType==='discount' && !p.offerPrice){
+    toast('⚠️ Discount Offer চালু করতে হলে প্রোডাক্ট Edit ফর্মে "অফার/ডিসকাউন্ট মূল্য" দিতে হবে');
+    return;
+  }
+
+  m.highlightOn = f.highlightOn;
+  m.highlightEndAt = f.highlightOn ? bccMarketDurationToEndAt(f.highlightDays) : m.highlightEndAt;
+  m.offerOn = f.offerOn;
+  m.offerType = f.offerType;
+  m.offerNote = f.offerNote;
+  m.offerEndAt = f.offerOn ? bccMarketDurationToEndAt(f.offerDays) : m.offerEndAt;
+
+  bccSaveProducts(prods);
+  await bccSyncProductToBazar(p);
+  document.getElementById('bccMarketDetailOverlay').classList.remove('show');
+  toast('✅ Market সেটিংস সেভ হয়েছে');
+  bccRenderMarket();
+});
+
+document.getElementById('bccMkPreviewBtn').addEventListener('click', ()=>{
+  if(!bccMkCurrentId) return;
+  const p = bccLoadProducts().find(x=>x.id===bccMkCurrentId);
+  if(!p) return;
+  const f = bccReadMarketForm();
+  const hasOffer = f.offerOn && f.offerType==='discount' && p.offerPrice && Number(p.offerPrice) < Number(p.sell);
+  const finalPrice = hasOffer ? p.offerPrice : p.sell;
+  const shopName = localStorage.getItem('shop-title') || '';
+
+  document.getElementById('bccPvImg').innerHTML = (p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}">` : '📦')
+    + `<span id="bccPvStar" class="pvStar" style="${f.highlightOn?'':'display:none;'}">⭐</span>`
+    + `<span id="bccPvOfferBadge" class="pvOfferBadge" style="${(f.offerOn)?'':'display:none;'}">${f.offerType==='discount'?'🔥 অফার':(f.offerType==='combo'?'🎁 কম্বো':(f.offerType==='free_delivery'?'🚚 ফ্রি ডেলিভারি':'🆕 নতুন'))}</span>`;
+  document.getElementById('bccPvName').textContent = p.name;
+  document.getElementById('bccPvShop').textContent = shopName;
+  document.getElementById('bccPvPrice').textContent = fmt(finalPrice);
+  document.getElementById('bccPvOld').style.display = hasOffer ? 'inline' : 'none';
+  document.getElementById('bccPvOld').textContent = hasOffer ? fmt(p.sell) : '';
+  const noteEl = document.getElementById('bccPvNote');
+  if(f.offerOn && f.offerType!=='discount' && f.offerNote){
+    noteEl.style.display = 'block'; noteEl.textContent = '🎁 ' + f.offerNote;
+  }else{
+    noteEl.style.display = 'none';
+  }
+  document.getElementById('bccMarketPreviewOverlay').classList.add('show');
+});
+document.getElementById('bccPvCloseBtn').addEventListener('click', ()=> document.getElementById('bccMarketPreviewOverlay').classList.remove('show'));
 
 // শেষ হয়ে যাওয়া মাল দ্রুত আবার স্টকে যোগ করার জন্য — ফুল এডিট ফর্ম না খুলেই এক-ট্যাপে
 // পরিমাণ যোগ করা যায়, নতুন কোনো ডুপ্লিকেট প্রোডাক্ট তৈরি হয় না

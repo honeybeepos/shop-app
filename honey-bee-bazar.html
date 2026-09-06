@@ -112,7 +112,9 @@
   .pCardImgWrap img{ width:100%; height:100%; object-fit:cover; }
   .pCardImgInner{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
   .pCardFav{ position:absolute; top:8px; right:8px; font-size:17px; cursor:pointer; background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
-  .pCardOfferBadge{ position:absolute; top:8px; left:8px; background:#dc2626; color:#fff; font-size:9.5px; font-weight:800; padding:3px 8px; border-radius:8px; }
+  .pCardBadges{ position:absolute; top:8px; left:8px; display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+  .pCardOfferBadge{ background:#dc2626; color:#fff; font-size:9.5px; font-weight:800; padding:3px 8px; border-radius:8px; }
+  .pCardHighlightBadge{ background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; font-size:9.5px; font-weight:800; padding:3px 7px; border-radius:8px; }
   .pCardBody{ padding:10px 11px 12px; }
   .pCardName{ font-size:12.5px; font-weight:700; line-height:1.3; margin-bottom:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:2.5em; }
   .pCardPriceRow{ display:flex; align-items:baseline; gap:6px; margin-bottom:6px; }
@@ -3225,6 +3227,20 @@ async function loadProducts(shopId){
 
 let __hbCurrentProductsList = []; // Product Details বটম-শিটে খোলার জন্য রেফারেন্স রাখা হয়
 
+/* 🐝 Market Products — POS-এর "Market" ট্যাব থেকে আসা Highlight/Offer তথ্য এখানে দেখানো হয়।
+   offerLive ফিল্ড ব্যাকওয়ার্ড-কম্প্যাটিবল: পুরনো সিঙ্ক হওয়া ডেটায় এই ফিল্ড না থাকলে (undefined)
+   আগের মতোই অফার দেখানো হবে — নতুন কিছু বন্ধ হয়ে যাবে না। শুধু POS থেকে স্পষ্টভাবে false
+   পাঠালে (মেয়াদ শেষ/বন্ধ করা) তখনই লুকানো হবে। */
+function hbGetOfferMeta(p){
+  const offerLive = p.offerLive !== false;
+  const type = p.offerType || 'discount';
+  const hasDiscount = offerLive && type === 'discount' && p.offerPrice != null && p.price != null && Number(p.offerPrice) < Number(p.price);
+  const finalPrice = hasDiscount ? p.offerPrice : (p.price != null ? p.price : 0);
+  const genericOffer = offerLive && type !== 'discount' && !!p.offerNote;
+  const badgeText = type === 'combo' ? '🎁 কম্বো অফার' : type === 'free_delivery' ? '🚚 ফ্রি ডেলিভারি' : type === 'new_arrival' ? '🆕 নতুন' : '🔥 অফার';
+  return { hasOffer: hasDiscount || genericOffer, hasDiscount, finalPrice, genericOffer, badgeText, offerNote: p.offerNote || null, highlight: !!p.highlight };
+}
+
 function renderProducts(products){
   __hbCurrentProductsList = products;
   const favs = (currentCustomer && currentCustomer.favoriteProducts) || [];
@@ -3236,25 +3252,27 @@ function renderProducts(products){
       else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
       else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
     }
-    const hasOffer = p.offerPrice != null && p.price != null && Number(p.offerPrice) < Number(p.price);
-    const finalPrice = hasOffer ? p.offerPrice : (p.price!=null?p.price:0);
+    const om = hbGetOfferMeta(p);
     const isFav = favs.includes(p.id);
     const outOfStock = stockClass === "out";
     return `
       <div class="pCard">
         <div class="pCardImgWrap" id="pimg-${p.id}" onclick="hbOpenProductDetail('${p.id}')">
           <span class="pCardImgInner" id="pimgInner-${p.id}">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</span>
-          ${hasOffer ? '<span class="pCardOfferBadge">🔥 অফার</span>' : ''}
+          <div class="pCardBadges">
+            ${om.highlight ? '<span class="pCardHighlightBadge">⭐</span>' : ''}
+            ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
+          </div>
           <span class="pCardFav" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
         </div>
         <div class="pCardBody">
           <div class="pCardName" onclick="hbOpenProductDetail('${p.id}')">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
           <div class="pCardPriceRow">
-            <span class="pCardPrice">${HB_CUR}${finalPrice}</span>
-            ${hasOffer ? `<span class="pCardOldPrice">${HB_CUR}${p.price}</span>` : ""}
+            <span class="pCardPrice">${HB_CUR}${om.finalPrice}</span>
+            ${om.hasDiscount ? `<span class="pCardOldPrice">${HB_CUR}${p.price}</span>` : ""}
           </div>
           <div class="pCardStock ${stockClass}">${stockLabel}</div>
-          <button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${finalPrice})">
+          <button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${om.finalPrice})">
             ${outOfStock ? "স্টক নেই" : "🛒 Add to Cart"}
           </button>
         </div>
@@ -3273,8 +3291,7 @@ window.hbOpenProductDetail = function(productId){
     else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
     else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
   }
-  const hasOffer = p.offerPrice != null && p.price != null && Number(p.offerPrice) < Number(p.price);
-  const finalPrice = hasOffer ? p.offerPrice : (p.price!=null?p.price:0);
+  const om = hbGetOfferMeta(p);
   const outOfStock = stockClass === "out";
   const favs = (currentCustomer && currentCustomer.favoriteProducts) || [];
   const isFav = favs.includes(p.id);
@@ -3282,18 +3299,19 @@ window.hbOpenProductDetail = function(productId){
   $("hbProductDetailBody").innerHTML = `
     <div class="pDetailImgWrap" id="pdimg-${p.id}">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
     <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;">
-      <div style="flex:1; font-size:17px; font-weight:800;">${escapeHtml(p.name||"প্রোডাক্ট")}</div>
+      <div style="flex:1; font-size:17px; font-weight:800;">${om.highlight ? '<span style="color:#fbbf24;">⭐</span> ' : ''}${escapeHtml(p.name||"প্রোডাক্ট")}</div>
       <span class="pCardFav" style="position:static;" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
     </div>
-    <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:8px;">
-      <span style="font-size:22px; font-weight:800; color:var(--amber);">${HB_CUR}${finalPrice}</span>
-      ${hasOffer ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${HB_CUR}${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : ""}
+    <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">
+      <span style="font-size:22px; font-weight:800; color:var(--amber);">${HB_CUR}${om.finalPrice}</span>
+      ${om.hasDiscount ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${HB_CUR}${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : (om.genericOffer ? `<span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">${om.badgeText}</span>` : "")}
     </div>
+    ${om.genericOffer && om.offerNote ? `<div style="font-size:12.5px; color:var(--amber); margin-bottom:8px;">🎁 ${escapeHtml(om.offerNote)}</div>` : ""}
     <div class="pCardStock ${stockClass}" style="font-size:12px; margin-bottom:14px;">${stockLabel}</div>
     ${p.description ? `<div style="font-size:13px; color:#ddd; line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
     <div style="display:flex; gap:10px;">
-      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${finalPrice})" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🛒 Add to Cart</button>
-      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${finalPrice}); hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
+      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${om.finalPrice})" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🛒 Add to Cart</button>
+      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${om.finalPrice}); hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
     </div>
   `;
   $("hbProductDetailModal").style.display = "flex";
