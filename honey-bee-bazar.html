@@ -1295,6 +1295,11 @@
     <!-- 📦 Order Details — বড় প্রোডাক্ট-নাম কার্ড -->
     <div id="hbTrackerOrderDetails" class="card" style="padding:14px; margin-bottom:18px;"></div>
 
+    <!-- 🚴 ডেলিভারি রাইডার খোঁজার আসল অবস্থা — POS/Cloud Function-এর dispatchState
+         ফিল্ড থেকে সরাসরি দেখানো হয়, যাতে "প্রস্তুত হচ্ছে"-তে আটকে থেকে কাস্টমার
+         বুঝতে না পারার সমস্যা না হয় (রাইডার খোঁজা হচ্ছে/এখনো রাইডার নেই/এসাইন হয়েছে) -->
+    <div id="hbTrackerDispatchNote" style="display:none; margin-bottom:16px; padding:12px 14px; border-radius:12px; background:rgba(255,183,3,0.12); border:1px solid rgba(255,183,3,0.3); font-size:12.5px; color:var(--amber); line-height:1.5;"></div>
+
     <!-- 🗺️ Live Map — শুধু রাইডার এসাইন হলে দেখা যাবে -->
     <div id="hbTrackerMapWrap" style="display:none; margin-bottom:18px;">
       <div style="font-size:12.5px; font-weight:700; color:var(--amber); margin-bottom:8px;">🟢 Live Tracking</div>
@@ -4273,6 +4278,16 @@ function hbTrackMiniRender(){
       ${idx < HB_STATUS_STEPS.length-1 ? `<div style="flex:1; height:2px; background:${idx<stepIndex?"#16a34a":"rgba(255,255,255,0.1)"};"></div>` : ""}`;
   }).join("");
 
+  // 🚴 প্রিপেয়ারিং ধাপে রাইডার-খোঁজার অবস্থা — এই ছোট কার্ডেই সংক্ষেপে দেখানো হয়,
+  // যাতে কাস্টমারকে পুরো ট্র্যাকার খুলতে না হয়
+  const HB_MINI_DISPATCH_NOTE = {
+    searching_rider: "🔍 রাইডার খোঁজা হচ্ছে...",
+    offer_sent: "📨 একজন রাইডারের সাড়ার অপেক্ষায়...",
+    waiting_for_rider: "⏳ এখনো কোনো রাইডার পাওয়া যায়নি, দোকানদার খুঁজছেন",
+    assigned: "✅ রাইডার অর্ডার গ্রহণ করেছেন"
+  };
+  const miniNote = (status === "preparing" && latest.dispatchState) ? HB_MINI_DISPATCH_NOTE[latest.dispatchState] : null;
+
   cardEl.innerHTML = `
     <div class="card" style="padding:14px; cursor:pointer;" id="hbTrackMiniClickable">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -4280,6 +4295,7 @@ function hbTrackMiniRender(){
         <span style="font-size:11px; font-weight:800; color:var(--amber);">${HB_STATUS_STEPS[stepIndex] ? HB_STATUS_STEPS[stepIndex].label : ""}</span>
       </div>
       <div style="display:flex; align-items:center; gap:2px;">${dots}</div>
+      ${miniNote ? `<div style="text-align:center; margin-top:8px; font-size:11px; color:var(--amber); font-weight:700;">${miniNote}</div>` : ""}
       <div style="text-align:center; margin-top:8px; font-size:11px; color:var(--muted);">বিস্তারিত দেখতে ট্যাপ করুন ›</div>
     </div>`;
   cardEl.style.display = "block";
@@ -4353,6 +4369,26 @@ function hbOpenTracker(order){
       </div>
       <span style="font-size:11px; font-weight:800; flex-shrink:0;">${HB_STATUS_LABEL[status]||status}</span>
     </div>`;
+
+  // 🚴 রাইডার ডিসপ্যাচ স্ট্যাটাস — "প্রস্তুত হচ্ছে" ধাপে থাকা অবস্থায় দোকানদার
+  // আসলে কী করছে (রাইডার খুঁজছে/এখনো পায়নি/পেয়ে গেছে) সেটা সরাসরি Firestore-এর
+  // dispatchState ফিল্ড থেকে দেখানো হয়, যাতে কাস্টমার অন্ধকারে না থাকে
+  const dispatchNoteEl = $("hbTrackerDispatchNote");
+  if(dispatchNoteEl){
+    const HB_DISPATCH_NOTE = {
+      searching_rider: "🔍 আপনার এলাকায় ডেলিভারি রাইডার খোঁজা হচ্ছে...",
+      offer_sent: "📨 একজন রাইডারকে অনুরোধ পাঠানো হয়েছে, তার সাড়ার অপেক্ষায়...",
+      waiting_for_rider: "⏳ এই মুহূর্তে আশেপাশে কোনো রাইডার উপলব্ধ নেই — দোকানদার একজন রাইডার খুঁজছেন। একটু ধৈর্য ধরুন, প্রয়োজনে দোকানে সরাসরি যোগাযোগ করতে পারেন।",
+      assigned: "✅ একজন রাইডার অর্ডারটি গ্রহণ করেছেন, শীঘ্রই রওনা দেবেন।"
+    };
+    const note = (status === "preparing" && order.dispatchState) ? HB_DISPATCH_NOTE[order.dispatchState] : null;
+    if(note){
+      dispatchNoteEl.textContent = note;
+      dispatchNoteEl.style.display = "block";
+    }else{
+      dispatchNoteEl.style.display = "none";
+    }
+  }
 
   // 🗺️ Live Map — শুধু status "shipped" আর রাইডার এসাইন করা থাকলে দেখানো হয়
   if(__hbTrackerRiderUnsub){ __hbTrackerRiderUnsub(); __hbTrackerRiderUnsub = null; }
