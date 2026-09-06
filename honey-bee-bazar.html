@@ -325,6 +325,16 @@
     --sheet:#1a1206;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+
+  /* 👆 সব বাটন/ট্যাপযোগ্য এলিমেন্টে চাপ দিলে একটা ছোট প্রেস-ফিডব্যাক এনিমেশন —
+     যেসব এলিমেন্টের নিজস্ব :active/animation আগে থেকেই আছে (যেমন .pCard,
+     .serviceCard, .mfCartBtn) সেগুলো এই সাধারণ নিয়মের চেয়ে বেশি স্পেসিফিক
+     হওয়ায় নিজেরটাই কাজ করবে, বাকি সব বাটন এই কমন প্রেস-ইফেক্ট পাবে। */
+  button, [onclick]{ transition: transform .12s ease, filter .12s ease; }
+  button:active, [onclick]:active{ transform:scale(0.93); filter:brightness(1.12); }
+  .footerNavItem{ transition: transform .12s ease; }
+  .footerNavItem:active{ transform:scale(0.9); }
+
   html,body{ height:100%; margin:0; }
   body{
     min-height:100vh;
@@ -3627,7 +3637,7 @@ window.hbOpenMarketProductDetail = function(shopId, productId){
     ${p.description ? `<div style="font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
     <div style="display:flex; gap:10px;">
       <button ${outOfStock ? "disabled" : ""} onclick="mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}')" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🛒 Add to Cart</button>
-      <button ${outOfStock ? "disabled" : ""} onclick="mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}'); setTimeout(hbOpenCart, 260);" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
+      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'}); $('hbProductDetailModal').style.display='none'; hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
     </div>
   `;
   $("hbProductDetailModal").style.display = "flex";
