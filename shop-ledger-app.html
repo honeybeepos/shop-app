@@ -11,6 +11,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- 🔖 রসিদে কাস্টমারের বারকোড প্রিন্ট করার জন্য (স্ক্যান করলে কাস্টমারের হিসাব খুঁজে পাওয়া যাবে) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.3/JsBarcode.all.min.js"></script>
+<!-- 📷 মোবাইলের ক্যামেরা দিয়ে বারকোড/QR স্ক্যান করার জন্য -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root{
     --ink:#2b2308;
@@ -1192,7 +1196,10 @@
         <div class="row">
           <div style="position:relative;">
             <label>মালামালের নাম</label>
-            <input id="qsItem" type="text" placeholder="যেমনঃ a13 display" autocomplete="off">
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input id="qsItem" type="text" placeholder="যেমনঃ a13 display" autocomplete="off" style="flex:1;">
+              <button type="button" id="qsScanBtn" title="ক্যামেরা দিয়ে বারকোড স্ক্যান করুন" style="flex-shrink:0; width:44px; height:44px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:18px; cursor:pointer;">📷</button>
+            </div>
             <div class="smartSuggestBox" id="qsSuggestBox"></div>
           </div>
         </div>
@@ -1441,7 +1448,10 @@
         <div>
           <label>🌐 গ্লোবাল সার্চ — নাম, মোবাইল নাম্বার বা প্রোডাক্ট দিয়ে খুঁজুন</label>
           <div style="position:relative;">
-            <input id="printName" type="text" placeholder="যেমনঃ রহিম অথবা 01xxxxxxxxx" autocomplete="off">
+            <div style="display:flex; gap:6px; align-items:center;">
+              <input id="printName" type="text" placeholder="যেমনঃ রহিম অথবা 01xxxxxxxxx" autocomplete="off" style="flex:1;">
+              <button type="button" id="printNameScanBtn" title="ক্যামেরা দিয়ে বারকোড স্ক্যান করুন" style="flex-shrink:0; width:44px; height:44px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:18px; cursor:pointer;">📷</button>
+            </div>
             <div class="smartSuggestBox" id="printGlobalBox"></div>
           </div>
           <datalist id="custList"></datalist>
@@ -1974,6 +1984,17 @@
   </div>
 </div>
 <div id="saleReceiptPrintArea" style="display:none;"></div>
+
+<!-- 📷 ক্যামেরা দিয়ে বারকোড/QR স্ক্যান করার শেয়ার্ড মোডাল — প্রোডাক্ট কোড, সেল আইটেম,
+     আর কাস্টমার সার্চ (Print ট্যাব) — এই তিনটা জায়গা থেকেই একই মোডাল খোলে (openBarcodeScanner) -->
+<div class="modal-overlay" id="barcodeScanOverlay" style="z-index:950;">
+  <div class="modal-box" style="max-width:360px; padding:16px; text-align:center; background:#111; color:#fff;">
+    <h3 style="margin:0 0 10px; font-size:15px;">📷 বারকোড স্ক্যান করুন</h3>
+    <div id="barcodeScanRegion" style="width:100%; border-radius:10px; overflow:hidden; background:#000; min-height:240px;"></div>
+    <p id="barcodeScanStatus" style="font-size:12px; color:#aaa; margin:10px 0 0;">ক্যামেরার অনুমতি দিন এবং বারকোডটা ফ্রেমে ধরুন</p>
+    <button type="button" id="barcodeScanCloseBtn" style="width:100%; margin-top:14px; padding:11px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:transparent; color:#fff; font-weight:700; cursor:pointer; font-family:inherit;">বন্ধ করুন</button>
+  </div>
+</div>
 
 <div class="modal-overlay" id="factoryResetModal">
   <div class="modal-box qiDarkModal" style="max-width:340px;">
@@ -3381,7 +3402,11 @@
           <input id="bccPName" placeholder="যেমন: Samsung A32 Display" autocomplete="off">
           <div class="bccPNameResults" id="bccPNameResults"></div>
         </div>
-        <label>🔤 Product Number / Code (Optional)</label><input id="bccPCode" placeholder="যেমন: F-1001">
+        <label>🔤 Product Number / Code (Optional)</label>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input id="bccPCode" placeholder="যেমন: F-1001" style="flex:1;">
+          <button type="button" id="bccPCodeScanBtn" title="ক্যামেরা দিয়ে বারকোড স্ক্যান করুন" style="flex-shrink:0; width:44px; height:44px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:#10152a; color:#fff; font-size:18px; cursor:pointer;">📷</button>
+        </div>
         <label>🏷️ Category (Optional)</label><select id="bccPCat"></select>
         <p class="pin-desc" style="margin:2px 0 10px;">ক্যাটাগরি সিলেক্ট করা বাধ্যতামূলক (এটাই Invoice-এ Brand হিসেবে দেখানো হয়)।</p>
         <label>📂 Sub-Category</label><select id="bccPSub"></select>
@@ -7616,6 +7641,20 @@ function bccOpenProductModal(editId){
   bccUpdateUnitLabels();
   document.getElementById('bccProductModalOverlay').classList.add('show');
 }
+// 🔫 বারকোড স্ক্যানার দিয়ে "Product Number / Code" ফিল্ডে স্ক্যান করলে (স্ক্যানার
+// কোডটা টাইপ করে সাথে সাথে Enter পাঠায়) — এই কোডে আগে থেকেই কোনো প্রোডাক্ট থাকলে
+// সেটা এডিট মোডে খোলার অপশন দেওয়া হয় (স্টক/দাম আপডেট) — নাহলে নতুন প্রোডাক্ট
+// হিসেবে যোগ করার জন্য নাম ফিল্ডে ফোকাস চলে যায়
+document.getElementById('bccPCode').addEventListener('keydown', (e)=>{
+  if(e.key !== 'Enter') return;
+  e.preventDefault();
+  const code = e.target.value.trim();
+  if(!code) return;
+  const existing = bccLoadProducts().find(p=> p.code && p.code.toLowerCase() === code.toLowerCase() && p.id !== bccEditingProductId);
+  if(!existing){ document.getElementById('bccPName').focus(); return; }
+  const ok = confirm(`এই বারকোডে আগে থেকেই "${existing.name}" প্রোডাক্টটি আছে (স্টক: ${existing.qty||0} পিস)। এটা এডিট মোডে খুলবেন?`);
+  if(ok) bccOpenProductModal(existing.id);
+});
 document.getElementById('bccPUnit') && document.getElementById('bccPUnit').addEventListener('change', bccUpdateUnitLabels);
 document.getElementById('bccAddProductBtn').addEventListener('click', ()=> bccOpenProductModal(null));
 document.getElementById('bccProductModalClose').addEventListener('click', ()=> document.getElementById('bccProductModalOverlay').classList.remove('show'));
@@ -9334,6 +9373,33 @@ function setupSmartSuggest(cfg){
 setupSmartSuggest({inputId:'qsItem', boxId:'qsSuggestBox', costId:'qsCost', priceId:'qsPrice', qtyId:'qsQty', previewId:'qsTotalPreview'});
 setupSmartSuggest({inputId:'fItem', boxId:'fSuggestBox', costId:'fCost', priceId:'fPrice', qtyId:'fQty', previewId:'fTotalPreview'});
 
+// 🔫 বারকোড স্ক্যানার দিয়ে সেল করা — "মালামালের নাম" ফিল্ডে স্ক্যান করলে (স্ক্যানার
+// কোডটা টাইপ করে সাথে সাথে Enter পাঠায়) সেই কোডের প্রোডাক্ট থাকলে সরাসরি কার্টে যোগ
+// হয়ে যায় — নাম টাইপ করে সাজেশন থেকে ক্লিক করা লাগবে না। ওজন/সিরিয়াল লাগে এমন
+// প্রোডাক্টে শুধু ফিল্ড পূরণ করে qty-তে ফোকাস দেওয়া হয় (ম্যানুয়াল ইনপুট দরকার বলে)।
+document.getElementById('qsItem').addEventListener('keydown', (e)=>{
+  if(e.key !== 'Enter') return;
+  const val = e.target.value.trim();
+  if(!val) return;
+  const matched = bccLoadProducts().find(p=> p.code && p.code.toLowerCase() === val.toLowerCase());
+  if(!matched) return; // এই কোডে কোনো প্রোডাক্ট নেই — স্বাভাবিক আচরণ, কিছু বদলাবে না
+  e.preventDefault();
+  e.target.value = matched.name;
+  e.target.dataset.productId = matched.id;
+  document.getElementById('qsCost').value = matched.buy || '';
+  document.getElementById('qsPrice').value = matched.sell || '';
+  bccToggleWeightUI('qsQty', matched);
+  bccToggleSerialUI('qsQty', matched);
+  updateTotalPreview('qsQty','qsPrice','qsTotalPreview');
+  document.getElementById('qsSuggestBox').classList.remove('show');
+  const qtyEl = document.getElementById('qsQty');
+  if(qtyEl.dataset.weightUnit || matched.requiresSerial){
+    qtyEl.focus(); // ওজন/সিরিয়াল ম্যানুয়ালি বসাতে হবে বলে সরাসরি কার্টে যোগ না করে ফোকাস দেওয়া হলো
+  } else {
+    document.getElementById('qsAddItemBtn').click(); // সাধারণ পিস-ভিত্তিক প্রোডাক্ট — স্ক্যান করলেই কার্টে যোগ হয়ে গেল
+  }
+});
+
 /* ---- Global search: customers (with due status) + products, usable from Due List / All Accounts / Print ---- */
 function bccGlobalDataSearch(query){
   const terms = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -10778,20 +10844,110 @@ function openShareModal(name, phone, message){
 function printSaleReceipt(name, phone, message){
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
   const printArea = document.getElementById('saleReceiptPrintArea');
+  // 🔖 কাস্টমারের নাম্বার দিয়েই বারকোড বানানো হয় (Bangla নাম CODE128-এ ঠিকভাবে
+  // এনকোড হয় না) — নাম্বার না থাকলে (walk-in/anonymous কাস্টমার) বারকোড ছাড়াই
+  // রসিদ প্রিন্ট হবে, কিছু ভাঙবে না। এই একই নাম্বার দিয়েই "🌐 গ্লোবাল সার্চ" বক্সে
+  // (Print ট্যাব) কাস্টমারের পুরো হিসাব/ইতিহাস বের করা যায়।
+  const barcodeValue = (phone || '').trim();
   printArea.innerHTML = `
     <div style="width:280px; margin:0 auto; padding:10px; font-family:'Space Mono',monospace; font-size:12px; color:#000;">
       ${shopName ? `<div style="text-align:center; font-weight:800; font-size:14px; margin-bottom:6px;">${escapeHtml(shopName)}</div>` : ''}
       <div style="border-top:1px dashed #000; margin:6px 0;"></div>
       <div style="white-space:pre-wrap; word-break:break-word; line-height:1.5;">${escapeHtml(message)}</div>
       <div style="border-top:1px dashed #000; margin:8px 0 4px;"></div>
-      <div style="text-align:center; font-size:10.5px;">ধন্যবাদ! আবার আসবেন 🙏</div>
+      ${barcodeValue ? `
+      <div style="text-align:center; margin-top:8px;">
+        <svg id="saleReceiptBarcode"></svg>
+        <div style="font-size:9px; margin-top:2px;">🔖 এই বারকোড স্ক্যান করলে কাস্টমারের হিসাব বের হবে</div>
+      </div>` : ''}
+      <div style="text-align:center; font-size:10.5px; margin-top:4px;">ধন্যবাদ! আবার আসবেন 🙏</div>
     </div>`;
+  if(barcodeValue && typeof JsBarcode !== 'undefined'){
+    try{
+      JsBarcode('#saleReceiptBarcode', barcodeValue, { format:'CODE128', displayValue:true, fontSize:12, height:38, margin:2 });
+    }catch(e){ console.warn('রসিদের বারকোড রেন্ডার ব্যর্থ (রসিদ তবু প্রিন্ট হবে, শুধু বারকোড ছাড়া):', e); }
+  }
   printArea.classList.add('printing');
   window.print();
   setTimeout(()=> printArea.classList.remove('printing'), 500);
 }
 document.getElementById('shareSkip').addEventListener('click', ()=> shareModal.classList.remove('show'));
 
+// 🔫 USB/Bluetooth বারকোড স্ক্যানার দিয়ে রসিদের বারকোড স্ক্যান করলে সেটা এই ফিল্ডেই
+// টাইপ হয়ে সাথে সাথে Enter পাঠায় — তাই Enter পেলেই সরাসরি "হিসাব দেখুন" বাটনটা ক্লিক
+// হয়ে যায়, আলাদাভাবে বাটনে চাপতে হয় না
+document.getElementById('printName').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('showStatementBtn').click(); }
+});
+
+/* ==================== 📷 মোবাইল ক্যামেরা দিয়ে বারকোড/QR স্ক্যান ====================
+   একটাই শেয়ার্ড মোডাল (barcodeScanOverlay) — যে ফিল্ডের পাশের 📷 বাটনে চাপা হয়েছে
+   সেই ইনপুট আইডি মনে রাখা হয় (barcodeScanTargetInputId), সফলভাবে কোড পড়া গেলে সেই
+   ফিল্ডেই বসিয়ে একটা সিন্থেটিক Enter কীডাউন পাঠানো হয় — এতে আগে থেকেই বানানো
+   USB/Bluetooth স্ক্যানারের Enter-হ্যান্ডলারগুলোই (bccPCode/qsItem/printName) পুনঃব্যবহার
+   হয়ে যায়, আলাদা করে দ্বিতীয়বার একই লজিক লেখা লাগে না। */
+let barcodeScannerInstance = null;
+let barcodeScanTargetInputId = null;
+
+function openBarcodeScanner(targetInputId){
+  barcodeScanTargetInputId = targetInputId;
+  document.getElementById('barcodeScanStatus').textContent = 'ক্যামেরার অনুমতি দিন এবং বারকোডটা ফ্রেমে ধরুন';
+  document.getElementById('barcodeScanOverlay').classList.add('show');
+  if(typeof Html5Qrcode === 'undefined'){
+    document.getElementById('barcodeScanStatus').textContent = '⚠️ ক্যামেরা স্ক্যানার লোড হয়নি — ইন্টারনেট কানেকশন চেক করুন';
+    return;
+  }
+  try{
+    barcodeScannerInstance = new Html5Qrcode('barcodeScanRegion', {
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODABAR,
+        Html5QrcodeSupportedFormats.ITF,
+      ],
+      verbose: false
+    });
+  }catch(e){
+    console.warn('Html5Qrcode init failed:', e);
+    document.getElementById('barcodeScanStatus').textContent = '⚠️ স্ক্যানার চালু করা যায়নি';
+    return;
+  }
+  barcodeScannerInstance.start(
+    { facingMode: 'environment' }, // 📱 পেছনের ক্যামেরা অগ্রাধিকার পাবে
+    { fps: 10, qrbox: { width: 250, height: 150 } },
+    (decodedText)=>{
+      const targetEl = document.getElementById(barcodeScanTargetInputId);
+      closeBarcodeScanner();
+      if(targetEl){
+        targetEl.value = decodedText;
+        targetEl.dispatchEvent(new Event('input', {bubbles:true}));
+        targetEl.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true}));
+      }
+    },
+    ()=>{ /* প্রতি ফ্রেমে কোড খুঁজে না পেলে এই এরর কলব্যাক বারবার আসে — এটা স্বাভাবিক, কিছু দেখানোর দরকার নেই */ }
+  ).catch(err=>{
+    console.warn('Camera scanner start failed:', err);
+    document.getElementById('barcodeScanStatus').textContent = '⚠️ ক্যামেরা চালু করা যায়নি — অনুমতি দিয়েছেন কিনা চেক করুন';
+  });
+}
+
+function closeBarcodeScanner(){
+  document.getElementById('barcodeScanOverlay').classList.remove('show');
+  if(barcodeScannerInstance){
+    const inst = barcodeScannerInstance;
+    barcodeScannerInstance = null;
+    inst.stop().then(()=> inst.clear()).catch(()=>{});
+  }
+}
+document.getElementById('barcodeScanCloseBtn').addEventListener('click', closeBarcodeScanner);
+document.getElementById('bccPCodeScanBtn').addEventListener('click', ()=> openBarcodeScanner('bccPCode'));
+document.getElementById('qsScanBtn').addEventListener('click', ()=> openBarcodeScanner('qsItem'));
+document.getElementById('printNameScanBtn').addEventListener('click', ()=> openBarcodeScanner('printName'));
 document.getElementById('showStatementBtn').addEventListener('click', ()=>{
   const q = document.getElementById('printName').value.trim().toLowerCase();
   if(!q){ toast('নাম অথবা নাম্বার দিন'); return; }
