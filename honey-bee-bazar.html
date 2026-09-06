@@ -510,10 +510,10 @@
       <div id="gpsStatusBanner" style="font-size:11.5px; color:var(--muted); margin-bottom:10px;"></div>
 
       <div style="display:flex; gap:8px; margin-bottom:10px;">
-        <select id="districtFilter" class="mfThemedSelect" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); font-family:inherit; font-size:13px;">
+        <select id="districtFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
           <option value="">সব জেলা</option>
         </select>
-        <select id="upazilaFilter" class="mfThemedSelect" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); font-family:inherit; font-size:13px;" disabled>
+        <select id="upazilaFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;" disabled>
           <option value="">সব উপজেলা</option>
         </select>
       </div>
@@ -1504,9 +1504,14 @@ window.addEventListener("popstate", ()=>{
 document.querySelectorAll(".serviceCard").forEach(card=>{
   card.addEventListener("click", ()=>{
     const svc = card.dataset.svc;
-    if(svc === "market" || svc === "favmarket"){
-      // 🏪 এখন বাজার-তালিকা আলাদা স্ক্রিনে (আগে হোমেই দেখাত)
+    if(svc === "market"){
+      // 🏪 বাজার বাছাইয়ের ড্যাশবোর্ড — এখন ☰ মেনু → "এলাকা নির্বাচন করুন" থেকেও আসা যায়
       showScreen("screenMarkets");
+    }else if(svc === "favmarket"){
+      // 🚶‍♂️🛍️ "আপনার পছন্দের বাজারে যান" — বাজার বাছাইয়ের ধাপ বাদ দিয়ে সরাসরি
+      // প্রোডাক্ট ফিডে নিয়ে যায় (শেষবার যে বাজারে ঢুকেছিলেন সেটাই, নাহলে
+      // GPS-এ কাছেরটা, নাহলে তালিকার প্রথমটা)
+      goToFavoriteMarket();
     }else if(svc === "transport"){
       showScreen("screenTransport");
     }else if(svc === "jibontori"){
@@ -3218,10 +3223,41 @@ window.selectMarket = function(marketId){
   const marketName = market ? (market.name || marketId) : marketId;
   $("currentMarketName").textContent = marketName;
   $("mfMarketName").textContent = marketName;
+  try{ localStorage.setItem("hb-last-market-id", marketId); }catch(e){}
   mfResetFilters();
   showScreen("screenMarketFeed");
   loadShops(marketId);
 };
+
+/* 🚶‍♂️🛍️ "আপনার পছন্দের বাজারে যান" — বাজার বাছাইয়ের ধাপ (screenMarkets) বাদ দিয়ে
+   সরাসরি সেই বাজারের প্রোডাক্ট ফিডে ঢুকিয়ে দেয়: আগে যে বাজারে ঢুকেছিলেন সেটাই
+   অগ্রাধিকার পায় (localStorage-এ মনে রাখা), না থাকলে GPS-এ সবচেয়ে কাছেরটা,
+   তাও না থাকলে তালিকার প্রথম বাজার। কোনো বাজারই না পাওয়া গেলে বাজার-বাছাই
+   স্ক্রিনে পাঠানো হয় (ব্যাকআপ, যাতে ইউজার আটকে না যান)। */
+async function goToFavoriteMarket(){
+  if(allMarkets.length === 0){
+    await loadMarkets().catch(()=>{});
+  }
+  if(allMarkets.length === 0){
+    showScreen("screenMarkets");
+    return;
+  }
+  let target = null;
+  let lastId = null;
+  try{ lastId = localStorage.getItem("hb-last-market-id"); }catch(e){}
+  if(lastId) target = allMarkets.find(m=> m.id === lastId);
+  if(!target && userLatLng){
+    let bestDist = Infinity;
+    allMarkets.forEach(m=>{
+      if(m.location && m.location.lat != null){
+        const d = haversineKm(userLatLng[0], userLatLng[1], m.location.lat, m.location.lng);
+        if(d < bestDist){ bestDist = d; target = m; }
+      }
+    });
+  }
+  if(!target) target = allMarkets[0];
+  selectMarket(target.id);
+}
 
 $("backToMarkets").addEventListener("click", ()=> showScreen("screenHome"));
 
