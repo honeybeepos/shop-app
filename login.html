@@ -88,12 +88,13 @@
 
     <label>জেলা</label>
     <select id="suDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
-    <label>উপজেলা/থানা</label>
+    <label>উপজেলা/থানা <span style="font-weight:400; color:#a89e8c;">(ঐচ্ছিক)</span></label>
     <select id="suUpazila" disabled><option value="">-- আগে জেলা নির্বাচন করুন --</option></select>
-    <label>বাজার</label>
+    <label>বাজার <span style="font-weight:400; color:#a89e8c;">(ঐচ্ছিক)</span></label>
     <select id="suMarket" disabled><option value="">-- আগে উপজেলা নির্বাচন করুন --</option></select>
-    <label>এজেন্ট <span style="font-weight:400; color:#a89e8c;">(এই বাজারে এজেন্ট থাকলে বেছে নিন)</span></label>
+    <label>এজেন্ট <span style="font-weight:400; color:#a89e8c;">(এই বাজারে এজেন্ট থাকলে বেছে নিন, ঐচ্ছিক)</span></label>
     <select id="suAgent" disabled><option value="">-- বাজার নির্বাচন করুন --</option></select>
+    <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:-6px;">⚠️ উপজেলা/বাজার নির্বাচন না করলে দোকানটি শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে কাজ করবে — Honey Bee Bazar-এ কাস্টমাররা অনলাইনে দেখতে/অর্ডার করতে পারবে না।</p>
 
     <button class="btn" id="signupBtn">দোকান তৈরি করুন</button>
     <div class="msg" id="signupMsg"></div>
@@ -483,8 +484,16 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   if(!shopName || !name || !email || pass.length < 6){
     showMsg("signupMsg","সব ঘর সঠিকভাবে পূরণ করুন (পাসওয়ার্ড কমপক্ষে ৬ অক্ষর)",false); return;
   }
-  if(!district || !upazila || !marketId){
-    showMsg("signupMsg","জেলা, উপজেলা ও বাজার — তিনটাই নির্বাচন করুন।",false); return;
+  if(!district){
+    showMsg("signupMsg","জেলা নির্বাচন করুন।",false); return;
+  }
+  // 🔌 উপজেলা/বাজার ঐচ্ছিক — না দিলে দোকানটা শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে
+  // কাজ করবে, Bazar-এ কোনো বাজারের অধীনে দেখা যাবে না (marketId খালি থাকায়
+  // honey-bee-bazar.html-এর loadShops() কখনো এই দোকান খুঁজেই পাবে না — সাথে
+  // onlineEnabled ফ্ল্যাগটাও স্পষ্টভাবে রাখা হচ্ছে, ভবিষ্যতে কোথাও দরকার হলে)
+  if(!marketId){
+    const proceedOffline = confirm("আপনি উপজেলা/বাজার নির্বাচন করেননি — এই দোকানটি শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে কাজ করবে এবং Honey Bee Bazar-এ অনলাইনে দেখা যাবে না। এভাবেই এগিয়ে যেতে চান?");
+    if(!proceedOffline) return;
   }
   const btn = document.getElementById("signupBtn");
   btn.disabled = true; btn.textContent = "তৈরি হচ্ছে...";
@@ -495,7 +504,8 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
     await db.collection("shops").doc(uid).set({
       shopId: uid, ownerUid: uid, shopName, ownerName: name, ownerEmail: email,
       status: "active",
-      district, upazila, marketId, assignedAgentId,
+      district, upazila: upazila || null, marketId: marketId || null, assignedAgentId,
+      onlineEnabled: !!marketId, // 🔌 বাজার ছাড়া নিবন্ধন করলে false — POS/অফলাইন-শুধু দোকান, Bazar-এ দেখা যাবে না
       storeCategory: category, appMode,
       features: { reports:true, extraIncome:true, ops:true, monitor:true, whatsapp:true },
       createdAt: fbNow(), updatedAt: fbNow()
