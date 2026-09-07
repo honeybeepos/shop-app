@@ -480,6 +480,26 @@ exports.onOrderConfirmed = onDocumentUpdated(
 
     console.log(JSON.stringify({ event: "ORDER_DISPATCH_STARTED", orderId }));
     await db.collection("orderRequests").doc(orderId).set({ dispatchState: "searching_rider" }, { merge: true });
+
+    // 🔔 কাস্টমারকে জানানো — দোকানদার অর্ডারটি গ্রহণ করেছেন। আগে এই মুহূর্তে
+    // কাস্টমারের কাছে কোনো সংকেতই যেত না (শুধু "নিরবতা"), অ্যাপ নিজে খুলে
+    // Order Tracking না দেখলে বোঝার উপায় ছিল না। messengerUsers/{uid}.fcmToken
+    // ইতিমধ্যেই আছে (Honey Messenger লগইনের সময় সেভ হয়), তাই সেটাই পুনর্ব্যবহার।
+    if (after.customerUid) {
+      try {
+        const shopSnap = await db.collection("shops").doc(after.shopId).get();
+        const shopName = shopSnap.exists ? (shopSnap.data().name || shopSnap.data().shopName || "দোকান") : "দোকান";
+        await sendFcmToMessengerUser(
+          after.customerUid,
+          "✅ অর্ডার গ্রহণ করা হয়েছে",
+          `${shopName} আপনার "${after.productName || "প্রোডাক্ট"}" অর্ডারটি গ্রহণ করেছে — এখন প্রস্তুত করা হচ্ছে।`,
+          { type: "order-accepted", orderId }
+        );
+      } catch (e) {
+        console.warn(JSON.stringify({ event: "CUSTOMER_ACCEPT_NOTIFY_FAILED", orderId, error: String(e && e.message || e) }));
+      }
+    }
+
     await dispatchOrderToNearestRider(orderId, after, []);
   }
 );
