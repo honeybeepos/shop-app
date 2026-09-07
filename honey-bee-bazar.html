@@ -713,7 +713,23 @@
         <option value="Bus">🚌 বাস</option>
       </select>
       <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">গন্তব্য</label>
-      <input type="text" id="tripDestination" placeholder="যেমনঃ হাজীগঞ্জ" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:8px;">
+      <input type="text" id="tripDestination" placeholder="যেমনঃ হাজীগঞ্জ" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+
+      <!-- 💰 Honey Bee Transport Media Phase 4 — ভাড়ার ধরন: দরকষাকষি (একাধিক
+           ড্রাইভার অফার দেবে, যাত্রী বেছে নেবে — আগে থেকেই ছিল) বনাম নির্দিষ্ট
+           ভাড়া (যাত্রী নিজে দাম বলবে, প্রথম যে ড্রাইভার রাজি হবে তার সাথেই
+           সাথে সাথে বুকিং নিশ্চিত হয়ে যাবে, কোনো দরকষাকষি ছাড়াই) -->
+      <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">ভাড়ার ধরন</label>
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <button type="button" id="tripFareTypeNegotiableBtn" data-type="negotiable" style="flex:1; padding:10px; border-radius:10px; border:1px solid var(--amber); background:var(--amber); color:var(--bg1); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">💬 দরকষাকষি</button>
+        <button type="button" id="tripFareTypeFixedBtn" data-type="fixed" style="flex:1; padding:10px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">🔒 নির্দিষ্ট ভাড়া</button>
+      </div>
+      <div id="tripFixedFareWrap" style="display:none; margin-bottom:8px;">
+        <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">আপনি কত ভাড়া দিতে চান? (টাকা)</label>
+        <input type="number" id="tripFixedFareInput" inputmode="numeric" placeholder="যেমনঃ ১৫০" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+        <p style="font-size:10.5px; color:var(--muted); margin:6px 0 0;">যে ড্রাইভার সবার আগে রাজি হবেন, সাথে সাথেই তার সাথে বুকিং নিশ্চিত হয়ে যাবে।</p>
+      </div>
+
       <p id="tripPickupStatus" style="font-size:11px; color:var(--muted); margin:0 0 14px;">📍 পিকআপ লোকেশন স্বয়ংক্রিয়ভাবে (GPS দিয়ে) নেওয়া হবে</p>
       <button id="tripSearchBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1);">🔍 ড্রাইভার খুঁজুন</button>
     </div>
@@ -761,11 +777,12 @@
        কন্টেন্ট/ফিচার পরে এখানে যুক্ত করা হবে। -->
   <div id="screenTransportMedia" style="padding:20px 16px;">
     <button class="backBtn" id="backToTransportFromMedia">← ফিরে যান</button>
-    <div style="text-align:center; padding:60px 20px;">
-      <div style="font-size:48px; margin-bottom:16px;">🐝🚕</div>
-      <div style="font-size:17px; font-weight:800; margin-bottom:8px;">Honey Bee Transport Media</div>
-      <div style="font-size:13px; color:var(--muted); line-height:1.6;">এই ড্যাশবোর্ড এখনো তৈরি হচ্ছে — শীঘ্রই নতুন ফিচার নিয়ে যুক্ত করা হবে।</div>
+    <div style="text-align:center; margin-bottom:16px;">
+      <div style="font-size:32px;">🐝🚕</div>
+      <div style="font-size:16px; font-weight:800;">Honey Bee Transport Media</div>
+      <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">এলাকার ড্রাইভার/গাড়ির সবশেষ আপডেট</div>
     </div>
+    <div id="tmFeedList">লোড হচ্ছে...</div>
   </div>
 
   <!-- 🕊️ জীবন তরী — হাব স্ক্রিন, ভেতরে একাধিক সাব-অপশন থাকবে -->
@@ -1183,6 +1200,22 @@
     </div>
   </div>
 
+  <!-- 💬 Honey Bee Transport Media Phase 6 — পোস্টের মন্তব্য প্যানেল
+       (bloodCommentsOverlay-এর ঠিক একই ডিজাইন/আচরণ, শুধু আলাদা কালেকশনে) -->
+  <div id="tmCommentsOverlay" style="display:none; position:fixed; inset:0; z-index:600; background:rgba(0,0,0,0.65); align-items:flex-end; justify-content:center;">
+    <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:18px; width:100%; max-width:480px; max-height:75vh; display:flex; flex-direction:column;">
+      <div style="display:flex; align-items:center; margin-bottom:12px; flex-shrink:0;">
+        <h3 style="margin:0; font-size:14.5px; color:#fff;">💬 মন্তব্য</h3>
+        <span id="tmCloseCommentsBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
+      </div>
+      <div id="tmCommentsList" style="flex:1; overflow-y:auto; font-size:12.5px; color:#eee; margin-bottom:12px;">লোড হচ্ছে...</div>
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <input type="text" id="tmCommentInput" placeholder="মন্তব্য লিখুন..." style="flex:1; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:14.5px;">
+        <button id="tmCommentSubmitBtn" style="padding:11px 16px; border:none; border-radius:10px; background:var(--amber); color:var(--bg1); font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;">পাঠান</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ==================== নিচের ফুটার নেভিগেশন ==================== -->
@@ -1498,6 +1531,7 @@ let __hbNavigatingViaPopstate = false;
 function showScreen(id){
   ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenTransportMedia","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
+  if(id === "screenTransportMedia") tmListenFeed(); // 📢 Phase 6 — স্ক্রিন খুললেই লাইভ ফিড লোড হয়
 
   // 🚕 Transport স্ক্রিনে থাকা অবস্থায় উপরের টাইটেল বার বদলে "Honey Bee
   // Transport Media" দেখানো হয় এবং সেটাতে ক্লিক করলে একটা নতুন (আপাতত
@@ -4616,6 +4650,23 @@ loadMarkets();
    একজনকে বেছে দেয় না) — যাত্রী নিজে সবচেয়ে ভালো অফারটা বেছে confirmedDriver
    সেট করে। এতে দুইজন ড্রাইভার একসাথে দাবি করার সমস্যা (race condition) হয় না। */
 let tripCurrentId = null, tripUnsub = null, tripCountdownInterval = null;
+let __tripFareType = "negotiable"; // 💰 Phase 4 — "negotiable" (ডিফল্ট, একাধিক ড্রাইভার অফার দেবে) বা "fixed" (যাত্রী দাম বলবে)
+
+function tripSetFareType(type){
+  __tripFareType = type;
+  const negBtn = $("tripFareTypeNegotiableBtn"), fixBtn = $("tripFareTypeFixedBtn");
+  if(type === "fixed"){
+    negBtn.style.background = "rgba(255,255,255,0.06)"; negBtn.style.color = "#fff8e8"; negBtn.style.borderColor = "var(--border)";
+    fixBtn.style.background = "var(--amber)"; fixBtn.style.color = "var(--bg1)"; fixBtn.style.borderColor = "var(--amber)";
+    $("tripFixedFareWrap").style.display = "block";
+  }else{
+    negBtn.style.background = "var(--amber)"; negBtn.style.color = "var(--bg1)"; negBtn.style.borderColor = "var(--amber)";
+    fixBtn.style.background = "rgba(255,255,255,0.06)"; fixBtn.style.color = "#fff8e8"; fixBtn.style.borderColor = "var(--border)";
+    $("tripFixedFareWrap").style.display = "none";
+  }
+}
+$("tripFareTypeNegotiableBtn") && $("tripFareTypeNegotiableBtn").addEventListener("click", ()=> tripSetFareType("negotiable"));
+$("tripFareTypeFixedBtn") && $("tripFareTypeFixedBtn").addEventListener("click", ()=> tripSetFareType("fixed"));
 
 /* ==================== 🩸 Blood Bank ====================
    Collection: bloodDonors/{uid} — Google-লগইন করা কাস্টমাররাই রক্তদাতা
@@ -5685,6 +5736,13 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
   if(!destination){ alert("গন্তব্য লিখুন।"); return; }
   if(!passengerPhone){ alert("আপনার মোবাইল নম্বর লিখুন — ড্রাইভার এই নম্বরে যোগাযোগ করবেন।"); return; }
 
+  // 💰 Phase 4 — নির্দিষ্ট ভাড়া বেছে নিলে দাম লিখা বাধ্যতামূলক
+  let proposedFare = null;
+  if(__tripFareType === "fixed"){
+    proposedFare = Number($("tripFixedFareInput").value);
+    if(!proposedFare || proposedFare <= 0){ alert("কত ভাড়া দিতে চান তা লিখুন।"); return; }
+  }
+
   $("tripSearchBtn").disabled = true; $("tripSearchBtn").textContent = "লোকেশন খোঁজা হচ্ছে...";
   try{
     const pickupLocation = await tripGetPickupLocation();
@@ -5697,6 +5755,8 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
       pickupLocation,
       vehicleType, destination,
       status: "searching",
+      fareType: __tripFareType, // 💰 Phase 4 — "negotiable" | "fixed"
+      proposedFare: proposedFare, // fareType "fixed" হলেই শুধু ব্যবহার হয়
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       sessionExpiresAt: firebase.firestore.Timestamp.fromMillis(now + 6*60*1000), // ৬ মিনিটের মাস্টার টাইমার
       rejectedDrivers: [],
@@ -5768,9 +5828,13 @@ function tripWatchTrip(tripId){
 function tripRenderStatus(trip){
   const list = trip.waitingList || [];
   if(trip.status === "searching"){
-    $("tripStatusIcon").textContent = "🔍";
-    $("tripStatusTitle").textContent = "ড্রাইভার খোঁজা হচ্ছে...";
-    $("tripStatusSub").textContent = "একটু অপেক্ষা করুন";
+    $("tripStatusIcon").textContent = trip.fareType === "fixed" ? "🔒" : "🔍";
+    $("tripStatusTitle").textContent = trip.fareType === "fixed"
+      ? `নির্দিষ্ট ভাড়া: ${HB_CUR} ${trip.proposedFare}`
+      : "ড্রাইভার খোঁজা হচ্ছে...";
+    $("tripStatusSub").textContent = trip.fareType === "fixed"
+      ? "কোনো ড্রাইভার রাজি হওয়ার অপেক্ষায়..."
+      : "একটু অপেক্ষা করুন";
     $("tripOffersList").innerHTML = "";
     $("tripConfirmedBox").style.display = "none";
   }else if(trip.status === "waiting_selection"){
@@ -5799,7 +5863,12 @@ function tripRenderStatus(trip){
     $("tripStatusTitle").textContent = "ড্রাইভার নিশ্চিত হয়েছে!";
     $("tripStatusSub").textContent = "";
     $("tripOffersList").innerHTML = "";
-    const chosen = list.find(o=> o.driverId === trip.confirmedDriver.driverId) || {};
+    // 💰 Phase 4 — নির্দিষ্ট ভাড়ার ট্রিপে কোনো waitingList নেই (ড্রাইভার
+    // সরাসরি accept করেন), তাই সেক্ষেত্রে ড্রাইভারের নাম/ফোন/গাড়ি
+    // confirmedDriver ডকুমেন্টেই সরাসরি সেভ করা থাকে
+    const chosen = (trip.fareType === "fixed" && trip.confirmedDriver && trip.confirmedDriver.driverName)
+      ? trip.confirmedDriver
+      : (list.find(o=> o.driverId === trip.confirmedDriver.driverId) || {});
     $("tripConfirmedBox").style.display = "block";
     $("tripConfirmedName").textContent = chosen.driverName || "ড্রাইভার";
     $("tripConfirmedMeta").textContent = `${chosen.vehicleModel||""} · ভাড়া: ${HB_CUR} ${trip.confirmedDriver.finalFare}`;
@@ -5861,7 +5930,230 @@ $("tripCancelBtn") && $("tripCancelBtn").addEventListener("click", async ()=>{
   $("tripStatusCard").style.display = "none";
   $("tripBookCard").style.display = "block";
   $("tripDestination").value = "";
+  $("tripFixedFareInput").value = "";
+  tripSetFareType("negotiable");
 });
+
+/* ==================== 📢 Honey Bee Transport Media Phase 6 — সোশ্যাল ফিড ====================
+   Collection: transportMediaPosts/{postId} — ড্রাইভাররা shop-ledger-app.html-এর
+   Driver Mode থেকে পোস্ট করেন (ছবি + লেখা), এখানে যাত্রীরা দেখেন, ❤️ লাইক ও
+   💬 মন্তব্য করতে পারেন। মন্তব্য সিস্টেমটা bloodDonors/bloodRequests-এর
+   comments সাবকালেকশনের একই প্রমাণিত ডিজাইন পুনর্ব্যবহার করছে (আলাদা
+   ফাংশন-সেট হিসেবে, ব্লাড ব্যাংকের কোড না ছুঁয়ে) — বাবল স্টাইল, long-press
+   এডিট/ডিলিট, count() দিয়ে হালকা মন্তব্য-সংখ্যা। */
+let __tmFeedUnsub = null;
+let __tmCommentsUnsub = null;
+let __tmCommentsCache = {};
+let __tmCommentsCurrentPostId = null;
+let __tmScreenInitialized = false;
+
+function tmInitScreen(){
+  if(__tmScreenInitialized) return;
+  $("tmCloseCommentsBtn").addEventListener("click", ()=>{
+    $("tmCommentsOverlay").style.display = "none";
+    if(__tmCommentsUnsub){ __tmCommentsUnsub(); __tmCommentsUnsub = null; }
+  });
+  $("tmCommentSubmitBtn").addEventListener("click", tmSubmitComment);
+  $("tmCommentInput").addEventListener("keypress", (e)=>{ if(e.key === "Enter") tmSubmitComment(); });
+  __tmScreenInitialized = true;
+}
+
+function tmListenFeed(){
+  tmInitScreen();
+  if(__tmFeedUnsub) return; // ইতিমধ্যে লিসেনার চালু থাকলে আবার বসানোর দরকার নেই
+  __tmFeedUnsub = db.collection("transportMediaPosts")
+    .where("status", "==", "active")
+    .orderBy("createdAt", "desc")
+    .limit(30)
+    .onSnapshot((qs)=>{
+      const posts = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+      tmRenderFeed(posts);
+    }, (err)=>{
+      console.warn("transport media feed error:", err);
+      $("tmFeedList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">ফিড লোড করা যায়নি।</div>';
+    });
+}
+
+function tmRenderFeed(posts){
+  const listEl = $("tmFeedList");
+  if(posts.length === 0){
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px; padding:30px 16px;">এখনো কোনো পোস্ট নেই — ড্রাইভাররা পোস্ট করলে এখানে দেখা যাবে।</div>';
+    return;
+  }
+  const myUid = currentCustomer && currentCustomer.uid;
+  listEl.innerHTML = posts.map(p=>{
+    const liked = myUid && (p.likedBy||[]).includes(myUid);
+    const timeTxt = p.createdAt ? p.createdAt.toDate().toLocaleDateString('bn-BD', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : "";
+    return `
+    <div class="card" style="padding:0; overflow:hidden; margin-bottom:14px;">
+      <div style="padding:12px 14px 8px; display:flex; align-items:center; gap:8px;">
+        <div style="font-weight:800; font-size:13px;">${escapeHtml(p.authorName||"ড্রাইভার")}</div>
+        ${p.isVerified ? '<span title="Verified">🛡️</span>' : ''}
+        <div style="margin-left:auto; font-size:10px; color:var(--muted);">${timeTxt}</div>
+      </div>
+      <div style="padding:0 14px 6px; font-size:11.5px; color:var(--muted);">${escapeHtml(p.vehicleLabel||"")}</div>
+      ${p.imageUrl ? `<img src="${p.imageUrl}" alt="" style="width:100%; display:block; max-height:320px; object-fit:cover;">` : ""}
+      ${p.text ? `<div style="padding:10px 14px; font-size:13px; line-height:1.5; color:#fff8e8;">${escapeHtml(p.text)}</div>` : ""}
+      <div style="display:flex; gap:8px; padding:10px 14px 14px; border-top:1px solid var(--border); margin-top:4px;">
+        <button class="tmLikeBtn" data-id="${p.id}" style="flex:1; padding:8px; border:none; border-radius:9px; background:${liked ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.06)"}; color:${liked ? "#f87171" : "#fff8e8"}; font-weight:700; font-size:12px; cursor:pointer; font-family:inherit;">${liked ? "❤️" : "🤍"} ${p.likeCount || 0}</button>
+        <button class="tmCommentBtn" data-id="${p.id}" style="flex:1; padding:8px; border:none; border-radius:9px; background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:700; font-size:12px; cursor:pointer; font-family:inherit;">💬 মন্তব্য</button>
+        ${p.authorPhone ? `<a href="tel:${p.authorPhone}" style="flex:1; text-align:center; padding:8px; border-radius:9px; background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:700; font-size:12px; text-decoration:none;">📞 কল</a>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  listEl.querySelectorAll(".tmLikeBtn").forEach(btn=> btn.addEventListener("click", ()=> tmToggleLike(btn.dataset.id)));
+  listEl.querySelectorAll(".tmCommentBtn").forEach(btn=> btn.addEventListener("click", ()=> tmOpenComments(btn.dataset.id)));
+  tmLoadCommentCounts(posts);
+}
+
+async function tmLoadCommentCounts(posts){
+  posts.forEach(async (p)=>{
+    try{
+      const snap = await db.collection("transportMediaPosts").doc(p.id).collection("comments").count().get();
+      const count = snap.data().count;
+      if(count > 0){
+        const btn = document.querySelector(`.tmCommentBtn[data-id="${p.id}"]`);
+        if(btn) btn.textContent = `💬 মন্তব্য (${count})`;
+      }
+    }catch(e){ /* count() সাপোর্ট না থাকলে চুপচাপ বাদ, ভাঙবে না */ }
+  });
+}
+
+// ❤️ লাইক টগল — likedBy অ্যারে + likeCount একসাথে আপডেট হয় (Firestore একই
+// update()-এ একাধিক FieldValue transform সাপোর্ট করে)। ⚠️ সততার সাথে বলা
+// দরকার — এটা arrayUnion/increment-ভিত্তিক, সত্যিকারের ট্রানজ্যাকশন না,
+// তাই একদম একই মুহূর্তে বহুবার চাপলে সামান্য গোনার গরমিল হতে পারে (রিয়েল
+// সোশ্যাল অ্যাপগুলোতেও এই স্তরের ঝুঁকি স্বাভাবিক ধরা হয়) — তাই বাটন
+// ক্লিকের সময় সাথে সাথেই disable করে দেওয়া হচ্ছে সেই ঝুঁকি কমাতে।
+async function tmToggleLike(postId){
+  if(!currentCustomer){ alert("লাইক করতে Google দিয়ে লগইন করুন।"); return; }
+  const btn = document.querySelector(`.tmLikeBtn[data-id="${postId}"]`);
+  if(btn) btn.disabled = true;
+  try{
+    const ref = db.collection("transportMediaPosts").doc(postId);
+    const doc = await ref.get();
+    if(!doc.exists) return;
+    const liked = (doc.data().likedBy||[]).includes(currentCustomer.uid);
+    if(liked){
+      await ref.update({
+        likedBy: firebase.firestore.FieldValue.arrayRemove(currentCustomer.uid),
+        likeCount: firebase.firestore.FieldValue.increment(-1)
+      });
+    }else{
+      await ref.update({
+        likedBy: firebase.firestore.FieldValue.arrayUnion(currentCustomer.uid),
+        likeCount: firebase.firestore.FieldValue.increment(1)
+      });
+    }
+  }catch(e){ console.warn("লাইক করা যায়নি:", e); }
+  finally{ if(btn) btn.disabled = false; }
+}
+
+function tmOpenComments(postId){
+  __tmCommentsCurrentPostId = postId;
+  $("tmCommentsOverlay").style.display = "flex";
+  $("tmCommentsList").innerHTML = "লোড হচ্ছে...";
+  if(__tmCommentsUnsub) __tmCommentsUnsub();
+  __tmCommentsUnsub = db.collection("transportMediaPosts").doc(postId).collection("comments")
+    .orderBy("createdAt", "asc")
+    .onSnapshot((qs)=>{
+      const comments = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+      comments.forEach(c=> { __tmCommentsCache[c.id] = c.text || ""; });
+      const listEl = $("tmCommentsList");
+      if(comments.length === 0){
+        listEl.innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px 0;">এখনো কোনো মন্তব্য নেই — প্রথম মন্তব্যটা করুন।</div>';
+      }else{
+        listEl.innerHTML = comments.map(c=>{
+          const isMine = currentCustomer && c.uid === currentCustomer.uid;
+          const timeTxt = c.createdAt ? c.createdAt.toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'}) : "";
+          const editedTxt = c.editedAt ? " (এডিট করা)" : "";
+          return `
+            <div style="display:flex; justify-content:${isMine ? "flex-end" : "flex-start"}; margin-bottom:10px;">
+              <div style="max-width:78%;">
+                <div class="${isMine ? "tmOwnCommentBubble" : ""}" data-cid="${c.id}" style="background:${isMine ? "var(--amber)" : "rgba(255,255,255,0.08)"}; color:${isMine ? "var(--bg1)" : "#eee"}; padding:8px 12px; border-radius:14px; ${isMine ? "border-bottom-right-radius:4px; user-select:none; -webkit-user-select:none;" : "border-bottom-left-radius:4px;"}">
+                  ${!isMine ? `<div style="font-weight:800; font-size:11px; color:var(--amber); margin-bottom:2px;">${escapeHtml(c.name||"একজন")}</div>` : ""}
+                  <div style="font-size:13.5px; line-height:1.4;">${escapeHtml(c.text||"")}</div>
+                  <div style="font-size:9.5px; opacity:0.7; margin-top:3px; text-align:right;">${timeTxt}${editedTxt}</div>
+                </div>
+                ${isMine ? `
+                <div class="tmCommentActions" data-cid="${c.id}" style="display:none; gap:10px; justify-content:flex-end; margin-top:4px;">
+                  <span class="tmEditCommentBtn" data-cid="${c.id}" style="font-size:12px; color:var(--muted); cursor:pointer; padding:4px 8px; background:rgba(255,255,255,0.06); border-radius:6px;">✏️ এডিট</span>
+                  <span class="tmDeleteCommentBtn" data-cid="${c.id}" style="font-size:12px; color:#f87171; cursor:pointer; padding:4px 8px; background:rgba(220,38,38,0.1); border-radius:6px;">🗑️ মুছুন</span>
+                </div>` : ""}
+              </div>
+            </div>`;
+        }).join("");
+
+        listEl.querySelectorAll(".tmOwnCommentBubble").forEach(bubble=>{
+          let holdTimer = null;
+          const cid = bubble.dataset.cid;
+          const showActions = ()=>{
+            listEl.querySelectorAll(".tmCommentActions").forEach(el=> el.style.display = "none");
+            const actionsEl = listEl.querySelector(`.tmCommentActions[data-cid="${cid}"]`);
+            if(actionsEl) actionsEl.style.display = "flex";
+            if(navigator.vibrate) navigator.vibrate(30);
+          };
+          bubble.addEventListener("touchstart", ()=>{ holdTimer = setTimeout(showActions, 500); }, { passive:true });
+          bubble.addEventListener("touchend", ()=>{ clearTimeout(holdTimer); }, { passive:true });
+          bubble.addEventListener("touchmove", ()=>{ clearTimeout(holdTimer); }, { passive:true });
+          bubble.addEventListener("mousedown", ()=>{ holdTimer = setTimeout(showActions, 500); });
+          bubble.addEventListener("mouseup", ()=>{ clearTimeout(holdTimer); });
+          bubble.addEventListener("mouseleave", ()=>{ clearTimeout(holdTimer); });
+          bubble.addEventListener("contextmenu", (e)=> e.preventDefault());
+        });
+        listEl.querySelectorAll(".tmEditCommentBtn").forEach(btn=>{
+          btn.addEventListener("click", ()=> tmEditComment(btn.dataset.cid));
+        });
+        listEl.querySelectorAll(".tmDeleteCommentBtn").forEach(btn=>{
+          btn.addEventListener("click", ()=> tmDeleteComment(btn.dataset.cid));
+        });
+      }
+      requestAnimationFrame(()=>{ listEl.scrollTop = listEl.scrollHeight; });
+    }, (err)=>{
+      console.warn("tm comments listener error:", err);
+      $("tmCommentsList").innerHTML = '<div style="text-align:center; color:var(--muted); padding:20px 0;">মন্তব্য লোড করা যায়নি।</div>';
+    });
+}
+
+async function tmSubmitComment(){
+  if(!currentCustomer){ alert("মন্তব্য করতে Google দিয়ে লগইন করুন।"); return; }
+  const text = $("tmCommentInput").value.trim();
+  if(!text || !__tmCommentsCurrentPostId) return;
+  const btn = $("tmCommentSubmitBtn");
+  btn.disabled = true;
+  try{
+    await db.collection("transportMediaPosts").doc(__tmCommentsCurrentPostId).collection("comments").add({
+      uid: currentCustomer.uid,
+      name: currentCustomer.name || "একজন",
+      text,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    $("tmCommentInput").value = "";
+  }catch(e){ alert("মন্তব্য পাঠানো যায়নি: " + e.message); }
+  finally{ btn.disabled = false; }
+}
+
+async function tmEditComment(commentId){
+  const currentText = __tmCommentsCache[commentId] || "";
+  const newText = prompt("মন্তব্য ঠিক করুন:", currentText);
+  if(newText === null || !newText.trim() || newText.trim() === currentText) return;
+  try{
+    await db.collection("transportMediaPosts").doc(__tmCommentsCurrentPostId)
+      .collection("comments").doc(commentId).update({
+        text: newText.trim(),
+        editedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+  }catch(e){ alert("এডিট করা যায়নি: " + e.message); }
+}
+
+async function tmDeleteComment(commentId){
+  if(!confirm("এই মন্তব্যটা মুছে ফেলবেন?")) return;
+  try{
+    await db.collection("transportMediaPosts").doc(__tmCommentsCurrentPostId)
+      .collection("comments").doc(commentId).delete();
+  }catch(e){ alert("মুছে ফেলা যায়নি: " + e.message); }
+}
 
 /* ==================== 🚑 Passenger View — Zero Interaction UI ====================
    টগল ON করলে GPS থেকে lat/lng নিয়ে passenger_waiting_queue কালেকশনে

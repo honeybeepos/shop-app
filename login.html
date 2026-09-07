@@ -150,6 +150,8 @@
     <select id="pvUpazila" disabled><option value="">-- আগে জেলা নির্বাচন করুন --</option></select>
     <label>বাজার/এলাকা</label>
     <select id="pvMarket" disabled><option value="">-- আগে উপজেলা নির্বাচন করুন --</option></select>
+    <label>আপনার এজেন্ট (ঐচ্ছিক)</label>
+    <select id="pvAgent" disabled><option value="">-- আগে বাজার নির্বাচন করুন --</option></select>
 
     <button class="btn" id="providerSignupBtn">✅ নিবন্ধন করুন</button>
     <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:10px;">নিবন্ধনের পর আপনার এলাকার Honey Bee Agent আপনাকে যাচাই (verify) করবেন — তারপর আপনি Honey Bee Bazar-এ 🛡️ ব্যাজসহ দেখা যাবেন।</p>
@@ -312,7 +314,9 @@ document.getElementById("pvDistrict").addEventListener("change", (e)=>{
   const district = e.target.value;
   const upSel = document.getElementById("pvUpazila");
   const marketSel = document.getElementById("pvMarket");
+  const agentSel = document.getElementById("pvAgent");
   marketSel.innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; marketSel.disabled = true;
+  agentSel.innerHTML = '<option value="">-- আগে বাজার নির্বাচন করুন --</option>'; agentSel.disabled = true;
   if(!district){
     upSel.innerHTML = '<option value="">-- আগে জেলা নির্বাচন করুন --</option>'; upSel.disabled = true;
     return;
@@ -326,6 +330,8 @@ document.getElementById("pvUpazila").addEventListener("change", async (e)=>{
   const district = document.getElementById("pvDistrict").value;
   const upazila = e.target.value;
   const marketSel = document.getElementById("pvMarket");
+  const agentSel = document.getElementById("pvAgent");
+  agentSel.innerHTML = '<option value="">-- আগে বাজার নির্বাচন করুন --</option>'; agentSel.disabled = true;
   if(!upazila){
     marketSel.innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; marketSel.disabled = true;
     return;
@@ -346,11 +352,40 @@ document.getElementById("pvUpazila").addEventListener("change", async (e)=>{
   }
 });
 
+// 🤝 Honey Bee Transport Media Phase 5 — এজেন্ট-ড্রাইভার সরাসরি সম্পর্ক।
+// আগে ড্রাইভার নিজে নিবন্ধন করলে শুধু marketId সেট হতো (সেই বাজারের যেকোনো
+// এজেন্টই দেখতে/ম্যানেজ করতে পারতেন), কিন্তু নির্দিষ্ট কোনো একজন এজেন্টের
+// সাথে সরাসরি সম্পর্ক তৈরি হতো না — shop-signup-এর "suAgent"-এর মতোই এখানে
+// একটা ঐচ্ছিক এজেন্ট বাছাই যোগ করা হলো।
+document.getElementById("pvMarket").addEventListener("change", async (e)=>{
+  const marketId = e.target.value;
+  const agentSel = document.getElementById("pvAgent");
+  if(!marketId){
+    agentSel.innerHTML = '<option value="">-- আগে বাজার নির্বাচন করুন --</option>'; agentSel.disabled = true;
+    return;
+  }
+  agentSel.innerHTML = '<option value="">লোড হচ্ছে...</option>'; agentSel.disabled = true;
+  try{
+    const qs = await db.collection("agents").where("marketId","==",marketId).where("status","==","active").get();
+    if(qs.empty){
+      agentSel.innerHTML = '<option value="">এই বাজারে এখনো কোনো এজেন্ট নেই (ঐচ্ছিক, খালি রাখতে পারেন)</option>';
+      agentSel.disabled = true;
+      return;
+    }
+    agentSel.innerHTML = '<option value="">-- এজেন্ট নির্বাচন করুন (ঐচ্ছিক) --</option>' +
+      qs.docs.map(d=> `<option value="${d.id}">${d.data().name || d.id}</option>`).join("");
+    agentSel.disabled = false;
+  }catch(e){
+    agentSel.innerHTML = '<option value="">লোড করা যায়নি</option>';
+  }
+});
+
 document.getElementById("providerSignupBtn").addEventListener("click", async ()=>{
   const name = document.getElementById("pvName").value.trim();
   const phone = document.getElementById("pvPhone").value.trim();
   const pass = document.getElementById("pvPass").value;
   const marketId = document.getElementById("pvMarket").value;
+  const assignedAgentId = document.getElementById("pvAgent").value || null;
   const district = document.getElementById("pvDistrict").value;
   const upazila = document.getElementById("pvUpazila").value;
   const vehicleType = document.getElementById("pvVehicleType").value;
@@ -376,7 +411,7 @@ document.getElementById("providerSignupBtn").addEventListener("click", async ()=
 
     await db.collection("users").doc(uid).set({ role: "transport_driver", phone, createdAt: fbNow() });
     await db.collection("transportDrivers").doc(uid).set({
-      name, phone, district, upazila, marketId,
+      name, phone, district, upazila, marketId, assignedAgentId,
       vehicle: {
         type: vehicleType, model: vehicleModel || null, regNumber: vehicleReg || null,
         color: vehicleColor || null, seatCount: vehicleSeats, status: "active"

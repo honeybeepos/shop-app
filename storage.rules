@@ -41,6 +41,19 @@ service firebase.storage {
         && request.resource.contentType == 'image/webp';
     }
 
+    match /transport-media-images/{uid}/{fileName} {
+
+      // 📢 Honey Bee Transport Media Phase 6 — পোস্টের ছবি সবাই দেখতে পারবে
+      allow read: if true;
+
+      // শুধু নিজের uid-এর অধীনেই নিজের পোস্টের ছবি আপলোড করা যাবে —
+      // vehicle-images-এর মতোই resize+WebP কম্প্রেশন করা থাকে
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size <= 200 * 1024
+        && request.resource.contentType == 'image/webp';
+    }
+
     // অন্য সব Storage path blocked
     match /{allPaths=**} {
       allow read, write: if false;
