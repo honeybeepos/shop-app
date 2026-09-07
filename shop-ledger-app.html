@@ -864,6 +864,24 @@
     <div class="dmStatBox"><div class="num" id="dmTodayTrips">0</div><div class="lbl">🧭 আজকের ট্রিপ</div></div>
   </div>
 
+  <!-- 📊 Honey Bee Transport Media Phase 2 — সাপ্তাহিক/মাসিক আয়, প্রতিদিনের
+       dailyEarnings লেজার থেকে হিসাব করা (ট্রিপ শেষ হওয়ার মুহূর্তেই লেখা হয়) -->
+  <div class="dmCard" id="dmIncomeSummaryCard">
+    <h3 style="margin:0 0 10px; font-size:14px; color:#4ade80;">📊 আয়ের সারাংশ</h3>
+    <div class="dmStatGrid">
+      <div class="dmStatBox">
+        <div class="num" id="dmWeekEarning">৳ 0</div>
+        <div class="lbl">📅 এই সপ্তাহ</div>
+        <div style="font-size:9.5px; color:#6a9c85; margin-top:2px;" id="dmWeekTripsLbl">0 ট্রিপ</div>
+      </div>
+      <div class="dmStatBox">
+        <div class="num" id="dmMonthEarning">৳ 0</div>
+        <div class="lbl">📆 এই মাস</div>
+        <div style="font-size:9.5px; color:#6a9c85; margin-top:2px;" id="dmMonthTripsLbl">0 ট্রিপ</div>
+      </div>
+    </div>
+  </div>
+
   <!-- 🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট — ভাড়া অফার করা -->
   <div class="dmCard" id="dmTripRequestsCard">
     <h3 style="margin:0 0 10px; font-size:14px; color:#4ade80;">🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট</h3>
@@ -13136,6 +13154,59 @@ function modeBackGuardHandler(){
   // "বের হতে চান" হলে কিছু করার দরকার নেই — ব্রাউজার ইতিমধ্যে এক ধাপ পিছিয়ে গেছে
 }
 
+/* ==================== 📊 Honey Bee Transport Media Phase 2 — সাপ্তাহিক/মাসিক আয় ====================
+   transportDrivers/{uid}/dailyEarnings/{YYYY-MM-DD} — প্রতিদিনের একটা ছোট
+   লেজার ডকুমেন্ট, ট্রিপ শেষ হওয়ার মুহূর্তেই increment হয় (৩টা জায়গা থেকে:
+   গন্তব্য-ভিত্তিক ট্রিপ শেষ, রাস্তা থেকে অপেক্ষার ট্রিপ শেষ, রাস্তা থেকে
+   সরাসরি Pick Up)। এখান থেকেই আজ/সপ্তাহ/মাসের আয় হিসাব হয় — পুরনো
+   transportDrivers.todayEarning ফিল্ডটা কখনো রিসেট হতো না (চিরকালের যোগফল
+   হয়ে যাচ্ছিল), তাই ড্রাইভারের নিজের ড্যাশবোর্ডে সেটার বদলে এই লেজারই
+   এখন ব্যবহার হয় — legacy ফিল্ডটা শুধু ব্যাকওয়ার্ড-কম্প্যাটিবিলিটির
+   জন্য লেখা অব্যাহত থাকছে, অন্য কোথাও এটা পড়া হয় না বলে নিশ্চিত হয়ে। */
+function dmDateStrFromDate(d){
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function dmTodayDateStr(){ return dmDateStrFromDate(new Date()); }
+function dmDateStrDaysAgo(n){ return dmDateStrFromDate(new Date(Date.now() - n*24*60*60*1000)); }
+
+async function dmRecordDailyEarning(fare, tripDelta){
+  if(!__dmDriverId) return;
+  try{
+    await db.collection("transportDrivers").doc(__dmDriverId).collection("dailyEarnings").doc(dmTodayDateStr()).set({
+      date: dmTodayDateStr(),
+      earning: firebase.firestore.FieldValue.increment(fare || 0),
+      tripCount: firebase.firestore.FieldValue.increment(tripDelta || 0),
+      updatedAt: fbNow()
+    }, { merge: true });
+  }catch(e){ console.warn("দৈনিক আয়ের লেজার লেখা যায়নি:", e); } // best-effort — ট্রিপ সম্পন্ন হওয়া আটকাবে না
+}
+
+async function dmLoadIncomeSummary(){
+  if(!__dmDriverId) return;
+  try{
+    const qs = await db.collection("transportDrivers").doc(__dmDriverId).collection("dailyEarnings")
+      .orderBy("date","desc").limit(31).get();
+    const today = dmTodayDateStr(), sevenAgo = dmDateStrDaysAgo(6), thirtyAgo = dmDateStrDaysAgo(29);
+    let todayE=0, todayC=0, weekE=0, weekC=0, monthE=0, monthC=0;
+    qs.docs.forEach(d=>{
+      const v = d.data();
+      const e = v.earning||0, c = v.tripCount||0;
+      if(v.date === today){ todayE=e; todayC=c; }
+      if(v.date >= sevenAgo){ weekE+=e; weekC+=c; }
+      if(v.date >= thirtyAgo){ monthE+=e; monthC+=c; }
+    });
+    document.getElementById("dmTodayEarning").textContent = HB_CUR + ' ' + todayE;
+    document.getElementById("dmTodayTrips").textContent = todayC;
+    document.getElementById("dmWeekEarning").textContent = HB_CUR + ' ' + weekE;
+    document.getElementById("dmWeekTripsLbl").textContent = weekC + " ট্রিপ";
+    document.getElementById("dmMonthEarning").textContent = HB_CUR + ' ' + monthE;
+    document.getElementById("dmMonthTripsLbl").textContent = monthC + " ট্রিপ";
+  }catch(e){
+    console.warn("আয়ের সারাংশ লোড ব্যর্থ:", e);
+  }
+}
+
 async function initDriverMode(uid){
   __dmDriverId = uid;
   try{
@@ -13155,8 +13226,10 @@ async function initDriverMode(uid){
   document.getElementById("dmVerifiedBadge").style.display = __dmDriver.isVerified ? "inline-block" : "none";
   const v = __dmDriver.vehicle || {};
   dmRenderVehicleInfo(v);
-  document.getElementById("dmTodayEarning").textContent = HB_CUR + ' ' + (__dmDriver.todayEarning || 0);
-  document.getElementById("dmTodayTrips").textContent = __dmDriver.todayTripCount || 0;
+  // 📊 Phase 2 — আজকের/সাপ্তাহিক/মাসিক আয় এখন dailyEarnings লেজার থেকে
+  // হিসাব হয় (নিচে dmLoadIncomeSummary), পুরনো todayEarning ফিল্ড আর UI-তে
+  // ব্যবহার হচ্ছে না (সেটা কখনো রিসেট হতো না — সারাজীবনের যোগফল হয়ে যেত)
+  dmLoadIncomeSummary();
 
   dmRefreshStatusUi(__dmDriver.driverStatus || "offline");
   if(__dmDriver.driverStatus === "online" || __dmDriver.driverStatus === "busy"){ dmStartGps(); }
@@ -13637,8 +13710,19 @@ function dmDrawTripRoute(trip){
 
 async function dmCompleteTrip(tripId){
   try{
+    // 📊 Phase 2 — এই "রাস্তা থেকে অপেক্ষা" ফ্লো-তে ভাড়া আগেই confirmedDriver.finalFare-এ
+    // ঠিক হয়ে থাকে (ব্যাকএন্ড থেকে), completed মার্ক করার আগেই সেটা পড়ে নেওয়া হচ্ছে
+    let fare = 0;
+    try{
+      const tripSnap = await db.collection("trips").doc(tripId).get();
+      const tripData = tripSnap.exists ? tripSnap.data() : {};
+      fare = (tripData.confirmedDriver && tripData.confirmedDriver.finalFare) || 0;
+    }catch(e){ console.warn("ভাড়া পড়া যায়নি:", e); }
+
     await db.collection("trips").doc(tripId).update({ status: "completed" });
     await dmResetActiveTripStatus();
+    await dmRecordDailyEarning(fare, 1);
+    dmLoadIncomeSummary();
     alert("✅ ট্রিপ সম্পন্ন হয়েছে।");
   }catch(e){ alert("ট্রিপ শেষ করা যায়নি: " + e.message); }
 }
@@ -14163,6 +14247,8 @@ async function dmPickUpPassenger(passenger){
       else alert("✅ Pick Up সম্পন্ন — তবে Wallet থেকে কাটা যায়নি, নগদ নিন।");
     }
     __dmRadarMap.closePopup();
+    await dmRecordDailyEarning(fare, 1); // 📊 Phase 2 — রাস্তা থেকে পিক-আপও আয়ের লেজারে যোগ হবে
+    dmLoadIncomeSummary();
   }catch(e){ alert("Pick Up করা যায়নি: " + e.message); }
 }
 
@@ -14286,10 +14372,10 @@ document.getElementById("dmEndTripBtn").addEventListener("click", async ()=>{
     __dmDriver.todayEarning = (__dmDriver.todayEarning || 0) + fare;
     __dmDriver.todayTripCount = (__dmDriver.todayTripCount || 0) + 1;
     __dmDriver.driverStatus = "online";
-    document.getElementById("dmTodayEarning").textContent = HB_CUR + ' ' + __dmDriver.todayEarning;
-    document.getElementById("dmTodayTrips").textContent = __dmDriver.todayTripCount;
     dmRefreshStatusUi("online");
     if(__dmTripMap){ __dmTripMap.remove(); __dmTripMap = null; __dmTripMarkers = {}; }
+    await dmRecordDailyEarning(fare, 1); // 📊 Phase 2 — আজ/সপ্তাহ/মাসের আয়ের লেজারে যোগ
+    dmLoadIncomeSummary();
   }catch(e){ alert("শেষ করা যায়নি: " + e.message); }
 });
 

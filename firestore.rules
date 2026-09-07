@@ -114,6 +114,16 @@ service cloud.firestore {
         (isSuperAdmin() || request.auth.uid == id ||
          (isAgent() && resource.data.marketId == myAgentMarketId()));
       allow delete: if isSuperAdmin();
+
+      // 📊 Honey Bee Transport Media Phase 2 — প্রতিদিনের আয়ের লেজার
+      // (সপ্তাহ/মাসের হিসাবের জন্য)। ম্যাচ ব্লক parent path-এ নেস্টেড হওয়ায়
+      // এখানে {id} উপরের transportDrivers doc-এর id-ই বোঝায়।
+      match /dailyEarnings/{dateId} {
+        allow read: if isSignedIn() &&
+          (request.auth.uid == id || isSuperAdmin() ||
+           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId == myAgentMarketId()));
+        allow write: if isSignedIn() && request.auth.uid == id;
+      }
     }
 
     match /trips/{tripId} {
