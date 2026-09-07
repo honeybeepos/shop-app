@@ -812,7 +812,10 @@
   <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
     <div style="font-size:30px;">🚑</div>
     <div>
-      <div style="font-weight:800; font-size:15px;" id="dmDriverName">Honey Bee Transport</div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <div style="font-weight:800; font-size:15px;" id="dmDriverName">Honey Bee Transport</div>
+        <span id="dmVerifiedBadge" style="display:none; font-size:9.5px; font-weight:800; padding:2px 7px; border-radius:20px; background:rgba(74,222,128,0.18); color:#4ade80; border:1px solid rgba(74,222,128,0.4);">✅ ভেরিফায়েড</span>
+      </div>
       <div style="font-size:10.5px; color:#a8d9c0; text-transform:uppercase; letter-spacing:1px;">Driver Mode</div>
     </div>
     <button id="dmHistoryBtn" title="হিস্ট্রি" style="margin-left:auto; background:transparent; border:1px solid rgba(255,255,255,0.2); color:#a8d9c0; width:32px; height:32px; border-radius:8px; font-size:14px; cursor:pointer; font-family:inherit;">📋</button>
@@ -853,6 +856,7 @@
       </div>
     </div>
     <div class="dmVehicleRow" id="dmVehicleInfo" style="text-align:center; padding-top:6px; border-top:1px solid rgba(255,255,255,0.08);"></div>
+    <button id="dmManageVehicleBtn" style="width:100%; margin-top:10px; padding:9px; border:1px solid rgba(74,222,128,0.35); border-radius:9px; background:transparent; color:#4ade80; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">🚐 গাড়ি ব্যবস্থাপনা</button>
   </div>
 
   <div class="dmStatGrid" style="margin-bottom:14px;">
@@ -887,6 +891,95 @@
   <div class="dmCard" id="dmHistoryCard">
     <h3 style="margin:0 0 10px; font-size:14px; color:#4ade80;">📋 সাম্প্রতিক ট্রিপ</h3>
     <div id="dmHistoryList" style="font-size:12px; color:#a8d9c0;">এখনো কোনো ট্রিপ সম্পন্ন হয়নি।</div>
+  </div>
+
+  <!-- 🚐 গাড়ি ব্যবস্থাপনা — বিস্তারিত তথ্য + ছবি (Honey Bee Transport Media, Phase 1) -->
+  <div id="dmVehicleEditOverlay" style="display:none; position:fixed; inset:0; z-index:600; background:#0f2318; overflow-y:auto; padding:16px 14px 90px;">
+    <div style="display:flex; align-items:center; margin-bottom:16px;">
+      <h3 style="margin:0; font-size:15px; color:#eafff2;">🚐 গাড়ি ব্যবস্থাপনা</h3>
+      <span id="dmCloseVehicleEditBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:#a8d9c0;">✕</span>
+    </div>
+
+    <div class="dmCard">
+      <h3 style="margin:0 0 12px; font-size:13px; color:#4ade80;">📷 গাড়ির ছবি</h3>
+      <p style="font-size:10.5px; color:#a8d9c0; margin:0 0 12px;">প্রতিটা ট্যাপ করে ছবি দিন — যাত্রীরা Public App-এ গাড়ি বুক করার আগে এই ছবিগুলো দেখবেন।</p>
+      <div id="dmVehiclePhotoGrid" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;"></div>
+    </div>
+
+    <div class="dmCard">
+      <h3 style="margin:0 0 12px; font-size:13px; color:#4ade80;">📝 গাড়ির তথ্য</h3>
+
+      <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">গাড়ির ধরন</label>
+      <select id="dmVehType" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px; margin-bottom:12px;">
+        <option value="bike">🏍️ বাইক</option>
+        <option value="cng">🛺 CNG / অটো রিকশা</option>
+        <option value="easy_bike">🛺✨ ইজি বাইক</option>
+        <option value="sedan">🚗 সেডান / প্রাইভেট কার</option>
+        <option value="hiace">🚐 হাইএস</option>
+        <option value="microbus">🚐 মাইক্রোবাস</option>
+        <option value="pickup">🛻 পিকআপ / ট্রাক</option>
+        <option value="ambulance_ac">🚑 অ্যাম্বুলেন্স (AC)</option>
+        <option value="ambulance_non_ac">🚑 অ্যাম্বুলেন্স (Non-AC)</option>
+        <option value="ambulance_icu">🚑 অ্যাম্বুলেন্স (ICU)</option>
+      </select>
+
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">ব্র্যান্ড</label>
+          <input type="text" id="dmVehBrand" placeholder="যেমনঃ Toyota" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px;">
+        </div>
+        <div style="flex:1;">
+          <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">মডেল</label>
+          <input type="text" id="dmVehModel" placeholder="যেমনঃ Hiace 2018" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px;">
+        </div>
+      </div>
+
+      <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">রেজিস্ট্রেশন নম্বর</label>
+      <input type="text" id="dmVehRegNumber" placeholder="যেমনঃ ঢাকা মেট্রো গ-১২৩৪৫৬" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px; margin-bottom:12px;">
+
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">রঙ</label>
+          <input type="text" id="dmVehColor" placeholder="যেমনঃ সাদা" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px;">
+        </div>
+        <div style="width:90px;">
+          <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">সিট</label>
+          <input type="number" id="dmVehSeatCount" min="1" placeholder="নং" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px;">
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">AC / Non-AC</label>
+          <select id="dmVehAcType" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px;">
+            <option value="">— নির্বাচন করুন —</option>
+            <option value="ac">❄️ AC</option>
+            <option value="non_ac">Non-AC</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">ফুয়েল</label>
+          <select id="dmVehFuelType" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px;">
+            <option value="">— নির্বাচন করুন —</option>
+            <option value="octane">⛽ অকটেন</option>
+            <option value="petrol">⛽ পেট্রল</option>
+            <option value="diesel">⛽ ডিজেল</option>
+            <option value="cng_fuel">🛺 CNG</option>
+            <option value="electric">🔋 ইলেকট্রিক</option>
+          </select>
+        </div>
+      </div>
+
+      <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">লাগেজ স্পেস</label>
+      <select id="dmVehLuggage" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px; margin-bottom:16px;">
+        <option value="">— নির্বাচন করুন —</option>
+        <option value="small">ছোট (১-২ ব্যাগ)</option>
+        <option value="medium">মাঝারি</option>
+        <option value="large">বড় (লাগেজ ভর্তি)</option>
+      </select>
+
+      <button id="dmVehSaveBtn" class="dmBtn dmBtnGreen">💾 সেভ করুন</button>
+    </div>
   </div>
 </div>
 
@@ -13056,11 +13149,12 @@ async function initDriverMode(uid){
   }catch(e){ console.error(e); return; }
 
   document.getElementById("dmDriverName").textContent = __dmDriver.name || "Honey Bee Transport";
+  // ✅ Honey Bee Transport Media — ভেরিফিকেশন ব্যাজ (ডেটা আগে থেকেই ছিল
+  // isVerified ফিল্ডে, শুধু এজেন্ট/অ্যাডমিন প্যানেলে দেখানো হতো, ড্রাইভারের
+  // নিজের ড্যাশবোর্ডে এই প্রথম দেখানো হচ্ছে)
+  document.getElementById("dmVerifiedBadge").style.display = __dmDriver.isVerified ? "inline-block" : "none";
   const v = __dmDriver.vehicle || {};
-  const vLabel = { bike:"🏍️ বাইক", cng:"🛺 CNG", sedan:"🚗 সেডান", hiace:"🚐 হাইএস", microbus:"🚐 মাইক্রোবাস",
-    pickup:"🛻 পিকআপ", ambulance_ac:"🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac:"🚑 অ্যাম্বুলেন্স (Non-AC)", ambulance_icu:"🚑 অ্যাম্বুলেন্স (ICU)", easy_bike:"🛺✨ ইজি বাইক" }[v.type] || v.type || "";
-  document.getElementById("dmVehicleInfo").textContent =
-    [vLabel, v.model, v.regNumber, v.color, v.seatCount ? v.seatCount+" সিট" : ""].filter(Boolean).join(" · ") || "গাড়ির তথ্য নেই";
+  dmRenderVehicleInfo(v);
   document.getElementById("dmTodayEarning").textContent = HB_CUR + ' ' + (__dmDriver.todayEarning || 0);
   document.getElementById("dmTodayTrips").textContent = __dmDriver.todayTripCount || 0;
 
@@ -13087,6 +13181,129 @@ async function initDriverMode(uid){
   refreshRingtoneSwitchUi();
   enableModeBackGuard();
 }
+
+/* ==================== 🚐 গাড়ি ব্যবস্থাপনা — Honey Bee Transport Media Phase 1 ====================
+   বিস্তারিত ভেহিকল প্রোফাইল (ব্র্যান্ড/AC/ফুয়েল/লাগেজ) + ৫টা ছবি (সামনে/ভেতরে/
+   সাইড/সিট/লাগেজ)। ছবি আপলোড প্রোডাক্ট-ইমেজের মতোই resize+WebP কম্প্রেশন করে
+   (hbProcessProductImage পুনর্ব্যবহার করা হচ্ছে), কিন্তু হ্যাশ-ভিত্তিক ডুপ্লিকেট-
+   ডিটেকশন নেই — প্রতিটা গাড়ির ছবি এমনিতেই আলাদা, তাই deterministic path
+   vehicle-images/{uid}/{slot}.webp ব্যবহার করে সরাসরি রিপ্লেস করা হয়। */
+const DM_VEHICLE_PHOTO_SLOTS = [
+  { key:"front", label:"সামনে", icon:"🚐" },
+  { key:"inside", label:"ভেতরে", icon:"💺" },
+  { key:"side", label:"সাইড", icon:"↔️" },
+  { key:"seats", label:"সিট", icon:"🪑" },
+  { key:"luggage", label:"লাগেজ", icon:"🧳" },
+];
+const DM_VEH_LABEL = { bike:"🏍️ বাইক", cng:"🛺 CNG", sedan:"🚗 সেডান", hiace:"🚐 হাইএস", microbus:"🚐 মাইক্রোবাস",
+  pickup:"🛻 পিকআপ", ambulance_ac:"🚑 অ্যাম্বুলেন্স (AC)", ambulance_non_ac:"🚑 অ্যাম্বুলেন্স (Non-AC)", ambulance_icu:"🚑 অ্যাম্বুলেন্স (ICU)", easy_bike:"🛺✨ ইজি বাইক" };
+const DM_VEH_AC_LABEL = { ac:"❄️ AC", non_ac:"Non-AC" };
+const DM_VEH_FUEL_LABEL = { octane:"⛽ অকটেন", petrol:"⛽ পেট্রল", diesel:"⛽ ডিজেল", cng_fuel:"🛺 CNG", electric:"🔋 ইলেকট্রিক" };
+const DM_VEH_LUGGAGE_LABEL = { small:"ছোট লাগেজ", medium:"মাঝারি লাগেজ", large:"বড় লাগেজ" };
+
+function dmRenderVehicleInfo(v){
+  const vLabel = DM_VEH_LABEL[v.type] || v.type || "";
+  const extra = [DM_VEH_AC_LABEL[v.acType], DM_VEH_FUEL_LABEL[v.fuelType], DM_VEH_LUGGAGE_LABEL[v.luggage]].filter(Boolean);
+  document.getElementById("dmVehicleInfo").textContent =
+    [vLabel, v.brand, v.model, v.regNumber, v.color, v.seatCount ? v.seatCount+" সিট" : "", ...extra].filter(Boolean).join(" · ") || "গাড়ির তথ্য নেই";
+}
+
+function dmRenderVehiclePhotoGrid(){
+  const v = (__dmDriver && __dmDriver.vehicle) || {};
+  const photos = v.photos || {};
+  const grid = document.getElementById("dmVehiclePhotoGrid");
+  grid.innerHTML = DM_VEHICLE_PHOTO_SLOTS.map(slot=>{
+    const url = photos[slot.key];
+    return `
+      <div class="dmVehPhotoTile" data-slot="${slot.key}" style="aspect-ratio:1; border-radius:10px; border:1px dashed rgba(74,222,128,0.4); background:${url ? `url('${url}') center/cover` : 'rgba(255,255,255,0.04)'}; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; overflow:hidden;">
+        ${url ? `<span style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.55); color:#fff; font-size:9px; padding:2px 0; text-align:center;">${slot.icon} ${slot.label}</span>`
+              : `<div style="text-align:center; color:#a8d9c0;"><div style="font-size:20px;">${slot.icon}</div><div style="font-size:9px; margin-top:2px;">${slot.label}</div></div>`}
+      </div>`;
+  }).join("");
+
+  grid.querySelectorAll(".dmVehPhotoTile").forEach(tile=>{
+    tile.addEventListener("click", ()=> dmPickVehiclePhoto(tile.dataset.slot));
+  });
+}
+
+function dmPickVehiclePhoto(slot){
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = "image/*";
+  input.addEventListener("change", async ()=>{
+    const file = input.files && input.files[0];
+    if(!file) return;
+    const tile = document.querySelector(`.dmVehPhotoTile[data-slot="${slot}"]`);
+    if(tile) tile.style.opacity = "0.5";
+    try{
+      if(!storage) throw new Error("Storage SDK লোড হয়নি");
+      const processed = await hbProcessProductImage(file);
+      const storageRef = storage.ref(`vehicle-images/${__dmDriverId}/${slot}.webp`);
+      await storageRef.put(processed.blob, { contentType: "image/webp" });
+      const url = await storageRef.getDownloadURL();
+      // ⚠️ ক্যাশ-বাস্টিং — একই ফাইলনেম রিপ্লেস হলেও ব্রাউজার/CDN পুরনো ছবি
+      // ক্যাশ করে রাখতে পারে, তাই URL-এর সাথে একটা টাইমস্ট্যাম্প যোগ করা হচ্ছে
+      const cacheBustedUrl = url + (url.includes("?") ? "&" : "?") + "v=" + Date.now();
+      if(!__dmDriver.vehicle) __dmDriver.vehicle = {};
+      if(!__dmDriver.vehicle.photos) __dmDriver.vehicle.photos = {};
+      __dmDriver.vehicle.photos[slot] = cacheBustedUrl;
+      await db.collection("transportDrivers").doc(__dmDriverId).set({
+        vehicle: { photos: { [slot]: cacheBustedUrl } }
+      }, { merge: true });
+      dmRenderVehiclePhotoGrid();
+    }catch(e){
+      console.error(e);
+      alert("ছবি আপলোড করা যায়নি: " + (e.message || e));
+      if(tile) tile.style.opacity = "1";
+    }
+  });
+  input.click();
+}
+
+function dmOpenVehicleEdit(){
+  const v = (__dmDriver && __dmDriver.vehicle) || {};
+  document.getElementById("dmVehType").value = v.type || "";
+  document.getElementById("dmVehBrand").value = v.brand || "";
+  document.getElementById("dmVehModel").value = v.model || "";
+  document.getElementById("dmVehRegNumber").value = v.regNumber || "";
+  document.getElementById("dmVehColor").value = v.color || "";
+  document.getElementById("dmVehSeatCount").value = v.seatCount || "";
+  document.getElementById("dmVehAcType").value = v.acType || "";
+  document.getElementById("dmVehFuelType").value = v.fuelType || "";
+  document.getElementById("dmVehLuggage").value = v.luggage || "";
+  dmRenderVehiclePhotoGrid();
+  document.getElementById("dmVehicleEditOverlay").style.display = "block";
+}
+document.getElementById("dmManageVehicleBtn").addEventListener("click", dmOpenVehicleEdit);
+document.getElementById("dmCloseVehicleEditBtn").addEventListener("click", ()=>{
+  document.getElementById("dmVehicleEditOverlay").style.display = "none";
+});
+
+document.getElementById("dmVehSaveBtn").addEventListener("click", async ()=>{
+  const btn = document.getElementById("dmVehSaveBtn");
+  const seatCountVal = document.getElementById("dmVehSeatCount").value.trim();
+  const updated = {
+    type: document.getElementById("dmVehType").value,
+    brand: document.getElementById("dmVehBrand").value.trim() || null,
+    model: document.getElementById("dmVehModel").value.trim() || null,
+    regNumber: document.getElementById("dmVehRegNumber").value.trim() || null,
+    color: document.getElementById("dmVehColor").value.trim() || null,
+    seatCount: seatCountVal ? Number(seatCountVal) : null,
+    acType: document.getElementById("dmVehAcType").value || null,
+    fuelType: document.getElementById("dmVehFuelType").value || null,
+    luggage: document.getElementById("dmVehLuggage").value || null,
+  };
+  btn.disabled = true; btn.textContent = "সেভ হচ্ছে...";
+  try{
+    await db.collection("transportDrivers").doc(__dmDriverId).set({ vehicle: updated }, { merge: true });
+    Object.assign(__dmDriver.vehicle || (__dmDriver.vehicle = {}), updated);
+    dmRenderVehicleInfo(__dmDriver.vehicle);
+    document.getElementById("dmVehicleEditOverlay").style.display = "none";
+  }catch(e){
+    alert("সেভ করা যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "💾 সেভ করুন";
+  }
+});
 
 /* ---------- Online/Busy/Offline টগল ---------- */
 function dmRefreshStatusUi(status){

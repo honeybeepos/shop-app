@@ -27,6 +27,20 @@ service firebase.storage {
       allow delete: if false;
     }
 
+    match /vehicle-images/{uid}/{photoSlot} {
+
+      // গাড়ির ছবি Bazar/Public App-এ দেখা যাবে
+      allow read: if true;
+
+      // শুধু নিজের uid-এর অধীনেই নিজের গাড়ির ছবি আপলোড/রিপ্লেস করা যাবে —
+      // content-hash dedup দরকার নেই (প্রতিটা গাড়ির ছবি এমনিতেই আলাদা),
+      // তাই product-images-এর মতো immutable না — replace করা যাবে
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size <= 200 * 1024
+        && request.resource.contentType == 'image/webp';
+    }
+
     // অন্য সব Storage path blocked
     match /{allPaths=**} {
       allow read, write: if false;
