@@ -4159,6 +4159,13 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
     $("hbCartAddressInput").value = ""; $("hbCartPhoneInput").value = "";
     __hbDeliveryGpsCoords = null; $("hbCartGpsStatus").style.display = "none";
     alert("✅ আপনার অর্ডার(গুলো) পাঠানো হয়েছে — দোকান(গুলো) শীঘ্রই যোগাযোগ করবে।");
+    // 📦 অর্ডার যেন কখনো "হারিয়ে" না যায় — কনফার্মের সাথে সাথেই সরাসরি
+    // Order Tracking-এ নিয়ে যাওয়া হচ্ছে, যাতে "আমার অর্ডারসমূহ"-তে
+    // 🕐 পেন্ডিং হিসেবে অর্ডারটা তখনই চোখে পড়ে (আগের কোনো ফিল্টার সাফ করে দিয়ে)
+    __hbOrdersFilter = null;
+    document.querySelectorAll(".hbCartStatusIcon").forEach(i=> i.style.background = "transparent");
+    $("hbCartOrdersFilterClear").style.display = "none";
+    hbOpenOrderTracking();
   }catch(e){
     alert("অর্ডার পাঠানো যায়নি: " + e.message);
   }finally{
@@ -4262,7 +4269,12 @@ function hbOrdersListen(){
       hbTrackMiniRender();
     }, (err)=>{
       console.warn("orders listener error:", err);
-      $("hbCartOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার লোড করা যায়নি।</div>';
+      // ⚠️ এরর হলে Firestore নিজেই লিসেনারটা বন্ধ করে দেয়, কিন্তু আগে
+      // __hbOrdersUnsub-এ পুরনো রেফারেন্স থেকে যাওয়ায় ভবিষ্যতে আর কখনো
+      // পুনরায় সাবস্ক্রাইব হতো না (Order Tracking খুললেও কিছুই লোড হতো
+      // না) — তাই রিসেট করে দেওয়া হচ্ছে, যাতে আবার চেষ্টা করা যায়
+      __hbOrdersUnsub = null;
+      $("hbCartOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার লোড করা যায়নি — নেটওয়ার্ক চেক করুন। <span style="color:var(--amber); text-decoration:underline; cursor:pointer;" onclick="hbOrdersListen()">আবার চেষ্টা করুন</span></div>';
     });
 }
 
