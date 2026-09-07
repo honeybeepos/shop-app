@@ -27,7 +27,7 @@
    DEPLOY-README.md ফাইলে ধাপে ধাপে নির্দেশনা আছে।
    ============================================================ */
 
-const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
@@ -185,6 +185,56 @@ async function sendFcmToRider(riderId, title, body, data) {
     console.warn(JSON.stringify({ event: "FCM_FAILED", riderId, error: String(e && e.message || e) }));
     if (e && e.code === "messaging/registration-token-not-registered") {
       await db.collection("riders").doc(riderId).update({ fcmToken: FieldValue.delete() }).catch(() => {});
+    }
+    return false;
+  }
+}
+
+/* ==================== 🔔 Honey Bee Transport Media Phase 7 — ট্রিপ/পোস্ট নোটিফিকেশন ====================
+   ⚠️ sendFcmToRider()/sendFcmToMessengerUser()-এর মতোই ইচ্ছাকৃতভাবে
+   সম্পূর্ণ আলাদা দুটো ফাংশন — এই নতুন কোডের কোনো বাগ যেন কখনো বিদ্যমান
+   Rider/Messenger নোটিফিকেশন সিস্টেমকে প্রভাবিত করতে না পারে। */
+async function sendFcmToTransportDriver(driverId, title, body, data) {
+  try {
+    const driverDoc = await db.collection("transportDrivers").doc(driverId).get();
+    const token = driverDoc.exists ? driverDoc.data().fcmToken : null;
+    if (!token) return false;
+
+    await getMessaging().send({
+      token,
+      notification: { title, body },
+      data: Object.assign({ type: "trip-update" }, data || {}),
+      webpush: { fcmOptions: { link: RIDER_MODE_URL } },
+    });
+    console.log(JSON.stringify({ event: "DRIVER_FCM_SENT", driverId }));
+    return true;
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "DRIVER_FCM_FAILED", driverId, error: String(e && e.message || e) }));
+    if (e && e.code === "messaging/registration-token-not-registered") {
+      await db.collection("transportDrivers").doc(driverId).update({ fcmToken: FieldValue.delete() }).catch(() => {});
+    }
+    return false;
+  }
+}
+
+async function sendFcmToCustomer(customerUid, title, body, data) {
+  try {
+    const custDoc = await db.collection("customers").doc(customerUid).get();
+    const token = custDoc.exists ? custDoc.data().fcmToken : null;
+    if (!token) return false;
+
+    await getMessaging().send({
+      token,
+      notification: { title, body },
+      data: Object.assign({ type: "trip-update" }, data || {}),
+      webpush: { fcmOptions: { link: BAZAR_APP_URL } },
+    });
+    console.log(JSON.stringify({ event: "CUSTOMER_FCM_SENT", customerUid }));
+    return true;
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "CUSTOMER_FCM_FAILED", customerUid, error: String(e && e.message || e) }));
+    if (e && e.code === "messaging/registration-token-not-registered") {
+      await db.collection("customers").doc(customerUid).update({ fcmToken: FieldValue.delete() }).catch(() => {});
     }
     return false;
   }
@@ -1091,6 +1141,128 @@ exports.checkExpiredTripOffers = onSchedule("every 2 minutes", async () => {
   console.log(`${expiredSnap.size}টা মেয়াদোত্তীর্ণ ট্রিপ অফার আপডেট করা হয়েছে`);
 });
 
+/* ==================== 🔔 Honey Bee Transport Media Phase 7 — trips/{tripId} আপডেট নোটিফিকেশন ====================
+   honey-bee-bazar.html-এর "গন্তব্য দিয়ে বুক করুন" ফ্লো (দরকষাকষি ও নির্দিষ্ট
+   ভাড়া দুটোই) সম্পূর্ণ ক্লায়েন্ট-সাইড Firestore write দিয়ে চলে — কোনো
+   Cloud Function কল করে না। তাই ট্রিপের status/waitingList বদলালেই এই
+   ট্রিগারটা চলে এবং প্রয়োজনে পুশ পাঠায় — বিদ্যমান কোনো ক্লায়েন্ট কোড
+   ছোঁয়া লাগেনি, সম্পূর্ণ additive। */
+exports.onTripStatusNotify = onDocumentUpdated(
+  "trips/{tripId}",
+  async (event) => {
+    const tripId = event.params.tripId;
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+
+    // ১. নতুন ভাড়া অফার এসেছে (দরকষাকষি ফ্লো, waitingList বেড়েছে) — যাত্রীকে জানানো
+    const beforeCount = (before.waitingList || []).length;
+    const afterCount = (after.waitingList || []).length;
+    if (afterCount > beforeCount && after.passengerId) {
+      await sendFcmToCustomer(
+        after.passengerId,
+        "💰 নতুন ভাড়া অফার এসেছে!",
+        `আপনার "${after.destination || "ট্রিপ"}" বুকিং-এ একজন ড্রাইভার ভাড়া অফার করেছেন।`,
+        { type: "trip-offer", tripId }
+      );
+    }
+
+    // ২. ট্রিপ কনফার্ম হয়েছে (দরকষাকষিতে যাত্রীর বাছাই অথবা নির্দিষ্ট
+    // ভাড়ায় ড্রাইভারের সরাসরি accept) — যাত্রী ও ড্রাইভার দুজনকেই জানানো
+    if (before.status !== "confirmed" && after.status === "confirmed" && after.confirmedDriver) {
+      if (after.passengerId) {
+        await sendFcmToCustomer(
+          after.passengerId,
+          "✅ ড্রাইভার নিশ্চিত হয়েছে!",
+          `${after.confirmedDriver.driverName || "আপনার ড্রাইভার"} আপনার ট্রিপ গ্রহণ করেছেন — কল করে যোগাযোগ করতে পারবেন।`,
+          { type: "trip-confirmed", tripId }
+        );
+      }
+      if (after.confirmedDriver.driverId) {
+        // ⚠️ যাত্রীর "trip-confirmed"-এর থেকে ইচ্ছাকৃতভাবে আলাদা type —
+        // firebase-messaging-sw.js এই দুটোকে ভিন্ন অ্যাপে (Bazar vs Rider
+        // Mode) রাউট করে, তাই একই type ব্যবহার করলে ভুল অ্যাপ খুলে যেত
+        await sendFcmToTransportDriver(
+          after.confirmedDriver.driverId,
+          "🚗 ট্রিপ কনফার্ম হয়েছে!",
+          "আপনার ট্রিপ নিশ্চিত হয়েছে — যাত্রীর কাছে যাওয়ার জন্য প্রস্তুত হোন।",
+          { type: "trip-confirmed-driver", tripId }
+        );
+      }
+    }
+  }
+);
+
+/* 📢 Transport Media পোস্টে নতুন মন্তব্য এলে পোস্টের মালিককে জানানো —
+   নিজের পোস্টে নিজে মন্তব্য করলে পুশ পাঠানো হয় না */
+exports.onTransportMediaCommentNotify = onDocumentCreated(
+  "transportMediaPosts/{postId}/comments/{commentId}",
+  async (event) => {
+    const postId = event.params.postId;
+    const commentData = event.data.data();
+    if (!commentData.uid) return;
+
+    const postDoc = await db.collection("transportMediaPosts").doc(postId).get();
+    if (!postDoc.exists) return;
+    const post = postDoc.data();
+    if (!post.authorId || post.authorId === commentData.uid) return;
+
+    await sendFcmToTransportDriver(
+      post.authorId,
+      `💬 ${commentData.name || "একজন"} মন্তব্য করেছেন`,
+      (commentData.text || "").slice(0, 100),
+      { type: "tm-comment", postId }
+    );
+  }
+);
+
+/* ==================== 🚩 রিপোর্ট-করা পোস্ট সরানো হলে পরিষ্কার-কাজ ====================
+   Transport Media পোস্টের ছবি "vehicle-images"/product-image ফ্লোর মতো
+   imageIndex-এ রেজিস্টার হয় না (postId-ভিত্তিক পাথ, একবারই আপলোড হয়) —
+   তাই cleanupOrphanImages (Step 6) এগুলো কখনো ধরবে না, এখানেই এক্সপ্লিসিটলি
+   মুছতে হবে। driver নিজে "removed" করুক বা agent/superadmin moderation-এর
+   মাধ্যমে করুক — দুই ক্ষেত্রেই ছবি মুছে ফেলা হয় (orphan storage কমাতে)।
+   reviewedBy ফিল্ড সেট থাকলে বোঝা যায় এটা moderator-এর কাজ — তখন এই
+   পোস্টের ওপর বাকি থাকা পেন্ডিং রিপোর্টগুলোও "resolved" করে দেওয়া হয়,
+   যাতে একই পোস্টের একাধিক রিপোর্ট এজেন্ট/সুপারঅ্যাডমিনের কিউতে আলাদা
+   আলাদা করে ঝুলে না থাকে। */
+exports.onTransportMediaPostRemoved = onDocumentUpdated(
+  "transportMediaPosts/{postId}",
+  async (event) => {
+    const postId = event.params.postId;
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+    if (before.status === after.status) return;
+    if (after.status !== "removed") return;
+
+    if (after.imageUrl && after.authorId) {
+      try {
+        const file = getStorage().bucket().file(`transport-media-images/${after.authorId}/${postId}.webp`);
+        const [exists] = await file.exists();
+        if (exists) await file.delete();
+        console.log(JSON.stringify({ event: "TM_POST_IMAGE_DELETED", postId }));
+      } catch (e) {
+        console.warn(JSON.stringify({ event: "TM_POST_IMAGE_DELETE_FAILED", postId, error: String(e && e.message || e) }));
+      }
+    }
+
+    if (after.reviewedBy) {
+      try {
+        const reportsSnap = await db.collection("transportMediaReports")
+          .where("postId", "==", postId)
+          .where("status", "==", "pending")
+          .get();
+        await Promise.all(reportsSnap.docs.map((d) => d.ref.set({
+          status: "resolved",
+          reviewedAt: FieldValue.serverTimestamp(),
+          reviewedBy: after.reviewedBy
+        }, { merge: true })));
+      } catch (e) {
+        console.warn(JSON.stringify({ event: "TM_REPORT_AUTO_RESOLVE_FAILED", postId, error: String(e && e.message || e) }));
+      }
+    }
+  }
+);
+
 /* ==================== 🗑️ ৭ দিনের বেশি পুরনো হিস্ট্রি স্বয়ংক্রিয়ভাবে মুছে ফেলা ====================
    প্রতিদিন একবার চলে — সম্পন্ন হয়ে যাওয়া ট্রিপ, ডেলিভারি, ও রাস্তা থেকে
    পিক-আপের রেকর্ড ৭ দিনের পুরনো হয়ে গেলে Firestore থেকে স্থায়ীভাবে মুছে
@@ -1143,3 +1315,113 @@ exports.cleanupExpiredPrivacyMessages = onSchedule("every 1 minutes", async () =
   await Promise.all(expiredSnap.docs.map((doc) => doc.ref.delete()));
   console.log(`🔐 প্রাইভেসি মোডের ${expiredSnap.size}টা মেয়াদোত্তীর্ণ মেসেজ মুছে ফেলা হয়েছে`);
 });
+
+/* ==================== 🐞 লগইন বাগ-ফিক্স — সার্ভার-সাইড অটো-লক ====================
+   আগে login.html-এর recordFailedLogin() ক্লায়েন্ট থেকেই সরাসরি
+   shops/{shopId}.status = "blocked" লেখার চেষ্টা করতো। কিন্তু ব্যর্থ-
+   লগইনের মুহূর্তে ব্যবহারকারী সাধারণত unauthenticated থাকেন (সাইন-ইনই
+   তো ব্যর্থ হয়েছে), আর firestore.rules-এ ওই রাইট isSignedIn() দাবি
+   করে — তাই সেই রাইট প্রায়ই নীরবে ব্যর্থ হতো, অথচ ক্লায়েন্ট UI-তে
+   "একাউন্ট ব্লক হয়ে গেছে" মেসেজ দেখানো হতো, বাস্তবে ডকুমেন্ট ব্লক না
+   হওয়া সত্ত্বেও (loginAttempts কাউন্টার আর আসল status ফিল্ড আলাদা হয়ে
+   যেত)। এছাড়া driver/rider রোলের ইমেইলের জন্য userData.shopId
+   undefined থাকায় সেই রাইট crash করারও ঝুঁকি ছিল।
+
+   এখন পুরো এনফোর্সমেন্টটা এখানে, Admin SDK দিয়ে (rules বাইপাস করে) —
+   তাই ক্লায়েন্টের auth অবস্থা নির্বিশেষে নির্ভরযোগ্যভাবে কাজ করবে, আর
+   সঠিক কালেকশনেই (role অনুযায়ী shops/transportDrivers/riders) লেখা
+   হবে। শুধু users.email ফিল্ড থাকা একাউন্টের জন্যই কাজ করে (shop-owner/
+   sub-user) — driver/rider সাইন-আপে users.email সেট হয় না (ফোন-ভিত্তিক
+   সিন্থেটিক ইমেইল দিয়ে লগইন করেন), তাদের জন্য role-ভিত্তিক
+   status/isVerified চেক login.html-এই সরাসরি হয়, এই ফাংশনের উপর
+   নির্ভর করে না। */
+exports.onFailedLoginThreshold = onDocumentWritten(
+  "loginAttempts/{emailKey}",
+  async (event) => {
+    if (!event.data.after.exists) return; // ডকুমেন্ট ডিলিট হয়েছে (সফল লগইনের পর clearFailedLogin) — কিছু করার নেই
+    const after = event.data.after.data();
+    const count = after.count || 0;
+    const MAX_FAILED_ATTEMPTS = 5; // login.html/firebase-init.js-এর ধ্রুবকের সাথে মিলিয়ে
+    if (count < MAX_FAILED_ATTEMPTS) return;
+    if (after.autoLockApplied) return; // একবার লক করা হয়ে থাকলে বারবার একই রাইট করার দরকার নেই
+
+    // ডকুমেন্ট আইডি-ই normalize করা (trim+lowercase) ইমেইল — firebase-init.js-এর
+    // normalizeLoginEmail()-এর সাথে মিলিয়ে
+    const email = event.params.emailKey;
+    try {
+      const userQuery = await db.collection("users").where("email", "==", email).limit(1).get();
+      if (userQuery.empty) return; // এই ইমেইলে কোনো shop-owner/sub-user একাউন্ট নেই — নিরাপদে কিছুই করা হলো না
+
+      const userDoc = userQuery.docs[0];
+      const userData = userDoc.data();
+      const uid = userDoc.id;
+      const blockedReason = "অতিরিক্ত ভুল পাসওয়ার্ড (auto-lock)";
+      const blockedAt = FieldValue.serverTimestamp();
+
+      if (userData.role === "transport_driver") {
+        await db.collection("transportDrivers").doc(uid).set({ status: "blocked", blockedReason, blockedAt }, { merge: true });
+      } else if (userData.role === "rider") {
+        await db.collection("riders").doc(uid).set({ status: "blocked", blockedReason, blockedAt }, { merge: true });
+      } else if (userData.shopId) {
+        await db.collection("shops").doc(userData.shopId).set({ status: "blocked", blockedReason, blockedAt }, { merge: true });
+      } else {
+        return; // চেনা role/shopId নেই — নিরাপদে কিছুই করা হলো না
+      }
+
+      await event.data.after.ref.set({ autoLockApplied: true }, { merge: true });
+      console.log(JSON.stringify({ event: "LOGIN_AUTOLOCK_APPLIED", email, role: userData.role || null }));
+    } catch (e) {
+      console.error(JSON.stringify({ event: "LOGIN_AUTOLOCK_FAILED", email, error: String(e && e.message || e) }));
+    }
+  }
+);
+
+/* ==================== 💬 ড্রাইভার-প্যাসেঞ্জার ইন-অ্যাপ চ্যাট ====================
+   ⚠️ sendFcmToMessengerUser()-এর থেকে ইচ্ছাকৃতভাবে সম্পূর্ণ আলাদা —
+   trips/{tripId}/chat সাবকালেকশন, Honey Messenger-এর messengerChats-এর
+   সাথে কোনো সম্পর্ক নেই। parent trips ডকুমেন্ট থেকেই passengerId ও
+   confirmedDriver.driverId পাওয়া যায় বলে আলাদা কোনো "participants"
+   অ্যারে/লুকআপের দরকার নেই। প্রাপককে (প্রেরক বাদে অন্যজনকে) পুশ পাঠানো
+   হয় — sendFcmToCustomer/sendFcmToTransportDriver দুটোই আগে থেকেই আছে
+   (ট্রিপ-স্ট্যাটাস নোটিফিকেশনের জন্য তৈরি হয়েছিল), এখানে পুনর্ব্যবহার
+   করা হচ্ছে। type আলাদা করে "trip-chat-passenger"/"trip-chat-driver" —
+   firebase-messaging-sw.js-এ ট্যাপ করলে সঠিক অ্যাপে (Bazar/POS) পাঠানোর
+   জন্য (onTripStatusNotify-এর trip-confirmed/trip-confirmed-driver
+   বিভাজনের সাথে মিলিয়ে)। */
+exports.onTripChatMessageCreated = onDocumentCreated(
+  "trips/{tripId}/chat/{messageId}",
+  async (event) => {
+    const tripId = event.params.tripId;
+    const messageData = event.data.data();
+    const senderId = messageData.senderId;
+    if (!senderId) return;
+
+    const tripDoc = await db.collection("trips").doc(tripId).get();
+    if (!tripDoc.exists) return;
+    const trip = tripDoc.data();
+    const passengerId = trip.passengerId;
+    const driverId = trip.confirmedDriver && trip.confirmedDriver.driverId;
+    if (!passengerId || !driverId) return;
+
+    const body = (messageData.text || "").slice(0, 100);
+
+    if (senderId === passengerId && driverId) {
+      // প্যাসেঞ্জার পাঠিয়েছেন — ড্রাইভারকে জানানো
+      await sendFcmToTransportDriver(
+        driverId,
+        `💬 ${trip.passengerName || "যাত্রী"}`,
+        body,
+        { type: "trip-chat-driver", tripId }
+      );
+    } else if (senderId === driverId && passengerId) {
+      // ড্রাইভার পাঠিয়েছেন — প্যাসেঞ্জারকে জানানো
+      const driverName = (trip.confirmedDriver && trip.confirmedDriver.driverName) || "ড্রাইভার";
+      await sendFcmToCustomer(
+        passengerId,
+        `💬 ${driverName}`,
+        body,
+        { type: "trip-chat-passenger", tripId }
+      );
+    }
+  }
+);
