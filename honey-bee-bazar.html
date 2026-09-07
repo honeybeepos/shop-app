@@ -428,9 +428,9 @@
         <span class="beeIcon beeInOut" style="font-size:30px; top:0;">🐝<span class="wing"></span></span>
       </div>
     </div>
-    <div style="overflow:hidden; flex:1;">
-      <h1 class="slideText">Honey Bee Bazar</h1>
-      <p>আপনার এলাকার সবকিছু, এক জায়গায়</p>
+    <div style="overflow:hidden; flex:1;" id="appHeaderTextWrap">
+      <h1 class="slideText" id="appHeaderTitle">Honey Bee Bazar</h1>
+      <p id="appHeaderTagline">আপনার এলাকার সবকিছু, এক জায়গায়</p>
     </div>
   </header>
 
@@ -753,6 +753,18 @@
       </div>
 
       <p id="tpWaitStatusTxt" style="font-size:11.5px; color:var(--muted); margin:14px 0 0;"></p>
+    </div>
+  </div>
+
+  <!-- 🐝🚕 Honey Bee Transport Media — ফুল-স্ক্রিন ড্যাশবোর্ড, আপাতত প্লেসহোল্ডার
+       (Transport স্ক্রিনের উপরের টাইটেল বার থেকে ক্লিক করলে খোলে)। আসল
+       কন্টেন্ট/ফিচার পরে এখানে যুক্ত করা হবে। -->
+  <div id="screenTransportMedia" style="padding:20px 16px;">
+    <button class="backBtn" id="backToTransportFromMedia">← ফিরে যান</button>
+    <div style="text-align:center; padding:60px 20px;">
+      <div style="font-size:48px; margin-bottom:16px;">🐝🚕</div>
+      <div style="font-size:17px; font-weight:800; margin-bottom:8px;">Honey Bee Transport Media</div>
+      <div style="font-size:13px; color:var(--muted); line-height:1.6;">এই ড্যাশবোর্ড এখনো তৈরি হচ্ছে — শীঘ্রই নতুন ফিচার নিয়ে যুক্ত করা হবে।</div>
     </div>
   </div>
 
@@ -1484,8 +1496,25 @@ let userLatLng = null;
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenTransportMedia","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
+
+  // 🚕 Transport স্ক্রিনে থাকা অবস্থায় উপরের টাইটেল বার বদলে "Honey Bee
+  // Transport Media" দেখানো হয় এবং সেটাতে ক্লিক করলে একটা নতুন (আপাতত
+  // প্লেসহোল্ডার) ফুল-স্ক্রিন ড্যাশবোর্ড খোলে — বাকি সব স্ক্রিনে আগের
+  // মতোই "Honey Bee Bazar" টাইটেল থাকে
+  const headerTitleEl = document.getElementById("appHeaderTitle");
+  const headerTaglineEl = document.getElementById("appHeaderTagline");
+  const headerWrapEl = document.getElementById("appHeaderTextWrap");
+  if(id === "screenTransport"){
+    if(headerTitleEl) headerTitleEl.textContent = "Honey Bee Transport Media";
+    if(headerTaglineEl) headerTaglineEl.textContent = "ক্লিক করে ট্রান্সপোর্ট ড্যাশবোর্ড দেখুন ›";
+    if(headerWrapEl){ headerWrapEl.style.cursor = "pointer"; headerWrapEl.onclick = ()=> showScreen("screenTransportMedia"); }
+  }else{
+    if(headerTitleEl) headerTitleEl.textContent = "Honey Bee Bazar";
+    if(headerTaglineEl) headerTaglineEl.textContent = "আপনার এলাকার সবকিছু, এক জায়গায়";
+    if(headerWrapEl){ headerWrapEl.style.cursor = ""; headerWrapEl.onclick = null; }
+  }
 
   // 🐝 Market Feed / Market তালিকা — হালকা (লাইট) থিম, "Honey Bee Bazar" টাইটেল
   // বার লুকানো থাকে শুধু এই দুটো স্ক্রিনে (নিচের header/footer toggle এর
@@ -1496,7 +1525,7 @@ function showScreen(id){
   // খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন লুকিয়ে যায়, যাতে
   // পুরোপুরি আলাদা একটা অ্যাপের মতো লাগে (Cart এখন hbCartScreen নিজস্ব
   // fixed overlay হিসেবে আলাদাভাবে ম্যানেজ হয়, showScreen()-এর অংশ না)
-  const isFullScreen = id === "screenHoneyMessenger";
+  const isFullScreen = id === "screenHoneyMessenger" || id === "screenTransportMedia";
   const headerEl = document.querySelector("header");
   if(headerEl) headerEl.style.display = isFullScreen ? "none" : "";
   const footerEl = document.querySelector(".footerNav");
@@ -2636,6 +2665,7 @@ $("menuProfileSaveBtn").addEventListener("click", async ()=>{
 });
 
 document.getElementById("backToHomeFromTransport") && document.getElementById("backToHomeFromTransport").addEventListener("click", ()=> showScreen("screenHome"));
+document.getElementById("backToTransportFromMedia") && document.getElementById("backToTransportFromMedia").addEventListener("click", ()=> showScreen("screenTransport"));
 
 /* ==================== 🤏 চেপে ধরে কনফার্ম করুন (Hold-to-Confirm) ====================
    গুরুত্বপূর্ণ/অপরিবর্তনীয় কাজে (যেমন "রক্ত পেয়ে গেছি", "আজ রক্ত দিয়েছি")
