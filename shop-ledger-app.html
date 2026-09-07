@@ -606,6 +606,26 @@
   }
   @keyframes beeFloat{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
   .bee-marker-trail{ position:absolute; border-left:2px dashed rgba(255,201,60,0.45); pointer-events:none; }
+
+  /* 🤏 রাইডারের "ডেলিভারি সম্পন্ন" বাটন — ভুলবশত এক ট্যাপে যেন কখনো
+     সম্পন্ন না হয়ে যায়, তাই ৩ সেকেন্ড চেপে ধরে রাখতে হয়। ধরে রাখা অবস্থায়
+     বাটনের ভেতর দিয়ে একটা ফিল-অ্যানিমেশন বাম থেকে ডানে ভরে যায়, ছেড়ে দিলে
+     সাথে সাথে খালি হয়ে যায় (কনফার্ম হয়নি বোঝাতে) — ৩ সেকেন্ড পূর্ণ হলে
+     একটা পপ-অ্যানিমেশন দিয়ে আসল আপডেট চালু হয়। */
+  .rmBazarDeliveredBtn{
+    position:relative; overflow:hidden; -webkit-user-select:none; user-select:none;
+    touch-action:manipulation; transition: transform .15s ease;
+  }
+  .rmBazarDeliveredBtn .rmHoldFill{
+    position:absolute; left:0; top:0; bottom:0; width:0%;
+    background:rgba(255,255,255,0.4); pointer-events:none;
+  }
+  .rmBazarDeliveredBtn .rmHoldLabel{ position:relative; z-index:1; }
+  .rmBazarDeliveredBtn.rmHolding{ transform:scale(0.97); }
+  .rmBazarDeliveredBtn.rmHolding .rmHoldFill{ width:100%; transition: width 3s linear; }
+  @keyframes rmHoldDone{ 0%{transform:scale(0.97);} 40%{transform:scale(1.12);} 65%{transform:scale(0.94);} 100%{transform:scale(1);} }
+  .rmBazarDeliveredBtn.rmHoldSuccess{ animation: rmHoldDone 0.5s ease; background:#16a34a !important; }
+  .rmBazarDeliveredBtn:disabled{ cursor:default; }
 </style>
 </head>
 <body>
@@ -14165,6 +14185,53 @@ async function rmSetupFcm(riderUid){
    orderRequests-এ assignedRiderId এই রাইডারের uid হয়ে যায় — সেটাই এখানে
    লাইভ শোনা হচ্ছে। কাস্টমারের ঠিকানা/ফোন এখানেই দেখা যাবে, আলাদা করে
    দোকানে ফোন করে জিজ্ঞেস করতে হবে না। */
+// 🤏 কোনো বাটনে "৩ সেকেন্ড চেপে ধরলে তবেই একশন হবে" — ভুল করে এক ট্যাপে
+// গুরুত্বপূর্ণ কিছু (যেমন ডেলিভারি সম্পন্ন) কনফার্ম হয়ে যাওয়া ঠেকাতে।
+// বাটনের ভেতরে .rmHoldFill (ফিল-অ্যানিমেশনের জন্য) আর .rmHoldLabel
+// (আসল টেক্সট) থাকা দরকার — নাহলে শুধু বাটনের textContent-ই লেবেল হিসেবে ব্যবহার হবে।
+function rmSetupHoldToConfirm(btn, holdMs, onConfirm){
+  const fillEl = btn.querySelector(".rmHoldFill");
+  const labelEl = btn.querySelector(".rmHoldLabel");
+  const originalLabel = labelEl ? labelEl.textContent : btn.textContent;
+  let holdTimer = null;
+  let confirmed = false;
+
+  function startHold(e){
+    if(confirmed || btn.disabled) return;
+    e.preventDefault();
+    btn.classList.add("rmHolding");
+    if(labelEl) labelEl.textContent = "🕐 ধরে থাকুন...";
+    holdTimer = setTimeout(async ()=>{
+      confirmed = true;
+      btn.classList.remove("rmHolding");
+      btn.classList.add("rmHoldSuccess");
+      if(labelEl) labelEl.textContent = "✅ সম্পন্ন হয়েছে!";
+      btn.disabled = true;
+      try{
+        await onConfirm();
+      }catch(err){
+        alert("আপডেট করা যায়নি: " + err.message);
+        // ব্যর্থ হলে আবার চেষ্টা করার সুযোগ দেওয়া হচ্ছে
+        confirmed = false;
+        btn.disabled = false;
+        btn.classList.remove("rmHoldSuccess");
+        if(labelEl) labelEl.textContent = originalLabel;
+      }
+    }, holdMs);
+  }
+  function cancelHold(){
+    if(confirmed) return;
+    clearTimeout(holdTimer);
+    btn.classList.remove("rmHolding");
+    if(labelEl) labelEl.textContent = originalLabel;
+  }
+
+  btn.addEventListener("pointerdown", startHold);
+  btn.addEventListener("pointerup", cancelHold);
+  btn.addEventListener("pointerleave", cancelHold);
+  btn.addEventListener("pointercancel", cancelHold);
+}
+
 let __rmBazarDeliveryUnsub = null;
 let __rmBazarDeliveryFirstLoad = true;
 
@@ -14189,15 +14256,13 @@ function rmStartBazarDeliveryListener(riderUid){
             <div style="font-size:11.5px; color:#a8a8a8; margin-top:3px;">পরিমাণ: ${o.qty||1}</div>
             ${o.deliveryAddress ? `<div style="font-size:12px; color:#fff; margin-top:6px;">📍 ${escapeAttr(o.deliveryAddress)}</div>${o.deliveryLat!=null ? `<a href="https://www.google.com/maps/search/?api=1&query=${o.deliveryLat},${o.deliveryLng}" target="_blank" style="display:inline-block; font-size:12px; color:#0ea5e9; margin-top:4px; text-decoration:none;">🗺️ ম্যাপে দেখুন (নেভিগেশন)</a>` : ''}` : '<div style="font-size:11px; color:#f87171; margin-top:6px;">⚠️ কাস্টমার কোনো ঠিকানা দেননি</div>'}
             ${o.deliveryPhone ? `<a href="tel:${escapeAttr(o.deliveryPhone)}" style="display:inline-block; font-size:12px; color:#FFC107; margin-top:4px; text-decoration:none;">📞 ${escapeAttr(o.deliveryPhone)}</a>` : ''}
-            <button class="rmBazarDeliveredBtn" data-oid="${o.id}" style="width:100%; margin-top:10px; padding:10px; border:none; border-radius:9px; background:#2fbf71; color:#0a2416; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ডেলিভারি সম্পন্ন হয়েছে</button>
+            <button class="rmBazarDeliveredBtn" data-oid="${o.id}" style="width:100%; margin-top:10px; padding:10px; border:none; border-radius:9px; background:#2fbf71; color:#0a2416; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;"><span class="rmHoldFill"></span><span class="rmHoldLabel">✅ ৩ সেকেন্ড চেপে ধরুন — ডেলিভারি সম্পন্ন</span></button>
           </div>`).join("");
         listEl.querySelectorAll(".rmBazarDeliveredBtn").forEach(btn=>{
-          btn.addEventListener("click", async ()=>{
-            try{
-              await db.collection("orderRequests").doc(btn.dataset.oid).update({
-                status: "delivered", deliveredAt: firebase.firestore.FieldValue.serverTimestamp()
-              });
-            }catch(e){ alert("আপডেট করা যায়নি: " + e.message); }
+          rmSetupHoldToConfirm(btn, 3000, async ()=>{
+            await db.collection("orderRequests").doc(btn.dataset.oid).update({
+              status: "delivered", deliveredAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
           });
         });
       }
