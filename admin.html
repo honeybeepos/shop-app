@@ -117,12 +117,36 @@
     <div id="allDriversList">লোড হচ্ছে...</div>
   </div>
 
+  <!-- 🚩 Transport Media — যাত্রীদের রিপোর্ট করা পোস্ট। এজেন্টও নিজের
+       বাজারের রিপোর্ট Honey Bee Agent অ্যাপ থেকে দেখেন/হ্যান্ডেল করেন —
+       এটা সুপারঅ্যাডমিনের জন্য সব বাজারের catch-all/escalation ভিউ। -->
+  <div class="card">
+    <h2>🚩 Transport Media রিপোর্ট (<span id="tmReportCount">0</span>) <span id="pendingTmReportBadge" style="display:none; background:var(--due); color:#fff; font-size:11px; padding:2px 8px; border-radius:20px; margin-left:6px;"></span></h2>
+    <p style="font-size:11.5px; color:#8a7f6c; margin:0 0 10px;">যাত্রীরা কোনো পোস্ট রিপোর্ট করলে এখানে দেখা যাবে (সব বাজার একসাথে) — সংশ্লিষ্ট বাজারের এজেন্টও নিজের অ্যাপ থেকে একই রিপোর্ট দেখতে/হ্যান্ডেল করতে পারেন।</p>
+    <div id="tmReportList">লোড হচ্ছে...</div>
+  </div>
+
   <div class="card">
     <h2>📊 Honey Bee Bazar — লাইভ অ্যানালিটিক্স</h2>
     <p style="font-size:13px; margin:0 0 10px;">এই মুহূর্তে অ্যাপে ব্রাউজ করছে: <b id="liveUserCount" style="color:var(--paid); font-size:16px;">0</b> জন</p>
     <div id="recentSessionsList" style="font-size:12px; color:#5a5142;">লোড হচ্ছে...</div>
   </div>
 
+</div>
+
+<!-- 🚩 রিপোর্ট করা পোস্ট রিভিউ — admin.html-এ আগে কোনো মোডাল-প্যাটার্ন
+     ছিল না (honey-bee-agent.html-এর .modalOverlay থেকে ভিন্ন), তাই
+     এই ফাইলের নিজস্ব .card স্টাইলেই একটা সাধারণ ওভারলে বানানো হলো। -->
+<div id="tmReportPostModal" style="display:none; position:fixed; inset:0; z-index:99; background:rgba(28,26,23,0.7); align-items:center; justify-content:center; padding:16px;">
+  <div class="card" style="max-width:420px; width:100%; max-height:80vh; overflow-y:auto;">
+    <h2>🚩 রিপোর্ট করা পোস্ট</h2>
+    <div id="tmReportPostModalBody">লোড হচ্ছে...</div>
+    <div class="row">
+      <button class="btn unblock" id="tmReportPostDismissBtn">✓ Dismiss (ঠিক আছে)</button>
+      <button class="btn block" id="tmReportPostDeleteBtn">🗑️ পোস্ট মুছুন</button>
+    </div>
+    <button class="btn secondary" id="closeTmReportPostModal" style="width:100%; margin-top:8px;">✕ বন্ধ করুন</button>
+  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -158,6 +182,7 @@ auth.onAuthStateChanged(async (user)=>{
   loadAgents();
   loadAllRiders();
   startDriversListener();
+  startTmReportsListener();
   startAnalyticsListener();
 });
 
@@ -528,12 +553,17 @@ async function setStatus(shopId, status){
   if(status === "active"){
     extra.blockedReason = firebase.firestore.FieldValue.delete();
     // এই দোকানের সব ইউজার/সাব-ইউজারের ভুল-পাসওয়ার্ড গণনা রিসেট করা হচ্ছে,
-    // নাহলে আনব্লক করার পরেও একটা ভুল চাপেই আবার ব্লক হয়ে যাবে
+    // নাহলে আনব্লক করার পরেও একটা ভুল চাপেই আবার ব্লক হয়ে যাবে।
+    // 🐞 বাগ-ফিক্স: loginAttempts ডকুমেন্ট আইডি এখন সবসময় trim+lowercase
+    // করা ইমেইল (login.html/firebase-init.js-এর normalizeLoginEmail())।
+    // এখানেও একইভাবে normalize না করলে ভুল/অস্তিত্বহীন ডকুমেন্ট ডিলিট
+    // হতো, আর আসল কাউন্টার-ডকুমেন্টটা রয়ে যেতো — ফলে "আনব্লক" করার পরও
+    // একটা ভুল পাসওয়ার্ড চাপলেই আবার "ব্লক" মেসেজ দেখাতো।
     const membersSnap = await db.collection("shops").doc(shopId).collection("members").get();
     const clears = membersSnap.docs
       .map(d => d.data().email)
       .filter(Boolean)
-      .map(email => db.collection("loginAttempts").doc(email).delete().catch(()=>{}));
+      .map(email => db.collection("loginAttempts").doc(String(email).trim().toLowerCase()).delete().catch(()=>{}));
     await Promise.all(clears);
   }
   await db.collection("shops").doc(shopId).set(extra, { merge: true });
@@ -641,6 +671,114 @@ function startDriversListener(){
     list.querySelectorAll('[data-driver-act="delete"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "driver", "ড্রাইভার")));
   }, (err)=> console.warn("drivers listener error:", err));
 }
+
+// admin.html-এ কোনো সাধারণ escape-হেল্পার আগে থেকে ছিল না (এই ফাইলের
+// বাকি সব জায়গায় ব্যবহারকারীর ডেটা escape ছাড়াই innerHTML-এ বসে) —
+// কিন্তু রিপোর্টের "details" ফিল্ড যাত্রীর সরাসরি লেখা ফ্রি-টেক্সট,
+// তাই নতুন এই কোডে অন্তত এটুকু নিরাপত্তা যোগ করা হলো।
+function escapeHtmlAdmin(str){
+  const div = document.createElement("div");
+  div.textContent = str == null ? "" : String(str);
+  return div.innerHTML;
+}
+
+/* ==================== 🚩 Transport Media রিপোর্ট (Super Admin — সব বাজার) ====================
+   transportMediaReports collection — এজেন্টরা নিজের বাজারের রিপোর্ট
+   Honey Bee Agent অ্যাপ থেকে market-scoped কোয়েরি দিয়ে দেখেন, এটা
+   সুপারঅ্যাডমিনের catch-all ভিউ — মার্কেট ফিল্টার ছাড়াই single
+   equality filter (status==), কোনো orderBy নেই — নতুন কম্পোজিট
+   ইনডেক্স লাগবে না। */
+function startTmReportsListener(){
+  db.collection("transportMediaReports").where("status","==","pending").onSnapshot((snap)=>{
+    document.getElementById("tmReportCount").textContent = snap.size;
+    const badge = document.getElementById("pendingTmReportBadge");
+    if(snap.size > 0){
+      badge.textContent = `${snap.size}টা রিপোর্ট বাকি`;
+      badge.style.display = "inline-block";
+    }else{
+      badge.style.display = "none";
+    }
+
+    const list = document.getElementById("tmReportList");
+    if(snap.empty){ list.innerHTML = "<p>এই মুহূর্তে কোনো পেন্ডিং রিপোর্ট নেই।</p>"; return; }
+
+    const TM_REASON_LABEL_ADMIN = {
+      spam: "🗑️ স্প্যাম/অপ্রাসঙ্গিক", inappropriate: "🔞 অনুপযুক্ত কনটেন্ট",
+      harassment: "😡 হয়রানি/হুমকি", fake: "🎭 ভুয়া তথ্য", other: "❓ অন্য কারণ"
+    };
+    list.innerHTML = "";
+    for(const doc of snap.docs){
+      const r = doc.data();
+      const div = document.createElement("div");
+      div.className = "shop";
+      div.innerHTML = `
+        <div class="shop-top">
+          <span class="shop-name">${TM_REASON_LABEL_ADMIN[r.reason] || escapeHtmlAdmin(r.reason) || "রিপোর্ট"}</span>
+        </div>
+        <div class="meta">${escapeHtmlAdmin(r.reporterName || "একজন যাত্রী")} রিপোর্ট করেছেন${r.details ? " · " + escapeHtmlAdmin(r.details) : ""}</div>
+        <div class="row">
+          <button class="btn" data-tmreport-act="view" data-id="${doc.id}" data-postid="${r.postId||""}">👀 পোস্ট দেখুন</button>
+        </div>
+      `;
+      list.appendChild(div);
+    }
+    list.querySelectorAll('[data-tmreport-act="view"]').forEach(b=>b.addEventListener("click", ()=>openTmReportModal(b.dataset.id, b.dataset.postid)));
+  }, (err)=> console.warn("tm reports listener error:", err));
+}
+
+let tmReportModalTargetId = null, tmReportModalTargetPostId = null;
+
+async function openTmReportModal(reportId, postId){
+  tmReportModalTargetId = reportId;
+  tmReportModalTargetPostId = postId;
+  const modal = document.getElementById("tmReportPostModal");
+  const body = document.getElementById("tmReportPostModalBody");
+  body.innerHTML = "লোড হচ্ছে...";
+  modal.style.display = "flex";
+  try{
+    const doc = await db.collection("transportMediaPosts").doc(postId).get();
+    if(!doc.exists){ body.innerHTML = "পোস্টটি আর নেই (হয়তো আগেই মুছে ফেলা হয়েছে)।"; return; }
+    const p = doc.data();
+    body.innerHTML = `
+      <div style="border:1px solid var(--border); border-radius:10px; padding:12px;">
+        <div style="font-weight:800; margin-bottom:6px;">${escapeHtmlAdmin(p.authorName || "ড্রাইভার")}</div>
+        ${p.imageUrl ? `<img src="${p.imageUrl}" style="width:100%; border-radius:8px; margin-bottom:8px;">` : ""}
+        ${p.text ? `<div style="font-size:13px;">${escapeHtmlAdmin(p.text)}</div>` : "<div style='color:#8a7f6c;'>(শুধু ছবি, কোনো লেখা নেই)</div>"}
+      </div>`;
+  }catch(e){
+    body.innerHTML = "পোস্ট লোড করা যায়নি: " + escapeHtmlAdmin(e.message);
+  }
+}
+
+document.getElementById("closeTmReportPostModal").addEventListener("click", ()=>{
+  document.getElementById("tmReportPostModal").style.display = "none";
+});
+document.getElementById("tmReportPostDismissBtn").addEventListener("click", async ()=>{
+  if(!tmReportModalTargetId) return;
+  try{
+    await db.collection("transportMediaReports").doc(tmReportModalTargetId).set({
+      status: "dismissed", reviewedAt: fbNow(), reviewedBy: (auth.currentUser && auth.currentUser.uid) || "superadmin"
+    }, { merge: true });
+    document.getElementById("tmReportPostModal").style.display = "none";
+  }catch(e){ alert("Dismiss করা যায়নি: " + e.message); }
+});
+document.getElementById("tmReportPostDeleteBtn").addEventListener("click", async ()=>{
+  if(!tmReportModalTargetId || !tmReportModalTargetPostId) return;
+  if(!confirm("এই পোস্টটা সত্যিই মুছে ফেলবেন?")) return;
+  try{
+    // 🚩 soft-delete convention — ড্রাইভারের নিজের ডিলিট বাটনের মতোই।
+    // reviewedBy সেট থাকায় functions/index.js-এর
+    // onTransportMediaPostRemoved ট্রিগার Storage থেকে ছবিও মুছবে ও
+    // এই পোস্টের বাকি পেন্ডিং রিপোর্টও অটো-রিজলভ করবে।
+    await db.collection("transportMediaPosts").doc(tmReportModalTargetPostId).set({
+      status: "removed", reviewedAt: fbNow(), reviewedBy: (auth.currentUser && auth.currentUser.uid) || "superadmin"
+    }, { merge: true });
+    await db.collection("transportMediaReports").doc(tmReportModalTargetId).set({
+      status: "resolved", reviewedAt: fbNow(), reviewedBy: (auth.currentUser && auth.currentUser.uid) || "superadmin"
+    }, { merge: true });
+    document.getElementById("tmReportPostModal").style.display = "none";
+  }catch(e){ alert("পোস্ট মোছা যায়নি: " + e.message); }
+});
 
 /* ==================== 📊 Honey Bee Bazar লাইভ অ্যানালিটিক্স ====================
    Honey Bee Bazar অ্যাপ প্রতি ~১৫ সেকেন্ডে activeSessions/{sessionId}-এ একটা

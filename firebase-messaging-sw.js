@@ -30,15 +30,21 @@ messaging.onBackgroundMessage((payload) => {
   // একের-পর-এক ভিন্ন নোটিফিকেশন (যেমন দুটো ভিন্ন চ্যাটের মেসেজ) এলে
   // ব্রাউজার আগেরটাকে নতুনটা দিয়ে চুপচাপ replace করে ফেলত, ইউজার
   // প্রথমটা মিস করে যেতেন
-  const tagId = (payload.data && (payload.data.chatId || payload.data.offerId || payload.data.orderId)) || "general";
+  // 📢 Honey Bee Transport Media Phase 7 — tripId/postId-ও tagId হিসেবে ব্যবহার হয়
+  const tagId = (payload.data && (payload.data.chatId || payload.data.offerId || payload.data.orderId || payload.data.tripId || payload.data.postId)) || "general";
   const tag = `honeybee-${type}-${tagId}`;
+
+  // 🔕 মেসেজ/মন্তব্যের মতো হালকা নোটিফিকেশন নিজে থেকেই কিছুক্ষণ পর সরে
+  // যাক — শুধু ডেলিভারি-কল আর ট্রিপ-কনফার্মের মতো সরাসরি অ্যাকশন-দরকার
+  // নোটিফিকেশন থেকেই যাবে যতক্ষণ না ব্যবহারকারী নিজে সরান
+  const softTypes = ["messenger-message", "tm-comment"];
 
   self.registration.showNotification(title, {
     body,
     icon: "icon-192.png",
     badge: "icon-192.png",
     vibrate: [500, 200, 500, 200, 500],
-    requireInteraction: type !== "messenger-message", // মেসেজ-নোটিফিকেশন নিজে থেকেই কিছুক্ষণ পর সরে যাক, ডেলিভারি-কল জরুরি বলে থেকে যাবে
+    requireInteraction: !softTypes.includes(type),
     tag,
     renotify: true,
     data: payload.data || {}
@@ -50,7 +56,11 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const type = (event.notification.data && event.notification.data.type) || "delivery-offer";
-  const targetFile = type === "messenger-message" ? "honey-bee-bazar.html" : "shop-ledger-app.html";
+  // 📢 Honey Bee Transport Media Phase 7 — যাত্রী-মুখী পুশ (নতুন ভাড়া
+  // অফার, ট্রিপ কনফার্ম) Bazar অ্যাপে যাবে; ড্রাইভার-মুখী পুশ (ট্রিপ
+  // কনফার্ম, পোস্টে মন্তব্য) Rider/Driver Mode-এ (shop-ledger-app.html)
+  const passengerFacingTypes = ["messenger-message", "trip-offer", "trip-confirmed", "trip-chat-passenger"];
+  const targetFile = passengerFacingTypes.includes(type) ? "honey-bee-bazar.html" : "shop-ledger-app.html";
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {

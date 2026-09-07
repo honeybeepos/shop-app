@@ -55,7 +55,7 @@
   .btn.danger{ background:var(--danger); color:#fff; }
   .btn.ok{ background:var(--ok); color:#fff; }
 
-  .statGrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+  .statGrid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:14px; }
   .statBox{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; text-align:center; }
   .statBox .num{ font-size:22px; font-weight:800; color:var(--amber); }
   .statBox .lbl{ font-size:11px; color:var(--muted); margin-top:2px; }
@@ -144,6 +144,7 @@
   <div class="statGrid">
     <div class="statBox"><div class="num" id="statRiders">—</div><div class="lbl">সক্রিয় রাইডার</div></div>
     <div class="statBox"><div class="num" id="statShops">—</div><div class="lbl">সক্রিয় দোকান</div></div>
+    <div class="statBox"><div class="num" id="statMyDrivers">—</div><div class="lbl">আপনার ড্রাইভার</div></div>
   </div>
 
   <div class="tabs">
@@ -180,6 +181,19 @@
   <!-- 🚑 ট্রান্সপোর্ট ড্রাইভার -->
   <div class="tabPanel" id="tabTransport">
     <p style="font-size:11.5px; color:var(--muted); margin:0 0 12px;">ড্রাইভাররা নিজেরাই login.html-এ গিয়ে নিবন্ধন করেন। এখানে আপনার বাজার/এলাকায় নিবন্ধিত সবাইকে দেখাবে — নতুনদের 🛡️ ভেরিফাই করুন।</p>
+
+    <!-- 🪪 ড্রাইভার নিজে NID/লাইসেন্স আপলোড করে জমা দিলে এখানে দেখাবে -->
+    <div id="docVerifyPendingWrap" style="display:none; margin-bottom:18px;">
+      <h2 style="font-size:14px; margin:0 0 8px;">🪪 পেন্ডিং ডকুমেন্ট ভেরিফিকেশন</h2>
+      <div id="docVerifyPendingList"></div>
+    </div>
+
+    <!-- 🚩 Transport Media পোস্টে যাত্রীদের রিপোর্ট থাকলে এখানে দেখাবে -->
+    <div id="tmReportPendingWrap" style="display:none; margin-bottom:18px;">
+      <h2 style="font-size:14px; margin:0 0 8px;">🚩 রিপোর্ট করা কনটেন্ট</h2>
+      <div id="tmReportPendingList"></div>
+    </div>
+
     <div id="driversList"><div class="emptyMsg">লোড হচ্ছে...</div></div>
   </div>
 
@@ -265,6 +279,41 @@
   </div>
 </div>
 
+<!-- ========= 🪪 ড্রাইভার-আপলোড করা NID/লাইসেন্স ডকুমেন্ট রিভিউ মোডাল ========= -->
+<!-- এটা উপরের 🛡️ ভেরিফিকেশন মোডাল থেকে আলাদা — উপরেরটা এজেন্ট নিজে সরেজমিনে
+     ছবি তুলে সাথে সাথে Approve করেন, এটা ড্রাইভার নিজে ড্যাশবোর্ড থেকে আগে
+     থেকেই আপলোড করে রাখা ছবি এজেন্ট পরে সময় করে রিভিউ করেন। -->
+<div class="modalOverlay" id="docVerifyModal">
+  <div class="modalCard">
+    <h3>🪪 ডকুমেন্ট রিভিউ — <span id="docVerifyModalName">—</span></h3>
+    <p style="font-size:12.5px; color:rgba(255,248,232,0.6); margin:0 0 14px;">ড্রাইভার নিজেই এই ছবিগুলো আপলোড করেছেন। সব ঠিকঠাক মনে হলে "Approve" চাপুন, নাহলে কারণ লিখে "Reject" চাপুন — ড্রাইভার তার ড্যাশবোর্ডে কারণটা দেখতে পাবেন।</p>
+    <div id="docVerifyModalBody"><div class="emptyMsg">লোড হচ্ছে...</div></div>
+    <label style="margin-top:10px;">❌ Reject করার কারণ (শুধু Reject করলে লাগবে)</label>
+    <input type="text" id="docVerifyRejectReason" placeholder="যেমনঃ NID-এর ছবি স্পষ্ট না">
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn small ok" id="docVerifyApproveBtn" style="flex:1; background:linear-gradient(135deg,#4ade80,#16a34a);">✅ Approve করুন</button>
+      <button class="btn small danger" id="docVerifyRejectBtn" style="flex:1;">❌ Reject করুন</button>
+    </div>
+    <p id="docVerifyMsg" style="display:none; font-size:12.5px; margin:8px 0 0;"></p>
+    <div class="modalClose"><span id="closeDocVerifyModal">✕ বন্ধ করুন</span></div>
+  </div>
+</div>
+
+<!-- ========= 🚩 Transport Media রিপোর্ট রিভিউ মোডাল ========= -->
+<div class="modalOverlay" id="tmReportModal">
+  <div class="modalCard">
+    <h3>🚩 রিপোর্ট রিভিউ</h3>
+    <p style="font-size:12.5px; color:rgba(255,248,232,0.6); margin:0 0 14px;">রিপোর্ট করা পোস্টটা দেখে সিদ্ধান্ত নিন — সমস্যা না থাকলে "Dismiss", সত্যিই নিয়ম ভাঙা হলে "পোস্ট মুছুন"।</p>
+    <div id="tmReportModalBody"><div class="emptyMsg">লোড হচ্ছে...</div></div>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn small ok" id="tmReportDismissBtn" style="flex:1;">✓ Dismiss (ঠিক আছে)</button>
+      <button class="btn small danger" id="tmReportDeletePostBtn" style="flex:1;">🗑️ পোস্ট মুছুন</button>
+    </div>
+    <p id="tmReportModalMsg" style="display:none; font-size:12.5px; margin:8px 0 0;"></p>
+    <div class="modalClose"><span id="closeTmReportModal">✕ বন্ধ করুন</span></div>
+  </div>
+</div>
+
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyD6qmuWkNUrskMIBHq8Z_AQ0N_WT1DL8Is",
@@ -337,7 +386,10 @@ auth.onAuthStateChanged(async (user)=>{
     }
     currentAgent = { uid: user.uid, ...agentDoc.data() };
 
-    if(currentAgent.status !== "active"){
+    // 🐞 বাগ-ফিক্স: `status !== "active"` এর বদলে সরাসরি "blocked" চেক —
+    // ভবিষ্যতে এজেন্টের জন্য অন্য কোনো status মান (যেমন "pending")
+    // যোগ হলে সেটাকেও ভুলভাবে "ব্লক" হিসেবে দেখাবে না।
+    if(currentAgent.status === "blocked"){
       $("loginScreen").style.display = "none";
       $("mainScreen").style.display = "none";
       $("blockedScreen").style.display = "block";
@@ -387,6 +439,8 @@ async function loadDashboard(){
   listenRiders();
   listenShops();
   listenDrivers();
+  listenDocVerifyPending(); // 🪪 ড্রাইভার-আপলোড করা NID/লাইসেন্স ডকুমেন্ট রিভিউ কিউ
+  listenTmReportsPending(); // 🚩 Transport Media রিপোর্ট-করা পোস্টের রিভিউ কিউ
 }
 
 function stopListeners(){
@@ -528,8 +582,14 @@ function listenDrivers(){
     .onSnapshot((qs)=>{
       if(qs.empty){
         $("driversList").innerHTML = '<div class="emptyMsg">এখনো কোনো ড্রাইভার যোগ করা হয়নি।</div>';
+        $("statMyDrivers").textContent = "0";
         return;
       }
+      // 🤝 Phase 5 — এই বাজারে যত ড্রাইভার আছে তার মধ্যে ঠিক কতজন
+      // নিবন্ধনের সময় এই এজেন্টকে সরাসরি বেছে নিয়েছেন, সেটা আলাদাভাবে দেখানো
+      const myCount = qs.docs.filter(d=> d.data().assignedAgentId === currentAgent.uid).length;
+      $("statMyDrivers").textContent = myCount;
+
       $("driversList").innerHTML = qs.docs.map(doc=>{
         const d = doc.data();
         const statusClass = d.status === "active" ? "active" : "blocked";
@@ -541,10 +601,11 @@ function listenDrivers(){
         const onlineDot = d.driverStatus === "online" ? '<span style="color:#4ade80;">🟢</span>'
           : d.driverStatus === "busy" ? '<span style="color:#fbbf24;">🟠</span>'
           : '<span style="color:#f87171;">⚪</span>';
+        const isMine = d.assignedAgentId === currentAgent.uid;
         return `
           <div class="rowItem">
             <div class="info">
-              <div class="name">${escapeHtml(d.name || "নাম নেই")} ${d.isVerified ? '<span title="Verified">🛡️</span>' : ''} ${onlineDot}</div>
+              <div class="name">${escapeHtml(d.name || "নাম নেই")} ${d.isVerified ? '<span title="Verified">🛡️</span>' : ''} ${onlineDot} ${isMine ? '<span style="font-size:10px; font-weight:800; color:#4ade80; background:rgba(74,222,128,0.15); border-radius:8px; padding:1px 7px; margin-left:2px;">👤 আপনার</span>' : ''}</div>
               <div class="meta">📱 ${escapeHtml(d.phone || "—")} · ${escapeHtml(vehicleLabel || "যানবাহন নির্ধারিত না")}</div>
             </div>
             <span class="badge ${statusClass}">${statusText}</span>
@@ -564,6 +625,256 @@ function listenDrivers(){
       $("driversList").innerHTML = '<div class="emptyMsg">ড্রাইভারের তালিকা লোড করা যায়নি।</div>';
     });
 }
+
+/* ---------- 🪪 ড্রাইভার-আপলোড করা NID/লাইসেন্স ডকুমেন্ট রিভিউ ---------- */
+// এজেন্টের এখন দুই ধরনের ভেরিফিকেশন ফ্লো আছে, একসাথে চলে: (১) পুরনো —
+// উপরের 🛡️ openVerifyModal দিয়ে সামনাসামনি লাইভ ছবি তুলে সাথে সাথেই
+// Approve করা, (২) নতুন — ড্রাইভার নিজে ড্যাশবোর্ড থেকে NID/লাইসেন্সের
+// ছবি আগে থেকেই আপলোড করে জমা দেন (transportDrivers/{id}/verification/docs
+// প্রাইভেট সাবকালেকশনে), এজেন্ট এখানে পরে সময় করে রিভিউ করে Approve/Reject
+// করেন। দুটো flow সম্পূর্ণ স্বাধীন — একটা আরেকটাকে প্রভাবিত করে না।
+let docVerifyUnsub = null;
+let docVerifyTargetId = null;
+function listenDocVerifyPending(){
+  // দুইটা equality filter (marketId, verificationStatus), কোনো orderBy
+  // নেই — তাই নতুন কম্পোজিট ইনডেক্স লাগবে না।
+  docVerifyUnsub = db.collection("transportDrivers")
+    .where("marketId", "==", currentAgent.marketId)
+    .where("verificationStatus", "==", "pending")
+    .onSnapshot((qs)=>{
+      const wrap = $("docVerifyPendingWrap");
+      if(qs.empty){
+        wrap.style.display = "none";
+        $("docVerifyPendingList").innerHTML = "";
+        return;
+      }
+      wrap.style.display = "block";
+      $("docVerifyPendingList").innerHTML = qs.docs.map(doc=>{
+        const d = doc.data();
+        return `
+          <div class="rowItem">
+            <div class="info">
+              <div class="name">${escapeHtml(d.name || "নাম নেই")}</div>
+              <div class="meta">📱 ${escapeHtml(d.phone || "—")}</div>
+            </div>
+          </div>
+          <div class="rowActions" style="margin:-6px 0 14px;">
+            <button class="btn small ok" onclick="openDocVerifyReview('${doc.id}','${escapeHtml(d.name || 'ড্রাইভার').replace(/'/g,"")}')">🪪 ডকুমেন্ট দেখুন</button>
+          </div>`;
+      }).join("");
+    }, (err)=>{
+      console.error("doc verify pending listener error:", err);
+    });
+}
+
+// ডকুমেন্টের ছবিগুলো এখানে lazy-load করা হয় — শুধু এজেন্ট রিভিউ করতে
+// চাইলেই প্রাইভেট verification/docs সাবকালেকশন থেকে আনা হয়, তালিকা
+// লোড হওয়ার সময় না (অপ্রয়োজনীয় রিড কমাতে)।
+window.openDocVerifyReview = async function(driverId, name){
+  docVerifyTargetId = driverId;
+  $("docVerifyModalName").textContent = name || "—";
+  $("docVerifyModalBody").innerHTML = '<div class="emptyMsg">লোড হচ্ছে...</div>';
+  $("docVerifyRejectReason").value = "";
+  $("docVerifyMsg").style.display = "none";
+  $("docVerifyModal").style.display = "flex";
+  try{
+    const doc = await db.collection("transportDrivers").doc(driverId)
+      .collection("verification").doc("docs").get();
+    if(!doc.exists){
+      $("docVerifyModalBody").innerHTML = '<div class="emptyMsg">কোনো ডকুমেন্ট পাওয়া যায়নি।</div>';
+      return;
+    }
+    const d = doc.data();
+    const imgs = [
+      { label: "NID সামনে", url: d.nidFront },
+      { label: "NID পেছনে", url: d.nidBack },
+      { label: "লাইসেন্স সামনে", url: d.licenseFront },
+      { label: "লাইসেন্স পেছনে", url: d.licenseBack }
+    ].filter(x=> x.url);
+    $("docVerifyModalBody").innerHTML = imgs.map(x=>`
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">${x.label}</div>
+        <img src="${x.url}" style="width:100%; max-width:280px; border-radius:8px; border:1px solid rgba(255,209,102,0.3);">
+      </div>`).join("") || '<div class="emptyMsg">কোনো ছবি নেই।</div>';
+  }catch(e){
+    $("docVerifyModalBody").innerHTML = '<div class="emptyMsg">ডকুমেন্ট লোড করা যায়নি: ' + escapeHtml(e.message) + '</div>';
+  }
+};
+$("closeDocVerifyModal").addEventListener("click", ()=> $("docVerifyModal").style.display = "none");
+
+$("docVerifyApproveBtn").addEventListener("click", async ()=>{
+  if(!docVerifyTargetId) return;
+  const btn = $("docVerifyApproveBtn");
+  btn.disabled = true; btn.textContent = "যাচাই হচ্ছে...";
+  try{
+    await db.collection("transportDrivers").doc(docVerifyTargetId).set({
+      isVerified: true,
+      verifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      verifiedBy: currentAgent.uid,
+      verificationStatus: "verified"
+    }, { merge: true });
+    await db.collection("transportDrivers").doc(docVerifyTargetId)
+      .collection("verification").doc("docs").set({
+        status: "verified",
+        rejectionReason: null,
+        reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        reviewedBy: currentAgent.uid
+      }, { merge: true });
+    $("docVerifyModal").style.display = "none";
+  }catch(e){
+    alert("Approve করা যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "✅ Approve করুন";
+  }
+});
+
+$("docVerifyRejectBtn").addEventListener("click", async ()=>{
+  if(!docVerifyTargetId) return;
+  const reason = $("docVerifyRejectReason").value.trim();
+  if(!reason){
+    $("docVerifyMsg").textContent = "⚠️ Reject করার কারণ লিখুন — ড্রাইভার এটা দেখতে পাবেন।";
+    $("docVerifyMsg").style.color = "#e2543d"; $("docVerifyMsg").style.display = "block";
+    return;
+  }
+  const btn = $("docVerifyRejectBtn");
+  btn.disabled = true; btn.textContent = "প্রক্রিয়া হচ্ছে...";
+  try{
+    // 🪪 Reject করলে isVerified ছোঁয়া হয় না (আগে থেকে false-ই থাকে) —
+    // শুধু স্ট্যাটাস আর কারণটা লেখা হয়, যাতে ড্রাইভার আবার ঠিকঠাক ছবি
+    // দিয়ে জমা দিতে পারেন।
+    await db.collection("transportDrivers").doc(docVerifyTargetId).set({
+      verificationStatus: "rejected"
+    }, { merge: true });
+    await db.collection("transportDrivers").doc(docVerifyTargetId)
+      .collection("verification").doc("docs").set({
+        status: "rejected",
+        rejectionReason: reason,
+        reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        reviewedBy: currentAgent.uid
+      }, { merge: true });
+    $("docVerifyModal").style.display = "none";
+  }catch(e){
+    alert("Reject করা যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "❌ Reject করুন";
+  }
+});
+
+/* ---------- 🚩 Transport Media রিপোর্ট-করা পোস্টের রিভিউ ---------- */
+// transportMediaReports/{postId}_{reporterUid} — দুইটা equality filter
+// (driverMarketId==, status==), কোনো orderBy নেই — নতুন কম্পোজিট
+// ইনডেক্স লাগবে না (docVerify কিউয়ের একই প্যাটার্ন)।
+let tmReportUnsub = null;
+let tmReportTargetId = null;
+let tmReportTargetPostId = null;
+
+const TM_REASON_LABEL = {
+  spam: "🗑️ স্প্যাম/অপ্রাসঙ্গিক", inappropriate: "🔞 অনুপযুক্ত কনটেন্ট",
+  harassment: "😡 হয়রানি/হুমকি", fake: "🎭 ভুয়া তথ্য", other: "❓ অন্য কারণ"
+};
+
+function listenTmReportsPending(){
+  tmReportUnsub = db.collection("transportMediaReports")
+    .where("driverMarketId", "==", currentAgent.marketId)
+    .where("status", "==", "pending")
+    .onSnapshot((qs)=>{
+      const wrap = $("tmReportPendingWrap");
+      if(qs.empty){
+        wrap.style.display = "none";
+        $("tmReportPendingList").innerHTML = "";
+        return;
+      }
+      wrap.style.display = "block";
+      $("tmReportPendingList").innerHTML = qs.docs.map(doc=>{
+        const r = doc.data();
+        return `
+          <div class="rowItem">
+            <div class="info">
+              <div class="name">${TM_REASON_LABEL[r.reason] || r.reason || "রিপোর্ট"}</div>
+              <div class="meta">${escapeHtml(r.reporterName || "একজন যাত্রী")} রিপোর্ট করেছেন${r.details ? " · " + escapeHtml(r.details) : ""}</div>
+            </div>
+          </div>
+          <div class="rowActions" style="margin:-6px 0 14px;">
+            <button class="btn small ok" onclick="openTmReportReview('${doc.id}','${r.postId}')">👀 পোস্ট দেখুন</button>
+          </div>`;
+      }).join("");
+    }, (err)=>{
+      console.error("tm report pending listener error:", err);
+    });
+}
+
+window.openTmReportReview = async function(reportId, postId){
+  tmReportTargetId = reportId;
+  tmReportTargetPostId = postId;
+  $("tmReportModalBody").innerHTML = '<div class="emptyMsg">লোড হচ্ছে...</div>';
+  $("tmReportModalMsg").style.display = "none";
+  $("tmReportModal").style.display = "flex";
+  try{
+    const doc = await db.collection("transportMediaPosts").doc(postId).get();
+    if(!doc.exists){
+      $("tmReportModalBody").innerHTML = '<div class="emptyMsg">পোস্টটি আর নেই (হয়তো আগেই মুছে ফেলা হয়েছে)।</div>';
+      return;
+    }
+    const p = doc.data();
+    $("tmReportModalBody").innerHTML = `
+      <div style="border:1px solid rgba(255,209,102,0.2); border-radius:10px; padding:12px; margin-bottom:4px;">
+        <div style="font-weight:800; font-size:13px; margin-bottom:6px;">${escapeHtml(p.authorName || "ড্রাইভার")}</div>
+        ${p.imageUrl ? `<img src="${p.imageUrl}" style="width:100%; border-radius:8px; margin-bottom:8px;">` : ""}
+        ${p.text ? `<div style="font-size:12.5px; color:rgba(255,248,232,0.85);">${escapeHtml(p.text)}</div>` : '<div style="font-size:11.5px; color:var(--muted);">(শুধু ছবি, কোনো লেখা নেই)</div>'}
+      </div>`;
+  }catch(e){
+    $("tmReportModalBody").innerHTML = '<div class="emptyMsg">পোস্ট লোড করা যায়নি: ' + escapeHtml(e.message) + '</div>';
+  }
+};
+$("closeTmReportModal").addEventListener("click", ()=> $("tmReportModal").style.display = "none");
+
+$("tmReportDismissBtn").addEventListener("click", async ()=>{
+  if(!tmReportTargetId) return;
+  const btn = $("tmReportDismissBtn");
+  btn.disabled = true; btn.textContent = "প্রক্রিয়া হচ্ছে...";
+  try{
+    await db.collection("transportMediaReports").doc(tmReportTargetId).set({
+      status: "dismissed",
+      reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      reviewedBy: currentAgent.uid
+    }, { merge: true });
+    $("tmReportModal").style.display = "none";
+  }catch(e){
+    alert("Dismiss করা যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "✓ Dismiss (ঠিক আছে)";
+  }
+});
+
+$("tmReportDeletePostBtn").addEventListener("click", async ()=>{
+  if(!tmReportTargetId || !tmReportTargetPostId) return;
+  if(!confirm("এই পোস্টটা সত্যিই মুছে ফেলবেন? এটা যাত্রীদের ফিড থেকে সরে যাবে।")) return;
+  const btn = $("tmReportDeletePostBtn");
+  btn.disabled = true; btn.textContent = "মুছে ফেলা হচ্ছে...";
+  try{
+    // 🚩 সরাসরি Firestore delete না — ড্রাইভার নিজে যেভাবে পোস্ট মোছেন
+    // সেই একই soft-delete convention (status:"removed"), ফিড/my-posts
+    // কোয়েরি এমনিতেই status ফিল্টার করে। reviewedBy সেট থাকায়
+    // functions/index.js-এর onTransportMediaPostRemoved ট্রিগার Storage
+    // থেকে ছবিও মুছে দেবে, আর এই পোস্টের ওপর অন্য কোনো পেন্ডিং রিপোর্ট
+    // থাকলে সেগুলোও স্বয়ংক্রিয়ভাবে resolved হয়ে যাবে।
+    await db.collection("transportMediaPosts").doc(tmReportTargetPostId).set({
+      status: "removed",
+      reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      reviewedBy: currentAgent.uid
+    }, { merge: true });
+    await db.collection("transportMediaReports").doc(tmReportTargetId).set({
+      status: "resolved",
+      reviewedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      reviewedBy: currentAgent.uid
+    }, { merge: true });
+    $("tmReportModal").style.display = "none";
+  }catch(e){
+    alert("পোস্ট মোছা যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "🗑️ পোস্ট মুছুন";
+  }
+});
 
 window.toggleDriverStatus = async function(driverId, currentStatus){
   const newStatus = currentStatus === "active" ? "blocked" : "active";

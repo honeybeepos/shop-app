@@ -109,10 +109,24 @@ service cloud.firestore {
     match /transportDrivers/{id} {
       allow get: if true;
       allow list: if true;
-      allow create: if isSignedIn() && request.auth.uid == id;
+      // 🪪 ড্রাইভার নিজে সাইন-আপের সময়ও isVerified: true লিখে নিজেকে
+      // ভেরিফাইড বানিয়ে ফেলতে পারবে না — নতুন ডকুমেন্টে এই ফিল্ড
+      // true থাকা মানেই তৈরি ব্লক হয়ে যাবে।
+      allow create: if isSignedIn() && request.auth.uid == id &&
+        (!('isVerified' in request.resource.data) || request.resource.data.isVerified == false);
+      // 🪪 আগে ড্রাইভার পুরো ডকুমেন্ট আপডেট করতে পারতো — অর্থাৎ raw Firestore
+      // কল দিয়ে নিজেই isVerified: true লিখে ভেরিফিকেশন এড়িয়ে যেতে পারতো।
+      // এখন ড্রাইভারের নিজের আপডেট থেকে isVerified/verifiedAt/verifiedBy
+      // ছুঁতে দেওয়া হচ্ছে না (শুধু এজেন্ট/সুপারঅ্যাডমিন সেগুলো বদলাতে
+      // পারবে), আর verificationStatus বদলাতে চাইলে ড্রাইভার শুধু "pending"-ই
+      // সেট করতে পারবে (নিজেকে "verified" বানাতে পারবে না)।
       allow update: if isSignedIn() &&
-        (isSuperAdmin() || request.auth.uid == id ||
-         (isAgent() && resource.data.marketId == myAgentMarketId()));
+        (isSuperAdmin() ||
+         (isAgent() && resource.data.marketId == myAgentMarketId()) ||
+         (request.auth.uid == id &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isVerified','verifiedAt','verifiedBy']) &&
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus']) ||
+           request.resource.data.verificationStatus == 'pending')));
       allow delete: if isSuperAdmin();
 
       // 📊 Honey Bee Transport Media Phase 2 — প্রতিদিনের আয়ের লেজার
@@ -124,6 +138,47 @@ service cloud.firestore {
            (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId == myAgentMarketId()));
         allow write: if isSignedIn() && request.auth.uid == id;
       }
+
+      // ⭐ Honey Bee Transport Media Phase 8 — যাত্রীর দেওয়া রেটিং। ডকুমেন্ট
+      // আইডি হিসেবে tripId ব্যবহার করা হয় — তাই একই ট্রিপ দুইবার রেট করা
+      // যাবে না (দ্বিতীয়বার create-ই ব্লক হয়ে যায়, doc আগে থেকেই থাকলে)।
+      // get() দিয়ে trips ডকুমেন্ট থেকে যাচাই করা হয় — যিনি রেট করছেন তিনিই
+      // আসলে এই ট্রিপের যাত্রী, ট্রিপটা সত্যিই এই ড্রাইভারের সাথে ছিল, ও
+      // ট্রিপ সত্যিই সম্পন্ন হয়েছে — এলোমেলো/জাল রেটিং আটকাতে। এডিট/ডিলিট
+      // বন্ধ — একবার দেওয়া রেটিং স্থায়ী থাকে (সততার সাথে সংরক্ষিত)।
+      match /ratings/{tripId} {
+        allow read: if true;
+        allow create: if isSignedIn()
+          && request.resource.data.passengerId == request.auth.uid
+          && request.resource.data.stars is int
+          && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+          && get(/databases/$(database)/documents/trips/$(tripId)).data.passengerId == request.auth.uid
+          && get(/databases/$(database)/documents/trips/$(tripId)).data.confirmedDriver.driverId == id
+          && get(/databases/$(database)/documents/trips/$(tripId)).data.status == "completed";
+        allow update, delete: if false;
+      }
+
+      // 🪪 Honey Bee Transport Media — ড্রাইভার-আপলোড করা NID/লাইসেন্স
+      // ডকুমেন্ট (প্রাইভেট সাবকালেকশন)। উপরের transportDrivers ডকুমেন্ট
+      // পাবলিকলি রিডেবল (allow get/list: if true) বলে সংবেদনশীল ছবির URL
+      // এখানে সরাসরি রাখা হয়নি — Firebase Storage-এর ডাউনলোড URL টোকেনই
+      // একধরনের bearer-capability, তাই পাবলিক ডকুমেন্টে URL রাখলে সেটা
+      // কার্যত সবার জন্য উন্মুক্ত হয়ে যেত। এখানে শুধু owner/এজেন্ট(নিজের
+      // মার্কেটের)/সুপারঅ্যাডমিন পড়তে পারবে।
+      match /verification/{docId} {
+        allow read: if isSignedIn() &&
+          (request.auth.uid == id || isSuperAdmin() ||
+           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId == myAgentMarketId()));
+        allow create: if isSignedIn() && request.auth.uid == id;
+        // ড্রাইভার নিজে আবার জমা দিলে status ফিরে "pending"-ই হতে হবে —
+        // নিজেকে "verified" বানানো যাবে না। এজেন্ট/সুপারঅ্যাডমিন approve/
+        // reject করতে পারবে (status যেকোনো মান হতে পারে)।
+        allow update: if isSignedIn() &&
+          (isSuperAdmin() ||
+           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId == myAgentMarketId()) ||
+           (request.auth.uid == id && request.resource.data.status == 'pending'));
+        allow delete: if false;
+      }
     }
 
     // 📢 Honey Bee Transport Media Phase 6 — সোশ্যাল ফিড। শুধু নিবন্ধিত
@@ -134,12 +189,25 @@ service cloud.firestore {
     // বাকি সব ফিল্ড শুধু নিজের পোস্টের মালিকই বদলাতে/সরাতে পারবেন।
     match /transportMediaPosts/{postId} {
       allow read: if true;
+      // 🚩 Moderation — যে ড্রাইভারের status "blocked" (এজেন্ট/সুপারঅ্যাডমিন
+      // ব্লক করে থাকলে) তিনি আর নতুন পোস্ট করতে পারবেন না।
       allow create: if isSignedIn()
         && request.resource.data.authorId == request.auth.uid
-        && exists(/databases/$(database)/documents/transportDrivers/$(request.auth.uid));
+        && exists(/databases/$(database)/documents/transportDrivers/$(request.auth.uid))
+        && get(/databases/$(database)/documents/transportDrivers/$(request.auth.uid)).data.status != "blocked";
+      // 🚩 Moderation — নিজের পোস্ট মালিক আগের মতোই সব বদলাতে/সরাতে পারবেন,
+      // যেকোনো সাইন-ইন ইউজার likedBy/likeCount বদলাতে পারবেন (আগের মতোই),
+      // আর নতুন করে এজেন্ট (নিজের মার্কেটের ড্রাইভার হলে)/সুপারঅ্যাডমিন
+      // শুধু status/reviewedAt/reviewedBy ফিল্ড বদলে (soft-delete/moderation)
+      // রিপোর্ট-করা পোস্ট সরাতে পারবেন — driver নিজে যেভাবে "removed" করেন
+      // সেই একই convention, সরাসরি Firestore delete না (feed/my-posts
+      // কোয়েরি এমনিতেই status ফিল্টার করে)।
       allow update: if isSignedIn() &&
         (request.auth.uid == resource.data.authorId ||
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likedBy','likeCount']));
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likedBy','likeCount']) ||
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy']) &&
+          (isSuperAdmin() ||
+           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(resource.data.authorId)).data.marketId == myAgentMarketId()))));
       allow delete: if false;
 
       match /comments/{commentId} {
@@ -149,10 +217,67 @@ service cloud.firestore {
       }
     }
 
+    // 🚩 Honey Bee Transport Media — কনটেন্ট রিপোর্ট/মডারেশন। প্রতি
+    // পোস্টে প্রতি ইউজার একবারই রিপোর্ট করতে পারবেন — ডকুমেন্ট আইডি-ই
+    // deterministic ({postId}_{reporterUid}), তাই দ্বিতীয়বার একই পোস্টে
+    // রিপোর্ট করলে create ব্যর্থ হয়ে যাবে (আলাদা কোনো ডুপ্লিকেট-চেক
+    // কোয়েরির দরকার নেই)। driverMarketId ফিল্ড রিপোর্ট তৈরির সময়ই
+    // ক্লায়েন্ট denormalize করে রাখে (transportDrivers/{authorId}.marketId
+    // থেকে) — এতে এজেন্টের কিউ-কোয়েরি (driverMarketId==, status==,
+    // কোনো orderBy না) নতুন কম্পোজিট ইনডেক্স ছাড়াই কাজ করে, ঠিক
+    // ড্রাইভার-ডকুমেন্ট-ভেরিফিকেশন কিউয়ের মতোই।
+    match /transportMediaReports/{reportId} {
+      allow read: if isSignedIn() &&
+        (request.auth.uid == resource.data.reporterUid ||
+         isSuperAdmin() ||
+         (isAgent() && resource.data.driverMarketId == myAgentMarketId()));
+      allow create: if isSignedIn()
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.postId is string
+        && request.resource.data.status == "pending"
+        && reportId == (request.resource.data.postId + "_" + request.auth.uid);
+      allow update: if isSignedIn() &&
+        (isSuperAdmin() ||
+         (isAgent() && resource.data.driverMarketId == myAgentMarketId()));
+      allow delete: if false;
+    }
+
     match /trips/{tripId} {
       allow read: if true;
       allow create: if true;
       allow update: if true;
+      // 📅 Calendar/ম্যানুয়াল-বুকিং Phase 3 — "ব্লক তুলে নিন" ফিচারটা এই
+      // ডকুমেন্ট delete করে (shop-ledger-app.html-এ dmCalToggleBlockBtn),
+      // কিন্তু আগে কোনো delete rule-ই ছিল না বলে সেটা প্রোডাকশনে সবসময়
+      // permission-denied দিয়ে ব্যর্থ হতো। driverId ফিল্ড শুধু
+      // scheduled/blocked ডকুমেন্টেই থাকে (ইনস্ট্যান্ট রিকোয়েস্ট ট্রিপে
+      // থাকে না), তাই এই rule শুধু নিজের ক্যালেন্ডার-এন্ট্রি মোছার
+      // অনুমতি দেয়, অন্য কারো কিছু না।
+      allow delete: if isSignedIn() && resource.data.driverId == request.auth.uid;
+
+      // 💬 ড্রাইভার-প্যাসেঞ্জার ইন-অ্যাপ চ্যাট — ট্রিপ-স্কোপড, নিজস্ব
+      // trips/{tripId}-এর সাবকালেকশন (Honey Messenger-এর থেকে সম্পূর্ণ
+      // আলাদা, ইচ্ছাকৃতভাবে — ড্রাইভারদের কোনো messengerUsers প্রোফাইল
+      // নেই, আর বন্ধু-অনুরোধ ছাড়া Messenger-এ চ্যাটও করা যায় না, যেটা
+      // এই তাৎক্ষণিক দরকারের সাথে মেলে না)। শুধু এই নির্দিষ্ট ট্রিপের
+      // passengerId/confirmedDriver.driverId মিলে গেলেই পড়তে/লিখতে
+      // পারবে — ratings সাবকালেকশনের get()-অন-প্যারেন্ট প্যাটার্নের
+      // মতোই। guest (লগইন-বিহীন) প্যাসেঞ্জারের request.auth.uid থাকে না
+      // বলে তারা চ্যাট ব্যবহার করতে পারবেন না — ট্রিপ হিস্ট্রির মতোই
+      // ইচ্ছাকৃতভাবে শুধু লগইন করা প্যাসেঞ্জারদের জন্য (honeybee-bazar.html
+      // চ্যাট বাটনও তাদের জন্যই লুকানো থাকে)।
+      match /chat/{messageId} {
+        allow read: if isSignedIn() &&
+          (request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.passengerId ||
+           request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.confirmedDriver.driverId);
+        allow create: if isSignedIn() &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000 &&
+          (request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.passengerId ||
+           request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.confirmedDriver.driverId);
+        allow update, delete: if false;
+      }
     }
 
     match /tripOffers/{offerId} {
@@ -275,7 +400,15 @@ service cloud.firestore {
     match /loginAttempts/{email} {
       allow read: if true;
       allow delete: if true;
-      allow create, update: if request.resource.data.keys().hasOnly(['count','lastAttempt']) &&
+      // 🐞 বাগ-ফিক্স: 'autoLockApplied' যোগ করা হলো — এই ফিল্ডটা এখন
+      // functions/index.js-এর onFailedLoginThreshold Cloud Function
+      // (Admin SDK, rules বাইপাস করে) থ্রেশহোল্ড পার হলে merge করে বসিয়ে
+      // দেয়, যাতে বারবার একই একাউন্ট ব্লক করার চেষ্টা না হয়। এই ফিল্ড
+      // ছাড়া hasOnly(['count','lastAttempt']) থাকলে, একবার Cloud
+      // Function লেখার পর ক্লায়েন্টের পরবর্তী যেকোনো ভুল-পাসওয়ার্ড
+      // গণনার merge-write hasOnly ব্যর্থ হয়ে reject হয়ে যেতো (merge-এর
+      // resulting document-এ autoLockApplied-ও থাকতো)।
+      allow create, update: if request.resource.data.keys().hasOnly(['count','lastAttempt','autoLockApplied']) &&
         request.resource.data.count is int && request.resource.data.count <= 20;
     }
 

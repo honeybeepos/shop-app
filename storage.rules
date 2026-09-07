@@ -41,6 +41,35 @@ service firebase.storage {
         && request.resource.contentType == 'image/webp';
     }
 
+    match /driver-documents/{uid}/{fileName} {
+
+      // 🪪 NID/ড্রাইভিং লাইসেন্সের ছবি — এগুলো সংবেদনশীল ব্যক্তিগত
+      // ডকুমেন্ট, তাই vehicle-images-এর মতো সবার জন্য পাবলিক-রিড না।
+      // শুধু owner নিজে, তার মার্কেটের এজেন্ট, বা সুপারঅ্যাডমিন দেখতে
+      // পারবে (firestore.rules-এ transportDrivers/{id}/verification
+      // সাবকালেকশনের রিড-অনুমতির সাথে মিলিয়ে)।
+      allow read: if request.auth != null
+        && (request.auth.uid == uid
+            || firestore.exists(
+                 /databases/(default)/documents/superadmins/$(request.auth.uid)
+               )
+            || (firestore.exists(
+                 /databases/(default)/documents/agents/$(request.auth.uid)
+               )
+               && firestore.get(
+                    /databases/(default)/documents/agents/$(request.auth.uid)
+                  ).data.marketId
+                  == firestore.get(
+                       /databases/(default)/documents/transportDrivers/$(uid)
+                     ).data.marketId));
+
+      // শুধু নিজের uid-এর অধীনেই নিজের ডকুমেন্ট আপলোড/রিপ্লেস করা যাবে
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size <= 200 * 1024
+        && request.resource.contentType == 'image/webp';
+    }
+
     match /transport-media-images/{uid}/{fileName} {
 
       // 📢 Honey Bee Transport Media Phase 6 — পোস্টের ছবি সবাই দেখতে পারবে

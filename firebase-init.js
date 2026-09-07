@@ -63,29 +63,37 @@ async function isSuperAdmin(uid) {
 /* ---------- লগইন ব্যর্থ হলে গণনা + অটো-ব্লক ---------- */
 const MAX_FAILED_ATTEMPTS = 5;
 
+// 🐞 বাগ-ফিক্স নোট: ইমেইল সবসময় trim+lowercase করে normalize করা হচ্ছে —
+// নাহলে একই ইমেইল আলাদা ছোট/বড় হাতের অক্ষরে টাইপ করলে আলাদা
+// loginAttempts ডকুমেন্ট তৈরি হয়ে যেত, আর গণনাও ভুল/অসামঞ্জস্যপূর্ণ হতো।
+function normalizeLoginEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
 async function recordFailedLogin(email) {
-  const ref = db.collection("loginAttempts").doc(email);
+  const key = normalizeLoginEmail(email);
+  const ref = db.collection("loginAttempts").doc(key);
   const snap = await ref.get();
   const count = (snap.exists ? (snap.data().count || 0) : 0) + 1;
   await ref.set({ count, lastAttempt: fbNow() }, { merge: true });
-
-  if (count >= MAX_FAILED_ATTEMPTS) {
-    // এই ইমেইলের মালিক কোন শপ, খুঁজে বের করে শপটা ব্লক করে দাও
-    const userQuery = await db.collection("users").where("email", "==", email).limit(1).get();
-    if (!userQuery.empty) {
-      const userData = userQuery.docs[0].data();
-      await db.collection("shops").doc(userData.shopId).set({
-        status: "blocked",
-        blockedReason: "অতিরিক্ত ভুল পাসওয়ার্ড (auto-lock)",
-        blockedAt: fbNow()
-      }, { merge: true });
-    }
-  }
+  // 🐞 বাগ-ফিক্স: আগে এখানেই ক্লায়েন্ট থেকে সরাসরি shops/{shopId}.status =
+  // "blocked" লেখার চেষ্টা হতো — কিন্তু ব্যর্থ-লগইনের মুহূর্তে সাধারণত
+  // request.auth == null থাকে (সাইন-ইনই তো ব্যর্থ হয়েছে), আর
+  // firestore.rules-এ এই রাইট isSignedIn() দাবি করে — তাই এই রাইট
+  // বেশিরভাগ সময়ই নীরবে ব্যর্থ হতো, অথচ ব্যবহারকারীকে "একাউন্ট ব্লক হয়ে
+  // গেছে" মেসেজ দেখানো হতো — বাস্তবে একাউন্ট ব্লক না হওয়া সত্ত্বেও।
+  // এখন এই এনফোর্সমেন্ট সম্পূর্ণভাবে functions/index.js-এর
+  // onFailedLoginThreshold Cloud Function-এ সরিয়ে নেওয়া হয়েছে — সেটা
+  // Admin SDK দিয়ে চলে (rules বাইপাস করে), তাই ক্লায়েন্টের auth অবস্থা
+  // নির্বিশেষে নির্ভরযোগ্যভাবে কাজ করবে। এছাড়া userData.shopId
+  // undefined হলে (ড্রাইভার/রাইডার একাউন্ট) doc(undefined) কল করে যে
+  // ক্র্যাশ হতো, সেটাও এভাবে এড়ানো গেল।
   return count;
 }
 
 async function clearFailedLogin(email) {
-  await db.collection("loginAttempts").doc(email).delete().catch(() => {});
+  const key = normalizeLoginEmail(email);
+  await db.collection("loginAttempts").doc(key).delete().catch(() => {});
 }
 
 /* ---------- ডিভাইস আইডি ----------

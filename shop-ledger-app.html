@@ -815,6 +815,9 @@
       <div style="display:flex; align-items:center; gap:6px;">
         <div style="font-weight:800; font-size:15px;" id="dmDriverName">Honey Bee Transport</div>
         <span id="dmVerifiedBadge" style="display:none; font-size:9.5px; font-weight:800; padding:2px 7px; border-radius:20px; background:rgba(74,222,128,0.18); color:#4ade80; border:1px solid rgba(74,222,128,0.4);">✅ ভেরিফায়েড</span>
+        <!-- ⭐ Honey Bee Transport Media Phase 8 — যাত্রীদের গড় রেটিং, ratings
+             সাবকালেকশন থেকে ক্লায়েন্ট-সাইডেই হিসাব করা (dmLoadRatings) -->
+        <span id="dmRatingBadge" style="display:none; font-size:9.5px; font-weight:800; padding:2px 7px; border-radius:20px; background:rgba(251,191,36,0.18); color:#fbbf24; border:1px solid rgba(251,191,36,0.4);">⭐ —</span>
       </div>
       <div style="font-size:10.5px; color:#a8d9c0; text-transform:uppercase; letter-spacing:1px;">Driver Mode</div>
     </div>
@@ -892,6 +895,17 @@
     <span style="color:#a8d9c0;">›</span>
   </button>
 
+  <!-- 🪪 ডকুমেন্ট ভেরিফিকেশন — নিজে NID/লাইসেন্সের ছবি জমা দিয়ে এজেন্টের
+       রিভিউয়ের অপেক্ষায় থাকা যায়, এজেন্ট সশরীরে না এসেও ভেরিফাই করতে পারবেন -->
+  <button id="dmOpenDocVerifyBtn" class="dmCard" style="width:100%; text-align:left; border:1px solid rgba(74,222,128,0.25); cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:10px; margin-top:10px;">
+    <span style="font-size:22px;">🪪</span>
+    <span style="flex:1;">
+      <span style="display:block; font-weight:800; font-size:13.5px; color:#eafff2;">ডকুমেন্ট ভেরিফিকেশন</span>
+      <span id="dmDocVerifyStatusTxt" style="display:block; font-size:10.5px; color:#a8d9c0; margin-top:2px;">NID/লাইসেন্সের ছবি জমা দিন</span>
+    </span>
+    <span style="color:#a8d9c0;">›</span>
+  </button>
+
   <!-- 🤝 Honey Bee Transport Media Phase 5 — এজেন্ট-ড্রাইভার সম্পর্ক। ড্রাইভার
        নিবন্ধনের সময় কোনো এজেন্ট বেছে নিলে তার যোগাযোগ এখানে দেখানো হয়, না
        নিলে পুরো কার্ডটাই লুকানো থাকে (initDriverMode-এ display সেট হয়) -->
@@ -920,6 +934,13 @@
   <div class="dmCard" id="dmMyPostsCard" style="display:none;">
     <h3 style="margin:0 0 10px; font-size:13px; color:#fbbf24;">📢 আমার পোস্টসমূহ</h3>
     <div id="dmMyPostsList" style="font-size:12px; color:#a8d9c0;"></div>
+  </div>
+
+  <!-- ⭐ Honey Bee Transport Media Phase 8 — যাত্রীদের রেটিং/মন্তব্য -->
+  <div class="dmCard" id="dmRatingsCard" style="display:none;">
+    <h3 style="margin:0 0 4px; font-size:13px; color:#fbbf24;">⭐ যাত্রীদের রেটিং</h3>
+    <div id="dmRatingsSummary" style="font-size:12px; color:#a8d9c0; margin-bottom:10px;"></div>
+    <div id="dmRatingsList" style="font-size:12px; color:#a8d9c0;"></div>
   </div>
 
   <div id="dmComposePostOverlay" style="display:none; position:fixed; inset:0; z-index:600; background:rgba(0,0,0,0.75); align-items:center; justify-content:center; padding:16px;">
@@ -963,6 +984,58 @@
   <div class="dmCard" id="dmHistoryCard">
     <h3 style="margin:0 0 10px; font-size:14px; color:#4ade80;">📋 সাম্প্রতিক ট্রিপ</h3>
     <div id="dmHistoryList" style="font-size:12px; color:#a8d9c0;">এখনো কোনো ট্রিপ সম্পন্ন হয়নি।</div>
+  </div>
+
+  <!-- 🪪 ডকুমেন্ট ভেরিফিকেশন — NID (বাধ্যতামূলক) + লাইসেন্স (ঐচ্ছিক) আপলোড,
+       এজেন্টের রিভিউয়ের অপেক্ষা। ছবিগুলো গাড়ির ছবির মতোই resize+WebP করে
+       Firebase Storage-এ যায় (driver-documents/{uid}/{slot}.webp — পাবলিক
+       না, শুধু নিজে/এজেন্ট/সুপারঅ্যাডমিন দেখতে পারবেন), কিন্তু URL-গুলো
+       transportDrivers-এর পাবলিক ডকুমেন্টে না রেখে আলাদা প্রাইভেট
+      verification সাব-কালেকশনে রাখা হয় — যাতে সংবেদনশীল ডকুমেন্টের লিংক
+       কখনোই পাবলিকভাবে-পড়া-যায় এমন ডকুমেন্টে উন্মুক্ত না থাকে। -->
+  <!-- 💬 ড্রাইভার-প্যাসেঞ্জার ইন-অ্যাপ চ্যাট — trips/{tripId}/chat
+       সাবকালেকশন, শুধু চলমান ট্রিপের জন্যই প্রাসঙ্গিক (Honey Messenger
+       থেকে সম্পূর্ণ আলাদা)। dmRenderActiveTripStatus-এর confirmed
+       ব্রাঞ্চ থেকে খোলে। -->
+  <div id="dmTripChatOverlay" style="display:none; position:fixed; inset:0; z-index:650; background:#0f2318; flex-direction:column;">
+    <div style="display:flex; align-items:center; gap:10px; padding:16px 14px; border-bottom:1px solid rgba(74,222,128,0.2); flex-shrink:0;">
+      <span id="dmCloseTripChatBtn" style="font-size:20px; cursor:pointer; color:#a8d9c0;">←</span>
+      <div>
+        <h3 style="margin:0; font-size:14.5px; color:#eafff2;" id="dmTripChatPassengerName">যাত্রী</h3>
+        <div style="font-size:10.5px; color:#a8d9c0;">এই ট্রিপ চলাকালীন চ্যাট</div>
+      </div>
+    </div>
+    <div id="dmTripChatMessages" style="flex:1; overflow-y:auto; padding:16px 14px;"></div>
+    <div style="display:flex; gap:8px; padding:12px 14px; border-top:1px solid rgba(74,222,128,0.2); flex-shrink:0;">
+      <input type="text" id="dmTripChatInput" placeholder="মেসেজ লিখুন..." style="flex:1; padding:11px; border-radius:20px; border:1px solid rgba(74,222,128,0.25); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13.5px;">
+      <button id="dmTripChatSendBtn" style="width:42px; height:42px; border-radius:50%; border:none; background:#4ade80; color:#0f2318; font-size:16px; cursor:pointer; font-family:inherit; flex-shrink:0;">➤</button>
+    </div>
+  </div>
+
+  <div id="dmDocVerifyOverlay" style="display:none; position:fixed; inset:0; z-index:600; background:#0f2318; overflow-y:auto; padding:16px 14px 90px;">
+    <div style="display:flex; align-items:center; margin-bottom:16px;">
+      <h3 style="margin:0; font-size:15px; color:#eafff2;">🪪 ডকুমেন্ট ভেরিফিকেশন</h3>
+      <span id="dmCloseDocVerifyBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:#a8d9c0;">✕</span>
+    </div>
+
+    <div class="dmCard" id="dmDocVerifyStatusCard" style="display:none;">
+      <div id="dmDocVerifyStatusBanner" style="font-size:12.5px; line-height:1.6;"></div>
+    </div>
+
+    <div class="dmCard">
+      <h3 style="margin:0 0 4px; font-size:13px; color:#4ade80;">🪪 জাতীয় পরিচয়পত্র (NID) — বাধ্যতামূলক</h3>
+      <p style="font-size:10.5px; color:#a8d9c0; margin:0 0 12px;">সামনে ও পেছনে দুটো ছবিই স্পষ্ট হতে হবে।</p>
+      <div id="dmDocNidGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;"></div>
+    </div>
+
+    <div class="dmCard">
+      <h3 style="margin:0 0 4px; font-size:13px; color:#4ade80;">🚗 ড্রাইভিং লাইসেন্স — ঐচ্ছিক</h3>
+      <p style="font-size:10.5px; color:#a8d9c0; margin:0 0 12px;">থাকলে যোগ করুন — না থাকলেও জমা দেওয়া যাবে (যেমনঃ বাইক/CNG চালকদের অনেকের আনুষ্ঠানিক লাইসেন্স না-ও থাকতে পারে)।</p>
+      <div id="dmDocLicenseGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px;"></div>
+    </div>
+
+    <button id="dmDocSubmitBtn" class="dmBtn dmBtnGreen">✅ রিভিউয়ের জন্য জমা দিন</button>
+    <p style="font-size:10px; color:#6a9c85; margin:8px 0 0; text-align:center;">জমা দেওয়ার পর আপনার এলাকার এজেন্ট এটা দেখে ভেরিফাই/প্রত্যাখ্যান করবেন।</p>
   </div>
 
   <!-- 🚐 গাড়ি ব্যবস্থাপনা — বিস্তারিত তথ্য + ছবি (Honey Bee Transport Media, Phase 1) -->
@@ -1120,6 +1193,25 @@
           <input type="time" id="dmMbTime" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px;">
         </div>
       </div>
+
+      <!-- ⏱️ বুকিং কনফ্লিক্ট Phase 2 — শুধু "একই মুহূর্তে" মিলে গেলে না, প্রকৃত
+           সময়-ওভারল্যাপ ধরার জন্য ট্রিপের আনুমানিক সময়কাল জানা দরকার। এটা
+           না থাকলে আগের ভার্সনে ২টা ভিন্ন সময় শুরু হওয়া কিন্তু বাস্তবে
+           ওভারল্যাপ করা ট্রিপ ধরা পড়তো না (যেমনঃ ২টায় শুরু হওয়া ২ ঘণ্টার
+           ট্রিপের মাঝে ৩টায় আরেকটা বুকিং নেওয়া যেত)। -->
+      <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">আনুমানিক সময়কাল (ট্রিপ কতক্ষণ চলবে)</label>
+      <select id="dmMbDuration" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px; margin-bottom:4px;">
+        <option value="30">৩০ মিনিট</option>
+        <option value="60" selected>১ ঘণ্টা</option>
+        <option value="90">দেড় ঘণ্টা</option>
+        <option value="120">২ ঘণ্টা</option>
+        <option value="180">৩ ঘণ্টা</option>
+        <option value="240">৪ ঘণ্টা</option>
+        <option value="360">৬ ঘণ্টা</option>
+        <option value="480">৮ ঘণ্টা (প্রায় সারাদিন ভাড়া)</option>
+        <option value="720">১২ ঘণ্টা</option>
+      </select>
+      <p style="font-size:10px; color:#6a9c85; margin:0 0 12px;">এই সময়ের মধ্যে ওভারল্যাপ করে এমন আরেকটা বুকিং নিতে দেওয়া হবে না।</p>
 
       <label style="display:block; font-size:11.5px; color:#a8d9c0; margin-bottom:4px;">যাত্রী সংখ্যা</label>
       <input type="number" id="dmMbPassengers" min="1" placeholder="নং" style="width:100%; padding:10px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#eafff2; font-family:inherit; font-size:13px; margin-bottom:12px;">
@@ -13224,8 +13316,13 @@ function watchAnnouncement(){
 async function createSubUser(shopId){
   const name = prompt("সাব-ইউজারের নাম:");
   if(!name) return;
-  const email = prompt("সাব-ইউজারের ইমেইল:");
+  let email = prompt("সাব-ইউজারের ইমেইল:");
   if(!email) return;
+  // 🐞 বাগ-ফিক্স: lowercase — নাহলে লগইনের সময় আলাদা ছোট/বড় হাতের
+  // অক্ষরে টাইপ করলে loginAttempts/auto-lock সিস্টেমের users.email
+  // কোয়েরি এই সাব-ইউজারকে খুঁজে না পাওয়ার ঝুঁকি থাকে (login.html-এর
+  // suEmail নরমালাইজেশনের সাথে সামঞ্জস্যপূর্ণ)।
+  email = email.trim().toLowerCase();
   const pass = prompt("পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর):");
   if(!pass || pass.length < 6){ alert("পাসওয়ার্ড কমপক্ষে ৬ অক্ষর হতে হবে।"); return; }
   try{
@@ -13356,14 +13453,27 @@ async function dmLoadIncomeSummary(){
    equality query-এ ওগুলো এমনিতেই বাদ পড়ে যায় — এই কোয়েরিতে নতুন কম্পোজিট
    ইনডেক্স লাগে না, শুধু equality ফিল্টার বলে)।
 
-   ⚠️ কনফ্লিক্ট-প্রোটেকশন: একই ড্রাইভারের একই তারিখ+সময়ে দুইটা বুকিং
-   আটকাতে deterministic doc ID (sched_{uid}_{date}_{time}) + Firestore
-   transaction ব্যবহার হয়েছে — transaction-এর ভেতর আগে exists চেক করে
-   তবেই write হয়, তাই দুইবার প্রায় একই মুহূর্তে সেভ করলেও রেস-কন্ডিশনে
-   ডাবল-বুকিং হবে না। সততার সাথে বলে রাখা ভালো — এই V1 শুধু "একদম একই
-   তারিখ+সময়" মিলে গেলে কনফ্লিক্ট ধরে; ভিন্ন সময়ের ওভারল্যাপিং দীর্ঘ ট্রিপ
-   (যেমন সারাদিনের ভাড়ার মাঝে অন্য একটা বুকিং) এই সংস্করণে ধরা হয় না —
-   পুরো দিন আটকাতে চাইলে "এই দিন ব্লক করুন" ব্যবহার করতে হবে। */
+   ⚠️ কনফ্লিক্ট-প্রোটেকশন — দুই স্তরে:
+   ১) exact-slot: একই ড্রাইভারের একই তারিখ+সময়ে দুইটা বুকিং আটকাতে
+      deterministic doc ID (sched_{uid}_{date}_{time}) + Firestore
+      transaction — transaction-এর ভেতর আগে exists চেক করে তবেই write
+      হয়, তাই দুইবার প্রায় একই মুহূর্তে সেভ করলেও রেস-কন্ডিশনে ডাবল-বুকিং
+      হবে না। এই স্তরটা রেস-কন্ডিশন থেকে সত্যিকারের সুরক্ষা দেয়।
+   ২) প্রকৃত ওভারল্যাপ (Phase 2, নতুন) — প্রতিটা বুকিংয়ে এখন একটা
+      durationMinutes ফিল্ড থাকে (ফর্মে "আনুমানিক সময়কাল" ড্রপডাউন থেকে),
+      তাই সেভ করার আগে dmFindOverlappingBooking() দিয়ে সেই তারিখের সব
+      বিদ্যমান বুকিংয়ের সাথে সময়-রেঞ্জ মিলিয়ে দেখা হয় (start < otherEnd &&
+      otherStart < end)। এটা exact-slot-এর মতো transaction-এর ভেতরে না,
+      write-এর ঠিক আগে fresh ডেটা রিলোড করে ক্লায়েন্ট-সাইডে চেক করা হয় —
+      তাই তাত্ত্বিকভাবে দুইজন একদম একই সেকেন্ডে দুইটা ভিন্ন-সময়ের ওভারল্যাপিং
+      বুকিং সেভ করলে রেসে হারাতে পারে, কিন্তু এটা এক ড্রাইভারের নিজের
+      সেলফ-সার্ভিস ক্যালেন্ডার (একসাথে দুই ডিভাইস থেকে বুকিং করা অস্বাভাবিক),
+      তাই বাস্তবে ঝুঁকি নগণ্য। পুরনো (durationMinutes ছাড়া) বুকিংকে ডিফল্ট
+      ৬০ মিনিট ধরে হিসাব করা হয়। মধ্যরাত পেরিয়ে যাওয়া বুকিং (যেমন রাত
+      ১১টায় শুরু, ৩ ঘণ্টার) শুধু একই ক্যালেন্ডার-তারিখের বুকিংয়ের সাথেই
+      মেলানো হয় — পরের দিনের সাথে ওভারল্যাপ চেক হয় না, এটাও একটা জানা
+      সীমাবদ্ধতা। পুরো দিন আটকাতে চাইলে এখনও "এই দিন ব্লক করুন" ব্যবহার
+      করতে হবে। */
 const DM_BN_MONTHS = ["জানুয়ারি","ফেব্রুয়ারি","মার্চ","এপ্রিল","মে","জুন","জুলাই","আগস্ট","সেপ্টেম্বর","অক্টোবর","নভেম্বর","ডিসেম্বর"];
 let __dmCalYear, __dmCalMonth; // __dmCalMonth 0-indexed
 let __dmCalAllItems = [];
@@ -13371,6 +13481,34 @@ let __dmCalSelectedDate = null;
 
 function dmScheduleDocId(driverId, dateStr, timeKey){
   return `sched_${driverId}_${dateStr}_${timeKey}`;
+}
+
+// ⏱️ বুকিং কনফ্লিক্ট Phase 2 — সময়-রেঞ্জ ওভারল্যাপ হিসাব করার হেল্পার
+function dmTimeToMinutes(timeStr){
+  const parts = (timeStr || "00:00").split(":");
+  const h = Number(parts[0]) || 0, m = Number(parts[1]) || 0;
+  return h * 60 + m;
+}
+function dmRangesOverlap(startA, endA, startB, endB){
+  return startA < endB && startB < endA;
+}
+// পুরনো (durationMinutes ছাড়া) বুকিংয়ের জন্য ডিফল্ট ৬০ মিনিট ধরা হয়
+function dmBookingDurationMinutes(item){
+  return item.durationMinutes != null ? item.durationMinutes : 60;
+}
+// একই তারিখে বিদ্যমান বুকিংগুলোর সাথে ওভারল্যাপ করে এমন একটা পাওয়া গেলে
+// সেটাই ফেরত দেয় (না পেলে null) — excludeId দিয়ে নিজেকে (এডিটের সময়) বাদ
+// দেওয়া যায়, যদিও এই ফর্মে এখনো এডিট ফিচার নেই, ভবিষ্যতের জন্য রাখা হলো
+function dmFindOverlappingBooking(dateStr, startMin, endMin, excludeId){
+  const dayBookings = __dmCalAllItems.filter(it=>
+    it.scheduledDate === dateStr && it.bookingSource !== "blocked" && it.id !== excludeId
+  );
+  for(const b of dayBookings){
+    const bStart = dmTimeToMinutes(b.scheduledTime);
+    const bEnd = bStart + dmBookingDurationMinutes(b);
+    if(dmRangesOverlap(startMin, endMin, bStart, bEnd)) return b;
+  }
+  return null;
 }
 
 async function dmOpenCalendar(){
@@ -13446,12 +13584,20 @@ function dmSelectCalendarDate(dateStr){
   }else if(bookings.length === 0){
     listEl.innerHTML = `<div>🟢 এই দিন খালি আছে।</div>`;
   }else{
-    listEl.innerHTML = bookings.map(b=> `
+    // ⏱️ Phase 2 — শুধু শুরুর সময় না, শেষের আনুমানিক সময়টাও দেখানো হয়
+    // (durationMinutes থেকে হিসাব করে), যাতে ওভারল্যাপ চোখেই ধরা পড়ে
+    listEl.innerHTML = bookings.map(b=> {
+      const startMin = dmTimeToMinutes(b.scheduledTime);
+      const endMin = startMin + dmBookingDurationMinutes(b);
+      const fmtM = (m)=> `${String(Math.floor((m%1440)/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+      const timeRangeTxt = b.scheduledTime ? `· ${b.scheduledTime}–${fmtM(endMin)}` : "";
+      return `
       <div style="padding:8px 0; border-bottom:1px solid rgba(74,222,128,0.1);">
-        <div style="color:#eafff2; font-weight:700;">${escapeHtmlDm(b.customerName || "কাস্টমার")} ${b.scheduledTime ? "· " + b.scheduledTime : ""}</div>
+        <div style="color:#eafff2; font-weight:700;">${escapeHtmlDm(b.customerName || "কাস্টমার")} ${timeRangeTxt}</div>
         <div style="font-size:11px; margin-top:2px;">${escapeHtmlDm([b.pickupAddress, b.destination].filter(Boolean).join(" → "))}</div>
         <div style="font-size:11px; margin-top:2px; color:#4ade80;">${b.amount != null ? HB_CUR + ' ' + b.amount : ""}</div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
   }
 
   document.getElementById("dmCalAddBookingBtn").style.display = isBlocked ? "none" : "block";
@@ -13508,6 +13654,7 @@ function dmOpenManualBookingForm(prefillDate){
   document.getElementById("dmMbTo").value = "";
   document.getElementById("dmMbDate").value = prefillDate || dmTodayDateStr();
   document.getElementById("dmMbTime").value = "";
+  document.getElementById("dmMbDuration").value = "60";
   document.getElementById("dmMbPassengers").value = "";
   document.getElementById("dmMbAmount").value = "";
   document.getElementById("dmMbAdvance").value = "";
@@ -13523,20 +13670,41 @@ document.getElementById("dmMbSaveBtn").addEventListener("click", async ()=>{
   const phone = document.getElementById("dmMbPhone").value.trim();
   const dateStr = document.getElementById("dmMbDate").value;
   const timeStr = document.getElementById("dmMbTime").value;
+  const durationMinutes = Number(document.getElementById("dmMbDuration").value) || 60;
   if(!name || !phone){ alert("কাস্টমারের নাম ও ফোন নম্বর দিতে হবে।"); return; }
   if(!dateStr || !timeStr){ alert("তারিখ ও সময় দিতে হবে।"); return; }
 
   const btn = document.getElementById("dmMbSaveBtn");
-  btn.disabled = true; btn.textContent = "সেভ হচ্ছে...";
-  const docId = dmScheduleDocId(__dmDriverId, dateStr, timeStr.replace(":",""));
+  btn.disabled = true; btn.textContent = "চেক করা হচ্ছে...";
   try{
+    // ⏱️ Phase 2 — লেখার ঠিক আগে সেই ড্রাইভারের সব বুকিং আবার তাজা করে
+    // লোড করে নেওয়া হয়, যাতে অন্য ডিভাইস/ট্যাব থেকে ইতিমধ্যে হয়ে যাওয়া
+    // কোনো বুকিং মিস না হয় — তারপর সময়-রেঞ্জ ওভারল্যাপ চেক
+    await dmLoadCalendarData();
+    const startMin = dmTimeToMinutes(timeStr);
+    const endMin = startMin + durationMinutes;
+    const isBlocked = __dmCalAllItems.some(it=> it.scheduledDate === dateStr && it.bookingSource === "blocked");
+    if(isBlocked){
+      alert("⚠️ এই দিনটা ব্লক করা আছে — আগে ব্লক তুলে নিন।");
+      return;
+    }
+    const overlap = dmFindOverlappingBooking(dateStr, startMin, endMin, null);
+    if(overlap){
+      const overlapEnd = dmTimeToMinutes(overlap.scheduledTime) + dmBookingDurationMinutes(overlap);
+      const fmtM = (m)=> `${String(Math.floor((m%1440)/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+      alert(`⚠️ এই সময়টা ${escapeHtmlDm(overlap.customerName||"আরেকটা বুকিং")}-এর (${overlap.scheduledTime||""}–${fmtM(overlapEnd)}) সাথে ওভারল্যাপ করছে — অন্য সময় বা কম সময়কাল বেছে নিন।`);
+      return;
+    }
+
+    btn.textContent = "সেভ হচ্ছে...";
+    const docId = dmScheduleDocId(__dmDriverId, dateStr, timeStr.replace(":",""));
     await db.runTransaction(async (tx)=>{
       const ref = db.collection("trips").doc(docId);
       const snap = await tx.get(ref);
-      if(snap.exists) throw new Error("SLOT_TAKEN");
+      if(snap.exists) throw new Error("SLOT_TAKEN"); // exact-slot ডিফেন্স-ইন-ডেপথ, উপরের ওভারল্যাপ-চেকের পাশাপাশি
       tx.set(ref, {
         driverId: __dmDriverId, hasSchedule: true, bookingSource: "manual",
-        scheduledDate: dateStr, scheduledTime: timeStr,
+        scheduledDate: dateStr, scheduledTime: timeStr, durationMinutes,
         customerName: name, customerPhone: phone,
         pickupAddress: document.getElementById("dmMbFrom").value.trim() || null,
         destination: document.getElementById("dmMbTo").value.trim() || null,
@@ -13577,10 +13745,13 @@ async function initDriverMode(uid){
   // isVerified ফিল্ডে, শুধু এজেন্ট/অ্যাডমিন প্যানেলে দেখানো হতো, ড্রাইভারের
   // নিজের ড্যাশবোর্ডে এই প্রথম দেখানো হচ্ছে)
   document.getElementById("dmVerifiedBadge").style.display = __dmDriver.isVerified ? "inline-block" : "none";
+  dmRefreshDocVerifyEntryStatus(); // 🪪 ডকুমেন্ট ভেরিফিকেশনের বর্তমান স্ট্যাটাস (not_submitted/pending/verified/rejected)
   const v = __dmDriver.vehicle || {};
   dmRenderVehicleInfo(v);
   dmLoadAssignedAgent(); // 🤝 Phase 5 — এজেন্টের যোগাযোগ তথ্য (থাকলে)
   dmListenMyPosts(); // 📢 Phase 6 — নিজের Transport Media পোস্টের তালিকা
+  dmSetupFcm(uid); // 🔔 Phase 7 — অ্যাপ বন্ধ থাকলেও ট্রিপ/মন্তব্যের পুশ নোটিফিকেশন
+  dmLoadRatings(); // ⭐ Phase 8 — যাত্রীদের গড় রেটিং ও মন্তব্য
   // 📊 Phase 2 — আজকের/সাপ্তাহিক/মাসিক আয় এখন dailyEarnings লেজার থেকে
   // হিসাব হয় (নিচে dmLoadIncomeSummary), পুরনো todayEarning ফিল্ড আর UI-তে
   // ব্যবহার হচ্ছে না (সেটা কখনো রিসেট হতো না — সারাজীবনের যোগফল হয়ে যেত)
@@ -13761,6 +13932,74 @@ function dmListenMyPosts(){
     }, (err)=> console.warn("my posts listener error:", err));
 }
 
+/* ==================== ⭐ Honey Bee Transport Media Phase 8 — যাত্রীদের রেটিং দেখা ====================
+   কোনো Cloud Function বা denormalized ratingSum/ratingCount ছাড়াই —
+   যাত্রীর কোনো লেখার অনুমতিই নেই transportDrivers ডকুমেন্টে (firestore.
+   rules-এ ইচ্ছাকৃতভাবে ব্লক করা, জাল গড়-রেটিং ঠেকাতে), তাই গড় এখানে
+   সরাসরি ratings সাবকালেকশনের সব ডকুমেন্ট পড়েই হিসাব করা হয়। সাম্প্রতিক
+   ২০০টা রেটিং পর্যন্ত পড়া হয় — এর বেশি হলে গড়টা সামান্য approximate হবে,
+   কিন্তু এটা একটা ছোট/মাঝারি বাজারের অ্যাপের জন্য যথেষ্ট নির্ভরযোগ্য। */
+async function dmLoadRatings(){
+  try{
+    const snap = await db.collection("transportDrivers").doc(__dmDriverId)
+      .collection("ratings").orderBy("createdAt", "desc").limit(200).get();
+    const badge = document.getElementById("dmRatingBadge");
+    const card = document.getElementById("dmRatingsCard");
+    if(snap.empty){ badge.style.display = "none"; card.style.display = "none"; return; }
+
+    const ratings = snap.docs.map(d=> d.data());
+    const sum = ratings.reduce((s,r)=> s + (r.stars||0), 0);
+    const avg = (sum / ratings.length).toFixed(1);
+
+    badge.textContent = `⭐ ${avg}`;
+    badge.style.display = "inline-block";
+
+    card.style.display = "block";
+    document.getElementById("dmRatingsSummary").textContent = `গড় ${avg} / ৫ · ${ratings.length}টা রেটিং`;
+    const withComments = ratings.filter(r=> r.comment).slice(0, 8);
+    document.getElementById("dmRatingsList").innerHTML = withComments.length === 0
+      ? '<div style="color:#6a9c85;">এখনো কোনো লিখিত মন্তব্য নেই।</div>'
+      : withComments.map(r=> `
+        <div style="padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+          <span style="color:#fbbf24;">${"★".repeat(r.stars)}${"☆".repeat(5-r.stars)}</span>
+          <span style="margin-left:6px; color:#eafff2;">${escapeHtmlDm(r.passengerName||"যাত্রী")}</span>
+          <div style="margin-top:2px;">${escapeHtmlDm(r.comment)}</div>
+        </div>`).join("");
+  }catch(e){ console.warn("রেটিং লোড করা যায়নি:", e); }
+}
+
+/* ==================== 🔔 Honey Bee Transport Media Phase 7 — ড্রাইভারের পুশ নোটিফিকেশন ====================
+   rmSetupFcm()-এর (Rider Mode) ঠিক একই ডিজাইন, শুধু transportDrivers
+   কালেকশনে fcmToken সেভ করে — যাতে ট্রিপ কনফার্ম হওয়া বা পোস্টে মন্তব্য
+   এলে অ্যাপ বন্ধ থাকা অবস্থাতেও নোটিফিকেশন পাওয়া যায় (functions/index.js-
+   এর onTripStatusNotify/onTransportMediaCommentNotify থেকে পাঠানো হয়,
+   deploy করার পরই কার্যকর হবে)। একই RM_FCM_VAPID_KEY পুনর্ব্যবহার করা
+   হচ্ছে — এটা প্রজেক্ট-ওয়াইড একটা কী, কালেকশন-নির্দিষ্ট না। */
+async function dmSetupFcm(driverUid){
+  if(RM_FCM_VAPID_KEY === "PASTE_YOUR_VAPID_KEY_HERE") return;
+  if(!("Notification" in window) || !("serviceWorker" in navigator)) return;
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== "granted") return;
+
+    const registration = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({ vapidKey: RM_FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+    if(token){
+      await db.collection("transportDrivers").doc(driverUid).update({ fcmToken: token });
+    }
+
+    messaging.onMessage((payload)=>{
+      if(typeof playBeeAlert === "function") playBeeAlert();
+      const title = (payload.notification && payload.notification.title) || "🚕 Honey Bee Transport";
+      const body = (payload.notification && payload.notification.body) || "";
+      try{ new Notification(title, { body, icon: "icon-192.png" }); }catch(e){}
+    });
+  }catch(e){
+    console.warn("Driver FCM সেটআপ ব্যর্থ হয়েছে:", e);
+  }
+}
+
 function dmRenderVehicleInfo(v){
   const vLabel = DM_VEH_LABEL[v.type] || v.type || "";
   const extra = [DM_VEH_AC_LABEL[v.acType], DM_VEH_FUEL_LABEL[v.fuelType], DM_VEH_LUGGAGE_LABEL[v.luggage]].filter(Boolean);
@@ -13817,6 +14056,162 @@ function dmPickVehiclePhoto(slot){
     }
   });
   input.click();
+}
+
+/* ==================== 🪪 ডকুমেন্ট ভেরিফিকেশন ====================
+   ড্রাইভার নিজে NID (বাধ্যতামূলক) + লাইসেন্স (ঐচ্ছিক) আপলোড করে "জমা"
+   দিতে পারেন — এজেন্ট এখন আর সশরীরে গিয়ে ছবি না তুলেও রিভিউ করতে
+   পারবেন (honey-bee-agent.html-এর নতুন "পেন্ডিং ডকুমেন্ট" সেকশন থেকে)।
+   আগের ইন-পার্সন quick-verify মোডালটাও অক্ষত আছে, এটা একটা বিকল্প পথ।
+
+   🔒 নিরাপত্তা — ছবি আপলোড হয় vehicle-images-এর মতোই resize+WebP করে
+   Firebase Storage-এ (driver-documents/{uid}/{slot}.webp, storage.rules-এ
+   পাবলিক-read না, শুধু নিজে/এজেন্ট/সুপারঅ্যাডমিন)। কিন্তু এই URL গুলো
+   transportDrivers-এর টপ-লেভেল ডকুমেন্টে রাখা হয় না — কারণ সেই ডকুমেন্ট
+   firestore.rules-এ `allow get/list: if true` (পুরোপুরি পাবলিক), আর
+   Storage download URL-এ token থাকায় সেটা কার্যত একটা bearer-capability —
+   পাবলিক ডকুমেন্টে রাখলে ছবির লিংক কার্যত সবার জন্যই উন্মুক্ত হয়ে যেত।
+   তাই URL গুলো আলাদা প্রাইভেট verification সাব-কালেকশনে রাখা হয় (রিড
+   firestore.rules-এ owner/agent/superadmin-এ সীমাবদ্ধ)। টপ-লেভেল
+   ডকুমেন্টে শুধু হালকা verificationStatus স্ট্রিং কপি থাকে (এজেন্টের
+   পেন্ডিং-কিউ ফিল্টার করার জন্য) — এটা সংবেদনশীল না। */
+const DM_DOC_SLOTS = {
+  nid: [
+    { key:"nidFront", label:"সামনে", icon:"🪪" },
+    { key:"nidBack", label:"পেছনে", icon:"🪪" }
+  ],
+  license: [
+    { key:"licenseFront", label:"সামনে", icon:"🚗" },
+    { key:"licenseBack", label:"পেছনে", icon:"🚗" }
+  ]
+};
+let __dmDocUrls = {};
+
+function dmRenderDocGrid(gridId, slots){
+  const grid = document.getElementById(gridId);
+  if(!grid) return;
+  grid.innerHTML = slots.map(slot=>{
+    const url = __dmDocUrls[slot.key];
+    return `
+      <div class="dmDocTile" data-slot="${slot.key}" style="aspect-ratio:1.4; border-radius:10px; border:1px dashed rgba(74,222,128,0.4); background:${url ? `url('${url}') center/cover` : 'rgba(255,255,255,0.04)'}; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; overflow:hidden;">
+        ${url ? `<span style="position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,0.55); color:#fff; font-size:9px; padding:2px 0; text-align:center;">✅ ${slot.label}</span>`
+              : `<div style="text-align:center; color:#a8d9c0;"><div style="font-size:20px;">${slot.icon}</div><div style="font-size:9px; margin-top:2px;">${slot.label}</div></div>`}
+      </div>`;
+  }).join("");
+  grid.querySelectorAll(".dmDocTile").forEach(tile=>{
+    tile.addEventListener("click", ()=> dmPickDocPhoto(tile.dataset.slot));
+  });
+}
+
+function dmPickDocPhoto(slot){
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = "image/*";
+  input.addEventListener("change", async ()=>{
+    const file = input.files && input.files[0];
+    if(!file) return;
+    const tile = document.querySelector(`.dmDocTile[data-slot="${slot}"]`);
+    if(tile) tile.style.opacity = "0.5";
+    try{
+      if(!storage) throw new Error("Storage SDK লোড হয়নি");
+      const processed = await hbProcessProductImage(file);
+      const storageRef = storage.ref(`driver-documents/${__dmDriverId}/${slot}.webp`);
+      await storageRef.put(processed.blob, { contentType: "image/webp" });
+      const url = await storageRef.getDownloadURL();
+      const cacheBustedUrl = url + (url.includes("?") ? "&" : "?") + "v=" + Date.now();
+      __dmDocUrls[slot] = cacheBustedUrl;
+      dmRenderDocGrid("dmDocNidGrid", DM_DOC_SLOTS.nid);
+      dmRenderDocGrid("dmDocLicenseGrid", DM_DOC_SLOTS.license);
+    }catch(e){
+      console.error(e);
+      alert("ছবি আপলোড করা যায়নি: " + (e.message || e));
+      if(tile) tile.style.opacity = "1";
+    }
+  });
+  input.click();
+}
+
+const DM_VERIFY_STATUS_LABEL = {
+  not_submitted: { text: "এখনো কোনো ডকুমেন্ট জমা দেননি।", color: "#a8d9c0" },
+  pending: { text: "⏳ রিভিউয়ের অপেক্ষায় — এজেন্ট শীঘ্রই দেখবেন।", color: "#fbbf24" },
+  verified: { text: "✅ ভেরিফাই হয়ে গেছে!", color: "#4ade80" },
+  rejected: { text: "❌ প্রত্যাখ্যান হয়েছে।", color: "#f87171" }
+};
+
+async function dmOpenDocVerify(){
+  __dmDocUrls = {};
+  dmRenderDocGrid("dmDocNidGrid", DM_DOC_SLOTS.nid);
+  dmRenderDocGrid("dmDocLicenseGrid", DM_DOC_SLOTS.license);
+  document.getElementById("dmDocVerifyStatusCard").style.display = "none";
+  document.getElementById("dmDocVerifyOverlay").style.display = "block";
+  try{
+    const doc = await db.collection("transportDrivers").doc(__dmDriverId)
+      .collection("verification").doc("docs").get();
+    if(doc.exists){
+      const d = doc.data();
+      __dmDocUrls = {
+        nidFront: d.nidFront || null, nidBack: d.nidBack || null,
+        licenseFront: d.licenseFront || null, licenseBack: d.licenseBack || null
+      };
+      dmRenderDocGrid("dmDocNidGrid", DM_DOC_SLOTS.nid);
+      dmRenderDocGrid("dmDocLicenseGrid", DM_DOC_SLOTS.license);
+      const status = d.status || "not_submitted";
+      const info = DM_VERIFY_STATUS_LABEL[status] || DM_VERIFY_STATUS_LABEL.not_submitted;
+      const card = document.getElementById("dmDocVerifyStatusCard");
+      const banner = document.getElementById("dmDocVerifyStatusBanner");
+      card.style.display = "block";
+      banner.style.color = info.color;
+      banner.innerHTML = info.text + (status === "rejected" && d.rejectionReason ? `<br><span style="color:#a8d9c0;">কারণঃ ${escapeHtmlDm(d.rejectionReason)}</span>` : "");
+    }
+  }catch(e){ console.warn("verification doc load failed:", e); }
+}
+document.getElementById("dmOpenDocVerifyBtn").addEventListener("click", dmOpenDocVerify);
+document.getElementById("dmCloseDocVerifyBtn").addEventListener("click", ()=>{
+  document.getElementById("dmDocVerifyOverlay").style.display = "none";
+});
+
+document.getElementById("dmDocSubmitBtn").addEventListener("click", async ()=>{
+  if(!__dmDocUrls.nidFront || !__dmDocUrls.nidBack){
+    alert("NID-এর সামনে ও পেছনের ছবি — দুটোই বাধ্যতামূলক।");
+    return;
+  }
+  const btn = document.getElementById("dmDocSubmitBtn");
+  btn.disabled = true; btn.textContent = "জমা হচ্ছে...";
+  try{
+    await db.collection("transportDrivers").doc(__dmDriverId)
+      .collection("verification").doc("docs").set({
+        nidFront: __dmDocUrls.nidFront, nidBack: __dmDocUrls.nidBack,
+        licenseFront: __dmDocUrls.licenseFront || null, licenseBack: __dmDocUrls.licenseBack || null,
+        status: "pending", rejectionReason: null,
+        submittedAt: fbNow()
+      }, { merge: true });
+    // 📊 এজেন্টের পেন্ডিং-কিউ ফিল্টারের জন্য পাবলিক ডকুমেন্টে শুধু হালকা
+    // স্ট্যাটাস-স্ট্রিং কপি — আসল ছবির URL না, তাই এটা রাখা নিরাপদ
+    await db.collection("transportDrivers").doc(__dmDriverId).set({
+      verificationStatus: "pending"
+    }, { merge: true });
+    if(__dmDriver) __dmDriver.verificationStatus = "pending";
+    dmRefreshDocVerifyEntryStatus();
+    alert("✅ জমা দেওয়া হয়েছে — এজেন্ট রিভিউ করার পর জানানো হবে।");
+    document.getElementById("dmDocVerifyOverlay").style.display = "none";
+  }catch(e){
+    alert("জমা দেওয়া যায়নি: " + (e.message || e));
+  }finally{
+    btn.disabled = false; btn.textContent = "✅ রিভিউয়ের জন্য জমা দিন";
+  }
+});
+
+// 🏠 ড্যাশবোর্ডের এন্ট্রি-বাটনের নিচে বর্তমান স্ট্যাটাস সংক্ষেপে দেখানো
+function dmRefreshDocVerifyEntryStatus(){
+  const el = document.getElementById("dmDocVerifyStatusTxt");
+  if(!el || !__dmDriver) return;
+  const status = __dmDriver.verificationStatus || "not_submitted";
+  const map = {
+    not_submitted: "NID/লাইসেন্সের ছবি জমা দিন",
+    pending: "⏳ রিভিউয়ের অপেক্ষায়",
+    verified: "✅ ভেরিফাই হয়ে গেছে",
+    rejected: "❌ প্রত্যাখ্যান হয়েছে — আবার জমা দিন"
+  };
+  el.textContent = map[status] || map.not_submitted;
 }
 
 function dmOpenVehicleEdit(){
@@ -13937,6 +14332,18 @@ function dmStopRingRepeat(){
   if(__dmRingRepeatInterval){ clearInterval(__dmRingRepeatInterval); __dmRingRepeatInterval = null; }
 }
 
+// ✈️ Smart Airport Pickup Engine — Phase 1 (API ছাড়া) — ট্রিপ রিকোয়েস্ট
+// কার্ডে এয়ারপোর্ট পিকআপ/ড্রপের জন্য একটা আলাদা ব্যাজ + ফ্লাইট নম্বর/সময়
+// দেখানো হয়, যাতে ড্রাইভার তুলে নেওয়ার আগেই বুঝতে পারেন এটা সাধারণ ট্রিপ
+// না, এবং কখন ফ্লাইট নামবে/ছাড়বে তা জানতে পারেন — কোনো Flight API ছাড়াই।
+function dmAirportBadgeHtml(t){
+  if(t.tripType !== "airport_pickup" && t.tripType !== "airport_drop") return "";
+  const f = t.flightInfo || {};
+  const label = t.tripType === "airport_pickup" ? "✈️ এয়ারপোর্ট পিকআপ" : "🛫 এয়ারপোর্ট ড্রপ";
+  const timeTxt = (f.flightDate || f.flightTime) ? `· ${escapeHtmlDm(f.flightDate||"")} ${escapeHtmlDm(f.flightTime||"")}` : "";
+  return `<div style="background:rgba(251,191,36,0.12); border:1px solid rgba(251,191,36,0.4); border-radius:8px; padding:6px 8px; margin-bottom:8px; font-size:10.5px; color:#fbbf24; font-weight:700;">${label} ${f.flightNumber ? "· "+escapeHtmlDm(f.flightNumber) : ""} ${timeTxt}</div>`;
+}
+
 function dmRenderTripRequests(trips){
   // ড্রাইভার ইতিমধ্যে কোনো ট্রিপের অপেক্ষায় থাকলে বা ট্রিপে থাকলে নতুন
   // রিকোয়েস্ট দেখানো হয় না — dmRenderActiveTripStatus সেই কার্ড দেখাচ্ছে
@@ -13980,6 +14387,7 @@ function dmRenderTripRequests(trips){
       <div style="background:#173a29; border:1px solid rgba(251,191,36,0.4); border-radius:12px; padding:12px; margin-bottom:10px;">
         <div style="font-weight:700; font-size:13px; color:#eafff2;">📍 ${escapeHtmlDm(t.destination||"—")}</div>
         <div style="font-size:11px; color:#a8d9c0; margin:2px 0 8px;">🚗 ${escapeHtmlDm(t.vehicleType||"")} · 🔒 নির্দিষ্ট ভাড়া</div>
+        ${dmAirportBadgeHtml(t)}
         <div style="font-weight:800; color:#fbbf24; font-size:16px; margin-bottom:8px;">${HB_CUR} ${t.proposedFare}</div>
         <div style="display:flex; gap:8px;">
           <button class="dmTripRejectBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#444; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ Reject</button>
@@ -13993,6 +14401,7 @@ function dmRenderTripRequests(trips){
     <div style="background:#173a29; border:1px solid rgba(74,222,128,0.2); border-radius:12px; padding:12px; margin-bottom:10px;">
       <div style="font-weight:700; font-size:13px; color:#eafff2;">📍 ${escapeHtmlDm(t.destination||"—")}</div>
       <div style="font-size:11px; color:#a8d9c0; margin:2px 0 8px;">🚗 ${escapeHtmlDm(t.vehicleType||"")} · ${waitCount}/3 জন ইতিমধ্যে অফার করেছেন</div>
+      ${dmAirportBadgeHtml(t)}
       <div style="display:flex; gap:8px;">
         <button class="dmTripRejectBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#444; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ Reject</button>
         <button class="dmTripOfferBtn" data-trip="${t.id}" ${isFull ? "disabled" : ""} style="flex:1; padding:8px; border:none; border-radius:8px; background:${isFull ? "#333" : "#16a34a"}; color:${isFull ? "#888" : "#fff"}; font-weight:800; font-size:11.5px; cursor:${isFull ? "not-allowed" : "pointer"}; font-family:inherit;">${isFull ? "🔒 ৩ জন পূর্ণ" : "💰 ভাড়া অফার করুন"}</button>
@@ -14120,6 +14529,31 @@ function dmWatchActiveTrip(tripId){
   });
 }
 
+// ✈️ Smart Airport Pickup Engine — Phase 1 — সক্রিয় ট্রিপ এয়ারপোর্ট
+// পিকআপ/ড্রপ হলে ফ্লাইট তথ্য + (শুধু পিকআপে) যাত্রীর সর্বশেষ Arrival
+// Mode স্ট্যাটাস লাইভ দেখায় — trip ডকুমেন্ট onSnapshot দিয়েই আসে, তাই
+// প্রতিবার আপডেট হলেই এই ব্লকটাও আপনাআপনি রিফ্রেশ হয়ে যায়
+function dmAirportInfoHtml(trip){
+  if(trip.tripType !== "airport_pickup" && trip.tripType !== "airport_drop") return "";
+  const f = trip.flightInfo || {};
+  const isPickup = trip.tripType === "airport_pickup";
+  const arrivalLabelMap = { landed:"🛬 নেমেছেন", immigration:"🛂 ইমিগ্রেশনে আছেন", luggage:"🧳 লাগেজ সংগ্রহ করছেন", exit:"🚪 বের হচ্ছেন", waiting_gate:"📍 Gate-এ অপেক্ষা করছেন" };
+  const rows = [];
+  if(f.flightNumber) rows.push(`ফ্লাইটঃ <b>${escapeHtmlDm(f.flightNumber)}</b>${f.airline ? " ("+escapeHtmlDm(f.airline)+")" : ""}`);
+  if(f.fromAirport || f.toAirport) rows.push(`রুটঃ ${escapeHtmlDm(f.fromAirport||"—")} → ${escapeHtmlDm(f.toAirport||"—")}`);
+  if(f.flightDate || f.flightTime) rows.push(`${isPickup?"নির্ধারিত অবতরণ":"নির্ধারিত ছাড়ার সময়"}ঃ ${escapeHtmlDm(f.flightDate||"")} ${escapeHtmlDm(f.flightTime||"")}`);
+  if(f.terminal) rows.push(`টার্মিনালঃ ${escapeHtmlDm(f.terminal)}`);
+  rows.push(`স্ট্যাটাসঃ ম্যানুয়াল (API যুক্ত হয়নি)`);
+  if(isPickup){
+    rows.push(`যাত্রীর অবস্থাঃ ${trip.arrivalStatus ? (arrivalLabelMap[trip.arrivalStatus]||trip.arrivalStatus) : "এখনো জানাননি"}`);
+  }
+  return `
+    <div style="background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.4); border-radius:10px; padding:10px 12px; margin-bottom:10px;">
+      <div style="font-weight:800; font-size:12px; color:#fbbf24; margin-bottom:4px;">${isPickup ? "✈️ এয়ারপোর্ট পিকআপ" : "🛫 এয়ারপোর্ট ড্রপ"}</div>
+      <div style="font-size:11.5px; color:#eafff2; line-height:1.7;">${rows.join("<br>")}</div>
+    </div>`;
+}
+
 async function dmRenderActiveTripStatus(trip, tripId){
   const listEl = document.getElementById("dmTripRequestsList");
   if(trip.status === "confirmed"){
@@ -14134,11 +14568,13 @@ async function dmRenderActiveTripStatus(trip, tripId){
           <div style="font-size:12px; color:#eafff2; margin:2px 0;">📍 পিকআপ: ${escapeHtmlDm((trip.pickupLocation && trip.pickupLocation.address) || "জানা নেই")}</div>
           <div style="font-size:12px; color:#eafff2; margin:2px 0;">🏁 গন্তব্য: ${escapeHtmlDm(trip.destination||"—")}</div>
           <div style="font-size:12px; color:#a8d9c0; margin-bottom:10px;">💰 ভাড়া: ${HB_CUR} ${trip.confirmedDriver.finalFare}</div>
+          ${dmAirportInfoHtml(trip)}
           <div id="dmTripRouteMapEl" style="width:100%; height:160px; border-radius:10px; overflow:hidden; background:#111; margin-bottom:10px; display:${trip.pickupLocation && trip.pickupLocation.lat ? "block" : "none"};"></div>
           <div style="display:flex; gap:8px; margin-bottom:8px;">
             <button id="dmNavigateBtn" style="flex:1; padding:10px; border:none; border-radius:9px; background:#2563eb; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">🧭 Navigate</button>
             <button id="dmCallPassengerBtn" style="flex:1; padding:10px; border:none; border-radius:9px; background:#f59e0b; color:#1a1206; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">📞 Call Passenger</button>
           </div>
+          <button id="dmOpenTripChatBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:rgba(255,255,255,0.08); color:#eafff2; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; margin-bottom:8px;">💬 যাত্রীর সাথে চ্যাট</button>
           <button id="dmCompleteTripBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ট্রিপ শেষ করুন</button>
         </div>`;
       attachHoldToConfirm(document.getElementById("dmCompleteTripBtn"), ()=> dmCompleteTrip(tripId));
@@ -14151,6 +14587,7 @@ async function dmRenderActiveTripStatus(trip, tripId){
         if(trip.passengerPhone) window.location.href = "tel:" + trip.passengerPhone;
         else alert("যাত্রীর ফোন নম্বর পাওয়া যায়নি।");
       });
+      document.getElementById("dmOpenTripChatBtn").addEventListener("click", ()=> dmOpenTripChat(tripId, trip));
       dmDrawTripRoute(trip);
     }else{
       // অন্য কোনো ড্রাইভার বেছে নেওয়া হয়েছে — আমি আবার "available"
@@ -14225,10 +14662,86 @@ async function dmCancelWait(tripId){
 async function dmResetActiveTripStatus(){
   if(dmActiveTripUnsub){ dmActiveTripUnsub(); dmActiveTripUnsub = null; }
   if(dmWaitCountdownInterval){ clearInterval(dmWaitCountdownInterval); dmWaitCountdownInterval = null; }
+  dmCloseTripChat(); // 💬 আগের ট্রিপের চ্যাট লিসেনার/স্ক্রিন খোলা থাকলে বন্ধ করা হচ্ছে
   __dmDriver.currentStatus = "available"; __dmDriver.activeTripId = null;
   try{ await db.collection("transportDrivers").doc(__dmDriverId).update({ currentStatus: "available", activeTripId: null }); }catch(e){}
   document.getElementById("dmTripRequestsList").innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
 }
+
+/* ==================== 💬 ড্রাইভার-প্যাসেঞ্জার ইন-অ্যাপ চ্যাট ====================
+   trips/{tripId}/chat সাবকালেকশন — passenger-side (honey-bee-bazar.html)-এর
+   tripOpenChat/tripSendChatMessage-এর ঠিক আয়না-প্রতিরূপ, একই ডেটা-শেপ
+   ({senderId, senderRole, text, sentAt}) ব্যবহার করে যাতে দুই পাশে একই
+   মেসেজ সঠিকভাবে রেন্ডার হয়। */
+let dmTripChatUnsub = null;
+let dmTripChatTripId = null;
+
+function dmOpenTripChat(tripId, trip){
+  dmTripChatTripId = tripId;
+  document.getElementById("dmTripChatPassengerName").textContent = trip.passengerName || "যাত্রী";
+  document.getElementById("dmTripChatMessages").innerHTML = '<div style="text-align:center; color:#a8d9c0; font-size:12px; margin-top:20px;">লোড হচ্ছে...</div>';
+  document.getElementById("dmTripChatOverlay").style.display = "flex";
+
+  if(dmTripChatUnsub) dmTripChatUnsub();
+  dmTripChatUnsub = db.collection("trips").doc(tripId).collection("chat")
+    .orderBy("sentAt","asc")
+    .onSnapshot((qs)=>{ dmRenderTripChatMessages(qs); }, (err)=>{
+      console.error("driver trip chat listener error:", err);
+      document.getElementById("dmTripChatMessages").innerHTML = '<div style="text-align:center; color:#a8d9c0; font-size:12px; margin-top:20px;">চ্যাট লোড করা যায়নি।</div>';
+    });
+}
+
+function dmCloseTripChat(){
+  document.getElementById("dmTripChatOverlay").style.display = "none";
+  if(dmTripChatUnsub){ dmTripChatUnsub(); dmTripChatUnsub = null; }
+  dmTripChatTripId = null;
+}
+
+function dmRenderTripChatMessages(qs){
+  const el = document.getElementById("dmTripChatMessages");
+  if(qs.empty){
+    el.innerHTML = '<div style="text-align:center; color:#a8d9c0; font-size:12px; margin-top:20px;">এখনো কোনো মেসেজ নেই — যাত্রীকে কিছু লিখুন।</div>';
+    return;
+  }
+  el.innerHTML = qs.docs.map(d=>{
+    const m = d.data();
+    const mine = m.senderId === __dmDriverId;
+    const time = m.sentAt ? m.sentAt.toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'}) : "";
+    return `
+      <div style="display:flex; justify-content:${mine ? "flex-end" : "flex-start"}; margin-bottom:8px;">
+        <div style="max-width:75%; padding:9px 13px; border-radius:14px; ${mine ? "background:#4ade80; color:#0f2318; border-bottom-right-radius:4px;" : "background:rgba(255,255,255,0.08); color:#eafff2; border-bottom-left-radius:4px;"}">
+          <div style="font-size:13.5px; word-wrap:break-word;">${escapeHtmlDm(m.text||"")}</div>
+          <div style="font-size:9.5px; opacity:0.7; margin-top:3px; text-align:right;">${time}</div>
+        </div>
+      </div>`;
+  }).join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+async function dmSendTripChatMessage(){
+  const input = document.getElementById("dmTripChatInput");
+  const text = input.value.trim();
+  if(!text || !dmTripChatTripId) return;
+  input.value = "";
+  try{
+    await db.collection("trips").doc(dmTripChatTripId).collection("chat").add({
+      senderId: __dmDriverId,
+      senderRole: "driver",
+      text,
+      sentAt: fbNow()
+    });
+  }catch(e){
+    console.error("driver chat send failed:", e);
+    alert("মেসেজ পাঠানো যায়নি — আবার চেষ্টা করুন।");
+    input.value = text;
+  }
+}
+
+document.getElementById("dmCloseTripChatBtn").addEventListener("click", dmCloseTripChat);
+document.getElementById("dmTripChatSendBtn").addEventListener("click", dmSendTripChatMessage);
+document.getElementById("dmTripChatInput").addEventListener("keydown", (e)=>{
+  if(e.key === "Enter"){ e.preventDefault(); dmSendTripChatMessage(); }
+});
 
 // 🗺️ চালক ও পিকআপ লোকেশনের মধ্যে একটা সরলরেখা (straight line) দেখানো হয় —
 // এটা আসল turn-by-turn রুট না (সেটার জন্য পেইড রুটিং API লাগত), শুধু
@@ -14953,7 +15466,12 @@ async function initRiderMode(uid){
     const riderDoc = await db.collection("riders").doc(uid).get();
     if(!riderDoc.exists){ alert("রাইডার প্রোফাইল পাওয়া যায়নি।"); auth.signOut(); return; }
     rmCurrentRider = { uid, ...riderDoc.data() };
-    if(rmCurrentRider.status !== "active"){ alert("আপনার অ্যাকাউন্ট ব্লক করা আছে — এজেন্টের সাথে যোগাযোগ করুন।"); auth.signOut(); return; }
+    // 🐞 বাগ-ফিক্স: আগে `status !== "active"` চেক করা হতো — অর্থাৎ status
+    // ফিল্ড "pending" (এজেন্টের UI-তে এই স্ট্যাটাসের জন্য আলাদা রঙ/লেবেল
+    // আগে থেকেই আছে) বা অনুপস্থিত থাকলেও legitimate, non-blocked রাইডারকে
+    // "ব্লক করা আছে" মেসেজ দেখাতো। এখন সরাসরি status === "blocked"
+    // চেক করা হচ্ছে — শুধু আসলেই ব্লক করা থাকলেই এই মেসেজ দেখাবে।
+    if(rmCurrentRider.status === "blocked"){ alert("আপনার অ্যাকাউন্ট ব্লক করা আছে — এজেন্টের সাথে যোগাযোগ করুন।"); auth.signOut(); return; }
   }catch(e){ console.error(e); return; }
 
   document.getElementById("rmGreetingTxt").textContent = `শুভ সকাল, ${rmCurrentRider.name || "রাইডার"}! 👋`;

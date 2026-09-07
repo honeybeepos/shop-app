@@ -697,6 +697,13 @@
   <div id="screenTransport">
     <button class="backBtn" id="backToHomeFromTransport">← হোমে ফিরে যান</button>
 
+    <!-- 📜 আমার ট্রিপ হিস্ট্রি — আগের সব ট্রিপ (সম্পন্ন/বাতিল/মেয়াদ শেষ) একসাথে দেখা যায় -->
+    <button id="tripHistoryOpenBtn" class="card" style="width:100%; text-align:left; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:10px; margin-bottom:12px; border:none;">
+      <span style="font-size:20px;">📜</span>
+      <span style="flex:1; text-align:left; font-weight:800; font-size:13.5px;">আমার ট্রিপ হিস্ট্রি</span>
+      <span style="color:var(--muted); font-size:16px;">›</span>
+    </button>
+
     <!-- ==================== 🚕 গন্তব্য দিয়ে বুক করুন — একাধিক ড্রাইভারের অফার থেকে বেছে নিন ==================== -->
     <div class="card" id="tripBookCard">
       <div style="text-align:center; margin-bottom:14px;">
@@ -714,6 +721,35 @@
       </select>
       <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">গন্তব্য</label>
       <input type="text" id="tripDestination" placeholder="যেমনঃ হাজীগঞ্জ" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+
+      <!-- ✈️ Smart Airport Pickup Engine — Phase 1 (এখনো কোনো Flight API যুক্ত
+           হয়নি, শুধু ম্যানুয়াল তথ্য) — ট্রিপের ধরন বেছে নিলে নিচে ফ্লাইট
+           তথ্যের ফর্ম খুলে যায়। প্রবাসী যাত্রীদের জন্য যিনি এয়ারপোর্টে
+           নামছেন/উড়ছেন তার ফ্লাইট নম্বর-সময়টা ড্রাইভার আগে থেকেই দেখতে পান। -->
+      <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">ট্রিপের ধরন</label>
+      <div style="display:flex; gap:6px; margin-bottom:12px;">
+        <button type="button" id="tripTypeNormalBtn" data-type="normal" style="flex:1; padding:10px 4px; border-radius:10px; border:1px solid var(--amber); background:var(--amber); color:var(--bg1); font-weight:800; font-size:11px; cursor:pointer; font-family:inherit;">🚗 সাধারণ</button>
+        <button type="button" id="tripTypeAirportPickupBtn" data-type="airport_pickup" style="flex:1; padding:10px 4px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:800; font-size:11px; cursor:pointer; font-family:inherit;">✈️ এয়ারপোর্ট পিকআপ</button>
+        <button type="button" id="tripTypeAirportDropBtn" data-type="airport_drop" style="flex:1; padding:10px 4px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:800; font-size:11px; cursor:pointer; font-family:inherit;">🛫 এয়ারপোর্ট ড্রপ</button>
+      </div>
+
+      <div id="tripFlightInfoWrap" style="display:none; margin-bottom:12px; background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.35); border-radius:12px; padding:12px;">
+        <div style="font-size:12px; font-weight:800; color:var(--amber); margin-bottom:10px;">✈️ ফ্লাইট তথ্য (ম্যানুয়াল — এখনো Flight API যুক্ত হয়নি)</div>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <input type="text" id="tripFlightAirline" placeholder="এয়ারলাইনের নাম" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
+          <input type="text" id="tripFlightNumber" placeholder="ফ্লাইট নম্বর (যেমনঃ SV805)" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <input type="text" id="tripFlightFrom" placeholder="কোথা থেকে (যেমনঃ রিয়াদ)" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
+          <input type="text" id="tripFlightTo" placeholder="কোথায় (যেমনঃ ঢাকা)" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
+        </div>
+        <label id="tripFlightTimeLabel" style="display:block; font-size:11px; color:var(--muted); margin-bottom:6px; font-weight:600;">নির্ধারিত অবতরণের (অ্যারাইভাল) তারিখ ও সময়</label>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <input type="date" id="tripFlightDate" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
+          <input type="time" id="tripFlightTime" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
+        </div>
+        <input type="text" id="tripFlightTerminal" placeholder="টার্মিনাল (ঐচ্ছিক)" style="width:100%; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; box-sizing:border-box;">
+      </div>
 
       <!-- 💰 Honey Bee Transport Media Phase 4 — ভাড়ার ধরন: দরকষাকষি (একাধিক
            ড্রাইভার অফার দেবে, যাত্রী বেছে নেবে — আগে থেকেই ছিল) বনাম নির্দিষ্ট
@@ -744,10 +780,78 @@
       </div>
       <div id="tripOffersList"></div>
       <div id="tripConfirmedBox" style="display:none; text-align:left; padding-top:10px; border-top:1px solid var(--border);">
-        <div style="font-weight:700; font-size:14px;" id="tripConfirmedName">—</div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="font-weight:700; font-size:14px;" id="tripConfirmedName">—</div>
+          <span id="tripConfirmedRating" style="font-size:11px; color:#fbbf24; font-weight:700;"></span>
+        </div>
         <div style="font-size:11.5px; color:var(--muted); margin-bottom:10px;" id="tripConfirmedMeta">—</div>
-        <a id="tripCallDriverBtn" href="#" style="display:none; width:100%; padding:11px; border-radius:10px; text-align:center; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff; text-decoration:none; box-sizing:border-box;">📞 ড্রাইভারকে কল করুন</a>
+        <a id="tripCallDriverBtn" href="#" style="display:none; width:100%; padding:11px; border-radius:10px; text-align:center; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff; text-decoration:none; box-sizing:border-box; margin-bottom:8px;">📞 ড্রাইভারকে কল করুন</a>
+        <!-- 💬 ড্রাইভার-প্যাসেঞ্জার চ্যাট — শুধু লগইন করা প্যাসেঞ্জারের জন্য
+             (guest সেশনের কোনো স্থায়ী auth uid নেই, firestore.rules-এ
+             চ্যাট সাবকালেকশনও isSignedIn() দাবি করে) -->
+        <button id="tripChatOpenBtn" style="display:none; width:100%; padding:11px; border:1px solid rgba(251,191,36,0.4); border-radius:10px; text-align:center; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit; background:rgba(251,191,36,0.1); color:var(--amber);">💬 ড্রাইভারের সাথে চ্যাট করুন</button>
       </div>
+
+      <!-- ✈️ Smart Airport Pickup Engine — Phase 1 — এয়ারপোর্ট পিকআপ/ড্রপ
+           ট্রিপ কনফার্ম হলে ফ্লাইট তথ্য + অফলাইন সেফটি কার্ড + Call/SMS
+           ব্যাকআপ + (শুধু পিকআপে) Arrival Mode দেখানো হয় -->
+      <div id="tripAirportBox" style="display:none; margin-top:14px;">
+        <div style="background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.35); border-radius:12px; padding:14px; margin-bottom:10px; text-align:left;">
+          <div id="tripAirportFlightTitle" style="font-weight:800; font-size:13px; color:var(--amber); margin-bottom:8px;">✈️ ফ্লাইট তথ্য</div>
+          <div id="tripAirportFlightDetails" style="font-size:12px; color:#eee; line-height:1.8;"></div>
+          <div style="font-size:10.5px; color:var(--muted); margin-top:6px;">স্ট্যাটাসঃ ম্যানুয়াল (এখনো Flight API যুক্ত হয়নি)</div>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:10px; text-align:left;">
+          <div style="font-weight:800; font-size:13px; color:#fff8e8; margin-bottom:8px;">🔒 অফলাইন সেফটি কার্ড</div>
+          <div id="tripAirportSafetyDetails" style="font-size:12px; color:#ddd; line-height:1.8;"></div>
+          <p style="font-size:10px; color:var(--muted); margin:6px 0 0;">ইন্টারনেট না থাকলেও এই তথ্যগুলো আপনার ফোনেই সেভ থাকবে — অ্যাপ বন্ধ করে আবার খুললেও হারাবে না।</p>
+        </div>
+
+        <button id="tripSmsDriverBtn" style="width:100%; padding:11px; border:none; border-radius:10px; background:rgba(255,255,255,0.08); color:#fff8e8; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; margin-bottom:8px;">📩 ইন্টারনেট নেই? SMS পাঠান</button>
+        <div id="tripSmsQuickWrap" style="display:none; margin-bottom:10px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+            <button type="button" class="tripSmsQuickBtn" data-msg="🛬 আমি নেমেছি" style="padding:9px 4px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,0.05); color:#fff8e8; font-size:11px; cursor:pointer; font-family:inherit;">🛬 আমি নেমেছি</button>
+            <button type="button" class="tripSmsQuickBtn" data-msg="🧳 আমি লাগেজ নিচ্ছি" style="padding:9px 4px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,0.05); color:#fff8e8; font-size:11px; cursor:pointer; font-family:inherit;">🧳 লাগেজ নিচ্ছি</button>
+            <button type="button" class="tripSmsQuickBtn" data-msg="🚪 আমি বের হচ্ছি" style="padding:9px 4px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,0.05); color:#fff8e8; font-size:11px; cursor:pointer; font-family:inherit;">🚪 বের হচ্ছি</button>
+            <button type="button" class="tripSmsQuickBtn" data-msg="📍 আমি Arrival Gate-এ আছি" style="padding:9px 4px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,0.05); color:#fff8e8; font-size:11px; cursor:pointer; font-family:inherit;">📍 Gate-এ আছি</button>
+          </div>
+        </div>
+
+        <div id="tripArrivalModeWrap" style="display:none; text-align:left; margin-bottom:6px;">
+          <div style="font-weight:800; font-size:13px; color:#fff8e8; margin-bottom:8px;">✈️ Arrival Mode — বর্তমান অবস্থা জানান</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px;">
+            <button type="button" class="tripArrivalBtn" data-status="landed" style="padding:10px 4px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,0.05); color:#fff8e8; font-size:11.5px; cursor:pointer; font-family:inherit;">🛬 Landed</button>
+            <button type="button" class="tripArrivalBtn" data-status="immigration" style="padding:10px 4px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,0.05); color:#fff8e8; font-size:11.5px; cursor:pointer; font-family:inherit;">🛂 Immigration</button>
+            <button type="button" class="tripArrivalBtn" data-status="luggage" style="padding:10px 4px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,0.05); color:#fff8e8; font-size:11.5px; cursor:pointer; font-family:inherit;">🧳 Luggage</button>
+            <button type="button" class="tripArrivalBtn" data-status="exit" style="padding:10px 4px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,0.05); color:#fff8e8; font-size:11.5px; cursor:pointer; font-family:inherit;">🚪 বের হচ্ছি</button>
+          </div>
+          <button type="button" class="tripArrivalBtn" data-status="waiting_gate" style="width:100%; padding:10px 4px; border:1px solid var(--border); border-radius:9px; background:rgba(255,255,255,0.05); color:#fff8e8; font-size:11.5px; cursor:pointer; font-family:inherit; margin-bottom:6px; box-sizing:border-box;">📍 Gate-এ অপেক্ষা করছি</button>
+          <div id="tripArrivalStatusNote" style="font-size:10.5px; color:var(--muted);"></div>
+        </div>
+      </div>
+
+      <!-- ⭐ Honey Bee Transport Media Phase 8 — ট্রিপ শেষে ড্রাইভারকে রেট করা -->
+      <div id="tripRatingBox" style="display:none; text-align:left; padding-top:10px; border-top:1px solid var(--border);">
+        <div id="tripRatingForm">
+          <div style="text-align:center; font-size:13px; font-weight:700; margin-bottom:10px;">কেমন লাগলো এই ট্রিপ?</div>
+          <div id="tripStarPicker" style="display:flex; justify-content:center; gap:6px; font-size:30px; margin-bottom:12px;">
+            <span class="tripStar" data-star="1" style="cursor:pointer;">☆</span>
+            <span class="tripStar" data-star="2" style="cursor:pointer;">☆</span>
+            <span class="tripStar" data-star="3" style="cursor:pointer;">☆</span>
+            <span class="tripStar" data-star="4" style="cursor:pointer;">☆</span>
+            <span class="tripStar" data-star="5" style="cursor:pointer;">☆</span>
+          </div>
+          <textarea id="tripRatingComment" placeholder="মন্তব্য (ঐচ্ছিক)" rows="2" style="width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; resize:vertical; box-sizing:border-box; margin-bottom:10px;"></textarea>
+          <button id="tripSubmitRatingBtn" style="width:100%; padding:12px; border:none; border-radius:10px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">⭐ রেটিং জমা দিন</button>
+        </div>
+        <div id="tripRatingDone" style="display:none; text-align:center; padding:10px 0;">
+          <div style="font-size:28px;">✅</div>
+          <div style="font-size:13px; font-weight:700; margin-top:4px;">ধন্যবাদ! আপনার রেটিং জমা হয়েছে।</div>
+        </div>
+        <button id="tripNewBookingBtn" style="width:100%; margin-top:12px; padding:11px; border-radius:10px; font-weight:800; cursor:pointer; font-family:inherit; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:var(--muted); font-size:12px;">🚕 নতুন বুকিং করুন</button>
+      </div>
+
       <button id="tripCancelBtn" style="width:100%; padding:11px; margin-top:12px; border-radius:10px; font-weight:800; cursor:pointer; font-family:inherit; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); color:var(--muted); font-size:12px;">🛑 পুরো বুকিং বাতিল করুন (সব ড্রাইভারই বাদ)</button>
     </div>
 
@@ -769,6 +873,35 @@
       </div>
 
       <p id="tpWaitStatusTxt" style="font-size:11.5px; color:var(--muted); margin:14px 0 0;"></p>
+    </div>
+  </div>
+
+  <!-- 📜 আমার ট্রিপ হিস্ট্রি — Order Tracking-এর ঠিক একই fixed-overlay
+       প্যাটার্ন, Transport স্ক্রিনের ওপর থেকে খোলে -->
+  <div id="tripHistoryScreen" style="display:none; position:fixed; inset:0; z-index:900; background:var(--bg1); overflow-y:auto; padding:14px 16px 40px;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+      <span id="tripHistoryBackBtn" style="font-size:22px; cursor:pointer; color:var(--muted);">←</span>
+      <div style="font-weight:800; font-size:16px;">📜 আমার ট্রিপ হিস্ট্রি</div>
+    </div>
+    <div id="tripHistoryList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- 💬 ড্রাইভার-প্যাসেঞ্জার ইন-অ্যাপ চ্যাট — Honey Messenger-এর
+       hmChatThread-এর ঠিক একই ফুল-স্ক্রিন lay‑out প্যাটার্ন, কিন্তু
+       সম্পূর্ণ আলাদা ডেটা-সোর্স (trips/{tripId}/chat) — একটা নির্দিষ্ট
+       ট্রিপের জন্যই, ট্রিপ শেষ হলে আর প্রাসঙ্গিক থাকে না -->
+  <div id="tripChatScreen" style="display:none; position:fixed; inset:0; z-index:920; background:var(--bg1); flex-direction:column;">
+    <div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border);">
+      <span id="tripChatBackBtn" style="font-size:22px; cursor:pointer; color:var(--muted);">←</span>
+      <div>
+        <div style="font-weight:800; font-size:15px; color:#fff8e8;" id="tripChatDriverName">ড্রাইভার</div>
+        <div style="font-size:11px; color:var(--muted);">এই ট্রিপ চলাকালীন চ্যাট</div>
+      </div>
+    </div>
+    <div id="tripChatMessages" style="flex:1; overflow-y:auto; padding:16px;"></div>
+    <div style="display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--border);">
+      <input type="text" id="tripChatInput" placeholder="মেসেজ লিখুন..." style="flex:1; padding:12px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:14px;">
+      <button id="tripChatSendBtn" style="width:44px; height:44px; border-radius:50%; border:none; background:var(--amber); color:var(--bg1); font-size:17px; cursor:pointer; font-family:inherit; flex-shrink:0;">➤</button>
     </div>
   </div>
 
@@ -1025,7 +1158,7 @@
     <div style="display:flex; gap:8px; margin-bottom:16px;">
       <button class="hmTabBtn active" id="hmTabMessengerBtn" style="flex:1; padding:12px 6px; border:none; border-radius:10px; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1);">💬 Honey Messenger</button>
       <button class="hmTabBtn" id="hmTabComplaintBtn" style="flex:1; padding:12px 6px; border:none; border-radius:10px; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; background:rgba(255,255,255,0.06); color:var(--muted);">⚠️ অভিযোগ কেন্দ্র</button>
-      <button class="hmTabBtn" id="hmTabThirdBtn" style="flex:1; padding:12px 6px; border:none; border-radius:10px; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; background:rgba(255,255,255,0.06); color:var(--muted); opacity:0.55;">🔜 শীঘ্রই আসছে</button>
+      <button class="hmTabBtn" id="hmTabThirdBtn" style="flex:1; padding:12px 6px; border:none; border-radius:10px; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; background:rgba(255,255,255,0.06); color:var(--muted);">👥 সবাই</button>
     </div>
 
     <!-- ১. Honey Messenger — খালি -->
@@ -1055,6 +1188,13 @@
           <div style="display:flex; gap:8px; margin-bottom:12px;">
             <input type="text" id="hmVillage" placeholder="গ্রাম/এলাকা" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
             <input type="text" id="hmWardNo" placeholder="ওয়ার্ড নং" style="width:100px; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
+          </div>
+
+          <!-- 📍 Honey Messenger "সবাই" ট্যাবে কাছের মানুষ আগে দেখানোর জন্য —
+               ঐচ্ছিক, না দিলে শুধু "সবাই" হিসেবে একটাই তালিকা দেখাবে -->
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <select id="hmDistrict" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;"></select>
+            <select id="hmUpazila" disabled style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;"><option value="">উপজেলা</option></select>
           </div>
 
           <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">পরিবারের কর্তার নাম (ঐচ্ছিক)</label>
@@ -1179,9 +1319,11 @@
       <div id="myComplaintsList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
     </div>
 
-    <!-- ৩. পরে নাম আসবে -->
+    <!-- ৩. সবার তালিকা — হানিবি-তে যুক্ত সবাই, পাশে Add বাটন। কাছের
+         (একই উপজেলা/থানা) মানুষ সবার আগে, তারপর একই জেলা, তারপর বাকি সবাই -->
     <div id="hmPanelThird" style="display:none;">
-      <div style="text-align:center; padding-top:60px; color:var(--muted); font-size:13px;">এই অংশটা শীঘ্রই আসছে।</div>
+      <div style="font-size:13px; font-weight:700; color:var(--muted); margin:0 4px 12px;">👥 হানিবি-তে যুক্ত সবাই — কাছের মানুষ আগে দেখানো হয়</div>
+      <div id="hmDiscoverList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
     </div>
   </div>
 
@@ -1213,6 +1355,22 @@
         <input type="text" id="tmCommentInput" placeholder="মন্তব্য লিখুন..." style="flex:1; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:14.5px;">
         <button id="tmCommentSubmitBtn" style="padding:11px 16px; border:none; border-radius:10px; background:var(--amber); color:var(--bg1); font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;">পাঠান</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 🚩 পোস্ট রিপোর্ট — এজেন্ট/সুপারঅ্যাডমিন রিভিউ করবেন
+       (transportMediaReports কালেকশন, প্রতি পোস্টে একজন ইউজার একবারই) -->
+  <div id="tmReportOverlay" style="display:none; position:fixed; inset:0; z-index:970; background:rgba(0,0,0,0.7); align-items:flex-end; justify-content:center;">
+    <div style="background:#1a1206; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px;">
+      <div style="display:flex; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0; font-size:15px; color:#fff8e8;">🚩 পোস্টটি রিপোর্ট করুন</h3>
+        <span id="tmCloseReportBtn" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
+      </div>
+      <p style="font-size:11.5px; color:var(--muted); margin:0 0 12px;">কেন রিপোর্ট করছেন?</p>
+      <div id="tmReportReasonList" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
+      <textarea id="tmReportDetails" placeholder="বিস্তারিত লিখুন (ঐচ্ছিক)" style="width:100%; min-height:60px; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; box-sizing:border-box; resize:vertical;"></textarea>
+      <button id="tmReportSubmitBtn" style="width:100%; margin-top:12px; padding:12px; border:none; border-radius:10px; background:#dc2626; color:#fff; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🚩 রিপোর্ট পাঠান</button>
+      <p id="tmReportMsg" style="display:none; font-size:11.5px; margin:8px 0 0; text-align:center;"></p>
     </div>
   </div>
 
@@ -1404,6 +1562,19 @@
           </div>
         </div>
 
+        <!-- 📍 Honey Messenger "সবাই" ট্যাবে কাছের মানুষ আগে দেখানোর জন্য —
+             ঐচ্ছিক, না দিলে শুধু "সবাই" হিসেবে একটাই তালিকা দেখাবে -->
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <div style="flex:1;">
+            <label style="display:block; font-size:11px; color:var(--muted); margin-bottom:4px;">জেলা</label>
+            <select id="menuProfileDistrict" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;"></select>
+          </div>
+          <div style="flex:1;">
+            <label style="display:block; font-size:11px; color:var(--muted); margin-bottom:4px;">উপজেলা/থানা</label>
+            <select id="menuProfileUpazila" disabled style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;"><option value="">উপজেলা</option></select>
+          </div>
+        </div>
+
         <label style="display:block; font-size:11px; color:var(--muted); margin-bottom:4px;">কর্তার নাম (পিতা/স্বামীর নাম)</label>
         <input type="text" id="menuProfileMemberName" placeholder="যেমনঃ পিতা/স্বামীর নাম" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
 
@@ -1491,6 +1662,7 @@ auth.onAuthStateChanged(async (user)=>{
   }
   renderAuthArea();
   hmSetupFcm(user.uid); // 🔔 Honey Messenger — অ্যাপ বন্ধ/ব্যাকগ্রাউন্ডে থাকলেও নতুন মেসেজের পুশ নোটিফিকেশন পেতে
+  tmSetupFcm(user.uid); // 🔔 Phase 7 — Transport ট্রিপ কনফার্ম/অফারের পুশ নোটিফিকেশন পেতে
   // 🩸 Blood Bank স্ক্রিনে থাকা অবস্থায় লগইন সম্পন্ন হলে প্রোফাইল কার্ডটা
   // নিজে থেকেই রিফ্রেশ হয় — আগে লগইন resolve হওয়ার আগেই স্ক্রিনে ঢুকলে
   // কার্ড খালি/ভুল অবস্থায় আটকে থাকত
@@ -1605,6 +1777,24 @@ window.addEventListener("popstate", ()=>{
     return;
   }
 
+  // 💬 ট্রিপ চ্যাট খোলা থাকলে সবার আগে সেটাই বন্ধ করা হয় (tripHistoryScreen-এর
+  // থেকেও উপরে খোলে বলে আগে চেক করা হচ্ছে — নিজস্ব fixed overlay, showScreen()-এর অংশ না)
+  const tripChatEl = document.getElementById("tripChatScreen");
+  if(tripChatEl && tripChatEl.style.display === "flex"){
+    tripCloseChat();
+    __hbNavigatingViaPopstate = false;
+    return;
+  }
+
+  // 📜 ট্রিপ হিস্ট্রি খোলা থাকলে আগে সেটাই বন্ধ করা হয় (Transport স্ক্রিনেই
+  // ফিরে যাওয়া — এটাও নিজস্ব fixed overlay, showScreen()-এর অংশ না)
+  const tripHistoryEl = document.getElementById("tripHistoryScreen");
+  if(tripHistoryEl && tripHistoryEl.style.display === "block"){
+    tripCloseHistory();
+    __hbNavigatingViaPopstate = false;
+    return;
+  }
+
   // 🛒 Cart খোলা থাকলে সেটাই বন্ধ করা হয় (নিজস্ব fixed overlay, showScreen()-এর অংশ না)
   const cartScreenEl = document.getElementById("hbCartScreen");
   if(cartScreenEl && cartScreenEl.style.display === "block"){
@@ -1699,10 +1889,17 @@ function hmSwitchTab(tab){
   });
   if(tab === "complaint") hmLoadMyComplaints();
   if(tab === "messenger") hmInitMessengerTab();
+  if(tab === "third") hmLoadDiscoverList();
 }
 $("hmTabMessengerBtn").addEventListener("click", ()=> hmSwitchTab("messenger"));
 $("hmTabComplaintBtn").addEventListener("click", ()=> hmSwitchTab("complaint"));
 $("hmTabThirdBtn").addEventListener("click", ()=> hmSwitchTab("third"));
+
+// 📍 Honey Messenger প্রোফাইলের জেলা/উপজেলা ড্রপডাউন চালু করা (bloodPopulateDistrictSelect
+// ফাংশনটা ফাইলের পরের দিকে ডিফাইন করা থাকলেও, ফাংশন-হয়েস্টিং-এর কারণে এখান থেকে
+// কল করা নিরাপদ — ঠিক rmSetupFcm-এ RM_FCM_VAPID_KEY ব্যবহারের মতো)
+bloodPopulateDistrictSelect($("hmDistrict"), $("hmUpazila"));
+bloodPopulateDistrictSelect($("menuProfileDistrict"), $("menuProfileUpazila"));
 
 /* ==================== 🔔 Honey Messenger — FCM পুশ নোটিফিকেশন ====================
    ⚠️ VAPID key rider Mode-এর সাথে একই (Firebase প্রজেক্ট-লেভেলে একটাই key,
@@ -1727,13 +1924,54 @@ async function hmSetupFcm(uid){
     }
 
     // অ্যাপ খোলা অবস্থায় (foreground) পুশ এলে — ছোট browser-notification + শব্দ
+    // ⚠️ Phase 7-এ tmSetupFcm() নিচে আরেকটা onMessage listener বসাচ্ছে
+    // (একই messaging instance-এ একাধিক onMessage listener সাপোর্টেড, সবাই
+    // প্রতিটা পুশেই ডাকা হয়) — তাই data.type চেক করে শুধু মেসেঞ্জারের
+    // পুশেই এখানে notification দেখানো হচ্ছে, নাহলে ট্রিপ/পোস্ট পুশেও
+    // ডাবল popup দেখা যেত
     messaging.onMessage((payload)=>{
+      const type = payload.data && payload.data.type;
+      if(type && type !== "messenger-message") return;
       const title = (payload.notification && payload.notification.title) || "🔔 নতুন মেসেজ";
       const body = (payload.notification && payload.notification.body) || "";
       try{ new Notification(title, { body, icon: "bazar-icon-192.png" }); }catch(e){}
     });
   }catch(e){
     console.warn("Messenger FCM সেটআপ ব্যর্থ হয়েছে:", e);
+  }
+}
+
+/* ==================== 🔔 Honey Bee Transport Media Phase 7 — যাত্রীর পুশ নোটিফিকেশন ====================
+   hmSetupFcm()-এর ঠিক একই ডিজাইন — ইচ্ছাকৃতভাবে আলাদা ফাংশন যাতে এই নতুন
+   কোডের কোনো বাগ Honey Messenger-এর প্রমাণিত নোটিফিকেশন সিস্টেমকে
+   প্রভাবিত করতে না পারে। Token সেভ হয় customers/{uid}.fcmToken-এ —
+   functions/index.js-এর onTripStatusNotify এখান থেকেই পড়ে (নতুন ভাড়া
+   অফার এলে বা ট্রিপ কনফার্ম হলে পুশ পাঠায়, deploy করার পর কার্যকর হবে)। */
+async function tmSetupFcm(uid){
+  if(!("Notification" in window) || !("serviceWorker" in navigator)) return;
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== "granted") return;
+
+    const registration = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({ vapidKey: HM_FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+    if(token){
+      await db.collection("customers").doc(uid).set({ fcmToken: token }, { merge: true });
+    }
+
+    // ⚠️ hmSetupFcm()-এর onMessage listener-এর সাথে একই messaging
+    // instance ভাগ হয় — শুধু ট্রিপ/Transport Media টাইপের পুশেই এখানে
+    // দেখানো হচ্ছে, মেসেঞ্জারেরটা hmSetupFcm নিজেই দেখাবে (ডাবল popup এড়াতে)
+    messaging.onMessage((payload)=>{
+      const type = payload.data && payload.data.type;
+      if(type !== "trip-offer" && type !== "trip-confirmed") return; // এই দুটোই passenger-মুখী (tm-comment/trip-confirmed-driver ড্রাইভারের জন্য)
+      const title = (payload.notification && payload.notification.title) || "🚕 Honey Bee Transport";
+      const body = (payload.notification && payload.notification.body) || "";
+      try{ new Notification(title, { body, icon: "bazar-icon-192.png" }); }catch(e){}
+    });
+  }catch(e){
+    console.warn("Transport FCM সেটআপ ব্যর্থ হয়েছে:", e);
   }
 }
 
@@ -1977,6 +2215,113 @@ async function hmRenderFriendsList(){
   listEl.querySelectorAll(".hmFriendItem").forEach(item=>{
     item.addEventListener("click", ()=> hmOpenChat(item.dataset.uid, item.dataset.username, item.dataset.name));
   });
+}
+
+/* ==================== 👥 "সবাই" ট্যাব — হানিবি-তে যুক্ত সবার তালিকা ====================
+   messengerUsers কালেকশন যেকোনো লগইন-করা ইউজার পড়তে পারেন (rules-এ আগে
+   থেকেই allow), তাই নতুন কোনো rules বদলানো ছাড়াই এই ফিচারটা করা গেছে।
+   সাজানোর ক্রমঃ ১) নিজের উপজেলা/থানা ২) নিজের জেলা (ভিন্ন উপজেলা)
+   ৩) বাকি সবাই। নিজের প্রোফাইলে জেলা/উপজেলা সেট করা না থাকলে (পুরনো
+   ইউজার, বা ঐচ্ছিক বলে বাদ দিয়েছেন) — সবাইকে একটাই ফ্ল্যাট "সবাই"
+   তালিকায় দেখানো হয়, এলাকা-ভিত্তিক ভাগ ছাড়াই। */
+function hmDiscoverRowHtml(u, status){
+  let actionHtml;
+  if(status === "pending_sent"){
+    actionHtml = '<span style="flex-shrink:0; padding:9px 14px; border-radius:9px; background:rgba(255,255,255,0.06); color:var(--muted); font-weight:800; font-size:11px;">⏳ অপেক্ষমাণ</span>';
+  }else if(status === "pending_received"){
+    actionHtml = '<span style="flex-shrink:0; padding:9px 14px; border-radius:9px; background:rgba(255,255,255,0.06); color:var(--amber); font-weight:800; font-size:10.5px;">📥 উপরে দেখুন</span>';
+  }else{
+    actionHtml = `<button class="hmDiscoverAddBtn" data-uid="${u.uid}" data-uname="${escapeHtml(u.username||"")}" data-name="${escapeHtml(u.fullName||"")}" style="flex-shrink:0; padding:9px 14px; border:none; border-radius:9px; background:var(--amber); color:var(--bg1); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">➕ Add</button>`;
+  }
+  const areaTxt = [u.upazila, u.district].filter(Boolean).join(", ");
+  return `
+    <div class="card" style="display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px;">
+      <div style="width:40px; height:40px; border-radius:50%; background:var(--amber); color:var(--bg1); font-weight:800; font-size:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${escapeHtml((u.fullName||u.username||"?")[0].toUpperCase())}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:13px;">${escapeHtml(u.fullName||u.username)}</div>
+        <div style="font-size:10.5px; color:var(--muted);">${areaTxt ? "📍 " + escapeHtml(areaTxt) : "@" + escapeHtml(u.username||"")}</div>
+      </div>
+      ${actionHtml}
+    </div>`;
+}
+
+async function hmLoadDiscoverList(){
+  const listEl = $("hmDiscoverList");
+  if(!currentCustomer){
+    listEl.innerHTML = '<div style="text-align:center; padding-top:40px; color:var(--muted); font-size:13px;">দেখতে হলে আগে ☰ Menu থেকে Google দিয়ে লগইন করুন।</div>';
+    return;
+  }
+  if(!__hmMyProfile){
+    listEl.innerHTML = '<div style="text-align:center; padding-top:40px; color:var(--muted); font-size:13px;">আগে "💬 Honey Messenger" ট্যাব থেকে নিজের প্রোফাইলটা সম্পূর্ণ করুন।</div>';
+    return;
+  }
+  listEl.innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
+  try{
+    const [allUsersSnap, sentSnap, receivedSnap] = await Promise.all([
+      db.collection("messengerUsers").where("profileCompleted","==",true).limit(500).get(),
+      db.collection("messengerFriendRequests").where("fromUid","==",currentCustomer.uid).get(),
+      db.collection("messengerFriendRequests").where("toUid","==",currentCustomer.uid).get()
+    ]);
+
+    // 🤝 friends/pending — দুই দিক থেকেই একসাথে ম্যাপ করা হচ্ছে, যাতে
+    // প্রতিটা ইউজারের জন্য আলাদা করে খোঁজার দরকার না হয়
+    const relStatus = {};
+    sentSnap.docs.forEach(d=>{
+      const r = d.data();
+      if(r.status === "accepted") relStatus[r.toUid] = "friends";
+      else if(r.status === "pending") relStatus[r.toUid] = "pending_sent";
+    });
+    receivedSnap.docs.forEach(d=>{
+      const r = d.data();
+      if(r.status === "accepted") relStatus[r.fromUid] = "friends";
+      else if(r.status === "pending") relStatus[r.fromUid] = "pending_received";
+    });
+
+    const myBlocked = __hmMyProfile.blockedUsers || [];
+    const others = allUsersSnap.docs
+      .map(d=> d.data())
+      .filter(u=> u.uid && u.uid !== currentCustomer.uid
+        && relStatus[u.uid] !== "friends"
+        && !myBlocked.includes(u.uid)
+        && !((u.blockedUsers||[]).includes(currentCustomer.uid)));
+
+    if(others.length === 0){
+      listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এই মুহূর্তে দেখানোর মতো নতুন কেউ নেই।</div>';
+      return;
+    }
+
+    const myDistrict = __hmMyProfile.district || "";
+    const myUpazila = __hmMyProfile.upazila || "";
+    const hasMyLocation = !!(myDistrict && myUpazila);
+
+    const groupSame = [], groupDistrict = [], groupOthers = [];
+    others.forEach(u=>{
+      if(hasMyLocation && u.upazila === myUpazila && u.district === myDistrict) groupSame.push(u);
+      else if(hasMyLocation && u.district === myDistrict) groupDistrict.push(u);
+      else groupOthers.push(u);
+    });
+
+    const section = (title, arr)=>{
+      if(arr.length === 0) return "";
+      return `<div style="font-size:12px; font-weight:700; color:var(--muted); margin:14px 4px 8px;">${title}</div>` +
+        arr.map(u=> hmDiscoverRowHtml(u, relStatus[u.uid])).join("");
+    };
+
+    listEl.innerHTML =
+      section("📍 আপনার এলাকার মানুষ (একই উপজেলা/থানা)", groupSame) +
+      section("🏘️ আপনার জেলার মানুষ", groupDistrict) +
+      section(hasMyLocation ? "🌐 অন্যান্য এলাকার মানুষ" : "👥 সবাই", groupOthers);
+
+    listEl.querySelectorAll(".hmDiscoverAddBtn").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        hmSendFriendRequest(btn.dataset.uid, btn.dataset.uname, btn.dataset.name);
+        btn.outerHTML = '<span style="flex-shrink:0; padding:9px 14px; border-radius:9px; background:rgba(255,255,255,0.06); color:var(--muted); font-weight:800; font-size:11px;">⏳ অপেক্ষমাণ</span>';
+      });
+    });
+  }catch(e){
+    console.error("discover list load failed:", e);
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">লোড করা যায়নি।</div>';
+  }
 }
 
 /* ==================== 🔍 ইউজারনেম দিয়ে খোঁজা ও ফ্রেন্ড রিকোয়েস্ট পাঠানো ==================== */
@@ -2514,6 +2859,8 @@ $("hmSaveProfileBtn") && $("hmSaveProfileBtn").addEventListener("click", async (
   const phone = $("hmPhone").value.trim();
   const village = $("hmVillage").value.trim();
   const wardNo = $("hmWardNo").value.trim();
+  const district = $("hmDistrict").value || "";
+  const upazila = $("hmUpazila").value || "";
   const memberName = $("hmMemberName").value.trim();
   const localReference = $("hmLocalReference").value.trim();
 
@@ -2539,6 +2886,8 @@ $("hmSaveProfileBtn") && $("hmSaveProfileBtn").addEventListener("click", async (
         email: currentCustomer.email || null,
         username, fullName, phone, village,
         wardNo: wardNo || null,
+        district: district || null,
+        upazila: upazila || null,
         memberName: memberName || null,
         localReference: localReference || null,
         profileCompleted: true,
@@ -2638,6 +2987,8 @@ function menuProfileRenderView(d){
   const addrParts = [];
   if(d.village) addrParts.push(d.village);
   if(d.wardNo) addrParts.push("ওয়ার্ড " + d.wardNo);
+  if(d.upazila) addrParts.push(d.upazila);
+  if(d.district) addrParts.push(d.district);
   if(d.memberName) addrParts.push(d.memberName);
   if(d.localReference) addrParts.push(d.localReference);
   $("menuProfileViewAddress").textContent = addrParts.length ? ("📍 " + addrParts.join(", ")) : "";
@@ -2660,6 +3011,18 @@ async function menuLoadProfileSection(){
     $("menuProfilePhone").value = d.phone || "";
     $("menuProfileVillage").value = d.village || "";
     $("menuProfileWardNo").value = d.wardNo || "";
+    // 📍 জেলা সেট থাকলে সাথে সাথেই উপজেলার তালিকা বসিয়ে সেটাও সিলেক্ট করে
+    // দেওয়া হয় — শুধু .value বসালে cascading dropdown-এর change ইভেন্ট
+    // নিজে থেকে ফায়ার হয় না, তাই ম্যানুয়ালি উপজেলা-অপশন বসানো হচ্ছে
+    $("menuProfileDistrict").value = d.district || "";
+    if(d.district){
+      $("menuProfileUpazila").disabled = false;
+      $("menuProfileUpazila").innerHTML = '<option value="">উপজেলা বেছে নিন</option>' + getUpazilasForDistrict(d.district).map(u=>`<option value="${u}">${u}</option>`).join("");
+      $("menuProfileUpazila").value = d.upazila || "";
+    }else{
+      $("menuProfileUpazila").innerHTML = '<option value="">উপজেলা</option>';
+      $("menuProfileUpazila").disabled = true;
+    }
     $("menuProfileMemberName").value = d.memberName || "";
     $("menuProfileLocalReference").value = d.localReference || "";
     // 📋 আগে থেকেই নাম+ফোন সেভ করা থাকলে সংক্ষিপ্ত ভিউ দেখানো হয়, প্রতিবার
@@ -2681,6 +3044,8 @@ $("menuProfileSaveBtn").addEventListener("click", async ()=>{
     fullName, phone,
     village: $("menuProfileVillage").value.trim() || null,
     wardNo: $("menuProfileWardNo").value.trim() || null,
+    district: $("menuProfileDistrict").value || null,
+    upazila: $("menuProfileUpazila").value || null,
     memberName: $("menuProfileMemberName").value.trim() || null,
     localReference: $("menuProfileLocalReference").value.trim() || null
   };
@@ -4650,6 +5015,28 @@ loadMarkets();
    একজনকে বেছে দেয় না) — যাত্রী নিজে সবচেয়ে ভালো অফারটা বেছে confirmedDriver
    সেট করে। এতে দুইজন ড্রাইভার একসাথে দাবি করার সমস্যা (race condition) হয় না। */
 let tripCurrentId = null, tripUnsub = null, tripCountdownInterval = null;
+
+// ⭐ Honey Bee Transport Media Phase 9 — Phase 8-এ যাত্রীরা রেটিং দেওয়া
+// শুরু করেছেন, কিন্তু সেটা এতদিন শুধু ড্রাইভারের নিজের ড্যাশবোর্ডেই দেখা
+// যেত — যাত্রী যেখানে ড্রাইভার বাছাই করেন (অফার লিস্ট, কনফার্মড ট্রিপ,
+// Transport Media ফিড) সেখানেই এখন দেখানো হচ্ছে, যাতে রেটিংটা আসলে
+// সিদ্ধান্ত নিতে কাজে লাগে। ratings সাবকালেকশন public-read (Phase 8-এর
+// firestore.rules), তাই কোনো নতুন rules লাগছে না। একই ড্রাইভারের জন্য
+// বারবার fetch এড়াতে সেশন-লেভেল ক্যাশ ব্যবহার করা হচ্ছে।
+let __ratingCache = {};
+async function fetchDriverRating(driverId){
+  if(!driverId) return null;
+  if(driverId in __ratingCache) return __ratingCache[driverId];
+  try{
+    const snap = await db.collection("transportDrivers").doc(driverId).collection("ratings").limit(100).get();
+    if(snap.empty){ __ratingCache[driverId] = null; return null; }
+    const stars = snap.docs.map(d=> d.data().stars || 0);
+    const avg = stars.reduce((a,b)=> a+b, 0) / stars.length;
+    const result = { avg: avg.toFixed(1), count: stars.length };
+    __ratingCache[driverId] = result;
+    return result;
+  }catch(e){ __ratingCache[driverId] = null; return null; }
+}
 let __tripFareType = "negotiable"; // 💰 Phase 4 — "negotiable" (ডিফল্ট, একাধিক ড্রাইভার অফার দেবে) বা "fixed" (যাত্রী দাম বলবে)
 
 function tripSetFareType(type){
@@ -4667,6 +5054,39 @@ function tripSetFareType(type){
 }
 $("tripFareTypeNegotiableBtn") && $("tripFareTypeNegotiableBtn").addEventListener("click", ()=> tripSetFareType("negotiable"));
 $("tripFareTypeFixedBtn") && $("tripFareTypeFixedBtn").addEventListener("click", ()=> tripSetFareType("fixed"));
+
+/* ==================== ✈️ Smart Airport Pickup Engine — Phase 1 (API ছাড়া) ====================
+   "সাধারণ" / "এয়ারপোর্ট পিকআপ" / "এয়ারপোর্ট ড্রপ" — বেছে নিলে ফ্লাইট তথ্যের
+   ফর্ম খোলে। এখনো কোনো Flight API যুক্ত হয়নি, তাই flightInfo.status
+   সবসময় "manual" থাকবে — পরে API যুক্ত হলে ঠিক এই ফিল্ডেই আসল স্ট্যাটাস
+   (scheduled/delayed/departed/landed/cancelled) বসানো হবে, বুকিং-এর গঠন
+   বদলাতে হবে না। */
+let __tripType = "normal"; // "normal" | "airport_pickup" | "airport_drop"
+
+function tripSetTripType(type){
+  __tripType = type;
+  const btns = { normal: $("tripTypeNormalBtn"), airport_pickup: $("tripTypeAirportPickupBtn"), airport_drop: $("tripTypeAirportDropBtn") };
+  Object.keys(btns).forEach(key=>{
+    const active = key === type;
+    btns[key].style.background = active ? "var(--amber)" : "rgba(255,255,255,0.06)";
+    btns[key].style.color = active ? "var(--bg1)" : "#fff8e8";
+    btns[key].style.borderColor = active ? "var(--amber)" : "var(--border)";
+  });
+  $("tripFlightInfoWrap").style.display = (type === "normal") ? "none" : "block";
+  $("tripFlightTimeLabel").textContent = (type === "airport_drop")
+    ? "নির্ধারিত ছাড়ার (ডিপারচার) তারিখ ও সময়"
+    : "নির্ধারিত অবতরণের (অ্যারাইভাল) তারিখ ও সময়";
+}
+$("tripTypeNormalBtn") && $("tripTypeNormalBtn").addEventListener("click", ()=> tripSetTripType("normal"));
+$("tripTypeAirportPickupBtn") && $("tripTypeAirportPickupBtn").addEventListener("click", ()=> tripSetTripType("airport_pickup"));
+$("tripTypeAirportDropBtn") && $("tripTypeAirportDropBtn").addEventListener("click", ()=> tripSetTripType("airport_drop"));
+
+function tripClearFlightFields(){
+  $("tripFlightAirline").value = ""; $("tripFlightNumber").value = "";
+  $("tripFlightFrom").value = ""; $("tripFlightTo").value = "";
+  $("tripFlightDate").value = ""; $("tripFlightTime").value = "";
+  $("tripFlightTerminal").value = "";
+}
 
 /* ==================== 🩸 Blood Bank ====================
    Collection: bloodDonors/{uid} — Google-লগইন করা কাস্টমাররাই রক্তদাতা
@@ -4775,7 +5195,7 @@ function ambRenderList(ambulances){
   listEl.innerHTML = ambulances.map(a=> `
     <div class="card" style="padding:14px;">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-        <div style="font-weight:800; font-size:14.5px;">${AMB_TYPE_LABELS[a.vehicle && a.vehicle.type] || "🚑 অ্যাম্বুলেন্স"}</div>
+        <div style="font-weight:800; font-size:14.5px;">${AMB_TYPE_LABELS[a.vehicle && a.vehicle.type] || "🚑 অ্যাম্বুলেন্স"} ${a.isVerified ? '<span title="Verified by Agent">🛡️</span>' : ''}</div>
         <span style="background:rgba(34,197,94,0.15); color:#4ade80; padding:3px 9px; border-radius:12px; font-size:10.5px; font-weight:800;">🟢 অনলাইন</span>
       </div>
       <div style="font-size:12.5px; color:#ddd; margin-bottom:3px;">📍 ${escapeHtml(a.upazila||"")}${a.upazila?", ":""}${escapeHtml(a.district||"")}</div>
@@ -5729,6 +6149,165 @@ function tripGetUserId(){
   return "guest_" + Date.now();
 }
 
+/* ==================== 📜 আমার ট্রিপ হিস্ট্রি ====================
+   শুধু লগইন করা প্যাসেঞ্জারের জন্য — guest সেশনের কোনো স্থায়ী পরিচয়
+   (localStorage-এ সেভ করা UID) এই অ্যাপে নেই, __sessionId রিফ্রেশেই
+   বদলে যায়, তাই guest ট্রিপ হিস্ট্রি নির্ভরযোগ্যভাবে খুঁজে বের করা যায়
+   না — তাই hmLoadMyComplaints-এর মতোই সরাসরি লগইন-গেট করা হলো।
+   একবারের .get() কোয়েরি — ট্রিপ শেষ হয়ে গেছে, লাইভ আপডেটের দরকার নেই।
+   single equality (passengerId==) + orderBy(createdAt) আলাদা ফিল্ডে —
+   hbOrdersListen-এর মতোই, নতুন কম্পোজিট ইনডেক্স লাগে না। */
+function tripOpenHistory(){
+  $("tripHistoryScreen").style.display = "block";
+  history.pushState({ hbScreen: "tripHistoryOpen" }, "", location.href);
+  tripLoadHistory();
+}
+function tripCloseHistory(){
+  $("tripHistoryScreen").style.display = "none";
+}
+$("tripHistoryOpenBtn") && $("tripHistoryOpenBtn").addEventListener("click", tripOpenHistory);
+$("tripHistoryBackBtn") && $("tripHistoryBackBtn").addEventListener("click", tripCloseHistory);
+
+const TRIP_HISTORY_STATUS_LABEL = {
+  completed: "🏁 সম্পন্ন",
+  cancelled: "✕ বাতিল",
+  expired: "⏱️ মেয়াদ শেষ"
+};
+
+async function tripLoadHistory(){
+  const listEl = $("tripHistoryList");
+  if(!currentCustomer){
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">ট্রিপ হিস্ট্রি দেখতে ☰ Menu থেকে লগইন করুন।</div>';
+    return;
+  }
+  listEl.innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
+  try{
+    const qs = await db.collection("trips").where("passengerId","==",currentCustomer.uid)
+      .orderBy("createdAt","desc").limit(30).get();
+    // 🏁 শুধু শেষ-হওয়া ট্রিপ — চলমান বুকিং তো এমনিতেই ওপরের লাইভ
+    // tripStatusCard-এ দেখা যায়, হিস্ট্রিতে সেটা আবার দেখানোর দরকার নেই
+    const trips = qs.docs.map(d=> ({id:d.id, ...d.data()}))
+      .filter(t=> ["completed","cancelled","expired"].includes(t.status));
+    if(trips.length === 0){
+      listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">এখনো কোনো ট্রিপ শেষ হয়নি।</div>';
+      return;
+    }
+    listEl.innerHTML = trips.map(t=> tripHistoryCardHtml(t)).join("");
+  }catch(e){
+    console.error("trip history load failed:", e);
+    listEl.innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">লোড করা যায়নি — নেটওয়ার্ক চেক করুন। <span style="color:var(--amber); text-decoration:underline; cursor:pointer;" onclick="tripLoadHistory()">আবার চেষ্টা করুন</span></div>';
+  }
+}
+
+function tripHistoryCardHtml(t){
+  const list = t.waitingList || [];
+  // 💰 Phase 4/8-এর একই chosen-driver লুকআপ যুক্তি — ফিক্সড-ভাড়ায়
+  // confirmedDriver-এই সরাসরি নাম থাকে, দরকষাকষিতে waitingList থেকে
+  const chosen = (t.fareType === "fixed" && t.confirmedDriver && t.confirmedDriver.driverName)
+    ? t.confirmedDriver
+    : (list.find(o=> t.confirmedDriver && o.driverId === t.confirmedDriver.driverId) || {});
+  const time = t.createdAt ? t.createdAt.toDate().toLocaleDateString('bn-BD', {day:'numeric', month:'short', year:'numeric'}) : "";
+  const fareTxt = (t.status === "completed" && t.confirmedDriver && t.confirmedDriver.finalFare)
+    ? `${HB_CUR} ${t.confirmedDriver.finalFare}`
+    : (t.fareType === "fixed" && t.proposedFare ? `${HB_CUR} ${t.proposedFare}` : "");
+  const airportTxt = (t.tripType === "airport_pickup" || t.tripType === "airport_drop")
+    ? `<div style="font-size:10.5px; color:#fbbf24; margin-top:2px;">${t.tripType === "airport_pickup" ? "✈️ এয়ারপোর্ট পিকআপ" : "🛫 এয়ারপোর্ট ড্রপ"}${t.flightInfo && t.flightInfo.flightNumber ? " · " + escapeHtml(t.flightInfo.flightNumber) : ""}</div>`
+    : "";
+  return `
+    <div class="card" style="padding:14px; margin-bottom:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px;">
+        <div style="font-weight:700; font-size:13.5px;">📍 ${escapeHtml(t.destination||"—")}</div>
+        <span style="font-size:11px; color:var(--muted); font-weight:700; flex-shrink:0;">${TRIP_HISTORY_STATUS_LABEL[t.status]||t.status}</span>
+      </div>
+      <div style="font-size:11.5px; color:var(--muted);">🚗 ${escapeHtml(t.vehicleType||"")}${chosen.driverName ? " · ড্রাইভারঃ " + escapeHtml(chosen.driverName) : ""}</div>
+      ${airportTxt}
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+        <div style="font-size:10.5px; color:var(--muted);">${time}</div>
+        ${fareTxt ? `<div style="font-weight:800; color:var(--amber); font-size:13px;">${fareTxt}</div>` : ""}
+      </div>
+    </div>`;
+}
+
+/* ==================== 💬 ড্রাইভার-প্যাসেঞ্জার ইন-অ্যাপ চ্যাট ====================
+   trips/{tripId}/chat সাবকালেকশন — Honey Messenger থেকে সম্পূর্ণ আলাদা
+   (ড্রাইভারদের কোনো messengerUsers প্রোফাইল/বন্ধু-অনুরোধ নেই, আর এই
+   চ্যাট শুধু চলমান ট্রিপের জন্যই প্রাসঙ্গিক)। firestore.rules-এ
+   isSignedIn() দাবি করে বলে শুধু লগইন করা প্যাসেঞ্জারের জন্যই এই বাটন
+   দেখানো হয় (tripRenderStatus-এর confirmed ব্রাঞ্চে)। */
+let tripChatUnsub = null;
+
+function tripOpenChat(){
+  if(!tripCurrentId || !currentCustomer) return;
+  const btn = $("tripChatOpenBtn");
+  $("tripChatDriverName").textContent = btn.dataset.driverName || "ড্রাইভার";
+  $("tripChatMessages").innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
+  $("tripChatScreen").style.display = "flex";
+  history.pushState({ hbScreen: "tripChatOpen" }, "", location.href);
+
+  if(tripChatUnsub) tripChatUnsub();
+  tripChatUnsub = db.collection("trips").doc(tripCurrentId).collection("chat")
+    .orderBy("sentAt","asc")
+    .onSnapshot((qs)=>{
+      tripRenderChatMessages(qs);
+    }, (err)=>{
+      console.error("trip chat listener error:", err);
+      $("tripChatMessages").innerHTML = '<div class="loadingMsg">চ্যাট লোড করা যায়নি।</div>';
+    });
+}
+
+function tripCloseChat(){
+  $("tripChatScreen").style.display = "none";
+  if(tripChatUnsub){ tripChatUnsub(); tripChatUnsub = null; }
+}
+
+function tripRenderChatMessages(qs){
+  const el = $("tripChatMessages");
+  if(qs.empty){
+    el.innerHTML = '<div style="text-align:center; color:var(--muted); font-size:12px; margin-top:20px;">এখনো কোনো মেসেজ নেই — ড্রাইভারকে কিছু লিখুন।</div>';
+    return;
+  }
+  const myUid = currentCustomer && currentCustomer.uid;
+  el.innerHTML = qs.docs.map(d=>{
+    const m = d.data();
+    const mine = m.senderId === myUid;
+    const time = m.sentAt ? m.sentAt.toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'}) : "";
+    return `
+      <div style="display:flex; justify-content:${mine ? "flex-end" : "flex-start"}; margin-bottom:8px;">
+        <div style="max-width:75%; padding:9px 13px; border-radius:14px; ${mine ? "background:var(--amber); color:var(--bg1); border-bottom-right-radius:4px;" : "background:rgba(255,255,255,0.08); color:#fff8e8; border-bottom-left-radius:4px;"}">
+          <div style="font-size:13.5px; word-wrap:break-word;">${escapeHtml(m.text||"")}</div>
+          <div style="font-size:9.5px; opacity:0.7; margin-top:3px; text-align:right;">${time}</div>
+        </div>
+      </div>`;
+  }).join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+async function tripSendChatMessage(){
+  const input = $("tripChatInput");
+  const text = input.value.trim();
+  if(!text || !tripCurrentId || !currentCustomer) return;
+  input.value = "";
+  try{
+    await db.collection("trips").doc(tripCurrentId).collection("chat").add({
+      senderId: currentCustomer.uid,
+      senderRole: "passenger",
+      text,
+      sentAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){
+    console.error("chat send failed:", e);
+    alert("মেসেজ পাঠানো যায়নি — আবার চেষ্টা করুন।");
+    input.value = text; // ব্যর্থ হলে টেক্সট ফিরিয়ে দেওয়া হচ্ছে, যাতে হারিয়ে না যায়
+  }
+}
+
+$("tripChatOpenBtn") && $("tripChatOpenBtn").addEventListener("click", tripOpenChat);
+$("tripChatBackBtn") && $("tripChatBackBtn").addEventListener("click", tripCloseChat);
+$("tripChatSendBtn") && $("tripChatSendBtn").addEventListener("click", tripSendChatMessage);
+$("tripChatInput") && $("tripChatInput").addEventListener("keydown", (e)=>{
+  if(e.key === "Enter"){ e.preventDefault(); tripSendChatMessage(); }
+});
+
 $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
   const vehicleType = $("tripVehicleType").value;
   const destination = $("tripDestination").value.trim();
@@ -5741,6 +6320,28 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
   if(__tripFareType === "fixed"){
     proposedFare = Number($("tripFixedFareInput").value);
     if(!proposedFare || proposedFare <= 0){ alert("কত ভাড়া দিতে চান তা লিখুন।"); return; }
+  }
+
+  // ✈️ Smart Airport Pickup Engine Phase 1 — এয়ারপোর্ট পিকআপ/ড্রপ বেছে নিলে
+  // ফ্লাইট নম্বর ও তারিখ-সময় বাধ্যতামূলক (বাকি ফিল্ড ঐচ্ছিক)
+  let flightInfo = null;
+  if(__tripType !== "normal"){
+    const flightNumber = $("tripFlightNumber").value.trim();
+    const flightDate = $("tripFlightDate").value;
+    const flightTime = $("tripFlightTime").value;
+    if(!flightNumber || !flightDate || !flightTime){
+      alert("ফ্লাইট নম্বর, তারিখ ও সময় — এই তিনটা লিখতে হবে।");
+      return;
+    }
+    flightInfo = {
+      airline: $("tripFlightAirline").value.trim() || null,
+      flightNumber,
+      fromAirport: $("tripFlightFrom").value.trim() || null,
+      toAirport: $("tripFlightTo").value.trim() || null,
+      flightDate, flightTime,
+      terminal: $("tripFlightTerminal").value.trim() || null,
+      status: "manual" // Phase 2-এ আসল Flight API যুক্ত হলে এখানে scheduled/delayed/departed/landed/cancelled বসবে
+    };
   }
 
   $("tripSearchBtn").disabled = true; $("tripSearchBtn").textContent = "লোকেশন খোঁজা হচ্ছে...";
@@ -5757,6 +6358,10 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
       status: "searching",
       fareType: __tripFareType, // 💰 Phase 4 — "negotiable" | "fixed"
       proposedFare: proposedFare, // fareType "fixed" হলেই শুধু ব্যবহার হয়
+      tripType: __tripType, // ✈️ Airport Pickup Phase 1 — "normal" | "airport_pickup" | "airport_drop"
+      flightInfo: flightInfo, // tripType "normal" না হলেই শুধু পূরণ থাকে
+      arrivalStatus: null, // শুধু airport_pickup-এ ব্যবহার হয়, প্যাসেঞ্জার নিজে Arrival Mode থেকে আপডেট করবেন
+      arrivalStatusAt: null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       sessionExpiresAt: firebase.firestore.Timestamp.fromMillis(now + 6*60*1000), // ৬ মিনিটের মাস্টার টাইমার
       rejectedDrivers: [],
@@ -5764,6 +6369,7 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
       confirmedDriver: { driverId: null, finalFare: 0, confirmedAt: null }
     });
     tripCurrentId = tripRef.id;
+    try{ localStorage.setItem("hbActiveTripId", tripCurrentId); }catch(e){}
     $("tripBookCard").style.display = "none";
     $("tripStatusCard").style.display = "block";
     tripWatchTrip(tripRef.id);
@@ -5827,6 +6433,13 @@ function tripWatchTrip(tripId){
 
 function tripRenderStatus(trip){
   const list = trip.waitingList || [];
+  // ⭐ Phase 8 — "completed" ছাড়া বাকি সব স্ট্যাটাসে রেটিং বক্স লুকানো,
+  // বাতিল বাটন দেখানো থাকে (নিচে "completed" ব্রাঞ্চেই উল্টোটা করা হয়)
+  $("tripRatingBox").style.display = "none";
+  $("tripCancelBtn").style.display = "block";
+  // ✈️ Airport Pickup Phase 1 — শুধু "confirmed" স্ট্যাটাসেই দেখানো হয়, নিচে
+  // "confirmed" ব্রাঞ্চে tripType অনুযায়ী আবার চালু হবে
+  $("tripAirportBox").style.display = "none";
   if(trip.status === "searching"){
     $("tripStatusIcon").textContent = trip.fareType === "fixed" ? "🔒" : "🔍";
     $("tripStatusTitle").textContent = trip.fareType === "fixed"
@@ -5844,7 +6457,10 @@ function tripRenderStatus(trip){
     $("tripConfirmedBox").style.display = "none";
     $("tripOffersList").innerHTML = list.map((o, idx)=> `
       <div style="background:rgba(255,255,255,0.05); border-radius:12px; padding:12px; margin-top:10px; text-align:left;">
-        <div style="font-weight:700; font-size:13.5px;">${escapeHtml(o.driverName||"ড্রাইভার")}</div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <div style="font-weight:700; font-size:13.5px;">${escapeHtml(o.driverName||"ড্রাইভার")}</div>
+          <span class="tripOfferRating" data-idx="${idx}" style="font-size:10.5px; color:#fbbf24; font-weight:700;"></span>
+        </div>
         <div style="font-size:11.5px; color:var(--muted); margin:2px 0 8px;">${escapeHtml(o.vehicleModel||"")} ${o.eta ? "· ETA: "+escapeHtml(o.eta) : ""}</div>
         <div style="font-weight:800; color:var(--amber); font-size:15px; margin-bottom:8px;">${HB_CUR} ${o.offeredFare}</div>
         <div style="display:flex; gap:8px;">
@@ -5857,6 +6473,14 @@ function tripRenderStatus(trip){
     });
     document.querySelectorAll(".tripRejectOfferBtn").forEach(btn=>{
       btn.addEventListener("click", ()=> tripRejectOffer(list[Number(btn.dataset.offerIdx)]));
+    });
+    // ⭐ Phase 9 — প্রতিটা অফার-কার্ডে ড্রাইভারের রেটিং (থাকলে) পরে যোগ হয়
+    list.forEach((o, idx)=>{
+      fetchDriverRating(o.driverId).then(r=>{
+        if(!r) return;
+        const el = document.querySelector(`.tripOfferRating[data-idx="${idx}"]`);
+        if(el) el.textContent = `⭐ ${r.avg} (${r.count})`;
+      });
     });
   }else if(trip.status === "confirmed"){
     $("tripStatusIcon").textContent = "✅";
@@ -5872,12 +6496,34 @@ function tripRenderStatus(trip){
     $("tripConfirmedBox").style.display = "block";
     $("tripConfirmedName").textContent = chosen.driverName || "ড্রাইভার";
     $("tripConfirmedMeta").textContent = `${chosen.vehicleModel||""} · ভাড়া: ${HB_CUR} ${trip.confirmedDriver.finalFare}`;
+    $("tripConfirmedRating").textContent = ""; // পুরনো ট্রিপের রেটিং যেন নতুনটাতে মুহূর্তের জন্যও দেখা না যায়
+    if(trip.confirmedDriver && trip.confirmedDriver.driverId){
+      fetchDriverRating(trip.confirmedDriver.driverId).then(r=>{
+        $("tripConfirmedRating").textContent = r ? `⭐ ${r.avg} (${r.count})` : "";
+      });
+    }
     const callBtn = $("tripCallDriverBtn");
     if(chosen.driverPhone){
       callBtn.href = "tel:" + chosen.driverPhone;
       callBtn.style.display = "block";
     }else{
       callBtn.style.display = "none";
+    }
+    // 💬 চ্যাট বাটন — শুধু লগইন করা প্যাসেঞ্জারের জন্য (guest সেশনের
+    // কোনো auth uid নেই, firestore.rules-এর trips/{id}/chat সাবকালেকশন
+    // isSignedIn() দাবি করে — তাই guest-দের জন্য এই বাটন দেখানো হলেও
+    // আসলে কাজ করতো না, তাই honest থাকতে লুকিয়ে রাখা হচ্ছে)
+    const chatBtn = $("tripChatOpenBtn");
+    if(currentCustomer && currentCustomer.uid === trip.passengerId && trip.confirmedDriver && trip.confirmedDriver.driverId){
+      chatBtn.style.display = "block";
+      chatBtn.dataset.driverId = trip.confirmedDriver.driverId;
+      chatBtn.dataset.driverName = chosen.driverName || "ড্রাইভার";
+    }else{
+      chatBtn.style.display = "none";
+    }
+    // ✈️ Smart Airport Pickup Engine Phase 1
+    if(trip.tripType === "airport_pickup" || trip.tripType === "airport_drop"){
+      tripRenderAirportBox(trip, chosen);
     }
   }else if(trip.status === "expired"){
     $("tripStatusIcon").textContent = "⏱️";
@@ -5888,8 +6534,108 @@ function tripRenderStatus(trip){
     $("tripStatusIcon").textContent = "✕";
     $("tripStatusTitle").textContent = "বাতিল করা হয়েছে";
     $("tripStatusSub").textContent = "";
+  }else if(trip.status === "completed"){
+    // ⭐ Honey Bee Transport Media Phase 8 — ট্রিপ শেষে ড্রাইভারকে রেট করা।
+    // confirmedDriver-এ driverName/vehicleModel ফিক্সড-ভাড়ায় সরাসরি থাকে,
+    // দরকষাকষিতে waitingList থেকে (Phase 4-এর একই লুকআপ যুক্তি পুনর্ব্যবহার)
+    const chosen = (trip.fareType === "fixed" && trip.confirmedDriver && trip.confirmedDriver.driverName)
+      ? trip.confirmedDriver
+      : (list.find(o=> o.driverId === trip.confirmedDriver.driverId) || {});
+    $("tripStatusIcon").textContent = "🏁";
+    $("tripStatusTitle").textContent = "ট্রিপ শেষ হয়েছে";
+    $("tripStatusSub").textContent = chosen.driverName ? `ড্রাইভার: ${chosen.driverName}` : "";
+    $("tripOffersList").innerHTML = "";
+    $("tripConfirmedBox").style.display = "none";
+    $("tripCancelBtn").style.display = "none";
+    $("tripRatingBox").style.display = "block";
+    tripCheckExistingRating(trip);
   }
 }
+
+// ⭐ যাত্রী এই নির্দিষ্ট ট্রিপে আগেই রেট করে থাকলে (পেজ রিফ্রেশ/আবার ফিরে
+// আসা) ফর্মের বদলে "ধন্যবাদ" বার্তা দেখানো হয় — একই ট্রিপ দুইবার রেট করা
+// আটকানো হয় ক্লায়েন্ট + firestore.rules দুই জায়গাতেই (rules-এ tripId
+// deterministic doc-id হওয়ায় দ্বিতীয়বার create ব্লক হয়ে যায়)
+async function tripCheckExistingRating(trip){
+  const driverId = trip.confirmedDriver && trip.confirmedDriver.driverId;
+  if(!driverId || !tripCurrentId) return;
+  try{
+    const doc = await db.collection("transportDrivers").doc(driverId)
+      .collection("ratings").doc(tripCurrentId).get();
+    if(doc.exists){
+      $("tripRatingForm").style.display = "none";
+      $("tripRatingDone").style.display = "block";
+    }else{
+      $("tripRatingForm").style.display = "block";
+      $("tripRatingDone").style.display = "none";
+    }
+  }catch(e){ console.warn("রেটিং চেক করা যায়নি:", e); }
+}
+
+let __tripSelectedStars = 0;
+document.querySelectorAll(".tripStar").forEach(star=>{
+  star.addEventListener("click", ()=>{
+    __tripSelectedStars = Number(star.dataset.star);
+    document.querySelectorAll(".tripStar").forEach(s=>{
+      s.textContent = Number(s.dataset.star) <= __tripSelectedStars ? "★" : "☆";
+      s.style.color = Number(s.dataset.star) <= __tripSelectedStars ? "var(--amber)" : "";
+    });
+  });
+});
+
+$("tripSubmitRatingBtn") && $("tripSubmitRatingBtn").addEventListener("click", async ()=>{
+  if(!currentCustomer){ alert("রেটিং দিতে Google দিয়ে লগইন করুন।"); return; }
+  if(__tripSelectedStars < 1){ alert("অন্তত ১টা তারা বেছে নিন।"); return; }
+  if(!tripCurrentId) return;
+  const btn = $("tripSubmitRatingBtn");
+  btn.disabled = true;
+  try{
+    const tripDoc = await db.collection("trips").doc(tripCurrentId).get();
+    if(!tripDoc.exists) throw new Error("ট্রিপটা পাওয়া যায়নি।");
+    const trip = tripDoc.data();
+    const driverId = trip.confirmedDriver && trip.confirmedDriver.driverId;
+    if(!driverId) throw new Error("ড্রাইভারের তথ্য পাওয়া যায়নি।");
+
+    // ⚠️ ড্রাইভারের গড় রেটিং এখানে সরাসরি transportDrivers ডকুমেন্টে
+    // আপডেট করা হচ্ছে না — যাত্রীর কোনো লেখার অনুমতিই নেই ঐ ডকুমেন্টে
+    // (firestore.rules-এ শুধু ড্রাইভার নিজে/এজেন্ট/সুপারঅ্যাডমিন লিখতে
+    // পারেন, ইচ্ছাকৃতভাবেই — যাতে কোনো যাত্রী নিজের রেটিং দিয়ে গড়টা
+    // জাল করতে না পারেন)। প্রতিটা রেটিং এই ratings সাবকালেকশনেই থেকে যায়,
+    // গড় দেখানোর সময় ড্রাইভারের ড্যাশবোর্ড থেকে সবগুলো পড়ে হিসাব হয়।
+    await db.collection("transportDrivers").doc(driverId).collection("ratings").doc(tripCurrentId).set({
+      stars: __tripSelectedStars,
+      comment: $("tripRatingComment").value.trim(),
+      passengerId: currentCustomer.uid,
+      passengerName: currentCustomer.name || "যাত্রী",
+      tripId: tripCurrentId,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    $("tripRatingForm").style.display = "none";
+    $("tripRatingDone").style.display = "block";
+  }catch(e){ alert("রেটিং জমা দেওয়া যায়নি: " + e.message); }
+  finally{ btn.disabled = false; }
+});
+
+$("tripNewBookingBtn") && $("tripNewBookingBtn").addEventListener("click", ()=>{
+  if(tripCountdownInterval) clearInterval(tripCountdownInterval);
+  if(tripUnsub) tripUnsub();
+  tripCloseChat(); // 💬 আগের ট্রিপের চ্যাট লিসেনার/স্ক্রিন খোলা থাকলে বন্ধ করা হচ্ছে
+  tripCurrentId = null;
+  __tripSelectedStars = 0;
+  document.querySelectorAll(".tripStar").forEach(s=>{ s.textContent = "☆"; s.style.color = ""; });
+  $("tripRatingComment").value = "";
+  $("tripStatusCard").style.display = "none";
+  $("tripBookCard").style.display = "block";
+  $("tripDestination").value = "";
+  $("tripFixedFareInput").value = "";
+  tripSetFareType("negotiable");
+  // ✈️ Airport Pickup Phase 1 — নতুন বুকিংয়ে আগের ফ্লাইট তথ্য/সেফটি কার্ড
+  // যেন বয়ে না যায়
+  tripSetTripType("normal");
+  tripClearFlightFields();
+  try{ localStorage.removeItem("hbActiveTripId"); localStorage.removeItem("hbAirportSafetyCard"); }catch(e){}
+});
 
 async function tripConfirmOffer(offer){
   if(!tripCurrentId || !offer) return;
@@ -5926,13 +6672,131 @@ $("tripCancelBtn") && $("tripCancelBtn").addEventListener("click", async ()=>{
   }
   if(tripCountdownInterval) clearInterval(tripCountdownInterval);
   if(tripUnsub) tripUnsub();
+  tripCloseChat(); // 💬 চ্যাট লিসেনার/স্ক্রিন খোলা থাকলে বন্ধ করা হচ্ছে
   tripCurrentId = null;
   $("tripStatusCard").style.display = "none";
   $("tripBookCard").style.display = "block";
   $("tripDestination").value = "";
   $("tripFixedFareInput").value = "";
   tripSetFareType("negotiable");
+  // ✈️ Airport Pickup Phase 1 — বাতিল করলেও একই কারণে রিসেট করা হয়
+  tripSetTripType("normal");
+  tripClearFlightFields();
+  try{ localStorage.removeItem("hbActiveTripId"); localStorage.removeItem("hbAirportSafetyCard"); }catch(e){}
 });
+
+/* ==================== ✈️ Smart Airport Pickup Engine — Phase 1 রেন্ডারিং+অ্যাকশন ====================
+   ফ্লাইট তথ্য কার্ড + লোকাল-স্টোরেজ অফলাইন সেফটি কার্ড + Call/SMS ব্যাকআপ +
+   (শুধু পিকআপে) Arrival Mode বাটন — সব একসাথে। */
+function tripRenderAirportBox(trip, chosen){
+  const f = trip.flightInfo || {};
+  const isPickup = trip.tripType === "airport_pickup";
+  $("tripAirportBox").style.display = "block";
+  $("tripAirportFlightTitle").textContent = isPickup ? "✈️ ফ্লাইট তথ্য (এয়ারপোর্ট পিকআপ)" : "🛫 ফ্লাইট তথ্য (এয়ারপোর্ট ড্রপ)";
+
+  const rows = [];
+  if(f.airline) rows.push(`এয়ারলাইনঃ ${escapeHtml(f.airline)}`);
+  if(f.flightNumber) rows.push(`ফ্লাইট নম্বরঃ <b>${escapeHtml(f.flightNumber)}</b>`);
+  if(f.fromAirport || f.toAirport) rows.push(`রুটঃ ${escapeHtml(f.fromAirport||"—")} → ${escapeHtml(f.toAirport||"—")}`);
+  if(f.flightDate || f.flightTime) rows.push(`${isPickup ? "নির্ধারিত অবতরণ" : "নির্ধারিত ছাড়ার সময়"}ঃ ${escapeHtml(f.flightDate||"")} ${escapeHtml(f.flightTime||"")}`);
+  if(f.terminal) rows.push(`টার্মিনালঃ ${escapeHtml(f.terminal)}`);
+  $("tripAirportFlightDetails").innerHTML = rows.length ? rows.join("<br>") : "কোনো ফ্লাইট তথ্য দেওয়া হয়নি।";
+
+  // 🔒 অফলাইন সেফটি কার্ড — কনফার্ম হওয়ার সাথে সাথেই localStorage-এ সেভ
+  // হয়ে যায়, ইন্টারনেট চলে গেলে বা অ্যাপ বন্ধ করে আবার খুললেও এই তথ্য
+  // হারাবে না (Firestore লাইভ ডেটার ওপর নির্ভর করে না)
+  const safety = {
+    tripId: tripCurrentId,
+    bookingCode: tripCurrentId ? tripCurrentId.slice(-6).toUpperCase() : "",
+    driverName: chosen.driverName || "",
+    driverPhone: chosen.driverPhone || "",
+    vehicleModel: chosen.vehicleModel || "",
+    pickupLocation: (trip.pickupLocation && trip.pickupLocation.address) || "",
+    destination: trip.destination || "",
+    tripType: trip.tripType,
+    flightNumber: f.flightNumber || "",
+    savedAt: Date.now()
+  };
+  try{ localStorage.setItem("hbAirportSafetyCard", JSON.stringify(safety)); }catch(e){}
+  tripRenderAirportSafetyCard(safety);
+
+  $("tripArrivalModeWrap").style.display = isPickup ? "block" : "none";
+  if(isPickup){
+    const labelMap = { landed:"🛬 নেমেছেন", immigration:"🛂 ইমিগ্রেশনে আছেন", luggage:"🧳 লাগেজ সংগ্রহ করছেন", exit:"🚪 বের হচ্ছেন", waiting_gate:"📍 Gate-এ অপেক্ষা করছেন" };
+    document.querySelectorAll(".tripArrivalBtn").forEach(btn=>{
+      const active = trip.arrivalStatus === btn.dataset.status;
+      btn.style.background = active ? "var(--amber)" : "rgba(255,255,255,0.05)";
+      btn.style.color = active ? "var(--bg1)" : "#fff8e8";
+      btn.style.borderColor = active ? "var(--amber)" : "var(--border)";
+    });
+    $("tripArrivalStatusNote").textContent = trip.arrivalStatus
+      ? `সর্বশেষ জানানো অবস্থাঃ ${labelMap[trip.arrivalStatus]||trip.arrivalStatus}`
+      : "এখনো কিছু জানাননি — ড্রাইভার শুধু নির্ধারিত সময়টাই দেখছেন।";
+  }
+}
+
+// 🔒 লোকাল-স্টোরেজে সেভ করা সেফটি কার্ড রেন্ডার করা — Firestore ছাড়াই কাজ করে
+function tripRenderAirportSafetyCard(safety){
+  const rows = [];
+  if(safety.bookingCode) rows.push(`বুকিং কোডঃ <b>${escapeHtml(safety.bookingCode)}</b>`);
+  if(safety.driverName) rows.push(`ড্রাইভারঃ ${escapeHtml(safety.driverName)}`);
+  if(safety.driverPhone) rows.push(`ফোনঃ ${escapeHtml(safety.driverPhone)}`);
+  if(safety.vehicleModel) rows.push(`গাড়িঃ ${escapeHtml(safety.vehicleModel)}`);
+  if(safety.pickupLocation) rows.push(`পিকআপঃ ${escapeHtml(safety.pickupLocation)}`);
+  if(safety.destination) rows.push(`গন্তব্যঃ ${escapeHtml(safety.destination)}`);
+  $("tripAirportSafetyDetails").innerHTML = rows.length ? rows.join("<br>") : "তথ্য পাওয়া যায়নি।";
+}
+
+// 📩 ইন্টারনেট একদমই না থাকলে (শুধু সিম-নেটওয়ার্ক) — SMS দিয়ে দ্রুত বার্তা
+$("tripSmsDriverBtn") && $("tripSmsDriverBtn").addEventListener("click", ()=>{
+  const wrap = $("tripSmsQuickWrap");
+  wrap.style.display = wrap.style.display === "none" ? "block" : "none";
+});
+document.querySelectorAll(".tripSmsQuickBtn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    let phone = "";
+    try{ phone = (JSON.parse(localStorage.getItem("hbAirportSafetyCard") || "{}").driverPhone) || ""; }catch(e){}
+    if(!phone){ alert("ড্রাইভারের ফোন নম্বর পাওয়া যায়নি।"); return; }
+    window.location.href = `sms:${phone}?body=${encodeURIComponent(btn.dataset.msg)}`;
+  });
+});
+
+// ✈️ Arrival Mode — বাটনে চাপলে trip ডকুমেন্টে arrivalStatus আপডেট হয়।
+// ইন্টারনেট সাময়িক না থাকলেও Firestore SDK নিজে থেকেই এই write মেমোরিতে
+// queue করে রাখে, সংযোগ ফিরলেই সয়ংক্রিয়ভাবে sync হয়ে যায় — আলাদা কোনো
+// অফলাইন-কিউ কোড লিখতে হয়নি।
+document.querySelectorAll(".tripArrivalBtn").forEach(btn=>{
+  btn.addEventListener("click", async ()=>{
+    if(!tripCurrentId) return;
+    try{
+      await db.collection("trips").doc(tripCurrentId).update({
+        arrivalStatus: btn.dataset.status,
+        arrivalStatusAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }catch(e){ /* silent — সংযোগ ফিরলে এমনিতেই sync হয়ে যাবে */ }
+  });
+});
+
+/* ✈️ Airport Pickup Phase 1 — অ্যাপ বন্ধ করে আবার খুললেও (বিশেষ করে
+   এয়ারপোর্টে দুর্বল/না-থাকা ইন্টারনেটে) চলমান ট্রিপ যেন হারিয়ে না যায়,
+   তাই tripId লোকালি সেভ রাখা হয় এবং পেজ লোড হলে আবার সেই ট্রিপ দেখানোর
+   চেষ্টা হয়। ব্যর্থ হলে চুপচাপ উপেক্ষা করা হয়, বিদ্যমান বুকিং ফ্লো ভাঙে না। */
+(function tripResumeFromLocalStorage(){
+  try{
+    const savedId = localStorage.getItem("hbActiveTripId");
+    if(!savedId || tripCurrentId) return;
+    db.collection("trips").doc(savedId).get().then((doc)=>{
+      if(!doc.exists || !["searching","waiting_selection","confirmed"].includes(doc.data().status)){
+        localStorage.removeItem("hbActiveTripId");
+        return;
+      }
+      tripCurrentId = savedId;
+      $("tripBookCard").style.display = "none";
+      $("tripStatusCard").style.display = "block";
+      tripWatchTrip(savedId);
+    }).catch(()=>{});
+  }catch(e){}
+})();
 
 /* ==================== 📢 Honey Bee Transport Media Phase 6 — সোশ্যাল ফিড ====================
    Collection: transportMediaPosts/{postId} — ড্রাইভাররা shop-ledger-app.html-এর
@@ -5989,6 +6853,7 @@ function tmRenderFeed(posts){
       <div style="padding:12px 14px 8px; display:flex; align-items:center; gap:8px;">
         <div style="font-weight:800; font-size:13px;">${escapeHtml(p.authorName||"ড্রাইভার")}</div>
         ${p.isVerified ? '<span title="Verified">🛡️</span>' : ''}
+        <span class="tmAuthorRating" data-author="${p.authorId||""}" style="font-size:10.5px; color:#fbbf24; font-weight:700;"></span>
         <div style="margin-left:auto; font-size:10px; color:var(--muted);">${timeTxt}</div>
       </div>
       <div style="padding:0 14px 6px; font-size:11.5px; color:var(--muted);">${escapeHtml(p.vehicleLabel||"")}</div>
@@ -5998,12 +6863,27 @@ function tmRenderFeed(posts){
         <button class="tmLikeBtn" data-id="${p.id}" style="flex:1; padding:8px; border:none; border-radius:9px; background:${liked ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.06)"}; color:${liked ? "#f87171" : "#fff8e8"}; font-weight:700; font-size:12px; cursor:pointer; font-family:inherit;">${liked ? "❤️" : "🤍"} ${p.likeCount || 0}</button>
         <button class="tmCommentBtn" data-id="${p.id}" style="flex:1; padding:8px; border:none; border-radius:9px; background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:700; font-size:12px; cursor:pointer; font-family:inherit;">💬 মন্তব্য</button>
         ${p.authorPhone ? `<a href="tel:${p.authorPhone}" style="flex:1; text-align:center; padding:8px; border-radius:9px; background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:700; font-size:12px; text-decoration:none;">📞 কল</a>` : ""}
+        <button class="tmReportBtn" data-id="${p.id}" title="রিপোর্ট করুন" style="flex:0 0 auto; width:36px; padding:8px 0; border:none; border-radius:9px; background:rgba(255,255,255,0.06); color:var(--muted); font-size:13px; cursor:pointer; font-family:inherit;">🚩</button>
       </div>
     </div>`;
   }).join("");
 
   listEl.querySelectorAll(".tmLikeBtn").forEach(btn=> btn.addEventListener("click", ()=> tmToggleLike(btn.dataset.id)));
   listEl.querySelectorAll(".tmCommentBtn").forEach(btn=> btn.addEventListener("click", ()=> tmOpenComments(btn.dataset.id)));
+  listEl.querySelectorAll(".tmReportBtn").forEach(btn=> btn.addEventListener("click", ()=> tmOpenReportModal(btn.dataset.id)));
+
+  // ⭐ Phase 9 — প্রতিটা পোস্টের লেখক ড্রাইভারের রেটিং। একই ড্রাইভারের
+  // একাধিক পোস্ট থাকলে fetchDriverRating() নিজেই ক্যাশ থেকে দেবে (একবারই
+  // আসল ফেচ হবে), কিন্তু DOM-এ সবগুলো কার্ডেই বসাতে querySelectorAll লাগছে
+  const uniqueAuthorIds = [...new Set(posts.map(p=> p.authorId).filter(Boolean))];
+  uniqueAuthorIds.forEach(authorId=>{
+    fetchDriverRating(authorId).then(r=>{
+      if(!r) return;
+      listEl.querySelectorAll(`.tmAuthorRating[data-author="${authorId}"]`).forEach(el=>{
+        el.textContent = `⭐ ${r.avg}`;
+      });
+    });
+  });
   tmLoadCommentCounts(posts);
 }
 
@@ -6049,6 +6929,101 @@ async function tmToggleLike(postId){
   }catch(e){ console.warn("লাইক করা যায়নি:", e); }
   finally{ if(btn) btn.disabled = false; }
 }
+
+/* ==================== 🚩 পোস্ট রিপোর্ট/মডারেশন ====================
+   transportMediaReports/{postId}_{reporterUid} — deterministic ডকুমেন্ট
+   আইডি বলে একই পোস্টে একই ইউজার দ্বিতীয়বার রিপোর্ট করলে create ব্যর্থ
+   হয়ে যায় (firestore.rules-এ, আলাদা কোনো ডুপ্লিকেট-চেক কোয়েরি লাগে না)।
+   এজেন্ট (নিজের মার্কেটের ড্রাইভার হলে)/সুপারঅ্যাডমিন রিভিউ করবেন। */
+const TM_REPORT_REASONS = [
+  {key:"spam", label:"🗑️ স্প্যাম/অপ্রাসঙ্গিক"},
+  {key:"inappropriate", label:"🔞 অনুপযুক্ত কনটেন্ট"},
+  {key:"harassment", label:"😡 হয়রানি/হুমকি"},
+  {key:"fake", label:"🎭 ভুয়া তথ্য"},
+  {key:"other", label:"❓ অন্য কারণ"}
+];
+let __tmReportPostId = null;
+let __tmReportSelectedReason = null;
+
+function tmOpenReportModal(postId){
+  if(!currentCustomer){ alert("রিপোর্ট করতে Google দিয়ে লগইন করুন।"); return; }
+  __tmReportPostId = postId;
+  __tmReportSelectedReason = null;
+  $("tmReportDetails").value = "";
+  $("tmReportMsg").style.display = "none";
+  const listEl = $("tmReportReasonList");
+  listEl.innerHTML = TM_REPORT_REASONS.map(r=> `
+    <button class="tmReportReasonBtn" data-key="${r.key}" style="text-align:left; padding:11px 13px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.04); color:#fff8e8; font-size:13px; cursor:pointer; font-family:inherit;">${r.label}</button>`).join("");
+  listEl.querySelectorAll(".tmReportReasonBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      __tmReportSelectedReason = btn.dataset.key;
+      listEl.querySelectorAll(".tmReportReasonBtn").forEach(b=>{
+        const active = b.dataset.key === __tmReportSelectedReason;
+        b.style.background = active ? "rgba(251,191,36,0.15)" : "rgba(255,255,255,0.04)";
+        b.style.borderColor = active ? "var(--amber)" : "var(--border)";
+      });
+    });
+  });
+  $("tmReportOverlay").style.display = "flex";
+}
+
+function tmCloseReportModal(){
+  $("tmReportOverlay").style.display = "none";
+  __tmReportPostId = null;
+}
+$("tmCloseReportBtn") && $("tmCloseReportBtn").addEventListener("click", tmCloseReportModal);
+
+$("tmReportSubmitBtn") && $("tmReportSubmitBtn").addEventListener("click", async ()=>{
+  if(!currentCustomer || !__tmReportPostId) return;
+  if(!__tmReportSelectedReason){
+    $("tmReportMsg").textContent = "⚠️ একটা কারণ বেছে নিন।";
+    $("tmReportMsg").style.color = "#f87171"; $("tmReportMsg").style.display = "block";
+    return;
+  }
+  const btn = $("tmReportSubmitBtn");
+  btn.disabled = true; btn.textContent = "পাঠানো হচ্ছে...";
+  try{
+    const postDoc = await db.collection("transportMediaPosts").doc(__tmReportPostId).get();
+    if(!postDoc.exists){
+      alert("পোস্টটি আর পাওয়া যাচ্ছে না।");
+      tmCloseReportModal();
+      return;
+    }
+    const authorId = postDoc.data().authorId;
+    // 🎯 এজেন্টের রিপোর্ট-কিউ মার্কেট-স্কোপড — driverMarketId এখানেই
+    // denormalize করে রাখা হচ্ছে (ড্রাইভার-ডকুমেন্ট-ভেরিফিকেশন কিউয়ের
+    // মতোই), যাতে এজেন্টের কোয়েরিতে নতুন কম্পোজিট ইনডেক্স না লাগে
+    let driverMarketId = null;
+    if(authorId){
+      const driverDoc = await db.collection("transportDrivers").doc(authorId).get();
+      driverMarketId = driverDoc.exists ? (driverDoc.data().marketId || null) : null;
+    }
+    const reportId = __tmReportPostId + "_" + currentCustomer.uid;
+    await db.collection("transportMediaReports").doc(reportId).set({
+      postId: __tmReportPostId,
+      postAuthorId: authorId || null,
+      driverMarketId,
+      reporterUid: currentCustomer.uid,
+      reporterName: currentCustomer.name || "একজন যাত্রী",
+      reason: __tmReportSelectedReason,
+      details: $("tmReportDetails").value.trim(),
+      status: "pending",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      reviewedAt: null,
+      reviewedBy: null
+    });
+    $("tmReportMsg").textContent = "✅ রিপোর্ট পাঠানো হয়েছে — ধন্যবাদ।";
+    $("tmReportMsg").style.color = "#4ade80"; $("tmReportMsg").style.display = "block";
+    setTimeout(tmCloseReportModal, 1200);
+  }catch(e){
+    console.error("report submit failed:", e);
+    const already = e && e.code === "permission-denied";
+    $("tmReportMsg").textContent = already ? "⚠️ আপনি এই পোস্টে আগেই রিপোর্ট করেছেন।" : "⚠️ রিপোর্ট পাঠানো যায়নি, আবার চেষ্টা করুন।";
+    $("tmReportMsg").style.color = "#f87171"; $("tmReportMsg").style.display = "block";
+  }finally{
+    btn.disabled = false; btn.textContent = "🚩 রিপোর্ট পাঠান";
+  }
+});
 
 function tmOpenComments(postId){
   __tmCommentsCurrentPostId = postId;
