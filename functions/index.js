@@ -57,6 +57,11 @@ const googleMapsApiKey = defineSecret("GOOGLE_MAPS_API_KEY");
 // সেট করতে: firebase functions:secrets:set GEMINI_API_KEY
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
+// 🔑 ✈️ AviationStack API key — একই নীতিতে Secrets Manager-এ, কখনো
+// Android/HTML ক্লায়েন্টে থাকবে না (APK/সোর্স ইন্সপেক্ট করলেও বের হবে না)।
+// সেট করতে: firebase functions:secrets:set AVIATIONSTACK_API_KEY
+const aviationstackApiKey = defineSecret("AVIATIONSTACK_API_KEY");
+
 const OFFER_TIMEOUT_SECONDS = 60;
 // রাইডার/এজেন্ট/হানি-বি — আয়ের ভাগ (Phase 5 ব্লুপ্রিন্ট অনুযায়ী: ৭০/২০/১০)
 const RIDER_SHARE = 0.7;
@@ -986,6 +991,379 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
     console.warn(JSON.stringify({ event: "MOU_CHAT_FAILED", error: String(e && e.message || e) }));
     // 🛟 Step 7 — error হলেও গ্রাহক খালি হাতে ফেরত যান না, একটা উষ্ণ fallback বার্তা পান
     return { reply: "দুঃখিত বন্ধু, এই মুহূর্তে ঠিক বুঝতে পারলাম না। আবার বলবেন? 🐝", mood: "idle", engine: "fallback" };
+  }
+});
+
+/* ==================== ✈️ Smart Flight Tracking ====================
+   পুরোপুরি স্বতন্ত্র একটা Aviation Information ফিচার — Bazar/Shop/Order/
+   Delivery/Market-এর সাথে কোনো সম্পর্ক নেই, ডেটা মডেল বা লজিক কোথাও
+   ছোঁয়নি। AviationStack API key কখনো ক্লায়েন্টে যায় না — শুধু এই Cloud
+   Function-এর ভেতরে সার্ভার-সাইড ব্যবহার হয় (Secrets Manager)। ফলাফল
+   Firestore flightCache-এ সংরক্ষণ হয় যাতে একই সার্চ বারবার করলে বারবার
+   API কল না লাগে (cost বাঁচানোর জন্য)। Login বাধ্যতামূলক না — Public
+   User-ও সার্চ করতে পারবেন। এই ধাপে শুধু Search → Result → Details —
+   Saved Flights/Watch/Notification/Airport module/Mou flight-intent/
+   rate-limiting ইচ্ছাকৃতভাবে বাদ (পরের ধাপে হবে)। */
+
+// ফ্লাইট নম্বর normalize/validate: "SV 123" / "sv123" → "SV123"
+function normalizeFlightNumber(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  const cleaned = raw.trim().toUpperCase().replace(/\s+/g, "");
+  if (!/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/.test(cleaned)) return null;
+  return cleaned;
+}
+
+// এয়ারপোর্ট IATA কোড normalize/validate: "dac" → "DAC" (ঠিক ৩ অক্ষর)
+function normalizeIata(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  const cleaned = raw.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(cleaned)) return null;
+  return cleaned;
+}
+
+// YYYY-MM-DD ফরম্যাট validate
+function normalizeDateStr(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  const cleaned = raw.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return null;
+  return cleaned;
+}
+
+// AviationStack-এর flight_status → App-এর normalized status
+const FLIGHT_STATUS_MAP = {
+  scheduled: "scheduled",
+  active: "active",
+  landed: "landed",
+  cancelled: "cancelled",
+  incident: "cancelled",
+  diverted: "diverted",
+};
+
+// ফ্লাইট status + সময় থেকে একটা আনুমানিক timeline-stage বের করা হয় (Scheduled
+// → Boarding → Departed → In Air → Approaching → Landed)। ⚠️ AviationStack
+// সরাসরি "boarding"/"approaching" দেয় না — এগুলো সময়ের ভিত্তিতে আনুমানিক
+// (best-effort), UI-তে এই দুইটা stage কে হালকাভাবে দেখানো উচিত (নিশ্চিত না)।
+function deriveFlightStage(status, dep, arr) {
+  const now = Date.now();
+  if (status === "cancelled") return "cancelled";
+  if (status === "diverted") return "diverted";
+  if (status === "landed") return "landed";
+  if (status === "active") {
+    const arrEstimated = arr.estimated ? new Date(arr.estimated).getTime() : null;
+    if (arrEstimated && arrEstimated - now <= 30 * 60 * 1000 && arrEstimated - now > -20 * 60 * 1000) {
+      return "approaching"; // আনুমানিক — অবতরণের প্রায় ৩০ মিনিটের মধ্যে
+    }
+    return "in_air";
+  }
+  if (status === "scheduled") {
+    const depScheduled = dep.scheduled ? new Date(dep.scheduled).getTime() : null;
+    if (depScheduled && depScheduled - now <= 45 * 60 * 1000 && depScheduled - now > 0) {
+      return "boarding"; // আনুমানিক — ছাড়ার প্রায় ৪৫ মিনিট আগে
+    }
+    return "scheduled";
+  }
+  return "unknown";
+}
+
+// AviationStack-এর raw রেসপন্স → App-এর standard (flat) normalized flight object
+function normalizeAviationstackFlight(raw) {
+  const dep = raw.departure || {};
+  const arr = raw.arrival || {};
+  const airline = raw.airline || {};
+  const aircraft = raw.aircraft || {};
+  const live = raw.live || {}; // 🛰️ শুধু AviationStack-এর Real-Time প্ল্যানে পাওয়া যায়, না থাকলে সব null
+  const status = FLIGHT_STATUS_MAP[String(raw.flight_status || "").toLowerCase()] || "unknown";
+
+  const flightNumber = (raw.flight && (raw.flight.iata || raw.flight.icao)) || null;
+
+  const normalized = {
+    flightNumber,
+    airline: airline.name || null,
+    status,
+
+    departureAirport: dep.airport || null,
+    departureIata: dep.iata || null,
+    arrivalAirport: arr.airport || null,
+    arrivalIata: arr.iata || null,
+
+    scheduledDeparture: dep.scheduled || null,
+    estimatedDeparture: dep.estimated || null,
+    actualDeparture: dep.actual || null,
+    scheduledArrival: arr.scheduled || null,
+    estimatedArrival: arr.estimated || null,
+    actualArrival: arr.actual || null,
+
+    departureTerminal: dep.terminal || null,
+    departureGate: dep.gate || null,
+    arrivalTerminal: arr.terminal || null,
+    arrivalGate: arr.gate || null,
+
+    aircraft: aircraft.registration || aircraft.icao || null,
+
+    // 🛰️ Live position — শুধু flight active থাকা অবস্থায়, এবং শুধু
+    // AviationStack-এর Real-Time Flight Tracking প্ল্যানে পাওয়া যায়
+    latitude: live.latitude != null ? live.latitude : null,
+    longitude: live.longitude != null ? live.longitude : null,
+    altitude: live.altitude != null ? live.altitude : null,
+    speed: live.speed_horizontal != null ? live.speed_horizontal : null,
+    heading: live.direction != null ? live.direction : null,
+
+    updatedAt: Date.now(),
+  };
+  normalized.stage = deriveFlightStage(status, dep, arr);
+
+  // 🟡 Delayed — API সরাসরি "delayed" status দেয় না, তাই scheduled বনাম
+  // estimated সময়ের পার্থক্য থেকে বের করা হয় (এখনো ছাড়েনি হলে departure
+  // দিয়ে, ছেড়ে গেছে/আকাশে থাকলে arrival দিয়ে) — ১৫ মিনিট বা বেশি হলে delayed
+  const relevantScheduled = normalized.actualDeparture ? normalized.scheduledArrival : normalized.scheduledDeparture;
+  const relevantEstimated = normalized.actualDeparture ? normalized.estimatedArrival : normalized.estimatedDeparture;
+  let delayMinutes = null;
+  if (relevantScheduled && relevantEstimated) {
+    const diffMs = new Date(relevantEstimated).getTime() - new Date(relevantScheduled).getTime();
+    if (Number.isFinite(diffMs)) delayMinutes = Math.round(diffMs / 60000);
+  }
+  normalized.delayMinutes = delayMinutes;
+  normalized.isDelayed = (status === "scheduled" || status === "active") && delayMinutes != null && delayMinutes >= 15;
+
+  return normalized;
+}
+
+// ফ্লাইটের status অনুযায়ী Firestore cache-এর মেয়াদ (ms)
+function flightCacheTtlMs(status) {
+  switch (status) {
+    case "active":
+    case "diverted": return 3 * 60 * 1000; // ৩ মিনিট
+    case "scheduled": return 20 * 60 * 1000; // ২০ মিনিট
+    case "landed":
+    case "cancelled": return 45 * 60 * 1000; // ৪৫ মিনিট
+    default: return 10 * 60 * 1000; // unknown
+  }
+}
+
+exports.searchFlight = onCall({ secrets: [aviationstackApiKey] }, async (request) => {
+  const data = request.data || {};
+  const flightNumber = normalizeFlightNumber(data.flightNumber);
+  const depIata = normalizeIata(data.departureIata);
+  const arrIata = normalizeIata(data.arrivalIata);
+  const flightDate = normalizeDateStr(data.flightDate);
+
+  // 🔎 দুই ধরনের সার্চ — ফ্লাইট নম্বর দিয়ে, অথবা Departure+Arrival Airport দিয়ে
+  // (Date ঐচ্ছিক, দুটোর সাথেই ব্যবহার করা যায়)
+  if (!flightNumber && !(depIata && arrIata)) {
+    throw new HttpsError(
+      "invalid-argument",
+      "সঠিক ফ্লাইট নম্বর (যেমনঃ SV123) অথবা Departure ও Arrival Airport কোড (যেমনঃ DAC → DXB) দিন।"
+    );
+  }
+
+  const todayKey = flightDate || new Date().toISOString().slice(0, 10);
+  const cacheKey = flightNumber ? `fn_${flightNumber}_${todayKey}` : `route_${depIata}_${arrIata}_${todayKey}`;
+  const cacheRef = db.collection("flightCache").doc(cacheKey);
+
+  try {
+    const cacheDoc = await cacheRef.get();
+    if (cacheDoc.exists) {
+      const cached = cacheDoc.data();
+      if (cached.expiresAt && cached.expiresAt.toMillis() > Date.now()) {
+        return { flights: cached.data, source: "cache" };
+      }
+    }
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "FLIGHT_CACHE_READ_FAILED", error: String((e && e.message) || e) }));
+  }
+
+  const apiKey = aviationstackApiKey.value();
+  if (!apiKey) {
+    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_NO_API_KEY" }));
+    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  const params = new URLSearchParams({ access_key: apiKey });
+  if (flightNumber) params.set("flight_iata", flightNumber);
+  if (depIata) params.set("dep_iata", depIata);
+  if (arrIata) params.set("arr_iata", arrIata);
+  if (flightDate) params.set("flight_date", flightDate); // ⚠️ AviationStack-এর কিছু প্ল্যানে date-ফিল্টার সমর্থিত না-ও হতে পারে
+
+  let apiRes;
+  try {
+    apiRes = await fetch(`https://api.aviationstack.com/v1/flights?${params.toString()}`);
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_NETWORK_ERROR", error: String((e && e.message) || e) }));
+    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  if (apiRes.status === 429) {
+    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_API_LIMIT" }));
+    throw new HttpsError("resource-exhausted", "এই মুহূর্তে অনেক অনুরোধ হচ্ছে। একটু পরে আবার চেষ্টা করুন।");
+  }
+  if (!apiRes.ok) {
+    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_API_ERROR", status: apiRes.status }));
+    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  let json;
+  try {
+    json = await apiRes.json();
+  } catch (e) {
+    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+  if (json.error) {
+    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_API_LOGICAL_ERROR", error: json.error }));
+    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  const results = Array.isArray(json.data) ? json.data : [];
+  if (results.length === 0) {
+    throw new HttpsError("not-found", "এই ফ্লাইটের কোনো তথ্য পাওয়া যায়নি। তথ্যগুলো আবার চেক করুন।");
+  }
+
+  // সর্বোচ্চ ২০টা রেজাল্ট normalize করে পাঠানো হয় (route সার্চে একাধিক ফ্লাইট আসতে পারে)
+  // flightDate সহ পাঠানো হয় — ক্লায়েন্ট Save/Track করলে এই তারিখটাই
+  // customers/{uid}/savedFlights-এ লাগবে (checkWatchedFlights-এর
+  // flightDate কোয়েরির সাথে মিলিয়ে)
+  const normalizedList = results.slice(0, 20).map((r) => Object.assign(normalizeAviationstackFlight(r), { flightDate: todayKey }));
+
+  // সবচেয়ে বেশি পরিবর্তনশীল (active) ফ্লাইট থাকলে তার ভিত্তিতে cache-মেয়াদ ঠিক হয়
+  const worstTtlStatus = normalizedList.some((f) => f.status === "active") ? "active" : (normalizedList[0] && normalizedList[0].status);
+  try {
+    await cacheRef.set({
+      cacheKey,
+      flightDate: todayKey,
+      data: normalizedList,
+      cachedAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(Date.now() + flightCacheTtlMs(worstTtlStatus)),
+      lastApiUpdate: FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "FLIGHT_CACHE_WRITE_FAILED", error: String((e && e.message) || e) }));
+  }
+
+  return { flights: normalizedList, source: "live" };
+});
+
+/* ==================== 🔔 Smart Flight Tracking — Phase 2 (Saved Flights + Notification) ====================
+   Login করা কাস্টমার customers/{uid}/savedFlights/{flightId}-এ (ক্লায়েন্ট
+   থেকে সরাসরি Firestore write, firestore.rules-এ owner-only) একটা ফ্লাইট
+   Save করতে পারবেন, চাইলে Tracking (trackingEnabled) চালু করতে পারবেন।
+   চালু থাকলে প্রতি ৫ মিনিটে নিচের checkWatchedFlights status/gate/সময়
+   পরিবর্তন চেক করে — পরিবর্তন পেলেই sendFcmToCustomer() দিয়ে পুশ পাঠায়
+   (আগে থেকেই ট্রিপ-আপডেটে ব্যবহৃত ফাংশন, শুধু data.type "flight-update")।
+   ফ্লাইট landed/cancelled/diverted (চূড়ান্ত অবস্থা) হয়ে গেলে tracking
+   নিজে থেকেই বন্ধ হয়ে যায়। ⚠️ collectionGroup("savedFlights") কোয়েরি
+   প্রথমবার চালানোর সময় Firestore একটা composite index চাইতে পারে —
+   Cloud Function log-এ auto-create লিংক দেখাবে, সেটায় ক্লিক করলেই হবে। */
+function flightChangeNotificationText(flight) {
+  if (flight.status === "cancelled") {
+    return { title: "🔴 ফ্লাইট বাতিল হয়েছে", body: `${flight.flightNumber} ফ্লাইটটা বাতিল করা হয়েছে।` };
+  }
+  if (flight.status === "landed") {
+    return { title: "🛬 ফ্লাইট অবতরণ করেছে", body: `${flight.flightNumber} নিরাপদে পৌঁছে গেছে।` };
+  }
+  if (flight.status === "diverted") {
+    return { title: "↪️ ফ্লাইট ভিন্ন গন্তব্যে সরানো হয়েছে", body: `${flight.flightNumber}-এর গন্তব্য পরিবর্তন হয়েছে।` };
+  }
+  if (flight.isDelayed) {
+    return { title: "🟡 ফ্লাইট বিলম্বিত", body: `${flight.flightNumber} প্রায় ${flight.delayMinutes} মিনিট দেরিতে চলছে।` };
+  }
+  if (flight.status === "active") {
+    return { title: "🟢 ফ্লাইট আকাশে", body: `${flight.flightNumber} এখন উড়ছে।` };
+  }
+  return { title: "✈️ ফ্লাইটের তথ্য আপডেট হয়েছে", body: `${flight.flightNumber}-এর সর্বশেষ তথ্য দেখুন — Smart Flight Information-এ চেক করুন।` };
+}
+
+exports.checkWatchedFlights = onSchedule({ schedule: "every 5 minutes", secrets: [aviationstackApiKey] }, async () => {
+  const apiKey = aviationstackApiKey.value();
+  if (!apiKey) {
+    console.warn(JSON.stringify({ event: "FLIGHT_WATCH_NO_API_KEY" }));
+    return;
+  }
+  const todayKey = new Date().toISOString().slice(0, 10);
+
+  let watchedDocs;
+  try {
+    const snap = await db.collectionGroup("savedFlights")
+      .where("trackingEnabled", "==", true)
+      .where("flightDate", "==", todayKey)
+      .get();
+    watchedDocs = snap.docs;
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "FLIGHT_WATCH_QUERY_FAILED", error: String((e && e.message) || e) }));
+    return;
+  }
+  if (watchedDocs.length === 0) return;
+
+  for (const doc of watchedDocs) {
+    const saved = doc.data();
+    const flightNumber = saved.flightNumber;
+    const customerUid = doc.ref.parent.parent && doc.ref.parent.parent.id;
+    if (!flightNumber || !customerUid) continue;
+
+    try {
+      const cacheRef = db.collection("flightCache").doc(`fn_${flightNumber}_${todayKey}`);
+      let normalized = null;
+
+      const cacheDoc = await cacheRef.get();
+      if (cacheDoc.exists) {
+        const cached = cacheDoc.data();
+        if (cached.expiresAt && cached.expiresAt.toMillis() > Date.now() && Array.isArray(cached.data) && cached.data[0]) {
+          normalized = cached.data[0];
+        }
+      }
+
+      if (!normalized) {
+        const params = new URLSearchParams({ access_key: apiKey, flight_iata: flightNumber, flight_date: todayKey });
+        const apiRes = await fetch(`https://api.aviationstack.com/v1/flights?${params.toString()}`);
+        if (!apiRes.ok) continue;
+        const json = await apiRes.json();
+        if (json.error) continue;
+        const results = Array.isArray(json.data) ? json.data : [];
+        if (results.length === 0) continue;
+        const normalizedList = results.slice(0, 20).map((r) => normalizeAviationstackFlight(r));
+        normalized = normalizedList[0];
+        await cacheRef.set({
+          cacheKey: `fn_${flightNumber}_${todayKey}`,
+          flightDate: todayKey,
+          data: normalizedList,
+          cachedAt: FieldValue.serverTimestamp(),
+          expiresAt: Timestamp.fromMillis(Date.now() + flightCacheTtlMs(normalized.status)),
+          lastApiUpdate: FieldValue.serverTimestamp(),
+        }).catch(() => {});
+      }
+      if (!normalized) continue;
+
+      const changed =
+        normalized.status !== saved.lastKnownStatus ||
+        normalized.estimatedDeparture !== saved.lastKnownEstimatedDeparture ||
+        normalized.estimatedArrival !== saved.lastKnownEstimatedArrival ||
+        normalized.departureGate !== saved.lastKnownGate;
+
+      const updatePayload = {
+        lastKnownStatus: normalized.status,
+        lastKnownEstimatedDeparture: normalized.estimatedDeparture,
+        lastKnownEstimatedArrival: normalized.estimatedArrival,
+        lastKnownGate: normalized.departureGate,
+        lastCheckedAt: FieldValue.serverTimestamp(),
+      };
+      // 🛬 চূড়ান্ত অবস্থায় পৌঁছালে আর ট্র্যাক করার দরকার নেই — Cloud
+      // Function-এর নিয়মিত খরচ/API-কল বাঁচাতে নিজে থেকেই বন্ধ হয়ে যায়
+      if (["landed", "cancelled", "diverted"].includes(normalized.status)) {
+        updatePayload.trackingEnabled = false;
+      }
+      await doc.ref.update(updatePayload).catch(() => {});
+
+      // 🔔 প্রথমবার status বসানোর সময় (saved.lastKnownStatus আগে সেট করা
+      // ছিল না) নোটিফিকেশন পাঠানো হয় না — শুধু প্রকৃত পরিবর্তনেই পাঠানো হয়
+      if (changed && saved.lastKnownStatus) {
+        const { title, body } = flightChangeNotificationText(normalized);
+        await sendFcmToCustomer(customerUid, title, body, {
+          type: "flight-update",
+          flightNumber,
+          flightDate: todayKey,
+        });
+      }
+    } catch (e) {
+      console.warn(JSON.stringify({ event: "FLIGHT_WATCH_CHECK_FAILED", flightNumber, error: String((e && e.message) || e) }));
+    }
   }
 });
 
