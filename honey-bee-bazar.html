@@ -902,10 +902,92 @@
        ক্লিক করলে খোলে)। পরে এখানে আসল ফ্লাইট ট্র্যাকিং ড্যাশবোর্ড বানানো হবে। -->
   <div id="screenSmartFlightInfo" style="padding:20px 16px;">
     <button class="backBtn" id="backToTransportFromFlightInfo">← ফিরে যান</button>
-    <div style="text-align:center; margin-top:60px;">
-      <div style="font-size:44px;">✈️</div>
-      <div style="font-size:17px; font-weight:800; margin-top:8px;">Smart Flight Information</div>
-      <div style="font-size:12px; color:var(--muted); margin-top:6px;">শীঘ্রই আসছে — ফ্লাইট ট্র্যাকিং ড্যাশবোর্ড এখানে যুক্ত হবে</div>
+    <div style="text-align:center; margin-bottom:16px;">
+      <div style="font-size:32px;">✈️</div>
+      <div style="font-size:16px; font-weight:800;">Smart Flight Information</div>
+      <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">লাইভ ফ্লাইট স্ট্যাটাস ও তথ্য — Honey Bee Bazar/Delivery থেকে সম্পূর্ণ আলাদা</div>
+    </div>
+
+    <!-- 🔎 দুই ধরনের সার্চ — ফ্লাইট নম্বর দিয়ে, অথবা Departure+Arrival Airport দিয়ে -->
+    <div class="card" id="sfiSearchCard">
+      <div style="display:flex; gap:6px; margin-bottom:12px;">
+        <button type="button" id="sfiModeFlightBtn" data-mode="flight" style="flex:1; padding:9px 4px; border-radius:10px; border:1px solid var(--amber); background:var(--amber); color:var(--bg1); font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">🔢 ফ্লাইট নম্বর</button>
+        <button type="button" id="sfiModeRouteBtn" data-mode="route" style="flex:1; padding:9px 4px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">🛫 রুট দিয়ে</button>
+      </div>
+
+      <div id="sfiFlightModeWrap">
+        <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">ফ্লাইট নম্বর</label>
+        <input type="text" id="sfiFlightNumberInput" placeholder="যেমনঃ SV123, BG147, EK585" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; box-sizing:border-box;">
+      </div>
+
+      <div id="sfiRouteModeWrap" style="display:none;">
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <div style="flex:1;">
+            <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">Departure (যেমনঃ DAC)</label>
+            <input type="text" id="sfiDepInput" maxlength="3" placeholder="DAC" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; text-transform:uppercase; box-sizing:border-box;">
+          </div>
+          <div style="flex:1;">
+            <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">Arrival (যেমনঃ DXB)</label>
+            <input type="text" id="sfiArrInput" maxlength="3" placeholder="DXB" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; text-transform:uppercase; box-sizing:border-box;">
+          </div>
+        </div>
+        <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">তারিখ (ঐচ্ছিক)</label>
+        <input type="date" id="sfiDateInput" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; box-sizing:border-box;">
+      </div>
+
+      <button id="sfiSearchBtn" style="width:100%; margin-top:14px; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1);">🔍 ফ্লাইট খুঁজুন</button>
+      <div id="sfiSearchMsg" style="font-size:12px; color:var(--danger); margin-top:10px; display:none;"></div>
+    </div>
+
+    <!-- 📋 একাধিক ফলাফল হলে তালিকা (route সার্চে), নাহলে সরাসরি বিস্তারিত কার্ড -->
+    <div id="sfiResultsList" style="margin-top:12px;"></div>
+
+    <!-- ✈️ ফ্লাইট বিস্তারিত কার্ড -->
+    <div class="card" id="sfiDetailCard" style="display:none; margin-top:12px; text-align:left;">
+      <button type="button" id="sfiBackToListBtn" style="display:none; background:none; border:none; color:var(--muted); font-size:12px; font-family:inherit; cursor:pointer; padding:0; margin-bottom:10px;">← তালিকায় ফিরুন</button>
+
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <div style="font-size:28px;">✈️</div>
+        <div style="flex:1;">
+          <div id="sfiDetailFlightNo" style="font-weight:800; font-size:16px;">—</div>
+          <div id="sfiDetailAirline" style="font-size:12px; color:var(--muted);">—</div>
+        </div>
+        <div id="sfiDetailStatusBadge" style="padding:5px 12px; border-radius:20px; font-size:11px; font-weight:800;">—</div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:14px;">
+        <div style="flex:1;">
+          <div id="sfiDepIata" style="font-size:20px; font-weight:800;">—</div>
+          <div id="sfiDepAirport" style="font-size:11px; color:var(--muted); margin-top:2px;">—</div>
+        </div>
+        <div style="align-self:center; font-size:18px; color:var(--amber);">✈️</div>
+        <div style="flex:1; text-align:right;">
+          <div id="sfiArrIata" style="font-size:20px; font-weight:800;">—</div>
+          <div id="sfiArrAirport" style="font-size:11px; color:var(--muted); margin-top:2px;">—</div>
+        </div>
+      </div>
+
+      <!-- 🕒 Flight Timeline — Scheduled → Boarding → Departed → In Air → Approaching → Landed
+           ⚠️ Boarding/Approaching সময়ভিত্তিক আনুমানিক (API-তে সরাসরি নেই) -->
+      <div id="sfiTimelineWrap" style="margin-bottom:14px;">
+        <div id="sfiTimelineTrack" style="display:flex; align-items:center;"></div>
+        <div id="sfiTimelineLabel" style="font-size:10.5px; color:var(--muted); text-align:center; margin-top:6px;">—</div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:12px; margin-bottom:10px;">
+        <div style="font-size:11.5px; font-weight:800; color:var(--amber); margin-bottom:8px;">🛫 ছাড়ার তথ্য</div>
+        <div id="sfiDepDetails" style="font-size:12px; color:#ddd; line-height:1.9;">—</div>
+      </div>
+      <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:12px; margin-bottom:10px;">
+        <div style="font-size:11.5px; font-weight:800; color:var(--amber); margin-bottom:8px;">🛬 পৌঁছানোর তথ্য</div>
+        <div id="sfiArrDetails" style="font-size:12px; color:#ddd; line-height:1.9;">—</div>
+      </div>
+      <div id="sfiExtraDetailsWrap" style="background:rgba(255,255,255,0.04); border-radius:12px; padding:12px; display:none;">
+        <div style="font-size:11.5px; font-weight:800; color:var(--amber); margin-bottom:8px;">ℹ️ অতিরিক্ত তথ্য</div>
+        <div id="sfiExtraDetails" style="font-size:12px; color:#ddd; line-height:1.9;">—</div>
+      </div>
+
+      <div style="font-size:10px; color:var(--muted); margin-top:10px; text-align:center;">সর্বশেষ আপডেটঃ <span id="sfiUpdatedAt">—</span></div>
     </div>
   </div>
 
@@ -3058,6 +3140,180 @@ document.getElementById("backToHomeFromTransport") && document.getElementById("b
 document.getElementById("backToTransportFromMedia") && document.getElementById("backToTransportFromMedia").addEventListener("click", ()=> showScreen("screenTransport"));
 document.getElementById("smartFlightInfoBtn") && document.getElementById("smartFlightInfoBtn").addEventListener("click", ()=> showScreen("screenSmartFlightInfo"));
 document.getElementById("backToTransportFromFlightInfo") && document.getElementById("backToTransportFromFlightInfo").addEventListener("click", ()=> showScreen("screenTransport"));
+
+/* ==================== ✈️ Smart Flight Tracking ====================
+   পুরোপুরি স্বতন্ত্র ফিচার — Bazar/Shop/Order/Delivery/Market-এর সাথে
+   কোনো সম্পর্ক নেই। শুধু functions/index.js-এর searchFlight callable
+   ফাংশন কল করে (AviationStack API key সার্ভার-সাইডে, ক্লায়েন্টে কখনো
+   আসে না)। এই ধাপে শুধু Search → Result → Details — Saved/Watch/
+   Notification/Live Map/Airport module ইচ্ছাকৃতভাবে বাদ। */
+let __sfiMode = "flight"; // "flight" | "route"
+let __sfiFlights = []; // সর্বশেষ সার্চ ফলাফল (একাধিক হলে তালিকা থেকে বিস্তারিত দেখানো হয়)
+
+function sfiSetMode(mode){
+  __sfiMode = mode;
+  const flightBtn = $("sfiModeFlightBtn"), routeBtn = $("sfiModeRouteBtn");
+  flightBtn.style.background = mode === "flight" ? "var(--amber)" : "rgba(255,255,255,0.06)";
+  flightBtn.style.color = mode === "flight" ? "var(--bg1)" : "#fff8e8";
+  flightBtn.style.borderColor = mode === "flight" ? "var(--amber)" : "var(--border)";
+  routeBtn.style.background = mode === "route" ? "var(--amber)" : "rgba(255,255,255,0.06)";
+  routeBtn.style.color = mode === "route" ? "var(--bg1)" : "#fff8e8";
+  routeBtn.style.borderColor = mode === "route" ? "var(--amber)" : "var(--border)";
+  $("sfiFlightModeWrap").style.display = mode === "flight" ? "block" : "none";
+  $("sfiRouteModeWrap").style.display = mode === "route" ? "block" : "none";
+}
+$("sfiModeFlightBtn") && $("sfiModeFlightBtn").addEventListener("click", ()=> sfiSetMode("flight"));
+$("sfiModeRouteBtn") && $("sfiModeRouteBtn").addEventListener("click", ()=> sfiSetMode("route"));
+
+const SFI_STATUS_META = {
+  scheduled: { label: "Scheduled", color: "#3b82f6" },
+  active: { label: "En Route", color: "#16a34a" },
+  landed: { label: "Landed", color: "#16a34a" },
+  cancelled: { label: "Cancelled", color: "#dc2626" },
+  diverted: { label: "Diverted", color: "#f59e0b" },
+  unknown: { label: "Unknown", color: "#6b7280" },
+};
+const SFI_STAGE_ORDER = ["scheduled","boarding","departed","in_air","approaching","landed"];
+const SFI_STAGE_LABEL = { scheduled:"Scheduled", boarding:"Boarding", departed:"Departed", in_air:"In Air", approaching:"Approaching", landed:"Landed" };
+// stage থেকে timeline-এ কতদূর পর্যন্ত dot ভরাট হবে তার ইনডেক্স
+const SFI_STAGE_TO_INDEX = { scheduled:0, boarding:1, in_air:3, approaching:4, landed:5 };
+
+function sfiFmtTime(iso){
+  if(!iso) return "—";
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return "—";
+  return d.toLocaleString("bn-BD", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
+}
+
+function sfiShowMsg(text){
+  const el = $("sfiSearchMsg");
+  el.textContent = text; el.style.display = text ? "block" : "none";
+}
+
+async function sfiHandleSearch(){
+  sfiShowMsg("");
+  $("sfiResultsList").innerHTML = "";
+  $("sfiDetailCard").style.display = "none";
+
+  let payload = {};
+  if(__sfiMode === "flight"){
+    const fn = $("sfiFlightNumberInput").value.trim();
+    if(!fn){ sfiShowMsg("ফ্লাইট নম্বর লিখুন।"); return; }
+    payload = { flightNumber: fn };
+  }else{
+    const dep = $("sfiDepInput").value.trim();
+    const arr = $("sfiArrInput").value.trim();
+    if(!dep || !arr){ sfiShowMsg("Departure ও Arrival — দুটো Airport কোডই দিন।"); return; }
+    payload = { departureIata: dep, arrivalIata: arr };
+    const dateVal = $("sfiDateInput").value;
+    if(dateVal) payload.flightDate = dateVal;
+  }
+
+  const btn = $("sfiSearchBtn");
+  const originalText = btn.textContent;
+  btn.disabled = true; btn.textContent = "খোঁজা হচ্ছে...";
+  try{
+    const callable = functionsInstance.httpsCallable("searchFlight");
+    const result = await callable(payload);
+    const flights = (result.data && result.data.flights) || [];
+    __sfiFlights = flights;
+    if(flights.length === 0){
+      sfiShowMsg("কোনো ফ্লাইট পাওয়া যায়নি।");
+    }else if(flights.length === 1){
+      sfiRenderDetail(flights[0], false);
+    }else{
+      sfiRenderList(flights);
+    }
+  }catch(e){
+    sfiShowMsg((e && e.message) || "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }finally{
+    btn.disabled = false; btn.textContent = originalText;
+  }
+}
+$("sfiSearchBtn") && $("sfiSearchBtn").addEventListener("click", sfiHandleSearch);
+
+function sfiRenderList(flights){
+  const listEl = $("sfiResultsList");
+  listEl.innerHTML = flights.map((f, idx)=>{
+    const meta = SFI_STATUS_META[f.status] || SFI_STATUS_META.unknown;
+    return `<button type="button" class="card sfiListItem" data-idx="${idx}" style="width:100%; text-align:left; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:10px; margin-bottom:8px; border:none;">
+      <div style="font-size:20px;">✈️</div>
+      <div style="flex:1;">
+        <div style="font-weight:800; font-size:13px;">${escapeHtml(f.flightNumber || "—")} <span style="color:var(--muted); font-weight:600; font-size:11.5px;">${escapeHtml(f.airline || "")}</span></div>
+        <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">${escapeHtml(f.departureIata || "—")} → ${escapeHtml(f.arrivalIata || "—")}</div>
+      </div>
+      <div style="padding:4px 10px; border-radius:14px; font-size:10.5px; font-weight:800; color:#fff; background:${meta.color};">${meta.label}</div>
+    </button>`;
+  }).join("");
+  listEl.querySelectorAll(".sfiListItem").forEach(btn=>{
+    btn.addEventListener("click", ()=> sfiRenderDetail(__sfiFlights[Number(btn.dataset.idx)], true));
+  });
+}
+
+function sfiRenderDetail(flight, cameFromList){
+  $("sfiResultsList").innerHTML = "";
+  $("sfiBackToListBtn").style.display = cameFromList ? "block" : "none";
+  $("sfiBackToListBtn").onclick = ()=>{ $("sfiDetailCard").style.display = "none"; sfiRenderList(__sfiFlights); };
+
+  const meta = SFI_STATUS_META[flight.status] || SFI_STATUS_META.unknown;
+  $("sfiDetailFlightNo").textContent = flight.flightNumber || "—";
+  $("sfiDetailAirline").textContent = flight.airline || "—";
+  const badgeEl = $("sfiDetailStatusBadge");
+  badgeEl.textContent = flight.isDelayed ? `🟡 Delayed${flight.delayMinutes ? " ("+flight.delayMinutes+" মিনিট)" : ""}` : meta.label;
+  badgeEl.style.background = flight.isDelayed ? "#f59e0b" : meta.color;
+  badgeEl.style.color = "#fff";
+
+  $("sfiDepIata").textContent = flight.departureIata || "—";
+  $("sfiDepAirport").textContent = flight.departureAirport || "—";
+  $("sfiArrIata").textContent = flight.arrivalIata || "—";
+  $("sfiArrAirport").textContent = flight.arrivalAirport || "—";
+
+  // 🕒 Timeline
+  const stageIdx = SFI_STAGE_TO_INDEX[flight.stage];
+  const timelineTrack = $("sfiTimelineTrack");
+  const timelineLabel = $("sfiTimelineLabel");
+  if(flight.stage === "cancelled" || flight.stage === "diverted" || flight.stage === "unknown" || stageIdx == null){
+    timelineTrack.innerHTML = "";
+    timelineLabel.textContent = flight.stage === "cancelled" ? "❌ ফ্লাইট বাতিল হয়েছে" : flight.stage === "diverted" ? "↪️ ফ্লাইট ভিন্ন গন্তব্যে সরানো হয়েছে" : "তথ্য অনুপলব্ধ";
+  }else{
+    timelineTrack.innerHTML = SFI_STAGE_ORDER.map((s, i)=>{
+      const filled = i <= stageIdx;
+      const dot = `<div style="width:10px; height:10px; border-radius:50%; background:${filled ? "var(--amber)" : "rgba(255,255,255,0.15)"};"></div>`;
+      const line = i < SFI_STAGE_ORDER.length - 1 ? `<div style="flex:1; height:2px; background:${i < stageIdx ? "var(--amber)" : "rgba(255,255,255,0.15)"};"></div>` : "";
+      return dot + line;
+    }).join("");
+    const stageLabel = SFI_STAGE_LABEL[flight.stage] || "—";
+    const approxNote = (flight.stage === "boarding" || flight.stage === "approaching") ? " (আনুমানিক)" : "";
+    timelineLabel.textContent = `বর্তমান ধাপঃ ${stageLabel}${approxNote}`;
+  }
+
+  $("sfiDepDetails").innerHTML = `
+    টার্মিনালঃ ${escapeHtml(flight.departureTerminal || "—")} · গেটঃ ${escapeHtml(flight.departureGate || "—")}<br>
+    নির্ধারিতঃ ${sfiFmtTime(flight.scheduledDeparture)}<br>
+    আনুমানিকঃ ${sfiFmtTime(flight.estimatedDeparture)}<br>
+    প্রকৃতঃ ${sfiFmtTime(flight.actualDeparture)}`;
+  $("sfiArrDetails").innerHTML = `
+    টার্মিনালঃ ${escapeHtml(flight.arrivalTerminal || "—")} · গেটঃ ${escapeHtml(flight.arrivalGate || "—")}<br>
+    নির্ধারিতঃ ${sfiFmtTime(flight.scheduledArrival)}<br>
+    আনুমানিকঃ ${sfiFmtTime(flight.estimatedArrival)}<br>
+    প্রকৃতঃ ${sfiFmtTime(flight.actualArrival)}`;
+
+  // ✈️ অতিরিক্ত তথ্য — এয়ারক্রাফট + লাইভ পজিশন (থাকলে তবেই দেখানো হয়)
+  const extraLines = [];
+  if(flight.aircraft) extraLines.push(`এয়ারক্রাফটঃ ${escapeHtml(flight.aircraft)}`);
+  if(flight.latitude != null && flight.longitude != null) extraLines.push(`অবস্থানঃ ${flight.latitude.toFixed(2)}, ${flight.longitude.toFixed(2)}`);
+  if(flight.altitude != null) extraLines.push(`উচ্চতাঃ ${Math.round(flight.altitude)} মি.`);
+  if(flight.speed != null) extraLines.push(`গতিঃ ${Math.round(flight.speed)} কিমি/ঘণ্টা`);
+  if(extraLines.length > 0){
+    $("sfiExtraDetailsWrap").style.display = "block";
+    $("sfiExtraDetails").innerHTML = extraLines.join("<br>");
+  }else{
+    $("sfiExtraDetailsWrap").style.display = "none";
+  }
+
+  $("sfiUpdatedAt").textContent = flight.updatedAt ? new Date(flight.updatedAt).toLocaleString("bn-BD") : "—";
+  $("sfiDetailCard").style.display = "block";
+}
 
 /* ==================== 🤏 চেপে ধরে কনফার্ম করুন (Hold-to-Confirm) ====================
    গুরুত্বপূর্ণ/অপরিবর্তনীয় কাজে (যেমন "রক্ত পেয়ে গেছি", "আজ রক্ত দিয়েছি")

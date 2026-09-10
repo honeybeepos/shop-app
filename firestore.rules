@@ -449,5 +449,15 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+
+    // ✈️ Smart Flight Tracking — Phase 1 (Foundation + Core Flight)।
+    // flightCache শুধু functions/index.js-এর searchFlight Cloud Function
+    // (Admin SDK, rules বাইপাস করে) লেখে — ক্লায়েন্ট থেকে সরাসরি লেখা
+    // যাবে না, শুধু পড়া যাবে (যাতে ভবিষ্যতে ক্লায়েন্ট-সাইড ক্যাশ-হিট
+    // অপ্টিমাইজেশনও সম্ভব হয়)।
+    match /flightCache/{cacheId} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }
