@@ -405,8 +405,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenMarketFeed, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenTransportMedia, #screenSmartFlightInfo, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenMarketFeed.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenTransportMedia.active, #screenSmartFlightInfo.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
+  #screenHome, #screenMarkets, #screenMarketFeed, #screenShops, #screenCategories, #screenSubcategories, #screenSubSubcategories, #screenProducts, #screenTransport, #screenTransportMedia, #screenSmartFlightInfo, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenMarketFeed.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenSubSubcategories.active, #screenProducts.active, #screenTransport.active, #screenTransportMedia.active, #screenSmartFlightInfo.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
 
   /* 💬 Honey Messenger — সম্পূর্ণ ফুল-ভিউপোর্ট, Bazar-এর সীমাবদ্ধ width-এর
      বাইরে গিয়ে সম্পূর্ণ আলাদা একটা অ্যাপের মতো খোলে */
@@ -672,6 +672,15 @@
       <div id="currentCategoryName" style="font-size:14px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
     </div>
     <div class="serviceCardGrid" id="subcategoriesGrid"></div>
+  </div>
+
+  <!-- ধাপ ৪.৫: সাব-সাব-ক্যাটাগরি (POS-এ নেস্টেড ক্যাটাগরি থাকলেই এই ধাপ আসে, নাহলে স্কিপ হয়) -->
+  <div id="screenSubSubcategories">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+      <button class="backBtn" id="backToSubcategories" style="margin-bottom:0; flex-shrink:0;">← সাব-ক্যাটাগরিতে ফিরে যান</button>
+      <div id="currentSubcategoryName" style="font-size:14px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+    </div>
+    <div class="serviceCardGrid" id="subSubcategoriesGrid"></div>
   </div>
 
   <!-- ধাপ ৫: প্রোডাক্ট/স্টক -->
@@ -1793,7 +1802,7 @@ let userLatLng = null;
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
   if(id === "screenTransportMedia") tmListenFeed(); // 📢 Phase 6 — স্ক্রিন খুললেই লাইভ ফিড লোড হয়
   // ✈️ Smart Flight Tracking — অন্য কোনো স্ক্রিনে গেলে auto-refresh টাইমার
@@ -4788,18 +4797,21 @@ $("shopSearch").addEventListener("input", (e)=>{
 });
 
 $("backToShops").addEventListener("click", ()=>{
-  // প্রোডাক্ট স্ক্রিন থেকে সঠিক আগের স্ক্রিনে ফিরে যাওয়া — সাব-ক্যাটাগরি
-  // দিয়ে এসে থাকলে সাব-ক্যাটাগরিতে, ক্যাটাগরি দিয়ে এসে থাকলে ক্যাটাগরিতে,
-  // নাহলে সরাসরি দোকানের তালিকায়
-  if(currentSubId) showScreen("screenSubcategories");
+  // প্রোডাক্ট স্ক্রিন থেকে সঠিক আগের স্ক্রিনে ফিরে যাওয়া — সাব-সাব-ক্যাটাগরি দিয়ে
+  // এসে থাকলে সাব-সাব-ক্যাটাগরিতে, সাব-ক্যাটাগরি দিয়ে এসে থাকলে সাব-ক্যাটাগরিতে,
+  // ক্যাটাগরি দিয়ে এসে থাকলে ক্যাটাগরিতে, নাহলে সরাসরি দোকানের তালিকায়
+  if(currentSubSubId) showScreen("screenSubSubcategories");
+  else if(currentSubId) showScreen("screenSubcategories");
   else if(currentCatId) showScreen("screenCategories");
   else showScreen("screenShops");
 });
 $("backToShopsFromCat") && $("backToShopsFromCat").addEventListener("click", ()=> showScreen("screenShops"));
 $("backToCategories") && $("backToCategories").addEventListener("click", ()=> showScreen("screenCategories"));
+$("backToSubcategories") && $("backToSubcategories").addEventListener("click", ()=> showScreen("screenSubcategories"));
 
 /* ---------- ধাপ ৩: প্রোডাক্ট/স্টক ---------- */
-let currentCatId = null, currentSubId = null;
+let currentCatId = null, currentSubId = null, currentSubSubId = null;
+let currentSubName = null; // 🗂️ ব্রেডক্রাম্বে ব্যবহারের জন্য — সাব-সাব-ক্যাটাগরি বাছার সময় দরকার হয়
 
 window.selectShop = function(shopId){
   currentShopId = shopId;
@@ -4852,12 +4864,12 @@ async function loadCategories(shopId, shopName){
 
 window.selectCategory = function(catId, catName){
   currentCatId = catId;
+  currentSubId = null; currentSubSubId = null; currentSubName = null;
   $("currentCategoryName").textContent = catName;
   const cat = (window.__catsCache||[]).find(c=> c.id === catId);
   const subs = cat ? (cat.subs||[]) : [];
   if(subs.length === 0){
     // এই ক্যাটাগরির কোনো সাব-ক্যাটাগরি নেই — সরাসরি প্রোডাক্টে চলে যাওয়া
-    currentSubId = null;
     $("currentShopName").textContent = $("currentShopNameCat").textContent;
     showScreen("screenProducts");
     loadProducts(currentShopId);
@@ -4871,9 +4883,34 @@ window.selectCategory = function(catId, catName){
   showScreen("screenSubcategories");
 };
 
+/* 🗂️ সাব-ক্যাটাগরি বাছার পর — POS-এ এর ভিতরে নেস্টেড সাব-সাব-ক্যাটাগরি থাকলে (long-press
+   দিয়ে যোগ করা) আরেকটা ধাপ (screenSubSubcategories) দেখানো হয়; না থাকলে আগের মতোই
+   সরাসরি প্রোডাক্টে চলে যায় — পুরনো দোকান/প্রোডাক্টের সাথে ব্যাকওয়ার্ড-কম্প্যাটিবল */
 window.selectSubcategory = function(subId, subName){
   currentSubId = subId;
-  $("currentShopName").textContent = $("currentShopNameCat").textContent + " · " + subName;
+  currentSubName = subName;
+  currentSubSubId = null;
+  const cat = (window.__catsCache||[]).find(c=> c.id === currentCatId);
+  const sub = cat ? (cat.subs||[]).find(s=> s.id === subId) : null;
+  const subSubs = sub ? (sub.subs||[]) : [];
+  if(subSubs.length === 0){
+    $("currentShopName").textContent = $("currentShopNameCat").textContent + " · " + subName;
+    showScreen("screenProducts");
+    loadProducts(currentShopId);
+    return;
+  }
+  $("currentSubcategoryName").textContent = $("currentShopNameCat").textContent + " · " + subName;
+  $("subSubcategoriesGrid").innerHTML = subSubs.map(ss=> `
+    <div class="serviceCard" onclick="selectSubSubcategory('${ss.id}','${escapeHtml(ss.name||'').replace(/'/g,"")}')">
+      <div class="ic">${catPlaceholderIcon(ss.id)}</div>
+      <div class="lbl">${escapeHtml(ss.name || "সাব-ক্যাটাগরি")}</div>
+    </div>`).join("");
+  showScreen("screenSubSubcategories");
+};
+
+window.selectSubSubcategory = function(subSubId, subSubName){
+  currentSubSubId = subSubId;
+  $("currentShopName").textContent = $("currentShopNameCat").textContent + " · " + (currentSubName||"") + " · " + subSubName;
   showScreen("screenProducts");
   loadProducts(currentShopId);
 };
@@ -4925,7 +4962,8 @@ async function loadProducts(shopId){
       return;
     }
     let products = qs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    if(currentSubId) products = products.filter(p=> p.subId === currentSubId);
+    if(currentSubSubId) products = products.filter(p=> p.subSubId === currentSubSubId);
+    else if(currentSubId) products = products.filter(p=> p.subId === currentSubId);
     else if(currentCatId) products = products.filter(p=> p.catId === currentCatId);
     if(products.length === 0){
       $("productsList").innerHTML = '<div class="emptyMsg">এই ক্যাটাগরিতে এখনো কোনো প্রোডাক্ট নেই।</div>';

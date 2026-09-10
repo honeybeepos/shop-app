@@ -3645,8 +3645,21 @@
     #program-bcc .bccSubChip{
       display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:20px;
       background:rgba(255,255,255,0.07); font-size:12px; color:#dfe6ff; margin:4px 6px 0 0;
+      cursor:pointer; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
     }
     #program-bcc .bccSubChip button{ background:none; border:none; color:#f87171; cursor:pointer; font-size:12px; }
+    /* 🗂️ সাব-ক্যাটাগরির ভিতরে নেস্টেড সাব-সাব-ক্যাটাগরি — সাব-ক্যাটাগরি চিপে ট্যাপ করলে
+       এই লিস্ট খোলে/বন্ধ হয়, চেপে ধরে রাখলে (long-press) নতুন একটা যোগ করার মডাল খোলে */
+    #program-bcc .subSubList{ margin-top:0; max-height:0; overflow:hidden; transition:max-height .25s ease, margin-top .25s ease; padding-left:16px; width:100%; }
+    #program-bcc .subSubList.open{ margin-top:6px; max-height:300px; }
+    #program-bcc .bccSubSubChip{
+      display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border-radius:16px;
+      background:rgba(255,255,255,0.05); font-size:11px; color:#c9d1f0; margin:3px 5px 0 0;
+      border:1px dashed rgba(255,255,255,0.18);
+    }
+    #program-bcc .bccSubSubChip button{ background:none; border:none; color:#f87171; cursor:pointer; font-size:11px; }
+    #program-bcc .bccSubChipHint{ color:#8b94b8; font-size:10.5px; padding:4px 0; }
+    #program-bcc .bccSubChipWrap{ display:flex; flex-direction:column; align-items:flex-start; width:100%; }
 
     /* 🗂️ All Category — প্রি-বিল্ট ক্যাটাগরি টগল ড্যাশবোর্ড (ফুল-স্ক্রিন) */
     #bccAllCategoryOverlay{
@@ -4056,6 +4069,7 @@
         <label>🏷️ Category (Optional)</label><select id="bccPCat"></select>
         <p class="pin-desc" style="margin:2px 0 10px;">ক্যাটাগরি সিলেক্ট করা বাধ্যতামূলক (এটাই Invoice-এ Brand হিসেবে দেখানো হয়)।</p>
         <label>📂 Sub-Category</label><select id="bccPSub"></select>
+        <label>🗂️ Sub-Sub-Category (Optional)</label><select id="bccPSubSub"></select>
 
         <label>🏷️ প্রোডাক্টের ধরন</label>
         <select id="bccPType">
@@ -4189,6 +4203,17 @@
       <div class="bccModalBody">
         <label>Sub-Category Name</label><input id="bccSubNameInput" placeholder="যেমন: Display">
         <button class="bccBtnPrimary" id="bccSaveSubCategoryBtn" style="width:100%; margin-top:14px;">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-Sub-Category Modal — একটা সাব-ক্যাটাগরি চিপ চেপে ধরে (long-press) রাখলে খোলে -->
+  <div class="bccModalOverlay" id="bccSubSubCategoryModalOverlay">
+    <div class="bccModalBox">
+      <div class="bccModalHead"><h3 id="bccSubSubCategoryModalTitle">➕ Sub-Sub-Category</h3><button class="bccModalClose" id="bccSubSubCategoryModalClose">✕</button></div>
+      <div class="bccModalBody">
+        <label>Sub-Sub-Category Name</label><input id="bccSubSubNameInput" placeholder="যেমন: Cotton Shirt">
+        <button class="bccBtnPrimary" id="bccSaveSubSubCategoryBtn" style="width:100%; margin-top:14px;">Save</button>
       </div>
     </div>
   </div>
@@ -7755,6 +7780,7 @@ function bccAllCategorySelect(idx, subName){
   const catSel = document.getElementById('bccPCat');
   catSel.value = own.id;
   bccPopulateSubSelect(document.getElementById('bccPSub'), own.id, subId);
+  bccPopulateSubSubSelect(document.getElementById('bccPSubSub'), own.id, subId, '');
   toast('✅ Category বসানো হলো — এখন প্রোডাক্টের তথ্য দিন');
 }
 document.getElementById('bccOpenAllCategoryBtn').addEventListener('click', bccOpenAllCategoryDashboard);
@@ -8068,6 +8094,7 @@ async function bccSyncProductToBazar(p){
       barcode: p.code || null,
       catId: p.catId || null,
       subId: p.subId || null,
+      subSubId: p.subSubId || null,
       imageUrl: p.imageUrl || null, // 🖼️ Step 5 — Storage-এ আপলোড করা ছবি থাকলে Bazar-এও দেখা যাবে
       // 👕 প্রোডাক্টের ধরন ও কালার/সাইজ ভ্যারিয়েন্ট — এখনই Bazar-এ কালার/সাইজ সিলেকশন UI
       // বানানো না হলেও, ডেটাটা আগে থেকেই সিঙ্ক করে রাখা হচ্ছে যাতে ভবিষ্যতে Bazar-এর
@@ -8119,7 +8146,9 @@ async function bccSyncCategoriesToBazar(){
     cats.forEach(c=>{
       batch.set(catsRef.doc(c.id), {
         name: c.name,
-        subs: (c.subs||[]).map(s=> ({ id: s.id, name: s.name })),
+        // 🗂️ সাব-ক্যাটাগরির ভিতরের নেস্টেড সাব-সাব-ক্যাটাগরিও (s.subs) এখানে সিঙ্ক করা হচ্ছে,
+        // যাতে Honey Bee Bazar কাস্টমার-সাইডে তিন-লেভেল Category → Sub → Sub-Sub মেনু দেখাতে পারে
+        subs: (c.subs||[]).map(s=> ({ id: s.id, name: s.name, subs: (s.subs||[]).map(ss=> ({ id: ss.id, name: ss.name })) })),
         imageUrl: c.imageUrl || null, // 🖼️ POS থেকে আপলোড করা ক্যাটাগরি ছবি থাকলে Bazar-এও দেখা যাবে
         updatedAt: fbNow()
       });
@@ -8537,6 +8566,14 @@ function bccPopulateSubSelect(selectEl, catId, selectedSubId){
   const subs = cat ? cat.subs : [];
   selectEl.innerHTML = '<option value="">— নির্বাচন করুন —</option>' + subs.map(s=>`<option value="${s.id}" ${s.id===selectedSubId?'selected':''}>${escapeHtml(s.name)}</option>`).join('');
 }
+// 🗂️ Sub-Sub-Category সিলেক্ট — সাব-ক্যাটাগরির ভিতরে নেস্টেড থাকা তৃতীয় লেভেল (ঐচ্ছিক)
+function bccPopulateSubSubSelect(selectEl, catId, subId, selectedSubSubId){
+  const cats = bccLoadCategories();
+  const cat = cats.find(c=>c.id===catId);
+  const sub = cat ? (cat.subs||[]).find(s=>s.id===subId) : null;
+  const subSubs = sub ? (sub.subs||[]) : [];
+  selectEl.innerHTML = '<option value="">— নির্বাচন করুন —</option>' + subSubs.map(ss=>`<option value="${ss.id}" ${ss.id===selectedSubSubId?'selected':''}>${escapeHtml(ss.name)}</option>`).join('');
+}
 
 // --- products list + search ---
 let bccBulkMode = false;
@@ -8861,6 +8898,7 @@ function bccOpenProductModal(editId){
   document.getElementById('bccPCode').value = p ? (p.code||'') : '';
   bccPopulateCategorySelect(document.getElementById('bccPCat'), p ? p.catId : '');
   bccPopulateSubSelect(document.getElementById('bccPSub'), p ? p.catId : '', p ? p.subId : '');
+  bccPopulateSubSubSelect(document.getElementById('bccPSubSub'), p ? p.catId : '', p ? p.subId : '', p ? p.subSubId : '');
   document.getElementById('bccPUnit').value = p ? (p.unit||'pcs') : 'pcs';
   // 🏷️ প্রোডাক্টের ধরন — এডিট হলে সেভ করা productType, নতুন হলে দোকানের ডিফল্ট ধরন প্রি-সিলেক্ট
   document.getElementById('bccPType').value = p ? (p.productType || bccGetAppMode()) : bccGetAppMode();
@@ -9248,6 +9286,10 @@ async function bccIntegrateProductImage(shopId){
 
 document.getElementById('bccPCat').addEventListener('change', (e)=>{
   bccPopulateSubSelect(document.getElementById('bccPSub'), e.target.value, '');
+  bccPopulateSubSubSelect(document.getElementById('bccPSubSub'), e.target.value, '', '');
+});
+document.getElementById('bccPSub').addEventListener('change', (e)=>{
+  bccPopulateSubSubSelect(document.getElementById('bccPSubSub'), document.getElementById('bccPCat').value, e.target.value, '');
 });
 document.getElementById('bccPImage').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
@@ -9465,6 +9507,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
     code: document.getElementById('bccPCode').value.trim(),
     catId,
     subId: document.getElementById('bccPSub').value,
+    subSubId: document.getElementById('bccPSubSub').value,
     unit: enteredUnit,
     genericName: enteredGeneric || null,
     rackLocation: enteredRack || null,
@@ -9600,7 +9643,13 @@ function bccRenderCategories(){
         </div>
       </div>
       <div class="subList" id="subList-${c.id}">
-        ${c.subs.map(s=>`<span class="bccSubChip">${escapeHtml(s.name)} <button data-delsub="${c.id}|${s.id}">✕</button></span>`).join('') || '<div style="color:#8b94b8;font-size:12px;">কোনো সাব-ক্যাটাগরি নেই</div>'}
+        ${c.subs.map(s=>`
+          <div class="bccSubChipWrap">
+            <span class="bccSubChip" data-cat="${c.id}" data-sub="${s.id}">🏷️ ${escapeHtml(s.name)}${(s.subs&&s.subs.length)?` <b style="opacity:.65;">(${s.subs.length})</b>`:''} <button data-delsub="${c.id}|${s.id}">✕</button></span>
+            <div class="subSubList" id="subSubList-${c.id}-${s.id}">
+              ${(s.subs||[]).map(ss=>`<span class="bccSubSubChip">↳ ${escapeHtml(ss.name)} <button data-delsubsub="${c.id}|${s.id}|${ss.id}">✕</button></span>`).join('') || '<div class="bccSubChipHint">কোনো নেস্টেড ক্যাটাগরি নেই — এই সাব-ক্যাটাগরিটা চেপে ধরে রাখুন (long-press) নতুন যোগ করতে</div>'}
+            </div>
+          </div>`).join('') || '<div style="color:#8b94b8;font-size:12px;">কোনো সাব-ক্যাটাগরি নেই</div>'}
       </div>
     </div>
   `).join('');
@@ -9611,6 +9660,34 @@ function bccRenderCategories(){
   listEl.querySelectorAll('[data-editcat]').forEach(b=> b.addEventListener('click', (e)=>{ e.stopPropagation(); bccOpenCategoryModal(b.dataset.editcat); }));
   listEl.querySelectorAll('[data-delcat]').forEach(b=> b.addEventListener('click', (e)=>{ e.stopPropagation(); bccDeleteCategory(b.dataset.delcat); }));
   listEl.querySelectorAll('[data-delsub]').forEach(b=> b.addEventListener('click', (e)=>{ e.stopPropagation(); const parts=b.dataset.delsub.split('|'); bccDeleteSubCategory(parts[0],parts[1]); }));
+  listEl.querySelectorAll('[data-delsubsub]').forEach(b=> b.addEventListener('click', (e)=>{ e.stopPropagation(); const parts=b.dataset.delsubsub.split('|'); bccDeleteSubSubCategory(parts[0],parts[1],parts[2]); }));
+  // 🖐️ সাব-ক্যাটাগরি চিপে সাধারণ ট্যাপ করলে তার নেস্টেড (সাব-সাব-ক্যাটাগরি) লিস্ট
+  // খোলে/বন্ধ হয়, আর চেপে ধরে রাখলে (long-press ~550ms) নতুন সাব-সাব-ক্যাটাগরি
+  // যোগ করার মডাল খোলে — ঠিক POS-এর বাকি ক্যাটাগরি-তৈরির প্যাটার্নের মতোই
+  listEl.querySelectorAll('.bccSubChip[data-sub]').forEach(chip=>{
+    let pressTimer = null, longPressed = false;
+    const start = (e)=>{
+      if(e.target.closest('[data-delsub]')) return; // ✕ বাটনে চাপ ধরলে long-press ট্রিগার হবে না
+      longPressed = false;
+      pressTimer = setTimeout(()=>{
+        longPressed = true;
+        bccOpenSubSubCategoryModal(chip.dataset.cat, chip.dataset.sub);
+      }, 550);
+    };
+    const cancel = ()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; } };
+    chip.addEventListener('mousedown', start);
+    chip.addEventListener('touchstart', start, {passive:true});
+    chip.addEventListener('mouseup', cancel);
+    chip.addEventListener('mouseleave', cancel);
+    chip.addEventListener('touchend', cancel);
+    chip.addEventListener('touchmove', cancel);
+    chip.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-delsub]')) return;
+      if(longPressed){ longPressed = false; return; } // long-press শেষে যে click ইভেন্টও ফায়ার হয়, সেটা এড়ানো হচ্ছে
+      const subSubEl = document.getElementById('subSubList-'+chip.dataset.cat+'-'+chip.dataset.sub);
+      if(subSubEl) subSubEl.classList.toggle('open');
+    });
+  });
 }
 
 let bccEditingCatId = null;
@@ -9772,6 +9849,50 @@ async function bccDeleteSubCategory(catId, subId){
   const cats = bccLoadCategories();
   const c = cats.find(x=>x.id===catId);
   if(c) c.subs = c.subs.filter(s=>s.id!==subId);
+  bccSaveCategories(cats);
+  bccRenderCategories(); bccRenderOverview();
+}
+
+// ==================== 🗂️ Sub-Sub-Category — সাব-ক্যাটাগরির ভিতরে আরেকটা নেস্টেড লেভেল ====================
+// সাব-ক্যাটাগরি চিপ চেপে ধরে রাখলে (long-press, bccRenderCategories-এ) এই মডাল খোলে।
+// ডেটা-মডেল: category.subs[i].subs = [{id, name}] — ঠিক category.subs-এর মতোই একই প্যাটার্ন,
+// শুধু একধাপ গভীরে। প্রোডাক্টের সাথেও যুক্ত (Add Product ফর্মে bccPSubSub সিলেক্টর)।
+let bccPendingSubSubParentCatId = null;
+let bccPendingSubSubParentSubId = null;
+function bccOpenSubSubCategoryModal(catId, subId){
+  bccPendingSubSubParentCatId = catId;
+  bccPendingSubSubParentSubId = subId;
+  const cats = bccLoadCategories();
+  const c = cats.find(x=>x.id===catId);
+  const s = c ? c.subs.find(x=>x.id===subId) : null;
+  document.getElementById('bccSubSubCategoryModalTitle').textContent = '➕ Sub-Sub-Category — ' + (s?s.name:'');
+  document.getElementById('bccSubSubNameInput').value = '';
+  document.getElementById('bccSubSubCategoryModalOverlay').classList.add('show');
+}
+document.getElementById('bccSubSubCategoryModalClose').addEventListener('click', ()=> document.getElementById('bccSubSubCategoryModalOverlay').classList.remove('show'));
+document.getElementById('bccSaveSubSubCategoryBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('bccSubSubNameInput').value.trim();
+  if(!name){ toast('সাব-সাব-ক্যাটাগরির নাম দিন'); return; }
+  const cats = bccLoadCategories();
+  const c = cats.find(x=>x.id===bccPendingSubSubParentCatId);
+  const s = c ? c.subs.find(x=>x.id===bccPendingSubSubParentSubId) : null;
+  if(s){
+    if(!s.subs) s.subs = [];
+    s.subs.push({id: bccUid(), name});
+  }
+  bccSaveCategories(cats);
+  document.getElementById('bccSubSubCategoryModalOverlay').classList.remove('show');
+  toast('সাব-সাব-ক্যাটাগরি যোগ হয়েছে ✅');
+  bccRenderCategories(); bccRenderOverview();
+});
+async function bccDeleteSubSubCategory(catId, subId, subSubId){
+  const entered = await openPinModal('পাসওয়ার্ড দিন', 'এই সাব-সাব-ক্যাটাগরি ডিলিট করার জন্য পাসওয়ার্ড দিন।');
+  if(entered === null) return;
+  if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, ডিলিট হয়নি'); return; }
+  const cats = bccLoadCategories();
+  const c = cats.find(x=>x.id===catId);
+  const s = c ? c.subs.find(x=>x.id===subId) : null;
+  if(s && s.subs) s.subs = s.subs.filter(ss=>ss.id!==subSubId);
   bccSaveCategories(cats);
   bccRenderCategories(); bccRenderOverview();
 }
