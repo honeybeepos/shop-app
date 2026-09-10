@@ -4498,8 +4498,8 @@ function mfBounceCartIcon(){
   setTimeout(()=> el.classList.remove("mfBounce"), 600);
 }
 
-window.mfAddToCartAnimated = function(btn, productId, productName, price, shopId, shopName){
-  addToCart(productId, productName, price, { shopId, shopName });
+window.mfAddToCartAnimated = function(btn, productId, productName, price, shopId, shopName, variantColor, variantSize){
+  addToCart(productId, productName, price, { shopId, shopName }, variantColor, variantSize);
   mfPlayAddAnim(btn);
   mfBounceCartIcon();
 };
@@ -4517,6 +4517,12 @@ function mfCardHTML(p, idx){
   const safeShopName = escapeHtml(p.__shopName||'').replace(/'/g,"");
   const favs = (currentCustomer && currentCustomer.favoriteProducts) || [];
   const isFav = favs.includes(p.id);
+  // 👕 কালার/সাইজ ভ্যারিয়েন্ট প্রোডাক্টে গ্রিড থেকে সরাসরি "🛒" চেপে কার্টে যোগ করা যায় না —
+  // আগে ডিটেইল পেজে গিয়ে রং/সাইজ বেছে নিতে হয়, তাই এই বাটন ডিটেইল পেজ খুলে দেয়
+  const isVariant = p.productType === "variant" && p.variants && p.variants.length;
+  const cartBtnClick = isVariant
+    ? `event.stopPropagation(); hbOpenMarketProductDetail('${p.__shopId}','${p.id}')`
+    : `event.stopPropagation(); mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}')`;
   return `
     <div class="pCard mfCard ${om.highlight ? 'mfGlow' : ''}" style="animation-delay:${Math.min(idx,12)*0.035}s;">
       <div class="pCardImgWrap" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">
@@ -4526,7 +4532,7 @@ function mfCardHTML(p, idx){
           ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
         </div>
         <span class="pCardFav" onclick="mfToggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
-        <button class="mfCartBtn" ${outOfStock ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''} onclick="event.stopPropagation(); mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}')">🛒</button>
+        <button class="mfCartBtn" ${outOfStock ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''} onclick="${cartBtnClick}">${isVariant ? "👕" : "🛒"}</button>
       </div>
       <div class="pCardBody">
         <div class="pCardName" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
@@ -4552,37 +4558,116 @@ function renderMarketFeed(){
   gridEl.innerHTML = list.map((p,i)=> mfCardHTML(p,i)).join("");
 }
 
+/* ---------- 👕 কালার/সাইজ ভ্যারিয়েন্ট সিলেক্টর (প্রোডাক্ট ডিটেইল পেজ) ----------
+   POS-সাইডে (shop-ledger-app.html) গার্মেন্টস-জাতীয় প্রোডাক্টে রং+সাইজ-ভিত্তিক
+   আলাদা স্টক রাখা যায় (p.productType==="variant", p.variants=[{color,size,qty}]) —
+   এখানে সেই একই ডেটা দিয়ে কাস্টমারকে রং তারপর সাইজ বেছে নিতে দেওয়া হয় (স্টক
+   শেষ সাইজ ধূসর/disabled), এবং যতক্ষণ না দুটোই বেছে নেওয়া হয় ততক্ষণ Add to
+   Cart/Buy Now বাটন বন্ধ থাকে — যাতে কোন নির্দিষ্ট ভ্যারিয়েন্ট অর্ডার হচ্ছে
+   সেটা সবসময় স্পষ্ট থাকে। hbOpenProductDetail ও hbOpenMarketProductDetail
+   দুটোতেই এই একই হেল্পার ব্যবহার হয়। */
+let __hbDetailSelectedVariant = { color: null, size: null };
+function hbVariantColorSwatchStyle(colorName){
+  // ইউজারের দেওয়া রং-এর নাম (Yellow, Blue ইত্যাদি) বেশিরভাগ ক্ষেত্রে সরাসরি
+  // বৈধ CSS কালার-নাম — না মিললে ব্রাউজার এমনিতেই উপেক্ষা করবে, তখন শুধু
+  // লেখা নামটাই (বাটনের টেক্সটে) দেখা যাবে
+  const safe = (colorName||"").toLowerCase().replace(/[^a-z]/g,"");
+  return `background:${safe || "#999"};`;
+}
+function hbVariantPickerHTML(p){
+  if(!(p.productType === "variant" && p.variants && p.variants.length)) return "";
+  const colors = [...new Set(p.variants.map(v=> v.color))];
+  const selColor = __hbDetailSelectedVariant.color;
+  const sizesForColor = selColor ? p.variants.filter(v=> v.color === selColor) : [];
+  return `
+    <div class="hbVariantPicker" style="margin-bottom:14px;">
+      <div style="font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;">🎨 রং বেছে নিন</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+        ${colors.map(c=> `
+          <button type="button" class="hbVariantColorBtn" data-color="${escapeHtml(c)}" style="display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; border:2px solid ${selColor===c?"var(--amber)":"var(--border)"}; background:${selColor===c?"rgba(245,166,35,0.12)":"transparent"}; color:#fff8e8; font-size:12.5px; font-family:inherit; cursor:pointer;">
+            <span style="width:15px; height:15px; border-radius:50%; border:1px solid rgba(255,255,255,0.35); ${hbVariantColorSwatchStyle(c)}"></span>${escapeHtml(c)}
+          </button>`).join("")}
+      </div>
+      <div style="font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;">📏 সাইজ বেছে নিন</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        ${selColor ? sizesForColor.map(v=>{
+            const out = (Number(v.qty)||0) <= 0;
+            const selected = __hbDetailSelectedVariant.size === v.size;
+            return `<button type="button" class="hbVariantSizeBtn" ${out?"disabled":""} data-size="${escapeHtml(v.size)}" style="padding:7px 14px; border-radius:10px; border:2px solid ${selected?"var(--amber)":"var(--border)"}; background:${selected?"rgba(245,166,35,0.12)":"transparent"}; color:${out?"var(--muted)":"#fff8e8"}; font-size:12.5px; font-weight:700; font-family:inherit; cursor:${out?"not-allowed":"pointer"}; opacity:${out?"0.45":"1"};">${escapeHtml(v.size)}${out?" (নেই)":""}</button>`;
+          }).join("")
+          : `<span style="font-size:12px; color:var(--muted);">আগে রং বেছে নিন</span>`}
+      </div>
+    </div>`;
+}
+// প্রতিটা রং/সাইজ বাটনে ক্লিক-হ্যান্ডলার জোড়া দেয় — renderFn আবার কল করে পুরো
+// ডিটেইল বডি রিফ্রেশ করে (নতুন সিলেকশন-স্টেট সহ), যাতে সাইজ-তালিকা ও
+// Add/Buy বাটনের enabled/disabled অবস্থা সবসময় সিলেকশনের সাথে মিলে থাকে
+function hbWireVariantPicker(renderFn){
+  const body = $("hbProductDetailBody");
+  body.querySelectorAll(".hbVariantColorBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      __hbDetailSelectedVariant = { color: btn.dataset.color, size: null };
+      renderFn();
+    });
+  });
+  body.querySelectorAll(".hbVariantSizeBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      __hbDetailSelectedVariant.size = btn.dataset.size;
+      renderFn();
+    });
+  });
+}
+
 window.hbOpenMarketProductDetail = function(shopId, productId){
   const p = marketFeedProducts.find(x=> x.id === productId && x.__shopId === shopId);
   if(!p) return;
-  const om = hbGetOfferMeta(p);
-  const qty = Number(p.stockQty);
-  let stockClass = "in", stockLabel = "স্টকে আছে";
-  if(!isNaN(qty)){
-    if(qty <= 0){ stockClass = "out"; stockLabel = "স্টক নেই"; }
-    else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
-    else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
-  }
-  const outOfStock = stockClass === "out";
-  const cur = p.__cur || '৳';
-  const safeName = escapeHtml(p.name||'').replace(/'/g,"");
-  const safeShopName = escapeHtml(p.__shopName||'').replace(/'/g,"");
-  $("hbProductDetailBody").innerHTML = `
-    <div class="pDetailImgWrap">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
-    <div style="font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:4px;">🏪 ${escapeHtml(p.__shopName||"দোকান")}${p.__shopArea ? ' · 📍 '+escapeHtml(p.__shopArea) : ''}</div>
-    <div style="font-size:17px; font-weight:800; margin-bottom:8px;">${om.highlight ? '<span style="color:#fbbf24;">⭐</span> ' : ''}${escapeHtml(p.name||"প্রোডাক্ট")}</div>
-    <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">
-      <span style="font-size:22px; font-weight:800; color:var(--amber);">${cur}${om.finalPrice}</span>
-      ${om.hasDiscount ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${cur}${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#e2543d; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : (om.genericOffer ? `<span style="font-size:11px; background:rgba(220,38,38,0.15); color:#e2543d; padding:2px 8px; border-radius:8px; font-weight:800;">${om.badgeText}</span>` : "")}
-    </div>
-    ${om.genericOffer && om.offerNote ? `<div style="font-size:12.5px; color:var(--amber); margin-bottom:8px;">🎁 ${escapeHtml(om.offerNote)}</div>` : ""}
-    <div class="pCardStock ${stockClass}" style="font-size:12px; margin-bottom:14px;">${stockLabel}</div>
-    ${p.description ? `<div style="font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
-    <div style="display:flex; gap:10px;">
-      <button ${outOfStock ? "disabled" : ""} onclick="mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}')" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🛒 Add to Cart</button>
-      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'}); $('hbProductDetailModal').style.display='none'; hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
-    </div>
-  `;
+  __hbDetailSelectedVariant = { color: null, size: null }; // নতুন প্রোডাক্ট খোলার সময় আগের সিলেকশন রিসেট
+  const isVariant = p.productType === "variant" && p.variants && p.variants.length;
+  const render = ()=>{
+    const om = hbGetOfferMeta(p);
+    const qty = Number(p.stockQty);
+    let stockClass = "in", stockLabel = "স্টকে আছে";
+    if(!isNaN(qty)){
+      if(qty <= 0){ stockClass = "out"; stockLabel = "স্টক নেই"; }
+      else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
+      else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
+    }
+    // 👕 ভ্যারিয়েন্ট প্রোডাক্টে সামগ্রিক স্টকের বদলে, ঠিক যে রং/সাইজ বেছে নেওয়া
+    // হয়েছে তার নিজস্ব স্টক দিয়েই Add/Buy বাটন enable/disable হয়
+    let variantChosen = true, variantHasStock = true;
+    if(isVariant){
+      variantChosen = !!(__hbDetailSelectedVariant.color && __hbDetailSelectedVariant.size);
+      if(variantChosen){
+        const v = p.variants.find(x=> x.color===__hbDetailSelectedVariant.color && x.size===__hbDetailSelectedVariant.size);
+        variantHasStock = !!(v && (Number(v.qty)||0) > 0);
+      }
+    }
+    const outOfStock = isVariant ? !(variantChosen && variantHasStock) : (stockClass === "out");
+    const cur = p.__cur || '৳';
+    const safeName = escapeHtml(p.name||'').replace(/'/g,"");
+    const safeShopName = escapeHtml(p.__shopName||'').replace(/'/g,"");
+    const vColor = escapeHtml(__hbDetailSelectedVariant.color||"").replace(/'/g,"");
+    const vSize = escapeHtml(__hbDetailSelectedVariant.size||"").replace(/'/g,"");
+    const buyLabel = isVariant && !variantChosen ? "রং/সাইজ বেছে নিন" : (outOfStock ? "স্টক নেই" : "⚡ Buy Now");
+    $("hbProductDetailBody").innerHTML = `
+      <div class="pDetailImgWrap">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
+      <div style="font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:4px;">🏪 ${escapeHtml(p.__shopName||"দোকান")}${p.__shopArea ? ' · 📍 '+escapeHtml(p.__shopArea) : ''}</div>
+      <div style="font-size:17px; font-weight:800; margin-bottom:8px;">${om.highlight ? '<span style="color:#fbbf24;">⭐</span> ' : ''}${escapeHtml(p.name||"প্রোডাক্ট")}</div>
+      <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">
+        <span style="font-size:22px; font-weight:800; color:var(--amber);">${cur}${om.finalPrice}</span>
+        ${om.hasDiscount ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${cur}${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#e2543d; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : (om.genericOffer ? `<span style="font-size:11px; background:rgba(220,38,38,0.15); color:#e2543d; padding:2px 8px; border-radius:8px; font-weight:800;">${om.badgeText}</span>` : "")}
+      </div>
+      ${om.genericOffer && om.offerNote ? `<div style="font-size:12.5px; color:var(--amber); margin-bottom:8px;">🎁 ${escapeHtml(om.offerNote)}</div>` : ""}
+      ${isVariant ? hbVariantPickerHTML(p) : `<div class="pCardStock ${stockClass}" style="font-size:12px; margin-bottom:14px;">${stockLabel}</div>`}
+      ${p.description ? `<div style="font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
+      <div style="display:flex; gap:10px;">
+        <button ${outOfStock ? "disabled" : ""} onclick="mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}','${vColor}','${vSize}')" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; opacity:${outOfStock?"0.5":"1"};">🛒 Add to Cart</button>
+        <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'},'${vColor}','${vSize}'); $('hbProductDetailModal').style.display='none'; hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; opacity:${outOfStock?"0.5":"1"};">${buyLabel}</button>
+      </div>
+    `;
+    if(isVariant) hbWireVariantPicker(render);
+  };
+  render();
   $("hbProductDetailModal").style.display = "flex";
 };
 
@@ -4884,6 +4969,9 @@ function renderProducts(products){
     const om = hbGetOfferMeta(p);
     const isFav = favs.includes(p.id);
     const outOfStock = stockClass === "out";
+    // 👕 ভ্যারিয়েন্ট (রং/সাইজ) প্রোডাক্টে গ্রিড থেকে সরাসরি কার্টে যোগ করা যায় না —
+    // আগে ডিটেইল পেজে গিয়ে রং/সাইজ বেছে নিতে হবে
+    const isVariant = p.productType === "variant" && p.variants && p.variants.length;
     return `
       <div class="pCard">
         <div class="pCardImgWrap" id="pimg-${p.id}" onclick="hbOpenProductDetail('${p.id}')">
@@ -4901,9 +4989,9 @@ function renderProducts(products){
             ${om.hasDiscount ? `<span class="pCardOldPrice">${HB_CUR}${p.price}</span>` : ""}
           </div>
           <div class="pCardStock ${stockClass}">${stockLabel}</div>
-          <button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${om.finalPrice})">
-            ${outOfStock ? "স্টক নেই" : "🛒 Add to Cart"}
-          </button>
+          ${isVariant
+            ? `<button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="hbOpenProductDetail('${p.id}')">${outOfStock ? "স্টক নেই" : "👕 রং/সাইজ বেছে নিন"}</button>`
+            : `<button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${om.finalPrice})">${outOfStock ? "স্টক নেই" : "🛒 Add to Cart"}</button>`}
         </div>
       </div>`;
   }).join("");
@@ -4913,44 +5001,62 @@ function renderProducts(products){
 window.hbOpenProductDetail = function(productId){
   const p = __hbCurrentProductsList.find(x=> x.id === productId);
   if(!p) return;
-  const qty = Number(p.stockQty);
-  let stockClass = "in", stockLabel = "স্টকে আছে";
-  if(!isNaN(qty)){
-    if(qty <= 0){ stockClass = "out"; stockLabel = "স্টক নেই"; }
-    else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
-    else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
-  }
-  const om = hbGetOfferMeta(p);
-  const outOfStock = stockClass === "out";
-  const favs = (currentCustomer && currentCustomer.favoriteProducts) || [];
-  const isFav = favs.includes(p.id);
+  __hbDetailSelectedVariant = { color: null, size: null }; // নতুন প্রোডাক্ট খোলার সময় আগের সিলেকশন রিসেট
+  const isVariant = p.productType === "variant" && p.variants && p.variants.length;
+  const render = ()=>{
+    const qty = Number(p.stockQty);
+    let stockClass = "in", stockLabel = "স্টকে আছে";
+    if(!isNaN(qty)){
+      if(qty <= 0){ stockClass = "out"; stockLabel = "স্টক নেই"; }
+      else if(qty <= 5){ stockClass = "low"; stockLabel = "কম আছে (" + qty + ")"; }
+      else{ stockClass = "in"; stockLabel = "স্টকে আছে (" + qty + ")"; }
+    }
+    const om = hbGetOfferMeta(p);
+    let variantChosen = true, variantHasStock = true;
+    if(isVariant){
+      variantChosen = !!(__hbDetailSelectedVariant.color && __hbDetailSelectedVariant.size);
+      if(variantChosen){
+        const v = p.variants.find(x=> x.color===__hbDetailSelectedVariant.color && x.size===__hbDetailSelectedVariant.size);
+        variantHasStock = !!(v && (Number(v.qty)||0) > 0);
+      }
+    }
+    const outOfStock = isVariant ? !(variantChosen && variantHasStock) : (stockClass === "out");
+    const favs = (currentCustomer && currentCustomer.favoriteProducts) || [];
+    const isFav = favs.includes(p.id);
+    const vColor = escapeHtml(__hbDetailSelectedVariant.color||"").replace(/'/g,"");
+    const vSize = escapeHtml(__hbDetailSelectedVariant.size||"").replace(/'/g,"");
+    const safeName = escapeHtml(p.name||"").replace(/'/g,"");
+    const buyLabel = isVariant && !variantChosen ? "রং/সাইজ বেছে নিন" : (outOfStock ? "স্টক নেই" : "⚡ Buy Now");
 
-  $("hbProductDetailBody").innerHTML = `
-    <div class="pDetailImgWrap" id="pdimg-${p.id}">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
-    <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;">
-      <div style="flex:1; font-size:17px; font-weight:800;">${om.highlight ? '<span style="color:#fbbf24;">⭐</span> ' : ''}${escapeHtml(p.name||"প্রোডাক্ট")}</div>
-      <span class="pCardFav" style="position:static;" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
-    </div>
-    <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">
-      <span style="font-size:22px; font-weight:800; color:var(--amber);">${HB_CUR}${om.finalPrice}</span>
-      ${om.hasDiscount ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${HB_CUR}${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : (om.genericOffer ? `<span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">${om.badgeText}</span>` : "")}
-    </div>
-    ${om.genericOffer && om.offerNote ? `<div style="font-size:12.5px; color:var(--amber); margin-bottom:8px;">🎁 ${escapeHtml(om.offerNote)}</div>` : ""}
-    <div class="pCardStock ${stockClass}" style="font-size:12px; margin-bottom:14px;">${stockLabel}</div>
-    ${p.description ? `<div style="font-size:13px; color:#ddd; line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
-    <div style="display:flex; gap:10px;">
-      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${om.finalPrice})" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">🛒 Add to Cart</button>
-      <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${om.finalPrice}); hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">${outOfStock ? "স্টক নেই" : "⚡ Buy Now"}</button>
-    </div>
-  `;
+    $("hbProductDetailBody").innerHTML = `
+      <div class="pDetailImgWrap" id="pdimg-${p.id}">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
+      <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;">
+        <div style="flex:1; font-size:17px; font-weight:800;">${om.highlight ? '<span style="color:#fbbf24;">⭐</span> ' : ''}${escapeHtml(p.name||"প্রোডাক্ট")}</div>
+        <span class="pCardFav" style="position:static;" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">
+        <span style="font-size:22px; font-weight:800; color:var(--amber);">${HB_CUR}${om.finalPrice}</span>
+        ${om.hasDiscount ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${HB_CUR}${p.price}</span><span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">🔥 অফার</span>` : (om.genericOffer ? `<span style="font-size:11px; background:rgba(220,38,38,0.15); color:#f87171; padding:2px 8px; border-radius:8px; font-weight:800;">${om.badgeText}</span>` : "")}
+      </div>
+      ${om.genericOffer && om.offerNote ? `<div style="font-size:12.5px; color:var(--amber); margin-bottom:8px;">🎁 ${escapeHtml(om.offerNote)}</div>` : ""}
+      ${isVariant ? hbVariantPickerHTML(p) : `<div class="pCardStock ${stockClass}" style="font-size:12px; margin-bottom:14px;">${stockLabel}</div>`}
+      ${p.description ? `<div style="font-size:13px; color:#ddd; line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
+      <div style="display:flex; gap:10px;">
+        <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},null,'${vColor}','${vSize}')" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; opacity:${outOfStock?"0.5":"1"};">🛒 Add to Cart</button>
+        <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},null,'${vColor}','${vSize}'); hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; opacity:${outOfStock?"0.5":"1"};">${buyLabel}</button>
+      </div>
+    `;
+    // 🖼️ গ্রিড কার্ডে ছবি ইতিমধ্যে লোড হয়ে থাকলে সেটাই কপি করা হয় (আবার নেটওয়ার্ক কল না করে)
+    const gridImgEl = document.getElementById(`pimg-${p.id}`);
+    const detailImgEl = document.getElementById(`pdimg-${p.id}`);
+    if(gridImgEl && detailImgEl && gridImgEl.querySelector("img")){
+      const innerEl = gridImgEl.querySelector(".pCardImgInner");
+      detailImgEl.innerHTML = innerEl ? innerEl.innerHTML : gridImgEl.innerHTML;
+    }
+    if(isVariant) hbWireVariantPicker(render);
+  };
+  render();
   $("hbProductDetailModal").style.display = "flex";
-  // 🖼️ গ্রিড কার্ডে ছবি ইতিমধ্যে লোড হয়ে থাকলে সেটাই কপি করা হয় (আবার নেটওয়ার্ক কল না করে)
-  const gridImgEl = document.getElementById(`pimg-${p.id}`);
-  const detailImgEl = document.getElementById(`pdimg-${p.id}`);
-  if(gridImgEl && detailImgEl && gridImgEl.querySelector("img")){
-    const innerEl = gridImgEl.querySelector(".pCardImgInner");
-    detailImgEl.innerHTML = innerEl ? innerEl.innerHTML : gridImgEl.innerHTML;
-  }
 };
 $("hbProductDetailCloseBtn").addEventListener("click", ()=> $("hbProductDetailModal").style.display = "none");
 
@@ -4992,7 +5098,7 @@ function hbCartBadgeUpdate(){
   else{ badge.style.display = "none"; }
 }
 
-window.addToCart = function(productId, productName, price, shopOverride){
+window.addToCart = function(productId, productName, price, shopOverride, variantColor, variantSize){
   if(!currentCustomer){ alert("Cart-এ যোগ করতে আগে Google দিয়ে লগইন করুন (☰ Menu থেকে)।"); return; }
   // 🛒 shopOverride ঐচ্ছিক — না দিলে আগের মতোই currentShopId (বর্তমানে
   // যে দোকানের পাতায় আছেন) ব্যবহার হয়, কোনো বিদ্যমান কল-সাইট প্রভাবিত হয়নি।
@@ -5000,25 +5106,37 @@ window.addToCart = function(productId, productName, price, shopOverride){
   // নাহলে ভুল দোকানের সাথে প্রোডাক্ট জুড়ে যেত।
   const shopId = (shopOverride && shopOverride.shopId) || currentShopId;
   const shopName = (shopOverride && shopOverride.shopName) || $("currentShopName").textContent || "দোকান";
+  // 👕 কালার/সাইজ ভ্যারিয়েন্ট — খালি স্ট্রিং এলে null ধরা হয় (onclick attribute
+  // দিয়ে পাস করার সময় খালি স্ট্রিং আসতে পারে, নন-ভ্যারিয়েন্ট প্রোডাক্টে)
+  variantColor = variantColor || null;
+  variantSize = variantSize || null;
   const items = hbCartGet();
-  const existing = items.find(it=> it.productId === productId && it.shopId === shopId);
+  // ভ্যারিয়েন্ট প্রোডাক্টে রং+সাইজ মিললে তবেই একই কার্ট-লাইন ধরা হয় — নাহলে
+  // এক শার্টের দুই সাইজ ভুলে একসাথে মিশে যেত
+  const existing = items.find(it=> it.productId === productId && it.shopId === shopId
+    && (it.variantColor||null) === variantColor && (it.variantSize||null) === variantSize);
   if(existing) existing.qty += 1;
-  else items.push({ shopId, shopName, productId, productName, price: Number(price)||0, qty: 1 });
+  else items.push({ shopId, shopName, productId, productName, price: Number(price)||0, qty: 1, variantColor, variantSize });
   hbCartSet(items);
-  if(!shopOverride) alert(`✅ "${productName}" Cart-এ যোগ হয়েছে।`); // Assistant নিজে চ্যাটে কনফার্ম করে, তাই alert ডুপ্লিকেট করা হয় না
+  const variantSuffix = variantColor ? ` (${variantColor}/${variantSize})` : "";
+  if(!shopOverride) alert(`✅ "${productName}"${variantSuffix} Cart-এ যোগ হয়েছে।`); // Assistant নিজে চ্যাটে কনফার্ম করে, তাই alert ডুপ্লিকেট করা হয় না
 };
 
-function hbCartQtyChange(shopId, productId, delta){
+function hbCartQtyChange(shopId, productId, delta, variantColor, variantSize){
+  variantColor = variantColor || null; variantSize = variantSize || null;
   const items = hbCartGet();
-  const item = items.find(it=> it.productId === productId && it.shopId === shopId);
+  const item = items.find(it=> it.productId === productId && it.shopId === shopId
+    && (it.variantColor||null) === variantColor && (it.variantSize||null) === variantSize);
   if(!item) return;
   item.qty += delta;
   const finalItems = item.qty <= 0 ? items.filter(it=> it !== item) : items;
   hbCartSet(finalItems);
   hbCartRenderItems();
 }
-function hbCartRemove(shopId, productId){
-  const items = hbCartGet().filter(it=> !(it.productId === productId && it.shopId === shopId));
+function hbCartRemove(shopId, productId, variantColor, variantSize){
+  variantColor = variantColor || null; variantSize = variantSize || null;
+  const items = hbCartGet().filter(it=> !(it.productId === productId && it.shopId === shopId
+    && (it.variantColor||null) === variantColor && (it.variantSize||null) === variantSize));
   hbCartSet(items);
   hbCartRenderItems();
 }
@@ -5041,16 +5159,17 @@ function hbCartRenderItems(){
     const rows = shopItems.map(it=>{
       const lineTotal = it.price * it.qty;
       total += lineTotal;
+      const variantLabel = it.variantColor ? ` (${escapeHtml(it.variantColor)}/${escapeHtml(it.variantSize)})` : "";
       return `
         <div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
           <div style="flex:1; min-width:0;">
-            <div style="font-size:13px; font-weight:700;">${escapeHtml(it.productName)}</div>
+            <div style="font-size:13px; font-weight:700;">${escapeHtml(it.productName)}${variantLabel}</div>
             <div style="font-size:11.5px; color:var(--muted);">${HB_CUR}${it.price} × ${it.qty} = ${HB_CUR}${lineTotal}</div>
           </div>
-          <button class="hbCartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-delta="-1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">−</button>
+          <button class="hbCartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-color="${it.variantColor||''}" data-size="${it.variantSize||''}" data-delta="-1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">−</button>
           <span style="font-weight:800; font-size:13px; min-width:18px; text-align:center;">${it.qty}</span>
-          <button class="hbCartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-delta="1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">+</button>
-          <span class="hbCartRemoveBtn" data-shop="${shopId}" data-pid="${it.productId}" style="color:#f87171; font-size:16px; cursor:pointer; padding:0 4px;">✕</span>
+          <button class="hbCartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-color="${it.variantColor||''}" data-size="${it.variantSize||''}" data-delta="1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">+</button>
+          <span class="hbCartRemoveBtn" data-shop="${shopId}" data-pid="${it.productId}" data-color="${it.variantColor||''}" data-size="${it.variantSize||''}" style="color:#f87171; font-size:16px; cursor:pointer; padding:0 4px;">✕</span>
         </div>`;
     }).join("");
     return `
@@ -5064,10 +5183,10 @@ function hbCartRenderItems(){
   $("hbCartSummary").style.display = "block";
 
   listEl.querySelectorAll(".hbCartQtyBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=> hbCartQtyChange(btn.dataset.shop, btn.dataset.pid, Number(btn.dataset.delta)));
+    btn.addEventListener("click", ()=> hbCartQtyChange(btn.dataset.shop, btn.dataset.pid, Number(btn.dataset.delta), btn.dataset.color, btn.dataset.size));
   });
   listEl.querySelectorAll(".hbCartRemoveBtn").forEach(el=>{
-    el.addEventListener("click", ()=> hbCartRemove(el.dataset.shop, el.dataset.pid));
+    el.addEventListener("click", ()=> hbCartRemove(el.dataset.shop, el.dataset.pid, el.dataset.color, el.dataset.size));
   });
 }
 
@@ -5086,6 +5205,9 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
   try{
     await Promise.all(items.map(it=> db.collection("orderRequests").add({
       shopId: it.shopId, productId: it.productId, productName: it.productName,
+      // 👕 কালার/সাইজ ভ্যারিয়েন্ট প্রোডাক্ট অর্ডার হলে দোকানদার যেন ঠিক কোন
+      // রং/সাইজ পাঠাতে হবে সেটা জানতে পারেন
+      variantColor: it.variantColor || null, variantSize: it.variantSize || null,
       customerUid: currentCustomer.uid, customerName: currentCustomer.name || "কাস্টমার",
       deliveryAddress, deliveryPhone,
       deliveryLat: __hbDeliveryGpsCoords ? __hbDeliveryGpsCoords.lat : null,
