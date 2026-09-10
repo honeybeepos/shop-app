@@ -405,8 +405,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenMarketFeed, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenMarketFeed.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
+  #screenHome, #screenMarkets, #screenMarketFeed, #screenShops, #screenCategories, #screenSubcategories, #screenProducts, #screenTransport, #screenTransportMedia, #screenSmartFlightInfo, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenMarketFeed.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenProducts.active, #screenTransport.active, #screenTransportMedia.active, #screenSmartFlightInfo.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
 
   /* 💬 Honey Messenger — সম্পূর্ণ ফুল-ভিউপোর্ট, Bazar-এর সীমাবদ্ধ width-এর
      বাইরে গিয়ে সম্পূর্ণ আলাদা একটা অ্যাপের মতো খোলে */
@@ -704,6 +704,14 @@
       <span style="color:var(--muted); font-size:16px;">›</span>
     </button>
 
+    <!-- ✈️ Smart Flight Information — আপাতত খালি প্লেসহোল্ডার ফুল-স্ক্রিন
+         ড্যাশবোর্ড, আসল ফ্লাইট ট্র্যাকিং সিস্টেম পরে এখানে যুক্ত হবে -->
+    <button id="smartFlightInfoBtn" class="card" style="width:100%; text-align:left; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:10px; margin-bottom:12px; border:none;">
+      <span style="font-size:20px;">✈️</span>
+      <span style="flex:1; text-align:left; font-weight:800; font-size:13.5px;">Smart Flight Information</span>
+      <span style="color:var(--muted); font-size:16px;">›</span>
+    </button>
+
     <!-- ==================== 🚕 গন্তব্য দিয়ে বুক করুন — একাধিক ড্রাইভারের অফার থেকে বেছে নিন ==================== -->
     <div class="card" id="tripBookCard">
       <div style="text-align:center; margin-bottom:14px;">
@@ -721,35 +729,6 @@
       </select>
       <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">গন্তব্য</label>
       <input type="text" id="tripDestination" placeholder="যেমনঃ হাজীগঞ্জ" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
-
-      <!-- ✈️ Smart Airport Pickup Engine — Phase 1 (এখনো কোনো Flight API যুক্ত
-           হয়নি, শুধু ম্যানুয়াল তথ্য) — ট্রিপের ধরন বেছে নিলে নিচে ফ্লাইট
-           তথ্যের ফর্ম খুলে যায়। প্রবাসী যাত্রীদের জন্য যিনি এয়ারপোর্টে
-           নামছেন/উড়ছেন তার ফ্লাইট নম্বর-সময়টা ড্রাইভার আগে থেকেই দেখতে পান। -->
-      <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">ট্রিপের ধরন</label>
-      <div style="display:flex; gap:6px; margin-bottom:12px;">
-        <button type="button" id="tripTypeNormalBtn" data-type="normal" style="flex:1; padding:10px 4px; border-radius:10px; border:1px solid var(--amber); background:var(--amber); color:var(--bg1); font-weight:800; font-size:11px; cursor:pointer; font-family:inherit;">🚗 সাধারণ</button>
-        <button type="button" id="tripTypeAirportPickupBtn" data-type="airport_pickup" style="flex:1; padding:10px 4px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:800; font-size:11px; cursor:pointer; font-family:inherit;">✈️ এয়ারপোর্ট পিকআপ</button>
-        <button type="button" id="tripTypeAirportDropBtn" data-type="airport_drop" style="flex:1; padding:10px 4px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-weight:800; font-size:11px; cursor:pointer; font-family:inherit;">🛫 এয়ারপোর্ট ড্রপ</button>
-      </div>
-
-      <div id="tripFlightInfoWrap" style="display:none; margin-bottom:12px; background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.35); border-radius:12px; padding:12px;">
-        <div style="font-size:12px; font-weight:800; color:var(--amber); margin-bottom:10px;">✈️ ফ্লাইট তথ্য (ম্যানুয়াল — এখনো Flight API যুক্ত হয়নি)</div>
-        <div style="display:flex; gap:8px; margin-bottom:10px;">
-          <input type="text" id="tripFlightAirline" placeholder="এয়ারলাইনের নাম" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
-          <input type="text" id="tripFlightNumber" placeholder="ফ্লাইট নম্বর (যেমনঃ SV805)" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
-        </div>
-        <div style="display:flex; gap:8px; margin-bottom:10px;">
-          <input type="text" id="tripFlightFrom" placeholder="কোথা থেকে (যেমনঃ রিয়াদ)" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
-          <input type="text" id="tripFlightTo" placeholder="কোথায় (যেমনঃ ঢাকা)" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
-        </div>
-        <label id="tripFlightTimeLabel" style="display:block; font-size:11px; color:var(--muted); margin-bottom:6px; font-weight:600;">নির্ধারিত অবতরণের (অ্যারাইভাল) তারিখ ও সময়</label>
-        <div style="display:flex; gap:8px; margin-bottom:10px;">
-          <input type="date" id="tripFlightDate" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
-          <input type="time" id="tripFlightTime" style="flex:1; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px;">
-        </div>
-        <input type="text" id="tripFlightTerminal" placeholder="টার্মিনাল (ঐচ্ছিক)" style="width:100%; padding:10px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; box-sizing:border-box;">
-      </div>
 
       <!-- 💰 Honey Bee Transport Media Phase 4 — ভাড়ার ধরন: দরকষাকষি (একাধিক
            ড্রাইভার অফার দেবে, যাত্রী বেছে নেবে — আগে থেকেই ছিল) বনাম নির্দিষ্ট
@@ -916,6 +895,18 @@
       <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">এলাকার ড্রাইভার/গাড়ির সবশেষ আপডেট</div>
     </div>
     <div id="tmFeedList">লোড হচ্ছে...</div>
+  </div>
+
+  <!-- ✈️ Smart Flight Information — ফুল-স্ক্রিন, আপাতত খালি প্লেসহোল্ডার
+       (Transport বুকিং স্ক্রিন থেকে "✈️ Smart Flight Information" বাটনে
+       ক্লিক করলে খোলে)। পরে এখানে আসল ফ্লাইট ট্র্যাকিং ড্যাশবোর্ড বানানো হবে। -->
+  <div id="screenSmartFlightInfo" style="padding:20px 16px;">
+    <button class="backBtn" id="backToTransportFromFlightInfo">← ফিরে যান</button>
+    <div style="text-align:center; margin-top:60px;">
+      <div style="font-size:44px;">✈️</div>
+      <div style="font-size:17px; font-weight:800; margin-top:8px;">Smart Flight Information</div>
+      <div style="font-size:12px; color:var(--muted); margin-top:6px;">শীঘ্রই আসছে — ফ্লাইট ট্র্যাকিং ড্যাশবোর্ড এখানে যুক্ত হবে</div>
+    </div>
   </div>
 
   <!-- 🕊️ জীবন তরী — হাব স্ক্রিন, ভেতরে একাধিক সাব-অপশন থাকবে -->
@@ -1701,7 +1692,7 @@ let userLatLng = null;
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenTransportMedia","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
   if(id === "screenTransportMedia") tmListenFeed(); // 📢 Phase 6 — স্ক্রিন খুললেই লাইভ ফিড লোড হয়
 
@@ -1731,7 +1722,7 @@ function showScreen(id){
   // খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন লুকিয়ে যায়, যাতে
   // পুরোপুরি আলাদা একটা অ্যাপের মতো লাগে (Cart এখন hbCartScreen নিজস্ব
   // fixed overlay হিসেবে আলাদাভাবে ম্যানেজ হয়, showScreen()-এর অংশ না)
-  const isFullScreen = id === "screenHoneyMessenger" || id === "screenTransportMedia";
+  const isFullScreen = id === "screenHoneyMessenger" || id === "screenTransportMedia" || id === "screenSmartFlightInfo";
   const headerEl = document.querySelector("header");
   if(headerEl) headerEl.style.display = isFullScreen ? "none" : "";
   const footerEl = document.querySelector(".footerNav");
@@ -3065,6 +3056,8 @@ $("menuProfileSaveBtn").addEventListener("click", async ()=>{
 
 document.getElementById("backToHomeFromTransport") && document.getElementById("backToHomeFromTransport").addEventListener("click", ()=> showScreen("screenHome"));
 document.getElementById("backToTransportFromMedia") && document.getElementById("backToTransportFromMedia").addEventListener("click", ()=> showScreen("screenTransport"));
+document.getElementById("smartFlightInfoBtn") && document.getElementById("smartFlightInfoBtn").addEventListener("click", ()=> showScreen("screenSmartFlightInfo"));
+document.getElementById("backToTransportFromFlightInfo") && document.getElementById("backToTransportFromFlightInfo").addEventListener("click", ()=> showScreen("screenTransport"));
 
 /* ==================== 🤏 চেপে ধরে কনফার্ম করুন (Hold-to-Confirm) ====================
    গুরুত্বপূর্ণ/অপরিবর্তনীয় কাজে (যেমন "রক্ত পেয়ে গেছি", "আজ রক্ত দিয়েছি")
@@ -5055,38 +5048,12 @@ function tripSetFareType(type){
 $("tripFareTypeNegotiableBtn") && $("tripFareTypeNegotiableBtn").addEventListener("click", ()=> tripSetFareType("negotiable"));
 $("tripFareTypeFixedBtn") && $("tripFareTypeFixedBtn").addEventListener("click", ()=> tripSetFareType("fixed"));
 
-/* ==================== ✈️ Smart Airport Pickup Engine — Phase 1 (API ছাড়া) ====================
-   "সাধারণ" / "এয়ারপোর্ট পিকআপ" / "এয়ারপোর্ট ড্রপ" — বেছে নিলে ফ্লাইট তথ্যের
-   ফর্ম খোলে। এখনো কোনো Flight API যুক্ত হয়নি, তাই flightInfo.status
-   সবসময় "manual" থাকবে — পরে API যুক্ত হলে ঠিক এই ফিল্ডেই আসল স্ট্যাটাস
-   (scheduled/delayed/departed/landed/cancelled) বসানো হবে, বুকিং-এর গঠন
-   বদলাতে হবে না। */
-let __tripType = "normal"; // "normal" | "airport_pickup" | "airport_drop"
-
-function tripSetTripType(type){
-  __tripType = type;
-  const btns = { normal: $("tripTypeNormalBtn"), airport_pickup: $("tripTypeAirportPickupBtn"), airport_drop: $("tripTypeAirportDropBtn") };
-  Object.keys(btns).forEach(key=>{
-    const active = key === type;
-    btns[key].style.background = active ? "var(--amber)" : "rgba(255,255,255,0.06)";
-    btns[key].style.color = active ? "var(--bg1)" : "#fff8e8";
-    btns[key].style.borderColor = active ? "var(--amber)" : "var(--border)";
-  });
-  $("tripFlightInfoWrap").style.display = (type === "normal") ? "none" : "block";
-  $("tripFlightTimeLabel").textContent = (type === "airport_drop")
-    ? "নির্ধারিত ছাড়ার (ডিপারচার) তারিখ ও সময়"
-    : "নির্ধারিত অবতরণের (অ্যারাইভাল) তারিখ ও সময়";
-}
-$("tripTypeNormalBtn") && $("tripTypeNormalBtn").addEventListener("click", ()=> tripSetTripType("normal"));
-$("tripTypeAirportPickupBtn") && $("tripTypeAirportPickupBtn").addEventListener("click", ()=> tripSetTripType("airport_pickup"));
-$("tripTypeAirportDropBtn") && $("tripTypeAirportDropBtn").addEventListener("click", ()=> tripSetTripType("airport_drop"));
-
-function tripClearFlightFields(){
-  $("tripFlightAirline").value = ""; $("tripFlightNumber").value = "";
-  $("tripFlightFrom").value = ""; $("tripFlightTo").value = "";
-  $("tripFlightDate").value = ""; $("tripFlightTime").value = "";
-  $("tripFlightTerminal").value = "";
-}
+/* ✈️ Airport Pickup/Drop ট্রিপ-টাইপ বেছে নেওয়ার UI (সাধারণ/এয়ারপোর্ট পিকআপ/
+   এয়ারপোর্ট ড্রপ বাটন + ম্যানুয়াল ফ্লাইট-তথ্য ফর্ম) সরিয়ে ফেলা হয়েছে —
+   এখন থেকে সব বুকিং সবসময় tripType:"normal" হিসেবেই তৈরি হয়। নিচে
+   tripAirportBox/tripArrivalModeWrap ইত্যাদি রেন্ডার-লজিক ইচ্ছাকৃতভাবে
+   রাখা হয়েছে, শুধু পুরনো (আগে বুক হওয়া) এয়ারপোর্ট ট্রিপগুলো ঠিকমতো
+   দেখানোর জন্য — নতুন কোনো ট্রিপে এটা আর চালু হবে না। */
 
 /* ==================== 🩸 Blood Bank ====================
    Collection: bloodDonors/{uid} — Google-লগইন করা কাস্টমাররাই রক্তদাতা
@@ -6322,27 +6289,10 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
     if(!proposedFare || proposedFare <= 0){ alert("কত ভাড়া দিতে চান তা লিখুন।"); return; }
   }
 
-  // ✈️ Smart Airport Pickup Engine Phase 1 — এয়ারপোর্ট পিকআপ/ড্রপ বেছে নিলে
-  // ফ্লাইট নম্বর ও তারিখ-সময় বাধ্যতামূলক (বাকি ফিল্ড ঐচ্ছিক)
-  let flightInfo = null;
-  if(__tripType !== "normal"){
-    const flightNumber = $("tripFlightNumber").value.trim();
-    const flightDate = $("tripFlightDate").value;
-    const flightTime = $("tripFlightTime").value;
-    if(!flightNumber || !flightDate || !flightTime){
-      alert("ফ্লাইট নম্বর, তারিখ ও সময় — এই তিনটা লিখতে হবে।");
-      return;
-    }
-    flightInfo = {
-      airline: $("tripFlightAirline").value.trim() || null,
-      flightNumber,
-      fromAirport: $("tripFlightFrom").value.trim() || null,
-      toAirport: $("tripFlightTo").value.trim() || null,
-      flightDate, flightTime,
-      terminal: $("tripFlightTerminal").value.trim() || null,
-      status: "manual" // Phase 2-এ আসল Flight API যুক্ত হলে এখানে scheduled/delayed/departed/landed/cancelled বসবে
-    };
-  }
+  // ✈️ এয়ারপোর্ট পিকআপ/ড্রপ ট্রিপ-টাইপ বেছে নেওয়ার UI সরিয়ে ফেলা হয়েছে,
+  // তাই flightInfo এখন সবসময় null — tripAirportBox/flightInfo সম্পর্কিত
+  // রেন্ডার-লজিক শুধু পুরনো ট্রিপের জন্য রয়ে গেছে (উপরের নোট দ্রষ্টব্য)
+  const flightInfo = null;
 
   $("tripSearchBtn").disabled = true; $("tripSearchBtn").textContent = "লোকেশন খোঁজা হচ্ছে...";
   try{
@@ -6358,8 +6308,8 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
       status: "searching",
       fareType: __tripFareType, // 💰 Phase 4 — "negotiable" | "fixed"
       proposedFare: proposedFare, // fareType "fixed" হলেই শুধু ব্যবহার হয়
-      tripType: __tripType, // ✈️ Airport Pickup Phase 1 — "normal" | "airport_pickup" | "airport_drop"
-      flightInfo: flightInfo, // tripType "normal" না হলেই শুধু পূরণ থাকে
+      tripType: "normal", // ✈️ এয়ারপোর্ট পিকআপ/ড্রপ অপশন সরানো হয়েছে, নতুন ট্রিপ সবসময় "normal"
+      flightInfo: flightInfo, // এখন সবসময় null
       arrivalStatus: null, // শুধু airport_pickup-এ ব্যবহার হয়, প্যাসেঞ্জার নিজে Arrival Mode থেকে আপডেট করবেন
       arrivalStatusAt: null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -6630,10 +6580,6 @@ $("tripNewBookingBtn") && $("tripNewBookingBtn").addEventListener("click", ()=>{
   $("tripDestination").value = "";
   $("tripFixedFareInput").value = "";
   tripSetFareType("negotiable");
-  // ✈️ Airport Pickup Phase 1 — নতুন বুকিংয়ে আগের ফ্লাইট তথ্য/সেফটি কার্ড
-  // যেন বয়ে না যায়
-  tripSetTripType("normal");
-  tripClearFlightFields();
   try{ localStorage.removeItem("hbActiveTripId"); localStorage.removeItem("hbAirportSafetyCard"); }catch(e){}
 });
 
@@ -6679,9 +6625,6 @@ $("tripCancelBtn") && $("tripCancelBtn").addEventListener("click", async ()=>{
   $("tripDestination").value = "";
   $("tripFixedFareInput").value = "";
   tripSetFareType("negotiable");
-  // ✈️ Airport Pickup Phase 1 — বাতিল করলেও একই কারণে রিসেট করা হয়
-  tripSetTripType("normal");
-  tripClearFlightFields();
   try{ localStorage.removeItem("hbActiveTripId"); localStorage.removeItem("hbAirportSafetyCard"); }catch(e){}
 });
 
