@@ -71,22 +71,6 @@
     <label>পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
     <input type="password" id="suPass" placeholder="••••••••">
 
-    <label>দোকানের প্রধান ধরন <span style="font-weight:400; color:#a89e8c;">(Bazar-এ দোকান এই ধরন দিয়ে দেখানো হবে; প্রতিটা প্রোডাক্ট যোগ করার সময় আলাদাভাবেও ধরন বেছে নেওয়া যাবে — তাই এক দোকানে সব ধরনের প্রোডাক্টই রাখা যায়)</span></label>
-    <select id="suCategory">
-      <option value="grocery">🟢 মুদি দোকান / কাঁচাবাজার</option>
-      <option value="fish_meat">🟢 মাছ ও মাংসের দোকান</option>
-      <option value="sweets">🟢 মিষ্টির দোকান</option>
-      <option value="fruits">🟢 ফলের দোকান</option>
-      <option value="pharmacy">🔴 ফার্মেসি / ওষুধের দোকান</option>
-      <option value="cosmetics">🔴 কসমেটিকস ও বিউটি শপ</option>
-      <option value="packaged_food">🔴 প্যাকেটজাত খাদ্য ও ডেইরি শপ</option>
-      <option value="mobile_gadget">🔵 মোবাইল ও গ্যাজেট শপ</option>
-      <option value="electronics">🔵 ইলেকট্রনিক্স ও হোম অ্যাপ্লায়েন্স</option>
-      <option value="computer_it">🔵 কম্পিউটার ও আইটি শপ</option>
-      <option value="garments">🟣 গার্মেন্টস ও ফ্যাশন (কাপড়, জুতা ইত্যাদি)</option>
-      <option value="other">🟡 অন্যান্য (সাধারণ মোড)</option>
-    </select>
-
     <label>দেশ (Country)</label>
     <select id="suCountry"></select>
     <label>মুদ্রা (Currency) <span style="font-weight:400; color:#a89e8c;">(দেশ অনুযায়ী অটো-সিলেক্ট হয়, চাইলে বদলে দিন)</span></label>
@@ -579,7 +563,6 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   // users.email কোয়েরি এই একাউন্টটা খুঁজে না পাওয়ার ঝুঁকি থাকে।
   const email = document.getElementById("suEmail").value.trim().toLowerCase();
   const pass = document.getElementById("suPass").value;
-  const category = document.getElementById("suCategory").value;
   const countryCode = document.getElementById("suCountry").value;
   const countryName = (document.getElementById("suCountry").selectedOptions[0] || {}).textContent || countryCode;
   const currencyCode = document.getElementById("suCurrency").value;
@@ -589,22 +572,6 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   const upazila = isBdShop ? document.getElementById("suUpazila").value : "";
   const marketId = isBdShop ? document.getElementById("suMarket").value : "";
   const assignedAgentId = isBdShop ? (document.getElementById("suAgent").value || null) : null;
-
-  // দোকানের ক্যাটাগরি অনুযায়ী POS-এর ডিফল্ট "মোড" ঠিক হয় — নতুন প্রোডাক্ট
-  // যোগ করার সময় প্রথমে এই মোডটাই প্রি-সিলেক্ট থাকে (তাড়াতাড়ি প্রোডাক্ট
-  // যোগ করার জন্য), কিন্তু প্রতিটা প্রোডাক্টের নিজস্ব ধরন এখন আলাদাভাবেও
-  // বেছে নেওয়া যায় (bccApplyProductType, shop-ledger-app.html) — তাই এক
-  // দোকান-অ্যাকাউন্টেই মুদি + ফার্মেসি + গার্মেন্টস ইত্যাদি সবরকম প্রোডাক্ট
-  // একসাথে রাখা যায়, একটামাত্র মোডে আটকে থাকতে হয় না।
-  const WEIGHT_MODE_CATEGORIES = ["grocery", "fish_meat", "sweets", "fruits"];
-  const BATCH_MODE_CATEGORIES = ["pharmacy", "cosmetics", "packaged_food"];
-  const SERIAL_MODE_CATEGORIES = ["mobile_gadget", "electronics", "computer_it"];
-  const VARIANT_MODE_CATEGORIES = ["garments"];
-  const appMode = WEIGHT_MODE_CATEGORIES.includes(category) ? "weight"
-    : BATCH_MODE_CATEGORIES.includes(category) ? "batch"
-    : SERIAL_MODE_CATEGORIES.includes(category) ? "serial"
-    : VARIANT_MODE_CATEGORIES.includes(category) ? "variant"
-    : "standard";
 
   if(!shopName || !name || !email || pass.length < 6){
     showMsg("signupMsg","সব ঘর সঠিকভাবে পূরণ করুন (পাসওয়ার্ড কমপক্ষে ৬ অক্ষর)",false); return;
@@ -634,7 +601,11 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
       district: district || null, upazila: upazila || null, marketId: marketId || null, assignedAgentId,
       onlineEnabled: !!marketId, // 🔌 বাজার ছাড়া নিবন্ধন করলে false — POS/অফলাইন-শুধু দোকান, Bazar-এ দেখা যাবে না
       country: countryName, countryCode, currencyCode, currencySymbol, // 🌍 আন্তর্জাতিক দোকান সাপোর্ট — country/currency
-      storeCategory: category, appMode,
+      // 🏷️ দোকানের ধরন এখন আর সাইনআপে জিজ্ঞাসা করা হয় না — প্রতিটা প্রোডাক্ট
+      // যোগ করার সময় নিজস্ব ধরন আলাদাভাবে বেছে নেওয়া যায় (shop-ledger-app.html,
+      // Add/Edit Product ফর্মের "প্রোডাক্টের ধরন" সিলেক্টর)। appMode ফিল্ড না
+      // থাকলে shop-ledger-app.html-এর bccGetAppMode() নিজে থেকেই 'standard'
+      // ধরে নেয়, তাই এখানে আলাদা করে কিছু লেখার দরকার নেই।
       features: { reports:true, extraIncome:true, ops:true, monitor:true, whatsapp:true },
       createdAt: fbNow(), updatedAt: fbNow()
     });
