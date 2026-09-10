@@ -1581,6 +1581,16 @@
               <label style="font-size:11.5px;">📱 IMEI/সিরিয়াল নম্বর</label>
               <input id="qsSerialInput" type="text" placeholder="IMEI/সিরিয়াল নম্বর লিখুন">
             </div>
+            <div id="qsVariantRow" class="bccVariantSelectRow" style="display:none; margin-top:6px; gap:6px;">
+              <div style="flex:1;">
+                <label style="font-size:11.5px;">🎨 রং</label>
+                <select id="qsVariantColor"></select>
+              </div>
+              <div style="flex:1;">
+                <label style="font-size:11.5px;">📏 সাইজ</label>
+                <select id="qsVariantSize"></select>
+              </div>
+            </div>
           </div>
         </div>
         <div class="row">
@@ -1698,6 +1708,16 @@
               <div id="fSerialRow" style="display:none; margin-top:6px;">
                 <label style="font-size:11.5px;">📱 IMEI/সিরিয়াল নম্বর</label>
                 <input id="fSerialInput" type="text" placeholder="IMEI/সিরিয়াল নম্বর লিখুন">
+              </div>
+              <div id="fVariantRow" style="display:none; margin-top:6px; gap:6px;">
+                <div style="flex:1;">
+                  <label style="font-size:11.5px;">🎨 রং</label>
+                  <select id="fVariantColor"></select>
+                </div>
+                <div style="flex:1;">
+                  <label style="font-size:11.5px;">📏 সাইজ</label>
+                  <select id="fVariantSize"></select>
+                </div>
               </div>
             </div>
           </div>
@@ -3965,6 +3985,16 @@
         <p class="pin-desc" style="margin:2px 0 10px;">ক্যাটাগরি সিলেক্ট করা বাধ্যতামূলক (এটাই Invoice-এ Brand হিসেবে দেখানো হয়)।</p>
         <label>📂 Sub-Category</label><select id="bccPSub"></select>
 
+        <label>🏷️ প্রোডাক্টের ধরন</label>
+        <select id="bccPType">
+          <option value="standard">🟡 সাধারণ (স্ট্যান্ডার্ড)</option>
+          <option value="weight">⚖️ ওজন-ভিত্তিক (কেজি/গ্রাম)</option>
+          <option value="batch">💊 ব্যাচ ও মেয়াদ-উত্তীর্ণ ট্র্যাকিং</option>
+          <option value="serial">📱 সিরিয়াল/IMEI ট্র্যাকিং</option>
+          <option value="variant">👕 কালার/সাইজ ভ্যারিয়েন্ট (গার্মেন্টস ইত্যাদি)</option>
+        </select>
+        <p class="pin-desc" style="margin:2px 0 10px;">প্রতিটা প্রোডাক্টের ধরন আলাদাভাবে বেছে নেওয়া যায় — তাই একই দোকান-অ্যাকাউন্টে মুদি, ফার্মেসি, গার্মেন্টস ইত্যাদি সবরকম প্রোডাক্ট একসাথে রাখা যায়।</p>
+
         <div id="bccPUnitRow" style="display:none;">
           <label>⚖️ বিক্রয় একক</label>
           <select id="bccPUnit">
@@ -4000,6 +4030,17 @@
           <label>🛡️ ডিফল্ট ওয়ারেন্টি মেয়াদ (মাস, ঐচ্ছিক)</label>
           <input type="number" id="bccPWarrantyMonths" placeholder="যেমনঃ 12 (১ বছর)">
           <p class="pin-desc" style="margin:2px 0 10px;">সিরিয়াল/IMEI লাগবে বললে সেলস স্ক্রিনে এই প্রোডাক্ট বিক্রি করার সময় IMEI/সিরিয়াল নম্বর চাওয়া হবে, এবং মেমোতে ওয়ারেন্টি তারিখসহ প্রিন্ট হবে।</p>
+        </div>
+
+        <div id="bccPVariantRow" style="display:none;">
+          <label>🎨 রং (কমা দিয়ে লিখুন)</label>
+          <input id="bccPColors" placeholder="যেমনঃ Yellow, Blue, Black">
+          <label>📏 সাইজ (কমা দিয়ে লিখুন)</label>
+          <input id="bccPSizes" placeholder="যেমনঃ S, M, L, XL">
+          <button type="button" class="bccBtnPrimary" id="bccBuildVariantsBtn" style="width:100%; margin:6px 0 10px;">🔄 ভ্যারিয়েন্ট টেবিল তৈরি করুন</button>
+          <div id="bccPVariantTable"></div>
+          <p class="pin-desc" id="bccPVariantTotalHint" style="margin:6px 0 10px;"></p>
+          <p class="pin-desc" style="margin:2px 0 10px;">প্রতিটা রং+সাইজ কম্বিনেশনের জন্য আলাদা স্টক সংখ্যা দিন। নিচের "Stock Quantity" এখান থেকেই স্বয়ংক্রিয়ভাবে হিসাব হবে। সেলস স্ক্রিনে বিক্রি করার সময় রং ও সাইজ বেছে নিতে হবে।</p>
         </div>
 
         <div class="bccTwoCol">
@@ -7432,25 +7473,111 @@ function bccSaveCategories(cats){
   bccSyncCategoriesToBazar(); // ক্যাটাগরি বদলালেই Bazar-এও সাথে সাথে আপডেট হয়
 }
 
-/* ==================== 📦 দোকানের মোড (Weight-Based / Batch-Expiry ইত্যাদি) ====================
-   সাইনআপের সময় ক্যাটাগরি অনুযায়ী ঠিক হওয়া মোড অনুযায়ী POS-এর কিছু ফিচার
-   দেখানো/লুকানো হয়। */
+/* ==================== 📦 প্রোডাক্টের ধরন (Weight-Based / Batch-Expiry / Serial / Variant) ====================
+   আগে এটা পুরো দোকানের জন্য একটামাত্র "মোড" ছিল (সাইনআপের সময় ক্যাটাগরি
+   অনুযায়ী ঠিক হতো)। এখন প্রতিটা প্রোডাক্ট যোগ করার সময় (bccPType সিলেক্টর)
+   নিজের ধরন আলাদাভাবে বেছে নিতে পারে — তাই একই দোকান-অ্যাকাউন্টে মুদি
+   (weight) + ফার্মেসি (batch) + ইলেকট্রনিক্স (serial) + গার্মেন্টস (variant)
+   সবরকম প্রোডাক্ট একসাথে থাকতে পারে। bccGetAppMode() এখনো "দোকানের ডিফল্ট
+   ধরন" হিসেবে থেকে যায় — নতুন প্রোডাক্ট যোগ করার সময় bccPType-এ প্রথমে এটাই
+   প্রি-সিলেক্ট থাকে (তাড়াতাড়ি যোগ করার সুবিধার জন্য), আর পুরনো প্রোডাক্ট যাদের
+   productType সেভ করা নেই তাদের জন্য fallback হিসেবেও ব্যবহার হয়। */
 function bccGetAppMode(){ return localStorage.getItem('shop-app-mode') || 'standard'; }
-function bccIsWeightMode(){ return bccGetAppMode() === 'weight'; }
-function bccIsBatchMode(){ return bccGetAppMode() === 'batch'; }
-function bccIsSerialMode(){ return bccGetAppMode() === 'serial'; }
+// ইতিমধ্যে সেভ করা একটা নির্দিষ্ট প্রোডাক্টের কার্যকর ধরন — নিজের productType থাকলে সেটাই,
+// নাহলে (পুরনো প্রোডাক্ট) দোকানের ডিফল্ট ধরন
+function bccProductType(p){ return (p && p.productType) ? p.productType : bccGetAppMode(); }
+// Add/Edit Product মডালে এই মুহূর্তে bccPType সিলেক্টে কোনটা বাছা আছে — মডাল খোলা অবস্থায়
+// ফিল্ড দেখানো/লুকানো ও সেভ করার সময় এটাই ব্যবহার হয়
+function bccGetModalProductType(){ const el = document.getElementById('bccPType'); return el ? el.value : bccGetAppMode(); }
+function bccIsWeightMode(){ return bccGetModalProductType() === 'weight'; }
+function bccIsBatchMode(){ return bccGetModalProductType() === 'batch'; }
+function bccIsSerialMode(){ return bccGetModalProductType() === 'serial'; }
+function bccIsVariantMode(){ return bccGetModalProductType() === 'variant'; }
 
 function bccApplyAppMode(){
   const weightMode = bccIsWeightMode();
   const batchMode = bccIsBatchMode();
   const serialMode = bccIsSerialMode();
+  const variantMode = bccIsVariantMode();
   const unitRow = document.getElementById('bccPUnitRow');
   if(unitRow) unitRow.style.display = weightMode ? 'block' : 'none';
   const batchRow = document.getElementById('bccPBatchRow');
   if(batchRow) batchRow.style.display = batchMode ? 'block' : 'none';
   const serialRow = document.getElementById('bccPSerialRow');
   if(serialRow) serialRow.style.display = serialMode ? 'block' : 'none';
+  const variantRow = document.getElementById('bccPVariantRow');
+  if(variantRow) variantRow.style.display = variantMode ? 'block' : 'none';
+  // ভ্যারিয়েন্ট মোডে স্টক-সংখ্যা ভ্যারিয়েন্ট টেবিল থেকে স্বয়ংক্রিয়ভাবে হিসাব হয়,
+  // তাই ম্যানুয়াল টাইপ বন্ধ রাখা হচ্ছে (readonly) — ভুলবশত দুই জায়গায় দুই রকম সংখ্যা
+  // থেকে যাওয়া আটকাতে।
+  const qtyEl = document.getElementById('bccPQty');
+  if(qtyEl){
+    qtyEl.readOnly = variantMode;
+    qtyEl.style.opacity = variantMode ? '0.6' : '1';
+    if(variantMode) qtyEl.placeholder = 'ভ্যারিয়েন্ট টেবিল থেকে হিসাব হবে';
+  }
 }
+
+/* ---------- 👕 কালার/সাইজ ভ্যারিয়েন্ট টেবিল (গার্মেন্টস ইত্যাদি) ----------
+   কমা দিয়ে লেখা রং ও সাইজ থেকে একটা টেবিল বানানো হয় — প্রতিটা কম্বিনেশনের
+   নিজস্ব স্টক-সংখ্যা থাকে। এই ফাংশনগুলো আগে থেকে টাইপ করা সংখ্যা (টেবিল আবার
+   বানালে) বা এডিট করা প্রোডাক্টের সেভ করা ভ্যারিয়েন্ট — দুটোই হারায় না। */
+function bccParseCsvList(str){
+  return (str||'').split(',').map(s=>s.trim()).filter(Boolean);
+}
+function bccCollectVariantsFromTable(){
+  return Array.from(document.querySelectorAll('#bccPVariantTable .bccVariantQtyInput')).map(inp=>({
+    color: inp.dataset.color, size: inp.dataset.size, qty: Number(inp.value)||0
+  }));
+}
+function bccUpdateVariantTotalHint(){
+  const variants = bccCollectVariantsFromTable();
+  const total = variants.reduce((s,v)=> s+(Number(v.qty)||0), 0);
+  const hintEl = document.getElementById('bccPVariantTotalHint');
+  if(hintEl) hintEl.textContent = variants.length ? `মোট স্টক (সব রং/সাইজ মিলিয়ে): ${total} পিস` : '';
+  const qtyEl = document.getElementById('bccPQty');
+  if(qtyEl && bccIsVariantMode()) qtyEl.value = total;
+}
+function bccRenderVariantTableRows(colors, sizes, currentTable, savedMap){
+  const wrap = document.getElementById('bccPVariantTable');
+  if(!wrap) return;
+  if(!colors.length || !sizes.length){
+    wrap.innerHTML = '<p class="pin-desc" style="color:#c0392b; margin:6px 0;">কমপক্ষে একটা রং ও একটা সাইজ লিখে তারপর "ভ্যারিয়েন্ট টেবিল তৈরি করুন"-এ চাপুন</p>';
+    bccUpdateVariantTotalHint();
+    return;
+  }
+  let html = '<div style="max-height:280px; overflow-y:auto; margin:6px 0;">';
+  colors.forEach(color=>{
+    sizes.forEach(size=>{
+      const key = color+'||'+size;
+      const qty = (key in currentTable) ? currentTable[key] : ((savedMap && savedMap[key] != null) ? savedMap[key] : '');
+      html += `<div style="display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid rgba(255,255,255,0.08);">
+        <span style="flex:1; font-size:12.5px;">${escapeHtml(color)} — ${escapeHtml(size)}</span>
+        <input type="number" min="0" step="1" class="bccVariantQtyInput" data-color="${escapeHtml(color)}" data-size="${escapeHtml(size)}" value="${qty}" placeholder="0" style="width:64px; padding:6px;">
+      </div>`;
+    });
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.bccVariantQtyInput').forEach(inp=> inp.addEventListener('input', bccUpdateVariantTotalHint));
+  bccUpdateVariantTotalHint();
+}
+function bccBuildVariantTable(){
+  const colors = bccParseCsvList(document.getElementById('bccPColors').value);
+  const sizes = bccParseCsvList(document.getElementById('bccPSizes').value);
+  const currentTable = {};
+  document.querySelectorAll('#bccPVariantTable .bccVariantQtyInput').forEach(inp=>{
+    currentTable[inp.dataset.color+'||'+inp.dataset.size] = inp.value;
+  });
+  const savedProduct = bccEditingProductId ? bccLoadProducts().find(x=>x.id===bccEditingProductId) : null;
+  const savedMap = {};
+  if(savedProduct && savedProduct.variants){
+    savedProduct.variants.forEach(v=> savedMap[v.color+'||'+v.size] = v.qty);
+  }
+  bccRenderVariantTableRows(colors, sizes, currentTable, savedMap);
+}
+document.getElementById('bccBuildVariantsBtn') && document.getElementById('bccBuildVariantsBtn').addEventListener('click', bccBuildVariantTable);
+document.getElementById('bccPType') && document.getElementById('bccPType').addEventListener('change', bccApplyAppMode);
 
 /* ---------- 🔴 ব্যাচ ও মেয়াদ-উত্তীর্ণ অ্যালার্ট ----------
    প্রতিটা প্রোডাক্টের সব ব্যাচের মধ্যে সবচেয়ে কাছের (আগে শেষ হবে এমন) মেয়াদ
@@ -7472,8 +7599,11 @@ function bccGetNearestExpiry(p){
 }
 
 function bccRenderExpiryAlert(){
+  // 📦 আগে এখানে দোকান-ওয়াইড ব্যাচ-মোড চেক ছিল; এখন যেহেতু ব্যাচ-ট্র্যাকিং
+  // প্রতি-প্রোডাক্ট ভিত্তিতে হয়, তাই সেই গেট তুলে দেওয়া হয়েছে — যেসব প্রোডাক্টে
+  // আসলেই batches ডেটা আছে শুধু তাদের জন্যই অ্যালার্ট হিসাব হবে (নিচেই ফিল্টার হয়)।
   const box = document.getElementById('bccExpiryAlertBox');
-  if(!box || !bccIsBatchMode()){ if(box) box.style.display = 'none'; return; }
+  if(!box) return;
   const prods = bccLoadProducts();
   const alerts = prods.map(p=> ({ p, exp: bccGetNearestExpiry(p) })).filter(x=> x.exp);
   if(!alerts.length){ box.style.display = 'none'; return; }
@@ -7512,7 +7642,7 @@ function bccToggleWeightUI(qtyId, prod){
   const toggleEl = document.getElementById(toggleId);
   const qtyEl = document.getElementById(qtyId);
   if(!toggleEl || !qtyEl) return;
-  const isWeightProduct = bccIsWeightMode() && prod && prod.unit === 'kg';
+  const isWeightProduct = prod && bccProductType(prod) === 'weight' && prod.unit === 'kg';
   toggleEl.style.display = isWeightProduct ? 'flex' : 'none';
   if(isWeightProduct){
     qtyEl.dataset.weightUnit = 'gram';
@@ -7545,12 +7675,42 @@ function bccToggleSerialUI(qtyId, prod){
   const rowId = qtyId.replace('Qty','SerialRow');
   const rowEl = document.getElementById(rowId);
   if(!rowEl) return;
-  const needsSerial = bccIsSerialMode() && prod && prod.requiresSerial;
+  const needsSerial = prod && bccProductType(prod) === 'serial' && prod.requiresSerial;
   rowEl.style.display = needsSerial ? 'block' : 'none';
   if(!needsSerial){
     const inputEl = document.getElementById(qtyId.replace('Qty','SerialInput'));
     if(inputEl) inputEl.value = '';
   }
+}
+
+/* ---------- 👕 কালার/সাইজ ভ্যারিয়েন্ট সিলেক্টর (সেলস স্ক্রিনে) ----------
+   ভ্যারিয়েন্ট-ধরনের প্রোডাক্ট (যেমনঃ গার্মেন্টস) বিক্রি করার সময় Qty ফিল্ডের
+   নিচে রং ও সাইজ বেছে নেওয়ার ড্রপডাউন দেখা যায় — কোন রং/সাইজের স্টক থেকে
+   বিক্রি হচ্ছে সেটা এখান থেকেই ঠিক হয়। স্টক শেষ হয়ে যাওয়া সাইজ ধূসর/disabled
+   দেখানো হয়, যেমন কাস্টমার-মুখী শপিং সাইটে দেখা যায়। */
+function bccToggleVariantUI(qtyId, prod){
+  const rowId = qtyId.replace('Qty','VariantRow');
+  const rowEl = document.getElementById(rowId);
+  if(!rowEl) return;
+  const isVariant = prod && bccProductType(prod) === 'variant' && prod.variants && prod.variants.length;
+  rowEl.style.display = isVariant ? 'flex' : 'none';
+  const colorEl = document.getElementById(qtyId.replace('Qty','VariantColor'));
+  const sizeEl = document.getElementById(qtyId.replace('Qty','VariantSize'));
+  if(!colorEl || !sizeEl) return;
+  if(!isVariant){
+    colorEl.innerHTML = ''; sizeEl.innerHTML = '';
+    return;
+  }
+  const colors = [...new Set(prod.variants.map(v=>v.color))];
+  colorEl.innerHTML = '<option value="">-- রং বেছে নিন --</option>' + colors.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  sizeEl.innerHTML = '<option value="">-- আগে রং বেছে নিন --</option>';
+  colorEl.onchange = ()=>{
+    const sizesForColor = prod.variants.filter(v=> v.color === colorEl.value);
+    sizeEl.innerHTML = '<option value="">-- সাইজ বেছে নিন --</option>' + sizesForColor.map(v=>{
+      const out = (Number(v.qty)||0) <= 0;
+      return `<option value="${escapeHtml(v.size)}" ${out?'disabled':''}>${escapeHtml(v.size)}${out?' (স্টকে নেই)':''}</option>`;
+    }).join('');
+  };
 }
 
 function bccLoadProducts(){
@@ -7619,6 +7779,11 @@ async function bccSyncProductToBazar(p){
       catId: p.catId || null,
       subId: p.subId || null,
       imageUrl: p.imageUrl || null, // 🖼️ Step 5 — Storage-এ আপলোড করা ছবি থাকলে Bazar-এও দেখা যাবে
+      // 👕 প্রোডাক্টের ধরন ও কালার/সাইজ ভ্যারিয়েন্ট — এখনই Bazar-এ কালার/সাইজ সিলেকশন UI
+      // বানানো না হলেও, ডেটাটা আগে থেকেই সিঙ্ক করে রাখা হচ্ছে যাতে ভবিষ্যতে Bazar-এর
+      // প্রোডাক্ট পেজে যোগ করার সময় POS-সাইডে আর কিছু বদলাতে না হয়
+      productType: p.productType || 'standard',
+      variants: (p.productType === 'variant' && p.variants && p.variants.length) ? p.variants : null,
       // 🐝 Market Products — Highlight/Offer স্ট্যাটাস (POS-এর "Market" ট্যাব থেকে কন্ট্রোল হয়)
       highlight: bccMarketHighlightActive(p),
       offerLive: bccMarketOfferActive(p),
@@ -7687,7 +7852,15 @@ function bccAdjustStockForSale(items){
     const p = bccResolveProduct(prods, it.item, it.productId);
     if(!p) return;
     const qtySold = Number(it.qty)||0;
-    p.qty = Math.max(0, (Number(p.qty)||0) - qtySold);
+    // 👕 ভ্যারিয়েন্ট (রং/সাইজ) প্রোডাক্ট বিক্রি হলে ঠিক সেই কম্বিনেশনের স্টক থেকে কমে,
+    // তারপর সামগ্রিক qty-টাও সব ভ্যারিয়েন্টের যোগফল দিয়ে নতুন করে হিসাব হয়
+    if(it.variantColor && it.variantSize && p.variants && p.variants.length){
+      const variant = p.variants.find(v=> v.color===it.variantColor && v.size===it.variantSize);
+      if(variant) variant.qty = Math.max(0, (Number(variant.qty)||0) - qtySold);
+      p.qty = p.variants.reduce((s,v)=> s+(Number(v.qty)||0), 0);
+    } else {
+      p.qty = Math.max(0, (Number(p.qty)||0) - qtySold);
+    }
     changed = true;
     if(p.qty === 0 && p.published){
       // 📦 স্টক শূন্য → স্বয়ংক্রিয়ভাবে Bazar থেকে সরিয়ে ফেলা (ভুল অর্ডার আটকাতে)
@@ -7913,6 +8086,7 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
     lines.push(`Unit Price: ${HB_CUR} ${it.unitPrice}${it.weightLabel ? '/kg' : ''}`);
     lines.push(`Amount: ${HB_CUR} ${it.price}`);
     if(it.serialNumber) lines.push(`IMEI/Serial: ${it.serialNumber}`);
+    if(it.variantColor) lines.push(`Color/Size: ${it.variantColor} / ${it.variantSize}`);
     if(it.warrantyMonths) lines.push(`Warranty: ${it.warrantyMonths} Month(s) (expires: ${it.warrantyExpiry})`);
     lines.push(`Time: ${formatInvoiceTime(it.date || now)} (${formatInvoiceDate(it.date || now)})`);
     return lines.join('\n');
@@ -8353,6 +8527,13 @@ function bccQuickRestock(id){
   const prods = bccLoadProducts();
   const p = prods.find(x=>x.id===id);
   if(!p) return;
+  // 👕 কালার/সাইজ ভ্যারিয়েন্ট প্রোডাক্টে কোন নির্দিষ্ট রং/সাইজে স্টক যোগ হবে সেটা
+  // এই দ্রুত-প্রম্পট থেকে বাছা যায় না — ভুল সংখ্যায় mismatch এড়াতে Edit Product-এ
+  // পাঠানো হচ্ছে, যেখানে ভ্যারিয়েন্ট টেবিল থেকে সঠিকভাবে আপডেট করা যাবে।
+  if(bccProductType(p) === 'variant'){
+    toast('⚠️ এই প্রোডাক্টে রং/সাইজ অনুযায়ী স্টক আলাদা — "Edit" থেকে ভ্যারিয়েন্ট টেবিলে গিয়ে আপডেট করুন');
+    return;
+  }
   const input = prompt(`"${p.name}" — বর্তমান স্টক: ${p.qty||0} পিস।\nকত পিস নতুন করে যোগ করবেন?`, '');
   if(input === null) return;
   const addQty = Number(input);
@@ -8360,7 +8541,7 @@ function bccQuickRestock(id){
   p.qty = (Number(p.qty)||0) + addQty;
 
   // ব্যাচ মোডে থাকলে এই নতুন স্টকের জন্য ব্যাচ নম্বর ও মেয়াদ জানতে চাওয়া হয়
-  if(bccIsBatchMode()){
+  if(bccProductType(p) === 'batch'){
     const batchNo = prompt('ব্যাচ নম্বর (ঐচ্ছিক, ফাঁকা রাখলে বাদ যাবে):', '') || '';
     const expiryDate = prompt('মেয়াদ শেষ হওয়ার তারিখ (YYYY-MM-DD, ঐচ্ছিক):', '') || '';
     if(expiryDate){
@@ -8391,6 +8572,20 @@ function bccOpenProductModal(editId){
   bccPopulateCategorySelect(document.getElementById('bccPCat'), p ? p.catId : '');
   bccPopulateSubSelect(document.getElementById('bccPSub'), p ? p.catId : '', p ? p.subId : '');
   document.getElementById('bccPUnit').value = p ? (p.unit||'pcs') : 'pcs';
+  // 🏷️ প্রোডাক্টের ধরন — এডিট হলে সেভ করা productType, নতুন হলে দোকানের ডিফল্ট ধরন প্রি-সিলেক্ট
+  document.getElementById('bccPType').value = p ? (p.productType || bccGetAppMode()) : bccGetAppMode();
+  // 👕 ভ্যারিয়েন্ট (রং/সাইজ) — এডিট করা প্রোডাক্টে আগের ভ্যারিয়েন্ট থাকলে রং/সাইজ ফিল্ড ও
+  // টেবিল দুটোই আগের সেভ করা ডেটা দিয়ে প্রি-ফিল করা হয়
+  const editVariants = (p && p.variants) ? p.variants : [];
+  const editColors = [...new Set(editVariants.map(v=>v.color))];
+  const editSizes = [...new Set(editVariants.map(v=>v.size))];
+  document.getElementById('bccPColors').value = editColors.join(', ');
+  document.getElementById('bccPSizes').value = editSizes.join(', ');
+  if(editVariants.length){
+    bccRenderVariantTableRows(editColors, editSizes, {}, Object.fromEntries(editVariants.map(v=>[v.color+'||'+v.size, v.qty])));
+  } else {
+    document.getElementById('bccPVariantTable').innerHTML = '';
+  }
   document.getElementById('bccPGeneric').value = p ? (p.genericName||'') : '';
   document.getElementById('bccPRack').value = p ? (p.rackLocation||'') : '';
   document.getElementById('bccPStripsPerBox').value = p ? (p.stripsPerBox||'') : '';
@@ -8868,6 +9063,12 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
   const enteredExpiryDate = document.getElementById('bccPExpiryDate').value;
   const enteredRequiresSerial = bccIsSerialMode() && document.getElementById('bccPRequiresSerial').value === 'yes';
   const enteredWarrantyMonths = Number(document.getElementById('bccPWarrantyMonths').value) || 0;
+  const enteredProductType = document.getElementById('bccPType').value || 'standard';
+  const enteredVariants = enteredProductType === 'variant' ? bccCollectVariantsFromTable() : [];
+  if(enteredProductType === 'variant' && !enteredVariants.length){
+    toast('⚠️ ভ্যারিয়েন্ট প্রোডাক্টের জন্য রং ও সাইজ দিয়ে "ভ্যারিয়েন্ট টেবিল তৈরি করুন"-এ চাপুন');
+    return;
+  }
 
   // ব্যাচ মোডে থাকলে ও এক্সপায়ারি তারিখ দেওয়া থাকলে এই স্টক-ইনটা একটা
   // "ব্যাচ" হিসেবে রেকর্ড হবে — মেয়াদ শেষ হওয়ার ৩০ দিন আগে অ্যালার্ট দেখাবে
@@ -8915,7 +9116,20 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
     );
     if(!ok) return;
     const oldImageId = dup.imageId || null; // 🖼️ Step 5 — নতুন ছবি হলে পরে এই পুরনোটার refCount কমানো হবে
-    dup.qty = (Number(dup.qty)||0) + enteredQty;
+    dup.productType = enteredProductType;
+    // 👕 ভ্যারিয়েন্ট প্রোডাক্টে ডুপ্লিকেট মিললে প্রতিটা রং/সাইজের স্টক আলাদাভাবে যোগ হয়
+    // (পুরনো ব্যাচ-এন্ট্রির মতোই) — সাধারণ প্রোডাক্টে আগের মতোই সরাসরি qty যোগ হয়
+    if(enteredProductType === 'variant'){
+      dup.variants = dup.variants || [];
+      enteredVariants.forEach(ev=>{
+        const existingVariant = dup.variants.find(v=> v.color===ev.color && v.size===ev.size);
+        if(existingVariant) existingVariant.qty = (Number(existingVariant.qty)||0) + (Number(ev.qty)||0);
+        else dup.variants.push({ color: ev.color, size: ev.size, qty: Number(ev.qty)||0 });
+      });
+      dup.qty = dup.variants.reduce((s,v)=> s+(Number(v.qty)||0), 0);
+    } else {
+      dup.qty = (Number(dup.qty)||0) + enteredQty;
+    }
     if(enteredBuy) dup.buy = enteredBuy;
     if(enteredSell) dup.sell = enteredSell;
     dup.offerPrice = enteredOfferPrice || null;
@@ -8968,6 +9182,8 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
     piecesPerStrip: enteredPiecesPerStrip || (existingProduct ? existingProduct.piecesPerStrip : 0) || 0,
     requiresSerial: enteredRequiresSerial,
     warrantyMonths: enteredWarrantyMonths || null,
+    productType: enteredProductType,
+    variants: enteredProductType === 'variant' ? enteredVariants : [],
     batches: existingProduct ? (existingProduct.batches || []) : [],
     buy: enteredBuy,
     sell: enteredSell,
@@ -10006,10 +10222,31 @@ function clearAddForm(){
    since a sale must not be allowed to proceed without a valid quantity. */
 /* স্টকে যত আছে তার বেশি বিক্রি আটকাতে — প্রোডাক্ট ইনভেন্টরি থেকে বাছাই করা হলেই এই চেক
    হয় (ফ্রি-টাইপ করা আইটেম, যেটা ইনভেন্টরিতে লিংক করা নেই, তার জন্য চেক করা সম্ভব না)। */
-function checkStockAvailable(productId, itemName, requestedQty, cartArray){
+function checkStockAvailable(productId, itemName, requestedQty, cartArray, variantColor, variantSize){
   if(!productId) return true;
   const product = bccLoadProducts().find(p=>p.id===productId);
   if(!product) return true;
+  // 👕 ভ্যারিয়েন্ট প্রোডাক্টে সামগ্রিক qty না দেখে, ঠিক যে রং/সাইজ বেছে নেওয়া হয়েছে
+  // তার নিজস্ব স্টকের বিপরীতে চেক হয় — নাহলে এক সাইজ শেষ হয়ে গেলেও অন্য সাইজের
+  // স্টক দেখিয়ে ভুলভাবে বিক্রি হয়ে যেতে পারত।
+  if(bccProductType(product) === 'variant' && product.variants && product.variants.length){
+    if(!variantColor || !variantSize){
+      toast(`⚠️ "${product.name}"-এর জন্য রং ও সাইজ বেছে নিন`);
+      return false;
+    }
+    const variant = product.variants.find(v=> v.color===variantColor && v.size===variantSize);
+    const available = variant ? (Number(variant.qty)||0) : 0;
+    const alreadyInCart = (cartArray||[]).filter(l=> l.productId===productId && l.variantColor===variantColor && l.variantSize===variantSize).reduce((s,l)=>s+(l.qty||0),0);
+    if(available <= 0){
+      toast(`⚠️ "${product.name}" (${variantColor}/${variantSize}) স্টকে নেই — সেল করা যাবে না`);
+      return false;
+    }
+    if(alreadyInCart + requestedQty > available){
+      toast(`⚠️ "${product.name}" (${variantColor}/${variantSize}) স্টকে আছে মাত্র ${available} টি (তালিকায় ইতিমধ্যে ${alreadyInCart} টি আছে)`);
+      return false;
+    }
+    return true;
+  }
   const available = Number(product.qty)||0;
   const alreadyInCart = (cartArray||[]).filter(l=>l.productId===productId).reduce((s,l)=>s+(l.qty||0),0);
   if(available <= 0){
@@ -10128,6 +10365,7 @@ function setupSmartSuggest(cfg){
         if(cfg.priceId){ const el=document.getElementById(cfg.priceId); if(el) el.value = prod.sell || ''; }
         if(cfg.qtyId) bccToggleWeightUI(cfg.qtyId, prod);
         if(cfg.qtyId) bccToggleSerialUI(cfg.qtyId, prod);
+        if(cfg.qtyId) bccToggleVariantUI(cfg.qtyId, prod);
         if(cfg.qtyId && cfg.priceId && cfg.previewId) updateTotalPreview(cfg.qtyId, cfg.priceId, cfg.previewId);
         boxEl.classList.remove('show');
         boxEl.innerHTML = '';
@@ -10167,11 +10405,13 @@ document.getElementById('qsItem').addEventListener('keydown', (e)=>{
   document.getElementById('qsPrice').value = matched.sell || '';
   bccToggleWeightUI('qsQty', matched);
   bccToggleSerialUI('qsQty', matched);
+  bccToggleVariantUI('qsQty', matched);
   updateTotalPreview('qsQty','qsPrice','qsTotalPreview');
   document.getElementById('qsSuggestBox').classList.remove('show');
   const qtyEl = document.getElementById('qsQty');
-  if(qtyEl.dataset.weightUnit || matched.requiresSerial){
-    qtyEl.focus(); // ওজন/সিরিয়াল ম্যানুয়ালি বসাতে হবে বলে সরাসরি কার্টে যোগ না করে ফোকাস দেওয়া হলো
+  const matchedIsVariant = bccProductType(matched) === 'variant' && matched.variants && matched.variants.length;
+  if(qtyEl.dataset.weightUnit || matched.requiresSerial || matchedIsVariant){
+    qtyEl.focus(); // ওজন/সিরিয়াল/ভ্যারিয়েন্ট ম্যানুয়ালি বসাতে হবে বলে সরাসরি কার্টে যোগ না করে ফোকাস দেওয়া হলো
   } else {
     document.getElementById('qsAddItemBtn').click(); // সাধারণ পিস-ভিত্তিক প্রোডাক্ট — স্ক্যান করলেই কার্টে যোগ হয়ে গেল
   }
@@ -10303,7 +10543,7 @@ function renderCartInto(cart, listElId, summaryElId, removeFn){
   if(!cart.length){ box.innerHTML=''; summary.style.display='none'; return; }
   box.innerHTML = cart.map((it, idx)=> `
     <div class="cart-item">
-      <div class="ci-info"><b>${escapeHtml(it.item)}</b><span class="ci-meta">${it.weightLabel ? it.weightLabel : (it.qty + ' pcs')} × ${fmt(it.unitPrice)}${it.weightLabel ? '/kg' : ''} = ${fmt(it.price)}${it.serialNumber ? ' · IMEI: '+escapeHtml(it.serialNumber) : ''}</span></div>
+      <div class="ci-info"><b>${escapeHtml(it.item)}${it.variantColor ? ' ('+escapeHtml(it.variantColor)+'/'+escapeHtml(it.variantSize)+')' : ''}</b><span class="ci-meta">${it.weightLabel ? it.weightLabel : (it.qty + ' pcs')} × ${fmt(it.unitPrice)}${it.weightLabel ? '/kg' : ''} = ${fmt(it.price)}${it.serialNumber ? ' · IMEI: '+escapeHtml(it.serialNumber) : ''}</span></div>
       <button type="button" class="ci-remove" onclick="${removeFn}(${idx})">✕</button>
     </div>`).join('');
   const totalPrice = cart.reduce((s,it)=>s+it.price,0);
@@ -10545,7 +10785,23 @@ function readCartLineFromFields(itemId, qtyId, costId, priceId){
     }
   }
 
-  return { item, productId: itemEl.dataset.productId || '', qty, weightLabel, unitCost, unitPrice, cost: unitCost*qty, price: unitPrice*qty, serialNumber, warrantyMonths, warrantyExpiry };
+  // 👕 কালার/সাইজ ভ্যারিয়েন্ট — VariantRow দেখা যাচ্ছে মানে এই প্রোডাক্ট ভ্যারিয়েন্ট-ধরনের,
+  // তাই কার্টে যোগ করার আগে রং ও সাইজ দুটোই বেছে নেওয়া বাধ্যতামূলক (নাহলে কোন স্টক থেকে
+  // কমবে বোঝা যাবে না)
+  let variantColor = null, variantSize = null;
+  const variantRowEl = document.getElementById(qtyId.replace('Qty','VariantRow'));
+  if(variantRowEl && variantRowEl.style.display !== 'none'){
+    const colorEl = document.getElementById(qtyId.replace('Qty','VariantColor'));
+    const sizeEl = document.getElementById(qtyId.replace('Qty','VariantSize'));
+    variantColor = colorEl ? colorEl.value : '';
+    variantSize = sizeEl ? sizeEl.value : '';
+    if(!variantColor || !variantSize){
+      toast('⚠️ রং ও সাইজ বেছে নিন');
+      return null;
+    }
+  }
+
+  return { item, productId: itemEl.dataset.productId || '', qty, weightLabel, unitCost, unitPrice, cost: unitCost*qty, price: unitPrice*qty, serialNumber, warrantyMonths, warrantyExpiry, variantColor, variantSize };
 }
 
 function readEsCartLine(){
@@ -10577,6 +10833,14 @@ function resetLineFields(itemId, qtyId, costId, priceId, previewId){
     const serialInputEl = document.getElementById(qtyId.replace('Qty','SerialInput'));
     if(serialInputEl) serialInputEl.value = '';
   }
+  const variantRowEl = document.getElementById(qtyId.replace('Qty','VariantRow'));
+  if(variantRowEl){
+    variantRowEl.style.display = 'none';
+    const colorEl = document.getElementById(qtyId.replace('Qty','VariantColor'));
+    const sizeEl = document.getElementById(qtyId.replace('Qty','VariantSize'));
+    if(colorEl) colorEl.innerHTML = '';
+    if(sizeEl) sizeEl.innerHTML = '';
+  }
   updateTotalPreview(qtyId, priceId, previewId);
   itemEl.focus();
 }
@@ -10584,7 +10848,7 @@ function resetLineFields(itemId, qtyId, costId, priceId, previewId){
 document.getElementById('fAddItemBtn').addEventListener('click', ()=>{
   const line = readCartLineFromFields('fItem','fQty','fCost','fPrice');
   if(!line) return;
-  if(!checkStockAvailable(line.productId, line.item, line.qty, creditCart)) return;
+  if(!checkStockAvailable(line.productId, line.item, line.qty, creditCart, line.variantColor, line.variantSize)) return;
   creditCart.push(line);
   renderCreditCart();
   resetLineFields('fItem','fQty','fCost','fPrice','fTotalPreview');
@@ -10594,7 +10858,7 @@ document.getElementById('fAddItemBtn').addEventListener('click', ()=>{
 document.getElementById('qsAddItemBtn').addEventListener('click', ()=>{
   const line = readCartLineFromFields('qsItem','qsQty','qsCost','qsPrice');
   if(!line) return;
-  if(!checkStockAvailable(line.productId, line.item, line.qty, qsCart)) return;
+  if(!checkStockAvailable(line.productId, line.item, line.qty, qsCart, line.variantColor, line.variantSize)) return;
   qsCart.push(line);
   renderQsCart();
   resetLineFields('qsItem','qsQty','qsCost','qsPrice','qsTotalPreview');
@@ -10969,7 +11233,7 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
   if(pendingItem){
     const line = readCartLineFromFields('qsItem','qsQty','qsCost','qsPrice');
     if(!line) return;
-    if(!checkStockAvailable(line.productId, line.item, line.qty, qsCart)) return;
+    if(!checkStockAvailable(line.productId, line.item, line.qty, qsCart, line.variantColor, line.variantSize)) return;
     qsCart.push(line);
   }
 

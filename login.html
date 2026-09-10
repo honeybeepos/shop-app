@@ -71,7 +71,7 @@
     <label>পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
     <input type="password" id="suPass" placeholder="••••••••">
 
-    <label>দোকানের ধরন <span style="font-weight:400; color:#a89e8c;">(এটা অনুযায়ী POS-এর ফিচার সাজানো হবে)</span></label>
+    <label>দোকানের প্রধান ধরন <span style="font-weight:400; color:#a89e8c;">(Bazar-এ দোকান এই ধরন দিয়ে দেখানো হবে; প্রতিটা প্রোডাক্ট যোগ করার সময় আলাদাভাবেও ধরন বেছে নেওয়া যাবে — তাই এক দোকানে সব ধরনের প্রোডাক্টই রাখা যায়)</span></label>
     <select id="suCategory">
       <option value="grocery">🟢 মুদি দোকান / কাঁচাবাজার</option>
       <option value="fish_meat">🟢 মাছ ও মাংসের দোকান</option>
@@ -83,6 +83,7 @@
       <option value="mobile_gadget">🔵 মোবাইল ও গ্যাজেট শপ</option>
       <option value="electronics">🔵 ইলেকট্রনিক্স ও হোম অ্যাপ্লায়েন্স</option>
       <option value="computer_it">🔵 কম্পিউটার ও আইটি শপ</option>
+      <option value="garments">🟣 গার্মেন্টস ও ফ্যাশন (কাপড়, জুতা ইত্যাদি)</option>
       <option value="other">🟡 অন্যান্য (সাধারণ মোড)</option>
     </select>
 
@@ -589,16 +590,20 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   const marketId = isBdShop ? document.getElementById("suMarket").value : "";
   const assignedAgentId = isBdShop ? (document.getElementById("suAgent").value || null) : null;
 
-  // দোকানের ক্যাটাগরি অনুযায়ী POS-এর "মোড" ঠিক হয় — এই মোড অনুযায়ী POS-এ
-  // কোন ফিচার (ওজন-হিসাব, মেয়াদ-ট্র্যাকিং, সিরিয়াল/IMEI ইত্যাদি) দেখাবে
-  // সেটা ঠিক হবে। আপাতত শুধু ওজনভিত্তিক মোড বানানো হয়েছে — বাকি মোড
-  // (ব্যাচ/এক্সপায়ারি, সিরিয়াল/IMEI, ভ্যারিয়েন্ট) পরের ধাপে যোগ হবে।
+  // দোকানের ক্যাটাগরি অনুযায়ী POS-এর ডিফল্ট "মোড" ঠিক হয় — নতুন প্রোডাক্ট
+  // যোগ করার সময় প্রথমে এই মোডটাই প্রি-সিলেক্ট থাকে (তাড়াতাড়ি প্রোডাক্ট
+  // যোগ করার জন্য), কিন্তু প্রতিটা প্রোডাক্টের নিজস্ব ধরন এখন আলাদাভাবেও
+  // বেছে নেওয়া যায় (bccApplyProductType, shop-ledger-app.html) — তাই এক
+  // দোকান-অ্যাকাউন্টেই মুদি + ফার্মেসি + গার্মেন্টস ইত্যাদি সবরকম প্রোডাক্ট
+  // একসাথে রাখা যায়, একটামাত্র মোডে আটকে থাকতে হয় না।
   const WEIGHT_MODE_CATEGORIES = ["grocery", "fish_meat", "sweets", "fruits"];
   const BATCH_MODE_CATEGORIES = ["pharmacy", "cosmetics", "packaged_food"];
   const SERIAL_MODE_CATEGORIES = ["mobile_gadget", "electronics", "computer_it"];
+  const VARIANT_MODE_CATEGORIES = ["garments"];
   const appMode = WEIGHT_MODE_CATEGORIES.includes(category) ? "weight"
     : BATCH_MODE_CATEGORIES.includes(category) ? "batch"
     : SERIAL_MODE_CATEGORIES.includes(category) ? "serial"
+    : VARIANT_MODE_CATEGORIES.includes(category) ? "variant"
     : "standard";
 
   if(!shopName || !name || !email || pass.length < 6){
