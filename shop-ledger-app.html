@@ -3648,6 +3648,49 @@
     }
     #program-bcc .bccSubChip button{ background:none; border:none; color:#f87171; cursor:pointer; font-size:12px; }
 
+    /* 🗂️ All Category — প্রি-বিল্ট ক্যাটাগরি টগল ড্যাশবোর্ড (ফুল-স্ক্রিন) */
+    #bccAllCategoryOverlay{
+      display:none; position:fixed; inset:0; z-index:850; background:#0b0f1e;
+      flex-direction:column; overflow-y:auto; padding:18px 16px 40px;
+      font-family:-apple-system,'Segoe UI',Roboto,sans-serif;
+    }
+    #bccAllCategoryOverlay.show{ display:flex; }
+    #bccAllCategoryOverlay .bacHead{
+      display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:16px;
+      position:sticky; top:0; background:#0b0f1e; padding:2px 0 12px; z-index:2;
+    }
+    #bccAllCategoryOverlay .bacHead h3{ margin:0 0 4px; font-size:17px; color:#fff; }
+    #bccAllCategoryOverlay .bacHead p{ margin:0; font-size:11.5px; color:#8b94b8; line-height:1.5; max-width:280px; }
+    #bccAllCategoryCloseBtn{
+      background:rgba(255,255,255,0.08); border:none; color:#eef1f7; font-size:18px;
+      width:34px; height:34px; border-radius:50%; cursor:pointer; flex-shrink:0;
+    }
+    #bccAllCategoryOverlay .bacCard{
+      border-radius:16px; padding:14px 16px; margin-bottom:12px;
+      background:linear-gradient(150deg,#20284a,#161c34); box-shadow:0 8px 18px rgba(0,0,0,0.3);
+      animation: rowIn3d .35s ease both;
+    }
+    #bccAllCategoryOverlay .bacCardHead{ display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; }
+    #bccAllCategoryOverlay .bacCardHead .nm{ font-size:14.5px; font-weight:800; color:#eef1f7; }
+    #bccAllCategoryOverlay .bacCardHead .cnt{ font-size:11px; color:#8b94b8; margin-top:2px; }
+    #bccAllCategoryOverlay .bacToggle{
+      position:relative; width:44px; height:24px; border-radius:14px; background:rgba(255,255,255,0.14);
+      border:none; cursor:pointer; flex-shrink:0; transition:background .2s ease; padding:0;
+    }
+    #bccAllCategoryOverlay .bacToggle::after{
+      content:''; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%;
+      background:#fff; transition:transform .2s ease; box-shadow:0 2px 4px rgba(0,0,0,0.3);
+    }
+    #bccAllCategoryOverlay .bacToggle.on{ background:linear-gradient(135deg,#4ade80,#16a34a); }
+    #bccAllCategoryOverlay .bacToggle.on::after{ transform:translateX(20px); }
+    #bccAllCategoryOverlay .bacSubWrap{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+    #bccAllCategoryOverlay .bacSubChip{
+      padding:7px 12px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer;
+      background:rgba(255,255,255,0.07); color:#dfe6ff; border:1px solid rgba(255,255,255,0.1);
+    }
+    #bccAllCategoryOverlay .bacSubChip.added{ background:rgba(74,222,128,0.15); color:#4ade80; border-color:rgba(74,222,128,0.35); }
+    #bccAllCategoryOverlay .bacSubChip.onlyCat{ background:rgba(124,58,237,0.18); color:#c4b5fd; border-color:rgba(124,58,237,0.4); }
+
     /* ==================== 🐝 Market Products ড্যাশবোর্ড ==================== */
     #program-bcc .bccMarketSummary{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px; }
     #program-bcc .bccMarketSumCard{
@@ -3867,8 +3910,24 @@
     </div>
 
     <div class="bccSubpanel" id="btab-categories" style="display:none;">
-      <button class="bccBtnPrimary" id="bccAddCategoryBtn" style="width:100%; margin-bottom:14px;">➕ নতুন Main Category</button>
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <button class="bccBtnPrimary" id="bccAddCategoryBtn" style="flex:1;">➕ নতুন Main Category</button>
+        <button class="bccBtnPrimary" id="bccOpenAllCategoryBtn" style="flex:1; background:linear-gradient(135deg,#7c3aed,#5b21b6);">🗂️ All Category</button>
+      </div>
       <div id="bccCategoryList"></div>
+    </div>
+
+    <!-- 🗂️ All Category — প্রি-বিল্ট কমন ক্যাটাগরি লিস্ট, টগল করে নিজের দোকানের জন্য বাছাই,
+         সাব-ক্যাটাগরিতে ট্যাপ করলে সরাসরি Category/Sub-category প্রি-ফিল করা Add Product ফর্ম খোলে -->
+    <div id="bccAllCategoryOverlay">
+      <div class="bacHead">
+        <div>
+          <h3>🗂️ All Category</h3>
+          <p>টগল করে আপনার দোকানের জন্য ক্যাটাগরি বেছে নিন। সাব-ক্যাটাগরিতে ট্যাপ করলেই সাথে সাথে সেই ক্যাটাগরি দিয়ে প্রোডাক্ট যোগ করা যাবে।</p>
+        </div>
+        <button id="bccAllCategoryCloseBtn">✕</button>
+      </div>
+      <div id="bccAllCategoryList"></div>
     </div>
 
     <!-- 🐝 Market Products — POS-এর প্রোডাক্ট Honey Bee Bazar-এ কীভাবে দেখাবে তার Workspace।
@@ -7472,6 +7531,123 @@ function bccSaveCategories(cats){
   localStorage.setItem('bcc-categories', JSON.stringify(cats));
   bccSyncCategoriesToBazar(); // ক্যাটাগরি বদলালেই Bazar-এও সাথে সাথে আপডেট হয়
 }
+
+/* ==================== 🗂️ All Category — প্রি-বিল্ট কমন ক্যাটাগরি লিস্ট ====================
+   দোকানদারকে প্রতিটা ক্যাটাগরি হাতে টাইপ করে বানাতে না হয়, তার জন্য বাংলাদেশের সাধারণ
+   দোকানে যা যা বিক্রি হয় তার একটা রেডিমেড লিস্ট (নাম + সাব-ক্যাটাগরি) — টগল করলেই
+   নিজের ক্যাটাগরি লিস্টে যোগ হয়ে যায়, আর কোনো সাব-ক্যাটাগরিতে ট্যাপ করলে সরাসরি
+   Category/Sub-category প্রি-ফিল করা অবস্থায় Add Product ফর্ম খুলে যায়। */
+const BCC_MASTER_CATEGORIES = [
+  { name:'🛒 মুদি ও কাঁচাবাজার', subs:['চাল/ডাল','তেল/মসলা','চিনি/লবণ','সাবান/শ্যাম্পু','বিস্কুট/স্ন্যাক্স','পানীয়/কোমল পানীয়','নুডলস/পাস্তা'] },
+  { name:'🐟 মাছ ও মাংস', subs:['মাছ','গরুর মাংস','খাসির মাংস','মুরগি','ডিম'] },
+  { name:'🍬 মিষ্টি ও বেকারি', subs:['মিষ্টি','কেক/পেস্ট্রি','রুটি/বিস্কুট','আইসক্রিম'] },
+  { name:'🍎 ফল ও সবজি', subs:['দেশি ফল','বিদেশি ফল','শাক-সবজি'] },
+  { name:'💊 ফার্মেসি ও ওষুধ', subs:['ট্যাবলেট/ক্যাপসুল','সিরাপ','ইনজেকশন','সার্জিক্যাল আইটেম','বেবি কেয়ার','ভিটামিন/সাপ্লিমেন্ট'] },
+  { name:'💄 কসমেটিক্স ও বিউটি', subs:['ত্বকের যত্ন','চুলের যত্ন','মেকআপ','পারফিউম','পুরুষদের গ্রুমিং'] },
+  { name:'📦 প্যাকেটজাত খাবার', subs:['নুডলস','চানাচুর/চিপস','সস/আচার','মসলা প্যাকেট','গুড়া দুধ'] },
+  { name:'📱 মোবাইল ও গ্যাজেট', subs:['স্মার্টফোন','ফিচার ফোন','চার্জার/কেবল','ইয়ারফোন/হেডফোন','মোবাইল কভার/গ্লাস','পাওয়ার ব্যাংক'] },
+  { name:'🔌 ইলেকট্রনিক্স ও ইলেকট্রিক্যাল', subs:['ফ্যান','লাইট/বাল্ব','সুইচ/সকেট','ব্যাটারি','হোম অ্যাপ্লায়েন্স'] },
+  { name:'💻 কম্পিউটার ও আইটি', subs:['ল্যাপটপ/ডেস্কটপ','প্রিন্টার','USB/পেনড্রাইভ','মাউস/কিবোর্ড','নেটওয়ার্কিং যন্ত্রাংশ'] },
+  { name:'👕 গার্মেন্টস ও ফ্যাশন', subs:['পুরুষদের পোশাক','মহিলাদের পোশাক','বাচ্চাদের পোশাক','জুতা/স্যান্ডেল','ব্যাগ','শীতের পোশাক'] },
+  { name:'🧸 খেলনা ও গিফট আইটেম', subs:['খেলনা','গিফট আইটেম','স্টেশনারি'] },
+  { name:'🏠 গৃহস্থালি ও হার্ডওয়্যার', subs:['রান্নাঘরের জিনিস','প্লাস্টিক আইটেম','হার্ডওয়্যার/টুলস','পেইন্ট/রং'] },
+];
+// নাম মেলানোর জন্য ইমোজি/অতিরিক্ত স্পেস বাদ দিয়ে normalize — যাতে দোকানদার নিজে হাতে
+// একই নামে (ইমোজি ছাড়া) ক্যাটাগরি বানিয়ে থাকলেও সেটাকে "আগে থেকেই আছে" হিসেবে ধরা যায়
+function bccNormalizeCatName(name){
+  return (name||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').trim().toLowerCase();
+}
+function bccFindOwnCategoryByName(name){
+  const norm = bccNormalizeCatName(name);
+  return bccLoadCategories().find(c=> bccNormalizeCatName(c.name)===norm) || null;
+}
+function bccOpenAllCategoryDashboard(){
+  bccRenderAllCategoryDashboard();
+  document.getElementById('bccAllCategoryOverlay').classList.add('show');
+}
+function bccRenderAllCategoryDashboard(){
+  const listEl = document.getElementById('bccAllCategoryList');
+  listEl.innerHTML = BCC_MASTER_CATEGORIES.map((mc, idx)=>{
+    const own = bccFindOwnCategoryByName(mc.name);
+    const ownSubNames = own ? own.subs.map(s=> bccNormalizeCatName(s.name)) : [];
+    return `
+    <div class="bacCard">
+      <div class="bacCardHead" data-toggle-cat="${idx}">
+        <div><div class="nm">${escapeHtml(mc.name)}</div><div class="cnt">${mc.subs.length} সাব-ক্যাটাগরি ${own?'· ✅ আপনার লিস্টে আছে':''}</div></div>
+        <button class="bacToggle ${own?'on':''}" data-toggle-cat="${idx}"></button>
+      </div>
+      <div class="bacSubWrap">
+        <span class="bacSubChip onlyCat" data-cat-only="${idx}">🏷️ শুধু এই Category (সাব ছাড়া)</span>
+        ${mc.subs.map(s=>`<span class="bacSubChip ${ownSubNames.includes(bccNormalizeCatName(s))?'added':''}" data-cat="${idx}" data-sub="${escapeHtml(s)}">${escapeHtml(s)}</span>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  listEl.querySelectorAll('[data-toggle-cat]').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); bccAllCategoryToggle(Number(el.dataset.toggleCat)); });
+  });
+  listEl.querySelectorAll('[data-cat-only]').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); bccAllCategorySelect(Number(el.dataset.catOnly), null); });
+  });
+  listEl.querySelectorAll('.bacSubChip[data-sub]').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); bccAllCategorySelect(Number(el.dataset.cat), el.dataset.sub); });
+  });
+}
+// টগল সুইচ — শুধু ক্যাটাগরিটা নিজের লিস্টে যোগ/বাদ করে (কোনো প্রোডাক্ট ফর্ম খোলে না),
+// যোগ করার সময় প্রি-বিল্ট সব সাব-ক্যাটাগরিও একসাথে চলে আসে যাতে হাতে আর একটাও টাইপ করতে না হয়
+function bccAllCategoryToggle(idx){
+  const mc = BCC_MASTER_CATEGORIES[idx];
+  const cats = bccLoadCategories();
+  const existing = cats.find(c=> bccNormalizeCatName(c.name)===bccNormalizeCatName(mc.name));
+  if(existing){
+    const prods = bccLoadProducts();
+    if(prods.some(p=>p.catId===existing.id)){
+      toast('⚠️ এই ক্যাটাগরিতে প্রোডাক্ট আছে — তাই টগল-অফ করে বাদ দেওয়া যাবে না');
+      return;
+    }
+    const remaining = cats.filter(c=>c.id!==existing.id);
+    bccSaveCategories(remaining);
+    deletedCategoryIds.push(existing.id);
+    saveDeletedCategoryIds(deletedCategoryIds);
+    bccDeleteCategoryFromBazar(existing.id);
+    toast('ক্যাটাগরি বাদ দেওয়া হলো');
+  } else {
+    cats.push({ id: bccUid(), name: mc.name, subs: mc.subs.map(s=>({id: bccUid(), name: s})), imageUrl:null });
+    bccSaveCategories(cats);
+    toast('✅ ক্যাটাগরি আপনার লিস্টে যোগ হলো');
+  }
+  bccRenderAllCategoryDashboard();
+  bccRenderCategories(); bccRenderOverview();
+}
+// একটা Category বা Sub-category "সিলেক্ট" করলে — সেটা নিজের লিস্টে না থাকলে আগে যোগ করে
+// নেয়, তারপর সরাসরি Add Product ফর্ম খুলে দেয় Category/Sub-category আগে থেকে বসানো অবস্থায়
+function bccAllCategorySelect(idx, subName){
+  const mc = BCC_MASTER_CATEGORIES[idx];
+  const cats = bccLoadCategories();
+  let own = cats.find(c=> bccNormalizeCatName(c.name)===bccNormalizeCatName(mc.name));
+  if(!own){
+    own = { id: bccUid(), name: mc.name, subs: [], imageUrl:null };
+    cats.push(own);
+  }
+  let subId = '';
+  if(subName){
+    let ownSub = own.subs.find(s=> bccNormalizeCatName(s.name)===bccNormalizeCatName(subName));
+    if(!ownSub){
+      ownSub = { id: bccUid(), name: subName };
+      own.subs.push(ownSub);
+    }
+    subId = ownSub.id;
+  }
+  bccSaveCategories(cats);
+  document.getElementById('bccAllCategoryOverlay').classList.remove('show');
+  bccRenderCategories(); bccRenderOverview();
+  bccOpenProductModal(null);
+  const catSel = document.getElementById('bccPCat');
+  catSel.value = own.id;
+  bccPopulateSubSelect(document.getElementById('bccPSub'), own.id, subId);
+  toast('✅ Category বসানো হলো — এখন প্রোডাক্টের তথ্য দিন');
+}
+document.getElementById('bccOpenAllCategoryBtn').addEventListener('click', bccOpenAllCategoryDashboard);
+document.getElementById('bccAllCategoryCloseBtn').addEventListener('click', ()=> document.getElementById('bccAllCategoryOverlay').classList.remove('show'));
 
 /* ==================== 📦 প্রোডাক্টের ধরন (Weight-Based / Batch-Expiry / Serial / Variant) ====================
    আগে এটা পুরো দোকানের জন্য একটামাত্র "মোড" ছিল (সাইনআপের সময় ক্যাটাগরি
