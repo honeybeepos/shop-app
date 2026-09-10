@@ -994,8 +994,8 @@
         <div style="font-size:11.5px; font-weight:800; color:var(--amber); margin-bottom:8px;">🛬 পৌঁছানোর তথ্য</div>
         <div id="sfiArrDetails" style="font-size:12px; color:#ddd; line-height:1.9;">—</div>
       </div>
-      <div id="sfiExtraDetailsWrap" style="background:rgba(255,255,255,0.04); border-radius:12px; padding:12px; display:none;">
-        <div style="font-size:11.5px; font-weight:800; color:var(--amber); margin-bottom:8px;">ℹ️ অতিরিক্ত তথ্য</div>
+      <div id="sfiExtraDetailsWrap" style="background:rgba(255,255,255,0.04); border-radius:12px; padding:12px;">
+        <div style="font-size:11.5px; font-weight:800; color:var(--amber); margin-bottom:8px;">✈️ Live Aircraft Data</div>
         <div id="sfiExtraDetails" style="font-size:12px; color:#ddd; line-height:1.9;">—</div>
       </div>
 
@@ -1796,6 +1796,9 @@ function showScreen(id){
   ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
   if(id === "screenTransportMedia") tmListenFeed(); // 📢 Phase 6 — স্ক্রিন খুললেই লাইভ ফিড লোড হয়
+  // ✈️ Smart Flight Tracking — অন্য কোনো স্ক্রিনে গেলে auto-refresh টাইমার
+  // বন্ধ হয়ে যায় (ব্যাক বাটন/বটম-নেভ/popstate — সব পথ এখান দিয়েই যায়)
+  if(id !== "screenSmartFlightInfo" && typeof sfiStopAutoRefresh === "function") sfiStopAutoRefresh();
 
   // 🚕 Transport স্ক্রিনে থাকা অবস্থায় উপরের টাইটেল বার বদলে "Honey Bee
   // Transport Media" দেখানো হয় এবং সেটাতে ক্লিক করলে একটা নতুন (আপাতত
@@ -3211,6 +3214,7 @@ function sfiShowMsg(text){
 
 async function sfiHandleSearch(){
   sfiShowMsg("");
+  sfiStopAutoRefresh();
   $("sfiResultsList").innerHTML = "";
   $("sfiDetailCard").style.display = "none";
 
@@ -3270,13 +3274,38 @@ function sfiRenderList(flights){
 }
 
 let __sfiCurrentFlight = null;
+let __sfiCameFromList = false;
+let __sfiAutoRefreshTimer = null;
+
+// 🔄 Auto Refresh — ডিটেইল কার্ড খোলা থাকা অবস্থায় প্রতি ৪৫ সেকেন্ডে
+// আবার searchFlight কল হয় (flightCache-এর কারণে বারবার AviationStack-এ
+// hit হয় না, শুধু cache মেয়াদ ফুরালেই আসল API কল হবে)। স্ক্রিন ছেড়ে
+// গেলে/নতুন সার্চ করলে/লিস্টে ফিরে গেলে বন্ধ হয়ে যায়।
+function sfiStopAutoRefresh(){
+  if(__sfiAutoRefreshTimer){ clearInterval(__sfiAutoRefreshTimer); __sfiAutoRefreshTimer = null; }
+}
+function sfiStartAutoRefresh(){
+  sfiStopAutoRefresh();
+  __sfiAutoRefreshTimer = setInterval(async ()=>{
+    if(!__sfiCurrentFlight || !__sfiCurrentFlight.flightNumber) return;
+    try{
+      const callable = functionsInstance.httpsCallable("searchFlight");
+      const result = await callable({ flightNumber: __sfiCurrentFlight.flightNumber, flightDate: __sfiCurrentFlight.flightDate });
+      const flights = (result.data && result.data.flights) || [];
+      if(flights.length > 0) sfiRenderDetail(flights[0], __sfiCameFromList);
+    }catch(e){
+      // 🛟 auto-refresh ব্যর্থ হলে চুপচাপ স্কিপ — যা আগে দেখানো ছিল সেটাই থেকে যায়, ইউজারকে বিরক্ত করা হয় না
+    }
+  }, 45000);
+}
 
 function sfiRenderDetail(flight, cameFromList){
   __sfiCurrentFlight = flight;
+  __sfiCameFromList = cameFromList;
   sfiRefreshSaveTrackBtnState(flight);
   $("sfiResultsList").innerHTML = "";
   $("sfiBackToListBtn").style.display = cameFromList ? "block" : "none";
-  $("sfiBackToListBtn").onclick = ()=>{ $("sfiDetailCard").style.display = "none"; sfiRenderList(__sfiFlights); };
+  $("sfiBackToListBtn").onclick = ()=>{ sfiStopAutoRefresh(); $("sfiDetailCard").style.display = "none"; sfiRenderList(__sfiFlights); };
 
   const meta = SFI_STATUS_META[flight.status] || SFI_STATUS_META.unknown;
   $("sfiDetailFlightNo").textContent = flight.flightNumber || "—";
@@ -3327,18 +3356,18 @@ function sfiRenderDetail(flight, cameFromList){
   if(flight.latitude != null && flight.longitude != null) extraLines.push(`অবস্থানঃ ${flight.latitude.toFixed(2)}, ${flight.longitude.toFixed(2)}`);
   if(flight.altitude != null) extraLines.push(`উচ্চতাঃ ${Math.round(flight.altitude)} মি.`);
   if(flight.speed != null) extraLines.push(`গতিঃ ${Math.round(flight.speed)} কিমি/ঘণ্টা`);
-  if(extraLines.length > 0){
-    $("sfiExtraDetailsWrap").style.display = "block";
-    $("sfiExtraDetails").innerHTML = extraLines.join("<br>");
-  }else{
-    $("sfiExtraDetailsWrap").style.display = "none";
-  }
+  // ⚠️ কখনো fake/অনুমান করা ডেটা দেখানো হয় না — API না দিলে স্পষ্ট করে
+  // "পাওয়া যাচ্ছে না" লেখা থাকে
+  $("sfiExtraDetails").innerHTML = extraLines.length > 0
+    ? extraLines.join("<br>")
+    : `<span style="color:var(--muted);">বর্তমানে লাইভ এয়ারক্রাফট তথ্য পাওয়া যাচ্ছে না।</span>`;
 
   $("sfiUpdatedAt").textContent = flight.updatedAt ? new Date(flight.updatedAt).toLocaleString("bn-BD") : "—";
   // 🐛 কার্ড দৃশ্যমান হওয়ার পরেই ম্যাপ তৈরি/আপডেট করা হচ্ছে — নাহলে
   // display:none কন্টেইনারে Leaflet সাইজ ভুল ক্যালকুলেট করে
   $("sfiDetailCard").style.display = "block";
   sfiRenderLiveMap(flight);
+  sfiStartAutoRefresh();
 }
 
 // 🗺️ Live Map — driver radar map-এর মতো একই Leaflet/OpenStreetMap প্যাটার্ন
