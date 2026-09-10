@@ -3690,6 +3690,18 @@
     }
     #bccAllCategoryOverlay .bacSubChip.added{ background:rgba(74,222,128,0.15); color:#4ade80; border-color:rgba(74,222,128,0.35); }
     #bccAllCategoryOverlay .bacSubChip.onlyCat{ background:rgba(124,58,237,0.18); color:#c4b5fd; border-color:rgba(124,58,237,0.4); }
+    #bccAllCategoryOverlay .bacChevron{ font-size:18px; color:#8b94b8; flex-shrink:0; }
+    #bccAllCategoryOverlay .bacSubChip .bacSubX{ background:none; border:none; color:#f87171; cursor:pointer; font-size:12px; margin-left:6px; padding:0; }
+    #bccAllCategoryOverlay .bacCustomRow{ display:flex; gap:8px; margin-top:14px; }
+    #bccAllCategoryOverlay .bacCustomRow input{
+      flex:1; box-sizing:border-box; padding:10px 12px; border-radius:10px; font-size:13.5px; color:#fff;
+      background:#10152a; border:1px solid rgba(255,255,255,0.08);
+    }
+    #bccAllCategoryOverlay .bacCustomRow button{
+      padding:10px 14px; border-radius:10px; border:none; background:linear-gradient(135deg,#7c3aed,#5b21b6);
+      color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; flex-shrink:0;
+    }
+    #bccAllCategoryOverlay .bacBackHint{ font-size:11.5px; color:#8b94b8; margin:2px 0 14px; }
 
     /* ==================== 🐝 Market Products ড্যাশবোর্ড ==================== */
     #program-bcc .bccMarketSummary{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px; }
@@ -3922,12 +3934,13 @@
     <div id="bccAllCategoryOverlay">
       <div class="bacHead">
         <div>
-          <h3>🗂️ All Category</h3>
-          <p>টগল করে আপনার দোকানের জন্য ক্যাটাগরি বেছে নিন। সাব-ক্যাটাগরিতে ট্যাপ করলেই সাথে সাথে সেই ক্যাটাগরি দিয়ে প্রোডাক্ট যোগ করা যাবে।</p>
+          <h3 id="bccACHeadTitle">🗂️ All Category</h3>
+          <p id="bccACHeadSubtitle">টগল করে আপনার দোকানের জন্য Main Category বেছে নিন। কোনো Category-তে ট্যাপ করলে তার সাব-ক্যাটাগরি দেখা যাবে।</p>
         </div>
         <button id="bccAllCategoryCloseBtn">✕</button>
       </div>
       <div id="bccAllCategoryList"></div>
+      <div id="bccAllCategoryDetailList" style="display:none;"></div>
     </div>
 
     <!-- 🐝 Market Products — POS-এর প্রোডাক্ট Honey Bee Bazar-এ কীভাবে দেখাবে তার Workspace।
@@ -7548,7 +7561,7 @@ const BCC_MASTER_CATEGORIES = [
   { name:'📱 মোবাইল ও গ্যাজেট', subs:['স্মার্টফোন','ফিচার ফোন','চার্জার/কেবল','ইয়ারফোন/হেডফোন','মোবাইল কভার/গ্লাস','পাওয়ার ব্যাংক'] },
   { name:'🔌 ইলেকট্রনিক্স ও ইলেকট্রিক্যাল', subs:['ফ্যান','লাইট/বাল্ব','সুইচ/সকেট','ব্যাটারি','হোম অ্যাপ্লায়েন্স'] },
   { name:'💻 কম্পিউটার ও আইটি', subs:['ল্যাপটপ/ডেস্কটপ','প্রিন্টার','USB/পেনড্রাইভ','মাউস/কিবোর্ড','নেটওয়ার্কিং যন্ত্রাংশ'] },
-  { name:'👕 গার্মেন্টস ও ফ্যাশন', subs:['পুরুষদের পোশাক','মহিলাদের পোশাক','বাচ্চাদের পোশাক','জুতা/স্যান্ডেল','ব্যাগ','শীতের পোশাক'] },
+  { name:'👕 গার্মেন্টস ও ফ্যাশন', subs:['👗 মহিলাদের পোশাক','🧕 ইসলামিক পোশাক','🩲 মহিলাদের অন্তর্বাস ও নাইটওয়্যার','👔 পুরুষদের পোশাক','🩳 পুরুষদের অন্তর্বাস ও নাইটওয়্যার','👦 ছেলে শিশুদের পোশাক','👧 মেয়ে শিশুদের পোশাক','🍼 বেবি পোশাক','🏃 স্পোর্টস পোশাক','🏖️ সুইমওয়্যার ও বিচওয়্যার','🧵 কাপড় ও ফ্যাব্রিক'] },
   { name:'🧸 খেলনা ও গিফট আইটেম', subs:['খেলনা','গিফট আইটেম','স্টেশনারি'] },
   { name:'🏠 গৃহস্থালি ও হার্ডওয়্যার', subs:['রান্নাঘরের জিনিস','প্লাস্টিক আইটেম','হার্ডওয়্যার/টুলস','পেইন্ট/রং'] },
 ];
@@ -7561,38 +7574,93 @@ function bccFindOwnCategoryByName(name){
   const norm = bccNormalizeCatName(name);
   return bccLoadCategories().find(c=> bccNormalizeCatName(c.name)===norm) || null;
 }
+// null হলে লিস্ট-ভিউ (সব Main Category), নাম্বার হলে সেই ইনডেক্সের ক্যাটাগরির সাব-ক্যাটাগরি ডিটেইল-ভিউ
+let bccACCurrentIdx = null;
 function bccOpenAllCategoryDashboard(){
-  bccRenderAllCategoryDashboard();
+  bccACCurrentIdx = null;
+  bccACShowListView();
   document.getElementById('bccAllCategoryOverlay').classList.add('show');
 }
+function bccACShowListView(){
+  bccACCurrentIdx = null;
+  document.getElementById('bccACHeadTitle').textContent = '🗂️ All Category';
+  document.getElementById('bccACHeadSubtitle').textContent = 'টগল করে আপনার দোকানের জন্য Main Category বেছে নিন। কোনো Category-তে ট্যাপ করলে তার সাব-ক্যাটাগরি দেখা যাবে।';
+  document.getElementById('bccAllCategoryCloseBtn').textContent = '✕';
+  document.getElementById('bccAllCategoryList').style.display = 'block';
+  document.getElementById('bccAllCategoryDetailList').style.display = 'none';
+  bccRenderAllCategoryDashboard();
+}
+function bccACShowDetailView(idx){
+  bccACCurrentIdx = idx;
+  const mc = BCC_MASTER_CATEGORIES[idx];
+  document.getElementById('bccACHeadTitle').textContent = mc.name;
+  document.getElementById('bccACHeadSubtitle').textContent = 'টগল/ট্যাপ করে সাব-ক্যাটাগরি বেছে নিন — এখানে যোগ করা কোনো সাব-ক্যাটাগরিতে ট্যাপ করলে সরাসরি Add Product খুলবে। নিজের সাব-ক্যাটাগরিও হাতে লিখে যোগ করতে পারবেন।';
+  document.getElementById('bccAllCategoryCloseBtn').textContent = '←';
+  document.getElementById('bccAllCategoryList').style.display = 'none';
+  document.getElementById('bccAllCategoryDetailList').style.display = 'block';
+  bccRenderAllCategoryDetail(idx);
+}
+// লিস্ট-ভিউ — শুধু Main Category-র নাম + টগল, কোনো সাব-ক্যাটাগরি এখানে দেখানো হয় না
+// (সাব-ক্যাটাগরি দেখতে/বাছাই করতে ক্যাটাগরির ওপর ট্যাপ করে ভেতরে ঢুকতে হবে)
 function bccRenderAllCategoryDashboard(){
   const listEl = document.getElementById('bccAllCategoryList');
   listEl.innerHTML = BCC_MASTER_CATEGORIES.map((mc, idx)=>{
     const own = bccFindOwnCategoryByName(mc.name);
-    const ownSubNames = own ? own.subs.map(s=> bccNormalizeCatName(s.name)) : [];
+    const subCount = own ? own.subs.length : mc.subs.length;
     return `
     <div class="bacCard">
-      <div class="bacCardHead" data-toggle-cat="${idx}">
-        <div><div class="nm">${escapeHtml(mc.name)}</div><div class="cnt">${mc.subs.length} সাব-ক্যাটাগরি ${own?'· ✅ আপনার লিস্টে আছে':''}</div></div>
-        <button class="bacToggle ${own?'on':''}" data-toggle-cat="${idx}"></button>
-      </div>
-      <div class="bacSubWrap">
-        <span class="bacSubChip onlyCat" data-cat-only="${idx}">🏷️ শুধু এই Category (সাব ছাড়া)</span>
-        ${mc.subs.map(s=>`<span class="bacSubChip ${ownSubNames.includes(bccNormalizeCatName(s))?'added':''}" data-cat="${idx}" data-sub="${escapeHtml(s)}">${escapeHtml(s)}</span>`).join('')}
+      <div class="bacCardHead" data-open-detail="${idx}">
+        <div><div class="nm">${escapeHtml(mc.name)}</div><div class="cnt">${subCount} সাব-ক্যাটাগরি ${own?'· ✅ আপনার লিস্টে আছে':''}</div></div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="bacToggle ${own?'on':''}" data-toggle-cat="${idx}"></button>
+          <span class="bacChevron">›</span>
+        </div>
       </div>
     </div>`;
   }).join('');
   listEl.querySelectorAll('[data-toggle-cat]').forEach(el=>{
     el.addEventListener('click', (e)=>{ e.stopPropagation(); bccAllCategoryToggle(Number(el.dataset.toggleCat)); });
   });
-  listEl.querySelectorAll('[data-cat-only]').forEach(el=>{
-    el.addEventListener('click', (e)=>{ e.stopPropagation(); bccAllCategorySelect(Number(el.dataset.catOnly), null); });
-  });
-  listEl.querySelectorAll('.bacSubChip[data-sub]').forEach(el=>{
-    el.addEventListener('click', (e)=>{ e.stopPropagation(); bccAllCategorySelect(Number(el.dataset.cat), el.dataset.sub); });
+  listEl.querySelectorAll('[data-open-detail]').forEach(el=>{
+    el.addEventListener('click', ()=> bccACShowDetailView(Number(el.dataset.openDetail)));
   });
 }
-// টগল সুইচ — শুধু ক্যাটাগরিটা নিজের লিস্টে যোগ/বাদ করে (কোনো প্রোডাক্ট ফর্ম খোলে না),
+// ডিটেইল-ভিউ — একটা নির্দিষ্ট Main Category-র প্রি-বিল্ট সাব-ক্যাটাগরি লিস্ট + যোগ করা থাকলে ✕
+// দিয়ে বাদ দেওয়ার সুবিধা + নিজের সাব-ক্যাটাগরি হাতে লিখে যোগ করার ফর্ম
+function bccRenderAllCategoryDetail(idx){
+  const mc = BCC_MASTER_CATEGORIES[idx];
+  const own = bccFindOwnCategoryByName(mc.name);
+  const detailEl = document.getElementById('bccAllCategoryDetailList');
+  detailEl.innerHTML = `
+    <div class="bacBackHint">${own?'✅ এই Category আপনার লিস্টে আছে':'⚪ এই Category এখনো আপনার লিস্টে যোগ হয়নি — নিচের কোনো সাব-ক্যাটাগরিতে ট্যাপ করলেই যোগ হয়ে যাবে'}</div>
+    <div class="bacSubWrap">
+      <span class="bacSubChip onlyCat" data-cat-only="1">🏷️ শুধু এই Category (সাব ছাড়া)</span>
+      ${mc.subs.map(s=>{
+        const ownSub = own ? own.subs.find(x=> bccNormalizeCatName(x.name)===bccNormalizeCatName(s)) : null;
+        return `<span class="bacSubChip ${ownSub?'added':''}" data-sub="${escapeHtml(s)}">${escapeHtml(s)}${ownSub?` <button class="bacSubX" data-remove-sub="${escapeHtml(s)}">✕</button>`:''}</span>`;
+      }).join('')}
+      ${own ? own.subs.filter(os=> !mc.subs.some(s=> bccNormalizeCatName(s)===bccNormalizeCatName(os.name))).map(os=>
+        `<span class="bacSubChip added" data-sub="${escapeHtml(os.name)}">${escapeHtml(os.name)} <button class="bacSubX" data-remove-sub="${escapeHtml(os.name)}">✕</button></span>`
+      ).join('') : ''}
+    </div>
+    <div class="bacCustomRow">
+      <input type="text" id="bccACCustomSubInput" placeholder="✍️ নিজের সাব-ক্যাটাগরি লিখুন...">
+      <button id="bccACAddCustomSubBtn">➕ যোগ করুন</button>
+    </div>
+  `;
+  detailEl.querySelector('[data-cat-only]').addEventListener('click', ()=> bccAllCategorySelect(idx, null));
+  detailEl.querySelectorAll('.bacSubChip[data-sub]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-remove-sub]')) return; // ✕ বাটনের নিজস্ব হ্যান্ডলার আলাদাভাবে চলবে
+      bccAllCategorySelect(idx, el.dataset.sub);
+    });
+  });
+  detailEl.querySelectorAll('[data-remove-sub]').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); bccACRemoveSub(idx, el.dataset.removeSub); });
+  });
+  document.getElementById('bccACAddCustomSubBtn').addEventListener('click', ()=> bccACAddCustomSub(idx));
+}
+// টগল সুইচ (লিস্ট-ভিউ) — শুধু ক্যাটাগরিটা নিজের লিস্টে যোগ/বাদ করে (কোনো প্রোডাক্ট ফর্ম খোলে না),
 // যোগ করার সময় প্রি-বিল্ট সব সাব-ক্যাটাগরিও একসাথে চলে আসে যাতে হাতে আর একটাও টাইপ করতে না হয়
 function bccAllCategoryToggle(idx){
   const mc = BCC_MASTER_CATEGORIES[idx];
@@ -7616,6 +7684,49 @@ function bccAllCategoryToggle(idx){
     toast('✅ ক্যাটাগরি আপনার লিস্টে যোগ হলো');
   }
   bccRenderAllCategoryDashboard();
+  bccRenderCategories(); bccRenderOverview();
+}
+// ডিটেইল-ভিউতে একটা যোগ-করা সাব-ক্যাটাগরির ✕ চাপলে — সেই সাব-ক্যাটাগরিতে প্রোডাক্ট থাকলে
+// ব্লক করে, নাহলে নিজের লিস্ট থেকে বাদ দিয়ে দেয় (Main Category-টা থেকে যায়)
+function bccACRemoveSub(idx, subName){
+  const mc = BCC_MASTER_CATEGORIES[idx];
+  const cats = bccLoadCategories();
+  const own = cats.find(c=> bccNormalizeCatName(c.name)===bccNormalizeCatName(mc.name));
+  if(!own) return;
+  const ownSub = own.subs.find(s=> bccNormalizeCatName(s.name)===bccNormalizeCatName(subName));
+  if(!ownSub) return;
+  const prods = bccLoadProducts();
+  if(prods.some(p=> p.catId===own.id && p.subId===ownSub.id)){
+    toast('⚠️ এই সাব-ক্যাটাগরিতে প্রোডাক্ট আছে — তাই বাদ দেওয়া যাবে না');
+    return;
+  }
+  own.subs = own.subs.filter(s=>s.id!==ownSub.id);
+  bccSaveCategories(cats);
+  toast('সাব-ক্যাটাগরি বাদ দেওয়া হলো');
+  bccRenderAllCategoryDetail(idx);
+  bccRenderCategories(); bccRenderOverview();
+}
+// ডিটেইল-ভিউতে হাতে লিখে নিজের সাব-ক্যাটাগরি যোগ করা — প্রি-বিল্ট লিস্টে না থাকা কোনো
+// সাব-ক্যাটাগরিও এভাবে বানানো যাবে (এটা সরাসরি Add Product-এ নিয়ে যায় না, শুধু লিস্টে যোগ করে)
+function bccACAddCustomSub(idx){
+  const mc = BCC_MASTER_CATEGORIES[idx];
+  const input = document.getElementById('bccACCustomSubInput');
+  const name = input.value.trim();
+  if(!name){ toast('সাব-ক্যাটাগরির নাম লিখুন'); return; }
+  const cats = bccLoadCategories();
+  let own = cats.find(c=> bccNormalizeCatName(c.name)===bccNormalizeCatName(mc.name));
+  if(!own){
+    own = { id: bccUid(), name: mc.name, subs: [], imageUrl:null };
+    cats.push(own);
+  }
+  if(own.subs.some(s=> bccNormalizeCatName(s.name)===bccNormalizeCatName(name))){
+    toast('এই নামে সাব-ক্যাটাগরি আগে থেকেই আছে');
+    return;
+  }
+  own.subs.push({ id: bccUid(), name });
+  bccSaveCategories(cats);
+  toast('✅ সাব-ক্যাটাগরি যোগ হলো');
+  bccRenderAllCategoryDetail(idx);
   bccRenderCategories(); bccRenderOverview();
 }
 // একটা Category বা Sub-category "সিলেক্ট" করলে — সেটা নিজের লিস্টে না থাকলে আগে যোগ করে
@@ -7647,7 +7758,10 @@ function bccAllCategorySelect(idx, subName){
   toast('✅ Category বসানো হলো — এখন প্রোডাক্টের তথ্য দিন');
 }
 document.getElementById('bccOpenAllCategoryBtn').addEventListener('click', bccOpenAllCategoryDashboard);
-document.getElementById('bccAllCategoryCloseBtn').addEventListener('click', ()=> document.getElementById('bccAllCategoryOverlay').classList.remove('show'));
+document.getElementById('bccAllCategoryCloseBtn').addEventListener('click', ()=>{
+  if(bccACCurrentIdx !== null){ bccACShowListView(); }
+  else { document.getElementById('bccAllCategoryOverlay').classList.remove('show'); }
+});
 
 /* ==================== 📦 প্রোডাক্টের ধরন (Weight-Based / Batch-Expiry / Serial / Variant) ====================
    আগে এটা পুরো দোকানের জন্য একটামাত্র "মোড" ছিল (সাইনআপের সময় ক্যাটাগরি
