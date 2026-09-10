@@ -59,7 +59,7 @@ self.addEventListener("notificationclick", (event) => {
   // 📢 Honey Bee Transport Media Phase 7 — যাত্রী-মুখী পুশ (নতুন ভাড়া
   // অফার, ট্রিপ কনফার্ম) Bazar অ্যাপে যাবে; ড্রাইভার-মুখী পুশ (ট্রিপ
   // কনফার্ম, পোস্টে মন্তব্য) Rider/Driver Mode-এ (shop-ledger-app.html)
-  const passengerFacingTypes = ["messenger-message", "trip-offer", "trip-confirmed", "trip-chat-passenger"];
+  const passengerFacingTypes = ["messenger-message", "trip-offer", "trip-confirmed", "trip-chat-passenger", "flight-update"];
   const targetFile = passengerFacingTypes.includes(type) ? "honey-bee-bazar.html" : "shop-ledger-app.html";
 
   event.waitUntil(

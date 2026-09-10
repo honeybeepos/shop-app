@@ -908,6 +908,16 @@
       <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">লাইভ ফ্লাইট স্ট্যাটাস ও তথ্য — Honey Bee Bazar/Delivery থেকে সম্পূর্ণ আলাদা</div>
     </div>
 
+    <!-- ⭐ Saved Flights — Phase 2 -->
+    <button id="sfiSavedToggleBtn" class="card" style="width:100%; text-align:left; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:10px; margin-bottom:12px; border:none;">
+      <span style="font-size:18px;">⭐</span>
+      <span style="flex:1; text-align:left; font-weight:800; font-size:12.5px;">সেভ করা ফ্লাইট</span>
+      <span style="color:var(--muted); font-size:14px;">›</span>
+    </button>
+    <div id="sfiSavedListWrap" style="display:none; margin-bottom:12px;">
+      <div id="sfiSavedList"></div>
+    </div>
+
     <!-- 🔎 দুই ধরনের সার্চ — ফ্লাইট নম্বর দিয়ে, অথবা Departure+Arrival Airport দিয়ে -->
     <div class="card" id="sfiSearchCard">
       <div style="display:flex; gap:6px; margin-bottom:12px;">
@@ -955,6 +965,8 @@
         <div id="sfiDetailStatusBadge" style="padding:5px 12px; border-radius:20px; font-size:11px; font-weight:800;">—</div>
       </div>
 
+      <button type="button" id="sfiSaveTrackBtn" style="width:100%; padding:11px; border-radius:10px; border:1px solid rgba(251,191,36,0.4); background:rgba(251,191,36,0.1); color:var(--amber); font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; margin-bottom:14px;">⭐ সেভ ও ট্র্যাক করুন</button>
+
       <div style="display:flex; justify-content:space-between; gap:10px; margin-bottom:14px;">
         <div style="flex:1;">
           <div id="sfiDepIata" style="font-size:20px; font-weight:800;">—</div>
@@ -985,6 +997,13 @@
       <div id="sfiExtraDetailsWrap" style="background:rgba(255,255,255,0.04); border-radius:12px; padding:12px; display:none;">
         <div style="font-size:11.5px; font-weight:800; color:var(--amber); margin-bottom:8px;">ℹ️ অতিরিক্ত তথ্য</div>
         <div id="sfiExtraDetails" style="font-size:12px; color:#ddd; line-height:1.9;">—</div>
+      </div>
+
+      <!-- 🗺️ Live Map — AviationStack-এর Real-Time প্ল্যানে লাইভ lat/lng এলে
+           তবেই দেখানো হয় (বেশিরভাগ ফ্রি প্ল্যানে এটা আসে না, তখন হাইড থাকে) -->
+      <div id="sfiMapWrap" style="display:none; margin-top:10px;">
+        <div style="font-size:11.5px; font-weight:800; color:var(--amber); margin-bottom:8px;">🗺️ লাইভ অবস্থান</div>
+        <div id="sfiMap" style="width:100%; height:180px; border-radius:12px; overflow:hidden; border:1px solid var(--border);"></div>
       </div>
 
       <div style="font-size:10px; color:var(--muted); margin-top:10px; text-align:center;">সর্বশেষ আপডেটঃ <span id="sfiUpdatedAt">—</span></div>
@@ -3250,7 +3269,11 @@ function sfiRenderList(flights){
   });
 }
 
+let __sfiCurrentFlight = null;
+
 function sfiRenderDetail(flight, cameFromList){
+  __sfiCurrentFlight = flight;
+  sfiRefreshSaveTrackBtnState(flight);
   $("sfiResultsList").innerHTML = "";
   $("sfiBackToListBtn").style.display = cameFromList ? "block" : "none";
   $("sfiBackToListBtn").onclick = ()=>{ $("sfiDetailCard").style.display = "none"; sfiRenderList(__sfiFlights); };
@@ -3312,8 +3335,174 @@ function sfiRenderDetail(flight, cameFromList){
   }
 
   $("sfiUpdatedAt").textContent = flight.updatedAt ? new Date(flight.updatedAt).toLocaleString("bn-BD") : "—";
+  // 🐛 কার্ড দৃশ্যমান হওয়ার পরেই ম্যাপ তৈরি/আপডেট করা হচ্ছে — নাহলে
+  // display:none কন্টেইনারে Leaflet সাইজ ভুল ক্যালকুলেট করে
   $("sfiDetailCard").style.display = "block";
+  sfiRenderLiveMap(flight);
 }
+
+// 🗺️ Live Map — driver radar map-এর মতো একই Leaflet/OpenStreetMap প্যাটার্ন
+// (shop-ledger-app.html-এ ব্যবহৃত), কার্ড ভাড়া করে নয় — সম্পূর্ণ open-source,
+// কোনো Google Maps billing লাগে না। lat/lng না থাকলে (বেশিরভাগ ফ্রি
+// AviationStack প্ল্যানে) সেকশনটাই হাইড থাকে।
+let __sfiMap = null, __sfiMapMarker = null;
+function sfiRenderLiveMap(flight){
+  const wrap = $("sfiMapWrap");
+  if(flight.latitude == null || flight.longitude == null){
+    wrap.style.display = "none";
+    return;
+  }
+  wrap.style.display = "block";
+  const latlng = [flight.latitude, flight.longitude];
+  const planeIcon = L.divIcon({
+    html: `<div style="font-size:22px; transform:rotate(${flight.heading != null ? flight.heading : 0}deg); filter:drop-shadow(0 0 3px #000);">✈️</div>`,
+    className: "", iconSize: [26,26], iconAnchor: [13,13]
+  });
+  if(!__sfiMap){
+    __sfiMap = L.map("sfiMap", { zoomControl: false, attributionControl: false }).setView(latlng, 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(__sfiMap);
+    __sfiMapMarker = L.marker(latlng, { icon: planeIcon }).addTo(__sfiMap);
+  }else{
+    // 🐛 লিফলেট ম্যাপ একবার একটা display:none কন্টেইনারে তৈরি হয়ে থাকলে
+    // সাইজ ভুল ক্যালকুলেট করে — invalidateSize() দিয়ে আবার সঠিক মাপে আনা হয়
+    setTimeout(()=> __sfiMap.invalidateSize(), 50);
+    __sfiMap.setView(latlng, 6);
+    __sfiMapMarker.setLatLng(latlng);
+    __sfiMapMarker.setIcon(planeIcon);
+  }
+}
+
+/* ==================== ⭐ Smart Flight Tracking — Phase 2 (Saved Flights + Tracking) ====================
+   customers/{uid}/savedFlights/{flightNumber_flightDate}-এ সরাসরি
+   ক্লায়েন্ট থেকে Firestore write (firestore.rules-এ owner-only)। Track
+   চালু রাখলে functions/index.js-এর checkWatchedFlights (প্রতি ৫ মিনিটে)
+   status/gate/সময় পরিবর্তন চেক করে পুশ নোটিফিকেশন পাঠায়। */
+$("sfiSavedToggleBtn") && $("sfiSavedToggleBtn").addEventListener("click", ()=>{
+  const wrap = $("sfiSavedListWrap");
+  const opening = wrap.style.display === "none";
+  wrap.style.display = opening ? "block" : "none";
+  if(opening) sfiLoadSavedList();
+});
+
+async function sfiLoadSavedList(){
+  const listEl = $("sfiSavedList");
+  if(!currentCustomer || !currentCustomer.uid){
+    listEl.innerHTML = `<div class="emptyMsg">সেভ করা ফ্লাইট দেখতে লগইন করুন।</div>`;
+    return;
+  }
+  listEl.innerHTML = `<div class="loadingMsg">লোড হচ্ছে...</div>`;
+  try{
+    const snap = await db.collection("customers").doc(currentCustomer.uid).collection("savedFlights").orderBy("savedAt", "desc").get();
+    if(snap.empty){
+      listEl.innerHTML = `<div class="emptyMsg">কোনো ফ্লাইট সেভ করা নেই।</div>`;
+      return;
+    }
+    listEl.innerHTML = snap.docs.map((doc)=>{
+      const d = doc.data();
+      const meta = SFI_STATUS_META[d.lastKnownStatus || "unknown"] || SFI_STATUS_META.unknown;
+      return `<div class="card sfiSavedItem" data-id="${escapeHtml(doc.id)}" data-fn="${escapeHtml(d.flightNumber || "")}" data-fd="${escapeHtml(d.flightDate || "")}" style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <div style="font-size:20px;">✈️</div>
+        <div style="flex:1; cursor:pointer;" class="sfiSavedItemView">
+          <div style="font-weight:800; font-size:13px;">${escapeHtml(d.flightNumber || "—")} <span style="color:var(--muted); font-weight:600; font-size:11.5px;">${escapeHtml(d.airline || "")}</span></div>
+          <div style="font-size:11px; color:var(--muted); margin-top:2px;">${escapeHtml(d.departureIata || "—")} → ${escapeHtml(d.arrivalIata || "—")} · ${escapeHtml(d.flightDate || "")}</div>
+        </div>
+        <div style="padding:4px 10px; border-radius:14px; font-size:10px; font-weight:800; color:#fff; background:${meta.color};">${d.trackingEnabled ? "🔔 " : ""}${meta.label}</div>
+        <span class="sfiSavedItemRemove" style="font-size:16px; color:var(--muted); cursor:pointer; padding:4px;">🗑️</span>
+      </div>`;
+    }).join("");
+    listEl.querySelectorAll(".sfiSavedItem").forEach((card)=>{
+      const flightNumber = card.dataset.fn, flightDate = card.dataset.fd, docId = card.dataset.id;
+      card.querySelector(".sfiSavedItemView").addEventListener("click", ()=> sfiViewSavedFlight(flightNumber, flightDate));
+      card.querySelector(".sfiSavedItemRemove").addEventListener("click", async (e)=>{
+        e.stopPropagation();
+        if(!confirm("এই ফ্লাইটটা সেভ-লিস্ট থেকে সরিয়ে ফেলবেন?")) return;
+        try{
+          await db.collection("customers").doc(currentCustomer.uid).collection("savedFlights").doc(docId).delete();
+          sfiLoadSavedList();
+        }catch(err){ alert("সরানো যায়নি: " + err.message); }
+      });
+    });
+  }catch(e){
+    listEl.innerHTML = `<div class="emptyMsg">লোড করা যায়নি — একটু পরে আবার চেষ্টা করুন।</div>`;
+  }
+}
+
+async function sfiViewSavedFlight(flightNumber, flightDate){
+  $("sfiSavedListWrap").style.display = "none";
+  sfiShowMsg("");
+  try{
+    const callable = functionsInstance.httpsCallable("searchFlight");
+    const result = await callable({ flightNumber, flightDate });
+    const flights = (result.data && result.data.flights) || [];
+    if(flights.length > 0) sfiRenderDetail(flights[0], false);
+    else sfiShowMsg("এই ফ্লাইটের সর্বশেষ তথ্য পাওয়া যায়নি।");
+  }catch(e){
+    sfiShowMsg((e && e.message) || "তথ্য পাওয়া যায়নি।");
+  }
+}
+
+async function sfiRefreshSaveTrackBtnState(flight){
+  const btn = $("sfiSaveTrackBtn");
+  if(!flight || !flight.flightNumber || !flight.flightDate){
+    btn.style.display = "none";
+    return;
+  }
+  btn.style.display = "block";
+  if(!currentCustomer || !currentCustomer.uid){
+    btn.textContent = "⭐ সেভ করতে লগইন করুন";
+    btn.dataset.saved = "0";
+    return;
+  }
+  const flightId = `${flight.flightNumber}_${flight.flightDate}`;
+  try{
+    const doc = await db.collection("customers").doc(currentCustomer.uid).collection("savedFlights").doc(flightId).get();
+    if(doc.exists){
+      btn.textContent = "✅ ট্র্যাক করা হচ্ছে — বাতিল করতে ট্যাপ করুন";
+      btn.dataset.saved = "1";
+    }else{
+      btn.textContent = "⭐ সেভ ও ট্র্যাক করুন";
+      btn.dataset.saved = "0";
+    }
+  }catch(e){
+    btn.textContent = "⭐ সেভ ও ট্র্যাক করুন";
+    btn.dataset.saved = "0";
+  }
+}
+
+$("sfiSaveTrackBtn") && $("sfiSaveTrackBtn").addEventListener("click", async ()=>{
+  if(!__sfiCurrentFlight) return;
+  if(!currentCustomer || !currentCustomer.uid){
+    alert("ফ্লাইট সেভ/ট্র্যাক করতে আগে লগইন করুন।");
+    return;
+  }
+  const flight = __sfiCurrentFlight;
+  const flightId = `${flight.flightNumber}_${flight.flightDate}`;
+  const btn = $("sfiSaveTrackBtn");
+  const ref = db.collection("customers").doc(currentCustomer.uid).collection("savedFlights").doc(flightId);
+  btn.disabled = true;
+  try{
+    if(btn.dataset.saved === "1"){
+      await ref.delete();
+    }else{
+      await ref.set({
+        flightNumber: flight.flightNumber,
+        flightDate: flight.flightDate,
+        departureIata: flight.departureIata,
+        arrivalIata: flight.arrivalIata,
+        airline: flight.airline,
+        trackingEnabled: true,
+        savedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    await sfiRefreshSaveTrackBtnState(flight);
+  }catch(e){
+    alert("করা যায়নি: " + e.message);
+  }finally{
+    btn.disabled = false;
+  }
+});
 
 /* ==================== 🤏 চেপে ধরে কনফার্ম করুন (Hold-to-Confirm) ====================
    গুরুত্বপূর্ণ/অপরিবর্তনীয় কাজে (যেমন "রক্ত পেয়ে গেছি", "আজ রক্ত দিয়েছি")

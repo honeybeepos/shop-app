@@ -304,6 +304,14 @@ service cloud.firestore {
 
     match /customers/{uid} {
       allow read, write: if isSignedIn() && request.auth.uid == uid;
+
+      // ✈️ Smart Flight Tracking — Phase 2 (Saved Flights + Notification)।
+      // শুধু মালিক নিজে পড়তে/লিখতে পারবেন — Cloud Function (Admin SDK)
+      // এই একই ডকুমেন্টে lastKnownStatus/trackingEnabled আপডেট করে,
+      // rules বাইপাস করে বলে ক্লায়েন্টের rules-এ প্রভাব পড়ে না।
+      match /savedFlights/{flightId} {
+        allow read, write: if isSignedIn() && request.auth.uid == uid;
+      }
     }
 
     match /wallets/{uid} {
