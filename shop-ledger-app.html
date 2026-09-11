@@ -3703,6 +3703,14 @@
     }
     #bccAllCategoryOverlay .bacSubChip.added{ background:rgba(74,222,128,0.15); color:#4ade80; border-color:rgba(74,222,128,0.35); }
     #bccAllCategoryOverlay .bacSubChip.onlyCat{ background:rgba(124,58,237,0.18); color:#c4b5fd; border-color:rgba(124,58,237,0.4); }
+    #bccAllCategoryOverlay .bacSubChip.onlyCat.small{ font-size:11px; padding:5px 9px; }
+    #bccAllCategoryOverlay .bacSubChip.branch{ background:rgba(124,58,237,0.12); border-color:rgba(124,58,237,0.3); }
+    #bccAllCategoryOverlay .bacBranchWrap{ display:flex; flex-direction:column; align-items:flex-start; width:100%; margin-bottom:2px; }
+    #bccAllCategoryOverlay .bacBranchList{
+      margin-top:0; max-height:0; overflow:hidden; transition:max-height .25s ease, margin-top .25s ease;
+      padding-left:14px; display:flex; flex-wrap:wrap; gap:6px; width:100%; box-sizing:border-box;
+    }
+    #bccAllCategoryOverlay .bacBranchList.open{ margin-top:8px; max-height:700px; margin-bottom:10px; }
     #bccAllCategoryOverlay .bacChevron{ font-size:18px; color:#8b94b8; flex-shrink:0; }
     #bccAllCategoryOverlay .bacSubChip .bacSubX{ background:none; border:none; color:#f87171; cursor:pointer; font-size:12px; margin-left:6px; padding:0; }
     #bccAllCategoryOverlay .bacCustomRow{ display:flex; gap:8px; margin-top:14px; }
@@ -7586,7 +7594,19 @@ const BCC_MASTER_CATEGORIES = [
   { name:'📱 মোবাইল ও গ্যাজেট', subs:['স্মার্টফোন','ফিচার ফোন','চার্জার/কেবল','ইয়ারফোন/হেডফোন','মোবাইল কভার/গ্লাস','পাওয়ার ব্যাংক'] },
   { name:'🔌 ইলেকট্রনিক্স ও ইলেকট্রিক্যাল', subs:['ফ্যান','লাইট/বাল্ব','সুইচ/সকেট','ব্যাটারি','হোম অ্যাপ্লায়েন্স'] },
   { name:'💻 কম্পিউটার ও আইটি', subs:['ল্যাপটপ/ডেস্কটপ','প্রিন্টার','USB/পেনড্রাইভ','মাউস/কিবোর্ড','নেটওয়ার্কিং যন্ত্রাংশ'] },
-  { name:'👕 গার্মেন্টস ও ফ্যাশন', subs:['👗 মহিলাদের পোশাক','🧕 ইসলামিক পোশাক','🩲 মহিলাদের অন্তর্বাস ও নাইটওয়্যার','👔 পুরুষদের পোশাক','🩳 পুরুষদের অন্তর্বাস ও নাইটওয়্যার','👦 ছেলে শিশুদের পোশাক','👧 মেয়ে শিশুদের পোশাক','🍼 বেবি পোশাক','🏃 স্পোর্টস পোশাক','🏖️ সুইমওয়্যার ও বিচওয়্যার','🧵 কাপড় ও ফ্যাব্রিক'] },
+  { name:'👕 গার্মেন্টস ও ফ্যাশন', subs:[
+    { name:'👗 মহিলাদের পোশাক', subs:['ড্রেস','টপস','টি-শার্ট','শার্ট','ব্লাউজ','কুর্তি','কামিজ','গাউন','প্যান্ট','জিন্স','লেগিংস','স্কার্ট','শর্টস','টু-পিস সেট','থ্রি-পিস','কোট','জ্যাকেট','সোয়েটার','হুডি','অন্যান্য'] },
+    { name:'🧕 ইসলামিক পোশাক', subs:['আবায়া','বোরকা','হিজাব','নিকাব','খিমার','ইসলামিক ড্রেস','নামাজের পোশাক','অন্যান্য'] },
+    { name:'🩲 মহিলাদের অন্তর্বাস ও নাইটওয়্যার', subs:['ব্রা','প্যান্টি','ইননারওয়্যার','শেপওয়্যার','স্লিপওয়্যার','নাইট ড্রেস','নাইটগাউন','পাজামা সেট','লাউঞ্জওয়্যার','অন্যান্য'] },
+    { name:'👔 পুরুষদের পোশাক', subs:['টি-শার্ট','পোলো শার্ট','শার্ট','প্যান্ট','জিন্স','শর্টস','পাঞ্জাবি','থোব/জুব্বা','ট্র্যাক প্যান্ট','ট্র্যাকসুট','কোট','ব্লেজার','জ্যাকেট','সোয়েটার','হুডি','অন্যান্য'] },
+    { name:'🩳 পুরুষদের অন্তর্বাস ও নাইটওয়্যার', subs:['আন্ডারওয়্যার','বক্সার','ভেস্ট','ইননারওয়্যার','পাজামা','নাইটওয়্যার','লাউঞ্জওয়্যার','অন্যান্য'] },
+    { name:'👦 ছেলে শিশুদের পোশাক', subs:['টি-শার্ট','শার্ট','প্যান্ট','জিন্স','শর্টস','পাঞ্জাবি','জ্যাকেট','সোয়েটার','হুডি','ট্র্যাকসুট','পোশাক সেট','অন্যান্য'] },
+    { name:'👧 মেয়ে শিশুদের পোশাক', subs:['ড্রেস','ফ্রক','টপস','টি-শার্ট','প্যান্ট','লেগিংস','স্কার্ট','গাউন','জ্যাকেট','সোয়েটার','পোশাক সেট','অন্যান্য'] },
+    { name:'🍼 বেবি পোশাক', subs:['নবজাতকের পোশাক','বেবি সেট','বডিস্যুট','রম্পার','টি-শার্ট','প্যান্ট','বেবি ড্রেস','সোয়েটার','জ্যাকেট','কম্বল/র‍্যাপ','অন্যান্য'] },
+    { name:'🏃 স্পোর্টস পোশাক', subs:['স্পোর্টস টি-শার্ট','জার্সি','স্পোর্টস টপ','ট্র্যাক প্যান্ট','স্পোর্টস শর্টস','লেগিংস','ট্র্যাকসুট','স্পোর্টস সেট','যোগব্যায়ামের পোশাক','জিম পোশাক','অন্যান্য'] },
+    { name:'🏖️ সুইমওয়্যার ও বিচওয়্যার', subs:['পুরুষদের সুইমওয়্যার','মহিলাদের সুইমওয়্যার','শিশুদের সুইমওয়্যার','বিচ ড্রেস','বিচ কভার-আপ','সুইমিং শর্টস','অন্যান্য'] },
+    { name:'🧵 কাপড় ও ফ্যাব্রিক', subs:['কটন কাপড়','সিল্ক','লিনেন','জর্জেট','শিফন','ডেনিম','নিট কাপড়','প্রিন্টেড কাপড়','থ্রি-পিস কাপড়','পাঞ্জাবির কাপড়','ব্লাউজের কাপড়','পর্দার কাপড়','অন্যান্য'] }
+  ] },
   { name:'🧸 খেলনা ও গিফট আইটেম', subs:['খেলনা','গিফট আইটেম','স্টেশনারি'] },
   { name:'🏠 গৃহস্থালি ও হার্ডওয়্যার', subs:['রান্নাঘরের জিনিস','প্লাস্টিক আইটেম','হার্ডওয়্যার/টুলস','পেইন্ট/রং'] },
 ];
@@ -7599,6 +7619,11 @@ function bccFindOwnCategoryByName(name){
   const norm = bccNormalizeCatName(name);
   return bccLoadCategories().find(c=> bccNormalizeCatName(c.name)===norm) || null;
 }
+// BCC_MASTER_CATEGORIES-এ একটা sub হয় সাধারণ স্ট্রিং (leaf, নিজের কোনো নেস্টেড আইটেম নেই)
+// অথবা {name, subs:[...]} অবজেক্ট (branch — যেমন "মহিলাদের পোশাক"-এর ভিতরে ড্রেস/টপস/...
+// থাকে) — এই দুই হেল্পার দিয়ে দুই ফরম্যাটই একইভাবে হ্যান্ডেল করা যায়
+function bccSubEntryName(s){ return (typeof s === 'string') ? s : s.name; }
+function bccSubEntrySubs(s){ return (s && typeof s === 'object' && s.subs) ? s.subs : []; }
 // null হলে লিস্ট-ভিউ (সব Main Category), নাম্বার হলে সেই ইনডেক্সের ক্যাটাগরির সাব-ক্যাটাগরি ডিটেইল-ভিউ
 let bccACCurrentIdx = null;
 function bccOpenAllCategoryDashboard(){
@@ -7660,30 +7685,97 @@ function bccRenderAllCategoryDetail(idx){
     <div class="bacBackHint">${own?'✅ এই Category আপনার লিস্টে আছে':'⚪ এই Category এখনো আপনার লিস্টে যোগ হয়নি — নিচের কোনো সাব-ক্যাটাগরিতে ট্যাপ করলেই যোগ হয়ে যাবে'}</div>
     <div class="bacSubWrap">
       <span class="bacSubChip onlyCat" data-cat-only="1">🏷️ শুধু এই Category (সাব ছাড়া)</span>
-      ${mc.subs.map(s=>{
-        const ownSub = own ? own.subs.find(x=> bccNormalizeCatName(x.name)===bccNormalizeCatName(s)) : null;
-        return `<span class="bacSubChip ${ownSub?'added':''}" data-sub="${escapeHtml(s)}">${escapeHtml(s)}${ownSub?` <button class="bacSubX" data-remove-sub="${escapeHtml(s)}">✕</button>`:''}</span>`;
-      }).join('')}
-      ${own ? own.subs.filter(os=> !mc.subs.some(s=> bccNormalizeCatName(s)===bccNormalizeCatName(os.name))).map(os=>
-        `<span class="bacSubChip added" data-sub="${escapeHtml(os.name)}">${escapeHtml(os.name)} <button class="bacSubX" data-remove-sub="${escapeHtml(os.name)}">✕</button></span>`
-      ).join('') : ''}
     </div>
+    <div id="bccACSubList"></div>
     <div class="bacCustomRow">
       <input type="text" id="bccACCustomSubInput" placeholder="✍️ নিজের সাব-ক্যাটাগরি লিখুন...">
       <button id="bccACAddCustomSubBtn">➕ যোগ করুন</button>
     </div>
   `;
+  // 🌿 প্রতিটা sub হয় leaf (সরাসরি ট্যাপ করলেই সিলেক্ট হয়) অথবা branch (নিজস্ব নেস্টেড
+  // সাব-সাব-ক্যাটাগরি আছে — ট্যাপ করলে খুলে/বন্ধ হয়, ভিতরের কোনো আইটেমে ট্যাপ করলে
+  // Category+Sub-category+Sub-sub-category তিনটাই একসাথে বসে যায়)
+  const subListEl = document.getElementById('bccACSubList');
+  subListEl.innerHTML = mc.subs.map((s, sIdx)=>{
+    const subName = bccSubEntryName(s);
+    const leafSubs = bccSubEntrySubs(s);
+    const ownSub = own ? own.subs.find(x=> bccNormalizeCatName(x.name)===bccNormalizeCatName(subName)) : null;
+    if(leafSubs.length === 0){
+      return `<div class="bacSubWrap"><span class="bacSubChip ${ownSub?'added':''}" data-leaf-sub-idx="${sIdx}">${escapeHtml(subName)}${ownSub?` <button class="bacSubX" data-remove-sub-idx="${sIdx}">✕</button>`:''}</span></div>`;
+    }
+    const ownSubSubNames = ownSub ? (ownSub.subs||[]).map(x=> bccNormalizeCatName(x.name)) : [];
+    return `
+      <div class="bacBranchWrap">
+        <div class="bacCardHead" data-toggle-branch="${sIdx}" style="cursor:pointer;">
+          <span class="bacSubChip branch ${ownSub?'added':''}">${escapeHtml(subName)} <b style="opacity:.65;">(${leafSubs.length})</b> ›</span>
+        </div>
+        <div class="bacBranchList" id="bacBranch-${sIdx}">
+          <span class="bacSubChip onlyCat small" data-select-sub-only-idx="${sIdx}">✓ শুধু "${escapeHtml(subName)}" (সাব-সাব ছাড়া)</span>
+          ${leafSubs.map((ls, lIdx)=>{
+            const added = ownSubSubNames.includes(bccNormalizeCatName(ls));
+            return `<span class="bacSubChip leaf ${added?'added':''}" data-sub-idx="${sIdx}" data-leaf-idx="${lIdx}">${escapeHtml(ls)}${added?` <button class="bacSubX" data-remove-subsub="${sIdx}|${lIdx}">✕</button>`:''}</span>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('') + (own ? own.subs.filter(os=> !mc.subs.some(s=> bccNormalizeCatName(bccSubEntryName(s))===bccNormalizeCatName(os.name))).map(os=>
+    `<div class="bacSubWrap"><span class="bacSubChip added" data-custom-sub="${escapeHtml(os.name)}">${escapeHtml(os.name)} <button class="bacSubX" data-remove-custom-sub="${escapeHtml(os.name)}">✕</button></span></div>`
+  ).join('') : '');
+
   detailEl.querySelector('[data-cat-only]').addEventListener('click', ()=> bccAllCategorySelect(idx, null));
-  detailEl.querySelectorAll('.bacSubChip[data-sub]').forEach(el=>{
+  document.getElementById('bccACAddCustomSubBtn').addEventListener('click', ()=> bccACAddCustomSub(idx));
+
+  // leaf-টাইপ sub (নিজস্ব নেস্টেড আইটেম নেই) — ট্যাপ করলেই সরাসরি সিলেক্ট
+  subListEl.querySelectorAll('[data-leaf-sub-idx]').forEach(el=>{
     el.addEventListener('click', (e)=>{
-      if(e.target.closest('[data-remove-sub]')) return; // ✕ বাটনের নিজস্ব হ্যান্ডলার আলাদাভাবে চলবে
-      bccAllCategorySelect(idx, el.dataset.sub);
+      if(e.target.closest('[data-remove-sub-idx]')) return;
+      const sIdx = Number(el.dataset.leafSubIdx);
+      bccAllCategorySelect(idx, bccSubEntryName(mc.subs[sIdx]));
     });
   });
-  detailEl.querySelectorAll('[data-remove-sub]').forEach(el=>{
-    el.addEventListener('click', (e)=>{ e.stopPropagation(); bccACRemoveSub(idx, el.dataset.removeSub); });
+  subListEl.querySelectorAll('[data-remove-sub-idx]').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); const sIdx = Number(el.dataset.removeSubIdx); bccACRemoveSub(idx, bccSubEntryName(mc.subs[sIdx])); });
   });
-  document.getElementById('bccACAddCustomSubBtn').addEventListener('click', ()=> bccACAddCustomSub(idx));
+  // পুরনো/কাস্টম sub (প্রি-বিল্ট লিস্টে নেই, দোকানদার হাতে লিখে যোগ করেছিল)
+  subListEl.querySelectorAll('[data-custom-sub]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-remove-custom-sub]')) return;
+      bccAllCategorySelect(idx, el.dataset.customSub);
+    });
+  });
+  subListEl.querySelectorAll('[data-remove-custom-sub]').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); bccACRemoveSub(idx, el.dataset.removeCustomSub); });
+  });
+  // branch হেড — খুলে/বন্ধ করে
+  subListEl.querySelectorAll('[data-toggle-branch]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const target = document.getElementById('bacBranch-'+el.dataset.toggleBranch);
+      if(target) target.classList.toggle('open');
+    });
+  });
+  // branch-এর ভিতরে "শুধু এই সাব-ক্যাটাগরি" — সাব-সাব ছাড়াই সিলেক্ট
+  subListEl.querySelectorAll('[data-select-sub-only-idx]').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); const sIdx = Number(el.dataset.selectSubOnlyIdx); bccAllCategorySelect(idx, bccSubEntryName(mc.subs[sIdx])); });
+  });
+  // branch-এর ভিতরের leaf আইটেম — Category+Sub+Sub-sub তিনটাই একসাথে সিলেক্ট
+  subListEl.querySelectorAll('.bacSubChip.leaf').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-remove-subsub]')) return;
+      const sIdx = Number(el.dataset.subIdx), lIdx = Number(el.dataset.leafIdx);
+      const subName = bccSubEntryName(mc.subs[sIdx]);
+      const leafName = bccSubEntrySubs(mc.subs[sIdx])[lIdx];
+      bccAllCategorySelectLeaf(idx, subName, leafName);
+    });
+  });
+  subListEl.querySelectorAll('[data-remove-subsub]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const parts = el.dataset.removeSubsub.split('|');
+      const sIdx = Number(parts[0]), lIdx = Number(parts[1]);
+      const subName = bccSubEntryName(mc.subs[sIdx]);
+      const leafName = bccSubEntrySubs(mc.subs[sIdx])[lIdx];
+      bccACRemoveLeafSub(idx, subName, leafName);
+    });
+  });
 }
 // টগল সুইচ (লিস্ট-ভিউ) — শুধু ক্যাটাগরিটা নিজের লিস্টে যোগ/বাদ করে (কোনো প্রোডাক্ট ফর্ম খোলে না),
 // যোগ করার সময় প্রি-বিল্ট সব সাব-ক্যাটাগরিও একসাথে চলে আসে যাতে হাতে আর একটাও টাইপ করতে না হয়
@@ -7704,7 +7796,11 @@ function bccAllCategoryToggle(idx){
     bccDeleteCategoryFromBazar(existing.id);
     toast('ক্যাটাগরি বাদ দেওয়া হলো');
   } else {
-    cats.push({ id: bccUid(), name: mc.name, subs: mc.subs.map(s=>({id: bccUid(), name: s})), imageUrl:null });
+    cats.push({ id: bccUid(), name: mc.name, subs: mc.subs.map(s=> ({
+      id: bccUid(),
+      name: bccSubEntryName(s),
+      subs: bccSubEntrySubs(s).map(ss=> ({id: bccUid(), name: ss}))
+    })), imageUrl:null });
     bccSaveCategories(cats);
     toast('✅ ক্যাটাগরি আপনার লিস্টে যোগ হলো');
   }
@@ -7748,7 +7844,7 @@ function bccACAddCustomSub(idx){
     toast('এই নামে সাব-ক্যাটাগরি আগে থেকেই আছে');
     return;
   }
-  own.subs.push({ id: bccUid(), name });
+  own.subs.push({ id: bccUid(), name, subs: [] });
   bccSaveCategories(cats);
   toast('✅ সাব-ক্যাটাগরি যোগ হলো');
   bccRenderAllCategoryDetail(idx);
@@ -7782,6 +7878,59 @@ function bccAllCategorySelect(idx, subName){
   bccPopulateSubSelect(document.getElementById('bccPSub'), own.id, subId);
   bccPopulateSubSubSelect(document.getElementById('bccPSubSub'), own.id, subId, '');
   toast('✅ Category বসানো হলো — এখন প্রোডাক্টের তথ্য দিন');
+}
+// একটা branch sub-category-র ভিতরের leaf আইটেম (যেমন "মহিলাদের পোশাক" > "কুর্তি")
+// সিলেক্ট করলে — Category, Sub-category ও Sub-sub-category তিনটাই (না থাকলে আগে
+// তৈরি করে) একসাথে বসিয়ে সরাসরি Add Product ফর্ম খুলে দেয়
+function bccAllCategorySelectLeaf(idx, subName, leafName){
+  const mc = BCC_MASTER_CATEGORIES[idx];
+  const cats = bccLoadCategories();
+  let own = cats.find(c=> bccNormalizeCatName(c.name)===bccNormalizeCatName(mc.name));
+  if(!own){
+    own = { id: bccUid(), name: mc.name, subs: [], imageUrl:null };
+    cats.push(own);
+  }
+  let ownSub = own.subs.find(s=> bccNormalizeCatName(s.name)===bccNormalizeCatName(subName));
+  if(!ownSub){
+    ownSub = { id: bccUid(), name: subName, subs: [] };
+    own.subs.push(ownSub);
+  }
+  if(!ownSub.subs) ownSub.subs = [];
+  let ownLeaf = ownSub.subs.find(ss=> bccNormalizeCatName(ss.name)===bccNormalizeCatName(leafName));
+  if(!ownLeaf){
+    ownLeaf = { id: bccUid(), name: leafName };
+    ownSub.subs.push(ownLeaf);
+  }
+  bccSaveCategories(cats);
+  document.getElementById('bccAllCategoryOverlay').classList.remove('show');
+  bccRenderCategories(); bccRenderOverview();
+  bccOpenProductModal(null);
+  const catSel = document.getElementById('bccPCat');
+  catSel.value = own.id;
+  bccPopulateSubSelect(document.getElementById('bccPSub'), own.id, ownSub.id);
+  bccPopulateSubSubSelect(document.getElementById('bccPSubSub'), own.id, ownSub.id, ownLeaf.id);
+  toast('✅ Category/Sub-category বসানো হলো — এখন প্রোডাক্টের তথ্য দিন');
+}
+// একটা যোগ-করা leaf (সাব-সাব-ক্যাটাগরি) ✕ চাপলে বাদ দেওয়া — প্রোডাক্ট থাকলে ব্লক করে
+function bccACRemoveLeafSub(idx, subName, leafName){
+  const mc = BCC_MASTER_CATEGORIES[idx];
+  const cats = bccLoadCategories();
+  const own = cats.find(c=> bccNormalizeCatName(c.name)===bccNormalizeCatName(mc.name));
+  if(!own) return;
+  const ownSub = own.subs.find(s=> bccNormalizeCatName(s.name)===bccNormalizeCatName(subName));
+  if(!ownSub || !ownSub.subs) return;
+  const ownLeaf = ownSub.subs.find(ss=> bccNormalizeCatName(ss.name)===bccNormalizeCatName(leafName));
+  if(!ownLeaf) return;
+  const prods = bccLoadProducts();
+  if(prods.some(p=> p.catId===own.id && p.subId===ownSub.id && p.subSubId===ownLeaf.id)){
+    toast('⚠️ এই সাব-সাব-ক্যাটাগরিতে প্রোডাক্ট আছে — তাই বাদ দেওয়া যাবে না');
+    return;
+  }
+  ownSub.subs = ownSub.subs.filter(ss=>ss.id!==ownLeaf.id);
+  bccSaveCategories(cats);
+  toast('বাদ দেওয়া হলো');
+  bccRenderAllCategoryDetail(idx);
+  bccRenderCategories(); bccRenderOverview();
 }
 document.getElementById('bccOpenAllCategoryBtn').addEventListener('click', bccOpenAllCategoryDashboard);
 document.getElementById('bccAllCategoryCloseBtn').addEventListener('click', ()=>{
