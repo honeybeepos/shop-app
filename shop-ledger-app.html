@@ -7639,6 +7639,18 @@ function bccSubEntryName(s){ return (typeof s === 'string') ? s : s.name; }
 function bccSubEntrySubs(s){ return (s && typeof s === 'object' && s.subs) ? s.subs : []; }
 // null হলে লিস্ট-ভিউ (সব Main Category), নাম্বার হলে সেই ইনডেক্সের ক্যাটাগরির সাব-ক্যাটাগরি ডিটেইল-ভিউ
 let bccACCurrentIdx = null;
+// 🗂️ All Category থেকে (কোনো সাব/সাব-সাব-ক্যাটাগরি ট্যাপ করে) Add Product খোলা হলে এখানে
+// {idx, branchSIdx} সেভ থাকে — প্রোডাক্ট সেভ/বন্ধ করার পর ঠিক এই একই জায়গায় (একই branch
+// খোলা অবস্থায়) আবার ফিরিয়ে নিয়ে যাওয়া হয়, যাতে একই সাব-ক্যাটাগরিতে একের পর এক প্রোডাক্ট
+// যোগ করার সময় বারবার All Category → Category → Sub-category নেভিগেট করতে না হয়।
+// bccOpenProductModal() ডাকা মাত্রই এটা null হয়ে যায় — শুধু All Category ফ্লো-ই এটা
+// পরে আবার সেট করে, তাই অন্য যেকোনো জায়গা (Edit Product, সাধারণ "+ Add Product" ইত্যাদি)
+// থেকে খোলা হলে এই "ফিরে যাওয়া" আচরণ চালু হয় না।
+let bccACReturnCtx = null;
+// 🏷️ শেষবার নতুন প্রোডাক্টে যে "প্রোডাক্টের ধরন" বেছে নেওয়া হয়েছিল — পরের নতুন প্রোডাক্ট
+// যোগ করার সময় এটাই প্রি-সিলেক্ট থাকে (দোকানের ডিফল্ট ধরনে রিসেট হয় না), যাতে একই ধরনের
+// (যেমন সিরিয়াল/IMEI) অনেকগুলো প্রোডাক্ট পরপর যোগ করার সময় বারবার ধরন বেছে নিতে না হয়
+let bccLastUsedProductType = null;
 function bccOpenAllCategoryDashboard(){
   bccACCurrentIdx = null;
   bccACShowListView();
@@ -7662,6 +7674,20 @@ function bccACShowDetailView(idx){
   document.getElementById('bccAllCategoryList').style.display = 'none';
   document.getElementById('bccAllCategoryDetailList').style.display = 'block';
   bccRenderAllCategoryDetail(idx);
+}
+// All Category থেকে Add Product খুলে প্রোডাক্ট সেভ/বন্ধ করার পর — bccACReturnCtx সেট
+// থাকলে ঠিক সেই Category-র ডিটেইল ভিউতে (এবং branch থাকলে সেটাও খোলা অবস্থায়) আবার
+// ফিরিয়ে নিয়ে যায়, যাতে একই সাব-ক্যাটাগরিতে পরপর অনেকগুলো প্রোডাক্ট যোগ করা যায়
+function bccReturnToAllCategoryIfNeeded(){
+  if(!bccACReturnCtx) return false;
+  const ctx = bccACReturnCtx;
+  document.getElementById('bccAllCategoryOverlay').classList.add('show');
+  bccACShowDetailView(ctx.idx);
+  if(ctx.branchSIdx != null){
+    const branchEl = document.getElementById('bacBranch-'+ctx.branchSIdx);
+    if(branchEl) branchEl.classList.add('open');
+  }
+  return true;
 }
 // লিস্ট-ভিউ — শুধু Main Category-র নাম + টগল, কোনো সাব-ক্যাটাগরি এখানে দেখানো হয় না
 // (সাব-ক্যাটাগরি দেখতে/বাছাই করতে ক্যাটাগরির ওপর ট্যাপ করে ভেতরে ঢুকতে হবে)
@@ -7767,7 +7793,7 @@ function bccRenderAllCategoryDetail(idx){
   });
   // branch-এর ভিতরে "শুধু এই সাব-ক্যাটাগরি" — সাব-সাব ছাড়াই সিলেক্ট
   subListEl.querySelectorAll('[data-select-sub-only-idx]').forEach(el=>{
-    el.addEventListener('click', (e)=>{ e.stopPropagation(); const sIdx = Number(el.dataset.selectSubOnlyIdx); bccAllCategorySelect(idx, bccSubEntryName(mc.subs[sIdx])); });
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); const sIdx = Number(el.dataset.selectSubOnlyIdx); bccAllCategorySelect(idx, bccSubEntryName(mc.subs[sIdx]), sIdx); });
   });
   // branch-এর ভিতরের leaf আইটেম — Category+Sub+Sub-sub তিনটাই একসাথে সিলেক্ট
   subListEl.querySelectorAll('.bacSubChip.leaf').forEach(el=>{
@@ -7776,7 +7802,7 @@ function bccRenderAllCategoryDetail(idx){
       const sIdx = Number(el.dataset.subIdx), lIdx = Number(el.dataset.leafIdx);
       const subName = bccSubEntryName(mc.subs[sIdx]);
       const leafName = bccSubEntrySubs(mc.subs[sIdx])[lIdx];
-      bccAllCategorySelectLeaf(idx, subName, leafName);
+      bccAllCategorySelectLeaf(idx, subName, leafName, sIdx);
     });
   });
   subListEl.querySelectorAll('[data-remove-subsub]').forEach(el=>{
@@ -7865,7 +7891,7 @@ function bccACAddCustomSub(idx){
 }
 // একটা Category বা Sub-category "সিলেক্ট" করলে — সেটা নিজের লিস্টে না থাকলে আগে যোগ করে
 // নেয়, তারপর সরাসরি Add Product ফর্ম খুলে দেয় Category/Sub-category আগে থেকে বসানো অবস্থায়
-function bccAllCategorySelect(idx, subName){
+function bccAllCategorySelect(idx, subName, branchSIdx){
   const mc = BCC_MASTER_CATEGORIES[idx];
   const cats = bccLoadCategories();
   let own = cats.find(c=> bccNormalizeCatName(c.name)===bccNormalizeCatName(mc.name));
@@ -7886,6 +7912,7 @@ function bccAllCategorySelect(idx, subName){
   document.getElementById('bccAllCategoryOverlay').classList.remove('show');
   bccRenderCategories(); bccRenderOverview();
   bccOpenProductModal(null);
+  bccACReturnCtx = { idx, branchSIdx: (branchSIdx!=null ? branchSIdx : null) };
   const catSel = document.getElementById('bccPCat');
   catSel.value = own.id;
   bccPopulateSubSelect(document.getElementById('bccPSub'), own.id, subId);
@@ -7895,7 +7922,7 @@ function bccAllCategorySelect(idx, subName){
 // একটা branch sub-category-র ভিতরের leaf আইটেম (যেমন "মহিলাদের পোশাক" > "কুর্তি")
 // সিলেক্ট করলে — Category, Sub-category ও Sub-sub-category তিনটাই (না থাকলে আগে
 // তৈরি করে) একসাথে বসিয়ে সরাসরি Add Product ফর্ম খুলে দেয়
-function bccAllCategorySelectLeaf(idx, subName, leafName){
+function bccAllCategorySelectLeaf(idx, subName, leafName, sIdx){
   const mc = BCC_MASTER_CATEGORIES[idx];
   const cats = bccLoadCategories();
   let own = cats.find(c=> bccNormalizeCatName(c.name)===bccNormalizeCatName(mc.name));
@@ -7918,6 +7945,7 @@ function bccAllCategorySelectLeaf(idx, subName, leafName){
   document.getElementById('bccAllCategoryOverlay').classList.remove('show');
   bccRenderCategories(); bccRenderOverview();
   bccOpenProductModal(null);
+  bccACReturnCtx = { idx, branchSIdx: (sIdx!=null ? sIdx : null) };
   const catSel = document.getElementById('bccPCat');
   catSel.value = own.id;
   bccPopulateSubSelect(document.getElementById('bccPSub'), own.id, ownSub.id);
@@ -9054,6 +9082,10 @@ let bccPendingImageIsNew = false;           // Step 5 — এই মোডাল
 let bccPendingImageProcessedResult = null;  // Step 5 — {blob, dataUrl, sizeBytes, width, height}
 let bccPendingImageDupCheck = null;         // Step 5 — hbCheckImageDuplicate()-এর ফলাফল
 function bccOpenProductModal(editId){
+  // যেকোনো জায়গা থেকে Add/Edit Product খোলা মাত্রই আগের "All Category ফিরে যাওয়ার" প্রসঙ্গ
+  // মুছে যায় — শুধু bccAllCategorySelect/bccAllCategorySelectLeaf-ই এই কলের ঠিক পরে এটা
+  // আবার সেট করে, তাই অন্য কোনো ফ্লো থেকে খুললে ভুলবশত All Category-তে ফিরে যাবে না
+  bccACReturnCtx = null;
   bccEditingProductId = editId || null;
   const prods = bccLoadProducts();
   const p = editId ? prods.find(x=>x.id===editId) : null;
@@ -9064,8 +9096,10 @@ function bccOpenProductModal(editId){
   bccPopulateSubSelect(document.getElementById('bccPSub'), p ? p.catId : '', p ? p.subId : '');
   bccPopulateSubSubSelect(document.getElementById('bccPSubSub'), p ? p.catId : '', p ? p.subId : '', p ? p.subSubId : '');
   document.getElementById('bccPUnit').value = p ? (p.unit||'pcs') : 'pcs';
-  // 🏷️ প্রোডাক্টের ধরন — এডিট হলে সেভ করা productType, নতুন হলে দোকানের ডিফল্ট ধরন প্রি-সিলেক্ট
-  document.getElementById('bccPType').value = p ? (p.productType || bccGetAppMode()) : bccGetAppMode();
+  // 🏷️ প্রোডাক্টের ধরন — এডিট হলে সেভ করা productType; নতুন প্রোডাক্টে শেষবার যে ধরন
+  // বেছে নেওয়া হয়েছিল সেটাই প্রি-সিলেক্ট থাকে (একই ধরনের অনেক প্রোডাক্ট পরপর যোগ করার
+  // সময় বারবার বেছে নিতে না হয়), প্রথমবার হলে দোকানের ডিফল্ট ধরন দেখাবে
+  document.getElementById('bccPType').value = p ? (p.productType || bccGetAppMode()) : (bccLastUsedProductType || bccGetAppMode());
   // 👕 ভ্যারিয়েন্ট (রং/সাইজ) — এডিট করা প্রোডাক্টে আগের ভ্যারিয়েন্ট থাকলে রং/সাইজ ফিল্ড ও
   // টেবিল দুটোই আগের সেভ করা ডেটা দিয়ে প্রি-ফিল করা হয়
   const editVariants = (p && p.variants) ? p.variants : [];
@@ -9121,7 +9155,10 @@ document.getElementById('bccPCode').addEventListener('keydown', (e)=>{
 });
 document.getElementById('bccPUnit') && document.getElementById('bccPUnit').addEventListener('change', bccUpdateUnitLabels);
 document.getElementById('bccAddProductBtn').addEventListener('click', ()=> bccOpenProductModal(null));
-document.getElementById('bccProductModalClose').addEventListener('click', ()=> document.getElementById('bccProductModalOverlay').classList.remove('show'));
+document.getElementById('bccProductModalClose').addEventListener('click', ()=>{
+  document.getElementById('bccProductModalOverlay').classList.remove('show');
+  bccReturnToAllCategoryIfNeeded();
+});
 
 function bccUpdatePublishStatusTxt(){
   const on = document.getElementById('bccPPublished').checked;
@@ -9560,6 +9597,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
   const enteredRequiresSerial = bccIsSerialMode() && document.getElementById('bccPRequiresSerial').value === 'yes';
   const enteredWarrantyMonths = Number(document.getElementById('bccPWarrantyMonths').value) || 0;
   const enteredProductType = document.getElementById('bccPType').value || 'standard';
+  bccLastUsedProductType = enteredProductType;
   const enteredVariants = enteredProductType === 'variant' ? bccCollectVariantsFromTable() : [];
   if(enteredProductType === 'variant' && !enteredVariants.length){
     toast('⚠️ ভ্যারিয়েন্ট প্রোডাক্টের জন্য রং ও সাইজ দিয়ে "ভ্যারিয়েন্ট টেবিল তৈরি করুন"-এ চাপুন');
@@ -9655,6 +9693,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
     document.getElementById('bccProductModalOverlay').classList.remove('show');
     toast('একই প্রোডাক্ট পাওয়া গেছে — ডুপ্লিকেট না করে স্টক আপডেট করা হলো ✅');
     bccRenderProducts(); bccRenderOverview();
+    bccReturnToAllCategoryIfNeeded();
     // 🖼️ Step 5 — পুরনো ছবি বদলে নতুন ছবি হলে, Product সফলভাবে সেভ হওয়ার পরই পুরনোটার refCount কমানো হয়
     if(imageIntegrationResult && oldImageId && oldImageId !== imageIntegrationResult.imageId){
       hbIncrementImageRef(oldImageId, -1);
@@ -9708,6 +9747,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
   document.getElementById('bccProductModalOverlay').classList.remove('show');
   toast('প্রোডাক্ট সেভ হয়েছে ✅');
   bccRenderProducts(); bccRenderOverview();
+  bccReturnToAllCategoryIfNeeded();
   // 🖼️ Step 5 — পুরনো ছবি বদলে নতুন ছবি হলে, Product সফলভাবে সেভ হওয়ার পরই পুরনোটার refCount কমানো হয়
   if(imageIntegrationResult && oldImageId && oldImageId !== imageIntegrationResult.imageId){
     hbIncrementImageRef(oldImageId, -1);
