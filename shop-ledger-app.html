@@ -8559,23 +8559,25 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
   const timeStr = formatInvoiceTime(now);
   const DIVIDER = '----------------------------------';
 
-  const itemBlocks = billItems.map((it, idx) => {
-    const { model, category } = getProductDetails(it.item, it.productId);
-    const lines = [`Item ${idx + 1}`, `Product : ${model}`];
-    if(category) lines.push(`Category: ${category}`);
-    lines.push(it.weightLabel ? `Quantity: ${it.weightLabel}` : `Quantity: ${it.qty}`);
-    lines.push(`Unit Price: ${HB_CUR} ${it.unitPrice}${it.weightLabel ? '/kg' : ''}`);
-    lines.push(`Amount: ${HB_CUR} ${it.price}`);
-    if(it.serialNumber) lines.push(`IMEI/Serial: ${it.serialNumber}`);
-    if(it.variantColor) lines.push(`Color/Size: ${it.variantColor} / ${it.variantSize}`);
-    if(it.warrantyMonths) lines.push(`Warranty: ${it.warrantyMonths} Month(s) (expires: ${it.warrantyExpiry})`);
-    lines.push(`Time: ${formatInvoiceTime(it.date || now)} (${formatInvoiceDate(it.date || now)})`);
-    return lines.join('\n');
-  }).join(`\n\n${DIVIDER}\n\n`);
+  // ছোট থার্মাল রসিদের মতো কম্প্যাক্ট ফরম্যাট — প্রতিটা প্রোডাক্টের জন্য বড় আলাদা "Item N" ব্লক
+  // (Category/Time সহ ৬-৭ লাইন) না বানিয়ে, একটামাত্র লাইনে প্রোডাক্টের নাম + পরিমাণ + দাম দেখানো হয়;
+  // IMEI/Serial, Color/Size, Warranty থাকলে শুধু তখনই একটা indented লাইনে যোগ হয় — ৪-৫টা প্রোডাক্ট হলেও
+  // পুরো ইনভয়েসটা ছোট এক-পাতার প্রফেশনাল রসিদের মতো থাকে
+  const itemBlocks = billItems.map((it) => {
+    const { model } = getProductDetails(it.item, it.productId);
+    const qtyLabel = it.weightLabel ? ` (${it.weightLabel})` : (it.qty && it.qty > 1 ? ` (${it.qty} × ${HB_CUR} ${it.unitPrice})` : '');
+    let line = `• ${model}${qtyLabel} — ${HB_CUR} ${it.price}`;
+    const extras = [];
+    if(it.serialNumber) extras.push(`IMEI/Serial: ${it.serialNumber}`);
+    if(it.variantColor) extras.push(`${it.variantColor} / ${it.variantSize}`);
+    if(it.warrantyMonths) extras.push(`Warranty: ${it.warrantyMonths}M (till ${it.warrantyExpiry})`);
+    if(extras.length) line += `\n   ${extras.join(' · ')}`;
+    return line;
+  }).join('\n');
 
-  let msg = `🧾 SALES INVOICE\n\n${shopName}${shopSubtitle ? `\n_${shopSubtitle}_` : ''}\n\nInvoice No: ${invoiceNo || nextInvoiceNumber()}\nDate: ${dateStr}\nTime: ${timeStr}\n\nCustomer Name: ${name}\nPhone: ${phone || '-'}\n\n${DIVIDER}\n\n${itemBlocks}\n\n${DIVIDER}\n\nTotal Bill : ${HB_CUR} ${billTotalPrice}\nReceived   : ${HB_CUR} ${paid}\nPrevious Due : ${HB_CUR} ${previousDue}`;
+  let msg = `🧾 SALES INVOICE\n\n${shopName}${shopSubtitle ? `\n_${shopSubtitle}_` : ''}\n\nInvoice No: ${invoiceNo || nextInvoiceNumber()}\nDate: ${dateStr}   Time: ${timeStr}\n\nCustomer: ${name}${phone ? `\nPhone: ${phone}` : ''}\n\n${DIVIDER}\n\n${itemBlocks}\n\n${DIVIDER}\n\nTotal Bill : ${HB_CUR} ${billTotalPrice}\nReceived   : ${HB_CUR} ${paid}\nPrevious Due : ${HB_CUR} ${previousDue}`;
 
-  msg += `\n\n${DIVIDER}\n\nCurrent Due : ${HB_CUR} ${currentDue}\n\nThank you for shopping with us.\n${shopName}`;
+  msg += `\n\n${DIVIDER}\n\nCurrent Due : ${HB_CUR} ${currentDue}\n\nThank you for shopping with us.`;
 
   msg += isCleared
     ? `\n\n✅ Your balance has been fully paid. Thank you so much for doing business with us!`
