@@ -9181,7 +9181,12 @@ document.getElementById('bccPPublished').addEventListener('change', bccUpdatePub
 // 🔗 প্রোডাক্ট লিংক — শুধু Publish অন থাকা ও আগে সেভ হওয়া (id আছে) প্রোডাক্টের জন্য
 // দেখানো হয়; একদম নতুন (এখনো সেভ হয়নি) প্রোডাক্টে id না থাকায় লিংক বানানো যায় না
 function bccProductPublicLink(productId){
-  return 'https://honeybeebazar.com/p/' + encodeURIComponent(session.shopId) + '/' + encodeURIComponent(productId);
+  // 🐛 ফিক্স: এই ফাইলে `session` কোনো শেয়ার্ড গ্লোবাল না — প্রতিটা ফাংশনেই আলাদা করে
+  // getSession() কল করে লোকালি বের করতে হয় (নাহলে ReferenceError হয়ে পুরো কলিং
+  // ফাংশন থেমে যায় — এই বাগের কারণেই Published প্রোডাক্টে Edit মোডাল খুলছিল না)
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  const shopId = (session && session.shopId) ? session.shopId : '';
+  return 'https://honeybeebazar.com/p/' + encodeURIComponent(shopId) + '/' + encodeURIComponent(productId);
 }
 function bccRenderProductLinkBlock(){
   const block = document.getElementById('bccProductLinkBlock');
@@ -9189,6 +9194,7 @@ function bccRenderProductLinkBlock(){
   const published = document.getElementById('bccPPublished').checked;
   const copyBtn = document.getElementById('bccCopyProductLinkBtn');
   const fbBtn = document.getElementById('bccFbShareProductLinkBtn');
+  const session = (typeof getSession === 'function') ? getSession() : null;
   if(!published || !session || !session.shopId){
     block.style.display = 'none';
     return;
