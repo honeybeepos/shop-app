@@ -605,6 +605,18 @@
     </div>
   </div>
 
+  <!-- 🔗 পাবলিক প্রোডাক্ট পেজ — Facebook/WhatsApp "Order Now" লিংক থেকে আসা ভিজিটরদের জন্য,
+       লগইন ছাড়াই প্রোডাক্ট দেখা ও সরাসরি অর্ডার করা যায় -->
+  <div id="hbPublicProductOverlay" style="display:none; position:fixed; inset:0; z-index:970; background:rgba(0,0,0,0.85); align-items:flex-end; justify-content:center;">
+    <div style="background:var(--sheet); border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:20px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="font-size:12px; font-weight:800; color:var(--amber);">🐝 Honey Bee Bazar</span>
+        <span onclick="hbClosePublicProductPage()" style="font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
+      </div>
+      <div id="hbPublicProductBody"></div>
+    </div>
+  </div>
+
   <!-- ==================== 🚑 Honey Bee Transport — বুকিং ==================== -->
   <div id="screenTransport">
     <button class="backBtn" id="backToHomeFromTransport">← হোমে ফিরে যান</button>
@@ -1608,6 +1620,22 @@ const functionsInstance = firebase.functions(); // 🤖 Step 5 — Gemini AI Clo
 
 let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], addresses:[] }
 
+/* ---------- 🔗 /p/{shopId}/{productId} ডিপ-লিংক ডিটেক্ট (404.html থেকে রিডাইরেক্ট হয়ে আসে) ----------
+   Facebook/WhatsApp-এর "Order Now"-জাতীয় বাটনে এই লিংক দিলে সরাসরি সেই প্রোডাক্টের
+   পেজ (লগইন ছাড়াই) খুলে যায়। hbOpenPublicProductPage() ফাংশনটা নিচে (hoisted) ডিফাইন করা। */
+(function hbDetectPublicProductDeepLink(){
+  const params = new URLSearchParams(location.search);
+  const targetPath = params.get('hbRedirect') || (/^\/p\//.test(location.pathname) ? location.pathname : null);
+  if(!targetPath) return;
+  const m = targetPath.match(/\/p\/([^\/?#]+)\/([^\/?#]+)/);
+  if(!m) return;
+  const shopId = decodeURIComponent(m[1]), productId = decodeURIComponent(m[2]);
+  try{ history.replaceState(null, '', '/p/' + shopId + '/' + productId); }catch(e){}
+  const openIt = ()=> hbOpenPublicProductPage(shopId, productId);
+  if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', openIt); }
+  else openIt();
+})();
+
 /* ---------- 🔐 Google দিয়ে লগইন — কাস্টমারের অর্ডার/পছন্দ UID-এর সাথে বাঁধা ---------- */
 function renderAuthArea(){
   const area = document.getElementById("authArea");
@@ -1646,6 +1674,11 @@ function renderAuthArea(){
 
 auth.onAuthStateChanged(async (user)=>{
   if(!user){ currentCustomer = null; renderAuthArea(); return; }
+  // 🔗 পাবলিক প্রোডাক্ট লিংক থেকে গেস্ট অর্ডার করার সময় ব্যাকগ্রাউন্ডে Anonymous
+  // Auth ব্যবহার হয় (শুধু Firestore-এর isSignedIn() rule পাস করানোর জন্য) —
+  // এটাকে সত্যিকারের কাস্টমার লগইন হিসেবে ধরা হবে না (প্রোফাইল তৈরি/UI লগইন-স্টেট
+  // কোনোটাই বদলাবে না), তাই এখানেই থামিয়ে দেওয়া হচ্ছে
+  if(user.isAnonymous) return;
   try{
     const ref = db.collection("customers").doc(user.uid);
     const doc = await ref.get();
@@ -4527,6 +4560,191 @@ function hbWireVariantPicker(renderFn){
       renderFn();
     });
   });
+}
+
+/* ---------- 🔗 পাবলিক প্রোডাক্ট পেজ + গেস্ট অর্ডার (Facebook "Order Now" লিংক) ----------
+   এই ফাংশনগুলো hbProductDetailModal-এর থেকে সম্পূর্ণ আলাদা রাখা হয়েছে (নিজস্ব
+   __hbPub* স্টেট + hbPublicProductBody কন্টেইনার), যাতে সাধারণ market/shop
+   ব্রাউজিং ফ্লো-র hbOpenMarketProductDetail/__hbDetailSelectedVariant-এর সাথে
+   কোনো সংঘর্ষ না হয় — কারণ এই পেজটা লগইন/হোম স্ক্রিন কিছু ছাড়াই সরাসরি খুলতে পারে। */
+let __hbPubProduct = null, __hbPubShopId = null, __hbPubProductId = null, __hbPubShopName = '';
+let __hbPubVariant = { color: null, size: null };
+let __hbPubView = 'detail'; // 'detail' | 'order' | 'done'
+
+async function hbOpenPublicProductPage(shopId, productId){
+  __hbPubShopId = shopId; __hbPubProductId = productId; __hbPubView = 'detail';
+  __hbPubVariant = { color: null, size: null };
+  const overlay = document.getElementById('hbPublicProductOverlay');
+  if(!overlay) return; // পেজ এখনো পুরোপুরি লোড হয়নি — DOMContentLoaded-এর অপেক্ষায় আবার ট্রাই হবে
+  overlay.style.display = 'flex';
+  document.getElementById('hbPublicProductBody').innerHTML = '<div style="padding:30px 0; text-align:center; color:var(--muted);">লোড হচ্ছে...</div>';
+  try{
+    const [shopDoc, prodDoc] = await Promise.all([
+      db.collection('shops').doc(shopId).get(),
+      db.collection('shops').doc(shopId).collection('publicStock').doc(productId).get()
+    ]);
+    __hbPubShopName = shopDoc.exists ? (shopDoc.data().shopName || 'Honey Bee দোকান') : 'Honey Bee দোকান';
+    __hbPubProduct = prodDoc.exists ? prodDoc.data() : null;
+  }catch(e){
+    console.error('public product load failed:', e);
+    __hbPubProduct = null;
+  }
+  hbRenderPublicProductBody();
+}
+function hbClosePublicProductPage(){
+  const overlay = document.getElementById('hbPublicProductOverlay');
+  if(overlay) overlay.style.display = 'none';
+}
+function hbPubIsVariant(p){ return !!(p && p.productType === 'variant' && p.variants && p.variants.length); }
+function hbPubFinalPrice(p){
+  return (p.offerPrice && Number(p.offerPrice) > 0 && Number(p.offerPrice) < Number(p.price)) ? p.offerPrice : p.price;
+}
+function hbPubVariantPickerHTML(p){
+  const colors = [...new Set(p.variants.map(v=> v.color))];
+  const selColor = __hbPubVariant.color;
+  const sizesForColor = selColor ? p.variants.filter(v=> v.color === selColor) : [];
+  return `
+    <div style="margin-bottom:14px;">
+      <div style="font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;">🎨 রং বেছে নিন</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+        ${colors.map(c=> `<button type="button" class="hbPubColorBtn" data-color="${escapeHtml(c)}" style="padding:6px 12px; border-radius:20px; border:2px solid ${selColor===c?"var(--amber)":"var(--border)"}; background:${selColor===c?"rgba(245,166,35,0.12)":"transparent"}; color:#fff8e8; font-size:12.5px; font-family:inherit; cursor:pointer;">${escapeHtml(c)}</button>`).join("")}
+      </div>
+      <div style="font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;">📏 সাইজ বেছে নিন</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        ${selColor ? sizesForColor.map(v=>{
+          const out = (Number(v.qty)||0) <= 0;
+          const selected = __hbPubVariant.size === v.size;
+          return `<button type="button" class="hbPubSizeBtn" ${out?"disabled":""} data-size="${escapeHtml(v.size)}" style="padding:7px 14px; border-radius:10px; border:2px solid ${selected?"var(--amber)":"var(--border)"}; background:${selected?"rgba(245,166,35,0.12)":"transparent"}; color:${out?"var(--muted)":"#fff8e8"}; font-size:12.5px; font-weight:700; font-family:inherit; cursor:${out?"not-allowed":"pointer"}; opacity:${out?"0.45":"1"};">${escapeHtml(v.size)}${out?" (নেই)":""}</button>`;
+        }).join("") : `<span style="font-size:12px; color:var(--muted);">আগে রং বেছে নিন</span>`}
+      </div>
+    </div>`;
+}
+function hbWirePublicVariantPicker(){
+  const body = document.getElementById('hbPublicProductBody');
+  body.querySelectorAll('.hbPubColorBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ __hbPubVariant = { color: btn.dataset.color, size: null }; hbRenderPublicProductBody(); });
+  });
+  body.querySelectorAll('.hbPubSizeBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ __hbPubVariant.size = btn.dataset.size; hbRenderPublicProductBody(); });
+  });
+}
+function hbRenderPublicProductBody(){
+  const body = document.getElementById('hbPublicProductBody');
+  const p = __hbPubProduct;
+  if(!p){
+    body.innerHTML = `
+      <div style="text-align:center; padding:30px 10px;">
+        <div style="font-size:40px; margin-bottom:10px;">😔</div>
+        <div style="font-size:15px; font-weight:700; margin-bottom:6px;">এই প্রোডাক্টটি এখন পাওয়া যাচ্ছে না</div>
+        <div style="font-size:12.5px; color:var(--muted);">প্রোডাক্টটি হয়তো দোকান থেকে সরিয়ে নেওয়া হয়েছে।</div>
+      </div>`;
+    return;
+  }
+  if(__hbPubView === 'done'){
+    body.innerHTML = `
+      <div style="text-align:center; padding:30px 10px;">
+        <div style="font-size:40px; margin-bottom:10px;">✅</div>
+        <div style="font-size:15px; font-weight:700; margin-bottom:6px;">অর্ডার সম্পন্ন হয়েছে!</div>
+        <div style="font-size:12.5px; color:var(--muted); margin-bottom:16px;">দোকান থেকে শীঘ্রই আপনার সাথে যোগাযোগ করা হবে।</div>
+        <button onclick="hbClosePublicProductPage()" style="padding:12px 24px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit;">ঠিক আছে</button>
+      </div>`;
+    return;
+  }
+  const isVariant = hbPubIsVariant(p);
+  const qty = Number(p.stockQty);
+  const outOfStockPlain = !isVariant && !isNaN(qty) && qty <= 0;
+  let variantChosen = true, variantHasStock = true;
+  if(isVariant){
+    variantChosen = !!(__hbPubVariant.color && __hbPubVariant.size);
+    if(variantChosen){
+      const v = p.variants.find(x=> x.color===__hbPubVariant.color && x.size===__hbPubVariant.size);
+      variantHasStock = !!(v && (Number(v.qty)||0) > 0);
+    }
+  }
+  const outOfStock = isVariant ? !(variantChosen && variantHasStock) : outOfStockPlain;
+  const cur = '৳';
+  const price = hbPubFinalPrice(p);
+
+  if(__hbPubView === 'order'){
+    body.innerHTML = `
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+        <span onclick="__hbPubView='detail'; hbRenderPublicProductBody();" style="cursor:pointer; font-size:18px;">←</span>
+        <div style="font-weight:800; font-size:14.5px;">অর্ডার তথ্য দিন</div>
+      </div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:14px;">${escapeHtml(p.name||'')}${isVariant?` (${escapeHtml(__hbPubVariant.color||'')} / ${escapeHtml(__hbPubVariant.size||'')})`:''} — <b style="color:var(--amber);">${cur}${price}</b></div>
+      <label style="font-size:12.5px; font-weight:700; display:block; margin-bottom:4px;">আপনার নাম</label>
+      <input id="hbPubName" placeholder="নাম লিখুন" style="width:100%; box-sizing:border-box; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.04); color:#fff; font-size:13.5px; margin-bottom:12px; font-family:inherit;">
+      <label style="font-size:12.5px; font-weight:700; display:block; margin-bottom:4px;">মোবাইল নম্বর</label>
+      <input id="hbPubPhone" type="tel" placeholder="01XXXXXXXXX" style="width:100%; box-sizing:border-box; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.04); color:#fff; font-size:13.5px; margin-bottom:12px; font-family:inherit;">
+      <label style="font-size:12.5px; font-weight:700; display:block; margin-bottom:4px;">ঠিকানা</label>
+      <input id="hbPubAddress" placeholder="সম্পূর্ণ ঠিকানা" style="width:100%; box-sizing:border-box; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.04); color:#fff; font-size:13.5px; margin-bottom:16px; font-family:inherit;">
+      <button id="hbPubOrderConfirmBtn" style="width:100%; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit;">🛒 অর্ডার নিশ্চিত করুন</button>
+    `;
+    document.getElementById('hbPubOrderConfirmBtn').addEventListener('click', hbSubmitGuestOrder);
+    return;
+  }
+
+  body.innerHTML = `
+    <div style="width:100%; aspect-ratio:1/1; max-height:220px; border-radius:14px; overflow:hidden; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:60px; margin-bottom:14px;">
+      ${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.parentElement.textContent='🛍️'">` : '🛍️'}
+    </div>
+    <div style="font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:4px;">🏪 ${escapeHtml(__hbPubShopName)}</div>
+    <div style="font-size:17px; font-weight:800; margin-bottom:8px;">${escapeHtml(p.name||'প্রোডাক্ট')}</div>
+    <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:12px;">
+      <span style="font-size:22px; font-weight:800; color:var(--amber);">${cur}${price}</span>
+      ${(p.offerPrice && Number(p.offerPrice) > 0 && Number(p.offerPrice) < Number(p.price)) ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${cur}${p.price}</span>` : ''}
+    </div>
+    ${isVariant ? hbPubVariantPickerHTML(p) : `<div style="font-size:12.5px; margin-bottom:14px; color:${outOfStockPlain?'#e2543d':'#22c55e'};">${outOfStockPlain?'🔴 বর্তমানে স্টক নেই':'🟢 Available'}</div>`}
+    <button id="hbPubOrderBtn" ${outOfStock?'disabled':''} style="width:100%; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; opacity:${outOfStock?'0.5':'1'};">${isVariant && !variantChosen ? 'রং/সাইজ বেছে নিন' : (outOfStock?'স্টক নেই':'🛒 অর্ডার করুন')}</button>
+  `;
+  const orderBtn = document.getElementById('hbPubOrderBtn');
+  if(orderBtn) orderBtn.addEventListener('click', ()=>{ __hbPubView = 'order'; hbRenderPublicProductBody(); });
+  if(isVariant) hbWirePublicVariantPicker();
+}
+async function hbSubmitGuestOrder(){
+  const name = (document.getElementById('hbPubName').value||'').trim();
+  const phone = (document.getElementById('hbPubPhone').value||'').trim();
+  const address = (document.getElementById('hbPubAddress').value||'').trim();
+  if(!name || !phone || !address){ alert('নাম, মোবাইল নম্বর ও ঠিকানা — সবগুলো দিন।'); return; }
+  const btn = document.getElementById('hbPubOrderConfirmBtn');
+  btn.disabled = true; btn.textContent = 'অর্ডার হচ্ছে...';
+  try{
+    let uid;
+    if(currentCustomer && currentCustomer.uid){
+      uid = currentCustomer.uid;
+    }else{
+      // 🔗 গেস্ট (লগইন করেনি) — ব্যাকগ্রাউন্ডে Anonymous Auth দিয়ে সাইন-ইন করে
+      // Firestore-এর isSignedIn() rule পাস করানো হচ্ছে, কাস্টমারকে কোনো লগইন
+      // স্ক্রিন দেখতে হচ্ছে না (Firebase Console-এ Anonymous sign-in চালু থাকা লাগবে)
+      let user = auth.currentUser;
+      if(!user){ user = (await auth.signInAnonymously()).user; }
+      uid = user.uid;
+    }
+    const p = __hbPubProduct;
+    const price = hbPubFinalPrice(p);
+    await db.collection('orderRequests').add({
+      shopId: __hbPubShopId,
+      productId: __hbPubProductId,
+      productName: p.name || '',
+      variantColor: __hbPubVariant.color || '',
+      variantSize: __hbPubVariant.size || '',
+      price: price || 0,
+      customerUid: uid,
+      customerName: name,
+      deliveryAddress: address,
+      deliveryPhone: phone,
+      qty: 1,
+      status: 'pending',
+      source: 'public_product_link',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    __hbPubView = 'done';
+    hbRenderPublicProductBody();
+  }catch(e){
+    console.error('guest order failed:', e);
+    alert('অর্ডার করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    btn.disabled = false; btn.textContent = '🛒 অর্ডার নিশ্চিত করুন';
+  }
 }
 
 window.hbOpenMarketProductDetail = function(shopId, productId){

@@ -4164,6 +4164,17 @@
           </div>
         </div>
 
+        <!-- 🔗 প্রোডাক্ট লিংক — Facebook/WhatsApp-এর "Order Now" বাটনে বসানোর জন্য।
+             শুধু তখনই দেখাবে যখন প্রোডাক্টটি Publish করা আছে ও আগে থেকে সেভ করা (id আছে)। -->
+        <div id="bccProductLinkBlock" style="display:none; background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:12px; margin:0 0 14px;">
+          <div style="font-weight:700; font-size:13px; margin-bottom:6px;">🔗 প্রোডাক্ট লিংক (Facebook/WhatsApp-এ শেয়ার করুন)</div>
+          <div id="bccProductLinkTxt" style="font-size:12px; color:#374151; word-break:break-all; background:#fff; border:1px solid #eee; border-radius:8px; padding:8px 10px; margin-bottom:8px;"></div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" id="bccCopyProductLinkBtn" style="flex:1; padding:8px; font-size:12.5px; border:1px solid #d1d5db; border-radius:8px; background:#fff; cursor:pointer; font-family:inherit;">📋 Copy Link</button>
+            <button type="button" id="bccFbShareProductLinkBtn" style="flex:1; padding:8px; font-size:12.5px; border:1px solid #d1d5db; border-radius:8px; background:#fff; cursor:pointer; font-family:inherit;">📘 Facebook-এ শেয়ার</button>
+          </div>
+        </div>
+
         <button class="bccBtnPrimary" id="bccSaveProductBtn" style="width:100%; margin-top:4px;">Save Product</button>
       </div>
     </div>
@@ -9163,8 +9174,49 @@ document.getElementById('bccProductModalClose').addEventListener('click', ()=>{
 function bccUpdatePublishStatusTxt(){
   const on = document.getElementById('bccPPublished').checked;
   document.getElementById('bccPublishStatusTxt').textContent = on ? '🟢 কাস্টমাররা Bazar-এ দেখতে পাচ্ছে' : '🔴 লুকানো আছে';
+  bccRenderProductLinkBlock();
 }
 document.getElementById('bccPPublished').addEventListener('change', bccUpdatePublishStatusTxt);
+
+// 🔗 প্রোডাক্ট লিংক — শুধু Publish অন থাকা ও আগে সেভ হওয়া (id আছে) প্রোডাক্টের জন্য
+// দেখানো হয়; একদম নতুন (এখনো সেভ হয়নি) প্রোডাক্টে id না থাকায় লিংক বানানো যায় না
+function bccProductPublicLink(productId){
+  return 'https://honeybeebazar.com/p/' + encodeURIComponent(session.shopId) + '/' + encodeURIComponent(productId);
+}
+function bccRenderProductLinkBlock(){
+  const block = document.getElementById('bccProductLinkBlock');
+  if(!block) return;
+  const published = document.getElementById('bccPPublished').checked;
+  const copyBtn = document.getElementById('bccCopyProductLinkBtn');
+  const fbBtn = document.getElementById('bccFbShareProductLinkBtn');
+  if(!published || !session || !session.shopId){
+    block.style.display = 'none';
+    return;
+  }
+  block.style.display = 'block';
+  if(!bccEditingProductId){
+    document.getElementById('bccProductLinkTxt').textContent = '💾 আগে "Save Product" চাপুন — সেভ হওয়ার পর Edit Product-এ আবার ঢুকলে এখানে লিংক দেখাবে।';
+    copyBtn.style.display = 'none';
+    fbBtn.style.display = 'none';
+    return;
+  }
+  copyBtn.style.display = '';
+  fbBtn.style.display = '';
+  document.getElementById('bccProductLinkTxt').textContent = bccProductPublicLink(bccEditingProductId);
+}
+document.getElementById('bccCopyProductLinkBtn').addEventListener('click', async ()=>{
+  const link = bccProductPublicLink(bccEditingProductId);
+  try{
+    await navigator.clipboard.writeText(link);
+    toast('🔗 লিংক কপি হয়েছে!');
+  }catch(e){
+    prompt('লিংকটি কপি করুন:', link);
+  }
+});
+document.getElementById('bccFbShareProductLinkBtn').addEventListener('click', ()=>{
+  const link = bccProductPublicLink(bccEditingProductId);
+  window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(link), '_blank');
+});
 
 function bccCheckMarginWarning(){
   const buy = Number(document.getElementById('bccPBuy').value) || 0;
