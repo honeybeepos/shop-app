@@ -98,8 +98,14 @@ service cloud.firestore {
     }
 
     match /riders/{riderId} {
+      // 🐛 ফিক্স: আগে দোকানের নিজের "📦 অর্ডার ব্যবস্থাপনা" থেকে ম্যানুয়ালি রাইডার
+      // এসাইন করার সময় riders কালেকশন read করতে পারত না (শুধু superadmin/নিজের
+      // agent/নিজে-রাইডার — দোকানদার এর কোনোটাই না), তাই ড্রপডাউন চিরকাল খালি
+      // দেখাত ("কোনো রাইডার অনলাইনে নেই") এমনকি রাইডার অনলাইন থাকলেও। এখন
+      // নিজের দোকানের marketId-র সাথে মিলে যাওয়া রাইডারও পড়তে পারবে।
       allow read: if isSignedIn() &&
-        (isSuperAdmin() || resource.data.assignedAgentId == request.auth.uid || request.auth.uid == riderId);
+        (isSuperAdmin() || resource.data.assignedAgentId == request.auth.uid || request.auth.uid == riderId ||
+         (myShopId() != null && get(/databases/$(database)/documents/shops/$(myShopId())).data.marketId == resource.data.marketId));
       allow create: if isSignedIn() && request.resource.data.assignedAgentId == request.auth.uid;
       allow update: if isSignedIn() &&
         (isSuperAdmin() || resource.data.assignedAgentId == request.auth.uid || request.auth.uid == riderId);
@@ -293,9 +299,21 @@ service cloud.firestore {
     }
 
     match /orderRequests/{orderId} {
+      // 🐛 ফিক্স: আগে যেকোনো signed-in ইউজার (এমনকি অন্য কারো গেস্ট/anonymous
+      // সেশনও) যেকোনো দোকানের যেকোনো অর্ডার read/update করতে পারত — নিজের
+      // দোকান/রাইডার/কাস্টমার কিনা কোনো চেক ছিল না। এখন শুধু সেই দোকান
+      // (shopId মিলে), এসাইন করা রাইডার, বা অর্ডারকারী কাস্টমার নিজেই
+      // read/update করতে পারবে।
       allow create: if isSignedIn();
-      allow read: if isSignedIn();
-      allow update: if isSignedIn();
+      allow read: if isSignedIn() &&
+        (isSuperAdmin() ||
+         (myShopId() != null && resource.data.shopId == myShopId()) ||
+         resource.data.assignedRiderId == request.auth.uid ||
+         resource.data.customerUid == request.auth.uid);
+      allow update: if isSignedIn() &&
+        (isSuperAdmin() ||
+         (myShopId() != null && resource.data.shopId == myShopId()) ||
+         resource.data.assignedRiderId == request.auth.uid);
     }
 
     match /passenger_waiting_queue/{docId} {
