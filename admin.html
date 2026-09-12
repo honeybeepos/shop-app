@@ -161,6 +161,10 @@ if("serviceWorker" in navigator){
 
 const cloudFunctions = firebase.functions();
 const deleteAccountFn = cloudFunctions.httpsCallable("deleteAccount");
+// 📧 দোকান-মালিকের ইমেইল ভুল/ভুয়া হলে বা পাসওয়ার্ড ভুলে গেলে (তাই নিজে
+// login.html-এর "ইমেইল পরিবর্তন" ফর্ম ব্যবহার করতে না পারলে), সুপার-এডমিন
+// থেকে সরাসরি ঠিক করার জন্য — Admin SDK লাগে বলে Cloud Function দিয়ে
+const adminUpdateShopOwnerEmailFn = cloudFunctions.httpsCallable("adminUpdateShopOwnerEmail");
 
 const FEATURE_LABELS = {
   reports: "রিপোর্ট", extraIncome: "বাড়তি আয়", ops: "সাপ্লায়ার/স্টাফ/খরচ",
@@ -491,6 +495,7 @@ async function loadShops(){
           : `<button class="btn block" data-act="block" data-id="${shopId}">⛔ ব্লক করুন</button>`}
         <button class="btn ghost" data-act="savefeat" data-id="${shopId}">💾 ফিচার সেভ করুন</button>
         <button class="btn secondary" data-act="editshop" data-id="${shopId}">✏️ এডিট</button>
+        <button class="btn secondary" data-act="fixemail" data-id="${shopId}">📧 ইমেইল ঠিক করুন</button>
         <button class="btn" style="background:var(--due);" data-act="deleteshop" data-id="${shopId}">🗑️ ডিলিট</button>
       </div>
     `;
@@ -502,7 +507,35 @@ async function loadShops(){
   list.querySelectorAll('[data-act="unblock"]').forEach(b=>b.addEventListener("click", ()=>setStatus(b.dataset.id,"active")));
   list.querySelectorAll('[data-act="savefeat"]').forEach(b=>b.addEventListener("click", ()=>saveFeatures(b.dataset.id, b.closest(".shop"))));
   list.querySelectorAll('[data-act="editshop"]').forEach(b=>b.addEventListener("click", ()=>editShop(b.dataset.id)));
+  list.querySelectorAll('[data-act="fixemail"]').forEach(b=>b.addEventListener("click", ()=>fixShopOwnerEmail(b.dataset.id)));
   list.querySelectorAll('[data-act="deleteshop"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "shop", "দোকান")));
+}
+
+// 🔐 এই দোকান-মালিকের Firebase Auth ইমেইল সরাসরি বদলে দেয় (Admin SDK দিয়ে,
+// Cloud Function-এর ভেতর দিয়ে) — uid অপরিবর্তিত থাকায় দোকানের সব ডেটা
+// (হিসাব/প্রোডাক্ট/কাস্টমার) একই একাউন্টেই থেকে যায়। ব্যবহার করার আগে
+// সুপার-এডমিন নিজে (ফোনে/সরাসরি কথা বলে) দোকানদারের পরিচয় ও নতুন ইমেইলটা
+// যাচাই করে নেবেন — এখান থেকে সেট করলে সাথে সাথেই ভেরিফায়েড ধরে নেওয়া হয়,
+// দোকানদারকে আর কোনো লিংকে ক্লিক করতে হবে না।
+async function fixShopOwnerEmail(shopId){
+  const doc = await db.collection("shops").doc(shopId).get();
+  if(!doc.exists) return;
+  const shop = doc.data();
+  const newEmail = prompt(
+    `"${shop.shopName || shopId}" দোকানের মালিকের বর্তমান ইমেইল: ${shop.ownerEmail || '(নেই)'}\n\nনতুন সঠিক ইমেইল লিখুন (এই দোকানের মালিক নিজেই এই ইমেইলের মালিক কিনা যাচাই করে নিন):`
+  );
+  if(!newEmail) return;
+  const trimmed = newEmail.trim().toLowerCase();
+  if(!trimmed.includes("@")){ alert("সঠিক ইমেইল লিখুন।"); return; }
+  const sure = confirm(`"${shop.shopName || shopId}" দোকানের লগইন ইমেইল "${shop.ownerEmail || ''}" থেকে বদলে "${trimmed}" করা হবে। নিশ্চিত?`);
+  if(!sure) return;
+  try{
+    await adminUpdateShopOwnerEmailFn({ shopId, newEmail: trimmed });
+    alert("✅ ইমেইল পরিবর্তন হয়েছে — দোকানদার এখন এই নতুন ইমেইল দিয়ে লগইন করতে পারবেন।");
+    await loadShops();
+  }catch(e){
+    alert("ইমেইল পরিবর্তন করা যায়নি: " + (e.message || e));
+  }
 }
 
 async function editShop(shopId){

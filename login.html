@@ -142,6 +142,37 @@
     <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:10px;">নিবন্ধনের পর আপনার এলাকার Honey Bee Agent আপনাকে যাচাই (verify) করবেন — তারপর আপনি Honey Bee Bazar-এ 🛡️ ব্যাজসহ দেখা যাবেন।</p>
     <div class="msg" id="providerMsg"></div>
   </div>
+
+  <!-- 📧 ইমেইল ভেরিফিকেশন গেট — ভুয়া/ভুল ইমেইল দিয়ে দোকান নিবন্ধন ঠেকাতে।
+       কোনো ট্যাবের সাথে যুক্ত না, শুধু afterLoginRoute()/signupBtn থেকে
+       showVerifyPanel() কল করলেই প্রোগ্রামেটিকভাবে দেখানো হয়। -->
+  <div class="panel" id="panel-verify">
+    <div style="text-align:center; font-size:38px; margin-bottom:8px;">📧</div>
+    <p style="text-align:center; font-size:14px; margin:0 0 4px; font-weight:700; color:var(--teal);">ইমেইল ভেরিফিকেশন প্রয়োজন</p>
+    <p style="text-align:center; font-size:12.5px; color:#6b6153; margin:0 0 16px;">
+      <span id="verifyEmailTxt" style="font-weight:700;"></span> — এই ইমেইলে পাঠানো ভেরিফিকেশন লিংকে ক্লিক করুন। ভুয়া/ভুল ইমেইল দিয়ে দোকান খোলা ঠেকাতেই এই ধাপটি রাখা হয়েছে।
+    </p>
+    <button class="btn" id="verifyCheckBtn">✅ ভেরিফাই করেছি, চেক করুন</button>
+    <p style="text-align:center;margin:10px 0 0;">
+      <a href="#" id="verifyResendLink" style="color:#1f4a48;font-size:12.5px;text-decoration:underline;">লিংক আবার পাঠান</a>
+    </p>
+    <div class="msg" id="verifyMsg"></div>
+
+    <div style="margin-top:22px; padding-top:16px; border-top:1px solid var(--line);">
+      <p style="font-size:12px; color:#6b6153; margin:0 0 10px; font-weight:600;">
+        এই ইমেইলে অ্যাক্সেস নেই? নতুন Gmail-এ পরিবর্তন করুন — আপনার দোকানের সব ডেটা (হিসাব, প্রোডাক্ট, কাস্টমার) অক্ষতই থাকবে, শুধু ইমেইলটা বদলাবে।
+      </p>
+      <label>নতুন ইমেইল</label>
+      <input type="email" id="verifyNewEmail" placeholder="new@gmail.com">
+      <label>বর্তমান পাসওয়ার্ড (নিশ্চিত করার জন্য)</label>
+      <input type="password" id="verifyChangePass" placeholder="••••••••">
+      <button class="btn" id="verifyChangeEmailBtn" style="background:var(--teal);">ইমেইল পরিবর্তন করুন</button>
+    </div>
+
+    <p style="text-align:center;margin:18px 0 0;">
+      <a href="#" id="verifySignOutLink" style="color:#a3372c;font-size:12.5px;text-decoration:underline;">অন্য একাউন্টে লগইন করুন (সাইন-আউট)</a>
+    </p>
+  </div>
 </div>
 
 <script src="bd-locations.js"></script>
@@ -480,6 +511,22 @@ async function afterLoginRoute(uid){
     await auth.signOut();
     return;
   }
+
+  // 📧 ইমেইল ভেরিফিকেশন গেট — শুধু দোকানের মালিক/এডমিন একাউন্টের জন্য
+  // (সাব-ইউজার একাউন্ট এডমিন নিজে তৈরি করেন ও ভরসা করেন বলে এখানে গেট করা
+  // হচ্ছে না)। ভুয়া/ভুল ইমেইল দিয়ে দোকান নিবন্ধন ঠেকাতে এই ধাপ।
+  if (userDoc.role === "admin" && auth.currentUser) {
+    await auth.currentUser.reload().catch(()=>{});
+    if (!auth.currentUser.emailVerified) {
+      // অনেক দিন আগে নিবন্ধিত পুরনো একাউন্ট যাদের কখনো ভেরিফিকেশন ইমেইলই
+      // পাঠানো হয়নি, তাদের জন্য এখানেই একটা নতুন লিংক অটো-পাঠানো হচ্ছে —
+      // এভাবে পুরনো একাউন্টও ধীরে ধীরে নিজে থেকেই ঠিক হয়ে যাবে।
+      auth.currentUser.sendEmailVerification().catch(()=>{});
+      showVerifyPanel(userDoc.email || auth.currentUser.email || "");
+      return;
+    }
+  }
+
   const shop = await getShopDoc(userDoc.shopId);
   if (!shop || shop.status === "blocked") {
     showMsg("loginMsg", "আপনার একাউন্টটি ব্লক করা হয়েছে। দোকানের এডমিনের সাথে যোগাযোগ করুন।", false);
@@ -615,12 +662,119 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
     await db.collection("shops").doc(uid).collection("members").doc(uid).set({
       uid, name, role: "admin", email, createdAt: fbNow()
     });
-    showMsg("signupMsg","দোকান তৈরি হয়ে গেছে! লগইন করা হচ্ছে...", true);
-    await afterLoginRoute(uid);
+    // 📧 ভুয়া/ভুল ইমেইল দিয়ে নিবন্ধন ঠেকাতে — দোকান তৈরির পরপরই একটা
+    // ভেরিফিকেশন লিংক পাঠিয়ে দেওয়া হচ্ছে, লিংকে ক্লিক না করা পর্যন্ত
+    // সরাসরি ড্যাশবোর্ডে ঢুকতে দেওয়া হবে না।
+    await cred.user.sendEmailVerification().catch(()=>{});
+    showMsg("signupMsg","দোকান তৈরি হয়ে গেছে! এখন ইমেইল ভেরিফাই করুন।", true);
+    showVerifyPanel(email);
   }catch(e){
     showMsg("signupMsg", e.message || "নিবন্ধন ব্যর্থ হয়েছে", false);
   }
   btn.disabled = false; btn.textContent = "দোকান তৈরি করুন";
+});
+
+/* ==================== 📧 ইমেইল ভেরিফিকেশন প্যানেল ==================== */
+function showVerifyPanel(email){
+  document.querySelectorAll(".tab-sw").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
+  document.getElementById("panel-verify").classList.add("active");
+  document.querySelector(".tabs").style.display = "none";
+  document.getElementById("verifyEmailTxt").textContent = email || "";
+  document.getElementById("verifyMsg").className = "msg";
+  document.getElementById("verifyNewEmail").value = "";
+  document.getElementById("verifyChangePass").value = "";
+}
+
+document.getElementById("verifyCheckBtn").addEventListener("click", async ()=>{
+  const btn = document.getElementById("verifyCheckBtn");
+  btn.disabled = true; btn.textContent = "চেক করা হচ্ছে...";
+  try{
+    if (!auth.currentUser) throw new Error("সেশন পাওয়া যায়নি — আবার লগইন করুন।");
+    await auth.currentUser.reload();
+    if (auth.currentUser.emailVerified) {
+      showMsg("verifyMsg", "✅ ভেরিফাই হয়ে গেছে! ঢোকানো হচ্ছে...", true);
+      __authFlowInProgress = true;
+      await afterLoginRoute(auth.currentUser.uid);
+    } else {
+      showMsg("verifyMsg", "এখনো ভেরিফাই হয়নি — ইমেইলের লিংকে ক্লিক করে তারপর আবার চেক করুন (স্প্যাম ফোল্ডারও দেখুন)।", false);
+    }
+  }catch(e){
+    showMsg("verifyMsg", e.message || "চেক করা যায়নি, আবার চেষ্টা করুন।", false);
+  }
+  btn.disabled = false; btn.textContent = "✅ ভেরিফাই করেছি, চেক করুন";
+});
+
+document.getElementById("verifyResendLink").addEventListener("click", async (e)=>{
+  e.preventDefault();
+  try{
+    if (!auth.currentUser) throw new Error("সেশন পাওয়া যায়নি — আবার লগইন করুন।");
+    await auth.currentUser.sendEmailVerification();
+    showMsg("verifyMsg", "ভেরিফিকেশন লিংক আবার পাঠানো হয়েছে। ইনবক্স (ও স্প্যাম ফোল্ডার) চেক করুন।", true);
+  }catch(e){
+    let friendly = e.message || "পাঠানো যায়নি, একটু পর আবার চেষ্টা করুন।";
+    if (e.code === "auth/too-many-requests") friendly = "একটু আগেই একবার পাঠানো হয়েছে — কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।";
+    showMsg("verifyMsg", friendly, false);
+  }
+});
+
+// 🔁 পুরনো ইমেইলে অ্যাক্সেস নেই এমন দোকানদারের জন্য সেলফ-সার্ভিস ইমেইল
+// পরিবর্তন — uid অপরিবর্তিত থাকায় দোকানের সব ডেটা (হিসাব/প্রোডাক্ট/কাস্টমার)
+// একই একাউন্টেই থেকে যায়, নতুন করে কিছু হারায় না।
+document.getElementById("verifyChangeEmailBtn").addEventListener("click", async ()=>{
+  const newEmail = document.getElementById("verifyNewEmail").value.trim().toLowerCase();
+  const pass = document.getElementById("verifyChangePass").value;
+  if (!newEmail || !newEmail.includes("@")) {
+    showMsg("verifyMsg", "সঠিক নতুন ইমেইল লিখুন।", false); return;
+  }
+  if (!pass) {
+    showMsg("verifyMsg", "নিশ্চিত করার জন্য বর্তমান পাসওয়ার্ড দিন।", false); return;
+  }
+  const btn = document.getElementById("verifyChangeEmailBtn");
+  btn.disabled = true; btn.textContent = "পরিবর্তন হচ্ছে...";
+  try{
+    const user = auth.currentUser;
+    if (!user) throw new Error("সেশন পাওয়া যায়নি — আবার লগইন করুন।");
+    const oldEmail = user.email;
+    // 🔒 সাম্প্রতিক লগইন না থাকলে Firebase updateEmail() রিফিউজ করে (auth/requires-recent-login) —
+    // তাই পুরনো ইমেইল+পাসওয়ার্ড দিয়ে re-authenticate করে নেওয়া হচ্ছে
+    const credential = firebase.auth.EmailAuthProvider.credential(oldEmail, pass);
+    await user.reauthenticateWithCredential(credential);
+    await user.updateEmail(newEmail);
+
+    // uid অপরিবর্তিত — শুধু users/shops/members ডকুমেন্টের ইমেইল ফিল্ড
+    // নতুন ইমেইলের সাথে সিঙ্ক করে দেওয়া হচ্ছে, বাকি সব ডেটা অক্ষত থাকে
+    const userDoc = await getMyUserDoc(user.uid);
+    await db.collection("users").doc(user.uid).update({ email: newEmail });
+    if (userDoc && userDoc.shopId) {
+      await db.collection("shops").doc(userDoc.shopId).update({ ownerEmail: newEmail, updatedAt: fbNow() }).catch(()=>{});
+      await db.collection("shops").doc(userDoc.shopId).collection("members").doc(user.uid).update({ email: newEmail }).catch(()=>{});
+    }
+
+    await user.sendEmailVerification();
+    showMsg("verifyMsg", "✅ ইমেইল পরিবর্তন হয়েছে! নতুন ইমেইল " + newEmail + " এ ভেরিফিকেশন লিংক পাঠানো হয়েছে — লিংকে ক্লিক করে তারপর উপরের বাটনে চেক করুন।", true);
+    document.getElementById("verifyEmailTxt").textContent = newEmail;
+    document.getElementById("verifyNewEmail").value = "";
+    document.getElementById("verifyChangePass").value = "";
+  }catch(e){
+    let friendly = e.message || "পরিবর্তন করা যায়নি।";
+    if (e.code === "auth/wrong-password") friendly = "বর্তমান পাসওয়ার্ড ভুল।";
+    else if (e.code === "auth/email-already-in-use") friendly = "এই ইমেইল দিয়ে আগে থেকেই অন্য একটা একাউন্ট আছে।";
+    else if (e.code === "auth/requires-recent-login") friendly = "নিরাপত্তার জন্য আবার সাইন-আউট করে লগইন করুন, তারপর চেষ্টা করুন।";
+    showMsg("verifyMsg", friendly, false);
+  }
+  btn.disabled = false; btn.textContent = "ইমেইল পরিবর্তন করুন";
+});
+
+document.getElementById("verifySignOutLink").addEventListener("click", async (e)=>{
+  e.preventDefault();
+  await auth.signOut().catch(()=>{});
+  document.querySelector(".tabs").style.display = "";
+  document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".tab-sw").forEach(x=>x.classList.remove("active"));
+  document.getElementById("panel-login").classList.add("active");
+  document.querySelector('.tab-sw[data-p="login"]').classList.add("active");
+  showMsg("loginMsg", "সাইন-আউট হয়েছে, আবার লগইন করুন।", true);
 });
 
 // আগে থেকে লগইন থাকলে সরাসরি অ্যাপে পাঠিয়ে দাও
