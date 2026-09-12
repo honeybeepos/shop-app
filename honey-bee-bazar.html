@@ -5334,9 +5334,10 @@ async function mcLoadMarketCategories(marketId){
           (c.subs||[]).forEach(s=>{
             const sName = (s.name||"").trim();
             if(!sName) return;
-            if(!entry.subs.has(sName)) entry.subs.set(sName, new Set());
+            if(!entry.subs.has(sName)) entry.subs.set(sName, { imageUrl:s.imageUrl||null, subSubs:new Set() });
             const subEntry = entry.subs.get(sName);
-            (s.subs||[]).forEach(ss=>{ if(ss.name) subEntry.add(ss.name.trim()); });
+            if(!subEntry.imageUrl && s.imageUrl) subEntry.imageUrl = s.imageUrl;
+            (s.subs||[]).forEach(ss=>{ if(ss.name) subEntry.subSubs.add(ss.name.trim()); });
           });
         });
         const cur = shop.currencySymbol
@@ -5360,6 +5361,25 @@ async function mcLoadMarketCategories(marketId){
         });
       }catch(e){ console.warn("market category load failed for shop:", shop.id, e); }
     }));
+
+    // 🖼️ ক্যাটাগরি/সাব-ক্যাটাগরির নিজস্ব কোনো ছবি সেট করা না থাকলে (বেশিরভাগ
+    // ক্ষেত্রেই থাকে না — POS-এর "All Category" প্রিসেটে emoji আইকন থাকে, ছবি না),
+    // ফোল্ডার আইকনের বদলে সেই ক্যাটাগরির যেকোনো দোকানের যেকোনো প্রোডাক্টের আসল
+    // ছবি বসানো হয় — কাস্টমার ছবি দেখেই বুঝতে পারবে কী ধরনের জিনিস। এটা প্রতিবার
+    // তাজা ডেটা থেকে হিসেব করা হয় (কোথাও সেভ করে রাখা হয় না), তাই সেই প্রোডাক্টের
+    // ছবি/প্রোডাক্টটাই পরে মুছে গেলে পরের বার এমনিতেই আরেকটা প্রোডাক্টের ছবি বসে যাবে।
+    catMap.forEach(entry=>{
+      if(!entry.imageUrl){
+        const rep = allProducts.find(p=> p.__catName === entry.name && p.imageUrl);
+        if(rep) entry.imageUrl = rep.imageUrl;
+      }
+      entry.subs.forEach((subEntry, subName)=>{
+        if(subEntry.imageUrl) return;
+        const repSub = allProducts.find(p=> p.__catName === entry.name && p.__subName === subName && p.imageUrl);
+        if(repSub) subEntry.imageUrl = repSub.imageUrl;
+      });
+    });
+
     __mcMarketId = marketId;
     __mcCategoryMap = catMap;
     // 🛒 mfCardHTML/hbOpenMarketProductDetail/mfAddToCartAnimated — এই ফাংশনগুলো
@@ -5395,17 +5415,21 @@ window.mcSelectCategory = function(catName){
   const entry = __mcCategoryMap ? __mcCategoryMap.get(catName) : null;
   __mcCurrentSubcatMap = entry ? entry.subs : null;
   $("mcCurrentCategoryName") && ($("mcCurrentCategoryName").textContent = catName);
-  const subs = entry ? Array.from(entry.subs.keys()).sort((a,b)=> a.localeCompare(b,'bn')) : [];
-  if(subs.length === 0){
+  const subNames = entry ? Array.from(entry.subs.keys()).sort((a,b)=> a.localeCompare(b,'bn')) : [];
+  if(subNames.length === 0){
     mcShowProducts(catName, null);
     return;
   }
-  $("mcSubcategoriesGrid").innerHTML = subs.map(sName=> `
+  $("mcSubcategoriesGrid").innerHTML = subNames.map(sName=>{
+    const subEntry = entry.subs.get(sName);
+    const img = subEntry && subEntry.imageUrl;
+    return `
     <div class="catListRow" onclick="mcSelectSubcategory('${escapeHtml(sName).replace(/'/g,"")}')">
-      <div class="thumb">🗂️</div>
+      <div class="thumb">${img ? `<img src="${escapeHtml(img)}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:12px;" onerror="this.parentElement.textContent='🗂️'">` : "🗂️"}</div>
       <div class="name">${escapeHtml(sName)}</div>
       <div class="chev">›</div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
   showScreen("screenMarketSubcategories");
 };
 
