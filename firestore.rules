@@ -72,6 +72,29 @@ service cloud.firestore {
       match /publicStock/{itemId} {
         allow read: if true;
         allow write: if isSignedIn() && myShopId() == shopId;
+
+        // 👍 লাইক ও 💬 কমেন্ট (Bazar প্রোডাক্ট পেজ + পাবলিক Facebook লিংক পেজ) —
+        // পড়া সবার জন্য খোলা (গেস্ট/Facebook ভিজিটরও দেখতে পারবে), কিন্তু লেখার
+        // জন্য আসল Google লগইন লাগবে (guest checkout-এর Anonymous Auth দিয়ে
+        // লাইক/কমেন্ট করা যাবে না, যাতে স্প্যাম আটকানো যায়)
+        match /comments/{commentId} {
+          allow read: if true;
+          allow create: if isSignedIn() &&
+            request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+            request.resource.data.customerUid == request.auth.uid &&
+            request.resource.data.text is string &&
+            request.resource.data.text.size() > 0 &&
+            request.resource.data.text.size() <= 500;
+          allow update, delete: if false;
+        }
+
+        match /likes/{uid} {
+          allow read: if true;
+          allow create, delete: if isSignedIn() &&
+            request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+            request.auth.uid == uid;
+          allow update: if false;
+        }
       }
 
       match /publicCategories/{catId} {

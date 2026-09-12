@@ -4697,11 +4697,13 @@ function hbRenderPublicProductBody(){
     ${isVariant ? hbPubVariantPickerHTML(p) : `<div style="font-size:12.5px; margin-bottom:14px; color:${outOfStockPlain?'#e2543d':'#22c55e'};">${outOfStockPlain?'🔴 বর্তমানে স্টক নেই':'🟢 Available'}</div>`}
     <button id="hbPubOrderBtn" ${outOfStock?'disabled':''} style="width:100%; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; opacity:${outOfStock?'0.5':'1'};">${isVariant && !variantChosen ? 'রং/সাইজ বেছে নিন' : (outOfStock?'স্টক নেই':'🛒 অর্ডার করুন')}</button>
     ${hbShareIconsHTML('pub')}
+    ${hbLikeCommentHTML('pub')}
   `;
   const orderBtn = document.getElementById('hbPubOrderBtn');
   if(orderBtn) orderBtn.addEventListener('click', ()=>{ __hbPubView = 'order'; hbRenderPublicProductBody(); });
   if(isVariant) hbWirePublicVariantPicker();
   __hbShareRegistry['pub'] = { link: hbBuildPublicLink(__hbPubShopId, __hbPubProductId), name: p.name || 'প্রোডাক্ট', shopName: __hbPubShopName || '' };
+  hbInitLikeComment('pub', __hbPubShopId, __hbPubProductId);
 }
 async function hbSubmitGuestOrder(){
   const name = (document.getElementById('hbPubName').value||'').trim();
@@ -4767,11 +4769,10 @@ function hbShareIconsHTML(shareId){
         <button type="button" onclick="hbShareVia('${shareId}','facebook')" style="flex:1; min-width:64px; padding:9px 5px; border-radius:10px; border:none; background:#1877f2; color:#fff; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;">📘 Facebook</button>
         <button type="button" onclick="hbShareVia('${shareId}','whatsapp')" style="flex:1; min-width:64px; padding:9px 5px; border-radius:10px; border:none; background:#25d366; color:#fff; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;">💬 WhatsApp</button>
         <button type="button" onclick="hbShareVia('${shareId}','sms')" style="flex:1; min-width:64px; padding:9px 5px; border-radius:10px; border:none; background:#6b7280; color:#fff; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;">📱 SMS</button>
-        <button type="button" onclick="hbShareVia('${shareId}','more')" style="flex:1; min-width:64px; padding:9px 5px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;">📤 আরও</button>
       </div>
     </div>`;
 }
-async function hbShareVia(shareId, platform){
+function hbShareVia(shareId, platform){
   const data = __hbShareRegistry[shareId];
   if(!data) return;
   const link = data.link;
@@ -4782,14 +4783,167 @@ async function hbShareVia(shareId, platform){
     window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
   }else if(platform === 'sms'){
     window.location.href = 'sms:?body=' + encodeURIComponent(text);
-  }else if(platform === 'more'){
-    if(navigator.share){
-      try{ await navigator.share({ title: data.name, text: '🐝 ' + data.name, url: link }); }
-      catch(e){ /* ব্যবহারকারী শেয়ার বাতিল করলে কিছু করার দরকার নেই */ }
+  }
+}
+
+/* ---------- 👍 লাইক + 💬 কমেন্ট ----------
+   shops/{shopId}/publicStock/{productId}/likes/{uid} ও .../comments/{commentId}
+   সাব-কালেকশনে রাখা হয়েছে (আলাদা টপ-লেভেল কালেকশন নয়) যাতে প্রতিটা প্রোডাক্টের
+   নিজের লাইক/কমেন্ট আপনাআপনি path দিয়েই আলাদা থাকে — শুধু createdAt দিয়ে
+   orderBy করলেই হয়, তাই কোনো নতুন composite index লাগে না। পাবলিক Facebook
+   লিংক পেজ ও নিয়মিত Bazar প্রোডাক্ট পেজ — দুই জায়গাতেই একই ফাংশন ব্যবহার হয়। */
+let __hbLcRegistry = {};
+let __hbLcCache = {};
+function hbLikesRef(key){
+  const d = __hbLcRegistry[key];
+  return db.collection('shops').doc(d.shopId).collection('publicStock').doc(d.productId).collection('likes');
+}
+function hbCommentsRef(key){
+  const d = __hbLcRegistry[key];
+  return db.collection('shops').doc(d.shopId).collection('publicStock').doc(d.productId).collection('comments');
+}
+function hbLikeCommentHTML(key){
+  return `
+    <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:10px;">
+        <button type="button" onclick="hbToggleLike('${key}')" style="display:flex; align-items:center; gap:6px; padding:7px 14px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:#fff; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit;">
+          <span id="hbLikeIcon_${key}">👍</span> <span id="hbLikeCount_${key}">0</span>
+        </button>
+        <span style="font-size:12px; color:var(--muted);">💬 <span id="hbCommentCount_${key}">0</span> কমেন্ট</span>
+      </div>
+      <div id="hbCommentList_${key}" style="display:flex; flex-direction:column; gap:8px; max-height:220px; overflow-y:auto; margin-bottom:10px;"></div>
+      <div id="hbCommentInputWrap_${key}"></div>
+    </div>`;
+}
+function hbRenderCommentInput(key){
+  const wrap = document.getElementById('hbCommentInputWrap_' + key);
+  if(!wrap) return;
+  if(currentCustomer && currentCustomer.uid){
+    wrap.innerHTML = `
+      <div style="display:flex; gap:8px;">
+        <input id="hbCommentInput_${key}" placeholder="একটা মন্তব্য লিখুন..." maxlength="500" style="flex:1; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.04); color:#fff; font-size:13px; font-family:inherit;">
+        <button id="hbCommentSendBtn_${key}" style="padding:0 16px; border:none; border-radius:10px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit;">পাঠান</button>
+      </div>`;
+    document.getElementById('hbCommentSendBtn_' + key).addEventListener('click', ()=> hbSubmitComment(key));
+    document.getElementById('hbCommentInput_' + key).addEventListener('keydown', (e)=>{ if(e.key === 'Enter') hbSubmitComment(key); });
+  }else{
+    wrap.innerHTML = `
+      <div style="text-align:center; padding:10px; background:rgba(255,255,255,0.03); border-radius:10px;">
+        <div style="font-size:12px; color:var(--muted); margin-bottom:8px;">মন্তব্য করতে Google দিয়ে লগইন করুন</div>
+        <button onclick="hbLcGoogleLogin('${key}')" style="padding:9px 18px; border:none; border-radius:10px; background:#1877f2; color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; font-family:inherit;">🔵 Google দিয়ে লগইন</button>
+      </div>`;
+  }
+}
+async function hbLcGoogleLogin(key){
+  try{
+    await auth.signInWithPopup(googleProvider);
+    // onAuthStateChanged আপডেট হতে সামান্য সময় লাগতে পারে, তাই একটু পরে রিফ্রেশ
+    setTimeout(()=>{ hbRenderCommentInput(key); hbRefreshLikeAfterLogin(key); }, 300);
+  }catch(e){
+    if(e.code === 'auth/popup-blocked' || e.code === 'auth/cancelled-popup-request'){
+      auth.signInWithRedirect(googleProvider);
     }else{
-      try{ await navigator.clipboard.writeText(link); alert('🔗 লিংক কপি হয়েছে! Instagram/TikTok/Messenger-এ পেস্ট করে শেয়ার করুন।'); }
-      catch(e){ prompt('লিংকটি কপি করুন:', link); }
+      console.error(e);
     }
+  }
+}
+async function hbRefreshLikeAfterLogin(key){
+  const cache = __hbLcCache[key];
+  if(!cache || !currentCustomer || !currentCustomer.uid) return;
+  try{
+    const doc = await hbLikesRef(key).doc(currentCustomer.uid).get();
+    cache.liked = doc.exists;
+    hbRenderLikeCommentFromCache(key);
+  }catch(e){ /* ignore */ }
+}
+function hbRenderLikeCommentFromCache(key){
+  const cache = __hbLcCache[key];
+  if(!cache) return;
+  const cntEl = document.getElementById('hbLikeCount_' + key);
+  if(cntEl) cntEl.textContent = cache.likeCount;
+  const iconEl = document.getElementById('hbLikeIcon_' + key);
+  if(iconEl) iconEl.textContent = cache.liked ? '💛' : '👍';
+  const cntCEl = document.getElementById('hbCommentCount_' + key);
+  if(cntCEl) cntCEl.textContent = cache.comments.length;
+  const listEl = document.getElementById('hbCommentList_' + key);
+  if(listEl){
+    if(!cache.comments.length){
+      listEl.innerHTML = `<div style="font-size:12px; color:var(--muted); text-align:center; padding:8px;">এখনো কোনো মন্তব্য নেই — প্রথম মন্তব্যটি আপনিই করুন!</div>`;
+    }else{
+      listEl.innerHTML = cache.comments.map(c=> `
+        <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:8px 10px;">
+          <div style="font-size:12px; font-weight:700; color:var(--amber); margin-bottom:2px;">${escapeHtml(c.customerName||'কাস্টমার')}</div>
+          <div style="font-size:12.5px; color:#eee; line-height:1.4; word-break:break-word;">${escapeHtml(c.text||'')}</div>
+        </div>`).join('');
+    }
+  }
+}
+async function hbInitLikeComment(key, shopId, productId){
+  __hbLcRegistry[key] = { shopId, productId };
+  hbRenderCommentInput(key);
+  const pid = shopId + '_' + productId;
+  const cached = __hbLcCache[key];
+  if(cached && cached.pid === pid){
+    hbRenderLikeCommentFromCache(key);
+    return;
+  }
+  const cache = { pid, likeCount: 0, liked: false, comments: [] };
+  __hbLcCache[key] = cache;
+  try{
+    const tasks = [
+      hbLikesRef(key).count().get().catch(()=>null),
+      (currentCustomer && currentCustomer.uid) ? hbLikesRef(key).doc(currentCustomer.uid).get().catch(()=>null) : Promise.resolve(null),
+      hbCommentsRef(key).orderBy('createdAt','desc').limit(50).get().catch(()=>null)
+    ];
+    const [countSnap, likeDoc, commentsSnap] = await Promise.all(tasks);
+    if(countSnap) cache.likeCount = countSnap.data().count;
+    if(likeDoc) cache.liked = likeDoc.exists;
+    if(commentsSnap) cache.comments = commentsSnap.docs.map(d=> d.data());
+  }catch(e){ console.warn('like/comment load failed:', e); }
+  hbRenderLikeCommentFromCache(key);
+}
+async function hbToggleLike(key){
+  if(!currentCustomer || !currentCustomer.uid){ hbLcGoogleLogin(key); return; }
+  const cache = __hbLcCache[key];
+  if(!cache) return;
+  const ref = hbLikesRef(key).doc(currentCustomer.uid);
+  try{
+    if(cache.liked){
+      await ref.delete();
+      cache.liked = false;
+      cache.likeCount = Math.max(0, cache.likeCount - 1);
+    }else{
+      await ref.set({ customerUid: currentCustomer.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      cache.liked = true;
+      cache.likeCount = cache.likeCount + 1;
+    }
+    hbRenderLikeCommentFromCache(key);
+  }catch(e){ console.error('like toggle failed:', e); }
+}
+async function hbSubmitComment(key){
+  const input = document.getElementById('hbCommentInput_' + key);
+  if(!input) return;
+  const text = (input.value||'').trim();
+  if(!text) return;
+  if(!currentCustomer || !currentCustomer.uid){ hbLcGoogleLogin(key); return; }
+  const btn = document.getElementById('hbCommentSendBtn_' + key);
+  if(btn){ btn.disabled = true; btn.textContent = '...'; }
+  try{
+    await hbCommentsRef(key).add({
+      customerUid: currentCustomer.uid,
+      customerName: currentCustomer.name || 'কাস্টমার',
+      text: text,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    input.value = '';
+    const cache = __hbLcCache[key];
+    if(cache){ cache.comments.unshift({ customerUid: currentCustomer.uid, customerName: currentCustomer.name || 'কাস্টমার', text: text }); }
+    hbRenderLikeCommentFromCache(key);
+  }catch(e){
+    console.error('comment failed:', e);
+    alert('মন্তব্য পাঠাতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = 'পাঠান'; }
   }
 }
 
@@ -4840,9 +4994,11 @@ window.hbOpenMarketProductDetail = function(shopId, productId){
         <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'},'${vColor}','${vSize}'); $('hbProductDetailModal').style.display='none'; hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; opacity:${outOfStock?"0.5":"1"};">${buyLabel}</button>
       </div>
       ${hbShareIconsHTML('detail')}
+      ${hbLikeCommentHTML('detail')}
     `;
     if(isVariant) hbWireVariantPicker(render);
     __hbShareRegistry['detail'] = { link: hbBuildPublicLink(p.__shopId, p.id), name: p.name || 'প্রোডাক্ট', shopName: p.__shopName || '' };
+    hbInitLikeComment('detail', p.__shopId, p.id);
   };
   render();
   $("hbProductDetailModal").style.display = "flex";
