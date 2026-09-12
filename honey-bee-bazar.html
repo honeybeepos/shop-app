@@ -396,8 +396,8 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenMarketFeed, #screenShops, #screenCategories, #screenSubcategories, #screenSubSubcategories, #screenProducts, #screenTransport, #screenTransportMedia, #screenSmartFlightInfo, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenMarketFeed.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenSubSubcategories.active, #screenProducts.active, #screenTransport.active, #screenTransportMedia.active, #screenSmartFlightInfo.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
+  #screenHome, #screenMarkets, #screenMarketFeed, #screenShops, #screenCategories, #screenSubcategories, #screenSubSubcategories, #screenProducts, #screenMarketCategories, #screenMarketSubcategories, #screenMarketProducts, #screenTransport, #screenTransportMedia, #screenSmartFlightInfo, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
+  #screenHome.active, #screenMarkets.active, #screenMarketFeed.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenSubSubcategories.active, #screenProducts.active, #screenMarketCategories.active, #screenMarketSubcategories.active, #screenMarketProducts.active, #screenTransport.active, #screenTransportMedia.active, #screenSmartFlightInfo.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
 
   /* 💬 Honey Messenger — সম্পূর্ণ ফুল-ভিউপোর্ট, Bazar-এর সীমাবদ্ধ width-এর
      বাইরে গিয়ে সম্পূর্ণ আলাদা একটা অ্যাপের মতো খোলে */
@@ -601,6 +601,35 @@
       <div id="currentShopName" style="font-size:14px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
     </div>
     <div id="productsList" class="pGrid"><div class="loadingMsg">স্টক লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- ==================== 🗂️ মার্কেট-ওয়াইড ক্যাটাগরি (নিচের ন্যাভের "ক্যাটাগরি" ট্যাব) ====================
+       একটা নির্দিষ্ট দোকানের ভেতরের ক্যাটাগরি (উপরের screenCategories) থেকে আলাদা —
+       এখানে বর্তমান বাজারের সব দোকান একসাথে ক্যাটাগরি অনুযায়ী দেখা যায়, যাতে
+       নির্দিষ্ট প্রোডাক্ট কোন দোকানে আছে না জেনেও খুঁজে পাওয়া যায়। -->
+  <div id="screenMarketCategories">
+    <button class="backBtn" id="backToHomeFromMarketCat">← হোমে ফিরে যান</button>
+    <div class="card" style="text-align:center; padding:12px; margin-bottom:14px;">
+      <div style="font-size:13px; color:var(--muted);">বাজার</div>
+      <div style="font-size:16px; font-weight:800; color:var(--amber);" id="mcMarketNameTxt">—</div>
+    </div>
+    <div class="serviceCardGrid" id="mcCategoriesGrid"><div class="loadingMsg">ক্যাটাগরি লোড হচ্ছে...</div></div>
+  </div>
+
+  <div id="screenMarketSubcategories">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+      <button class="backBtn" id="backToMarketCategories" style="margin-bottom:0; flex-shrink:0;">← ক্যাটাগরিতে ফিরে যান</button>
+      <div id="mcCurrentCategoryName" style="font-size:14px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+    </div>
+    <div class="catListWrap" id="mcSubcategoriesGrid"></div>
+  </div>
+
+  <div id="screenMarketProducts">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+      <button class="backBtn" id="backToMarketSubcategories" style="margin-bottom:0; flex-shrink:0;">← পেছনে ফিরে যান</button>
+      <div id="mcProductsTitle" style="font-size:14px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+    </div>
+    <div id="mcProductsGrid" class="pGrid"><div class="loadingMsg">প্রোডাক্ট লোড হচ্ছে...</div></div>
   </div>
 
   <!-- 📄 প্রোডাক্ট বিস্তারিত — বটম-শিট -->
@@ -1406,6 +1435,10 @@
     <div class="ic">🏠</div>
     <div class="lbl">Home</div>
   </div>
+  <div class="footerNavItem" id="footerNavCategory">
+    <div class="ic">🗂️</div>
+    <div class="lbl">ক্যাটাগরি</div>
+  </div>
   <div class="footerNavItem" id="footerNavCart" style="position:relative;">
     <div class="ic">🛒</div>
     <div class="lbl">Cart</div>
@@ -1742,7 +1775,7 @@ let userLatLng = null;
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenMarketCategories","screenMarketSubcategories","screenMarketProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
   if(id === "screenTransportMedia") tmListenFeed(); // 📢 Phase 6 — স্ক্রিন খুললেই লাইভ ফিড লোড হয়
   // ✈️ Smart Flight Tracking — অন্য কোনো স্ক্রিনে গেলে auto-refresh টাইমার
@@ -1909,6 +1942,17 @@ $("footerNavHome").addEventListener("click", ()=>{
   showScreen("screenHome");
 });
 $("footerNavCart").addEventListener("click", hbOpenCart);
+$("footerNavCategory").addEventListener("click", ()=> mcOpenMarketCategories());
+$("backToHomeFromMarketCat") && $("backToHomeFromMarketCat").addEventListener("click", ()=>{
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavHome").classList.add("active");
+  showScreen("screenHome");
+});
+$("backToMarketCategories") && $("backToMarketCategories").addEventListener("click", ()=> showScreen("screenMarketCategories"));
+$("backToMarketSubcategories") && $("backToMarketSubcategories").addEventListener("click", ()=>{
+  if(__mcCurrentSubcatMap && __mcCurrentSubcatMap.size > 0) showScreen("screenMarketSubcategories");
+  else showScreen("screenMarketCategories");
+});
 $("footerNavSms").addEventListener("click", ()=>{
   document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
   $("footerNavSms").classList.add("active");
@@ -5203,6 +5247,184 @@ window.selectSubSubcategory = function(subSubId, subSubName){
   showScreen("screenProducts");
   loadProducts(currentShopId);
 };
+
+/* ==================== 🗂️ মার্কেট-ওয়াইড ক্যাটাগরি (নিচের ন্যাভের "ক্যাটাগরি" ট্যাব) ====================
+   উপরের ক্যাটাগরি সিস্টেমটা একটা নির্দিষ্ট দোকানের ভেতরে (দোকানের নিজস্ব ক্যাটাগরি
+   আইডি দিয়ে)। এখানে বর্তমান বাজারের *সব* দোকান একসাথে ক্যাটাগরি অনুযায়ী দেখানো হয়,
+   যাতে কাস্টমার কোন দোকানে কী আছে না জেনেও সরাসরি নির্দিষ্ট প্রোডাক্ট খুঁজে পেতে
+   পারে। যেহেতু প্রতিটা দোকানের ক্যাটাগরি আইডি আলাদা (একই নামের ক্যাটাগরি বিভিন্ন
+   দোকানে ভিন্ন Firestore ডকুমেন্ট), তাই ক্যাটাগরির *নাম* দিয়ে সব দোকানের ক্যাটাগরি
+   একত্র (group) করা হয় — বেশিরভাগ দোকান POS-এর "All Category" প্রিসেট লিস্ট থেকেই
+   নাম বেছে নেয় বলে একই নাম সাধারণত একই ধরনের জিনিস বোঝায়। */
+let __mcMarketId = null;
+let __mcCategoryMap = null;       // ক্যাটাগরি-নাম -> { name, imageUrl, subs: Map(সাব-নাম -> Set(সাব-সাব-নাম)) }
+let __mcCurrentCat = null, __mcCurrentSub = null;
+let __mcCurrentSubcatMap = null;  // বর্তমান ক্যাটাগরির subs Map — ব্যাক বাটনে কোন স্ক্রিনে ফেরত যাবে বোঝার জন্য
+
+async function mcOpenMarketCategories(){
+  document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+  $("footerNavCategory") && $("footerNavCategory").classList.add("active");
+
+  let marketId = currentMarketId;
+  if(!marketId){
+    // 📍 কোনো বাজার এখনো বাছাই করা না থাকলে "আপনার পছন্দের বাজারে যান" কার্ডের
+    // মতোই — আগের বাজার (localStorage) → GPS-এ কাছেরটা → তালিকার প্রথমটা
+    if(allMarkets.length === 0) await loadMarkets().catch(()=>{});
+    if(allMarkets.length === 0){ showScreen("screenMarkets"); return; }
+    let target = null, lastId = null;
+    try{ lastId = localStorage.getItem("hb-last-market-id"); }catch(e){}
+    if(lastId) target = allMarkets.find(m=> m.id === lastId);
+    if(!target && userLatLng){
+      let bestDist = Infinity;
+      allMarkets.forEach(m=>{
+        if(m.location && m.location.lat != null){
+          const d = haversineKm(userLatLng[0], userLatLng[1], m.location.lat, m.location.lng);
+          if(d < bestDist){ bestDist = d; target = m; }
+        }
+      });
+    }
+    if(!target) target = allMarkets[0];
+    marketId = target.id;
+    currentMarketId = marketId;
+    try{ localStorage.setItem("hb-last-market-id", marketId); }catch(e){}
+    const marketName = target.name || marketId;
+    $("currentMarketName") && ($("currentMarketName").textContent = marketName);
+    $("mfMarketName") && ($("mfMarketName").textContent = marketName);
+  }
+  const marketObj = (allMarkets||[]).find(m=> m.id === marketId);
+  $("mcMarketNameTxt") && ($("mcMarketNameTxt").textContent = marketObj ? (marketObj.name||marketId) : marketId);
+
+  showScreen("screenMarketCategories");
+  await mcLoadMarketCategories(marketId);
+}
+
+async function mcLoadMarketCategories(marketId){
+  const gridEl = $("mcCategoriesGrid");
+  if(__mcMarketId === marketId && __mcCategoryMap){
+    mcRenderCategoryGrid();
+    return;
+  }
+  if(gridEl) gridEl.innerHTML = '<div class="loadingMsg">ক্যাটাগরি লোড হচ্ছে...</div>';
+  try{
+    const shopsQs = await db.collection("shops")
+      .where("marketId","==",marketId).where("status","==","active").get();
+    const shops = shopsQs.docs.map(d=> ({ id:d.id, ...d.data() }));
+    if(shops.length === 0){
+      __mcMarketId = marketId; __mcCategoryMap = new Map(); marketFeedProducts = [];
+      if(gridEl) gridEl.innerHTML = '<div class="mfEmpty">এই বাজারে এখনো কোনো সক্রিয় দোকান নেই।</div>';
+      return;
+    }
+    const catMap = new Map();
+    const allProducts = [];
+    await Promise.all(shops.map(async (shop)=>{
+      try{
+        const [catsQs, stockQs] = await Promise.all([
+          db.collection("shops").doc(shop.id).collection("publicCategories").get(),
+          db.collection("shops").doc(shop.id).collection("publicStock").get()
+        ]);
+        const cats = catsQs.docs.map(d=> ({ id:d.id, ...d.data() }));
+        const catById = {};
+        cats.forEach(c=>{
+          catById[c.id] = c;
+          const cName = (c.name||"").trim();
+          if(!cName) return;
+          if(!catMap.has(cName)) catMap.set(cName, { name:cName, imageUrl:c.imageUrl||null, subs:new Map() });
+          const entry = catMap.get(cName);
+          if(!entry.imageUrl && c.imageUrl) entry.imageUrl = c.imageUrl;
+          (c.subs||[]).forEach(s=>{
+            const sName = (s.name||"").trim();
+            if(!sName) return;
+            if(!entry.subs.has(sName)) entry.subs.set(sName, new Set());
+            const subEntry = entry.subs.get(sName);
+            (s.subs||[]).forEach(ss=>{ if(ss.name) subEntry.add(ss.name.trim()); });
+          });
+        });
+        const cur = shop.currencySymbol
+          || (shop.currencyCode && typeof window.hbGetCurrencySymbol === 'function' ? window.hbGetCurrencySymbol(shop.currencyCode) : null)
+          || '৳';
+        stockQs.docs.forEach(d=>{
+          const p = { ...d.data(), id:d.id };
+          const cat = p.catId ? catById[p.catId] : null;
+          const sub = (cat && p.subId) ? (cat.subs||[]).find(s=> s.id===p.subId) : null;
+          const subSub = (sub && p.subSubId) ? (sub.subs||[]).find(ss=> ss.id===p.subSubId) : null;
+          allProducts.push({
+            ...p,
+            __shopId: shop.id,
+            __shopName: shop.name || shop.shopName || "দোকান",
+            __shopArea: shop.upazila || shop.district || "",
+            __cur: cur,
+            __catName: cat ? (cat.name||"").trim() : "",
+            __subName: sub ? (sub.name||"").trim() : "",
+            __subSubName: subSub ? (subSub.name||"").trim() : ""
+          });
+        });
+      }catch(e){ console.warn("market category load failed for shop:", shop.id, e); }
+    }));
+    __mcMarketId = marketId;
+    __mcCategoryMap = catMap;
+    // 🛒 mfCardHTML/hbOpenMarketProductDetail/mfAddToCartAnimated — এই ফাংশনগুলো
+    // marketFeedProducts থেকেই প্রোডাক্ট খুঁজে বের করে, তাই এখানেও একই ভ্যারিয়েবল
+    // ব্যবহার করা হলো (Market Feed স্ক্রিনে ঢুকলে এটা আবার তার নিজের মতো রিফ্রেশ হয়)
+    marketFeedProducts = allProducts;
+  }catch(e){
+    console.error(e);
+    if(gridEl) gridEl.innerHTML = '<div class="mfEmpty">ক্যাটাগরি লোড করা যায়নি।</div>';
+    return;
+  }
+  mcRenderCategoryGrid();
+}
+
+function mcRenderCategoryGrid(){
+  const gridEl = $("mcCategoriesGrid");
+  if(!gridEl || !__mcCategoryMap) return;
+  const cats = Array.from(__mcCategoryMap.values()).sort((a,b)=> a.name.localeCompare(b.name,'bn'));
+  if(cats.length === 0){
+    gridEl.innerHTML = '<div class="mfEmpty">😕 এই বাজারে এখনো কোনো ক্যাটাগরি পাওয়া যায়নি।</div>';
+    return;
+  }
+  gridEl.innerHTML = cats.map(c=> `
+    <div class="serviceCard" onclick="mcSelectCategory('${escapeHtml(c.name).replace(/'/g,"")}')">
+      <div class="ic">${c.imageUrl ? `<img src="${escapeHtml(c.imageUrl)}" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:8px;" onerror="this.parentElement.textContent='🗂️'">` : "🗂️"}</div>
+      <div class="lbl">${escapeHtml(c.name)}</div>
+    </div>`).join("");
+}
+
+window.mcSelectCategory = function(catName){
+  __mcCurrentCat = catName;
+  __mcCurrentSub = null;
+  const entry = __mcCategoryMap ? __mcCategoryMap.get(catName) : null;
+  __mcCurrentSubcatMap = entry ? entry.subs : null;
+  $("mcCurrentCategoryName") && ($("mcCurrentCategoryName").textContent = catName);
+  const subs = entry ? Array.from(entry.subs.keys()).sort((a,b)=> a.localeCompare(b,'bn')) : [];
+  if(subs.length === 0){
+    mcShowProducts(catName, null);
+    return;
+  }
+  $("mcSubcategoriesGrid").innerHTML = subs.map(sName=> `
+    <div class="catListRow" onclick="mcSelectSubcategory('${escapeHtml(sName).replace(/'/g,"")}')">
+      <div class="thumb">🗂️</div>
+      <div class="name">${escapeHtml(sName)}</div>
+      <div class="chev">›</div>
+    </div>`).join("");
+  showScreen("screenMarketSubcategories");
+};
+
+window.mcSelectSubcategory = function(subName){
+  __mcCurrentSub = subName;
+  mcShowProducts(__mcCurrentCat, subName);
+};
+
+function mcShowProducts(catName, subName){
+  const list = marketFeedProducts.filter(p=> p.__catName === catName && (!subName || p.__subName === subName));
+  $("mcProductsTitle") && ($("mcProductsTitle").textContent = catName + (subName ? " · " + subName : ""));
+  const gridEl = $("mcProductsGrid");
+  if(gridEl){
+    gridEl.innerHTML = list.length === 0
+      ? '<div class="mfEmpty">😕 এই ক্যাটাগরিতে এখনো কোনো প্রোডাক্ট নেই।</div>'
+      : list.map((p,i)=> mfCardHTML(p,i)).join("");
+  }
+  showScreen("screenMarketProducts");
+}
 
 /* ==================== 🖼️ অটোমেটেড ইমেজ পাইপলাইন (Zero-Storage) ====================
    কোনো ছবি POS থেকে আপলোড হয় না। বার্কোড থাকলে Open Food Facts থেকে (সত্যিকারের
