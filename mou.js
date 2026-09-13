@@ -100,15 +100,34 @@ function mouWaitForAuth(timeoutMs){
 /* ==================== 🔊 Voice Output — Development #3 ====================
    ব্রাউজার-নেটিভ speechSynthesis — নতুন কোনো API-খরচ নেই। honey-bee-bazar.html-এর
    hbSpeak()-এর সাথে হুবহু একই প্যাটার্ন, যাতে দুই জায়গাতেই একই আচরণ থাকে। */
+// 🔇 ইমোজি (যেমন 🐝) TTS ইঞ্জিন মাঝে মাঝে জোরে পড়ে ফেলে (যেমন "মৌমাছি" বলে) —
+// চ্যাট বাবলে ইমোজি থাকবে, কিন্তু কণ্ঠে বলার আগে সেগুলো বাদ দেওয়া হয় এখানে
+function mouStripEmojiForSpeech(text){
+  return text
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function mouSpeak(text){
   if(!("speechSynthesis" in window)) return;
+  const speakText = mouStripEmojiForSpeech(text);
+  if(!speakText) return;
   try{
     window.speechSynthesis.cancel(); // মৌ আগের কথা শেষ না করে থাকলে থামিয়ে নতুনটা বলবে
-    const utter = new SpeechSynthesisUtterance(text);
+    const utter = new SpeechSynthesisUtterance(speakText);
     utter.lang = "bn-BD";
-    utter.rate = 1.0;
+    utter.rate = 1.05;
+    // 🧒 বাচ্চাদের জন্য মজার, একটু উঁচু-কণ্ঠের (শিশু-সুলভ) আওয়াজ — pitch বাড়ানো হলো
+    // (Web Speech API-তে নির্দিষ্ট "শিশুর কণ্ঠ" বেছে নেওয়ার সুযোগ নেই, তাই pitch দিয়ে
+    // যতটা সম্ভব হালকা/কচি শোনানো হচ্ছে — ফোন/ব্রাউজারভেদে ফলাফল কিছুটা আলাদা হতে পারে)
+    utter.pitch = 1.35;
     const voices = window.speechSynthesis.getVoices();
-    const bnVoice = voices.find(v=> v.lang === "bn-BD" || v.lang === "bn-IN" || v.lang.startsWith("bn"));
+    const bnVoices = voices.filter(v=> v.lang === "bn-BD" || v.lang === "bn-IN" || v.lang.startsWith("bn"));
+    // মেয়েলি/female voice পাওয়া গেলে সেটাই অগ্রাধিকার — না পেলে male না এমন যেকোনো bn voice, শেষে প্রথমটা
+    const bnVoice = bnVoices.find(v=>/female/i.test(v.name))
+      || bnVoices.find(v=>!/male/i.test(v.name))
+      || bnVoices[0];
     if(bnVoice) utter.voice = bnVoice; // বাংলা voice ইনস্টল করা না থাকলে ব্রাউজারের ডিফল্ট voice-এই বলবে
     window.speechSynthesis.speak(utter);
   }catch(e){ console.warn("মৌ-এর কথা বলা (speechSynthesis) ব্যর্থ:", e); }
