@@ -533,8 +533,16 @@ exports.onOrderConfirmed = onDocumentUpdated(
     // ইতিমধ্যে dispatch শুরু হয়ে থাকলে (রেট্রি/ডুপ্লিকেট ইভেন্ট) আবার শুরু করব না
     if (after.dispatchState) return;
 
-    console.log(JSON.stringify({ event: "ORDER_DISPATCH_STARTED", orderId }));
-    await db.collection("orderRequests").doc(orderId).set({ dispatchState: "searching_rider" }, { merge: true });
+    // 🤝 দোকানদার POS-এর গ্রুপ-অ্যাকসেপ্ট পপ-আপে "নিজে/অন্য মাধ্যমে পাঠাবো"
+    // বেছে নিলে এই অর্ডারে selfDelivery:true লেখা হয় (শপ-ledger-app.html-এর
+    // ordConfirmAcceptGroup())। তখন এখানে অটো-রাইডার-ডিসপ্যাচ শুরু হবে না —
+    // শুধু কাস্টমারকে আলাদা মেসেজ দিয়ে জানানো হবে।
+    const isSelfDelivery = after.selfDelivery === true;
+    console.log(JSON.stringify({ event: "ORDER_DISPATCH_STARTED", orderId, selfDelivery: isSelfDelivery }));
+    await db.collection("orderRequests").doc(orderId).set(
+      { dispatchState: isSelfDelivery ? "self_delivery" : "searching_rider" },
+      { merge: true }
+    );
 
     // 🔔 কাস্টমারকে জানানো — দোকানদার অর্ডারটি গ্রহণ করেছেন। আগে এই মুহূর্তে
     // কাস্টমারের কাছে কোনো সংকেতই যেত না (শুধু "নিরবতা"), অ্যাপ নিজে খুলে
@@ -544,16 +552,21 @@ exports.onOrderConfirmed = onDocumentUpdated(
       try {
         const shopSnap = await db.collection("shops").doc(after.shopId).get();
         const shopName = shopSnap.exists ? (shopSnap.data().name || shopSnap.data().shopName || "দোকান") : "দোকান";
+        const body = isSelfDelivery
+          ? `${shopName} আপনার "${after.productName || "প্রোডাক্ট"}" অর্ডারটি গ্রহণ করেছে — রাইডার ছাড়াই (নিজে/অন্য মাধ্যমে) পাঠানো হবে।`
+          : `${shopName} আপনার "${after.productName || "প্রোডাক্ট"}" অর্ডারটি গ্রহণ করেছে — এখন প্রস্তুত করা হচ্ছে।`;
         await sendFcmToMessengerUser(
           after.customerUid,
           "✅ অর্ডার গ্রহণ করা হয়েছে",
-          `${shopName} আপনার "${after.productName || "প্রোডাক্ট"}" অর্ডারটি গ্রহণ করেছে — এখন প্রস্তুত করা হচ্ছে।`,
+          body,
           { type: "order-accepted", orderId }
         );
       } catch (e) {
         console.warn(JSON.stringify({ event: "CUSTOMER_ACCEPT_NOTIFY_FAILED", orderId, error: String(e && e.message || e) }));
       }
     }
+
+    if (isSelfDelivery) return; // 🤝 রাইডার খোঁজা লাগবে না — দোকানদার নিজে/অন্য মাধ্যমে পাঠাবেন
 
     await dispatchOrderToNearestRider(orderId, after, []);
   }
@@ -839,6 +852,22 @@ function ruleBasedParse(text) {
 // কড়াকড়িভাবে বলা হয় শুধু {itemQuery, qty, unit} ফেরত দিতে, কোনো
 // productId/price/stock বানাতে বলা হয় না (ওগুলো AI-এর প্রম্পটেও নেই,
 // AI-এর আউটপুট শুধু items array হিসেবে পার্স হয়, অন্য কিছু গ্রহণ করা হয় না)।
+//
+// 🐛 বাগ-ফিক্স (২০২৬-০৯-১৩, দুই ধাপে):
+// ধাপ ১ — মডেল আগে "gemini-2.0-flash" ছিল, যেটা Google ২০২৬-০৬-০১ থেকে
+// সম্পূর্ণ বন্ধ (shut down) করে দিয়েছে — তাই এতদিন এই ফাংশনের Gemini কল
+// সবসময় ব্যর্থ হয়ে rule-based fallback-এ পড়ে যাচ্ছিল, আর মৌ-চ্যাট
+// (mouChat) প্রতিটা মেসেজেই ফলব্যাক জবাব দিচ্ছিল। প্রথমে "gemini-3.5-flash"
+// এ পরিবর্তন করা হয়েছিল (Google-এর সুপারিশকৃত দুটো replacement-এর একটা)।
+// ধাপ ২ — কিন্তু "gemini-3.5-flash" নতুন API key দিয়েও বারবার
+// "Gemini API status 429" (rate-limit/quota exceeded) দিচ্ছিল — সম্ভবত
+// ফ্রি-টায়ারে এই মডেলের কোটা খুব কম/উপলব্ধ না। তাই Google-এর অন্য
+// সুপারিশকৃত replacement "gemini-3.1-flash-lite"-এ পরিবর্তন করা হলো, যেটার
+// ফ্রি-টায়ারে ডকুমেন্টেড higher quota আছে (মৌ-চ্যাট/শপিং-পার্সের মতো ছোট,
+// হালকা কাজের জন্য এটাই যথেষ্ট)। ভবিষ্যতে আবার সমস্যা হলে Firebase
+// Functions log-এ "MOU_CHAT_FAILED"/"Gemini parse ব্যর্থ" ইভেন্ট খুঁজলে
+// exact এরর মেসেজ পাওয়া যাবে (৪০৪ = মডেল-নাম ভ্যালিড না, ৪০১ = key ভুল/
+// বাতিল, ৪২৯ = rate-limit/quota শেষ)।
 async function geminiParse(text, apiKey) {
   const prompt = `তুমি একটা বাংলা মুদি-বাজারের শপিং লিস্ট পার্সার। নিচের কাস্টমারের কথা থেকে প্রতিটা প্রোডাক্টের নাম, পরিমাণ ও একক বের করো।
 নিয়ম:
@@ -852,7 +881,7 @@ async function geminiParse(text, apiKey) {
 
 শুধু JSON array রিটার্ন করো, যেমন: [{"itemQuery":"চাল","qty":5,"unit":"কেজি"}]`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -861,7 +890,13 @@ async function geminiParse(text, apiKey) {
       generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
     }),
   });
-  if (!res.ok) throw new Error(`Gemini API status ${res.status}`);
+  if (!res.ok) {
+    // 🔎 আগে শুধু status নম্বর (যেমন 400) লগ হতো — আসল কারণ (Google-এর error
+    // body) দেখা যেত না। এখন body টেক্সট-ও ধরে এরর মেসেজে জোড়া হচ্ছে, যাতে
+    // পরের বার লগ চেক করলেই সঠিক কারণ পাওয়া যায়, আন্দাজ করতে না হয়।
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Gemini API status ${res.status}: ${errBody.slice(0, 300)}`);
+  }
   const data = await res.json();
   const rawText = data.candidates && data.candidates[0] && data.candidates[0].content
     && data.candidates[0].content.parts && data.candidates[0].content.parts[0]
@@ -898,7 +933,7 @@ exports.parseShoppingIntent = onCall({ secrets: [geminiApiKey] }, async (request
   if (apiKey) {
     try {
       const items = await geminiParse(text, apiKey);
-      if (items.length > 0) return { items, engine: "gemini-2.0-flash" };
+      if (items.length > 0) return { items, engine: "gemini-3.1-flash-lite" };
       // AI খালি রেজাল্ট দিলে নিচে rule-based ফলব্যাকে যাওয়া হয়
     } catch (e) {
       console.warn("Gemini parse ব্যর্থ, rule-based fallback ব্যবহার হচ্ছে:", String(e && e.message || e));
@@ -932,7 +967,7 @@ async function mouGeminiReply(text, apiKey) {
 
 গ্রাহকের কথা: "${text}"`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -941,7 +976,13 @@ async function mouGeminiReply(text, apiKey) {
       generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
     }),
   });
-  if (!res.ok) throw new Error(`Gemini API status ${res.status}`);
+  if (!res.ok) {
+    // 🔎 আগে শুধু status নম্বর (যেমন 400) লগ হতো — আসল কারণ (Google-এর error
+    // body) দেখা যেত না। এখন body টেক্সট-ও ধরে এরর মেসেজে জোড়া হচ্ছে, যাতে
+    // পরের বার লগ চেক করলেই সঠিক কারণ পাওয়া যায়, আন্দাজ করতে না হয়।
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Gemini API status ${res.status}: ${errBody.slice(0, 300)}`);
+  }
   const data = await res.json();
   const rawText = data.candidates && data.candidates[0] && data.candidates[0].content
     && data.candidates[0].content.parts && data.candidates[0].content.parts[0]
@@ -986,7 +1027,7 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   try {
     const result = await mouGeminiReply(text.trim(), apiKey);
     console.log(JSON.stringify({ event: "MOU_CHAT_REPLIED", uid: request.auth.uid }));
-    return { reply: result.reply, mood: result.mood, engine: "gemini-2.0-flash" };
+    return { reply: result.reply, mood: result.mood, engine: "gemini-3.1-flash-lite" };
   } catch (e) {
     console.warn(JSON.stringify({ event: "MOU_CHAT_FAILED", error: String(e && e.message || e) }));
     // 🛟 Step 7 — error হলেও গ্রাহক খালি হাতে ফেরত যান না, একটা উষ্ণ fallback বার্তা পান
@@ -1458,6 +1499,50 @@ exports.adminUpdateShopOwnerEmail = onCall(async (request) => {
       throw new HttpsError("already-exists", "এই ইমেইল দিয়ে আগে থেকেই অন্য একটা একাউন্ট আছে।");
     }
     throw new HttpsError("internal", "ইমেইল পরিবর্তন করা যায়নি — " + (err && err.message ? err.message : String(err)));
+  }
+});
+
+// 📦 "প্রস্তুত হচ্ছে" ট্যাবে একটা কাস্টমারের পুরো রসিদ (একাধিক প্রোডাক্ট/orderRequests
+// ডকুমেন্ট) প্যাকেজিং শেষ হলে দোকানদার একবার এই callable-টা ডাকেন (প্রতিটা
+// প্রোডাক্টের জন্য আলাদা আলাদা না — নাহলে কাস্টমার একই কথায় ৩-৪টা নোটিফিকেশন
+// পেতেন) যাতে কাস্টমার ঠিক একটাই "প্যাকেজিং শেষ" পুশ নোটিফিকেশন পান।
+exports.notifyOrderPackagingDone = onCall(async (request) => {
+  try {
+    const callerUid = request.auth && request.auth.uid;
+    if (!callerUid) throw new HttpsError("unauthenticated", "লগইন করা নেই।");
+
+    const { shopId, customerUid, itemCount } = request.data || {};
+    if (!shopId || !customerUid) {
+      throw new HttpsError("invalid-argument", "shopId ও customerUid দিতে হবে।");
+    }
+
+    // 🔒 কলারকে অবশ্যই এই shopId-র মালিক অথবা স্টাফ (members) হতে হবে —
+    // নাহলে যে কেউ যেকোনো কাস্টমারকে ইচ্ছামতো নোটিফিকেশন পাঠাতে পারতো
+    const shopDoc = await db.collection("shops").doc(shopId).get();
+    if (!shopDoc.exists) throw new HttpsError("not-found", "দোকান পাওয়া যায়নি।");
+    const shopData = shopDoc.data();
+    const isOwner = shopData.ownerUid === callerUid || shopId === callerUid;
+    let isStaff = isOwner;
+    if (!isStaff) {
+      const memberDoc = await db.collection("shops").doc(shopId).collection("members").doc(callerUid).get();
+      isStaff = memberDoc.exists;
+    }
+    if (!isStaff) throw new HttpsError("permission-denied", "এই দোকানের স্টাফ না।");
+
+    const shopName = shopData.name || shopData.shopName || "দোকান";
+    const n = Number(itemCount) || 1;
+    await sendFcmToMessengerUser(
+      customerUid,
+      "📦 প্যাকেজিং শেষ",
+      `${shopName} আপনার ${n > 1 ? n + "টা প্রোডাক্টের " : ""}অর্ডার প্যাকেজিং শেষ করেছে — এখন পাঠানোর অপেক্ষায়।`,
+      { type: "order-packaging-done", shopId }
+    );
+
+    return { success: true };
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    console.error("notifyOrderPackagingDone ব্যর্থ হয়েছে:", err);
+    throw new HttpsError("internal", "নোটিফিকেশন পাঠানো যায়নি — " + (err && err.message ? err.message : String(err)));
   }
 });
 

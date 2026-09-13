@@ -554,6 +554,8 @@
     #saleReceiptPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #productLabelPrintArea.printing, #productLabelPrintArea.printing *{visibility:visible;}
     #productLabelPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
+    #ordReceiptPrintArea.printing, #ordReceiptPrintArea.printing *{visibility:visible;}
+    #ordReceiptPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     .no-print{display:none !important;}
   }
 </style>
@@ -637,6 +639,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<!-- 📦 অর্ডার ব্যবস্থাপনায় "প্যাকেজিং শেষ" জানানোর জন্য একটাই Cloud Function
+     কল (notifyOrderPackagingDone) দরকার — honey-bee-bazar.html-এ যেভাবে
+     আছে সেভাবেই -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script src="hb-currency.js"></script>
 <script src="firebase-init.js"></script>
 
@@ -2639,6 +2645,39 @@
     #program-orders .ordList{ padding:0 16px 24px; }
     #program-orders .ordCard{ background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:14px; margin-bottom:12px; color:#fff; }
     #program-orders .ordEmpty{ text-align:center; color:#8ec9a8; font-size:12.5px; padding:30px 16px; }
+
+    /* 🧾 একই কাস্টমারের একাধিক প্রোডাক্ট-অর্ডার এখন একসাথে একটা কার্ডে/রসিদে —
+       আগে প্রতিটা প্রোডাক্ট আলাদা কার্ড হয়ে "নতুন"/"প্রস্তুত হচ্ছে" ট্যাবে
+       ছড়িয়ে থাকতো, একটা একটা করে গ্রহণ করতে হতো */
+    #program-orders .ordGroupCard{ background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:14px; margin-bottom:14px; color:#fff; }
+    #program-orders .ordGroupHead{ margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed rgba(255,255,255,0.15); }
+    #program-orders .ordGroupCustomer{ font-weight:800; font-size:14px; }
+    #program-orders .ordGroupMeta{ font-size:11.5px; color:#8ec9a8; margin-top:3px; }
+    #program-orders .ordItemRow{ display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
+    #program-orders .ordItemRow:last-child{ border-bottom:none; }
+    #program-orders .ordItemThumb{ width:40px; height:40px; border-radius:8px; overflow:hidden; background:rgba(255,255,255,0.06); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:18px; }
+    #program-orders .ordItemThumb img{ width:100%; height:100%; object-fit:cover; }
+    #program-orders .ordItemInfo{ flex:1; min-width:0; }
+    #program-orders .ordItemName{ font-weight:700; font-size:12.5px; }
+    #program-orders .ordItemMeta{ font-size:11px; color:#fbbf24; font-weight:700; }
+    #program-orders .ordItemRemoveBtn{ flex-shrink:0; width:26px; height:26px; border-radius:50%; background:rgba(220,38,38,0.2); color:#fca5a5; border:none; font-size:13px; cursor:pointer; }
+    #program-orders .ordGroupAcceptBtn{ width:100%; margin-top:12px; padding:11px; border:none; border-radius:10px; background:#22c55e; color:#08130d; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit; }
+
+    /* 🔁 "রসিদ" আগে থেকেই ছিল, কিন্তু কাস্টমার আবার অর্ডার করায় নতুন
+       প্রোডাক্ট যোগ হলো — এটা আলাদা রঙ+হালকা এনিমেশন দিয়ে বোঝানো হয়, যাতে
+       দোকানদার সহজেই "লেগে থাকা" (পুরনো/repeat) কাস্টমার চিনতে পারেন */
+    #program-orders .ordAddOnBadge{ font-size:10.5px; font-weight:800; color:#0d1b1e; background:linear-gradient(135deg,#fcd34d,#f59e0b); display:inline-block; padding:3px 9px; border-radius:20px; margin:8px 0 4px; }
+    #program-orders .ordAddOnBatch .ordItemRow{ background:rgba(245,158,11,0.10); border-radius:10px; padding:8px 8px; animation: ordAddOnPulse 1.6s ease-in-out 2; }
+    @keyframes ordAddOnPulse{
+      0%,100%{ box-shadow:0 0 0 0 rgba(245,158,11,0.0); }
+      50%{ box-shadow:0 0 0 5px rgba(245,158,11,0.25); }
+    }
+    #program-orders .ordPackagingDoneBtn{ width:100%; margin-top:10px; padding:10px; border-radius:9px; border:1px solid rgba(96,165,250,0.4); background:rgba(96,165,250,0.12); color:#93c5fd; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; }
+    #program-orders .ordPackagingDoneBtn.done{ border-color:rgba(34,197,94,0.4); background:rgba(34,197,94,0.12); color:#86efac; cursor:default; }
+    #program-orders .ordSelfDeliveryTag{ display:inline-block; font-size:10.5px; font-weight:800; color:#0d1b1e; background:#a78bfa; padding:3px 9px; border-radius:20px; margin-top:8px; }
+
+    /* ✅ গ্রহণ-করার পপ-আপ (গ্রুপ-অ্যাকসেপ্ট) */
+    #ordAcceptGroupModal .ordAGDeliveryOpt.active{ background:rgba(34,197,94,0.18) !important; border-color:#22c55e !important; color:#4ade80; }
   </style>
   <div class="ordTopBar">
     <button class="backBtn" id="backFromOrders" style="background:rgba(255,255,255,0.1); border:none; width:36px; height:36px; border-radius:10px; color:#fff; font-size:17px; cursor:pointer;">←</button>
@@ -2653,6 +2692,25 @@
   </div>
   <div class="ordList" id="ordList"><div class="ordEmpty">লোড হচ্ছে...</div></div>
 </div>
+
+<!-- ✅ একই কাস্টমারের সব প্রোডাক্ট একসাথে "গ্রহণ করুন" করার পপ-আপ — প্রিন্ট +
+     ডেলিভারি-পদ্ধতি (রাইডার / নিজে-অন্য মাধ্যম) বেছে নিয়ে একবারে কনফার্ম হয় -->
+<div class="modal-overlay" id="ordAcceptGroupModal">
+  <div class="modal-box" style="max-width:420px; text-align:left; max-height:85vh; overflow-y:auto; background:#0f1a14; color:#fff; border:1px solid rgba(34,197,94,0.3);">
+    <h3 style="margin:0 0 4px; color:#4ade80;">✅ অর্ডার গ্রহণ করুন</h3>
+    <p class="pin-desc" id="ordAGCustomerName" style="margin:0 0 12px; color:rgba(255,255,255,0.6);"></p>
+    <div id="ordAGItemsList" style="margin-bottom:14px;"></div>
+    <div style="font-size:12.5px; font-weight:700; color:#8ec9a8; margin-bottom:8px;">🚚 ডেলিভারি কিভাবে পাঠাবেন?</div>
+    <div style="display:flex; gap:8px; margin-bottom:16px;">
+      <div class="ordAGDeliveryOpt active" data-mode="rider" style="flex:1; text-align:center; padding:12px 8px; border-radius:10px; cursor:pointer; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.16); font-size:12.5px; font-weight:700;">🚚<br>রাইডার লাগবে</div>
+      <div class="ordAGDeliveryOpt" data-mode="self" style="flex:1; text-align:center; padding:12px 8px; border-radius:10px; cursor:pointer; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.16); font-size:12.5px; font-weight:700;">🤝<br>নিজে/অন্য মাধ্যমে পাঠাবো</div>
+    </div>
+    <button class="mini-btn" id="ordAGPrintBtn" style="width:100%; margin-bottom:10px;">🖨️ প্রিন্ট করুন</button>
+    <button class="btn" id="ordAGConfirmBtn" style="width:100%;">✅ নিশ্চিত করে গ্রহণ করুন</button>
+    <button class="mini-btn" id="ordAGCancelBtn" style="width:100%; margin-top:8px; background:transparent;">বাতিল</button>
+  </div>
+</div>
+<div id="ordReceiptPrintArea"></div>
 
 <div id="program-ops" style="display:none; position:fixed; inset:0; z-index:500; flex-direction:column; overflow:auto;
     background:
@@ -4987,6 +5045,15 @@ document.getElementById('backFromReport').addEventListener('click', ()=> switchP
 let __ordCurrentStatus = "pending";
 let __ordUnsub = null;
 let __ordShopMarketId = null;
+const ordFunctionsInstance = firebase.functions(); // 📦 "প্যাকেজিং শেষ" নোটিফিকেশন কল করার জন্য
+
+// 🤖 dispatchState অনুযায়ী মানুষ-পড়ার-মতো লেবেল — অটো-ডিসপ্যাচ কোন
+// ধাপে আছে তা দোকানদার এখান থেকেই বুঝবেন, আলাদা করে কিছু করতে হবে না
+const ORD_DISPATCH_STATE_LABEL = {
+  searching_rider: '🤖 রাইডার খোঁজা হচ্ছে...',
+  offer_sent: '🤖 রাইডারকে অফার পাঠানো হয়েছে — সাড়ার অপেক্ষায় (সর্বোচ্চ ১ মিনিট)',
+  assigned: '✅ রাইডার এসাইন হয়ে গেছে',
+};
 
 async function ordGetShopMarketId(){
   if(__ordShopMarketId) return __ordShopMarketId;
@@ -5101,81 +5168,363 @@ function ordListen(){
     });
 }
 
-async function ordRender(orders){
-  const listEl = document.getElementById('ordList');
-  if(orders.length === 0){
-    listEl.innerHTML = '<div class="ordEmpty">এই ধাপে কোনো অর্ডার নেই।</div>';
-    return;
-  }
-  // 🤖 dispatchState অনুযায়ী মানুষ-পড়ার-মতো লেবেল — অটো-ডিসপ্যাচ কোন
-  // ধাপে আছে তা দোকানদার এখান থেকেই বুঝবেন, আলাদা করে কিছু করতে হবে না
-  const DISPATCH_STATE_LABEL = {
-    searching_rider: '🤖 রাইডার খোঁজা হচ্ছে...',
-    offer_sent: '🤖 রাইডারকে অফার পাঠানো হয়েছে — সাড়ার অপেক্ষায় (সর্বোচ্চ ১ মিনিট)',
-    assigned: '✅ রাইডার এসাইন হয়ে গেছে',
-  };
+/* ==================== 🧾 একই কাস্টমারের একাধিক প্রোডাক্ট-অর্ডার এক লিস্টে/রসিদে
+   ====================
+   আগে orderRequests-এ প্রতিটা প্রোডাক্ট সবসময়ই আলাদা ডকুমেন্ট ছিল (Bazar-এর
+   checkout একসাথে ৩টা প্রোডাক্ট অর্ডার করলেও ৩টা আলাদা ডকুমেন্ট তৈরি করে,
+   কোনো কমন "batch id" নেই) — POS-এ প্রতিটা আলাদা কার্ড হিসেবে দেখানো হতো,
+   একটা একটা করে গ্রহণ/বাতিল করতে হতো। এখন "নতুন" আর "প্রস্তুত হচ্ছে" ট্যাবে
+   একই কাস্টমারের (customerUid দিয়ে) সব প্রোডাক্ট ক্লায়েন্ট-সাইডেই এক
+   কার্ডে/রসিদে গ্রুপ করা হয় — নতুন কোনো Firestore ফিল্ড/ইনডেক্স লাগেনি, তাই
+   এটা "প্রস্তুত হচ্ছে"-তে একই কাস্টমারের নতুন অর্ডার এলে এমনিতেই আগের রসিদে
+   জুড়ে যায় (আলাদা করে কোনো "মার্জ" লজিক লাগেনি — গ্রুপিংটাই সেই কাজ করে)। */
+function ordGroupByCustomer(orders){
+  const map = {};
+  const keys = [];
+  orders.forEach(o=>{
+    const key = o.customerUid || ((o.customerName||'') + '|' + (o.deliveryPhone||''));
+    if(!map[key]){
+      map[key] = {
+        key, customerUid: o.customerUid || null, customerName: o.customerName,
+        deliveryPhone: o.deliveryPhone, deliveryAddress: o.deliveryAddress,
+        deliveryLat: o.deliveryLat, deliveryLng: o.deliveryLng, items: []
+      };
+      keys.push(key);
+    }
+    map[key].items.push(o);
+  });
+  return keys.map(k=> map[k]);
+}
 
-  // 📦 প্রতিটা অর্ডারের প্রোডাক্ট-বিস্তারিত (ছবি, দাম, লাইভ স্টক) POS-এর নিজস্ব
-  // প্রোডাক্ট ডেটা থেকে টেনে আনা হয় — যাতে "গ্রহণ করুন" চাপার আগেই দোকানদার
-  // নিশ্চিত হতে পারেন এই জিনিসটা আসলেই এখন পাঠাতে পারবেন কিনা (শুধু নাম/পরিমাণ
-  // দেখানো যথেষ্ট ছিল না, অর্ডার দেওয়ার পর স্টক ফুরিয়ে যেতেও পারে)
+function ordGroupHeadHtml(g, titlePrefix){
+  return `
+    <div class="ordGroupHead">
+      <div class="ordGroupCustomer">${titlePrefix} ${escapeAttr(g.customerName||'কাস্টমার')}</div>
+      <div class="ordGroupMeta">${g.deliveryAddress ? '📍 ' + escapeAttr(g.deliveryAddress) : ''}${g.deliveryPhone ? ' · 📞 ' + escapeAttr(g.deliveryPhone) : ''}${g.deliveryLat!=null ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${g.deliveryLat},${g.deliveryLng}" target="_blank" style="color:#0ea5e9;">🗺️ ম্যাপে দেখুন</a>` : ''}</div>
+    </div>`;
+}
+
+function ordItemStockHtml(o, prod){
+  if(!prod) return o.productId ? `<div style="color:#fbbf24; font-size:10.5px; font-weight:700;">⚠️ প্রোডাক্ট খুঁজে পাওয়া যায়নি</div>` : '';
+  let availableQty = prod.qty;
+  if(prod.productType === 'variant' && o.variantColor && o.variantSize){
+    const v = (prod.variants||[]).find(x=> x.color===o.variantColor && x.size===o.variantSize);
+    availableQty = v ? v.qty : null;
+  }
+  const need = o.qty || 1;
+  if(availableQty == null) return '';
+  if(Number(availableQty) <= 0) return `<div style="color:#fca5a5; font-size:10.5px; font-weight:700;">🔴 স্টকে নেই</div>`;
+  if(Number(availableQty) < need) return `<div style="color:#fbbf24; font-size:10.5px; font-weight:700;">⚠️ স্টকে মাত্র ${availableQty}টি</div>`;
+  return `<div style="color:#8ec9a8; font-size:10.5px;">🟢 স্টকে আছে (${availableQty}টি)</div>`;
+}
+
+function ordItemRowHtml(o, allProducts, opts){
+  opts = opts || {};
+  const prod = o.productId ? allProducts.find(p=> p.id === o.productId) : null;
+  const thumb = prod && (prod.imageUrl || prod.image)
+    ? `<img src="${escapeAttr(prod.imageUrl || prod.image)}">`
+    : '📦';
+  const removeBtn = opts.noRemove ? '' : `<button class="ordItemRemoveBtn" data-oid="${o.id}" title="এই প্রোডাক্টটা বাতিল করুন">✕</button>`;
+  return `
+    <div class="ordItemRow">
+      <div class="ordItemThumb">${thumb}</div>
+      <div class="ordItemInfo">
+        <div class="ordItemName">${escapeAttr(o.productName||'প্রোডাক্ট')}${o.variantColor ? ` · 🎨${escapeAttr(o.variantColor)}/📏${escapeAttr(o.variantSize)}` : ''}</div>
+        <div class="ordItemMeta">${prod ? (typeof fmt === 'function' ? fmt(prod.sell) : prod.sell) : ''}${o.qty>1 ? ` × ${o.qty}` : ''}</div>
+        ${ordItemStockHtml(o, prod)}
+      </div>
+      ${removeBtn}
+    </div>`;
+}
+
+function ordBuildPendingGroupHtml(g, allProducts){
+  const itemsHtml = g.items.map(o=> ordItemRowHtml(o, allProducts)).join('');
+  return `
+    <div class="ordGroupCard">
+      ${ordGroupHeadHtml(g, '👤')}
+      <div class="ordGroupItems">${itemsHtml}</div>
+      <button class="ordGroupAcceptBtn" data-gkey="${escapeAttr(g.key)}">✅ সব গ্রহণ করুন (${g.items.length}টা)</button>
+    </div>`;
+}
+
+function ordItemTimeMs(o){
+  const ts = o.preparingAt || o.createdAt;
+  return (ts && typeof ts.toMillis === 'function') ? ts.toMillis() : 0;
+}
+// 🔁 একই রসিদে সময়ের ফাঁক (>১ মিনিট) দেখে বোঝা হয় কোন প্রোডাক্টগুলো একসাথে
+// অর্ডার হয়েছিল (batch ১) আর কোনগুলো কাস্টমার পরে আবার অর্ডার করে জুড়ে
+// দিয়েছেন (batch ২+) — এগুলোই হাইলাইট করে দেখানো হয়
+function ordSplitBatches(items){
+  const sorted = items.slice().sort((a,b)=> ordItemTimeMs(a) - ordItemTimeMs(b));
+  const batches = [];
+  let cur = [];
+  let lastT = null;
+  sorted.forEach(it=>{
+    const t = ordItemTimeMs(it);
+    if(lastT !== null && (t - lastT) > 60000){ batches.push(cur); cur = []; }
+    cur.push(it);
+    lastT = t;
+  });
+  if(cur.length) batches.push(cur);
+  return batches;
+}
+
+function ordDispatchBlockHtml(o){
+  // 🤝 "নিজে/অন্য মাধ্যমে পাঠাবো" বেছে নেওয়া হলে রাইডার-সার্চ শুরুই হয় না —
+  // রসিদের উপরে একবার ordSelfDeliveryTag দিয়েই বোঝানো হয়, এখানে আলাদা কিছু দরকার নেই
+  if(o.selfDelivery === true) return '';
+  const label = `<div style="font-size:9.5px; color:rgba(255,255,255,0.4); margin:8px 0 3px;">${escapeAttr(o.productName||'')} —</div>`;
+  if(o.dispatchState === 'searching_rider' || o.dispatchState === 'offer_sent' || o.dispatchState === 'assigned'){
+    return `${label}<div style="padding:8px 10px; border-radius:8px; background:rgba(14,165,233,0.12); color:#7dd3fc; font-size:11.5px; font-weight:700;">${ORD_DISPATCH_STATE_LABEL[o.dispatchState]}</div>`;
+  }
+  return `
+    ${label}
+    ${o.dispatchState === 'waiting_for_rider' ? `<div style="padding:9px 10px; border-radius:8px; background:rgba(234,179,8,0.12); color:#fbbf24; font-size:11px; font-weight:700; line-height:1.5;">⚠️ এই মুহূর্তে কোনো Delivery Rider Duty-তে নেই — Rider এলে অটো এসাইন হবে।</div>` : ''}
+    <div style="margin-top:6px;">
+      <select class="ordRiderSelect" data-oid="${o.id}" style="width:100%; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#fff; font-family:inherit; font-size:11.5px; margin-bottom:6px;">
+        <option value="">রাইডার বেছে নিন...</option>
+      </select>
+      <button class="ordAssignBtn" data-oid="${o.id}" style="width:100%; padding:9px; border:none; border-radius:8px; background:#0ea5e9; color:#04222f; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">🚚 রাইডার এসাইন করে পাঠান</button>
+    </div>`;
+}
+
+function ordBuildPreparingGroupHtml(g, allProducts){
+  const batches = ordSplitBatches(g.items);
+  let itemsHtml = '';
+  batches.forEach((batch, idx)=>{
+    const rows = batch.map(o=> ordItemRowHtml(o, allProducts)).join('');
+    itemsHtml += (idx === 0)
+      ? rows
+      : `<div class="ordAddOnBatch"><div class="ordAddOnBadge">🔁 আবার অর্ডার করেছেন — নতুন যোগ হলো</div>${rows}</div>`;
+  });
+
+  const dispatchHtml = g.items.map(o=> ordDispatchBlockHtml(o)).join('');
+  const allPackaged = g.items.every(o=> o.packagingDone === true);
+  const packagingBtn = allPackaged
+    ? `<div class="ordPackagingDoneBtn done">✅ প্যাকেজিং শেষ — পাঠানোর অপেক্ষায়</div>`
+    : `<button class="ordPackagingDoneBtn" data-gkey="${escapeAttr(g.key)}">📦 প্যাকেজিং শেষ, পাঠানোর অপেক্ষায়</button>`;
+  const selfDeliveryTag = g.items.some(o=> o.selfDelivery === true)
+    ? `<div class="ordSelfDeliveryTag">🤝 নিজে/অন্য মাধ্যমে পাঠানো হবে (রাইডার লাগবে না)</div>` : '';
+
+  return `
+    <div class="ordGroupCard ordReceiptCard">
+      ${ordGroupHeadHtml(g, '🧾 রসিদ —')}
+      <div class="ordGroupItems">${itemsHtml}</div>
+      ${selfDeliveryTag}
+      ${dispatchHtml}
+      ${packagingBtn}
+    </div>`;
+}
+
+// 🚚 রাইডার ড্রপডাউন পপুলেট — "প্রস্তুত হচ্ছে" রসিদে যেসব প্রোডাক্টের
+// ম্যানুয়াল ফলব্যাক দেখানো হয়েছে (waiting_for_rider/legacy), শুধু সেগুলোতেই
+async function ordPopulateRiderSelects(listEl){
+  if(!listEl.querySelector('.ordRiderSelect')) return;
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  const marketId = await ordGetShopMarketId();
+  let riders = [];
+  if(marketId && session && session.shopId){
+    try{
+      const rSnap = await db.collection('riders').where('marketId','==',marketId).where('online','==',true).get();
+      riders = rSnap.docs.map(d=> ({ id:d.id, ...d.data() }));
+      const shopDoc = await db.collection('shops').doc(session.shopId).get();
+      const shopLoc = shopDoc.exists ? shopDoc.data().storeLocation : null;
+      if(shopLoc){
+        riders.forEach(r=>{
+          r.distanceKm = (r.liveLocation && r.liveLocation.lat != null)
+            ? dmHaversineKm(shopLoc.lat, shopLoc.lng, r.liveLocation.lat, r.liveLocation.lng)
+            : null;
+        });
+        riders.sort((a,b)=>{
+          if(a.distanceKm == null && b.distanceKm == null) return 0;
+          if(a.distanceKm == null) return 1;
+          if(b.distanceKm == null) return -1;
+          return a.distanceKm - b.distanceKm;
+        });
+      }
+    }catch(e){ console.warn('riders fetch failed:', e); }
+  }
+  listEl.querySelectorAll('.ordRiderSelect').forEach(sel=>{
+    sel.innerHTML = '<option value="">রাইডার বেছে নিন (কাছেরটা আগে)...</option>' +
+      (riders.length ? riders.map(r=>{
+        const distTxt = r.distanceKm != null ? ` — 📍 ${r.distanceKm.toFixed(1)} কিমি দূরে` : ' — 📍 লোকেশন জানা নেই';
+        return `<option value="${r.id}">${escapeAttr(r.name)} (${escapeAttr(r.phone||'')})${distTxt}</option>`;
+      }).join('')
+                      : '<option value="" disabled>🔴 এই মুহূর্তে কোনো রাইডার অনলাইনে নেই</option>');
+  });
+  listEl.querySelectorAll('.ordAssignBtn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const sel = listEl.querySelector(`.ordRiderSelect[data-oid="${btn.dataset.oid}"]`);
+      const riderId = sel.value;
+      if(!riderId){ alert('আগে একজন রাইডার বেছে নিন।'); return; }
+      const rider = riders.find(r=> r.id === riderId);
+      try{
+        await db.collection('orderRequests').doc(btn.dataset.oid).update({
+          status: 'shipped', assignedRiderId: riderId, assignedRiderName: rider ? rider.name : null,
+          riderAssignedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          shippedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          dispatchState: 'assigned' // ম্যানুয়ালি এসাইন করলেও dispatchState সমন্বিত থাকে
+        });
+      }catch(e){ alert('এসাইন করা যায়নি: ' + e.message); }
+    });
+  });
+}
+
+/* ---------- ✅ গ্রুপ-অ্যাকসেপ্ট পপ-আপ (নতুন ট্যাব) ---------- */
+let __ordAGGroup = null;
+let __ordAGMode = 'rider';
+
+function ordOpenAcceptGroup(gkey, groups){
+  const g = groups.find(x=> x.key === gkey);
+  if(!g || !g.items.length) return;
+  __ordAGGroup = g;
+  __ordAGMode = 'rider';
+  document.getElementById('ordAGCustomerName').textContent =
+    (g.customerName||'কাস্টমার') + (g.deliveryPhone ? ' · 📞 ' + g.deliveryPhone : '');
+  const allProducts = (typeof bccLoadProducts === 'function') ? bccLoadProducts() : [];
+  document.getElementById('ordAGItemsList').innerHTML = g.items.map(o=> ordItemRowHtml(o, allProducts, {noRemove:true})).join('');
+  document.querySelectorAll('#ordAcceptGroupModal .ordAGDeliveryOpt').forEach(el=>{
+    el.classList.toggle('active', el.dataset.mode === 'rider');
+  });
+  document.getElementById('ordAcceptGroupModal').classList.add('show');
+}
+
+document.querySelectorAll('#ordAcceptGroupModal .ordAGDeliveryOpt').forEach(el=>{
+  el.addEventListener('click', ()=>{
+    __ordAGMode = el.dataset.mode;
+    document.querySelectorAll('#ordAcceptGroupModal .ordAGDeliveryOpt').forEach(x=> x.classList.toggle('active', x===el));
+  });
+});
+document.getElementById('ordAGCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('ordAcceptGroupModal').classList.remove('show');
+  __ordAGGroup = null;
+});
+document.getElementById('ordAGPrintBtn').addEventListener('click', ()=> ordPrintReceipt(__ordAGGroup));
+document.getElementById('ordAGConfirmBtn').addEventListener('click', async ()=>{
+  if(!__ordAGGroup) return;
+  const btn = document.getElementById('ordAGConfirmBtn');
+  btn.disabled = true; btn.textContent = 'গ্রহণ করা হচ্ছে...';
+  try{
+    const batch = db.batch();
+    __ordAGGroup.items.forEach(o=>{
+      batch.update(db.collection('orderRequests').doc(o.id), {
+        status: 'preparing',
+        preparingAt: firebase.firestore.FieldValue.serverTimestamp(),
+        selfDelivery: __ordAGMode === 'self'
+      });
+    });
+    await batch.commit();
+    document.getElementById('ordAcceptGroupModal').classList.remove('show');
+    if(typeof toast === 'function') toast('✅ অর্ডার গ্রহণ করা হয়েছে');
+    __ordAGGroup = null;
+  }catch(e){
+    alert('গ্রহণ করা যায়নি: ' + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = '✅ নিশ্চিত করে গ্রহণ করুন';
+  }
+});
+
+// 🖨️ কাস্টমারের পুরো রসিদ (তার সব প্রোডাক্ট একসাথে) প্রিন্ট — বিদ্যমান
+// #saleReceiptPrintArea প্যাটার্নই অনুসরণ করে (আলাদা প্রিন্ট-এরিয়া + .printing ক্লাস)
+function ordPrintReceipt(g){
+  if(!g) return;
+  const time = new Date().toLocaleString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const rows = g.items.map(o=> `
+    <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #999;">
+      <span>${escapeAttr(o.productName||'প্রোডাক্ট')}${o.variantColor ? ` (${escapeAttr(o.variantColor)}/${escapeAttr(o.variantSize)})` : ''} × ${o.qty||1}</span>
+    </div>`).join('');
+  document.getElementById('ordReceiptPrintArea').innerHTML = `
+    <div style="width:280px; margin:0 auto; padding:10px; font-family:'Space Mono',monospace; font-size:12px; color:#000;">
+      <div style="text-align:center; font-weight:800; margin-bottom:6px;">🧾 অর্ডার রসিদ</div>
+      <div>কাস্টমার: ${escapeAttr(g.customerName||'—')}</div>
+      ${g.deliveryPhone ? `<div>ফোন: ${escapeAttr(g.deliveryPhone)}</div>` : ''}
+      ${g.deliveryAddress ? `<div>ঠিকানা: ${escapeAttr(g.deliveryAddress)}</div>` : ''}
+      <div>সময়: ${time}</div>
+      <div style="border-top:1px dashed #000; margin:8px 0;"></div>
+      ${rows}
+      <div style="text-align:center; margin-top:10px; font-size:11px;">মোট আইটেম: ${g.items.length}টা</div>
+    </div>`;
+  const area = document.getElementById('ordReceiptPrintArea');
+  area.classList.add('printing');
+  window.print();
+  setTimeout(()=> area.classList.remove('printing'), 500);
+}
+
+// 📦 "প্রস্তুত হচ্ছে" রসিদে প্যাকেজিং শেষ হলে — পুরো রসিদের সব প্রোডাক্ট একসাথে
+// আপডেট + কাস্টমারকে ঠিক একটাই নোটিফিকেশন (প্রতিটা প্রোডাক্টের জন্য আলাদা না)
+async function ordMarkPackagingDone(gkey, groups){
+  const g = groups.find(x=> x.key === gkey);
+  if(!g) return;
+  const pending = g.items.filter(o=> o.packagingDone !== true);
+  if(!pending.length) return;
+  try{
+    const batch = db.batch();
+    pending.forEach(o=>{
+      batch.update(db.collection('orderRequests').doc(o.id), {
+        packagingDone: true,
+        packagingDoneAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    await batch.commit();
+    if(g.customerUid){
+      const session = (typeof getSession === 'function') ? getSession() : null;
+      if(session && session.shopId){
+        try{
+          await ordFunctionsInstance.httpsCallable('notifyOrderPackagingDone')({
+            shopId: session.shopId, customerUid: g.customerUid, itemCount: g.items.length
+          });
+        }catch(e){ console.warn('packaging notify failed:', e); }
+      }
+    }
+    if(typeof toast === 'function') toast('📦 কাস্টমারকে জানানো হয়েছে');
+  }catch(e){
+    alert('আপডেট করা যায়নি: ' + e.message);
+  }
+}
+
+async function ordRenderGrouped(orders){
+  const listEl = document.getElementById('ordList');
+  const __ordAllProducts = (typeof bccLoadProducts === 'function') ? bccLoadProducts() : [];
+  const groups = ordGroupByCustomer(orders);
+
+  if(__ordCurrentStatus === 'pending'){
+    listEl.innerHTML = groups.map(g=> ordBuildPendingGroupHtml(g, __ordAllProducts)).join('');
+    listEl.querySelectorAll('.ordItemRemoveBtn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ if(confirm('এই প্রোডাক্টটা বাতিল করবেন?')) ordUpdateStatus(btn.dataset.oid, 'cancelled'); });
+    });
+    listEl.querySelectorAll('.ordGroupAcceptBtn').forEach(btn=>{
+      btn.addEventListener('click', ()=> ordOpenAcceptGroup(btn.dataset.gkey, groups));
+    });
+  }else if(__ordCurrentStatus === 'preparing'){
+    listEl.innerHTML = groups.map(g=> ordBuildPreparingGroupHtml(g, __ordAllProducts)).join('');
+    listEl.querySelectorAll('.ordItemRemoveBtn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ if(confirm('এই প্রোডাক্টটা বাতিল করবেন?')) ordUpdateStatus(btn.dataset.oid, 'cancelled'); });
+    });
+    listEl.querySelectorAll('.ordPackagingDoneBtn:not(.done)').forEach(btn=>{
+      btn.addEventListener('click', ()=> ordMarkPackagingDone(btn.dataset.gkey, groups));
+    });
+    await ordPopulateRiderSelects(listEl);
+    listEl.querySelectorAll('.ordDeliveredBtn').forEach(btn=>{
+      btn.addEventListener('click', ()=> ordUpdateStatus(btn.dataset.oid, 'delivered'));
+    });
+  }
+}
+
+// 🚚/✅/❌ "পথে আছে"/"ডেলিভার্ড"/"বাতিল" ট্যাব — এগুলো এখনো প্রতি-প্রোডাক্ট
+// আলাদা কার্ড হিসেবেই দেখানো হয় (গ্রুপিং শুধু নতুন+প্রস্তুত হচ্ছেতে চাওয়া হয়েছিল)
+async function ordRenderFlat(orders){
+  const listEl = document.getElementById('ordList');
   const __ordAllProducts = (typeof bccLoadProducts === 'function') ? bccLoadProducts() : [];
   listEl.innerHTML = orders.map(o=>{
     const time = o.createdAt ? o.createdAt.toDate().toLocaleString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
     const prod = o.productId ? __ordAllProducts.find(p=> p.id === o.productId) : null;
-    let stockHtml = '';
-    if(prod){
-      let availableQty = prod.qty;
-      if(prod.productType === 'variant' && o.variantColor && o.variantSize){
-        const v = (prod.variants||[]).find(x=> x.color===o.variantColor && x.size===o.variantSize);
-        availableQty = v ? v.qty : null;
-      }
-      const need = o.qty || 1;
-      if(availableQty == null){
-        stockHtml = '';
-      }else if(Number(availableQty) <= 0){
-        stockHtml = `<div style="margin-top:6px; padding:5px 8px; border-radius:6px; background:rgba(220,38,38,0.15); color:#fca5a5; font-size:11px; font-weight:700;">🔴 স্টকে নেই — এখন পাঠানো যাবে না</div>`;
-      }else if(Number(availableQty) < need){
-        stockHtml = `<div style="margin-top:6px; padding:5px 8px; border-radius:6px; background:rgba(234,179,8,0.15); color:#fbbf24; font-size:11px; font-weight:700;">⚠️ স্টকে আছে মাত্র ${availableQty}টি (দরকার ${need}টি)</div>`;
-      }else{
-        stockHtml = `<div style="margin-top:6px; font-size:11px; color:#8ec9a8;">🟢 স্টকে আছে (${availableQty}টি)</div>`;
-      }
-    }else if(o.productId){
-      stockHtml = `<div style="margin-top:6px; font-size:11px; color:#fbbf24;">⚠️ এই প্রোডাক্টটি POS-এ খুঁজে পাওয়া যায়নি (মুছে ফেলা হয়ে থাকতে পারে)</div>`;
-    }
     const thumb = prod && (prod.imageUrl || prod.image)
       ? `<img src="${escapeAttr(prod.imageUrl || prod.image)}" style="width:100%; height:100%; object-fit:cover;">`
       : '📦';
     let actionHtml = '';
-    if(__ordCurrentStatus === 'pending'){
+    if(__ordCurrentStatus === 'shipped'){
       actionHtml = `
-        <div style="display:flex; gap:8px; margin-top:10px;">
-          <button class="ordAcceptBtn" data-oid="${o.id}" style="flex:1; padding:10px; border:none; border-radius:9px; background:#22c55e; color:#08130d; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ গ্রহণ করুন</button>
-          <button class="ordRejectBtn" data-oid="${o.id}" style="flex:1; padding:10px; border:none; border-radius:9px; background:rgba(220,38,38,0.2); color:#fca5a5; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">❌ বাতিল করুন</button>
-        </div>`;
-    }else if(__ordCurrentStatus === 'preparing'){
-      // 🤖 স্বাভাবিক অবস্থায় (searching_rider/offer_sent/assigned) — অটো-ডিসপ্যাচ
-      // নিজে থেকেই কাজ করছে, দোকানদারকে রাইডার বাছতে বলা হয় না
-      if(o.dispatchState === 'searching_rider' || o.dispatchState === 'offer_sent' || o.dispatchState === 'assigned'){
-        actionHtml = `<div style="margin-top:10px; padding:9px 10px; border-radius:8px; background:rgba(14,165,233,0.12); color:#7dd3fc; font-size:12px; font-weight:700;">${DISPATCH_STATE_LABEL[o.dispatchState]}</div>`;
-      }
-      // ⚠️ dispatchState === 'waiting_for_rider' (কোনো এলিজিবল রাইডার নেই) —
-      // অথবা dispatchState একদমই নেই (পুরনো/legacy অর্ডার, অটো-ডিসপ্যাচ এখনো
-      // ট্রিগার হয়নি) — শুধু তখনই জরুরি ম্যানুয়াল ফলব্যাক দেখানো হয়
-      else{
-        actionHtml = `
-          ${o.dispatchState === 'waiting_for_rider' ? `<div style="margin-top:10px; padding:10px; border-radius:8px; background:rgba(234,179,8,0.12); color:#fbbf24; font-size:11.5px; font-weight:700; line-height:1.5;">⚠️ এই মুহূর্তে কোনো Delivery Rider Duty-তে নেই।<br>অর্ডারটি Delivery Queue-তে রাখা হয়েছে।<br>Rider available হলে System automatically assignment করবে।</div>` : ''}
-          <div style="margin-top:8px;">
-            <div style="font-size:10.5px; color:#8ec9a8; margin-bottom:4px;">${o.dispatchState === 'waiting_for_rider' ? '⚠️ জরুরি ম্যানুয়াল Assignment (ঐচ্ছিক)' : ''}</div>
-            <select class="ordRiderSelect" data-oid="${o.id}" style="width:100%; padding:9px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:#fff; font-family:inherit; font-size:12px; margin-bottom:8px;">
-              <option value="">রাইডার বেছে নিন...</option>
-            </select>
-            <button class="ordAssignBtn" data-oid="${o.id}" style="width:100%; padding:10px; border:none; border-radius:9px; background:#0ea5e9; color:#04222f; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">🚚 রাইডার এসাইন করে পাঠান</button>
-          </div>`;
-      }
-    }else if(__ordCurrentStatus === 'shipped'){
-      actionHtml = `
-        <div style="margin-top:10px; font-size:11.5px; color:#8ec9a8;">🚚 রাইডার: ${o.assignedRiderName ? escapeAttr(o.assignedRiderName) : '—'}</div>
+        <div style="margin-top:10px; font-size:11.5px; color:#8ec9a8;">🚚 রাইডার: ${o.selfDelivery ? '🤝 নিজে/অন্য মাধ্যম' : (o.assignedRiderName ? escapeAttr(o.assignedRiderName) : '—')}</div>
         <button class="ordDeliveredBtn" data-oid="${o.id}" style="width:100%; margin-top:8px; padding:10px; border:none; border-radius:9px; background:#22c55e; color:#08130d; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ডেলিভারি সম্পন্ন হয়েছে</button>`;
     }
     return `
@@ -5188,7 +5537,6 @@ async function ordRender(orders){
               <div style="font-size:11px; color:#8ec9a8; flex-shrink:0;">${time}</div>
             </div>
             ${prod ? `<div style="font-size:11.5px; color:#fbbf24; font-weight:700;">${typeof fmt === 'function' ? fmt(prod.sell) : prod.sell}${o.qty>1 ? ` × ${o.qty}` : ''}</div>` : ''}
-            ${stockHtml}
           </div>
         </div>
         <div style="font-size:12px; color:#c9c3f0;">কাস্টমার: ${escapeAttr(o.customerName||'—')} · পরিমাণ: ${o.qty||1}${o.variantColor ? ` · 🎨 ${escapeAttr(o.variantColor)} / 📏 ${escapeAttr(o.variantSize)}` : ''}</div>
@@ -5197,72 +5545,22 @@ async function ordRender(orders){
       </div>`;
   }).join('');
 
-  // Accept/Reject
-  listEl.querySelectorAll('.ordAcceptBtn').forEach(btn=>{
-    btn.addEventListener('click', ()=> ordUpdateStatus(btn.dataset.oid, 'preparing'));
-  });
-  listEl.querySelectorAll('.ordRejectBtn').forEach(btn=>{
-    btn.addEventListener('click', ()=>{ if(confirm('এই অর্ডারটা বাতিল করবেন?')) ordUpdateStatus(btn.dataset.oid, 'cancelled'); });
-  });
-  // Rider dropdown populate — শুধু যেসব কার্ডে ম্যানুয়াল ফলব্যাক UI দেখানো
-  // হয়েছে (waiting_for_rider বা dispatchState-বিহীন পুরনো অর্ডার), সেগুলোতেই
-  // — স্বাভাবিক অটো-ডিসপ্যাচ চলাকালীন এই ড্রপডাউন একদমই রেন্ডার হয় না
-  if(__ordCurrentStatus === 'preparing' && listEl.querySelector('.ordRiderSelect')){
-    const session = (typeof getSession === 'function') ? getSession() : null;
-    const marketId = await ordGetShopMarketId();
-    let riders = [];
-    if(marketId && session && session.shopId){
-      try{
-        const rSnap = await db.collection('riders').where('marketId','==',marketId).where('online','==',true).get();
-        riders = rSnap.docs.map(d=> ({ id:d.id, ...d.data() }));
-
-        // 📍 দোকানের লোকেশনের সাথে প্রতিটা রাইডারের দূরত্ব হিসাব করে কাছেরটা
-        // আগে দেখানো হয় — যাতে পিকআপের জন্য কাছের রাইডার সহজে বেছে নেওয়া যায়
-        const shopDoc = await db.collection('shops').doc(session.shopId).get();
-        const shopLoc = shopDoc.exists ? shopDoc.data().storeLocation : null;
-        if(shopLoc){
-          riders.forEach(r=>{
-            r.distanceKm = (r.liveLocation && r.liveLocation.lat != null)
-              ? dmHaversineKm(shopLoc.lat, shopLoc.lng, r.liveLocation.lat, r.liveLocation.lng)
-              : null;
-          });
-          riders.sort((a,b)=>{
-            if(a.distanceKm == null && b.distanceKm == null) return 0;
-            if(a.distanceKm == null) return 1; // লোকেশন না-জানা রাইডার সবার শেষে
-            if(b.distanceKm == null) return -1;
-            return a.distanceKm - b.distanceKm;
-          });
-        }
-      }catch(e){ console.warn('riders fetch failed:', e); }
-    }
-    listEl.querySelectorAll('.ordRiderSelect').forEach(sel=>{
-      sel.innerHTML = '<option value="">রাইডার বেছে নিন (কাছেরটা আগে)...</option>' +
-        (riders.length ? riders.map(r=>{
-          const distTxt = r.distanceKm != null ? ` — 📍 ${r.distanceKm.toFixed(1)} কিমি দূরে` : ' — 📍 লোকেশন জানা নেই';
-          return `<option value="${r.id}">${escapeAttr(r.name)} (${escapeAttr(r.phone||'')})${distTxt}</option>`;
-        }).join('')
-                        : '<option value="" disabled>🔴 এই মুহূর্তে কোনো রাইডার অনলাইনে নেই</option>');
-    });
-    listEl.querySelectorAll('.ordAssignBtn').forEach(btn=>{
-      btn.addEventListener('click', async ()=>{
-        const sel = listEl.querySelector(`.ordRiderSelect[data-oid="${btn.dataset.oid}"]`);
-        const riderId = sel.value;
-        if(!riderId){ alert('আগে একজন রাইডার বেছে নিন।'); return; }
-        const rider = riders.find(r=> r.id === riderId);
-        try{
-          await db.collection('orderRequests').doc(btn.dataset.oid).update({
-            status: 'shipped', assignedRiderId: riderId, assignedRiderName: rider ? rider.name : null,
-            riderAssignedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            shippedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            dispatchState: 'assigned' // ম্যানুয়ালি এসাইন করলেও dispatchState সমন্বিত থাকে
-          });
-        }catch(e){ alert('এসাইন করা যায়নি: ' + e.message); }
-      });
-    });
-  }
   listEl.querySelectorAll('.ordDeliveredBtn').forEach(btn=>{
     btn.addEventListener('click', ()=> ordUpdateStatus(btn.dataset.oid, 'delivered'));
   });
+}
+
+async function ordRender(orders){
+  const listEl = document.getElementById('ordList');
+  if(orders.length === 0){
+    listEl.innerHTML = '<div class="ordEmpty">এই ধাপে কোনো অর্ডার নেই।</div>';
+    return;
+  }
+  if(__ordCurrentStatus === 'pending' || __ordCurrentStatus === 'preparing'){
+    await ordRenderGrouped(orders);
+  }else{
+    await ordRenderFlat(orders);
+  }
 }
 
 async function ordUpdateStatus(orderId, newStatus){
