@@ -647,6 +647,8 @@
   <div class="left"><span id="cloudSyncDot"></span><span id="cloudShopLabel"></span><span id="cloudNetLabel" style="margin-left:6px;font-weight:700;"></span></div>
   <div class="left">
     <button id="subUserBtn" style="display:none;">+ সাব-ইউজার</button>
+    <button id="quickPrintTabBtn" title="প্রিন্ট" style="padding:6px 10px; font-size:15px;">🖨️</button>
+    <button id="quickQrTabBtn" title="QR (ওজন স্টিকার)" style="padding:6px 10px; font-size:15px;">🏷️</button>
     <button id="shopSettingsBtn" title="সেটিং" style="padding:6px 10px; font-size:15px;">⚙️</button>
     <button id="ordBellBtn" title="Bazar অর্ডার" style="position:relative; padding:6px 10px; font-size:15px;">
       🔔<span id="ordBellBadge" style="display:none; position:absolute; top:-4px; right:-2px; background:#e0433c; color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:9px; line-height:16px; text-align:center; padding:0 3px; font-family:inherit;">0</span>
@@ -1437,8 +1439,12 @@
     <div class="tab-btn active" data-tab="dash">🏠 ড্যাশবোর্ড</div>
     <div class="tab-btn" data-tab="add">🛒 সেল</div>
     <div class="tab-btn" data-tab="list">📋 সব হিসাব</div>
-    <div class="tab-btn" data-tab="print">🖨️ প্রিন্ট</div>
-    <div class="tab-btn" data-tab="qr">🏷️ QR</div>
+    <!-- 🔝 প্রিন্ট আর QR-এর শর্টকাট এখন উপরে (cloudTopBar-এ, + সাব-ইউজার বাটনের পাশে)
+         নিয়ে যাওয়া হয়েছে — তাই এই দুইটা বাটন এখান থেকে লুকানো হলো (মুছে ফেলা হয়নি,
+         কারণ পুরনো লজিক — active class, qrTabBtn লিসেনার ইত্যাদি — এগুলোর সাথে
+         জড়ানো আছে; উপরের নতুন বাটন দুইটা এদেরই .click() করে)। -->
+    <div class="tab-btn" data-tab="print" style="display:none;">🖨️ প্রিন্ট</div>
+    <div class="tab-btn" data-tab="qr" style="display:none;">🏷️ QR</div>
     <div class="tab-btn" data-tab="settings">⚙️</div>
   </div>
 
@@ -4838,6 +4844,16 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
   });
+});
+
+/* 🔝 উপরের (cloudTopBar) প্রিন্ট/QR শর্টকাট বাটন — নিচের আসল (এখন লুকানো)
+   .tab-btn এলিমেন্টেই .click() করে, তাই active-class টগল করা, QR ট্যাবের
+   qrLoadRecentTickets() লোড হওয়া ইত্যাদি সব পুরনো লজিক অপরিবর্তিত থাকে। */
+document.getElementById('quickPrintTabBtn').addEventListener('click', ()=>{
+  document.querySelector('.tab-btn[data-tab="print"]').click();
+});
+document.getElementById('quickQrTabBtn').addEventListener('click', ()=>{
+  document.querySelector('.tab-btn[data-tab="qr"]').click();
 });
 
 /* পুরনো, সরল ব্যাক-বাটন হ্যান্ডলারটা এখান থেকে সরানো হয়েছে — এটা নিচের
