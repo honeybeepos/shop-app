@@ -118,10 +118,10 @@ function mouSpeak(text){
     const utter = new SpeechSynthesisUtterance(speakText);
     utter.lang = "bn-BD";
     utter.rate = 1.05;
-    // 🧒 বাচ্চাদের জন্য মজার, একটু উঁচু-কণ্ঠের (শিশু-সুলভ) আওয়াজ — pitch বাড়ানো হলো
-    // (Web Speech API-তে নির্দিষ্ট "শিশুর কণ্ঠ" বেছে নেওয়ার সুযোগ নেই, তাই pitch দিয়ে
-    // যতটা সম্ভব হালকা/কচি শোনানো হচ্ছে — ফোন/ব্রাউজারভেদে ফলাফল কিছুটা আলাদা হতে পারে)
-    utter.pitch = 1.35;
+    // 🧒 বাচ্চাদের জন্য মজার, উঁচু-কণ্ঠের (মেয়েলি/শিশু-সুলভ) আওয়াজ — pitch আরও বাড়ানো হলো
+    // (Web Speech API-তে নির্দিষ্ট "শিশুর কণ্ঠ" বেছে নেওয়ার সুযোগ নেই, আর ফোনভেদে বাংলা voice
+    // সাধারণত একটাই থাকে — male/female আলাদা করে বেছে নেওয়া যায় না, তাই pitch-ই একমাত্র লিভার)
+    utter.pitch = 1.7;
     const voices = window.speechSynthesis.getVoices();
     const bnVoices = voices.filter(v=> v.lang === "bn-BD" || v.lang === "bn-IN" || v.lang.startsWith("bn"));
     // মেয়েলি/female voice পাওয়া গেলে সেটাই অগ্রাধিকার — না পেলে male না এমন যেকোনো bn voice, শেষে প্রথমটা
@@ -129,6 +129,11 @@ function mouSpeak(text){
       || bnVoices.find(v=>!/male/i.test(v.name))
       || bnVoices[0];
     if(bnVoice) utter.voice = bnVoice; // বাংলা voice ইনস্টল করা না থাকলে ব্রাউজারের ডিফল্ট voice-এই বলবে
+    // 🔍 ডিবাগ — ফোনে ঠিক কোন কোন বাংলা voice আছে সেটা কনসোলে লগ হচ্ছে (ভবিষ্যতে
+    // আরও নির্দিষ্টভাবে voice বেছে নিতে হলে এই তথ্য কাজে লাগবে)
+    if(bnVoices.length){
+      console.log("মৌ-এর জন্য পাওয়া বাংলা voice-গুলো:", bnVoices.map(v=>`${v.name} (${v.lang})`));
+    }
     window.speechSynthesis.speak(utter);
   }catch(e){ console.warn("মৌ-এর কথা বলা (speechSynthesis) ব্যর্থ:", e); }
 }
