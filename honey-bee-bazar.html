@@ -654,6 +654,15 @@
     </div>
   </div>
 
+  <!-- 🤏 প্রোডাক্টের ছবিতে চাপলে ফুল-স্ক্রিনে খোলে, তারপর দুই আঙুল দিয়ে জুম
+       করা যায় (pinch-to-zoom) + জুম করা অবস্থায় এক আঙুলে ছবির ভেতর সরানো যায় —
+       প্রোডাক্ট ডিটেইল আর পাবলিক-লিংক পেজ দুই জায়গাতেই ব্যবহার হয় (hbOpenImageZoom) -->
+  <div id="hbImgZoomOverlay" style="display:none; position:fixed; inset:0; z-index:99990; background:#000; align-items:center; justify-content:center; touch-action:none; overflow:hidden;">
+    <span id="hbImgZoomCloseBtn" style="position:absolute; top:16px; right:18px; z-index:2; font-size:26px; color:#fff; opacity:0.85; cursor:pointer; padding:6px;">✕</span>
+    <div style="position:absolute; top:16px; left:18px; z-index:2; font-size:11.5px; color:rgba(255,255,255,0.6); font-weight:700;">🤏 জুম করতে দুই আঙুল দিয়ে টানুন</div>
+    <img id="hbImgZoomImg" src="" style="max-width:100%; max-height:100%; touch-action:none; user-select:none; -webkit-user-select:none;">
+  </div>
+
   <!-- ==================== 🚑 Honey Bee Transport — বুকিং ==================== -->
   <div id="screenTransport">
     <button class="backBtn" id="backToHomeFromTransport">← হোমে ফিরে যান</button>
@@ -4731,7 +4740,7 @@ function hbRenderPublicProductBody(){
   }
 
   body.innerHTML = `
-    <div style="width:100%; aspect-ratio:1/1; max-height:220px; border-radius:14px; overflow:hidden; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:60px; margin-bottom:14px;">
+    <div id="hbPubDetailImgWrap" style="width:100%; aspect-ratio:1/1; max-height:220px; border-radius:14px; overflow:hidden; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:60px; margin-bottom:14px;">
       ${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.parentElement.textContent='🛍️'">` : '🛍️'}
     </div>
     <div style="font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:4px;">🏪 ${escapeHtml(__hbPubShopName)}</div>
@@ -4748,6 +4757,7 @@ function hbRenderPublicProductBody(){
   if(orderBtn) orderBtn.addEventListener('click', ()=>{ __hbPubView = 'order'; hbRenderPublicProductBody(); });
   if(isVariant) hbWirePublicVariantPicker();
   hbInitLikeComment('pub', __hbPubShopId, __hbPubProductId);
+  if(p.imageUrl) hbBindImageZoomTap(document.getElementById('hbPubDetailImgWrap'), p.imageUrl);
 }
 async function hbSubmitGuestOrder(){
   const name = (document.getElementById('hbPubName').value||'').trim();
@@ -4956,6 +4966,107 @@ async function hbSubmitComment(key){
   }
 }
 
+/* ==================== 🤏 প্রোডাক্ট ছবি — ফুলস্ক্রিন জুম ====================
+   প্রোডাক্ট ডিটেইল/পাবলিক-লিংক পেজের ছবিতে চাপলে ফুলস্ক্রিনে খোলে, সেখানে দুই
+   আঙুল দিয়ে পিঞ্চ-জুম + জুম করা অবস্থায় এক আঙুলে টেনে সরানো যায় (স্ট্যান্ডার্ড
+   ফটো-ভিউয়ার প্যাটার্ন) — .pDetailImgWrap-এর ভেতরেই সরাসরি জুম করতে দিলে
+   ছোট বক্সের ভেতর ক্লিপ হয়ে দেখতে সমস্যা হতো বলে এই ফুলস্ক্রিন ভিউয়ারটাই বেছে নেওয়া হলো। */
+let __hbZoomScale = 1, __hbZoomPanX = 0, __hbZoomPanY = 0;
+let __hbZoomStartDist = 0, __hbZoomStartScale = 1;
+let __hbZoomStartPanX = 0, __hbZoomStartPanY = 0, __hbZoomStartMidX = 0, __hbZoomStartMidY = 0;
+let __hbZoomIsPanning = false, __hbZoomPanStartX = 0, __hbZoomPanStartY = 0;
+
+function hbOpenImageZoom(url){
+  if(!url) return;
+  __hbZoomScale = 1; __hbZoomPanX = 0; __hbZoomPanY = 0;
+  const img = document.getElementById('hbImgZoomImg');
+  img.src = url;
+  img.style.transform = 'translate(0px, 0px) scale(1)';
+  document.getElementById('hbImgZoomOverlay').style.display = 'flex';
+}
+function hbCloseImageZoom(){
+  document.getElementById('hbImgZoomOverlay').style.display = 'none';
+}
+// 🖼️ .pDetailImgWrap (বা যেকোনো র‍্যাপার) এর ভেতরের ছবিতে ট্যাপ করলে যেন
+// hbOpenImageZoom() খোলে — একই র‍্যাপারে দুইবার বাইন্ড না হয় সেটা চেক করা হয়
+function hbBindImageZoomTap(wrapEl, url){
+  if(!wrapEl || !url || wrapEl.__hbZoomBound) return;
+  wrapEl.__hbZoomBound = true;
+  wrapEl.style.cursor = 'zoom-in';
+  wrapEl.addEventListener('click', ()=> hbOpenImageZoom(url));
+}
+
+(function hbInitImageZoomOverlay(){
+  const overlay = document.getElementById('hbImgZoomOverlay');
+  const img = document.getElementById('hbImgZoomImg');
+  if(!overlay || !img) return;
+
+  document.getElementById('hbImgZoomCloseBtn').addEventListener('click', hbCloseImageZoom);
+  overlay.addEventListener('click', (ev)=>{ if(ev.target === overlay) hbCloseImageZoom(); });
+
+  function applyTransform(){
+    img.style.transform = `translate(${__hbZoomPanX}px, ${__hbZoomPanY}px) scale(${__hbZoomScale})`;
+  }
+  function clampZoom(){
+    __hbZoomScale = Math.min(5, Math.max(1, __hbZoomScale));
+    if(__hbZoomScale === 1){ __hbZoomPanX = 0; __hbZoomPanY = 0; }
+  }
+  function dist(t1, t2){ return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); }
+  function mid(t1, t2){ return { x:(t1.clientX+t2.clientX)/2, y:(t1.clientY+t2.clientY)/2 }; }
+
+  overlay.addEventListener('touchstart', (ev)=>{
+    if(ev.touches.length === 2){
+      ev.preventDefault();
+      __hbZoomStartDist = dist(ev.touches[0], ev.touches[1]);
+      __hbZoomStartScale = __hbZoomScale;
+      const m = mid(ev.touches[0], ev.touches[1]);
+      __hbZoomStartMidX = m.x; __hbZoomStartMidY = m.y;
+      __hbZoomStartPanX = __hbZoomPanX; __hbZoomStartPanY = __hbZoomPanY;
+    }else if(ev.touches.length === 1 && __hbZoomScale > 1){
+      __hbZoomIsPanning = true;
+      __hbZoomPanStartX = ev.touches[0].clientX - __hbZoomPanX;
+      __hbZoomPanStartY = ev.touches[0].clientY - __hbZoomPanY;
+    }
+  }, { passive:false });
+
+  overlay.addEventListener('touchmove', (ev)=>{
+    if(ev.touches.length === 2 && __hbZoomStartDist){
+      ev.preventDefault();
+      const d = dist(ev.touches[0], ev.touches[1]);
+      __hbZoomScale = Math.min(5, Math.max(1, __hbZoomStartScale * (d / __hbZoomStartDist)));
+      const m = mid(ev.touches[0], ev.touches[1]);
+      __hbZoomPanX = __hbZoomStartPanX + (m.x - __hbZoomStartMidX);
+      __hbZoomPanY = __hbZoomStartPanY + (m.y - __hbZoomStartMidY);
+      applyTransform();
+    }else if(ev.touches.length === 1 && __hbZoomIsPanning){
+      ev.preventDefault();
+      __hbZoomPanX = ev.touches[0].clientX - __hbZoomPanStartX;
+      __hbZoomPanY = ev.touches[0].clientY - __hbZoomPanStartY;
+      applyTransform();
+    }
+  }, { passive:false });
+
+  overlay.addEventListener('touchend', (ev)=>{
+    if(ev.touches.length < 2) __hbZoomStartDist = 0;
+    if(ev.touches.length === 0){ __hbZoomIsPanning = false; clampZoom(); applyTransform(); }
+  });
+  overlay.addEventListener('touchcancel', ()=>{
+    __hbZoomIsPanning = false; __hbZoomStartDist = 0; clampZoom(); applyTransform();
+  });
+
+  // 👆👆 ডাবল-ট্যাপে ১x ↔ ২x টগল (ডেস্কটপ প্রিভিউ/দ্রুত জুমের জন্য সুবিধা)
+  let lastTapT = 0;
+  overlay.addEventListener('touchend', ()=>{
+    const now = Date.now();
+    if(now - lastTapT < 300){
+      __hbZoomScale = __hbZoomScale > 1 ? 1 : 2;
+      __hbZoomPanX = 0; __hbZoomPanY = 0;
+      applyTransform();
+    }
+    lastTapT = now;
+  });
+})();
+
 window.hbOpenMarketProductDetail = function(shopId, productId){
   const p = marketFeedProducts.find(x=> x.id === productId && x.__shopId === shopId);
   if(!p) return;
@@ -4988,7 +5099,7 @@ window.hbOpenMarketProductDetail = function(shopId, productId){
     const vSize = escapeHtml(__hbDetailSelectedVariant.size||"").replace(/'/g,"");
     const buyLabel = isVariant && !variantChosen ? "রং/সাইজ বেছে নিন" : (outOfStock ? "স্টক নেই" : "⚡ Buy Now");
     $("hbProductDetailBody").innerHTML = `
-      <div class="pDetailImgWrap">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
+      <div class="pDetailImgWrap" id="mfDetailImgWrap">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
       <div style="font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:4px;">🏪 ${escapeHtml(p.__shopName||"দোকান")}${p.__shopArea ? ' · 📍 '+escapeHtml(p.__shopArea) : ''}</div>
       <div style="font-size:17px; font-weight:800; margin-bottom:8px;">${om.highlight ? '<span style="color:#fbbf24;">⭐</span> ' : ''}${escapeHtml(p.name||"প্রোডাক্ট")}</div>
       <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">
@@ -5006,6 +5117,7 @@ window.hbOpenMarketProductDetail = function(shopId, productId){
     `;
     if(isVariant) hbWireVariantPicker(render);
     hbInitLikeComment('detail', p.__shopId, p.id);
+    if(p.imageUrl) hbBindImageZoomTap(document.getElementById('mfDetailImgWrap'), p.imageUrl);
   };
   render();
   $("hbProductDetailModal").style.display = "flex";
@@ -5627,6 +5739,7 @@ window.hbOpenProductDetail = function(productId){
       detailImgEl.innerHTML = innerEl ? innerEl.innerHTML : gridImgEl.innerHTML;
     }
     if(isVariant) hbWireVariantPicker(render);
+    if(p.imageUrl) hbBindImageZoomTap(detailImgEl, p.imageUrl);
   };
   render();
   $("hbProductDetailModal").style.display = "flex";
