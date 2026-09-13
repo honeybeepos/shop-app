@@ -552,6 +552,8 @@
     #permCustPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #saleReceiptPrintArea.printing, #saleReceiptPrintArea.printing *{visibility:visible;}
     #saleReceiptPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
+    #productLabelPrintArea.printing, #productLabelPrintArea.printing *{visibility:visible;}
+    #productLabelPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     .no-print{display:none !important;}
   }
 </style>
@@ -2370,6 +2372,7 @@
   </div>
 </div>
 <div id="saleReceiptPrintArea"></div>
+<div id="productLabelPrintArea"></div>
 
 <!-- 📷 ক্যামেরা দিয়ে বারকোড/QR স্ক্যান করার শেয়ার্ড মোডাল — প্রোডাক্ট কোড, সেল আইটেম,
      আর কাস্টমার সার্চ (Print ট্যাব) — এই তিনটা জায়গা থেকেই একই মোডাল খোলে (openBarcodeScanner) -->
@@ -4080,7 +4083,13 @@
         <div style="display:flex; gap:6px; align-items:center;">
           <input id="bccPCode" placeholder="যেমন: F-1001" style="flex:1;">
           <button type="button" id="bccPCodeScanBtn" title="ক্যামেরা দিয়ে বারকোড স্ক্যান করুন" style="flex-shrink:0; width:44px; height:44px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:#10152a; color:#fff; font-size:18px; cursor:pointer;">📷</button>
+          <button type="button" id="bccPCodeGenBtn" title="নতুন বারকোড (HB-১০০১...) জেনারেট করুন" style="flex-shrink:0; width:44px; height:44px; border-radius:8px; border:1px solid rgba(255,255,255,0.15); background:#10152a; color:#fff; font-size:18px; cursor:pointer;">🏷️</button>
         </div>
+        <!-- 🏷️ যেই প্রোডাক্টের নিজস্ব কোম্পানি-বারকোড নেই, তার জন্য এই বাটনে চাপলে
+             HB-১০০১, HB-১০০২... এভাবে ক্রমিক নম্বরের একটা নতুন কোড বসে যায়, হাতে
+             টাইপ করার দরকার নেই — সেভ করার পর প্রোডাক্ট লিস্টে 🔖 বাটনে চাপলে এটার
+             স্টিকার প্রিন্ট করা যাবে -->
+        <p class="pin-desc" style="margin:2px 0 10px;">কোনো বারকোড নেই? পাশের 🏷️ বাটনে চেপে নিজে থেকে একটা কোড বানিয়ে নিন।</p>
         <label>🏷️ Category (Optional)</label><select id="bccPCat"></select>
         <p class="pin-desc" style="margin:2px 0 10px;">ক্যাটাগরি সিলেক্ট করা বাধ্যতামূলক (এটাই Invoice-এ Brand হিসেবে দেখানো হয়)।</p>
         <label>📂 Sub-Category</label><select id="bccPSub"></select>
@@ -8271,6 +8280,61 @@ function bccLoadProducts(){
 }
 function bccSaveProducts(prods){ localStorage.setItem('bcc-products', JSON.stringify(prods)); }
 
+// 🏷️ কোম্পানির বারকোড নেই এমন প্রোডাক্টের জন্য নিজে থেকে HB-১০০১, HB-১০০২...
+// এভাবে সহজ ক্রমিক কোড বানানো হয় (হাতে টাইপ করার মতোও সহজ থাকে) — আগের সব
+// প্রোডাক্টের কোড ঘেঁটে সবচেয়ে বড় HB-#### খুঁজে তার পরেরটা দেওয়া হয়, প্রথমবার
+// হলে HB-1001 থেকে শুরু
+function bccNextProductCode(){
+  const prods = bccLoadProducts();
+  let maxNum = 1000;
+  prods.forEach(p=>{
+    const m = p.code && /^HB-(\d+)$/i.exec(p.code.trim());
+    if(m){ const n = parseInt(m[1], 10); if(n > maxNum) maxNum = n; }
+  });
+  return 'HB-' + String(maxNum + 1).padStart(4, '0');
+}
+
+// 🖨️ প্রোডাক্টের নাম+দাম+বারকোড দিয়ে একটা ছোট প্রিন্টযোগ্য স্টিকার বানানো হয় (নতুন
+// কোড না থাকলে প্রথমে bccNextProductCode() দিয়ে একটা বানিয়ে প্রোডাক্টে সেভ করে
+// নেওয়া হয়, যাতে ভবিষ্যতে এই একই বারকোড স্ক্যান করলে প্রোডাক্টটা চেনা যায়)
+function bccPrintProductLabel(id){
+  const prods = bccLoadProducts();
+  const p = prods.find(x=>x.id===id);
+  if(!p) return;
+  if(!p.code || !p.code.trim()){
+    p.code = bccNextProductCode();
+    bccSaveProducts(prods);
+    bccRenderProducts();
+    toast(`🏷️ নতুন কোড দেওয়া হলো: ${p.code}`);
+  }
+  const copiesInput = prompt(`"${p.name}" — কয়টা স্টিকার প্রিন্ট করবেন?`, '1');
+  if(copiesInput === null) return;
+  const copies = Math.max(1, Number(copiesInput) || 1);
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  const printArea = document.getElementById('productLabelPrintArea');
+  let labelsHtml = '';
+  for(let i=0;i<copies;i++){
+    labelsHtml += `
+    <div style="width:220px; padding:8px; margin:0 auto 6px; font-family:'Space Mono',monospace; font-size:12px; color:#000; border:1px dashed #999; text-align:center; page-break-inside:avoid;">
+      ${shopName ? `<div style="font-size:10px; margin-bottom:2px;">${escapeHtml(shopName)}</div>` : ''}
+      <div style="font-weight:800; font-size:13px; margin-bottom:2px; word-break:break-word;">${escapeHtml(p.name)}</div>
+      <div style="font-size:13px; font-weight:700; margin-bottom:4px;">৳${fmt(p.sell)}${p.unit==='kg' ? '/kg' : ''}</div>
+      <svg id="productLabelBarcode${i}"></svg>
+    </div>`;
+  }
+  printArea.innerHTML = labelsHtml;
+  if(typeof JsBarcode !== 'undefined'){
+    for(let i=0;i<copies;i++){
+      try{
+        JsBarcode(`#productLabelBarcode${i}`, p.code, { format:'CODE128', displayValue:true, fontSize:12, height:34, margin:2 });
+      }catch(e){ console.warn('প্রোডাক্ট লেবেলের বারকোড রেন্ডার ব্যর্থ:', e); }
+    }
+  }
+  printArea.classList.add('printing');
+  window.print();
+  setTimeout(()=> printArea.classList.remove('printing'), 500);
+}
+
 /* ==================== 🐝 Market Products — Highlight/Offer ডেটা মডেল ====================
    এখানে নতুন কোনো Product ডেটাবেজ তৈরি হয় না — POS-এর প্রোডাক্ট অবজেক্টেই একটা ছোট
    `market` সাব-অবজেক্ট যোগ হয় (highlightOn/highlightEndAt/offerOn/offerType/offerNote/offerEndAt)।
@@ -8856,12 +8920,14 @@ function bccRenderProducts(){
       </div>
       <div class="actions">
         <button data-restock="${p.id}" title="স্টক যোগ করুন">🔄</button>
+        <button data-label="${p.id}" title="বারকোড স্টিকার প্রিন্ট করুন">🔖</button>
         <button data-edit="${p.id}">✏️</button>
         <button data-del="${p.id}">🗑️</button>
       </div>
     </div>`;
   }).join('');
   listEl.querySelectorAll('[data-restock]').forEach(b=> b.addEventListener('click', ()=> bccQuickRestock(b.dataset.restock)));
+  listEl.querySelectorAll('[data-label]').forEach(b=> b.addEventListener('click', ()=> bccPrintProductLabel(b.dataset.label)));
   listEl.querySelectorAll('[data-edit]').forEach(b=> b.addEventListener('click', ()=> bccOpenProductModal(b.dataset.edit)));
   listEl.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', ()=> bccDeleteProduct(b.dataset.del)));
   listEl.querySelectorAll('[data-bulkid]').forEach(cb=> cb.addEventListener('change', ()=>{
@@ -9199,8 +9265,9 @@ function bccOpenProductModal(editId){
 }
 // 🔫 বারকোড স্ক্যানার দিয়ে "Product Number / Code" ফিল্ডে স্ক্যান করলে (স্ক্যানার
 // কোডটা টাইপ করে সাথে সাথে Enter পাঠায়) — এই কোডে আগে থেকেই কোনো প্রোডাক্ট থাকলে
-// সেটা এডিট মোডে খোলার অপশন দেওয়া হয় (স্টক/দাম আপডেট) — নাহলে নতুন প্রোডাক্ট
-// হিসেবে যোগ করার জন্য নাম ফিল্ডে ফোকাস চলে যায়
+// সরাসরি bccQuickRestock() (শুধু "কত পিস যোগ হলো" জিজ্ঞেস করে, ফুল এডিট ফর্ম খোলে
+// না) চালু হয়ে যায় — একটার পর একটা প্রোডাক্ট স্ক্যান করে দ্রুত রিস্টক করা যায়;
+// নাহলে (নতুন কোড) নতুন প্রোডাক্ট হিসেবে যোগ করার জন্য নাম ফিল্ডে ফোকাস চলে যায়
 document.getElementById('bccPCode').addEventListener('keydown', (e)=>{
   if(e.key !== 'Enter') return;
   e.preventDefault();
@@ -9208,8 +9275,16 @@ document.getElementById('bccPCode').addEventListener('keydown', (e)=>{
   if(!code) return;
   const existing = bccLoadProducts().find(p=> p.code && p.code.toLowerCase() === code.toLowerCase() && p.id !== bccEditingProductId);
   if(!existing){ document.getElementById('bccPName').focus(); return; }
-  const ok = confirm(`এই বারকোডে আগে থেকেই "${existing.name}" প্রোডাক্টটি আছে (স্টক: ${existing.qty||0} পিস)। এটা এডিট মোডে খুলবেন?`);
-  if(ok) bccOpenProductModal(existing.id);
+  e.target.value = ''; // পরের স্ক্যানের জন্য বক্স খালি রাখা হলো, চাইলে চেইন করে একাধিক প্রোডাক্ট দ্রুত রিস্টক করা যায়
+  bccQuickRestock(existing.id);
+  e.target.focus();
+});
+
+// 🏷️ কোনো বারকোড না থাকলে এই বাটনে চাপ দিলেই একটা নতুন সহজ ক্রমিক কোড (HB-১০০১...)
+// বসে যায় — হাতে টাইপ করার দরকার নেই, সেভ করলেই এই কোডটা প্রোডাক্টে জমা থাকবে
+document.getElementById('bccPCodeGenBtn').addEventListener('click', ()=>{
+  document.getElementById('bccPCode').value = bccNextProductCode();
+  document.getElementById('bccPName').focus();
 });
 document.getElementById('bccPUnit') && document.getElementById('bccPUnit').addEventListener('change', bccUpdateUnitLabels);
 document.getElementById('bccAddProductBtn').addEventListener('click', ()=> bccOpenProductModal(null));
