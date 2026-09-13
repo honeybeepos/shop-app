@@ -647,8 +647,6 @@
   <div class="left"><span id="cloudSyncDot"></span><span id="cloudShopLabel"></span><span id="cloudNetLabel" style="margin-left:6px;font-weight:700;"></span></div>
   <div class="left">
     <button id="subUserBtn" style="display:none;">+ সাব-ইউজার</button>
-    <button id="quickPrintTabBtn" title="প্রিন্ট" style="padding:6px 10px; font-size:15px;">🖨️</button>
-    <button id="quickQrTabBtn" title="QR (ওজন স্টিকার)" style="padding:6px 10px; font-size:15px;">🏷️</button>
     <button id="shopSettingsBtn" title="সেটিং" style="padding:6px 10px; font-size:15px;">⚙️</button>
     <button id="ordBellBtn" title="Bazar অর্ডার" style="position:relative; padding:6px 10px; font-size:15px;">
       🔔<span id="ordBellBadge" style="display:none; position:absolute; top:-4px; right:-2px; background:#e0433c; color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:9px; line-height:16px; text-align:center; padding:0 3px; font-family:inherit;">0</span>
@@ -759,6 +757,10 @@
     <div id="logoPlaceholder" style="width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:22px;">➕</div>
   </div>
   <input type="file" id="logoInput" accept="image/*" style="display:none;">
+  <!-- 🖨️🏷️ প্রিন্ট আর QR ড্যাশবোর্ডে সরাসরি যাওয়ার শর্টকাট — লোগোর পাশে খালি
+       জায়গায় (আগে নিচের ট্যাব-বারে ছিল, এখন সেখান থেকে সরিয়ে এখানে আনা হলো) -->
+  <div id="headerPrintShortcut" title="🖨️ প্রিন্ট" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🖨️</div>
+  <div id="headerQrShortcut" title="🏷️ QR (ওজন স্টিকার)" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🏷️</div>
 </header>
 
 <!-- ==================== 🚑 DRIVER MODE — ট্রান্সপোর্ট ড্রাইভার লগইন করলে এই পুরো
@@ -4846,13 +4848,14 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
   });
 });
 
-/* 🔝 উপরের (cloudTopBar) প্রিন্ট/QR শর্টকাট বাটন — নিচের আসল (এখন লুকানো)
-   .tab-btn এলিমেন্টেই .click() করে, তাই active-class টগল করা, QR ট্যাবের
-   qrLoadRecentTickets() লোড হওয়া ইত্যাদি সব পুরনো লজিক অপরিবর্তিত থাকে। */
-document.getElementById('quickPrintTabBtn').addEventListener('click', ()=>{
+/* 🔝 দোকানের লোগোর পাশে (header-এর খালি জায়গায়) প্রিন্ট/QR শর্টকাট আইকন —
+   নিচের আসল (এখন লুকানো) .tab-btn এলিমেন্টেই .click() করে, তাই active-class
+   টগল করা, QR ট্যাবের qrLoadRecentTickets() লোড হওয়া ইত্যাদি সব পুরনো লজিক
+   অপরিবর্তিত থাকে। */
+document.getElementById('headerPrintShortcut').addEventListener('click', ()=>{
   document.querySelector('.tab-btn[data-tab="print"]').click();
 });
-document.getElementById('quickQrTabBtn').addEventListener('click', ()=>{
+document.getElementById('headerQrShortcut').addEventListener('click', ()=>{
   document.querySelector('.tab-btn[data-tab="qr"]').click();
 });
 
