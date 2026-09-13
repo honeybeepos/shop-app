@@ -1,6 +1,6 @@
-/* ==================== 🐝 মৌ — Interaction Logic (Development #2A) ====================
-   ⚠️ শুধু text↔Gemini সংযোগ — Voice/Camera/Memory কিছুই এখানে নেই।
-   কোনো conversation history/memory পাঠানো হয় না, প্রতিটা বার্তা
+/* ==================== 🐝 মৌ — Interaction Logic (Development #3) ====================
+   ⚠️ এখন text↔Gemini + real Voice (mic-এ বলা, কণ্ঠে শোনা) — Camera/Memory
+   এখনো নেই। কোনো conversation history/memory পাঠানো হয় না, প্রতিটা বার্তা
    স্বতন্ত্রভাবে Cloud Function-এ যায়। */
 
 // 🔗 Firebase init — honey-bee-bazar.html-এর ঠিক একই কনফিগ (নতুন প্রজেক্ট না)
@@ -97,13 +97,38 @@ function mouWaitForAuth(timeoutMs){
   });
 }
 
-async function mouHandleSend(){
-  const text = mouTextInput.value.trim();
-  if(!text) return;
+/* ==================== 🔊 Voice Output — Development #3 ====================
+   ব্রাউজার-নেটিভ speechSynthesis — নতুন কোনো API-খরচ নেই। honey-bee-bazar.html-এর
+   hbSpeak()-এর সাথে হুবহু একই প্যাটার্ন, যাতে দুই জায়গাতেই একই আচরণ থাকে। */
+function mouSpeak(text){
+  if(!("speechSynthesis" in window)) return;
+  try{
+    window.speechSynthesis.cancel(); // মৌ আগের কথা শেষ না করে থাকলে থামিয়ে নতুনটা বলবে
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "bn-BD";
+    utter.rate = 1.0;
+    const voices = window.speechSynthesis.getVoices();
+    const bnVoice = voices.find(v=> v.lang === "bn-BD" || v.lang === "bn-IN" || v.lang.startsWith("bn"));
+    if(bnVoice) utter.voice = bnVoice; // বাংলা voice ইনস্টল করা না থাকলে ব্রাউজারের ডিফল্ট voice-এই বলবে
+    window.speechSynthesis.speak(utter);
+  }catch(e){ console.warn("মৌ-এর কথা বলা (speechSynthesis) ব্যর্থ:", e); }
+}
+
+function mouShowMicToast(text){
+  mouMicToast.textContent = text;
+  mouMicToast.classList.add("show");
+  setTimeout(()=> mouMicToast.classList.remove("show"), 2200);
+}
+
+// 📝 text প্যারামিটার এখন বাধ্যতামূলক — টাইপ করে পাঠানো ও ভয়েসে বলা, দুটো
+// পথই একই ফাংশনে মিশে যায়, ইনপুট বক্স থেকে নিজে নিজে পড়ে না
+async function mouHandleSend(text){
+  if(!text || !text.trim()) return;
+  text = text.trim();
   mouAppendBubble("user", text);
   mouTextInput.value = "";
 
-  // 🎧 পাঠানোর মুহূর্তে সংক্ষিপ্ত "শুনছি" expression (visual, real listening/mic না)
+  // 🎧 পাঠানোর মুহূর্তে সংক্ষিপ্ত "শুনছি" expression
   mouSetState("listening");
   await mouWaitForAuth(4000);
   const thinkingBubble = mouShowThinking();
@@ -116,26 +141,73 @@ async function mouHandleSend(){
     const mood = (result.data && result.data.mood) || "idle";
     mouAppendBubble("mou", reply);
     mouSetState(mood);
+    // 🔊 Development #3 — মৌ এখন সত্যিকারের কণ্ঠে জবাব দেয় (টাইপ করে বললেও,
+    // ভয়েসে বললেও) — টেক্সট বাবল সবসময়ই থাকে, voice শুধু বাড়তি
+    mouSpeak(reply);
   }catch(e){
     // 🛟 Step 7 — network/permission/অন্য যেকোনো ব্যর্থতায়ও গ্রাহক খালি হাতে থাকেন না
     console.warn("মৌ-চ্যাট কল ব্যর্থ:", e);
     thinkingBubble.remove();
-    mouAppendBubble("mou", "দুঃখিত বন্ধু, এই মুহূর্তে আমার সাথে যোগাযোগ করা যাচ্ছে না। একটু পরে চেষ্টা করুন। 🐝");
+    const failReply = "দুঃখিত বন্ধু, এই মুহূর্তে আমার সাথে যোগাযোগ করা যাচ্ছে না। একটু পরে চেষ্টা করুন। 🐝";
+    mouAppendBubble("mou", failReply);
     mouSetState("idle");
+    mouSpeak(failReply);
   }
 
   if(mouReturnTimer) clearTimeout(mouReturnTimer);
   mouReturnTimer = setTimeout(()=> mouSetState("idle"), 3500);
 }
 
-mouSendBtn.addEventListener("click", mouHandleSend);
-mouTextInput.addEventListener("keydown", (e)=>{ if(e.key === "Enter") mouHandleSend(); });
+mouSendBtn.addEventListener("click", ()=> mouHandleSend(mouTextInput.value));
+mouTextInput.addEventListener("keydown", (e)=>{ if(e.key === "Enter") mouHandleSend(mouTextInput.value); });
 
-// 🎙️ Voice — এই ধাপেও শুধু placeholder, কোনো mic permission/recording নেই
-mouMicBtn.addEventListener("click", ()=>{
-  mouMicToast.classList.add("show");
-  setTimeout(()=> mouMicToast.classList.remove("show"), 1800);
-});
+/* ==================== 🎙️ Voice Input — Development #3 ====================
+   ব্রাউজার-নেটিভ SpeechRecognition — honey-bee-bazar.html-এর hbInitVoiceInput()-এর
+   সাথে একই প্যাটার্ন (bn-BD, single-shot)। সাপোর্ট না থাকলে বাটন থাকবে কিন্তু
+   ক্লিকে জানিয়ে দেবে, অ্যাপ ভাঙবে না। */
+const MOU_SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let mouRecognition = null;
+let mouIsListening = false;
+
+function mouInitVoiceInput(){
+  if(!MOU_SpeechRecognition){
+    mouMicBtn.addEventListener("click", ()=>{
+      mouShowMicToast("🎙️ এই ব্রাউজারে ভয়েস সাপোর্ট নেই — টাইপ করে বলুন");
+    });
+    return;
+  }
+  mouRecognition = new MOU_SpeechRecognition();
+  mouRecognition.lang = "bn-BD";
+  mouRecognition.continuous = false;
+  mouRecognition.interimResults = false;
+
+  mouRecognition.onstart = ()=>{
+    mouIsListening = true;
+    mouMicBtn.classList.add("listening");
+    mouSetState("listening");
+  };
+  mouRecognition.onend = ()=>{
+    mouIsListening = false;
+    mouMicBtn.classList.remove("listening");
+  };
+  mouRecognition.onerror = (e)=>{
+    console.warn("মৌ-এর SpeechRecognition এরর:", e.error);
+    mouShowMicToast("🎙️ শুনতে সমস্যা হয়েছে — আবার চেষ্টা করুন বা টাইপ করুন");
+    mouSetState("idle");
+  };
+  mouRecognition.onresult = (e)=>{
+    const transcript = e.results[0][0].transcript;
+    if(transcript && transcript.trim()) mouHandleSend(transcript);
+  };
+
+  mouMicBtn.addEventListener("click", ()=>{
+    if(mouIsListening){ mouRecognition.stop(); return; }
+    if("speechSynthesis" in window) window.speechSynthesis.cancel(); // মৌ নিজে কথা বলতে থাকলে থামিয়ে আগে শোনা শুরু
+    try{ mouRecognition.start(); }
+    catch(e){ console.warn("মৌ-এর recognition start ব্যর্থ:", e); }
+  });
+}
+mouInitVoiceInput();
 
 // শুরুতে idle state দিয়ে শুরু (HTML-এও ডিফল্ট বসানো আছে, এখানে আবার নিশ্চিত করা হলো)
 mouSetState("idle");
