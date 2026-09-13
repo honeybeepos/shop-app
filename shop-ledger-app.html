@@ -1438,6 +1438,7 @@
     <div class="tab-btn" data-tab="add">🛒 সেল</div>
     <div class="tab-btn" data-tab="list">📋 সব হিসাব</div>
     <div class="tab-btn" data-tab="print">🖨️ প্রিন্ট</div>
+    <div class="tab-btn" data-tab="qr">🏷️ QR</div>
     <div class="tab-btn" data-tab="settings">⚙️</div>
   </div>
 
@@ -1876,6 +1877,44 @@
         </div>
       </div>
       <button class="btn" id="downloadRangeBtn">এক্সেল ফাইল (CSV) ডাউনলোড করুন</button>
+    </div>
+  </div>
+
+  <!-- 🏷️ QR ড্যাশবোর্ড — ওজন-ভিত্তিক প্রোডাক্টের বারকোড স্টিকার বানানো ও প্রিন্ট করা,
+       আর সাম্প্রতিক স্টিকারগুলোর তালিকা/স্ট্যাটাস (বিক্রি হয়েছে/অপেক্ষমান/বাতিল) দেখা।
+       এই স্টিকারগুলো shops/{shopId}/weightTickets-এ ফায়ারস্টোরে জমা থাকে (localStorage
+       না) — কারণ ওজন করে যেই ডিভাইস থেকে প্রিন্ট হয়, বিক্রির সময় স্ক্যান হয়তো
+       আলাদা ডিভাইসে (কাউন্টারে) হবে — দুই ডিভাইসেই এই ডেটা দেখা লাগবে। -->
+  <div class="tab-panel" id="tab-qr">
+    <div class="panel">
+      <h2><span class="num">⚖</span> ওজন স্টিকার</h2>
+      <p class="pin-desc">ওজন-ভিত্তিক প্রোডাক্ট মেপে এখান থেকে বারকোড স্টিকার প্রিন্ট করুন — পরে কাউন্টারে Quick Sale-এ স্ক্যান করলেই ঠিক ওজন ও দাম দিয়ে সরাসরি কার্টে যোগ হয়ে যাবে, কিছু টাইপ করা লাগবে না।</p>
+      <div style="position:relative;">
+        <input type="text" id="qrProductSearch" placeholder="🔍 প্রোডাক্ট খুঁজুন (যেমন: আলু)" autocomplete="off">
+        <div class="smartSuggestBox" id="qrProductResults"></div>
+      </div>
+
+      <div id="qrSelectedProductBox" style="display:none; margin-top:12px; padding:12px; border:1px dashed var(--line); border-radius:10px;">
+        <div id="qrSelectedProductInfo" style="font-weight:700; margin-bottom:10px;"></div>
+        <div class="row">
+          <div>
+            <label>কেজি</label>
+            <input type="number" id="qrWeightKg" min="0" step="1" value="0">
+          </div>
+          <div>
+            <label>গ্রাম</label>
+            <input type="number" id="qrWeightGram" min="0" max="999" step="1" value="0">
+          </div>
+        </div>
+        <div id="qrPricePreview" style="font-size:16px; font-weight:800; color:var(--teal); margin:10px 0;">দাম: ৳0</div>
+        <button class="btn addItemBtn" id="qrPrintTicketBtn">🖨️ স্টিকার প্রিন্ট করুন</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2><span class="num">🧾</span> সাম্প্রতিক স্টিকার</h2>
+      <div id="qrRecentTicketsLoading" style="color:var(--line-2, #999); font-size:13px;">লোড হচ্ছে...</div>
+      <div id="qrRecentTickets"></div>
     </div>
   </div>
 
@@ -8335,6 +8374,213 @@ function bccPrintProductLabel(id){
   setTimeout(()=> printArea.classList.remove('printing'), 500);
 }
 
+/* ==================== ⚖️ ওজন-ভিত্তিক প্রোডাক্ট বারকোড টিকেট ("🏷️ QR" ট্যাব) ====================
+   ওজন করে একটা নির্দিষ্ট ওজন+দামের "টিকেট" ফায়ারস্টোরে (shops/{shopId}/weightTickets)
+   জমা রাখা হয় — লোকাল localStorage না, কারণ ওজন করে যেই ডিভাইসে প্রিন্ট হয়, বিক্রির
+   সময় স্ক্যান হয়তো কাউন্টারের আলাদা ডিভাইসে হবে। স্ক্যান হয়ে গেলে used:true হয়ে
+   যায়, তাই একই স্টিকার দ্বিতীয়বার স্ক্যান করে আর বিক্রি করা যাবে না। */
+
+let qrSelectedProduct = null;
+
+// ⏱️ মিলিসেকেন্ড-টাইমস্ট্যাম্প বেস-৩৬-এ — সংক্ষিপ্ত, ক্রমান্বয়ী, আর ব্যবহারিকভাবে
+// ইউনিক (একই মিলিসেকেন্ডে দুইটা স্টিকার প্রিন্ট হওয়ার সম্ভাবনা নেই) — তাই আলাদা
+// কাউন্টার/ট্রানজেকশন ছাড়াই সরাসরি ডকুমেন্ট আইডি হিসেবে ব্যবহার করা যায়
+function bccNewTicketCode(){
+  return 'WT-' + Date.now().toString(36).toUpperCase();
+}
+
+function qrRenderProductResults(list){
+  const box = document.getElementById('qrProductResults');
+  if(!list.length){ box.classList.remove('show'); box.innerHTML=''; return; }
+  box.innerHTML = list.slice(0,8).map(p=>
+    `<div class="smartSuggestItem" data-id="${p.id}"><span class="nm">${escapeHtml(p.name)} — স্টক: ${(Number(p.qty)||0).toFixed(3)} kg</span></div>`
+  ).join('');
+  box.classList.add('show');
+  box.querySelectorAll('[data-id]').forEach(el=> el.addEventListener('click', ()=> qrSelectProduct(el.dataset.id)));
+}
+
+document.getElementById('qrProductSearch').addEventListener('input', (e)=>{
+  const val = e.target.value.trim().toLowerCase();
+  if(!val){ qrRenderProductResults([]); return; }
+  const matches = bccLoadProducts().filter(p=> bccProductType(p)==='weight' && p.name && p.name.toLowerCase().includes(val));
+  qrRenderProductResults(matches);
+});
+
+function qrSelectProduct(id){
+  const p = bccLoadProducts().find(x=>x.id===id);
+  if(!p) return;
+  qrSelectedProduct = p;
+  document.getElementById('qrProductSearch').value = p.name;
+  document.getElementById('qrProductResults').classList.remove('show');
+  document.getElementById('qrSelectedProductInfo').textContent = `${p.name} — বর্তমান স্টক: ${(Number(p.qty)||0).toFixed(3)} kg, দাম: ৳${fmt(p.sell)}/kg`;
+  document.getElementById('qrSelectedProductBox').style.display = 'block';
+  document.getElementById('qrWeightKg').value = 0;
+  document.getElementById('qrWeightGram').value = 0;
+  qrUpdatePricePreview();
+}
+
+function qrUpdatePricePreview(){
+  if(!qrSelectedProduct) return;
+  const kg = Number(document.getElementById('qrWeightKg').value)||0;
+  const gram = Number(document.getElementById('qrWeightGram').value)||0;
+  const totalKg = kg + (gram/1000);
+  const price = totalKg * (Number(qrSelectedProduct.sell)||0);
+  document.getElementById('qrPricePreview').textContent = `দাম: ৳${price.toFixed(2)} (${totalKg.toFixed(3)} kg)`;
+}
+document.getElementById('qrWeightKg').addEventListener('input', qrUpdatePricePreview);
+document.getElementById('qrWeightGram').addEventListener('input', qrUpdatePricePreview);
+
+document.getElementById('qrPrintTicketBtn').addEventListener('click', async ()=>{
+  if(!qrSelectedProduct){ toast('⚠️ প্রথমে একটা প্রোডাক্ট বেছে নিন'); return; }
+  const kg = Number(document.getElementById('qrWeightKg').value)||0;
+  const gram = Number(document.getElementById('qrWeightGram').value)||0;
+  const totalGrams = Math.round(kg*1000 + gram);
+  if(totalGrams <= 0){ toast('⚠️ সঠিক ওজন দিন'); return; }
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId || typeof db === 'undefined'){ toast('⚠️ সংযোগ সমস্যা — আবার চেষ্টা করুন'); return; }
+
+  const totalKg = totalGrams/1000;
+  const price = totalKg * (Number(qrSelectedProduct.sell)||0);
+  const code = bccNewTicketCode();
+
+  try{
+    await db.collection('shops').doc(session.shopId).collection('weightTickets').doc(code).set({
+      code,
+      productId: qrSelectedProduct.id,
+      productName: qrSelectedProduct.name,
+      weightGrams: totalGrams,
+      unitSellPrice: Number(qrSelectedProduct.sell)||0,
+      price: Number(price.toFixed(2)),
+      createdAt: fbNow(),
+      createdBy: session.name || null,
+      used: false, usedAt: null, voided: false
+    });
+  }catch(e){ console.warn('ওজন-টিকেট সেভ ব্যর্থ:', e); toast('⚠️ স্টিকার সেভ করা যায়নি, আবার চেষ্টা করুন'); return; }
+
+  // 🎯 ওজন করে আলাদা করার মুহূর্তেই এই পরিমাণ "বিক্রির জন্য প্রস্তুত" ধরে স্টক থেকে
+  // কমানো হয় — স্টিকার বাতিল করলে (নিচের "বাতিল করুন" বাটনে) এই স্টক ফিরিয়ে দেওয়া হয়
+  const prods = bccLoadProducts();
+  const pRef = prods.find(x=>x.id===qrSelectedProduct.id);
+  if(pRef){
+    pRef.qty = Math.max(0, (Number(pRef.qty)||0) - totalKg);
+    bccSaveProducts(prods);
+    bccRenderProducts(); bccRenderOverview();
+  }
+
+  qrPrintTicketLabel(code, qrSelectedProduct.name, totalGrams, price);
+  qrLoadRecentTickets();
+  toast(`✅ স্টিকার তৈরি হয়েছে: ${code}`);
+  document.getElementById('qrWeightKg').value = 0;
+  document.getElementById('qrWeightGram').value = 0;
+  qrUpdatePricePreview();
+});
+
+function qrPrintTicketLabel(code, name, grams, price){
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  const weightText = grams >= 1000 ? (grams/1000).toFixed(3)+' kg' : grams+' g';
+  const printArea = document.getElementById('productLabelPrintArea');
+  printArea.innerHTML = `
+    <div style="width:220px; padding:8px; margin:0 auto; font-family:'Space Mono',monospace; font-size:12px; color:#000; border:1px dashed #999; text-align:center;">
+      ${shopName ? `<div style="font-size:10px; margin-bottom:2px;">${escapeHtml(shopName)}</div>` : ''}
+      <div style="font-weight:800; font-size:13px; margin-bottom:2px; word-break:break-word;">${escapeHtml(name)}</div>
+      <div style="font-size:12px; margin-bottom:2px;">ওজন: ${weightText}</div>
+      <div style="font-size:13px; font-weight:700; margin-bottom:4px;">৳${price.toFixed(2)}</div>
+      <svg id="ticketBarcodeSvg"></svg>
+    </div>`;
+  if(typeof JsBarcode !== 'undefined'){
+    try{ JsBarcode('#ticketBarcodeSvg', code, { format:'CODE128', displayValue:true, fontSize:11, height:32, margin:2 }); }
+    catch(e){ console.warn('ওজন-স্টিকারের বারকোড রেন্ডার ব্যর্থ:', e); }
+  }
+  printArea.classList.add('printing');
+  window.print();
+  setTimeout(()=> printArea.classList.remove('printing'), 500);
+}
+
+async function qrLoadRecentTickets(){
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  const listEl = document.getElementById('qrRecentTickets');
+  const loadingEl = document.getElementById('qrRecentTicketsLoading');
+  if(!session || !session.shopId || typeof db === 'undefined'){ if(loadingEl) loadingEl.textContent = '⚠️ সংযোগ সমস্যা'; return; }
+  loadingEl.style.display = '';
+  loadingEl.textContent = 'লোড হচ্ছে...';
+  try{
+    const snap = await db.collection('shops').doc(session.shopId).collection('weightTickets')
+      .orderBy('createdAt','desc').limit(20).get();
+    loadingEl.style.display = 'none';
+    if(snap.empty){ listEl.innerHTML = `<p class="pin-desc">এখনো কোনো স্টিকার প্রিন্ট করা হয়নি।</p>`; return; }
+    listEl.innerHTML = snap.docs.map(doc=>{
+      const t = doc.data();
+      const weightText = (t.weightGrams||0) >= 1000 ? ((t.weightGrams||0)/1000).toFixed(3)+' kg' : (t.weightGrams||0)+' g';
+      let statusHtml;
+      if(t.voided) statusHtml = `<span style="color:#c0392b;">❌ বাতিল</span>`;
+      else if(t.used) statusHtml = `<span style="color:#27ae60;">✅ বিক্রি হয়েছে</span>`;
+      else statusHtml = `<span style="color:#d4a017;">⏳ অপেক্ষমান</span><br><button data-void="${t.code}" style="margin-top:4px; font-size:11px; background:none; border:1px solid #c0392b; color:#c0392b; border-radius:6px; padding:2px 8px; cursor:pointer;">বাতিল করুন</button>`;
+      return `<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
+        <div>
+          <div style="font-weight:700;">${escapeHtml(t.productName||'')}</div>
+          <div style="font-size:11.5px; color:#8a7f6c;">${t.code} • ${weightText} • ৳${(t.price||0).toFixed(2)}</div>
+        </div>
+        <div style="font-size:12px; text-align:right; flex-shrink:0;">${statusHtml}</div>
+      </div>`;
+    }).join('');
+    listEl.querySelectorAll('[data-void]').forEach(b=> b.addEventListener('click', ()=> qrVoidTicket(b.dataset.void)));
+  }catch(e){ console.warn('সাম্প্রতিক স্টিকার লোড ব্যর্থ:', e); loadingEl.textContent = '⚠️ লোড করতে সমস্যা হয়েছে'; }
+}
+
+// ❌ ভুল ওজন হয়ে গেলে/স্টিকার নষ্ট হলে — স্টিকারটা "বাতিল" করে দেওয়া হয় (স্ক্যান
+// করলেও আর কার্টে যোগ হবে না) আর যেই ওজনটা স্টক থেকে কমানো হয়েছিল সেটা ফিরিয়ে দেওয়া হয়
+async function qrVoidTicket(code){
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId || typeof db === 'undefined') return;
+  const ok = confirm(`"${code}" স্টিকারটা বাতিল করবেন? ওজনটা আবার স্টকে ফিরে যাবে।`);
+  if(!ok) return;
+  try{
+    const ref = db.collection('shops').doc(session.shopId).collection('weightTickets').doc(code);
+    const doc = await ref.get();
+    if(!doc.exists) return;
+    const t = doc.data();
+    if(t.used || t.voided) return;
+    await ref.update({ voided: true });
+    const prods = bccLoadProducts();
+    const pRef = prods.find(x=>x.id===t.productId);
+    if(pRef){
+      pRef.qty = (Number(pRef.qty)||0) + ((t.weightGrams||0)/1000);
+      bccSaveProducts(prods);
+      bccRenderProducts(); bccRenderOverview();
+    }
+    toast('✅ স্টিকার বাতিল হয়েছে, স্টক ফিরিয়ে দেওয়া হলো');
+    qrLoadRecentTickets();
+  }catch(e){ console.warn('স্টিকার বাতিল ব্যর্থ:', e); toast('⚠️ বাতিল করা যায়নি'); }
+}
+
+// 🏷️➡️🛒 Quick Sale-এ WT- বারকোড স্ক্যান করলে সরাসরি লক-করা ওজন+দাম দিয়ে কার্টে যোগ হয়,
+// প্রোডাক্টের এখনকার দাম/স্টক দিয়ে না — যেহেতু ওজন করার সময়ই স্টক ইতিমধ্যে কমানো হয়েছে
+async function bccScanWeightTicket(code){
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId || typeof db === 'undefined'){ toast('⚠️ সংযোগ সমস্যা — আবার চেষ্টা করুন'); return; }
+  try{
+    const ref = db.collection('shops').doc(session.shopId).collection('weightTickets').doc(code.toUpperCase());
+    const doc = await ref.get();
+    if(!doc.exists){ toast('❌ এই স্টিকার খুঁজে পাওয়া যায়নি'); return; }
+    const t = doc.data();
+    if(t.voided){ toast('❌ এই স্টিকার বাতিল করা হয়েছে'); return; }
+    if(t.used){ toast('⚠️ এই স্টিকার আগেই বিক্রি হয়ে গেছে'); return; }
+    qsCart.push({
+      item: t.productName, productId: t.productId || '', qty: (t.weightGrams||0)/1000,
+      weightLabel: (t.weightGrams||0)+' g', unitCost: 0, unitPrice: t.unitSellPrice || 0,
+      cost: 0, price: t.price || 0, serialNumber: null, warrantyMonths: null, warrantyExpiry: null,
+      variantColor: null, variantSize: null
+    });
+    renderQsCart();
+    await ref.update({ used: true, usedAt: fbNow() });
+    toast(`✅ "${t.productName}" (${((t.weightGrams||0)/1000).toFixed(3)} kg) কার্টে যোগ হলো`);
+  }catch(e){ console.warn('ওজন-টিকেট স্ক্যান ব্যর্থ:', e); toast('⚠️ স্টিকার যাচাই করতে সমস্যা হয়েছে'); }
+}
+
+// "🏷️ QR" ট্যাবে ঢুকলে সাম্প্রতিক স্টিকার তালিকা (রিফ্রেশ করে) লোড হয়
+const qrTabBtn = document.querySelector('.tab-btn[data-tab="qr"]');
+if(qrTabBtn) qrTabBtn.addEventListener('click', qrLoadRecentTickets);
+
 /* ==================== 🐝 Market Products — Highlight/Offer ডেটা মডেল ====================
    এখানে নতুন কোনো Product ডেটাবেজ তৈরি হয় না — POS-এর প্রোডাক্ট অবজেক্টেই একটা ছোট
    `market` সাব-অবজেক্ট যোগ হয় (highlightOn/highlightEndAt/offerOn/offerType/offerNote/offerEndAt)।
@@ -11154,6 +11400,14 @@ document.getElementById('qsItem').addEventListener('keydown', (e)=>{
   if(e.key !== 'Enter') return;
   const val = e.target.value.trim();
   if(!val) return;
+  // 🏷️ ওজন-স্টিকারের বারকোড (WT-...) হলে আলাদাভাবে হ্যান্ডল হয় — Firestore থেকে
+  // টিকেট খুঁজে লক-করা ওজন+দাম দিয়েই সরাসরি কার্টে যোগ হয়, নিচের কোড-ম্যাচ দরকার নেই
+  if(/^WT-/i.test(val)){
+    e.preventDefault();
+    e.target.value = '';
+    bccScanWeightTicket(val);
+    return;
+  }
   const matched = bccLoadProducts().find(p=> p.code && p.code.toLowerCase() === val.toLowerCase());
   if(!matched) return; // এই কোডে কোনো প্রোডাক্ট নেই — স্বাভাবিক আচরণ, কিছু বদলাবে না
   e.preventDefault();

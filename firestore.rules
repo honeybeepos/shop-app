@@ -59,6 +59,14 @@ service cloud.firestore {
         allow write: if isSignedIn() && myShopId() == shopId;
       }
 
+      // 🏷️ ওজন-ভিত্তিক প্রোডাক্টের বারকোড স্টিকার টিকেট ("🏷️ QR" ট্যাব) — শুধু এই
+      // দোকানের নিজের স্টাফই পড়তে/লিখতে পারবে (পাবলিক না, কাস্টমার/গেস্টের এখানে
+      // কোনো কাজ নেই); ওজন করার ডিভাইস আর কাউন্টারের স্ক্যান-ডিভাইস আলাদা হতে পারে
+      // বলেই এটা localStorage-এর বদলে এখানে রাখা হয়েছে
+      match /weightTickets/{ticketId} {
+        allow read, write: if isSignedIn() && myShopId() == shopId;
+      }
+
       match /deliveryCalls/{callId} {
         allow read: if true;
         allow create: if isSignedIn() && myShopId() == shopId;
