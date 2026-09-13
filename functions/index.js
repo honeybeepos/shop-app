@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    functions/index.js
    এই ফাইলে এখন তিনটা সিস্টেম আছে:
 
@@ -852,7 +852,7 @@ async function geminiParse(text, apiKey) {
 
 শুধু JSON array রিটার্ন করো, যেমন: [{"itemQuery":"চাল","qty":5,"unit":"কেজি"}]`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -898,7 +898,7 @@ exports.parseShoppingIntent = onCall({ secrets: [geminiApiKey] }, async (request
   if (apiKey) {
     try {
       const items = await geminiParse(text, apiKey);
-      if (items.length > 0) return { items, engine: "gemini-2.0-flash" };
+      if (items.length > 0) return { items, engine: "gemini-3.1-flash-lite" };
       // AI খালি রেজাল্ট দিলে নিচে rule-based ফলব্যাকে যাওয়া হয়
     } catch (e) {
       console.warn("Gemini parse ব্যর্থ, rule-based fallback ব্যবহার হচ্ছে:", String(e && e.message || e));
@@ -932,7 +932,7 @@ async function mouGeminiReply(text, apiKey) {
 
 গ্রাহকের কথা: "${text}"`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -986,7 +986,7 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   try {
     const result = await mouGeminiReply(text.trim(), apiKey);
     console.log(JSON.stringify({ event: "MOU_CHAT_REPLIED", uid: request.auth.uid }));
-    return { reply: result.reply, mood: result.mood, engine: "gemini-2.0-flash" };
+    return { reply: result.reply, mood: result.mood, engine: "gemini-3.1-flash-lite" };
   } catch (e) {
     console.warn(JSON.stringify({ event: "MOU_CHAT_FAILED", error: String(e && e.message || e) }));
     // 🛟 Step 7 — error হলেও গ্রাহক খালি হাতে ফেরত যান না, একটা উষ্ণ fallback বার্তা পান
