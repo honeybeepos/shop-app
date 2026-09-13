@@ -233,8 +233,9 @@
     position:absolute; bottom:8px; right:8px; width:32px; height:32px; border-radius:50%; border:none;
     background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-size:15px;
     display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 3px 8px rgba(0,0,0,0.25);
-    transform-style:preserve-3d; perspective:60px; transition:box-shadow .2s ease;
+    transform-style:preserve-3d; perspective:60px; transition:box-shadow .2s ease, transform .12s ease;
   }
+  .mfCartBtn:active{ transform:translateY(2px) scale(0.9); }
   /* 🛒 Cart-এ যোগ হওয়ার "3D" কনফার্মেশন এনিমেশন — ক্লিক করলে বোঝা যায় যোগ হয়েছে */
   @keyframes mfCartPop{
     0%{ transform:scale(1) rotate3d(1,1,0,0deg); }
@@ -280,6 +281,40 @@
     0%, 100%{ box-shadow:0 6px 16px rgba(0,0,0,0.14), 0 0 0 1px rgba(255,183,3,0.45); }
     50%{ box-shadow:0 6px 20px rgba(0,0,0,0.16), 0 0 0 1px rgba(255,183,3,0.8), 0 0 16px rgba(255,183,3,0.35); }
   }
+
+  /* 🪝 Hanging Wall Display — শুধু Bazar মার্কেট-ফিড কার্ড (.pCard.mfCard) এর জন্য;
+     দোকানের নিজের প্রোডাক্ট লিস্টের প্লেইন .pCard এতে কোনো প্রভাব পড়ে না */
+  .pCard.mfCard{
+    position:relative; overflow:visible; margin-top:22px;
+    animation: mfCardIn 0.42s cubic-bezier(.2,.8,.3,1) both, mfHangSway 4.2s ease-in-out infinite;
+  }
+  .pCard.mfCard.mfGlow{
+    animation: mfCardIn 0.42s cubic-bezier(.2,.8,.3,1) both, mfGlowPulse 2.6s ease-in-out infinite, mfHangSway 4.2s ease-in-out infinite;
+  }
+  .pCard.mfCard .pCardImgWrap{ border-radius:16px 16px 0 0; }
+  .pCard.mfCard::before{
+    content:"🪝"; position:absolute; top:-19px; left:50%; transform:translateX(-50%);
+    font-size:15px; opacity:0.88; filter:drop-shadow(0 2px 2px rgba(0,0,0,0.4)); pointer-events:none; z-index:1;
+  }
+  .pCard.mfCard::after{
+    content:""; position:absolute; top:-3px; left:50%; transform:translateX(-50%);
+    width:34px; height:9px; border-radius:50%;
+    background:radial-gradient(ellipse at center, rgba(255,183,3,0.38), rgba(255,183,3,0) 72%);
+    pointer-events:none; z-index:0;
+  }
+  @keyframes mfHangSway{
+    0%, 100%{ transform:rotate(0deg) translateX(0); }
+    25%{ transform:rotate(-0.6deg) translateX(-1px); }
+    75%{ transform:rotate(0.6deg) translateX(1px); }
+  }
+  @keyframes pCardFavPop{
+    0%{ transform:scale(1) rotate(0deg); }
+    35%{ transform:scale(1.5) rotate(-10deg); }
+    60%{ transform:scale(0.85) rotate(5deg); }
+    100%{ transform:scale(1) rotate(0deg); }
+  }
+  .pCardFav{ transition:transform .15s ease; }
+  .pCardFav.mfFavPop{ animation:pCardFavPop 0.5s cubic-bezier(.34,1.56,.64,1); }
 
   .mfEmpty{ text-align:center; padding:40px 16px; color:var(--muted); font-size:13px; grid-column:1/-1; }
 
@@ -4445,8 +4480,19 @@ window.mfToggleFavoriteProduct = async function(ev, productId){
   const isFav = favs.includes(productId);
   const updated = isFav ? favs.filter(id=>id!==productId) : [...favs, productId];
   currentCustomer.favoriteProducts = updated;
-  mfRenderFeatured();
-  renderMarketFeed();
+  // ❤️ তাৎক্ষণিক ভিজ্যুয়াল ফিডব্যাক — গ্রিড রিরেন্ডার হওয়ার আগেই বাউন্স+পালস এনিমেশন দেখানো হয়,
+  // নাহলে renderMarketFeed() সাথে সাথে DOM রিপ্লেস করে দেওয়ায় এনিমেশনটা চোখেই পড়তো না
+  const heartEl = ev.currentTarget;
+  if(heartEl){
+    heartEl.textContent = updated.includes(productId) ? "❤️" : "🤍";
+    heartEl.classList.remove("mfFavPop");
+    void heartEl.offsetWidth;
+    heartEl.classList.add("mfFavPop");
+  }
+  setTimeout(()=>{
+    mfRenderFeatured();
+    renderMarketFeed();
+  }, 380);
   try{
     await db.collection("customers").doc(currentCustomer.uid).set({ favoriteProducts: updated }, { merge: true });
   }catch(e){ console.warn("favorite product save failed:", e); }
@@ -4523,7 +4569,7 @@ function mfCardHTML(p, idx){
     ? `event.stopPropagation(); hbOpenMarketProductDetail('${p.__shopId}','${p.id}')`
     : `event.stopPropagation(); mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}')`;
   return `
-    <div class="pCard mfCard ${om.highlight ? 'mfGlow' : ''}" style="animation-delay:${Math.min(idx,12)*0.035}s;">
+    <div class="pCard mfCard ${om.highlight ? 'mfGlow' : ''}" style="animation-delay:${Math.min(idx,12)*0.08}s;">
       <div class="pCardImgWrap" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">
         <span class="pCardImgInner">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</span>
         <div class="pCardBadges">
