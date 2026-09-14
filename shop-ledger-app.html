@@ -10089,7 +10089,7 @@ async function hbUploadShopLogo(blob, shopId){
   if(!shopId) throw new Error("shopId প্রয়োজন");
   // 🗂️ প্রতিটা দোকানের জন্য একটাই নির্দিষ্ট পাথ — নতুন ছবি আপলোড করলে পুরনোটার
   // জায়গায় ওভাররাইট হয়ে যায়, আলাদা করে পুরনো ফাইল মুছতে হয় না
-  const storageRef = storage.ref(`shop-logos/${shopId}.webp`);
+  const storageRef = storage.ref(`shop-logos/${shopId}/logo.webp`);
   await storageRef.put(blob, { contentType: "image/webp" });
   return await storageRef.getDownloadURL();
 }
@@ -15085,7 +15085,15 @@ document.getElementById("headerShopOpenWrap").addEventListener("click", async ()
     alert("দোকানের তথ্য পাওয়া যাচ্ছে না। একবার পেজ রিলোড করুন, অথবা লগ-আউট করে আবার লগইন করুন।");
     return;
   }
-  const newState = !headerShopOpenState;
+  // 🐞 বাগ-ফিক্স: newState আগে শুধু headerShopOpenState ভ্যারিয়েবলের ওপর
+  // নির্ভর করে ঠিক হতো — কোনো কারণে (রেস-কন্ডিশন/অন্য কোনো অসামঞ্জস্য) এই
+  // ভ্যারিয়েবলটা স্ক্রিনে আসলে কী দেখাচ্ছে তার সাথে মিলে না গেলে সুইচ একদিকে
+  // (যেমন "বন্ধ") আটকে থেকে যেতে পারতো — ক্লিক করলে কিছুই বদলাতো না। এখন
+  // ভ্যারিয়েবলের বদলে সরাসরি নবের বর্তমান (স্ক্রিনে দেখা) পজিশন থেকে বর্তমান
+  // অবস্থা বের করা হয়, তাই চোখে যা দেখা যাচ্ছে ক্লিক করলে সবসময় তার উল্টোটাই হবে।
+  const __knobEl = document.getElementById("headerShopOpenKnob");
+  const isCurrentlyOpen = __knobEl ? __knobEl.style.left !== "2px" : headerShopOpenState;
+  const newState = !isCurrentlyOpen;
   hbApplyShopOpenToggleUI(newState); // তাৎক্ষণিক ভিজ্যুয়াল ফিডব্যাক, Firestore রাউন্ড-ট্রিপের জন্য অপেক্ষা করতে হয় না
   // 🎬 ক্লিক করার সাথে সাথে একটা ছোট্ট "পপ" অ্যানিমেশন — টাচ করলে যে প্রতিক্রিয়া হয়েছে সেটা চোখে বোঝা যায়
   const __wrapEl = document.getElementById("headerShopOpenWrap");
