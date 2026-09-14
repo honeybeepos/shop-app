@@ -946,33 +946,47 @@ exports.parseShoppingIntent = onCall({ secrets: [geminiApiKey] }, async (request
   return { items, engine: "rule-based-fallback" };
 });
 
-/* ==================== 🐝 মৌ — Text Chat via Gemini (Development #2A) ====================
+/* ==================== 🐝 মৌ — Text Chat via Gemini (Development #4) ====================
    ⚠️ ইচ্ছাকৃতভাবে parseShoppingIntent থেকে সম্পূর্ণ আলাদা ফাংশন — উদ্দেশ্য
    ভিন্ন (এটা সাধারণ কথোপকথন, ওটা structured shopping-list বের করা)।
    একই GEMINI_API_KEY secret পুনর্ব্যবহার করা হচ্ছে (নতুন কোনো key/secret
-   তৈরি করা হয়নি)। কোনো conversation-history/memory পাঠানো হয় না —
-   প্রতিটা বার্তা স্বতন্ত্রভাবে প্রসেস হয় (Development #2A-এর সুযোগের মধ্যেই)। */
-async function mouGeminiReply(text, apiKey) {
-  const prompt = `তুমি "মৌ" — Honey Bee Bazar-এর একটা বন্ধুত্বপূর্ণ, উষ্ণ মৌমাছি সহকারী।
+   তৈরি করা হয়নি)।
+   🧠 Development #4 — এখন ক্লায়েন্ট (mou.js) সাম্প্রতিক কথোপকথনের ইতিহাস
+   (history) পাঠায় (Firestore-এ mouChats/{uid}/messages-এ সেভ থাকা), সেটা
+   Gemini-এর multi-turn `contents` array-তে বসিয়ে দেওয়া হয় (persona/ফরম্যাট
+   নিয়ম আলাদা systemInstruction-এ) — যাতে Gemini আগের কথা মনে রেখে উত্তর
+   দিতে পারে। history খালি থাকলে (নতুন কাস্টমার) আগের মতোই single-turn আচরণ। */
+async function mouGeminiReply(text, apiKey, history) {
+  const systemInstruction = `তুমি "মৌ" — Honey Bee Bazar-এর একটা বন্ধুত্বপূর্ণ, উষ্ণ মৌমাছি সহকারী।
 নিয়ম:
 - শুধু বাংলায় উত্তর দেবে, ছোট (১-২ বাক্য), আন্তরিক ও সহজ ভাষায়।
 - মাঝেমধ্যে ইমোজি ব্যবহার করতে পারো (🐝 😊 ইত্যাদি), বেশি না।
 - তুমি কোনো প্রোডাক্টের দাম/স্টক বানিয়ে বলবে না (সেটা তোমার কাজ না, এখানে তুমি শুধু গল্প করছ)।
+- নিচে থাকলে আগের কথোপকথন খেয়াল রেখে উত্তর দেবে (যেমন গ্রাহক আগে নিজের নাম/
+  পছন্দ বললে, সেটা মনে রেখে প্রাসঙ্গিকভাবে ব্যবহার করবে) — আগে কিছু জিজ্ঞেস
+  করা না হলে নতুন প্রসঙ্গ ধরে নেবে না।
 - শুধু JSON রিটার্ন করবে, অন্য কোনো টেক্সট না।
 
 ফরম্যাট: {"reply": "তোমার উত্তর", "mood": "happy" অথবা "idle" অথবা "serious"}
 - সাধারণ/হাসিখুশি কথায় mood হবে "happy"
 - গুরুত্বপূর্ণ/সমস্যার কথায় mood হবে "serious"
-- বাকি সব ক্ষেত্রে "idle"
+- বাকি সব ক্ষেত্রে "idle"`;
 
-গ্রাহকের কথা: "${text}"`;
+  // 🧠 history-র প্রতিটা টার্ন Gemini-এর role-ভিত্তিক contents-এ বসানো হয়
+  // (আমাদের "mou" role → Gemini-এর "model" role) — এরপর সবশেষে চলতি বার্তাটা
+  const contents = (history || []).map((h) => ({
+    role: h.role === "mou" ? "model" : "user",
+    parts: [{ text: h.text }],
+  }));
+  contents.push({ role: "user", parts: [{ text }] });
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      contents,
       generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
     }),
   });
@@ -1017,6 +1031,16 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
     throw new HttpsError("invalid-argument", "বার্তাটা একটু ছোট করে লিখুন।");
   }
 
+  // 🧠 Development #4 — history ক্লায়েন্ট থেকে আসা ঐচ্ছিক ডেটা, তাই অন্ধভাবে
+  // বিশ্বাস না করে যাচাই/ছেঁকে নেওয়া হচ্ছে (shape ভুল হলে বা কেউ অস্বাভাবিক
+  // বড় পেলোড পাঠালেও Gemini কলে যেন সমস্যা না হয়) — সর্বোচ্চ ১২টা টার্ন,
+  // প্রতিটা মেসেজ সর্বোচ্চ ৫০০ ক্যারেক্টার
+  const rawHistory = Array.isArray(request.data && request.data.history) ? request.data.history : [];
+  const history = rawHistory
+    .filter((h) => h && (h.role === "user" || h.role === "mou") && typeof h.text === "string" && h.text.trim())
+    .slice(-12)
+    .map((h) => ({ role: h.role, text: h.text.trim().slice(0, 500) }));
+
   const apiKey = geminiApiKey.value();
   if (!apiKey) {
     // 🛟 key সেট করা না থাকলেও ফাংশনটা crash না করে পরিষ্কার fallback দেয়
@@ -1025,8 +1049,8 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   }
 
   try {
-    const result = await mouGeminiReply(text.trim(), apiKey);
-    console.log(JSON.stringify({ event: "MOU_CHAT_REPLIED", uid: request.auth.uid }));
+    const result = await mouGeminiReply(text.trim(), apiKey, history);
+    console.log(JSON.stringify({ event: "MOU_CHAT_REPLIED", uid: request.auth.uid, historyLen: history.length }));
     return { reply: result.reply, mood: result.mood, engine: "gemini-3.1-flash-lite" };
   } catch (e) {
     console.warn(JSON.stringify({ event: "MOU_CHAT_FAILED", error: String(e && e.message || e) }));
