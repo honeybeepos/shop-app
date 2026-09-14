@@ -127,6 +127,11 @@
   .pCardPrice{ font-weight:800; font-size:14.5px; color:var(--amber); }
   .pCardOldPrice{ font-size:11px; color:var(--muted); text-decoration:line-through; }
   .pCardStock{ font-size:10px; font-weight:700; margin-bottom:8px; }
+  /* 🏪 দোকান কার্ড — প্রোডাক্ট কার্ডের মতোই (বড় ছবি + নিচে নাম/বিবরণ), শুধু
+     দাম/স্টক নেই — বাজারের দোকান তালিকা ও "কাছের বাজার"-এর নিচের তালিকা
+     দুই জায়গাতেই একই স্টাইল ব্যবহার হয় */
+  .shopCardMeta{ font-size:10.5px; color:var(--muted); margin-bottom:3px; }
+  .shopCardDesc{ font-size:11px; color:#d8c9a8; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .pCardStock.in{ color:var(--ok); } .pCardStock.low{ color:var(--amber); } .pCardStock.out{ color:var(--danger); }
   .pCardAddBtn{
     width:100%; padding:8px; border-radius:9px; border:none; cursor:pointer; font-family:inherit;
@@ -5337,31 +5342,40 @@ function getFilteredShops(){
 
 // 🏪 দোকানের ছবি — POS হেডারের "➕" আইকনে আপলোড করা ছবিটা (shop.logoUrl,
 // Firebase Storage-এ) থাকলে সেটাই দেখানো হয়, নাহলে আগের মতোই জেনেরিক আইকন
-function hbShopIconHTML(s){
-  return s.logoUrl
-    ? `<img src="${escapeHtml(s.logoUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" onerror="this.parentElement.textContent='🏪';">`
-    : '🏪';
+// 🏪 দোকানের কার্ড — প্রোডাক্ট গ্রিড কার্ডের (.pCard) মতোই স্টাইল: বড় বর্গাকার
+// ছবি (দোকানের লোগো/ছবি, POS-এর হেডার থেকে আপলোড করা), উপরে খোলা/বন্ধ ও
+// ভেরিফাইড ব্যাজ, আর নিচে দোকানের নাম + ক্যাটাগরি + (থাকলে) সংক্ষিপ্ত বিবরণ।
+// আগে এখানে শুধু একটা ছোট আইকন/ইমোজি row-style-এ দেখানো হতো, তাই দোকানের
+// আসল ছবি প্রায় অদৃশ্য হয়ে যেত (আইকনের কন্টেইনারে কোনো নির্দিষ্ট width/height
+// ছিল না) — এখন .pCardImgWrap ব্যবহার করায় ছবিটা নির্ভরযোগ্যভাবেই দেখাবে।
+function hbShopCardHTML(s, onClickExpr){
+  const favs = (currentCustomer && currentCustomer.favoriteShops) || [];
+  const isFav = favs.includes(s.id);
+  const closedBadge = s.isShopOpen === false ? '<span class="pCardOfferBadge" style="background:#6b7280;">🔴 বন্ধ</span>' : '';
+  const verifiedBadge = s.isVerified ? '<span class="pCardHighlightBadge">🛡️ Verified</span>' : '';
+  return `
+    <div class="pCard" onclick="${onClickExpr}">
+      <div class="pCardImgWrap">
+        <span class="pCardImgInner">${s.logoUrl ? `<img src="${escapeHtml(s.logoUrl)}" alt="" onerror="this.parentElement.textContent='🏪';">` : '🏪'}</span>
+        <div class="pCardBadges">${closedBadge}${verifiedBadge}</div>
+        <span class="pCardFav" onclick="toggleFavoriteShop(event,'${s.id}')">${isFav ? "❤️" : "🤍"}</span>
+      </div>
+      <div class="pCardBody">
+        <div class="pCardName">${escapeHtml(s.name || s.shopName || "দোকান")}</div>
+        <div class="shopCardMeta">${escapeHtml(s.category || "")}</div>
+        ${s.logoDescription ? `<div class="shopCardDesc">${escapeHtml(s.logoDescription)}</div>` : ''}
+      </div>
+    </div>`;
 }
 
 function renderShops(list){
   if(list.length === 0){
+    $("shopsList").className = "";
     $("shopsList").innerHTML = '<div class="emptyMsg">এই বাজারে এখনো কোনো সক্রিয় দোকান নেই।</div>';
     return;
   }
-  const favs = (currentCustomer && currentCustomer.favoriteShops) || [];
-  $("shopsList").innerHTML = list.map(s => {
-    const isFav = favs.includes(s.id);
-    return `
-    <div class="card shopItem">
-      <div class="ic" style="cursor:pointer;" onclick="selectShop('${s.id}')">${hbShopIconHTML(s)}</div>
-      <div class="info" style="cursor:pointer;" onclick="selectShop('${s.id}')">
-        <div class="name">${escapeHtml(s.name || s.shopName || "দোকান")} ${s.isVerified ? '<span title="Verified by Agent">🛡️</span>' : ''} ${s.isShopOpen === false ? '<span style="color:#e53935;font-size:11px;font-weight:700;">🔴 বন্ধ</span>' : ''}</div>
-        <div class="meta">${escapeHtml(s.category || "")}</div>
-      </div>
-      <div class="favHeart" onclick="toggleFavoriteShop(event,'${s.id}')">${isFav ? "❤️" : "🤍"}</div>
-      <div class="chev" onclick="selectShop('${s.id}')">›</div>
-    </div>`;
-  }).join("");
+  $("shopsList").className = "pGrid";
+  $("shopsList").innerHTML = list.map(s => hbShopCardHTML(s, `selectShop('${s.id}')`)).join("");
 }
 
 // 📍 "কাছের বাজার" পেজেই দেখানো ঐ বাজারের দোকানের তালিকা (আলাদা ট্যাপ ছাড়াই)
@@ -5369,18 +5383,12 @@ function renderNearbyMarketShops(marketId, list){
   const container = $("nearbyMarketShopsList");
   if(!container) return;
   if(!list || list.length === 0){
+    container.className = "";
     container.innerHTML = '<div class="emptyMsg">এই বাজারে এখনো কোনো সক্রিয় দোকান যোগ হয়নি।</div>';
     return;
   }
-  container.innerHTML = list.map(s => `
-    <div class="card shopItem" onclick="selectNearbyMarketShop('${marketId}','${s.id}')">
-      <div class="ic">${hbShopIconHTML(s)}</div>
-      <div class="info">
-        <div class="name">${escapeHtml(s.name || s.shopName || "দোকান")} ${s.isVerified ? '<span title="Verified by Agent">🛡️</span>' : ''} ${s.isShopOpen === false ? '<span style="color:#e53935;font-size:11px;font-weight:700;">🔴 বন্ধ</span>' : ''}</div>
-        <div class="meta">${escapeHtml(s.category || "")}</div>
-      </div>
-      <div class="chev">›</div>
-    </div>`).join("");
+  container.className = "pGrid";
+  container.innerHTML = list.map(s => hbShopCardHTML(s, `selectNearbyMarketShop('${marketId}','${s.id}')`)).join("");
 }
 
 // 📍 "কাছের বাজার" পেজে দেখানো দোকান তালিকা থেকে সরাসরি কোনো দোকানে ঢোকা —
