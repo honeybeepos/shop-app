@@ -572,6 +572,11 @@
   #announceBar{display:none;background:#fff3e8;color:#8f4c1f;padding:9px 14px;font-size:13px;text-align:center;border-bottom:1px solid #d8cbb0;}
   .subuser-hide{display:none !important;}
 
+  /* 🟢🔴 দোকান খোলা/বন্ধ সুইচ — ক্লিক করলে একটা ছোট্ট "পপ" অ্যানিমেশন দেখায়,
+     যাতে ছোঁয়ার সাথে সাথেই বোঝা যায় সুইচটা প্রতিক্রিয়া দেখিয়েছে */
+  @keyframes hbSwitchPop{ 0%{transform:scale(1);} 45%{transform:scale(1.14);} 100%{transform:scale(1);} }
+  #headerShopOpenWrap.hbSwitchPop #headerShopOpenToggle{ animation: hbSwitchPop 0.38s cubic-bezier(.34,1.56,.64,1); }
+
   #syncToast{
     position:fixed; top:14px; left:50%; z-index:100000;
     transform:translateX(-50%) translateY(-40px) scale(0.6);
@@ -769,10 +774,10 @@
   <div id="headerQrShortcut" title="🏷️ QR (ওজন স্টিকার)" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🏷️</div>
   <!-- 🟢🔴 দোকান খোলা/বন্ধ সুইচ — শপকিপার এখান থেকে টগল করলে shops/{shopId}.isShopOpen
        আপডেট হয়, Bazar-এ কাস্টমাররা তখন দোকান বন্ধ থাকলে দেখতে/বুঝতে পারবেন -->
-  <div id="headerShopOpenWrap" title="দোকান খোলা/বন্ধ করুন" style="cursor:pointer; flex-shrink:0; display:flex; align-items:center; gap:6px;">
-    <span id="headerShopOpenLabel" style="font-size:11px; font-weight:800; color:#fff; white-space:nowrap;">🟢 খোলা</span>
-    <div id="headerShopOpenToggle" style="width:44px; height:24px; border-radius:16px; background:#2fbf71; position:relative; border:2px solid rgba(255,255,255,.5); box-sizing:border-box; transition:background .2s ease;">
-      <div id="headerShopOpenKnob" style="width:16px; height:16px; border-radius:50%; background:#fff; position:absolute; top:2px; left:22px; transition:left .2s ease;"></div>
+  <div id="headerShopOpenWrap" title="দোকান খোলা/বন্ধ করুন" style="cursor:pointer; flex-shrink:0; display:flex; align-items:center; gap:7px;">
+    <span id="headerShopOpenLabel" style="font-size:12.5px; font-weight:800; color:#fff; white-space:nowrap;">🟢 খোলা</span>
+    <div id="headerShopOpenToggle" style="width:56px; height:30px; border-radius:20px; background:#2fbf71; position:relative; border:2px solid rgba(255,255,255,.5); box-sizing:border-box; transition:background .2s ease;">
+      <div id="headerShopOpenKnob" style="width:22px; height:22px; border-radius:50%; background:#fff; position:absolute; top:2px; left:28px; transition:left .25s cubic-bezier(.34,1.56,.64,1); box-shadow:0 1px 3px rgba(0,0,0,.35);"></div>
     </div>
   </div>
 </header>
@@ -4598,18 +4603,58 @@ document.getElementById('factoryResetConfirmBtn').addEventListener('click', asyn
   try{ await confirmCloudSave(); }catch(e){ console.error(e); }
   setTimeout(()=> window.location.reload(), 800);
 });
-logoInputEl.addEventListener('change', (e)=>{
+// 🐞 বাগ-ফিক্স: আগে এই ছবি শুধু এই ডিভাইসের localStorage-এ থেকে যেত —
+// ক্লাউডে/Bazar-এ কখনো পৌঁছাতো না। এখন কম্প্রেস করে Firebase Storage-এ
+// আপলোড হয় (shops/{shopId}.logoUrl) এবং তারপর একটা সংক্ষিপ্ত বর্ণনাও
+// (ঐচ্ছিক) নেওয়া হয় — এই দুটোই Honey Bee Bazar-এ দোকানের ছবি/তথ্য
+// হিসেবে ব্যবহৃত হবে।
+logoInputEl.addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    localStorage.setItem('shop-logo', reader.result);
-    shopLogoEl.src = reader.result;
-    shopLogoEl.style.display = 'block';
-    logoPlaceholderEl.style.display = 'none';
-    toast('লোগো সেভ হয়েছে');
-  };
-  reader.readAsDataURL(file);
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId){
+    alert('দোকানের তথ্য পাওয়া যাচ্ছে না — একবার পেজ রিলোড করে আবার চেষ্টা করুন।');
+    logoInputEl.value = '';
+    return;
+  }
+
+  toast('ছবি প্রসেস হচ্ছে...');
+  let processed;
+  try{
+    processed = await hbProcessShopLogoImage(file);
+  }catch(err){
+    console.error('Shop logo processing failed:', err);
+    alert('⚠️ ' + (err.message || 'ছবি প্রসেস করা যায়নি'));
+    logoInputEl.value = '';
+    return;
+  }
+
+  // তাৎক্ষণিক লোকাল প্রিভিউ — ক্লাউড আপলোড শেষ হওয়ার অপেক্ষা না করেই
+  localStorage.setItem('shop-logo', processed.dataUrl);
+  shopLogoEl.src = processed.dataUrl;
+  shopLogoEl.style.display = 'block';
+  logoPlaceholderEl.style.display = 'none';
+  toast('আপলোড হচ্ছে...');
+
+  try{
+    const logoUrl = await hbUploadShopLogo(processed.blob, session.shopId);
+    await db.collection('shops').doc(session.shopId).set({ logoUrl }, { merge: true });
+    toast('✅ দোকানের ছবি বাজারে সেভ হয়েছে');
+
+    // 📝 ছবি আপলোডের পর একটা সংক্ষিপ্ত বর্ণনা/ক্যাপশন দেওয়ার সুযোগ — সম্পূর্ণ ঐচ্ছিক
+    setTimeout(()=>{
+      const desc = prompt('দোকানের ছবির একটা সংক্ষিপ্ত বর্ণনা দিন (ঐচ্ছিক, খালি রাখলে বাদ যাবে):', window.__hbShopLogoDescription || '');
+      if(desc !== null && desc.trim() !== ''){
+        db.collection('shops').doc(session.shopId).set({ logoDescription: desc.trim() }, { merge: true })
+          .then(()=>{ window.__hbShopLogoDescription = desc.trim(); toast('বর্ণনা সেভ হয়েছে'); })
+          .catch((e2)=> console.warn('logoDescription সেভ ব্যর্থ:', e2));
+      }
+    }, 300);
+  }catch(err){
+    console.error('Shop logo cloud upload failed:', err);
+    alert('⚠️ ছবিটা এই ডিভাইসে দেখা যাচ্ছে ঠিকই, কিন্তু বাজারে (ক্লাউডে) আপলোড করা যায়নি — ইন্টারনেট চেক করে আবার চেষ্টা করুন।');
+  }
+  logoInputEl.value = '';
 });
 
 function fmt(n){ return HB_CUR + ' ' + (Number(n)||0).toLocaleString('en-US'); }
@@ -9979,6 +10024,76 @@ async function hbProcessProductImage(file){
   return { blob, dataUrl, sizeBytes: blob.size, width, height };
 }
 
+/* ==================== 🏪 Shop Logo/Photo — কম্প্রেশন + ক্লাউড আপলোড ====================
+   POS হেডারের "➕" আইকনে দোকানের যে ছবি আপলোড করা হয়, সেটাই এখন "দোকানের ছবি"
+   হিসেবে ব্যবহার হবে — শুধু এই ডিভাইসে (localStorage) না রেখে Firebase Storage-এও
+   আপলোড হয় (shops/{shopId}.logoUrl), যাতে Honey Bee Bazar-এ কাস্টমাররা এই
+   দোকানের আসল ছবি দেখতে পায়। প্রোডাক্ট-ছবির (hbProcessProductImage) মতোই
+   Canvas দিয়ে resize/কম্প্রেস করা হয়, কিন্তু লোগোর জন্য অনেক ছোট টার্গেট/সীমা:
+   টার্গেট ৫০KB, আর কোনোভাবেই ১০০KB-এর বেশি সাইজ আপলোড/সেভ হতে দেওয়া হয় না। */
+const HB_LOGO_TARGET_BYTES = 50 * 1024;  // ৫০KB — এর মধ্যেই আনার চেষ্টা হয়
+const HB_LOGO_MAX_BYTES = 100 * 1024;    // ১০০KB — হার্ড ক্যাপ, এর বেশি হলে আপলোডই হবে না
+const HB_LOGO_MAX_DIM = 480;             // দোকানের ছোট ছবি/আইকনের জন্য এটুকুই যথেষ্ট
+const HB_LOGO_MIN_DIM = 160;
+const HB_LOGO_QUALITY_FLOOR = 0.35;
+
+async function hbProcessShopLogoImage(file){
+  if(!file || !file.type || !file.type.startsWith("image/")){
+    throw new Error("শুধু ছবি ফাইল সমর্থিত (JPEG/PNG/WebP)");
+  }
+  const img = await hbLoadImageFromFile(file);
+  let width = img.naturalWidth || img.width;
+  let height = img.naturalHeight || img.height;
+  if(width > HB_LOGO_MAX_DIM || height > HB_LOGO_MAX_DIM){
+    const scale = HB_LOGO_MAX_DIM / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  let canvas = hbDrawResizedCanvas(img, width, height);
+
+  const qualitySteps = [0.8, 0.65, 0.5, HB_LOGO_QUALITY_FLOOR];
+  let blob = null;
+  for(const q of qualitySteps){
+    blob = await hbCanvasToWebpBlob(canvas, q);
+    if(blob && blob.size <= HB_LOGO_TARGET_BYTES) break;
+  }
+
+  let attempts = 0;
+  while(blob && blob.size > HB_LOGO_TARGET_BYTES && attempts < 3 && width > HB_LOGO_MIN_DIM){
+    width = Math.max(HB_LOGO_MIN_DIM, Math.round(width * 0.8));
+    height = Math.max(HB_LOGO_MIN_DIM, Math.round(height * 0.8));
+    canvas = hbDrawResizedCanvas(img, width, height);
+    blob = await hbCanvasToWebpBlob(canvas, HB_LOGO_QUALITY_FLOOR);
+    attempts++;
+  }
+
+  if(!blob) throw new Error("ছবি প্রসেস করা যায়নি");
+
+  // 🚧 হার্ড ক্যাপ — এত চেষ্টার পরও ১০০KB-এর বেশি থাকলে আপলোড করা হবে না,
+  // বরং স্পষ্ট এরর দেখানো হবে (ডাটাবেজে বড় ফাইল যেন কখনোই না যায়)
+  if(blob.size > HB_LOGO_MAX_BYTES){
+    throw new Error("ছবিটি অনেক জটিল — ১০০KB-এর নিচে আনা যায়নি। দয়া করে অন্য/সহজ একটা ছবি ব্যবহার করুন।");
+  }
+
+  const dataUrl = await new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+
+  return { blob, dataUrl, sizeBytes: blob.size, width, height };
+}
+
+async function hbUploadShopLogo(blob, shopId){
+  if(!storage) throw new Error("Firebase Storage SDK লোড হয়নি (firebase-storage-compat.js চেক করুন)");
+  if(!shopId) throw new Error("shopId প্রয়োজন");
+  // 🗂️ প্রতিটা দোকানের জন্য একটাই নির্দিষ্ট পাথ — নতুন ছবি আপলোড করলে পুরনোটার
+  // জায়গায় ওভাররাইট হয়ে যায়, আলাদা করে পুরনো ফাইল মুছতে হয় না
+  const storageRef = storage.ref(`shop-logos/${shopId}.webp`);
+  await storageRef.put(blob, { contentType: "image/webp" });
+  return await storageRef.getDownloadURL();
+}
+
 /* ==================== 🔍 SHA-256 Duplicate Detection — Step 3 ====================
    ⚠️ hash সবসময় FINAL PROCESSED WebP blob-এর ওপর তৈরি হয় (raw
    5MB আসল ছবির ওপর না) — নাহলে একই ছবি সামান্য ভিন্ন কম্প্রেশন-সেটিংয়ে
@@ -14923,6 +15038,21 @@ function watchShopStatus(shopId){
     // 🟢🔴 হেডারের খোলা/বন্ধ সুইচ — অন্য কোনো ডিভাইস/ট্যাব থেকে বদলালেও এখানে লাইভ সিঙ্ক হবে;
     // ফিল্ড না থাকলে (পুরনো দোকান) ডিফল্ট "খোলা" ধরা হয়, যাতে হঠাৎ বন্ধ দেখানো না হয়ে যায়
     hbApplyShopOpenToggleUI(shop.isShopOpen !== false);
+
+    // 🏪 দোকানের ছবি — ক্লাউডে (shops/{shopId}.logoUrl) যা আছে সেটাই এখানেও
+    // দেখানো হয়, যাতে নতুন ডিভাইস/ব্রাউজারে লগইন করলেও আগে আপলোড করা ছবিটা
+    // হেডারে দেখা যায় (আগে শুধু localStorage-নির্ভর ছিল বলে এটা হতো না)।
+    // বর্ণনাটাও ক্যাশ করে রাখা হচ্ছে যাতে পরের বার ছবি বদলানোর সময় prompt()-এ
+    // আগেরটা প্রি-ফিল করা যায়।
+    if(shop.logoDescription) window.__hbShopLogoDescription = shop.logoDescription;
+    if(shop.logoUrl && localStorage.getItem('shop-logo') !== shop.logoUrl){
+      localStorage.setItem('shop-logo', shop.logoUrl);
+      if(shopLogoEl && logoPlaceholderEl){
+        shopLogoEl.src = shop.logoUrl;
+        shopLogoEl.style.display = 'block';
+        logoPlaceholderEl.style.display = 'none';
+      }
+    }
   });
 }
 
@@ -14935,7 +15065,7 @@ function hbApplyShopOpenToggleUI(isOpen){
   if(isOpen){
     label.textContent = "🟢 খোলা";
     track.style.background = "#2fbf71";
-    knob.style.left = "22px";
+    knob.style.left = "28px";
   }else{
     label.textContent = "🔴 বন্ধ";
     track.style.background = "#e53935";
@@ -14957,6 +15087,11 @@ document.getElementById("headerShopOpenWrap").addEventListener("click", async ()
   }
   const newState = !headerShopOpenState;
   hbApplyShopOpenToggleUI(newState); // তাৎক্ষণিক ভিজ্যুয়াল ফিডব্যাক, Firestore রাউন্ড-ট্রিপের জন্য অপেক্ষা করতে হয় না
+  // 🎬 ক্লিক করার সাথে সাথে একটা ছোট্ট "পপ" অ্যানিমেশন — টাচ করলে যে প্রতিক্রিয়া হয়েছে সেটা চোখে বোঝা যায়
+  const __wrapEl = document.getElementById("headerShopOpenWrap");
+  __wrapEl.classList.remove("hbSwitchPop");
+  void __wrapEl.offsetWidth; // রি-ফ্লো — একই অ্যানিমেশন পরপর দুইবার ক্লিক করলেও যেন আবার চালু হয়
+  __wrapEl.classList.add("hbSwitchPop");
   try{
     await db.collection("shops").doc(session.shopId).set({ isShopOpen: newState }, { merge: true });
   }catch(e){

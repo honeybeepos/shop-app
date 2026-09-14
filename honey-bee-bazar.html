@@ -526,6 +526,12 @@
       <input type="text" class="searchBox" id="marketSearch" placeholder="🔍 বাজারের নাম দিয়ে খুঁজুন...">
       <div style="font-size:12.5px; font-weight:700; color:var(--muted); margin:14px 0 8px;">📍 কাছের বাজার</div>
       <div id="marketsList"><div class="loadingMsg">বাজারের তালিকা লোড হচ্ছে...</div></div>
+
+      <!-- 🏪 সবচেয়ে কাছের বাজারটা GPS দিয়ে পাওয়া গেলে, সেই বাজারের সব দোকান
+           এই পেজেই (আলাদা কোনো ট্যাপ ছাড়াই) নিচে দেখানো হয় — যাতে কাস্টমার
+           সাথে সাথে বুঝতে পারে এই বাজারে কী কী দোকান আছে -->
+      <div id="nearbyMarketShopsHead" style="display:none; font-size:12.5px; font-weight:700; color:var(--muted); margin:20px 0 8px;">🏪 এই বাজারের দোকানসমূহ</div>
+      <div id="nearbyMarketShopsList"></div>
     </div>
   </div>
 
@@ -1827,6 +1833,7 @@ let currentShopIsOpen = true; // 🔴 বর্তমানে ব্রাউ�
 // (selectShop()-এ সেট হয়), পুরনো দোকান বা মুদ্রা সেট না থাকলে ডিফল্ট টাকা (৳)।
 let HB_CUR = '৳';
 let userLatLng = null;
+let __nearbyMarketId = null; // 📍 GPS-এ সবচেয়ে কাছের বাজার — screenMarkets পেজেই এর দোকানের তালিকা দেখানো হয়
 
 let __hbNavigatingViaPopstate = false;
 
@@ -4162,6 +4169,14 @@ function requestGpsLocation(){
     userLatLng = [pos.coords.latitude, pos.coords.longitude];
     $("gpsStatusBanner").textContent = "📍 আপনার কাছের বাজার আগে দেখানো হচ্ছে";
     renderMarkets(getFilteredMarkets());
+    // 🏪 সবচেয়ে কাছের বাজারটা পেয়ে গেলে সেটার দোকানগুলোও সাথে সাথে (এই
+    // পেজেই, আলাদা ট্যাপ ছাড়াই) লোড করে নিচে দেখানো শুরু হয়
+    const nearest = getNearestMarket();
+    if(nearest){
+      __nearbyMarketId = nearest.id;
+      $("nearbyMarketShopsHead").style.display = "block";
+      loadShops(nearest.id);
+    }
   }, ()=>{
     $("gpsStatusBanner").textContent = "";
   }, { enableHighAccuracy: true, timeout: 10000 });
@@ -4203,6 +4218,20 @@ function getFilteredMarkets(){
     (!upazila || m.upazila === upazila) &&
     (!q || (m.name||"").toLowerCase().includes(q))
   );
+}
+
+// 📍 GPS লোকেশনের সবচেয়ে কাছের বাজার — goToFavoriteMarket()-এ ব্যবহৃত একই
+// হিসাবের একটা রিইউজেবল সংস্করণ
+function getNearestMarket(){
+  if(!userLatLng) return null;
+  let best = null, bestDist = Infinity;
+  allMarkets.forEach(m=>{
+    if(m.location && m.location.lat != null){
+      const d = haversineKm(userLatLng[0], userLatLng[1], m.location.lat, m.location.lng);
+      if(d < bestDist){ bestDist = d; best = m; }
+    }
+  });
+  return best;
 }
 
 /* ---------- ধাপ ১: বাজারের তালিকা ---------- */
@@ -5254,10 +5283,12 @@ function loadShops(marketId){
     .onSnapshot((qs)=>{
       allShops = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
       renderShops(getFilteredShops());
+      if(__nearbyMarketId === marketId) renderNearbyMarketShops(marketId, allShops);
       if($("screenMarketFeed") && $("screenMarketFeed").classList.contains("active")) loadMarketFeedProducts();
     }, (e)=>{
       console.error(e);
       $("shopsList").innerHTML = '<div class="emptyMsg">দোকানের তালিকা লোড করা যায়নি।</div>';
+      if(__nearbyMarketId === marketId) $("nearbyMarketShopsList").innerHTML = '<div class="emptyMsg">দোকানের তালিকা লোড করা যায়নি।</div>';
     });
 }
 
@@ -5265,6 +5296,14 @@ function getFilteredShops(){
   const q = ($("shopSearch") ? $("shopSearch").value : "").trim().toLowerCase();
   if(!q) return allShops;
   return allShops.filter(s => (s.name||s.shopName||"").toLowerCase().includes(q));
+}
+
+// 🏪 দোকানের ছবি — POS হেডারের "➕" আইকনে আপলোড করা ছবিটা (shop.logoUrl,
+// Firebase Storage-এ) থাকলে সেটাই দেখানো হয়, নাহলে আগের মতোই জেনেরিক আইকন
+function hbShopIconHTML(s){
+  return s.logoUrl
+    ? `<img src="${escapeHtml(s.logoUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" onerror="this.parentElement.textContent='🏪';">`
+    : '🏪';
 }
 
 function renderShops(list){
@@ -5277,9 +5316,9 @@ function renderShops(list){
     const isFav = favs.includes(s.id);
     return `
     <div class="card shopItem">
-      <div class="ic" style="cursor:pointer;" onclick="selectShop('${s.id}')">🏪</div>
+      <div class="ic" style="cursor:pointer;" onclick="selectShop('${s.id}')">${hbShopIconHTML(s)}</div>
       <div class="info" style="cursor:pointer;" onclick="selectShop('${s.id}')">
-        <div class="name">${escapeHtml(s.name || s.shopName || "দোকান")} ${s.isVerified ? '<span title="Verified by Agent">🛡️</span>' : ''}</div>
+        <div class="name">${escapeHtml(s.name || s.shopName || "দোকান")} ${s.isVerified ? '<span title="Verified by Agent">🛡️</span>' : ''} ${s.isShopOpen === false ? '<span style="color:#e53935;font-size:11px;font-weight:700;">🔴 বন্ধ</span>' : ''}</div>
         <div class="meta">${escapeHtml(s.category || "")}</div>
       </div>
       <div class="favHeart" onclick="toggleFavoriteShop(event,'${s.id}')">${isFav ? "❤️" : "🤍"}</div>
@@ -5287,6 +5326,38 @@ function renderShops(list){
     </div>`;
   }).join("");
 }
+
+// 📍 "কাছের বাজার" পেজেই দেখানো ঐ বাজারের দোকানের তালিকা (আলাদা ট্যাপ ছাড়াই)
+function renderNearbyMarketShops(marketId, list){
+  const container = $("nearbyMarketShopsList");
+  if(!container) return;
+  if(!list || list.length === 0){
+    container.innerHTML = '<div class="emptyMsg">এই বাজারে এখনো কোনো সক্রিয় দোকান যোগ হয়নি।</div>';
+    return;
+  }
+  container.innerHTML = list.map(s => `
+    <div class="card shopItem" onclick="selectNearbyMarketShop('${marketId}','${s.id}')">
+      <div class="ic">${hbShopIconHTML(s)}</div>
+      <div class="info">
+        <div class="name">${escapeHtml(s.name || s.shopName || "দোকান")} ${s.isVerified ? '<span title="Verified by Agent">🛡️</span>' : ''} ${s.isShopOpen === false ? '<span style="color:#e53935;font-size:11px;font-weight:700;">🔴 বন্ধ</span>' : ''}</div>
+        <div class="meta">${escapeHtml(s.category || "")}</div>
+      </div>
+      <div class="chev">›</div>
+    </div>`).join("");
+}
+
+// 📍 "কাছের বাজার" পেজে দেখানো দোকান তালিকা থেকে সরাসরি কোনো দোকানে ঢোকা —
+// প্রথমে selectMarket()-এর মতোই বাজারের কনটেক্সট (currentMarketId ইত্যাদি)
+// সেট করে নেওয়া হয়, তারপর সরাসরি সেই দোকানের ক্যাটাগরি/প্রোডাক্টে চলে যাওয়া হয়
+window.selectNearbyMarketShop = function(marketId, shopId){
+  currentMarketId = marketId;
+  const market = allMarkets.find(m=> m.id === marketId);
+  const marketName = market ? (market.name || marketId) : marketId;
+  $("currentMarketName").textContent = marketName;
+  $("mfMarketName").textContent = marketName;
+  try{ localStorage.setItem("hb-last-market-id", marketId); }catch(e){}
+  selectShop(shopId);
+};
 
 window.toggleFavoriteShop = async function(ev, shopId){
   ev.stopPropagation();
