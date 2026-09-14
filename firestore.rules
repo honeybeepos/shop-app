@@ -42,10 +42,19 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.auth.uid == shopId;
       allow get: if true;
       allow list: if true;
+      // 👍 দোকানের ছবি/পোস্টে Facebook-এর মতো লাইক — logoLikedBy/logoLikeCount
+      // সরাসরি এই shops/{shopId} ডকুমেন্টেই ডিনরমালাইজড রাখা হয়েছে
+      // (transportMediaPosts-এর likedBy/likeCount-এর একই প্যাটার্ন), তাই
+      // যেকোনো সাইন-ইন করা (নন-অ্যানোনিমাস) কাস্টমারকে শুধু এই দুইটা +
+      // logoCommentCount ফিল্ড বদলানোর অনুমতি দেওয়া হচ্ছে — মালিক/এজেন্ট/
+      // সুপারঅ্যাডমিন ছাড়া বাকি সব ফিল্ড আগের মতোই সুরক্ষিত থাকছে।
       allow update: if isSignedIn() &&
         (isSuperAdmin() ||
          (myShopId() == shopId && myRole() == 'admin') ||
-         (resource.data.assignedAgentId == request.auth.uid));
+         (resource.data.assignedAgentId == request.auth.uid) ||
+         (request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['logoLikedBy','logoLikeCount','logoCommentCount'])));
       allow delete: if isSuperAdmin();
 
       match /members/{memberUid} {
@@ -103,6 +112,20 @@ service cloud.firestore {
             request.auth.uid == uid;
           allow update: if false;
         }
+      }
+
+      // 💬 দোকানের ছবি/পোস্টে মন্তব্য — publicStock/{itemId}/comments-এর
+      // ঠিক একই কনভেনশন (পড়া সবার জন্য খোলা, লেখা শুধু আসল Google
+      // লগইন করা কাস্টমারের জন্য, ইমিউটেবল — এডিট/ডিলিট নেই)।
+      match /logoComments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn() &&
+          request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+          request.resource.data.customerUid == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 500;
+        allow update, delete: if false;
       }
 
       match /publicCategories/{catId} {
