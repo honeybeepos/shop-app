@@ -573,9 +573,20 @@
   .subuser-hide{display:none !important;}
 
   /* 🟢🔴 দোকান খোলা/বন্ধ সুইচ — ক্লিক করলে একটা ছোট্ট "পপ" অ্যানিমেশন দেখায়,
-     যাতে ছোঁয়ার সাথে সাথেই বোঝা যায় সুইচটা প্রতিক্রিয়া দেখিয়েছে */
+     যাতে ছোঁয়ার সাথে সাথেই বোঝা যায় সুইচটা প্রতিক্রিয়া দেখিয়েছে। এছাড়া
+     সবসময় (idle অবস্থায়ও) দোকান খোলা থাকলে সবুজ, বন্ধ থাকলে লাল একটা হালকা
+     "ফ্ল্যাশ"/গ্লো পালস চলতে থাকে — দূর থেকেও চোখে পড়ে দোকানের অবস্থা কী */
   @keyframes hbSwitchPop{ 0%{transform:scale(1);} 45%{transform:scale(1.14);} 100%{transform:scale(1);} }
-  #headerShopOpenWrap.hbSwitchPop #headerShopOpenToggle{ animation: hbSwitchPop 0.38s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes hbFlashGreen{ 0%,100%{ box-shadow: 0 0 0 0 rgba(47,191,113,0.75); } 50%{ box-shadow: 0 0 0 7px rgba(47,191,113,0); } }
+  @keyframes hbFlashRed{ 0%,100%{ box-shadow: 0 0 0 0 rgba(229,57,53,0.75); } 50%{ box-shadow: 0 0 0 7px rgba(229,57,53,0); } }
+
+  /* idle অবস্থায় শুধু ফ্ল্যাশ; ক্লিকের মুহূর্তে (hbSwitchPop ক্লাসও থাকলে)
+     ফ্ল্যাশ + পপ দুটো অ্যানিমেশনই একসাথে চলে (CSS-এ animation শর্টহ্যান্ড
+     একবারই সেট করা যায় বলে দুই অবস্থার জন্য আলাদা কম্বিনেশন রুল লাগে) */
+  #headerShopOpenToggle.hbFlashOpen{ animation: hbFlashGreen 1.6s ease-in-out infinite; }
+  #headerShopOpenToggle.hbFlashClosed{ animation: hbFlashRed 1.6s ease-in-out infinite; }
+  #headerShopOpenToggle.hbFlashOpen.hbSwitchPop{ animation: hbFlashGreen 1.6s ease-in-out infinite, hbSwitchPop 0.38s cubic-bezier(.34,1.56,.64,1); }
+  #headerShopOpenToggle.hbFlashClosed.hbSwitchPop{ animation: hbFlashRed 1.6s ease-in-out infinite, hbSwitchPop 0.38s cubic-bezier(.34,1.56,.64,1); }
 
   #syncToast{
     position:fixed; top:14px; left:50%; z-index:100000;
@@ -774,10 +785,10 @@
   <div id="headerQrShortcut" title="🏷️ QR (ওজন স্টিকার)" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🏷️</div>
   <!-- 🟢🔴 দোকান খোলা/বন্ধ সুইচ — শপকিপার এখান থেকে টগল করলে shops/{shopId}.isShopOpen
        আপডেট হয়, Bazar-এ কাস্টমাররা তখন দোকান বন্ধ থাকলে দেখতে/বুঝতে পারবেন -->
-  <div id="headerShopOpenWrap" title="দোকান খোলা/বন্ধ করুন" style="cursor:pointer; flex-shrink:0; display:flex; align-items:center; gap:7px;">
-    <span id="headerShopOpenLabel" style="font-size:12.5px; font-weight:800; color:#fff; white-space:nowrap;">🟢 খোলা</span>
-    <div id="headerShopOpenToggle" style="width:56px; height:30px; border-radius:20px; background:#2fbf71; position:relative; border:2px solid rgba(255,255,255,.5); box-sizing:border-box; transition:background .2s ease;">
-      <div id="headerShopOpenKnob" style="width:22px; height:22px; border-radius:50%; background:#fff; position:absolute; top:2px; left:28px; transition:left .25s cubic-bezier(.34,1.56,.64,1); box-shadow:0 1px 3px rgba(0,0,0,.35);"></div>
+  <div id="headerShopOpenWrap" title="দোকান খোলা/বন্ধ করুন" style="cursor:pointer; flex-shrink:0;">
+    <div id="headerShopOpenToggle" style="width:82px; height:32px; border-radius:20px; background:#2fbf71; position:relative; border:2px solid rgba(255,255,255,.5); box-sizing:border-box; transition:background .2s ease; overflow:hidden;">
+      <span id="headerShopOpenLabel" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-start; padding-left:10px; font-size:10.5px; font-weight:800; color:#fff; white-space:nowrap;">খোলা</span>
+      <div id="headerShopOpenKnob" style="width:24px; height:24px; border-radius:50%; background:#fff; position:absolute; top:2px; left:52px; transition:left .25s cubic-bezier(.34,1.56,.64,1); box-shadow:0 1px 3px rgba(0,0,0,.35); z-index:2;"></div>
     </div>
   </div>
 </header>
@@ -15056,20 +15067,32 @@ function watchShopStatus(shopId){
   });
 }
 
-// 🟢🔴 দোকান খোলা/বন্ধ সুইচের ভিজ্যুয়াল আপডেট (সরাসরি DOM, নতুন কোনো CSS ক্লাস লাগেনি)
+// 🟢🔴 দোকান খোলা/বন্ধ সুইচের ভিজ্যুয়াল আপডেট — লেখাটা (খোলা/বন্ধ) এখন সুইচের
+// ভিতরেই থাকে (বাইরে আলাদা কোনো লেবেল নেই), আর সবসময় (idle অবস্থায়ও) খোলা
+// থাকলে সবুজ, বন্ধ থাকলে লাল একটা হালকা ফ্ল্যাশ/গ্লো চলতে থাকে
 function hbApplyShopOpenToggleUI(isOpen){
   const label = document.getElementById("headerShopOpenLabel");
   const track = document.getElementById("headerShopOpenToggle");
   const knob = document.getElementById("headerShopOpenKnob");
   if(!label || !track || !knob) return;
   if(isOpen){
-    label.textContent = "🟢 খোলা";
+    label.textContent = "খোলা";
+    label.style.justifyContent = "flex-start";
+    label.style.paddingLeft = "10px";
+    label.style.paddingRight = "0";
     track.style.background = "#2fbf71";
-    knob.style.left = "28px";
+    knob.style.left = "51px";
+    track.classList.remove("hbFlashClosed");
+    track.classList.add("hbFlashOpen");
   }else{
-    label.textContent = "🔴 বন্ধ";
+    label.textContent = "বন্ধ";
+    label.style.justifyContent = "flex-end";
+    label.style.paddingLeft = "0";
+    label.style.paddingRight = "10px";
     track.style.background = "#e53935";
-    knob.style.left = "2px";
+    knob.style.left = "3px";
+    track.classList.remove("hbFlashOpen");
+    track.classList.add("hbFlashClosed");
   }
   headerShopOpenState = isOpen;
 }
@@ -15096,14 +15119,15 @@ document.getElementById("headerShopOpenWrap").addEventListener("click", async ()
   // ভ্যারিয়েবলের বদলে সরাসরি নবের বর্তমান (স্ক্রিনে দেখা) পজিশন থেকে বর্তমান
   // অবস্থা বের করা হয়, তাই চোখে যা দেখা যাচ্ছে ক্লিক করলে সবসময় তার উল্টোটাই হবে।
   const __knobEl = document.getElementById("headerShopOpenKnob");
-  const isCurrentlyOpen = __knobEl ? __knobEl.style.left !== "2px" : headerShopOpenState;
+  const isCurrentlyOpen = __knobEl ? __knobEl.style.left !== "3px" : headerShopOpenState;
   const newState = !isCurrentlyOpen;
   hbApplyShopOpenToggleUI(newState); // তাৎক্ষণিক ভিজ্যুয়াল ফিডব্যাক, Firestore রাউন্ড-ট্রিপের জন্য অপেক্ষা করতে হয় না
-  // 🎬 ক্লিক করার সাথে সাথে একটা ছোট্ট "পপ" অ্যানিমেশন — টাচ করলে যে প্রতিক্রিয়া হয়েছে সেটা চোখে বোঝা যায়
-  const __wrapEl = document.getElementById("headerShopOpenWrap");
-  __wrapEl.classList.remove("hbSwitchPop");
-  void __wrapEl.offsetWidth; // রি-ফ্লো — একই অ্যানিমেশন পরপর দুইবার ক্লিক করলেও যেন আবার চালু হয়
-  __wrapEl.classList.add("hbSwitchPop");
+  // 🎬 ক্লিক করার সাথে সাথে একটা ছোট্ট "পপ" অ্যানিমেশন (ফ্ল্যাশ অ্যানিমেশনের সাথে একসাথে চলে) —
+  // টাচ করলে যে প্রতিক্রিয়া হয়েছে সেটা চোখে বোঝা যায়
+  const __trackEl = document.getElementById("headerShopOpenToggle");
+  __trackEl.classList.remove("hbSwitchPop");
+  void __trackEl.offsetWidth; // রি-ফ্লো — একই অ্যানিমেশন পরপর দুইবার ক্লিক করলেও যেন আবার চালু হয়
+  __trackEl.classList.add("hbSwitchPop");
   try{
     await db.collection("shops").doc(session.shopId).set({ isShopOpen: newState }, { merge: true });
   }catch(e){
