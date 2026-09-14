@@ -955,8 +955,12 @@ exports.parseShoppingIntent = onCall({ secrets: [geminiApiKey] }, async (request
    (history) পাঠায় (Firestore-এ mouChats/{uid}/messages-এ সেভ থাকা), সেটা
    Gemini-এর multi-turn `contents` array-তে বসিয়ে দেওয়া হয় (persona/ফরম্যাট
    নিয়ম আলাদা systemInstruction-এ) — যাতে Gemini আগের কথা মনে রেখে উত্তর
-   দিতে পারে। history খালি থাকলে (নতুন কাস্টমার) আগের মতোই single-turn আচরণ। */
-async function mouGeminiReply(text, apiKey, history) {
+   দিতে পারে। history খালি থাকলে (নতুন কাস্টমার) আগের মতোই single-turn আচরণ।
+   🖼️ Development #5 — image (ঐচ্ছিক {mimeType, data(base64)}) দেওয়া থাকলে
+   চলতি টার্নের parts-এ inlineData হিসেবে যোগ হয় — gemini-3.1-flash-lite
+   মাল্টিমোডাল (ছবি+টেক্সট ইনপুট বুঝতে পারে), তাই আলাদা কোনো মডেল/এন্ডপয়েন্ট
+   লাগে না। */
+async function mouGeminiReply(text, apiKey, history, image) {
   const systemInstruction = `তুমি "মৌ" — Honey Bee Bazar-এর একটা বন্ধুত্বপূর্ণ, উষ্ণ মৌমাছি সহকারী।
 নিয়ম:
 - শুধু বাংলায় উত্তর দেবে, ছোট (১-২ বাক্য), আন্তরিক ও সহজ ভাষায়।
@@ -965,6 +969,8 @@ async function mouGeminiReply(text, apiKey, history) {
 - নিচে থাকলে আগের কথোপকথন খেয়াল রেখে উত্তর দেবে (যেমন গ্রাহক আগে নিজের নাম/
   পছন্দ বললে, সেটা মনে রেখে প্রাসঙ্গিকভাবে ব্যবহার করবে) — আগে কিছু জিজ্ঞেস
   করা না হলে নতুন প্রসঙ্গ ধরে নেবে না।
+- গ্রাহক ছবি পাঠালে সেটা মন দিয়ে দেখে সহজ, ছোট বাক্যে বলবে ছবিতে কী দেখছ —
+  তবে ছবিতে কোনো প্রোডাক্ট/দাম থাকলেও সেটার দাম/স্টক অনুমান করে বলবে না।
 - শুধু JSON রিটার্ন করবে, অন্য কোনো টেক্সট না।
 
 ফরম্যাট: {"reply": "তোমার উত্তর", "mood": "happy" অথবা "idle" অথবা "serious"}
@@ -974,11 +980,16 @@ async function mouGeminiReply(text, apiKey, history) {
 
   // 🧠 history-র প্রতিটা টার্ন Gemini-এর role-ভিত্তিক contents-এ বসানো হয়
   // (আমাদের "mou" role → Gemini-এর "model" role) — এরপর সবশেষে চলতি বার্তাটা
+  // (ছবি থাকলে সেটাও এই সবশেষ টার্নেই inlineData হিসেবে জোড়া হয়)
   const contents = (history || []).map((h) => ({
     role: h.role === "mou" ? "model" : "user",
     parts: [{ text: h.text }],
   }));
-  contents.push({ role: "user", parts: [{ text }] });
+  const currentParts = [{ text }];
+  if (image && image.mimeType && image.data) {
+    currentParts.push({ inlineData: { mimeType: image.mimeType, data: image.data } });
+  }
+  contents.push({ role: "user", parts: currentParts });
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
@@ -1041,6 +1052,24 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
     .slice(-12)
     .map((h) => ({ role: h.role, text: h.text.trim().slice(0, 500) }));
 
+  // 🖼️ Development #5 — image ঐচ্ছিক, ক্লায়েন্ট থেকে আসা তাই এখানেও অন্ধভাবে
+  // বিশ্বাস না করে shape/সাইজ/টাইপ যাচাই করা হচ্ছে। ক্লায়েন্ট WebP-এ
+  // কম্প্রেস করেই পাঠায় (~১৫০KB টার্গেট, ৩৫০KB হার্ড ক্যাপ) — base64
+  // এনকোডিং সাধারণত আসল সাইজের ~৪/৩ গুণ হয়, তাই এখানে ৬,00,000 ক্যারেক্টার
+  // (~৪৫০KB raw) ক্যাপ যথেষ্ট নিরাপদ মার্জিন রাখে অথচ অস্বাভাবিক বড় পেলোড আটকায়
+  const rawImage = request.data && request.data.image;
+  const MOU_ALLOWED_IMAGE_TYPES = ["image/webp", "image/jpeg", "image/png"];
+  let image = null;
+  if (rawImage && typeof rawImage.data === "string" && typeof rawImage.mimeType === "string") {
+    if (!MOU_ALLOWED_IMAGE_TYPES.includes(rawImage.mimeType)) {
+      throw new HttpsError("invalid-argument", "ছবির ফরম্যাট সমর্থিত না।");
+    }
+    if (rawImage.data.length > 600000) {
+      throw new HttpsError("invalid-argument", "ছবিটা অনেক বড় — একটু ছোট/সহজ ছবি চেষ্টা করুন।");
+    }
+    image = { mimeType: rawImage.mimeType, data: rawImage.data };
+  }
+
   const apiKey = geminiApiKey.value();
   if (!apiKey) {
     // 🛟 key সেট করা না থাকলেও ফাংশনটা crash না করে পরিষ্কার fallback দেয়
@@ -1049,8 +1078,10 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   }
 
   try {
-    const result = await mouGeminiReply(text.trim(), apiKey, history);
-    console.log(JSON.stringify({ event: "MOU_CHAT_REPLIED", uid: request.auth.uid, historyLen: history.length }));
+    const result = await mouGeminiReply(text.trim(), apiKey, history, image);
+    console.log(JSON.stringify({
+      event: "MOU_CHAT_REPLIED", uid: request.auth.uid, historyLen: history.length, hasImage: !!image,
+    }));
     return { reply: result.reply, mood: result.mood, engine: "gemini-3.1-flash-lite" };
   } catch (e) {
     console.warn(JSON.stringify({ event: "MOU_CHAT_FAILED", error: String(e && e.message || e) }));
