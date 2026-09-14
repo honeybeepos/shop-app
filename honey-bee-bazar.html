@@ -4171,15 +4171,41 @@ function requestGpsLocation(){
     renderMarkets(getFilteredMarkets());
     // 🏪 সবচেয়ে কাছের বাজারটা পেয়ে গেলে সেটার দোকানগুলোও সাথে সাথে (এই
     // পেজেই, আলাদা ট্যাপ ছাড়াই) লোড করে নিচে দেখানো শুরু হয়
-    const nearest = getNearestMarket();
-    if(nearest){
-      __nearbyMarketId = nearest.id;
-      $("nearbyMarketShopsHead").style.display = "block";
-      loadShops(nearest.id);
-    }
+    updateNearbyMarketShopsSection();
   }, ()=>{
     $("gpsStatusBanner").textContent = "";
+    // 📍 GPS পাওয়া না গেলেও (পারমিশন বন্ধ/সিগন্যাল নেই) নিচে তালিকার
+    // প্রথম বাজারের দোকান দেখানো হবে — ফিচারটা GPS ছাড়াও কাজ করবে
+    updateNearbyMarketShopsSection();
   }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+// 🏪 "এই বাজারের দোকানসমূহ" সেকশন — GPS দিয়ে আসল সবচেয়ে কাছের বাজার পাওয়া
+// গেলে সেটা দেখাবে; কিন্তু GPS না থাকলে, বা বাজারটার লোকেশন ডেটা
+// Firestore-এ সেট না থাকলে (দূরত্ব হিসাব করা সম্ভব না হলে), অথবা GPS-এর
+// কাছের বাজারটা বর্তমান জেলা/উপজেলা/সার্চ ফিল্টারের সাথে না মিললে —
+// তখন বর্তমান ফিল্টার অনুযায়ী তালিকার সবচেয়ে উপরের বাজারটার দোকান
+// দেখানো হয়, যাতে ফিচারটা সবসময় কিছু না কিছু দেখায়
+function updateNearbyMarketShopsSection(){
+  const filtered = getFilteredMarkets();
+  let target = getNearestMarket();
+  if(target && !filtered.some(m=> m.id === target.id)) target = null;
+  if(!target){
+    const sorted = sortMarketsByDistance(filtered);
+    target = sorted.length ? sorted[0] : null;
+  }
+  if(!target){
+    __nearbyMarketId = null;
+    $("nearbyMarketShopsHead").style.display = "none";
+    $("nearbyMarketShopsList").innerHTML = "";
+    return;
+  }
+  $("nearbyMarketShopsHead").textContent = `🏪 ${target.name || target.id} এর দোকানসমূহ`;
+  $("nearbyMarketShopsHead").style.display = "block";
+  if(__nearbyMarketId !== target.id){
+    __nearbyMarketId = target.id;
+    loadShops(target.id);
+  }
 }
 
 /* ---------- জেলা/উপজেলা ম্যানুয়াল ফিল্টার ---------- */
@@ -4206,8 +4232,12 @@ $("districtFilter").addEventListener("change", (e)=>{
       getUpazilasForDistrict(district).map(u=>`<option value="${u}">${u}</option>`).join("");
   }
   renderMarkets(getFilteredMarkets());
+  updateNearbyMarketShopsSection();
 });
-$("upazilaFilter").addEventListener("change", ()=> renderMarkets(getFilteredMarkets()));
+$("upazilaFilter").addEventListener("change", ()=>{
+  renderMarkets(getFilteredMarkets());
+  updateNearbyMarketShopsSection();
+});
 
 function getFilteredMarkets(){
   const district = $("districtFilter").value;
@@ -4240,11 +4270,30 @@ async function loadMarkets(){
     const qs = await db.collection("markets").orderBy("name").get();
     allMarkets = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
     renderMarkets(allMarkets);
+    updateNearbyMarketShopsSection();
     requestGpsLocation();
   }catch(e){
     console.error(e);
     $("marketsList").innerHTML = '<div class="emptyMsg">বাজারের তালিকা লোড করা যায়নি — ইন্টারনেট চেক করুন।</div>';
   }
+}
+
+// 📍 GPS থাকলে দূরত্ব অনুযায়ী সাজায় (লোকেশন-ডেটাহীন বাজারগুলো শেষে);
+// GPS না থাকলে তালিকা যেভাবে আছে সেভাবেই রাখে — renderMarkets() এবং
+// updateNearbyMarketShopsSection() দুই জায়গাতেই একই হিসাব ব্যবহারের জন্য
+function sortMarketsByDistance(list){
+  if(!userLatLng) return list;
+  return list.map(m=>{
+    const dist = (m.location && m.location.lat != null)
+      ? haversineKm(userLatLng[0], userLatLng[1], m.location.lat, m.location.lng)
+      : null;
+    return { ...m, __dist: dist };
+  }).sort((a,b)=>{
+    if(a.__dist == null && b.__dist == null) return 0;
+    if(a.__dist == null) return 1;
+    if(b.__dist == null) return -1;
+    return a.__dist - b.__dist;
+  });
 }
 
 function renderMarkets(list){
@@ -4253,20 +4302,7 @@ function renderMarkets(list){
     return;
   }
 
-  let sorted = list;
-  if(userLatLng){
-    sorted = list.map(m=>{
-      const dist = (m.location && m.location.lat != null)
-        ? haversineKm(userLatLng[0], userLatLng[1], m.location.lat, m.location.lng)
-        : null;
-      return { ...m, __dist: dist };
-    }).sort((a,b)=>{
-      if(a.__dist == null && b.__dist == null) return 0;
-      if(a.__dist == null) return 1;
-      if(b.__dist == null) return -1;
-      return a.__dist - b.__dist;
-    });
-  }
+  const sorted = sortMarketsByDistance(list);
 
   $("marketsList").innerHTML = sorted.map(m => `
     <div class="card marketItem" onclick="selectMarket('${m.id}')">
@@ -4281,6 +4317,7 @@ function renderMarkets(list){
 
 $("marketSearch").addEventListener("input", ()=>{
   renderMarkets(getFilteredMarkets());
+  updateNearbyMarketShopsSection();
 });
 
 window.selectMarket = function(marketId){
