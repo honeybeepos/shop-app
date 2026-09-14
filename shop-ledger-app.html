@@ -4568,7 +4568,35 @@ document.getElementById('shopSettingsModalOverlay').addEventListener('click', (e
   }
 });
 
-document.getElementById('logoWrap').addEventListener('click', ()=> logoInputEl.click());
+// 🐞 বাগ-ফিক্স: আগে সাধারণ ক্লিকেই গ্যালারি খুলে যেত, তাই ভুলবশত (এই আইকনের
+// আশেপাশেই প্রিন্টার/ট্যাগ আইকন ও শপ-খোলা/বন্ধ সুইচ থাকায়) ট্যাপ পড়ে গিয়ে
+// দোকানের ছবি বদলে যাওয়ার ঝুঁকি ছিল। এখন একটু চেপে ধরে (হোল্ড করে) রাখলেই
+// গ্যালারি খুলবে — শুধু ছোঁয়া/ক্লিক করলে কিছু হবে না।
+(function(){
+  const wrap = document.getElementById('logoWrap');
+  if(!wrap) return;
+  const HOLD_MS = 450;
+  let holdTimer = null;
+  let holdTriggered = false;
+  function startHold(){
+    holdTriggered = false;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(()=>{
+      holdTriggered = true;
+      logoInputEl.click();
+    }, HOLD_MS);
+  }
+  function cancelHold(){
+    clearTimeout(holdTimer);
+  }
+  wrap.addEventListener('touchstart', startHold, {passive:true});
+  wrap.addEventListener('touchend', cancelHold);
+  wrap.addEventListener('touchmove', cancelHold);
+  wrap.addEventListener('touchcancel', cancelHold);
+  wrap.addEventListener('mousedown', startHold);
+  wrap.addEventListener('mouseup', cancelHold);
+  wrap.addEventListener('mouseleave', cancelHold);
+})();
 
 // ---------------- সিক্রেট ফ্যাক্টরি রিসেট (লুকানো) ----------------
 // দোকানের লোগোর জায়গায় দ্রুত ৭ বার ট্যাপ করলে এই লুকানো অপশনটা খুলবে —
@@ -4645,25 +4673,33 @@ logoInputEl.addEventListener('change', async (e)=>{
   shopLogoEl.src = processed.dataUrl;
   shopLogoEl.style.display = 'block';
   logoPlaceholderEl.style.display = 'none';
-  toast('আপলোড হচ্ছে...');
 
+  // 📝 বাগ-ফিক্স: আগে বিবরণ লেখার অপশনটা ক্লাউডে ছবি আপলোড *সফল* হলেই তবেই
+  // আসত — তাই ছবি আপলোড ব্যর্থ হলে (Storage Rules বা নেট সমস্যায়) দোকানদার
+  // কখনোই বিবরণ লেখার সুযোগ পেতেন না। এখন ছবি লোকালি প্রসেস হওয়ার সাথে সাথেই
+  // বিবরণ চাওয়া হয় — এটা শুধু একটা টেক্সট ফিল্ড, shops কালেকশনে লেখার
+  // অনুমতি (Firestore rules) আগে থেকেই আছে, Storage Rules-এর উপর নির্ভর করে না।
+  setTimeout(()=>{
+    const desc = prompt('দোকানের ছবির একটা সংক্ষিপ্ত বর্ণনা দিন (ঐচ্ছিক, খালি রাখলে বাদ যাবে):', window.__hbShopLogoDescription || '');
+    if(desc !== null && desc.trim() !== ''){
+      db.collection('shops').doc(session.shopId).set({ logoDescription: desc.trim() }, { merge: true })
+        .then(()=>{ window.__hbShopLogoDescription = desc.trim(); toast('বর্ণনা সেভ হয়েছে'); })
+        .catch((e2)=> console.warn('logoDescription সেভ ব্যর্থ:', e2));
+    }
+  }, 300);
+
+  toast('আপলোড হচ্ছে...');
   try{
     const logoUrl = await hbUploadShopLogo(processed.blob, session.shopId);
     await db.collection('shops').doc(session.shopId).set({ logoUrl }, { merge: true });
     toast('✅ দোকানের ছবি বাজারে সেভ হয়েছে');
-
-    // 📝 ছবি আপলোডের পর একটা সংক্ষিপ্ত বর্ণনা/ক্যাপশন দেওয়ার সুযোগ — সম্পূর্ণ ঐচ্ছিক
-    setTimeout(()=>{
-      const desc = prompt('দোকানের ছবির একটা সংক্ষিপ্ত বর্ণনা দিন (ঐচ্ছিক, খালি রাখলে বাদ যাবে):', window.__hbShopLogoDescription || '');
-      if(desc !== null && desc.trim() !== ''){
-        db.collection('shops').doc(session.shopId).set({ logoDescription: desc.trim() }, { merge: true })
-          .then(()=>{ window.__hbShopLogoDescription = desc.trim(); toast('বর্ণনা সেভ হয়েছে'); })
-          .catch((e2)=> console.warn('logoDescription সেভ ব্যর্থ:', e2));
-      }
-    }, 300);
   }catch(err){
     console.error('Shop logo cloud upload failed:', err);
-    alert('⚠️ ছবিটা এই ডিভাইসে দেখা যাচ্ছে ঠিকই, কিন্তু বাজারে (ক্লাউডে) আপলোড করা যায়নি — ইন্টারনেট চেক করে আবার চেষ্টা করুন।');
+    if(err && err.code === 'storage/unauthorized'){
+      alert('⚠️ ছবিটা বাজারে (ক্লাউডে) আপলোড করা যায়নি — অনুমতি (Storage Rules) ঠিকমতো Publish করা নেই। Firebase Console → Storage → Rules ট্যাবে গিয়ে rules-টা আবার Publish করে তারপর একবার লগ-আউট করে আবার লগইন করে ছবি আপলোড করুন।');
+    }else{
+      alert('⚠️ ছবিটা এই ডিভাইসে দেখা যাচ্ছে ঠিকই, কিন্তু বাজারে (ক্লাউডে) আপলোড করা যায়নি — ইন্টারনেট চেক করে আবার চেষ্টা করুন।');
+    }
   }
   logoInputEl.value = '';
 });
