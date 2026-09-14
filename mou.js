@@ -1,7 +1,12 @@
-/* ==================== 🐝 মৌ — Interaction Logic (Development #3) ====================
-   ⚠️ এখন text↔Gemini + real Voice (mic-এ বলা, কণ্ঠে শোনা) — Camera/Memory
-   এখনো নেই। কোনো conversation history/memory পাঠানো হয় না, প্রতিটা বার্তা
-   স্বতন্ত্রভাবে Cloud Function-এ যায়। */
+/* ==================== 🐝 মৌ — Interaction Logic (Development #4) ====================
+   ⚠️ text↔Gemini + real Voice (mic-এ বলা, কণ্ঠে শোনা) + আগের কথোপকথন মনে রাখা
+   (Firestore মেমোরি) — Camera এখনো নেই।
+   মেমোরি কীভাবে কাজ করে: প্রতিটা মেসেজ (কাস্টমারের + মৌ-এর জবাব) Firestore-এ
+   mouChats/{uid}/messages সাব-কালেকশনে সেভ হয় (uid — লগইন করা থাকলে আসল uid,
+   না করলে anonymous session-এর uid, যেটা ব্রাউজারে persist থাকে)। পেজ খোলার
+   সাথে সাথে শেষ কিছু মেসেজ লোড করে চ্যাট বক্সে দেখানো হয়, আর প্রতিটা নতুন
+   মেসেজ পাঠানোর সময় সাম্প্রতিক কয়েকটা মেসেজ (history) Cloud Function-এ পাঠানো
+   হয় যাতে Gemini আগের কথা মনে রেখে উত্তর দিতে পারে। */
 
 // 🔗 Firebase init — honey-bee-bazar.html-এর ঠিক একই কনফিগ (নতুন প্রজেক্ট না)
 const firebaseConfig = {
@@ -15,6 +20,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const mouAuth = firebase.auth();
 const mouFunctions = firebase.functions();
+const mouDb = firebase.firestore();
 
 const mouScreen = document.getElementById("mouScreen");
 const mouStateChip = document.getElementById("mouStateChip");
@@ -30,17 +36,60 @@ const mouDemoRow = document.getElementById("mouDemoRow");
 
 let mouReturnTimer = null;
 let mouAuthReady = false;
+let mouUid = null;
+
+// 🧠 চলতি সেশনে এখন পর্যন্ত যা কথা হয়েছে (RAM-এ, Gemini-কে পাঠানোর জন্য) —
+// প্রতিটা আইটেম {role:'user'|'mou', text}। পেজ লোড হওয়ার সময় Firestore থেকে
+// আগের কথোপকথনও এখানে লোড করে বসানো হয়, যাতে পুরনো সেশনের প্রসঙ্গও মনে থাকে।
+let mouHistory = [];
+const MOU_HISTORY_LOAD_LIMIT = 20; // পেজ খোলার সময় Firestore থেকে এত মেসেজ পর্যন্ত লোড হবে
+const MOU_HISTORY_SEND_LIMIT = 12; // প্রতিবার Gemini-কে এর বেশি পুরনো মেসেজ পাঠানো হয় না (খরচ/সাইজ নিয়ন্ত্রণে)
 
 // 🔐 Login না করা visitor-ও মৌ-এর সাথে কথা বলতে পারবেন — কিন্তু Cloud
 // Function-টা যেন সম্পূর্ণ open/anonymous script দিয়ে সরাসরি কল করা না
 // যায়, তার জন্য অন্তত একটা anonymous Firebase session লাগবে। এটা কোনো
-// login-wall না — customer কিছুই টের পান না, ব্যাকগ্রাউন্ডে হয়ে যায়।
+// login-wall না — customer কিছুই টের পান না, ব্যাকগ্রাউন্ডে হয়ে যায়। এই একই
+// uid (anonymous হলেও) দিয়েই Firestore-এ মেমোরি সেভ/লোড হয় — অর্থাৎ একই
+// ব্রাউজারে ফিরে এলে মৌ আগের কথা মনে রাখবে, ব্রাউজার/ডিভাইস পাল্টালে না।
 mouAuth.onAuthStateChanged((user)=>{
-  if(user){ mouAuthReady = true; return; }
-  mouAuth.signInAnonymously().then(()=>{ mouAuthReady = true; }).catch((e)=>{
+  if(user){ mouAuthReady = true; mouUid = user.uid; mouLoadHistory(); return; }
+  mouAuth.signInAnonymously().then((cred)=>{
+    mouAuthReady = true;
+    mouUid = cred.user.uid;
+    mouLoadHistory();
+  }).catch((e)=>{
     console.warn("মৌ-এর anonymous session তৈরি ব্যর্থ:", e);
   });
 });
+
+// 📖 পেজ খোলার সাথে সাথে Firestore থেকে শেষ কিছু মেসেজ লোড করে চ্যাট বক্সে
+// দেখানো — থাকলে ডিফল্ট "হ্যালো" বাবলটা সরিয়ে আসল ইতিহাস দেখানো হয়, একদম
+// নতুন কাস্টমার হলে (কোনো ইতিহাস নেই) ডিফল্ট গ্রিটিংটাই থেকে যায়।
+function mouLoadHistory(){
+  mouDb.collection("mouChats").doc(mouUid).collection("messages")
+    .orderBy("createdAt", "desc").limit(MOU_HISTORY_LOAD_LIMIT).get()
+    .then((qs)=>{
+      if(qs.empty) return;
+      const msgs = qs.docs.map(d=> d.data()).reverse();
+      mouChatArea.innerHTML = ""; // ডিফল্ট গ্রিটিং বাবল সরানো হলো
+      msgs.forEach((m)=>{
+        if(m && typeof m.text === "string" && m.text.trim()){
+          mouAppendBubble(m.role === "user" ? "user" : "mou", m.text);
+          mouHistory.push({ role: m.role === "user" ? "user" : "mou", text: m.text });
+        }
+      });
+    })
+    .catch((e)=> console.warn("মৌ-এর পুরনো কথোপকথন লোড করা যায়নি:", e));
+}
+
+// 💾 একটা মেসেজ (কাস্টমারের বা মৌ-এর) Firestore-এ সেভ করা — ব্যর্থ হলেও চ্যাট
+// থেমে যাবে না (মেমোরি সেভ ব্যর্থ হলে শুধু সেবার মনে রাখা যাবে না, বাকি সব চলবে)
+function mouSaveMessage(role, text){
+  if(!mouUid) return;
+  mouDb.collection("mouChats").doc(mouUid).collection("messages").add({
+    role, text, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch((e)=> console.warn("মৌ-এর মেসেজ সেভ ব্যর্থ:", e));
+}
 
 // 🎭 মূল state-পরিবর্তন ফাংশন — MOU_STATES (mou-state.js) থেকে ভ্রু/মুখ/চিপ বসায়
 function mouSetState(stateName){
@@ -152,6 +201,13 @@ async function mouHandleSend(text){
   mouAppendBubble("user", text);
   mouTextInput.value = "";
 
+  // 🧠 মেমোরি — এই মেসেজটা পাঠানোর আগেই history-তে আর Firestore-এ যোগ করা
+  // হচ্ছে (রেফারেন্সের জন্য কপি), আর Gemini-কে পাঠানোর জন্য সাম্প্রতিক কয়েকটা
+  // মেসেজ (এই নতুনটা বাদে, কারণ সেটা আলাদাভাবে `text`-এ যাচ্ছে) কেটে নেওয়া হয়
+  const historyForGemini = mouHistory.slice(-MOU_HISTORY_SEND_LIMIT);
+  mouHistory.push({ role: "user", text });
+  mouSaveMessage("user", text);
+
   // 🎧 পাঠানোর মুহূর্তে সংক্ষিপ্ত "শুনছি" expression
   mouSetState("listening");
   await mouWaitForAuth(4000);
@@ -159,12 +215,14 @@ async function mouHandleSend(text){
 
   try{
     const callMouChat = mouFunctions.httpsCallable("mouChat");
-    const result = await callMouChat({ text });
+    const result = await callMouChat({ text, history: historyForGemini });
     thinkingBubble.remove();
     const reply = (result.data && result.data.reply) || "দুঃখিত বন্ধু, আবার বলবেন? 🐝";
     const mood = (result.data && result.data.mood) || "idle";
     mouAppendBubble("mou", reply);
     mouSetState(mood);
+    mouHistory.push({ role: "mou", text: reply });
+    mouSaveMessage("mou", reply);
     // 🔊 Development #3 — মৌ এখন সত্যিকারের কণ্ঠে জবাব দেয় (টাইপ করে বললেও,
     // ভয়েসে বললেও) — টেক্সট বাবল সবসময়ই থাকে, voice শুধু বাড়তি
     mouSpeak(reply);
@@ -176,6 +234,8 @@ async function mouHandleSend(text){
     mouAppendBubble("mou", failReply);
     mouSetState("idle");
     mouSpeak(failReply);
+    // ⚠️ ব্যর্থতার বার্তাটা ইচ্ছাকৃতভাবে মেমোরিতে/Firestore-এ সেভ করা হচ্ছে না —
+    // এটা আসল কথোপকথনের অংশ না, পরের বার আবার জিজ্ঞেস করলে গুলিয়ে যাবে না
   }
 
   if(mouReturnTimer) clearTimeout(mouReturnTimer);

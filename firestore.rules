@@ -386,6 +386,25 @@ service cloud.firestore {
       }
     }
 
+    // 🐝🧠 মৌ-এর কথোপকথনের মেমোরি (Development #4) — প্রতিটা মেসেজ (কাস্টমারের
+    // + মৌ-এর জবাব) এখানে সেভ থাকে যাতে পরের বার এলে মৌ আগের কথা মনে রাখতে
+    // পারে। uid এখানে লগইন-করা কাস্টমারের আসল uid বা anonymous session-এর
+    // uid হতে পারে — দুটোই isSignedIn()-এ পাস করে (anonymous-ও request.auth
+    // সেট করে), তাই আলাদা কোনো শর্ত লাগে না। শুধু মালিক নিজেই নিজের চ্যাট
+    // ইতিহাস পড়তে/লিখতে পারবেন, edit/delete একদম বন্ধ (immutable log, বাকি
+    // চ্যাট-লগ/কমেন্টের প্যাটার্নের মতোই)।
+    match /mouChats/{uid} {
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && request.auth.uid == uid;
+        allow create: if isSignedIn() && request.auth.uid == uid
+          && request.resource.data.role in ['user', 'mou']
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow update, delete: if false;
+      }
+    }
+
     match /wallets/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin() || isAgent());
       allow write: if isSignedIn();
