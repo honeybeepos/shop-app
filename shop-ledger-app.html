@@ -17230,14 +17230,26 @@ function rmStartBazarDeliveryListener(riderUid){
         card.style.display = "none";
       }else{
         card.style.display = "block";
-        listEl.innerHTML = orders.map(o=> `
+        listEl.innerHTML = orders.map(o=>{
+          // 📏 রাইডারের নিজের লাইভ GPS (__rmMyLatLng, প্রতি GPS ফিক্সে আপডেট হয়) থাকলে
+          // কাস্টমারের ঠিকানার দূরত্ব + আনুমানিক সময় এখানেও দেখানো হচ্ছে (dmHaversineKm
+          // ফাংশনটা এই ফাইলেই আগে থেকে আছে, শপ↔রাইডার দূরত্বের জন্য ব্যবহার হতো)
+          let distBadge = '';
+          if(__rmMyLatLng && o.deliveryLat != null){
+            const km = dmHaversineKm(__rmMyLatLng[0], __rmMyLatLng[1], o.deliveryLat, o.deliveryLng);
+            const distTxt = km < 1 ? Math.round(km * 1000) + ' মিটার' : km.toFixed(1) + ' কিমি';
+            const mins = Math.max(1, Math.round((km / 22) * 60));
+            distBadge = `<div style="font-size:11.5px; color:#FFC107; margin-top:4px; font-weight:700;">📏 আপনার থেকে ${distTxt} দূরে (আনুমানিক ${mins} মিনিট)</div>`;
+          }
+          return `
           <div style="background:#212121; border-radius:12px; padding:12px; margin-bottom:10px;">
             <div style="font-weight:800; font-size:13px;">${escapeAttr(o.productName||'প্রোডাক্ট')}</div>
-            <div style="font-size:11.5px; color:#a8a8a8; margin-top:3px;">পরিমাণ: ${o.qty||1}</div>
-            ${o.deliveryAddress ? `<div style="font-size:12px; color:#fff; margin-top:6px;">📍 ${escapeAttr(o.deliveryAddress)}</div>${o.deliveryLat!=null ? `<a href="https://www.google.com/maps/search/?api=1&query=${o.deliveryLat},${o.deliveryLng}" target="_blank" style="display:inline-block; font-size:12px; color:#0ea5e9; margin-top:4px; text-decoration:none;">🗺️ ম্যাপে দেখুন (নেভিগেশন)</a>` : ''}` : '<div style="font-size:11px; color:#f87171; margin-top:6px;">⚠️ কাস্টমার কোনো ঠিকানা দেননি</div>'}
+            <div style="font-size:11.5px; color:#a8a8a8; margin-top:3px;">👤 ${escapeAttr(o.customerName||'কাস্টমার')} · পরিমাণ: ${o.qty||1}</div>
+            ${o.deliveryAddress ? `<div style="font-size:12px; color:#fff; margin-top:6px;">📍 ${escapeAttr(o.deliveryAddress)}</div>${o.deliveryLat!=null ? `<a href="https://www.google.com/maps/search/?api=1&query=${o.deliveryLat},${o.deliveryLng}" target="_blank" style="display:inline-block; font-size:12px; color:#0ea5e9; margin-top:4px; text-decoration:none;">🗺️ ম্যাপে দেখুন (নেভিগেশন)</a>` : ''}${distBadge}` : '<div style="font-size:11px; color:#f87171; margin-top:6px;">⚠️ কাস্টমার কোনো ঠিকানা দেননি</div>'}
             ${o.deliveryPhone ? `<a href="tel:${escapeAttr(o.deliveryPhone)}" style="display:inline-block; font-size:12px; color:#FFC107; margin-top:4px; text-decoration:none;">📞 ${escapeAttr(o.deliveryPhone)}</a>` : ''}
             <button class="rmBazarDeliveredBtn" data-oid="${o.id}" style="width:100%; margin-top:10px; padding:10px; border:none; border-radius:9px; background:#2fbf71; color:#0a2416; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;"><span class="rmHoldFill"></span><span class="rmHoldLabel">✅ ৩ সেকেন্ড চেপে ধরুন — ডেলিভারি সম্পন্ন</span></button>
-          </div>`).join("");
+          </div>`;
+        }).join("");
         listEl.querySelectorAll(".rmBazarDeliveredBtn").forEach(btn=>{
           rmSetupHoldToConfirm(btn, 3000, async ()=>{
             await db.collection("orderRequests").doc(btn.dataset.oid).update({
