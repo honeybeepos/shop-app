@@ -1,12 +1,16 @@
-/* ==================== 🐝 মৌ — Interaction Logic (Development #4) ====================
+/* ==================== 🐝 মৌ — Interaction Logic (Development #5) ====================
    ⚠️ text↔Gemini + real Voice (mic-এ বলা, কণ্ঠে শোনা) + আগের কথোপকথন মনে রাখা
-   (Firestore মেমোরি) — Camera এখনো নেই।
+   (Firestore মেমোরি) + ক্যামেরা (ছবি দেখিয়ে Gemini Vision দিয়ে জিজ্ঞেস করা)।
    মেমোরি কীভাবে কাজ করে: প্রতিটা মেসেজ (কাস্টমারের + মৌ-এর জবাব) Firestore-এ
    mouChats/{uid}/messages সাব-কালেকশনে সেভ হয় (uid — লগইন করা থাকলে আসল uid,
    না করলে anonymous session-এর uid, যেটা ব্রাউজারে persist থাকে)। পেজ খোলার
    সাথে সাথে শেষ কিছু মেসেজ লোড করে চ্যাট বক্সে দেখানো হয়, আর প্রতিটা নতুন
    মেসেজ পাঠানোর সময় সাম্প্রতিক কয়েকটা মেসেজ (history) Cloud Function-এ পাঠানো
-   হয় যাতে Gemini আগের কথা মনে রেখে উত্তর দিতে পারে। */
+   হয় যাতে Gemini আগের কথা মনে রেখে উত্তর দিতে পারে।
+   ক্যামেরা কীভাবে কাজ করে: ছবিটা ব্রাউজারেই ছোট/কম্প্রেস (WebP) করে নেওয়া হয়,
+   তারপর base64 হিসেবে Cloud Function-এ পাঠানো হয় (Gemini-এর inlineData
+   ফরম্যাটে)। মেমোরিতে/Firestore-এ ছবির বাইট রাখা হয় না (খরচ/সাইজ বাঁচাতে) —
+   শুধু "একটা ছবি পাঠিয়েছে" মার্কার + মৌ-এর নিজের জবাব সেভ থাকে। */
 
 // 🔗 Firebase init — honey-bee-bazar.html-এর ঠিক একই কনফিগ (নতুন প্রজেক্ট না)
 const firebaseConfig = {
@@ -33,6 +37,8 @@ const mouSendBtn = document.getElementById("mouSendBtn");
 const mouMicBtn = document.getElementById("mouMicBtn");
 const mouMicToast = document.getElementById("mouMicToast");
 const mouDemoRow = document.getElementById("mouDemoRow");
+const mouCameraBtn = document.getElementById("mouCameraBtn");
+const mouCameraInput = document.getElementById("mouCameraInput");
 
 let mouReturnTimer = null;
 let mouAuthReady = false;
@@ -134,6 +140,100 @@ function mouShowThinking(){
   return bubble;
 }
 
+// 🖼️ ছবির বাবল — user/mou দুই পক্ষই ছবি দেখাতে পারবে (এখন শুধু user, ভবিষ্যতে
+// মৌ নিজে ছবি পাঠালেও এটাই ব্যবহার হবে)। ক্যাপশন ঐচ্ছিক।
+function mouAppendImageBubble(role, dataUrl, captionText){
+  const bubble = document.createElement("div");
+  bubble.className = `mouBubble ${role === "user" ? "user" : "mou"}`;
+  const img = document.createElement("img");
+  img.src = dataUrl;
+  img.alt = "";
+  img.className = "mouBubbleImg";
+  bubble.appendChild(img);
+  if(captionText && captionText.trim()){
+    const cap = document.createElement("div");
+    cap.textContent = captionText.trim();
+    bubble.appendChild(cap);
+  }
+  mouChatArea.appendChild(bubble);
+  mouChatArea.scrollTop = mouChatArea.scrollHeight;
+  return bubble;
+}
+
+/* ==================== 📷 ক্যামেরা — Development #5 ====================
+   shop-ledger-app.html-এর hbProcessShopLogoImage()-এর একই ধাঁচ (resize →
+   WebP কম্প্রেস, টার্গেট সাইজ না মিললে ধাপে ধাপে ছোট করা) — চ্যাটে পাঠানো
+   ছবির জন্য একটু বড় target রাখা হয়েছে (দোকানের লোগো আইকনের চেয়ে বেশি ডিটেইল
+   লাগে, যেমন খাবার/জিনিস চেনার জন্য)। */
+const MOU_IMG_MAX_DIM = 640;
+const MOU_IMG_MIN_DIM = 240;
+const MOU_IMG_TARGET_BYTES = 150 * 1024;
+const MOU_IMG_MAX_BYTES = 350 * 1024;
+const MOU_IMG_QUALITY_FLOOR = 0.4;
+
+function mouLoadImageFromFile(file){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = ()=>{ URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error("ছবি লোড করা যায়নি")); };
+    img.src = url;
+  });
+}
+function mouDrawResizedCanvas(img, width, height){
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, width, height);
+  return canvas;
+}
+function mouCanvasToWebpBlob(canvas, quality){
+  return new Promise((resolve)=> canvas.toBlob((blob)=> resolve(blob), "image/webp", quality));
+}
+
+async function mouProcessCameraImage(file){
+  if(!file || !file.type || !file.type.startsWith("image/")){
+    throw new Error("শুধু ছবি ফাইল সমর্থিত (JPEG/PNG/WebP)");
+  }
+  const img = await mouLoadImageFromFile(file);
+  let width = img.naturalWidth || img.width;
+  let height = img.naturalHeight || img.height;
+  if(width > MOU_IMG_MAX_DIM || height > MOU_IMG_MAX_DIM){
+    const scale = MOU_IMG_MAX_DIM / Math.max(width, height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  let canvas = mouDrawResizedCanvas(img, width, height);
+
+  const qualitySteps = [0.8, 0.65, 0.5, MOU_IMG_QUALITY_FLOOR];
+  let blob = null;
+  for(const q of qualitySteps){
+    blob = await mouCanvasToWebpBlob(canvas, q);
+    if(blob && blob.size <= MOU_IMG_TARGET_BYTES) break;
+  }
+  let attempts = 0;
+  while(blob && blob.size > MOU_IMG_TARGET_BYTES && attempts < 3 && width > MOU_IMG_MIN_DIM){
+    width = Math.max(MOU_IMG_MIN_DIM, Math.round(width * 0.8));
+    height = Math.max(MOU_IMG_MIN_DIM, Math.round(height * 0.8));
+    canvas = mouDrawResizedCanvas(img, width, height);
+    blob = await mouCanvasToWebpBlob(canvas, MOU_IMG_QUALITY_FLOOR);
+    attempts++;
+  }
+  if(!blob) throw new Error("ছবি প্রসেস করা যায়নি");
+  if(blob.size > MOU_IMG_MAX_BYTES){
+    throw new Error("ছবিটা অনেক জটিল — একটু সহজ/অন্য একটা ছবি চেষ্টা করুন।");
+  }
+
+  const dataUrl = await new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+  const base64 = dataUrl.split(",")[1];
+  return { dataUrl, base64, mimeType: "image/webp" };
+}
+
 // একবার Firebase Auth রেডি না হলে সর্বোচ্চ কয়েক সেকেন্ড অপেক্ষা করা (পেজ
 // খোলার সাথে সাথেই কেউ টাইপ করে ফেললে যাতে ব্যর্থ না হয়)
 function mouWaitForAuth(timeoutMs){
@@ -193,20 +293,26 @@ function mouShowMicToast(text){
   setTimeout(()=> mouMicToast.classList.remove("show"), 2200);
 }
 
-// 📝 text প্যারামিটার এখন বাধ্যতামূলক — টাইপ করে পাঠানো ও ভয়েসে বলা, দুটো
-// পথই একই ফাংশনে মিশে যায়, ইনপুট বক্স থেকে নিজে নিজে পড়ে না
-async function mouHandleSend(text){
-  if(!text || !text.trim()) return;
-  text = text.trim();
-  mouAppendBubble("user", text);
+// 📝 text/image — টাইপ করে পাঠানো, ভয়েসে বলা, আর ছবি পাঠানো — সবই এই একই
+// ফাংশনে মিশে যায়। image দেওয়া থাকলে {dataUrl, base64, mimeType} (ছবি ছাড়া
+// শুধু text পাঠালে আগের মতোই আচরণ)।
+async function mouHandleSend(text, image){
+  text = (text || "").trim();
+  if(!text && !image) return;
+
+  if(image){ mouAppendImageBubble("user", image.dataUrl, text); }
+  else { mouAppendBubble("user", text); }
   mouTextInput.value = "";
 
   // 🧠 মেমোরি — এই মেসেজটা পাঠানোর আগেই history-তে আর Firestore-এ যোগ করা
   // হচ্ছে (রেফারেন্সের জন্য কপি), আর Gemini-কে পাঠানোর জন্য সাম্প্রতিক কয়েকটা
-  // মেসেজ (এই নতুনটা বাদে, কারণ সেটা আলাদাভাবে `text`-এ যাচ্ছে) কেটে নেওয়া হয়
+  // মেসেজ (এই নতুনটা বাদে, কারণ সেটা আলাদাভাবে `text`-এ যাচ্ছে) কেটে নেওয়া হয়।
+  // ছবি হলে মেমোরিতে/Firestore-এ আসল ছবি রাখা হয় না — শুধু একটা সংক্ষিপ্ত
+  // মার্কার (ভবিষ্যতে ছবির বিষয়টা মৌ-এর নিজের জবাব থেকেই বোঝা যাবে)
   const historyForGemini = mouHistory.slice(-MOU_HISTORY_SEND_LIMIT);
-  mouHistory.push({ role: "user", text });
-  mouSaveMessage("user", text);
+  const historyText = image ? (text ? `[একটা ছবি পাঠিয়েছে] ${text}` : "[একটা ছবি পাঠিয়েছে]") : text;
+  mouHistory.push({ role: "user", text: historyText });
+  mouSaveMessage("user", historyText);
 
   // 🎧 পাঠানোর মুহূর্তে সংক্ষিপ্ত "শুনছি" expression
   mouSetState("listening");
@@ -215,7 +321,9 @@ async function mouHandleSend(text){
 
   try{
     const callMouChat = mouFunctions.httpsCallable("mouChat");
-    const result = await callMouChat({ text, history: historyForGemini });
+    const payload = { text: text || "এই ছবিতে কী দেখছ, বলো তো!", history: historyForGemini };
+    if(image){ payload.image = { mimeType: image.mimeType, data: image.base64 }; }
+    const result = await callMouChat(payload);
     thinkingBubble.remove();
     const reply = (result.data && result.data.reply) || "দুঃখিত বন্ধু, আবার বলবেন? 🐝";
     const mood = (result.data && result.data.mood) || "idle";
@@ -244,6 +352,25 @@ async function mouHandleSend(text){
 
 mouSendBtn.addEventListener("click", ()=> mouHandleSend(mouTextInput.value));
 mouTextInput.addEventListener("keydown", (e)=>{ if(e.key === "Enter") mouHandleSend(mouTextInput.value); });
+
+// 📷 ক্যামেরা বাটন — ট্যাপ করলে ছবি তোলা/গ্যালারি থেকে বেছে নেওয়ার অপশন আসবে
+// (capture="environment" মোবাইলে সরাসরি ক্যামেরা খুলবে, কম্পিউটারে ফাইল
+// পিকার আসবে)। ছবি বেছে নেওয়ার সময় ইনপুট বক্সে যা লেখা ছিল সেটাই ক্যাপশন
+// হিসেবে চলে যাবে (খালি রাখলে ডিফল্ট প্রশ্ন পাঠানো হয়)।
+mouCameraBtn.addEventListener("click", ()=> mouCameraInput.click());
+mouCameraInput.addEventListener("change", async (e)=>{
+  const file = e.target.files && e.target.files[0];
+  e.target.value = ""; // পরের বার আবার একই ফাইল বেছে নিলেও change ইভেন্ট আসবে
+  if(!file) return;
+  let processed;
+  try{
+    processed = await mouProcessCameraImage(file);
+  }catch(err){
+    alert("⚠️ " + (err.message || "ছবি প্রসেস করা যায়নি"));
+    return;
+  }
+  await mouHandleSend(mouTextInput.value, processed);
+});
 
 /* ==================== 🎙️ Voice Input — Development #3 ====================
    ব্রাউজার-নেটিভ SpeechRecognition — honey-bee-bazar.html-এর hbInitVoiceInput()-এর
