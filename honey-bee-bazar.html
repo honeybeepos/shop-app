@@ -42,19 +42,47 @@
   }
   @keyframes slideInText{ from{ transform:translateX(-20px); opacity:0; } to{ transform:translateX(0); opacity:1; } }
 
-  /* ---------- হোমস্ক্রিন সার্ভিস কার্ড গ্রিড ---------- */
+  /* ---------- সার্ভিস কার্ড গ্রিড — এই ক্লাসটা হোমস্ক্রিনের ৬টা কার্ড ছাড়াও
+     ক্যাটাগরি/ব্লাডব্যাংক/মেডিকেল ইকুইপমেন্ট গ্রিডেও শেয়ার হয়, তাই ডিফল্ট ৩ কলামই
+     থাকছে — শুধু হোমস্ক্রিনের গ্রিডে (নিচে .homeSvcGrid) ২ কলামে (উপরে দুইটা,
+     নিচে দুইটা, তার নিচে আরো দুইটা — মোট ৩ সারি) বড় ফ্রেম দেখানো হবে ---------- */
   .serviceCardGrid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:20px; }
+  .serviceCardGrid.homeSvcGrid{ grid-template-columns:1fr 1fr; gap:14px; }
   .serviceCard{
     position:relative; background:var(--card); border:1px solid var(--border); border-radius:16px;
-    padding:18px 8px; text-align:center; cursor:pointer; transition:.15s;
+    padding:22px 8px 16px; text-align:center; cursor:pointer; transition:.15s;
   }
   .serviceCard:active{ transform:scale(0.96); }
   .serviceCard .ic{ font-size:32px; margin-bottom:6px; }
 
-  /* 🐝 নতুন মাসকট আর্টওয়ার্ক — Transport/Worker Hire/House Rent/আপনার পছন্দের বাজারে
-     যান/জীবন তরী কার্ডের আইকন হিসেবে ব্যবহৃত হয় (আগে এই কার্ডগুলোতে emoji/হাতে-আঁকা
-     SVG আইকন ছিল, এখন প্রতিটার জন্য আলাদা কাস্টম ছবি) */
-  .svcMascot{ width:56px; height:56px; border-radius:14px; object-fit:cover; margin-bottom:6px; }
+  /* 🖼️ মাসকট ছবিটা এখন একটা "ছবির ফ্রেম" — উপরে একটা হুক/পিন-এ ঝুলছে, আর হালকাভাবে
+     দুলছে (নাড়াচাড়া করছে), ঠিক যেভাবে বাজারে আমাদের প্রোডাক্ট/দোকানের ছবি পাবলিক
+     কার্ডে ফ্রেমের মতো দেখা যায় সেভাবেই — আগে এখানে সরাসরি রাউন্ডেড আইকন ছিল */
+  .svcFrameWrap{ position:relative; display:flex; justify-content:center; margin-bottom:8px; padding-top:9px; }
+  .svcHook{
+    position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width:9px; height:9px; border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, #ffe9a8, #b8860b);
+    box-shadow:0 1px 3px rgba(0,0,0,0.5); z-index:2;
+  }
+  .svcHook::after{
+    content:''; position:absolute; top:7px; left:50%; transform:translateX(-50%);
+    width:2px; height:7px; background:rgba(255,255,255,0.45);
+  }
+  .svcFrame{
+    width:78px; height:78px; border-radius:10px;
+    background:linear-gradient(135deg,#e8b84b,#8a5a1e);
+    padding:4px; box-shadow:0 6px 14px rgba(0,0,0,0.35);
+    transform-origin: top center;
+    animation: svcSway 3.6s ease-in-out infinite;
+  }
+  @keyframes svcSway{ 0%,100%{ transform:rotate(-3deg); } 50%{ transform:rotate(3deg); } }
+  .serviceCard:nth-child(2) .svcFrame{ animation-delay:0.5s; }
+  .serviceCard:nth-child(3) .svcFrame{ animation-delay:1s; }
+  .serviceCard:nth-child(4) .svcFrame{ animation-delay:1.5s; }
+  .serviceCard:nth-child(5) .svcFrame{ animation-delay:0.3s; }
+  .serviceCard:nth-child(6) .svcFrame{ animation-delay:0.8s; }
+  .svcMascot{ width:100%; height:100%; border-radius:6px; object-fit:cover; display:block; border:1px solid rgba(0,0,0,0.25); }
   .serviceCard .lbl{ font-size:11.5px; font-weight:700; color:#fff8e8; }
   .serviceCard.soon{ opacity:0.55; }
   .serviceCard.soon .soonBadge{
@@ -518,32 +546,32 @@
     <!-- 🐝 মৌ — Home-এর বড় ব্যানার এন্ট্রি সরিয়ে টাইটেল বারের headerMouBtn-এ
          নেওয়া হয়েছে, তাই এখানে আর আলাদা এন্ট্রির দরকার নেই -->
 
-    <div class="serviceCardGrid">
+    <div class="serviceCardGrid homeSvcGrid">
       <div class="serviceCard" data-svc="transport">
-        <img src="transport-mascot.png" alt="Transport" class="svcMascot">
+        <div class="svcFrameWrap"><span class="svcHook"></span><div class="svcFrame"><img src="transport-mascot.png" alt="Transport" class="svcMascot"></div></div>
         <div class="lbl">Transport</div>
       </div>
       <div class="serviceCard soon" data-svc="worker">
-        <img src="worker-hire-mascot.png" alt="Worker Hire" class="svcMascot">
+        <div class="svcFrameWrap"><span class="svcHook"></span><div class="svcFrame"><img src="worker-hire-mascot.png" alt="Worker Hire" class="svcMascot"></div></div>
         <div class="lbl">Worker Hire</div>
         <div class="soonBadge">শীঘ্রই আসছে</div>
       </div>
       <div class="serviceCard soon" data-svc="house">
-        <img src="house-rent-mascot.png" alt="House Rent" class="svcMascot">
+        <div class="svcFrameWrap"><span class="svcHook"></span><div class="svcFrame"><img src="house-rent-mascot.png" alt="House Rent" class="svcMascot"></div></div>
         <div class="lbl">House Rent</div>
         <div class="soonBadge">শীঘ্রই আসছে</div>
       </div>
       <div class="serviceCard soon" data-svc="hotel">
-        <img src="hotel-mascot.png" alt="Hotel" class="svcMascot">
+        <div class="svcFrameWrap"><span class="svcHook"></span><div class="svcFrame"><img src="hotel-mascot.png" alt="Hotel" class="svcMascot"></div></div>
         <div class="lbl">Hotel</div>
         <div class="soonBadge">শীঘ্রই আসছে</div>
       </div>
       <div class="serviceCard" data-svc="favmarket" id="favMarketCard">
-        <img src="fav-market-mascot.png" alt="আপনার পছন্দের বাজারে যান" class="svcMascot">
+        <div class="svcFrameWrap"><span class="svcHook"></span><div class="svcFrame"><img src="fav-market-mascot.png" alt="আপনার পছন্দের বাজারে যান" class="svcMascot"></div></div>
         <div class="lbl">আপনার পছন্দের বাজারে যান</div>
       </div>
       <div class="serviceCard" data-svc="jibontori" id="jibonToriCard">
-        <img src="jibontori-mascot.png" alt="জীবন তরী" class="svcMascot">
+        <div class="svcFrameWrap"><span class="svcHook"></span><div class="svcFrame"><img src="jibontori-mascot.png" alt="জীবন তরী" class="svcMascot"></div></div>
         <div class="lbl">জীবন তরী</div>
       </div>
     </div>
