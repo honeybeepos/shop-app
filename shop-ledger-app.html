@@ -599,7 +599,7 @@
 <!-- 🗺️ Google Maps JavaScript API — লাইভ ম্যাপে ব্যবহার হয় (Bee Flying থিম +
      স্মুথ ইন্টারপোলেশন সহ)। এই key HTTP-referrer রেস্ট্রিকশন দিয়ে সুরক্ষিত
      রাখা জরুরি (Google Cloud Console → Credentials)। -->
-<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDeufdK--qSX0a6-2m1JwQOrig7q4C8IGY&libraries=geometry"></script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAPSIPyU8mTRHyGDdHnrzUWPrzRbcN_EUU&libraries=geometry"></script>
 <style>
   /* 🐝 Bee Flying Theme — লাইভ ম্যাপে রাইডারের মার্কার */
   .bee-marker-icon{
@@ -14946,7 +14946,15 @@ function hbApplyShopOpenToggleUI(isOpen){
 let headerShopOpenState = true;
 document.getElementById("headerShopOpenWrap").addEventListener("click", async ()=>{
   const session = (typeof getSession === 'function') ? getSession() : null;
-  if(!session || !session.shopId) return;
+  // 🐞 আগে সেশন/shopId না পেলে এখানে একদম নিঃশব্দে থেমে যেত — বাটনে ক্লিক করলে
+  // দেখে বোঝাই যেত না কেন কিছু হচ্ছে না ("কিছুই বদলায় না" বলে রিপোর্ট এসেছিল)।
+  // এখন অন্তত একটা স্পষ্ট বাংলা বার্তা দেখানো হচ্ছে, যাতে ইউজার বুঝতে পারে এবং
+  // রিলগইন করে ঠিক করতে পারে।
+  if(!session || !session.shopId){
+    console.warn("headerShopOpenWrap ক্লিক: সেশন/shopId পাওয়া যায়নি", session);
+    alert("দোকানের তথ্য পাওয়া যাচ্ছে না। একবার পেজ রিলোড করুন, অথবা লগ-আউট করে আবার লগইন করুন।");
+    return;
+  }
   const newState = !headerShopOpenState;
   hbApplyShopOpenToggleUI(newState); // তাৎক্ষণিক ভিজ্যুয়াল ফিডব্যাক, Firestore রাউন্ড-ট্রিপের জন্য অপেক্ষা করতে হয় না
   try{
