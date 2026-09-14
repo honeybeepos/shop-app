@@ -135,8 +135,19 @@
      বদলে ৩ লাইন পর্যন্ত দেখাবে */
   .shopCardDesc{ font-size:12.5px; color:#e8dcc0; line-height:1.4; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:8px; }
   /* 👍💬🔗 Facebook-এর মতো লাইক/কমেন্ট/শেয়ার — দোকানের ছোট কার্ডেই (মার্কেট
-     লিস্ট ও "কাছের বাজার" গ্রিড দুই জায়গাতেই) */
-  .shopCardSocial{ display:flex; gap:6px; padding-top:8px; border-top:1px solid var(--border); }
+     লিস্ট ও "কাছের বাজার" গ্রিড দুই জায়গাতেই)। ডিফল্টভাবে কার্ড আগের মতোই
+     পরিষ্কার/সাদামাটা দেখাবে (শুধু ছবি/নাম/বিবরণ) — নিচে একটা ছোট্ট চিহ্ন
+     (▾) থাকবে, তাতে ট্যাপ করলেই লাইক/কমেন্ট/শেয়ার সারি খুলে যাবে (আবার ট্যাপ
+     করলে বন্ধ হবে)। */
+  .shopSocialToggle{
+    display:flex; align-items:center; justify-content:center; gap:4px;
+    padding-top:6px; margin-top:2px; font-size:10.5px; color:var(--muted);
+    cursor:pointer; user-select:none;
+  }
+  .shopSocialToggle .chev{ display:inline-block; font-size:10px; transition:transform 0.2s ease; }
+  .shopSocialToggle.open .chev{ transform:rotate(180deg); }
+  .shopCardSocial{ display:none; gap:6px; padding-top:8px; margin-top:6px; border-top:1px solid var(--border); }
+  .shopCardSocial.open{ display:flex; }
   .shopSocialBtn{
     flex:1; display:flex; align-items:center; justify-content:center; gap:3px;
     padding:6px 4px; border:none; border-radius:8px; background:rgba(255,255,255,0.06);
@@ -5397,6 +5408,7 @@ function hbShopCardHTML(s, onClickExpr){
         <div class="pCardName">${escapeHtml(s.name || s.shopName || "দোকান")}</div>
         <div class="shopCardMeta">${escapeHtml(s.category || "")}</div>
         ${s.logoDescription ? `<div class="shopCardDesc">${escapeHtml(s.logoDescription)}</div>` : ''}
+        <div class="shopSocialToggle" onclick="hbToggleShopSocialPanel(event,this)"><span class="chev">▾</span></div>
         <div class="shopCardSocial">
           <button type="button" class="shopSocialBtn${liked ? ' liked' : ''}" onclick="hbToggleShopLike(event,'${s.id}')">${liked ? '❤️' : '🤍'} ${s.logoLikeCount||0}</button>
           <button type="button" class="shopSocialBtn" onclick="hbOpenShopComments(event,'${s.id}')">💬 ${s.logoCommentCount||0}</button>
@@ -5405,6 +5417,17 @@ function hbShopCardHTML(s, onClickExpr){
       </div>
     </div>`;
 }
+
+// 🔽 ডিফল্টে কার্ড পরিষ্কার/সাদামাটা রাখার জন্য লাইক/কমেন্ট/শেয়ার সারিটা লুকানো
+// থাকে — নিচের ছোট্ট ▾ চিহ্নে ট্যাপ করলে খুলে যায় (আবার ট্যাপ করলে বন্ধ),
+// কার্ডে ক্লিক করলে যেন দোকান খুলে না যায় সেজন্য stopPropagation
+window.hbToggleShopSocialPanel = function(ev, toggleEl){
+  ev.stopPropagation();
+  const panel = toggleEl.nextElementSibling;
+  if(!panel) return;
+  const isOpen = panel.classList.toggle('open');
+  toggleEl.classList.toggle('open', isOpen);
+};
 
 function renderShops(list){
   if(list.length === 0){
