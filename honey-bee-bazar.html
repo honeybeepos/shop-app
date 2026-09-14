@@ -1822,6 +1822,7 @@ function $(id){ return document.getElementById(id); }
 let allMarkets = [];
 let allShops = [];
 let currentMarketId = null, currentShopId = null;
+let currentShopIsOpen = true; // 🔴 বর্তমানে ব্রাউজ করা দোকানটা খোলা/বন্ধ কিনা — selectShop()-এ সেট হয়
 // 🌍 বর্তমানে খোলা দোকানের মুদ্রা-চিহ্ন — যে দোকান খোলা আছে সেই দোকান অনুযায়ী পরিবর্তন হয়
 // (selectShop()-এ সেট হয়), পুরনো দোকান বা মুদ্রা সেট না থাকলে ডিফল্ট টাকা (৳)।
 let HB_CUR = '৳';
@@ -4342,6 +4343,7 @@ async function loadMarketFeedProducts(){
           __shopName: shop.name || shop.shopName || "দোকান",
           __shopCategory: shop.category || "",
           __shopArea: shop.upazila || shop.district || "",
+          __shopIsOpen: shop.isShopOpen !== false,
           __cur: cur
         }));
       }catch(e){ console.warn("Market feed: shop stock load failed", shop.id, e); return []; }
@@ -4568,6 +4570,9 @@ function mfCardHTML(p, idx){
     if(qty <= 0){ outOfStock = true; stockLabel = "স্টক নেই"; }
     else if(qty <= 5){ stockLabel = "কম আছে (" + qty + ")"; }
   }
+  // 🔴 দোকান বন্ধ থাকলে (শপকিপারের হেডার সুইচ) — অর্ডার করা যাবে না, কার্ট বাটন
+  // স্টক-শেষের মতোই ডিসেবল থাকবে, প্লাস একটা "বন্ধ" ব্যাজ দেখা যাবে
+  const shopClosed = p.__shopIsOpen === false;
   const cur = p.__cur || '৳';
   const safeName = escapeHtml(p.name||'').replace(/'/g,"");
   const safeShopName = escapeHtml(p.__shopName||'').replace(/'/g,"");
@@ -4585,11 +4590,12 @@ function mfCardHTML(p, idx){
       <div class="pCardImgWrap" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">
         <span class="pCardImgInner">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</span>
         <div class="pCardBadges">
+          ${shopClosed ? '<span class="pCardOfferBadge" style="background:#6b7280;">🔴 দোকান বন্ধ</span>' : ''}
           ${om.highlight ? '<span class="pCardHighlightBadge">⭐</span>' : ''}
           ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
         </div>
         <span class="pCardFav" onclick="mfToggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
-        <button class="mfCartBtn" ${outOfStock ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''} onclick="${cartBtnClick}">${isVariant ? "👕" : "🛒"}</button>
+        <button class="mfCartBtn" ${(outOfStock || shopClosed) ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''} onclick="${cartBtnClick}">${isVariant ? "👕" : "🛒"}</button>
       </div>
       <div class="pCardBody">
         <div class="pCardName" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
@@ -4681,6 +4687,7 @@ function hbWireVariantPicker(renderFn){
    ব্রাউজিং ফ্লো-র hbOpenMarketProductDetail/__hbDetailSelectedVariant-এর সাথে
    কোনো সংঘর্ষ না হয় — কারণ এই পেজটা লগইন/হোম স্ক্রিন কিছু ছাড়াই সরাসরি খুলতে পারে। */
 let __hbPubProduct = null, __hbPubShopId = null, __hbPubProductId = null, __hbPubShopName = '';
+let __hbPubShopIsOpen = true; // 🔴 গেস্ট প্রোডাক্ট-লিংক পেজের দোকানটা খোলা/বন্ধ কিনা
 let __hbPubVariant = { color: null, size: null };
 let __hbPubView = 'detail'; // 'detail' | 'order' | 'done'
 
@@ -4697,6 +4704,7 @@ async function hbOpenPublicProductPage(shopId, productId){
       db.collection('shops').doc(shopId).collection('publicStock').doc(productId).get()
     ]);
     __hbPubShopName = shopDoc.exists ? (shopDoc.data().shopName || 'Honey Bee দোকান') : 'Honey Bee দোকান';
+    __hbPubShopIsOpen = shopDoc.exists ? (shopDoc.data().isShopOpen !== false) : true;
     __hbPubProduct = prodDoc.exists ? prodDoc.data() : null;
   }catch(e){
     console.error('public product load failed:', e);
@@ -4807,8 +4815,8 @@ function hbRenderPublicProductBody(){
       <span style="font-size:22px; font-weight:800; color:var(--amber);">${cur}${price}</span>
       ${(p.offerPrice && Number(p.offerPrice) > 0 && Number(p.offerPrice) < Number(p.price)) ? `<span style="font-size:14px; color:var(--muted); text-decoration:line-through;">${cur}${p.price}</span>` : ''}
     </div>
-    ${isVariant ? hbPubVariantPickerHTML(p) : `<div style="font-size:12.5px; margin-bottom:14px; color:${outOfStockPlain?'#e2543d':'#22c55e'};">${outOfStockPlain?'🔴 বর্তমানে স্টক নেই':'🟢 Available'}</div>`}
-    <button id="hbPubOrderBtn" ${outOfStock?'disabled':''} style="width:100%; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; opacity:${outOfStock?'0.5':'1'};">${isVariant && !variantChosen ? 'রং/সাইজ বেছে নিন' : (outOfStock?'স্টক নেই':'🛒 অর্ডার করুন')}</button>
+    ${!__hbPubShopIsOpen ? `<div style="font-size:12.5px; margin-bottom:14px; color:#e2543d;">🔴 এই দোকানটি এখন বন্ধ আছে — এই মুহূর্তে অর্ডার নেওয়া হচ্ছে না</div>` : isVariant ? hbPubVariantPickerHTML(p) : `<div style="font-size:12.5px; margin-bottom:14px; color:${outOfStockPlain?'#e2543d':'#22c55e'};">${outOfStockPlain?'🔴 বর্তমানে স্টক নেই':'🟢 Available'}</div>`}
+    <button id="hbPubOrderBtn" ${(outOfStock || !__hbPubShopIsOpen)?'disabled':''} style="width:100%; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; opacity:${(outOfStock || !__hbPubShopIsOpen)?'0.5':'1'};">${!__hbPubShopIsOpen ? 'দোকান বন্ধ' : (isVariant && !variantChosen ? 'রং/সাইজ বেছে নিন' : (outOfStock?'স্টক নেই':'🛒 অর্ডার করুন'))}</button>
     ${hbLikeCommentHTML('pub')}
   `;
   const orderBtn = document.getElementById('hbPubOrderBtn');
@@ -4818,6 +4826,7 @@ function hbRenderPublicProductBody(){
   if(p.imageUrl) hbBindImageZoomTap(document.getElementById('hbPubDetailImgWrap'), p.imageUrl);
 }
 async function hbSubmitGuestOrder(){
+  if(!__hbPubShopIsOpen){ alert('এই দোকানটি এখন বন্ধ আছে, তাই অর্ডার নেওয়া যাচ্ছে না।'); return; }
   const name = (document.getElementById('hbPubName').value||'').trim();
   const phone = (document.getElementById('hbPubPhone').value||'').trim();
   const address = (document.getElementById('hbPubAddress').value||'').trim();
@@ -5318,7 +5327,8 @@ window.selectShop = function(shopId){
   currentShopId = shopId;
   const shop = allShops.find(s=> s.id === shopId);
   const shopName = shop ? (shop.name || shop.shopName || shopId) : shopId;
-  $("currentShopNameCat").textContent = shopName;
+  currentShopIsOpen = shop ? shop.isShopOpen !== false : true;
+  $("currentShopNameCat").textContent = currentShopIsOpen ? shopName : (shopName + " 🔴 (বন্ধ)");
   // 🌍 এই দোকানের মুদ্রা-চিহ্ন — সাইনআপে country/currency সেট করা থাকলে সেটাই দেখানো হবে
   HB_CUR = (shop && shop.currencySymbol)
     || (shop && shop.currencyCode && typeof window.hbGetCurrencySymbol === 'function' ? window.hbGetCurrencySymbol(shop.currencyCode) : null)
@@ -5344,7 +5354,7 @@ async function loadCategories(shopId, shopName){
     const qs = await db.collection("shops").doc(shopId).collection("publicCategories").get();
     if(qs.empty){
       // এই দোকানের কোনো ক্যাটাগরি সেট করা নেই — সরাসরি সব প্রোডাক্ট দেখানো হচ্ছে
-      $("currentShopName").textContent = shopName;
+      $("currentShopName").textContent = currentShopIsOpen ? shopName : (shopName + " 🔴 (বন্ধ)");
       currentCatId = null; currentSubId = null;
       showScreen("screenProducts");
       loadProducts(shopId);
@@ -5523,6 +5533,7 @@ async function mcLoadMarketCategories(marketId){
             __shopId: shop.id,
             __shopName: shop.name || shop.shopName || "দোকান",
             __shopArea: shop.upazila || shop.district || "",
+            __shopIsOpen: shop.isShopOpen !== false,
             __cur: cur,
             __catName: cat ? (cat.name||"").trim() : "",
             __subName: sub ? (sub.name||"").trim() : "",
@@ -5712,6 +5723,9 @@ function renderProducts(products){
     const om = hbGetOfferMeta(p);
     const isFav = favs.includes(p.id);
     const outOfStock = stockClass === "out";
+    // 🔴 দোকান বন্ধ থাকলে (শপকিপারের হেডার সুইচ) অর্ডার করা যাবে না — স্টক-শেষের
+    // বাটনের মতোই ডিসেবল থাকবে
+    const shopClosed = !currentShopIsOpen;
     // 👕 ভ্যারিয়েন্ট (রং/সাইজ) প্রোডাক্টে গ্রিড থেকে সরাসরি কার্টে যোগ করা যায় না —
     // আগে ডিটেইল পেজে গিয়ে রং/সাইজ বেছে নিতে হবে
     const isVariant = p.productType === "variant" && p.variants && p.variants.length;
@@ -5720,6 +5734,7 @@ function renderProducts(products){
         <div class="pCardImgWrap" id="pimg-${p.id}" onclick="hbOpenProductDetail('${p.id}')">
           <span class="pCardImgInner" id="pimgInner-${p.id}">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</span>
           <div class="pCardBadges">
+            ${shopClosed ? '<span class="pCardOfferBadge" style="background:#6b7280;">🔴 দোকান বন্ধ</span>' : ''}
             ${om.highlight ? '<span class="pCardHighlightBadge">⭐</span>' : ''}
             ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
           </div>
@@ -5733,8 +5748,8 @@ function renderProducts(products){
           </div>
           <div class="pCardStock ${stockClass}">${stockLabel}</div>
           ${isVariant
-            ? `<button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="hbOpenProductDetail('${p.id}')">${outOfStock ? "স্টক নেই" : "👕 রং/সাইজ বেছে নিন"}</button>`
-            : `<button class="pCardAddBtn" ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${om.finalPrice})">${outOfStock ? "স্টক নেই" : "🛒 Add to Cart"}</button>`}
+            ? `<button class="pCardAddBtn" ${(outOfStock || shopClosed) ? "disabled" : ""} onclick="hbOpenProductDetail('${p.id}')">${shopClosed ? "দোকান বন্ধ" : outOfStock ? "স্টক নেই" : "👕 রং/সাইজ বেছে নিন"}</button>`
+            : `<button class="pCardAddBtn" ${(outOfStock || shopClosed) ? "disabled" : ""} onclick="addToCart('${p.id}','${escapeHtml(p.name||'').replace(/'/g,"")}',${om.finalPrice})">${shopClosed ? "দোকান বন্ধ" : outOfStock ? "স্টক নেই" : "🛒 Add to Cart"}</button>`}
         </div>
       </div>`;
   }).join("");
@@ -5943,6 +5958,21 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
   const deliveryPhone = $("hbCartPhoneInput").value.trim();
   if(!deliveryAddress){ alert("ডেলিভারি ঠিকানা লিখুন — রাইডার এই ঠিকানা দেখেই ডেলিভারি করবেন।"); return; }
   if(!deliveryPhone){ alert("যোগাযোগ নম্বর লিখুন।"); return; }
+
+  // 🔴 কার্টে একাধিক দোকানের প্রোডাক্ট থাকতে পারে — যেই দোকান(গুলো) এখন বন্ধ
+  // (শপকিপারের হেডার সুইচ), সেগুলোর প্রোডাক্ট অর্ডার হতে দেওয়া হবে না
+  const closedShopIds = new Set(items.map(it=> it.shopId).filter(sid=>{
+    const s = allShops.find(x=> x.id === sid);
+    return s && s.isShopOpen === false;
+  }));
+  if(closedShopIds.size > 0){
+    const closedNames = [...closedShopIds].map(sid=>{
+      const s = allShops.find(x=> x.id === sid);
+      return s ? (s.name || s.shopName || "দোকান") : "দোকান";
+    }).join(", ");
+    alert(`⚠️ ${closedNames} — এই দোকান(গুলো) এখন বন্ধ আছে, তাই এর প্রোডাক্ট অর্ডার করা যাচ্ছে না। কার্ট থেকে সেই প্রোডাক্ট(গুলো) সরিয়ে বাকিগুলো অর্ডার করুন।`);
+    return;
+  }
 
   const btn = $("hbCartCheckoutBtn");
   btn.disabled = true; btn.textContent = "অর্ডার হচ্ছে...";
@@ -6254,6 +6284,15 @@ function hbOpenTracker(order){
    ⚠️ রাইডারের liveLocation ইতিমধ্যেই Rider Mode থেকে GPS দিয়ে Firestore-এ
    সেভ হয় (POS-এর বিদ্যমান সিস্টেম) — এখানে শুধু সেটা পড়া হচ্ছে, নতুন কোনো
    লোকেশন-ট্র্যাকিং কোড লেখা হয়নি। */
+// 📏 দুইটা GPS পয়েন্টের মধ্যে সরলরেখা দূরত্ব (কিমি) — Haversine ফর্মুলা,
+// কোনো Google API কল লাগে না, একদম ফ্রি ও তাৎক্ষণিক হিসাব
+function hbHaversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) ** 2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 async function hbStartLiveTracking(order){
   $("hbTrackerRiderInfo").textContent = "রাইডারের লোকেশন লোড হচ্ছে...";
   let shopLoc = null;
@@ -6273,7 +6312,17 @@ async function hbStartLiveTracking(order){
     }
     const riderLoc = doc.data().liveLocation;
     const riderName = doc.data().name || "রাইডার";
-    $("hbTrackerRiderInfo").textContent = `🛵 ${riderName} — লোকেশন আপডেট হচ্ছে লাইভ`;
+    let infoTxt = `🛵 ${riderName} — লোকেশন আপডেট হচ্ছে লাইভ`;
+    // 📏+⏱️ কাস্টমারের GPS লোকেশন থাকলে (অর্ডার-দেওয়ার সময় ক্যাপচার করা), রাইডার
+    // থেকে কাস্টমারের দূরত্ব + আনুমানিক সময় দেখানো হয় — সরলরেখা দূরত্ব, রাস্তার
+    // আসল দূরত্ব না, তবে বাস্তব রাস্তার দূরত্ব সাধারণত এর কাছাকাছিই থাকে
+    if(customerLoc){
+      const distKm = hbHaversineKm(riderLoc.lat, riderLoc.lng, customerLoc.lat, customerLoc.lng);
+      const distTxt = distKm < 1 ? Math.round(distKm * 1000) + " মিটার" : distKm.toFixed(1) + " কিমি";
+      const etaMin = Math.max(1, Math.round((distKm / 22) * 60)); // ধরে নেওয়া গড় গতি ~22 কিমি/ঘণ্টা
+      infoTxt += ` · আপনার থেকে ${distTxt} দূরে (আনুমানিক ${etaMin} মিনিট)`;
+    }
+    $("hbTrackerRiderInfo").textContent = infoTxt;
     hbRenderTrackerMap(shopLoc, { lat: riderLoc.lat, lng: riderLoc.lng }, customerLoc);
   }, (err)=>{
     console.warn("rider location listener error:", err);

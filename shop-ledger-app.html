@@ -767,6 +767,14 @@
        জায়গায় (আগে নিচের ট্যাব-বারে ছিল, এখন সেখান থেকে সরিয়ে এখানে আনা হলো) -->
   <div id="headerPrintShortcut" title="🖨️ প্রিন্ট" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🖨️</div>
   <div id="headerQrShortcut" title="🏷️ QR (ওজন স্টিকার)" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🏷️</div>
+  <!-- 🟢🔴 দোকান খোলা/বন্ধ সুইচ — শপকিপার এখান থেকে টগল করলে shops/{shopId}.isShopOpen
+       আপডেট হয়, Bazar-এ কাস্টমাররা তখন দোকান বন্ধ থাকলে দেখতে/বুঝতে পারবেন -->
+  <div id="headerShopOpenWrap" title="দোকান খোলা/বন্ধ করুন" style="cursor:pointer; flex-shrink:0; display:flex; align-items:center; gap:6px;">
+    <span id="headerShopOpenLabel" style="font-size:11px; font-weight:800; color:#fff; white-space:nowrap;">🟢 খোলা</span>
+    <div id="headerShopOpenToggle" style="width:44px; height:24px; border-radius:16px; background:#2fbf71; position:relative; border:2px solid rgba(255,255,255,.5); box-sizing:border-box; transition:background .2s ease;">
+      <div id="headerShopOpenKnob" style="width:16px; height:16px; border-radius:50%; background:#fff; position:absolute; top:2px; left:22px; transition:left .2s ease;"></div>
+    </div>
+  </div>
 </header>
 
 <!-- ==================== 🚑 DRIVER MODE — ট্রান্সপোর্ট ড্রাইভার লগইন করলে এই পুরো
@@ -14912,8 +14920,43 @@ function watchShopStatus(shopId){
       document.getElementById("blockedOverlay").style.display = "none";
       applyFeatureFlags(shop.features);
     }
+    // 🟢🔴 হেডারের খোলা/বন্ধ সুইচ — অন্য কোনো ডিভাইস/ট্যাব থেকে বদলালেও এখানে লাইভ সিঙ্ক হবে;
+    // ফিল্ড না থাকলে (পুরনো দোকান) ডিফল্ট "খোলা" ধরা হয়, যাতে হঠাৎ বন্ধ দেখানো না হয়ে যায়
+    hbApplyShopOpenToggleUI(shop.isShopOpen !== false);
   });
 }
+
+// 🟢🔴 দোকান খোলা/বন্ধ সুইচের ভিজ্যুয়াল আপডেট (সরাসরি DOM, নতুন কোনো CSS ক্লাস লাগেনি)
+function hbApplyShopOpenToggleUI(isOpen){
+  const label = document.getElementById("headerShopOpenLabel");
+  const track = document.getElementById("headerShopOpenToggle");
+  const knob = document.getElementById("headerShopOpenKnob");
+  if(!label || !track || !knob) return;
+  if(isOpen){
+    label.textContent = "🟢 খোলা";
+    track.style.background = "#2fbf71";
+    knob.style.left = "22px";
+  }else{
+    label.textContent = "🔴 বন্ধ";
+    track.style.background = "#e53935";
+    knob.style.left = "2px";
+  }
+  headerShopOpenState = isOpen;
+}
+let headerShopOpenState = true;
+document.getElementById("headerShopOpenWrap").addEventListener("click", async ()=>{
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId) return;
+  const newState = !headerShopOpenState;
+  hbApplyShopOpenToggleUI(newState); // তাৎক্ষণিক ভিজ্যুয়াল ফিডব্যাক, Firestore রাউন্ড-ট্রিপের জন্য অপেক্ষা করতে হয় না
+  try{
+    await db.collection("shops").doc(session.shopId).set({ isShopOpen: newState }, { merge: true });
+  }catch(e){
+    console.warn("isShopOpen আপডেট ব্যর্থ:", e);
+    hbApplyShopOpenToggleUI(!newState); // ব্যর্থ হলে আগের অবস্থায় ফিরিয়ে নেওয়া হচ্ছে
+    alert("দোকানের অবস্থা আপডেট করা যায়নি, আবার চেষ্টা করুন।");
+  }
+});
 
 function watchAnnouncement(){
   db.collection("system").doc("announcement").onSnapshot(snap=>{
