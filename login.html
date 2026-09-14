@@ -562,9 +562,23 @@ document.getElementById("loginBtn").addEventListener("click", async ()=>{
   // ব্যর্থ-লগইন কাউন্টার বাড়িয়ে দিতো। এখন দুটো ধাপ আলাদা try/catch-এ —
   // সাইন-ইন ব্যর্থ হলেই শুধু ব্যর্থ-লগইন কাউন্টার বাড়বে।
   let cred;
+  let __signInTimedOut = false;
   try{
-    cred = await auth.signInWithEmailAndPassword(email, pass);
+    // 🐞 বাগ-ফিক্স: signInWithEmailAndPassword কলটাও আগে কোনো টাইম-লিমিট
+    // ছাড়া ছিল — নেটওয়ার্ক আটকে গেলে (দুর্বল/অস্থির কানেকশন) এটাও
+    // অনন্তকাল আটকে থাকতে পারতো, বাটন কোনো মেসেজ ছাড়াই "লগইন হচ্ছে..."
+    // দেখাতেই থাকতো। এটা টাইমআউট হলে সেটাকে "ভুল পাসওয়ার্ড" হিসেবে গণনা
+    // করা হয় না (নেটওয়ার্ক সমস্যা, পাসওয়ার্ড ভুল না)।
+    cred = await Promise.race([
+      auth.signInWithEmailAndPassword(email, pass),
+      new Promise((_, reject)=> setTimeout(()=>{ __signInTimedOut = true; reject(new Error('signIn timeout')); }, 15000))
+    ]);
   }catch(e){
+    if(__signInTimedOut){
+      showMsg("loginMsg", "ইন্টারনেট কানেকশন খুব ধীর বা আটকে গেছে — লগইন সম্পন্ন করা যায়নি। কানেকশন চেক করে আবার চেষ্টা করুন।", false);
+      btn.disabled = false; btn.textContent = "লগইন করুন";
+      return;
+    }
     const count = await recordFailedLogin(email);
     if (count >= MAX_FAILED_ATTEMPTS) {
       showMsg("loginMsg", "বারবার ভুল পাসওয়ার্ড দেওয়ার কারণে একাউন্ট ব্লক হয়ে গেছে। এডমিনের সাথে যোগাযোগ করুন।", false);
