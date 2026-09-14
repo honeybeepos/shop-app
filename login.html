@@ -577,12 +577,23 @@ document.getElementById("loginBtn").addEventListener("click", async ()=>{
   // এই পয়েন্টে পাসওয়ার্ড সঠিক ছিল বলেই প্রমাণিত — তাই এখন থেকে আর
   // কোনো এরর হলে সেটাকে "ভুল পাসওয়ার্ড" হিসেবে গণনা করা হবে না।
   try{
+    // 🐞 বাগ-ফিক্স: আগে এই ধাপে কোনো টাইম-লিমিট ছিল না — নেটওয়ার্ক
+    // হিক্কআপ/IndexedDB লক (যেমন লগ-আউটের ঠিক পরপরই আবার লগইন করলে) হলে
+    // এই await কখনোই শেষ হতো না, ফলে "লগইন হচ্ছে..." বাটন চিরকাল আটকে
+    // থাকতো, কোনো এরর মেসেজও দেখাতো না। এখন ১৫ সেকেন্ডের মধ্যে সাড়া না
+    // পেলে স্পষ্ট মেসেজ দেখিয়ে বাটন রিসেট করে দেওয়া হয়, যাতে আবার
+    // চেষ্টা করা যায় (shop-ledger-app.html-এর cloud-pull টাইমআউটের
+    // মতোই প্যাটার্ন)।
     await clearFailedLogin(email);
-    await afterLoginRoute(cred.user.uid);
+    await Promise.race([
+      afterLoginRoute(cred.user.uid),
+      new Promise((_, reject)=> setTimeout(()=> reject(new Error('afterLoginRoute timeout')), 15000))
+    ]);
   }catch(e){
     console.error(e);
-    showMsg("loginMsg", "লগইন সফল হয়েছে, কিন্তু প্রোফাইল লোড করা যায়নি — ইন্টারনেট চেক করে আবার চেষ্টা করুন। সমস্যা থাকলে এডমিনের সাথে যোগাযোগ করুন।", false);
-    await auth.signOut().catch(()=>{});
+    showMsg("loginMsg", "লগইন সফল হয়েছে, কিন্তু প্রোফাইল লোড করা যায়নি (ইন্টারনেট ধীর বা আটকে গেছে) — বাটনে আবার চাপ দিয়ে চেষ্টা করুন, অথবা পেজ রিলোড করে আবার লগইন করুন।", false);
+    btn.disabled = false; btn.textContent = "লগইন করুন";
+    return;
   }
   btn.disabled = false; btn.textContent = "লগইন করুন";
 });
