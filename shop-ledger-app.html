@@ -2583,7 +2583,7 @@
       <div class="bizIconBadge" style="background:linear-gradient(135deg,#ffd166,#fca311);">🐝</div>
       <div class="bizCardBody">
         <div class="bizCardTitle">Honey Bee Network</div>
-        <div class="bizCardSub">HIVE · NETWORK · GROWTH</div>
+        <div class="bizCardSub">ফোন/হাতে-অর্ডার · ডেলিভারি</div>
       </div>
       <div class="bizChevron">›</div>
     </div>
@@ -3548,8 +3548,8 @@
 
 <div id="hbAddModal" class="modal-overlay">
   <div class="modal-box" style="max-width:340px; text-align:left; background:#241605; color:#fff8e8; border:1px solid rgba(255,209,102,0.35);">
-    <h3 style="margin:0 0 4px; color:var(--hb-amber, #ffd166);">🐝 নতুন অর্ডার যোগ করুন</h3>
-    <p class="pin-desc" style="margin:0 0 14px; color:rgba(255,248,232,0.6);">Honey Bee Network থেকে আসা একটা অনলাইন অর্ডার/ডেলিভারি লগ করুন</p>
+    <h3 style="margin:0 0 4px; color:var(--hb-amber, #ffd166);">📞 ফোন/হাতে-অর্ডার যোগ করুন</h3>
+    <p class="pin-desc" style="margin:0 0 14px; color:rgba(255,248,232,0.6);">যেসব অর্ডার Bazar অ্যাপ দিয়ে না এসে ফোন/WhatsApp-এ সরাসরি এসেছে, সেগুলো এখানে হাতে লিখে রাখুন। Bazar অ্যাপ থেকে আসা অর্ডার এখানে লাগে না — সেগুলো "📦 অর্ডার ব্যবস্থাপনা"-তে নিজে থেকেই চলে আসে।</p>
 
     <label style="display:block; font-size:12px; color:rgba(255,248,232,0.7); margin:0 0 4px;">অর্ডারের টাকা (৳)</label>
     <input id="hbOrderAmount" type="number" inputmode="numeric" placeholder="০" style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid rgba(255,209,102,0.35); background:rgba(255,255,255,0.06); color:#fff8e8; font-size:15px; margin-bottom:12px;">
@@ -3572,7 +3572,7 @@
     <button id="backFromHoneyBee">←</button>
     <div>
       <div class="hbHeaderTitle">🐝 Honey Bee Network</div>
-      <div class="hbHeaderSub">Business Management</div>
+      <div class="hbHeaderSub">📞 ফোন/হাতে-অর্ডার + ডেলিভারি</div>
     </div>
   </div>
 
@@ -3581,13 +3581,13 @@
       <div class="hbHex">🐝</div>
     </div>
     <div class="hbTitle">Honey Bee Network</div>
-    <p class="hbTagline">দোকানের সার্বিক লাইভ স্ট্যাটাস — আজকের অনলাইন অর্ডার, ডেলিভারি ও অতিরিক্ত আয় এক নজরে।</p>
+    <p class="hbTagline">যেসব অর্ডার Bazar অ্যাপ ছাড়া সরাসরি ফোন/WhatsApp-এ আসে, সেগুলোর হিসাব আর ডেলিভারি-ম্যান ডাকার জায়গা এটা। Bazar অ্যাপের real অর্ডার দেখতে "📦 অর্ডার ব্যবস্থাপনা"-তে যান — সেগুলো এখন থেকে মূল বিক্রির হিসাবেও (Monitoring) নিজে থেকেই যোগ হয়ে যায়।</p>
   </div>
 
   <div class="hbComb">
     <div class="hbCard">
       <div class="hbCardIcon">💰</div>
-      <div class="hbCardTitle">আজকের অনলাইন অর্ডার</div>
+      <div class="hbCardTitle">আজকের ফোন/হাতে-অর্ডার</div>
       <div class="hbCardValue" id="hbTodayOrderAmount">৳ 0</div>
     </div>
     <div class="hbCard">
@@ -3602,7 +3602,7 @@
     </div>
   </div>
 
-  <button class="hbAddBtn" id="hbAddOrderBtn">➕ নতুন অর্ডার যোগ করুন</button>
+  <button class="hbAddBtn" id="hbAddOrderBtn">📞 ফোন/হাতে-অর্ডার যোগ করুন</button>
   <button class="hbAddBtn" id="hbCallDeliveryBtn" style="background:linear-gradient(145deg,#16a34a,#0f7a3a); margin-top:10px;">🔔 ডেলিভারি ম্যান কে ডাকুন</button>
   <div id="hbConnectCodeRow" style="text-align:center; margin-top:4px;">
     <span id="hbRingStatusLbl" style="font-size:11px; color:rgba(255,248,232,0.4);"></span>
@@ -5708,8 +5708,62 @@ async function ordUpdateStatus(orderId, newStatus){
   const timeFieldMap = { preparing: 'preparingAt', shipped: 'shippedAt', delivered: 'deliveredAt', cancelled: 'cancelledAt' };
   const update = { status: newStatus };
   if(timeFieldMap[newStatus]) update[timeFieldMap[newStatus]] = firebase.firestore.FieldValue.serverTimestamp();
-  try{ await db.collection('orderRequests').doc(orderId).update(update); }
+  try{
+    await db.collection('orderRequests').doc(orderId).update(update);
+    // 🐝 Bazar-এর real অনলাইন অর্ডার "Delivered" হলে দোকানের মূল বিক্রির হিসাবেও
+    // (retailEntries → Monitoring) যোগ হবে — যাতে দোকানের ভিতরের বিক্রি আর অনলাইন
+    // বিক্রি মিলিয়ে একটাই মোট সংখ্যা দেখা যায় (আগে এই দুটো সম্পূর্ণ আলাদা ছিল)।
+    if(newStatus === 'delivered') await ordRecordDeliveredSale(orderId);
+  }
   catch(e){ alert('আপডেট করা যায়নি: ' + e.message); }
+}
+
+// 🐝🧾 Bazar-এর একটা "Delivered" অনলাইন অর্ডারকে POS-এর মূল সেল-হিসাবে (retailEntries)
+// একটা এন্ট্রি হিসেবে যোগ করা হয় — Monitoring-এর "আজকের মোট বিক্রি"/লাভ/প্রোডাক্ট-বিক্রির
+// সংখ্যা, সবকিছুতেই এখন থেকে অনলাইন অর্ডারও ধরা পড়বে। ধরে নেওয়া হচ্ছে ডেলিভারির সময়
+// টাকা পুরোপুরি বুঝে নেওয়া হয়েছে (Cash on Delivery বা আগে থেকেই Wallet-এ পেমেন্ট করা) —
+// তাই এন্ট্রিটা "নগদ-বিক্রি" (কোনো বাকি নেই) হিসেবে সেভ হয়। বাস্তবে যদি কখনো ডেলিভারির
+// পরও টাকা বাকি থেকে যাওয়ার সিস্টেম থাকে, এই ধরে নেওয়াটা বদলাতে হবে।
+async function ordRecordDeliveredSale(orderId){
+  try{
+    // ⚠️ একই অর্ডার যেন ভুলবশত দুইবার হিসাবে যোগ না হয় (যেমন বাটনে দুইবার চাপ পড়লে)
+    if(retailEntries.some(e=> e.onlineOrderId === orderId)) return;
+    const doc = await db.collection('orderRequests').doc(orderId).get();
+    if(!doc.exists) return;
+    const o = doc.data();
+    const prods = (typeof bccLoadProducts === 'function') ? bccLoadProducts() : [];
+    const prod = o.productId ? prods.find(p=> p.id === o.productId) : null;
+    const qty = Number(o.qty)||1;
+    const unitPrice = Number(o.price)||0;
+    const unitCost = prod ? (Number(prod.buy)||0) : 0;
+
+    const entry = {
+      id: (typeof genLineId === 'function') ? genLineId() : ('ord-'+Date.now()),
+      name: o.customerName || 'অনলাইন কাস্টমার',
+      phone: o.deliveryPhone || '',
+      item: o.productName || 'প্রোডাক্ট',
+      price: unitPrice * qty,
+      cost: unitCost * qty,
+      qty, unitPrice,
+      paid: unitPrice * qty,
+      status: 'নগদ-বিক্রি',
+      paymentMethod: 'cash',
+      date: new Date().toISOString(),
+      soldBy: '🐝 Honey Bee Bazar (Online)',
+      onlineOrderId: orderId // ডুপ্লিকেট-চেক এই ফিল্ড দিয়েই হয়, উপরে দেখুন
+    };
+    retailEntries.push(entry);
+    if(typeof backupRecentSaleEntries === 'function') backupRecentSaleEntries([entry]);
+
+    // 📦 স্টকও এখন থেকে কমবে — POS-এর ম্যানুয়াল সেলের মতোই একই ফাংশন পুনর্ব্যবহার করা হলো,
+    // যাতে "Stock"/"Slow Moving" মনিটরিংও অনলাইন বিক্রি হিসাব করে (আগে এটা হতো না)
+    if(o.productId && typeof bccAdjustStockForSale === 'function'){
+      bccAdjustStockForSale([{ item: o.productName, qty, productId: o.productId, variantColor: o.variantColor, variantSize: o.variantSize }]);
+    }
+
+    await persistData();
+    if(typeof monRenderAll === 'function') monRenderAll();
+  }catch(e){ console.error('ordRecordDeliveredSale failed:', e); }
 }
 
 function escapeAttr(str){
