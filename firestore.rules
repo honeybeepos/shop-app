@@ -370,6 +370,22 @@ service cloud.firestore {
          resource.data.assignedRiderId == request.auth.uid);
     }
 
+    // 🔧 Bazar কাস্টমার শপ ভিজিট / প্রোডাক্ট ডিটেইল দেখার সময় লগ করে (honey-bee-bazar.html,
+    // hbLogShopVisit/hbLogProductView) — এগুলো শুধু create-only (কাস্টমার কখনো নিজের
+    // পুরনো লগ read/update/delete করতে পারবে না), আর দোকান মালিক নিজের দোকানের
+    // (myShopId() মিলে) লগগুলো read করতে পারবে Monitoring-এ দেখানোর জন্য।
+    match /shopVisits/{visitId} {
+      allow create: if isSignedIn() && request.resource.data.shopId is string;
+      allow read: if isSignedIn() && (isSuperAdmin() || (myShopId() != null && resource.data.shopId == myShopId()));
+      allow update, delete: if false;
+    }
+
+    match /productViews/{viewId} {
+      allow create: if isSignedIn() && request.resource.data.shopId is string;
+      allow read: if isSignedIn() && (isSuperAdmin() || (myShopId() != null && resource.data.shopId == myShopId()));
+      allow update, delete: if false;
+    }
+
     match /passenger_waiting_queue/{docId} {
       allow read, create, update, delete: if true;
     }

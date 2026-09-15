@@ -1910,6 +1910,61 @@ auth.onAuthStateChanged(async (user)=>{
 
 renderAuthArea();
 
+/* ================= 📊 শপ ভিজিট + প্রোডাক্ট-দেখার সময় ট্র্যাকিং =================
+   দোকান মালিক জানতে চান কতজন কাস্টমার শপ ভিজিট করেছে, আর কোন কোন প্রোডাক্টে
+   বেশি সময় দিয়েছে (POS-এর Monitoring > 👥 ভিজিটর ট্যাবে দেখানো হয়)। বেশিরভাগ
+   ব্রাউজিং কাস্টমারই লগইন করা থাকে না, তাই লগইন ছাড়াই ব্যাকগ্রাউন্ডে Anonymous
+   Auth দিয়ে একটা uid নেওয়া হয় (firestore.rules-এর isSignedIn() পাস করার জন্য —
+   ঠিক গেস্ট-চেকআউট ফ্লো-তে যেমন হয়, এখানে পেজ খোলার শুরুতেই, নীরবে)। */
+let __hbVisitorAuthPromise = null;
+function hbEnsureVisitorAuth(){
+  if(auth.currentUser) return Promise.resolve(auth.currentUser.uid);
+  if(__hbVisitorAuthPromise) return __hbVisitorAuthPromise;
+  __hbVisitorAuthPromise = auth.signInAnonymously()
+    .then(cred => cred.user.uid)
+    .catch(err => { console.error('hbEnsureVisitorAuth failed:', err); __hbVisitorAuthPromise = null; return null; });
+  return __hbVisitorAuthPromise;
+}
+hbEnsureVisitorAuth(); // পেজ লোড হওয়ার সাথে সাথেই ব্যাকগ্রাউন্ডে শুরু করা হচ্ছে, কোনো কিছু আটকে থাকবে না
+
+// একই ট্যাব-সেশনে একই দোকান বারবার খুললে (ব্যাক/ফরোয়ার্ড, রিফ্রেশ) প্রতিবার নতুন
+// ভিজিট লগ না হয়ে যাতে গোনাটা বাস্তবসম্মত থাকে — প্রতি সেশনে দোকান-প্রতি একবারই লগ হয়
+function hbLogShopVisit(shopId){
+  if(!shopId) return;
+  const flagKey = 'hbVisited_' + shopId;
+  try{ if(sessionStorage.getItem(flagKey)) return; }catch(e){}
+  hbEnsureVisitorAuth().then(uid=>{
+    if(!uid) return;
+    db.collection('shopVisits').add({
+      shopId, visitorId: uid,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    }).then(()=>{ try{ sessionStorage.setItem(flagKey, '1'); }catch(e){} })
+      .catch(err=> console.error('hbLogShopVisit failed:', err));
+  });
+}
+
+// প্রোডাক্ট-ডিটেইল মোডাল খোলার সময় টাইমার শুরু, বন্ধ করার সময় (ক্লোজ বাটনে) কতক্ষণ
+// দেখলো সেটা হিসাব করে লগ হয় — ১ সেকেন্ডের কম হলে (ভুলে ট্যাপ) বাদ দেওয়া হয়
+let __hbProductViewStart = null;
+function hbStartProductViewTimer(shopId, productId, productName){
+  __hbProductViewStart = { shopId, productId, productName: productName || '', startTs: Date.now() };
+}
+function hbEndProductViewTimer(){
+  const v = __hbProductViewStart;
+  __hbProductViewStart = null;
+  if(!v) return;
+  const durationMs = Date.now() - v.startTs;
+  if(durationMs < 1000) return; // ১ সেকেন্ডের কম হলে বাদ
+  hbEnsureVisitorAuth().then(uid=>{
+    if(!uid) return;
+    db.collection('productViews').add({
+      shopId: v.shopId, productId: v.productId, productName: v.productName,
+      visitorId: uid, durationMs,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    }).catch(err=> console.error('hbEndProductViewTimer failed:', err));
+  });
+}
+
 function $(id){ return document.getElementById(id); }
 let allMarkets = [];
 let allShops = [];
@@ -5289,6 +5344,7 @@ function hbBindImageZoomTap(wrapEl, url){
 window.hbOpenMarketProductDetail = function(shopId, productId){
   const p = marketFeedProducts.find(x=> x.id === productId && x.__shopId === shopId);
   if(!p) return;
+  if(typeof hbStartProductViewTimer === 'function') hbStartProductViewTimer(shopId, productId, p.name);
   __hbDetailSelectedVariant = { color: null, size: null }; // নতুন প্রোডাক্ট খোলার সময় আগের সিলেকশন রিসেট
   const isVariant = p.productType === "variant" && p.variants && p.variants.length;
   const render = ()=>{
@@ -5330,7 +5386,7 @@ window.hbOpenMarketProductDetail = function(shopId, productId){
       ${p.description ? `<div style="font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:16px;">${escapeHtml(p.description)}</div>` : ""}
       <div style="display:flex; gap:10px;">
         <button ${outOfStock ? "disabled" : ""} onclick="mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}','${vColor}','${vSize}')" style="flex:1; padding:13px; border:1px solid var(--amber); border-radius:12px; background:transparent; color:var(--amber); font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; opacity:${outOfStock?"0.5":"1"};">🛒 Add to Cart</button>
-        <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'},'${vColor}','${vSize}'); $('hbProductDetailModal').style.display='none'; hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; opacity:${outOfStock?"0.5":"1"};">${buyLabel}</button>
+        <button ${outOfStock ? "disabled" : ""} onclick="addToCart('${p.id}','${safeName}',${om.finalPrice},{shopId:'${p.__shopId}',shopName:'${safeShopName}'},'${vColor}','${vSize}'); if(typeof hbEndProductViewTimer==='function') hbEndProductViewTimer(); $('hbProductDetailModal').style.display='none'; hbOpenCart();" style="flex:1; padding:13px; border:none; border-radius:12px; background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-weight:800; font-size:13.5px; cursor:pointer; font-family:inherit; opacity:${outOfStock?"0.5":"1"};">${buyLabel}</button>
       </div>
       ${hbLikeCommentHTML('detail')}
     `;
@@ -5677,6 +5733,7 @@ let currentSubName = null; // 🗂️ ব্রেডক্রাম্বে �
 
 window.selectShop = function(shopId){
   currentShopId = shopId;
+  if(typeof hbLogShopVisit === 'function') hbLogShopVisit(shopId);
   const shop = allShops.find(s=> s.id === shopId);
   const shopName = shop ? (shop.name || shop.shopName || shopId) : shopId;
   currentShopIsOpen = shop ? shop.isShopOpen !== false : true;
@@ -6111,6 +6168,7 @@ function renderProducts(products){
 window.hbOpenProductDetail = function(productId){
   const p = __hbCurrentProductsList.find(x=> x.id === productId);
   if(!p) return;
+  if(typeof hbStartProductViewTimer === 'function') hbStartProductViewTimer(currentShopId, productId, p.name);
   __hbDetailSelectedVariant = { color: null, size: null }; // নতুন প্রোডাক্ট খোলার সময় আগের সিলেকশন রিসেট
   const isVariant = p.productType === "variant" && p.variants && p.variants.length;
   const render = ()=>{
@@ -6169,7 +6227,10 @@ window.hbOpenProductDetail = function(productId){
   render();
   $("hbProductDetailModal").style.display = "flex";
 };
-$("hbProductDetailCloseBtn").addEventListener("click", ()=> $("hbProductDetailModal").style.display = "none");
+$("hbProductDetailCloseBtn").addEventListener("click", ()=>{
+  if(typeof hbEndProductViewTimer === 'function') hbEndProductViewTimer();
+  $("hbProductDetailModal").style.display = "none";
+});
 
 
 window.toggleFavoriteProduct = async function(ev, productId){

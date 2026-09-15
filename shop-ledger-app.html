@@ -3373,6 +3373,7 @@
       <div class="monSubtab" data-mtab="performance">📈 Performance</div>
       <div class="monSubtab" data-mtab="alerts">🔔 Alerts</div>
       <div class="monSubtab" data-mtab="orders">📦 অর্ডার</div>
+      <div class="monSubtab" data-mtab="visitors">👥 ভিজিটর</div>
       <div class="monSubtab" data-mtab="reco">🐝 সাজেশন</div>
     </div>
   </div>
@@ -3461,6 +3462,15 @@
         <div class="glassCard" id="monOrdInvoiceCard" style="cursor:pointer;"><div class="ic">🧾</div><div class="lbl">মোট ইনভয়েস</div><div class="val" id="monOrdInvoiceCount">0</div></div>
       </div>
       <p style="font-size:10.5px; color:#c9c3f0; line-height:1.6; margin-top:6px;">💡 প্রতিটা কার্ডে ক্লিক করলে সেই তালিকার সব অর্ডার দেখাবে, আর সেখান থেকেই সরাসরি প্রিন্ট করা যাবে।</p>
+    </div>
+
+    <div class="monSection" id="mtab-visitors" style="display:none;">
+      <div class="monSectionTitle">👥 কাস্টমার ভিজিট বিশ্লেষণ</div>
+      <div class="glassGrid">
+        <div class="glassCard wide" id="monVisitorsCard" style="cursor:pointer;"><div class="ic">👥</div><div class="lbl">সাম্প্রতিক ভিজিটর (ইউনিক)</div><div class="val" id="monVisitorsCount">0</div></div>
+        <div class="glassCard wide" id="monProductViewsCard" style="cursor:pointer;"><div class="ic">👀</div><div class="lbl">বেশি দেখা প্রোডাক্ট</div><div class="val" id="monProductViewsCount">0</div></div>
+      </div>
+      <p style="font-size:10.5px; color:#c9c3f0; line-height:1.6; margin-top:6px;">💡 কাস্টমার Bazar-এ দোকান বা প্রোডাক্ট দেখলে (লগইন ছাড়াই) এখানে হিসাব হয়। সাম্প্রতিক ১০০০টা রেকর্ড থেকে হিসাব করা — নতুন Bazar আপলোড আর Firestore rules deploy দুটোই লাগবে এই ফিচার চালু হতে।</p>
     </div>
 
     <div class="monSection" id="mtab-reco" style="display:none;">
@@ -15018,6 +15028,10 @@ document.querySelectorAll('#program-monitor .monSubtab').forEach(t=>{
         if(invoiceCountEl && typeof ordGetAllBills === 'function') invoiceCountEl.textContent = ordGetAllBills().length;
       }catch(e){ console.error('orders tab open refresh failed:', e); }
     }
+    if(t.dataset.mtab === 'visitors'){
+      try{ if(typeof ordRefreshVisitorCards === 'function') ordRefreshVisitorCards(); }
+      catch(e){ console.error('visitors tab open refresh failed:', e); }
+    }
   });
 });
 
@@ -15107,7 +15121,84 @@ function ordCardListRowHtml_invoice(b){
   </div>`;
 }
 
-function ordRenderCardListRows(status){
+/* ================= 👥 ভিজিটর + প্রোডাক্ট-ভিউ কার্ড (Monitoring > 👥 ভিজিটর) =================
+   Bazar-এ কাস্টমার (লগইন ছাড়াই) দোকান/প্রোডাক্ট দেখলে honey-bee-bazar.html
+   shopVisits/productViews কালেকশনে লগ করে। এই লগগুলো WORM (লিখেই যায়, কখনো
+   মোছে না) — তাই অর্ডার-স্ট্যাটাস কার্ডগুলোর মতো লাইভ onSnapshot না রেখে, ট্যাব
+   খোলার সময় একবার সাম্প্রতিক ১০০০টা রেকর্ড fetch করে ক্লায়েন্ট-সাইডে যোগফল করা
+   হয় — নাহলে সময়ের সাথে সাথে একটা কালেকশন যত বড় হবে, লিস্টেনারও তত ভারী হয়ে
+   যেত (ঠিক আগের ক্র্যাশ-কারণের মতোই একটা ফাঁদ, তাই সচেতনভাবে এড়ানো হয়েছে)। */
+let __ordVisitsCache = [];
+let __ordProductViewsCache = [];
+
+async function ordFetchRecentVisits(){
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId || typeof db === 'undefined') return [];
+  const qs = await db.collection('shopVisits').where('shopId','==',session.shopId)
+    .orderBy('timestamp','desc').limit(1000).get();
+  return qs.docs.map(d=>({id:d.id, ...d.data()}));
+}
+async function ordFetchRecentProductViews(){
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId || typeof db === 'undefined') return [];
+  const qs = await db.collection('productViews').where('shopId','==',session.shopId)
+    .orderBy('timestamp','desc').limit(1000).get();
+  return qs.docs.map(d=>({id:d.id, ...d.data()}));
+}
+function ordAggregateProductViews(views){
+  const map = {};
+  views.forEach(v=>{
+    const key = v.productId || v.productName || '—';
+    if(!map[key]) map[key] = { productName: v.productName || '—', totalDurationMs:0, viewCount:0 };
+    map[key].totalDurationMs += (v.durationMs||0);
+    map[key].viewCount += 1;
+  });
+  return Object.values(map).sort((a,b)=> b.totalDurationMs - a.totalDurationMs);
+}
+function ordFormatDuration(ms){
+  const totalSec = Math.round((ms||0)/1000);
+  if(totalSec < 60) return totalSec + ' সেকেন্ড';
+  const min = Math.floor(totalSec/60), sec = totalSec % 60;
+  return min + ' মিনিট' + (sec ? ' ' + sec + ' সেকেন্ড' : '');
+}
+async function ordRefreshVisitorCards(){
+  try{
+    const visits = await ordFetchRecentVisits();
+    __ordVisitsCache = visits;
+    const uniqueVisitors = new Set(visits.map(v=>v.visitorId)).size;
+    const el = document.getElementById('monVisitorsCount');
+    if(el) el.textContent = uniqueVisitors;
+  }catch(e){ console.error('ordRefreshVisitorCards (visits) failed:', e); }
+  try{
+    const views = await ordFetchRecentProductViews();
+    const agg = ordAggregateProductViews(views);
+    __ordProductViewsCache = agg;
+    const el = document.getElementById('monProductViewsCount');
+    if(el) el.textContent = agg.length;
+  }catch(e){ console.error('ordRefreshVisitorCards (views) failed:', e); }
+}
+
+function ordCardListRowHtml_visit(v){
+  const ts = (v.timestamp && v.timestamp.toDate) ? v.timestamp.toDate() : null;
+  const dateStr = ts ? (ts.toLocaleDateString('bn-BD',{day:'numeric', month:'short', year:'numeric'}) + ' · ' + ts.toLocaleTimeString('bn-BD',{hour:'2-digit', minute:'2-digit'})) : '';
+  return `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 4px; border-bottom:1px solid var(--line);">
+    <div style="min-width:0;">
+      <div style="font-weight:700; font-size:13px;">ভিজিটর: ${escapeHtml((v.visitorId||'').slice(0,10))}…</div>
+      <div style="font-size:11px; color:#8a7f6c;">${dateStr}</div>
+    </div>
+  </div>`;
+}
+function ordCardListRowHtml_productView(pv, rank){
+  return `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 4px; border-bottom:1px solid var(--line);">
+    <div style="min-width:0;">
+      <div style="font-weight:700; font-size:13.5px;">${rank}. ${escapeHtml(pv.productName||'—')}</div>
+      <div style="font-size:11.5px; color:#7a6f63;">মোট ${pv.viewCount} বার দেখা হয়েছে</div>
+    </div>
+    <div style="font-weight:700; font-size:13px; white-space:nowrap;">${ordFormatDuration(pv.totalDurationMs)}</div>
+  </div>`;
+}
+
+async function ordRenderCardListRows(status){
   const rowsEl = document.getElementById('ordCardListRows');
   const countEl = document.getElementById('ordCardListCount');
   if(!rowsEl || !countEl) return;
@@ -15115,6 +15206,28 @@ function ordRenderCardListRows(status){
     const bills = ordGetAllBills();
     countEl.textContent = bills.length;
     rowsEl.innerHTML = bills.length ? bills.map(ordCardListRowHtml_invoice).join('') : '<div class="glassEmpty">কোনো ইনভয়েস নেই</div>';
+    return;
+  }
+  if(status === 'visitors'){
+    rowsEl.innerHTML = '<div class="glassEmpty">লোড হচ্ছে...</div>';
+    try{
+      const visits = await ordFetchRecentVisits();
+      __ordVisitsCache = visits;
+      const uniqueVisitors = new Set(visits.map(v=>v.visitorId)).size;
+      countEl.textContent = uniqueVisitors;
+      rowsEl.innerHTML = visits.length ? visits.map(ordCardListRowHtml_visit).join('') : '<div class="glassEmpty">এখনো কোনো ভিজিট রেকর্ড হয়নি</div>';
+    }catch(e){ console.error('ordRenderCardListRows (visitors) failed:', e); rowsEl.innerHTML = '<div class="glassEmpty">লোড করতে সমস্যা হয়েছে</div>'; }
+    return;
+  }
+  if(status === 'productviews'){
+    rowsEl.innerHTML = '<div class="glassEmpty">লোড হচ্ছে...</div>';
+    try{
+      const views = await ordFetchRecentProductViews();
+      const agg = ordAggregateProductViews(views);
+      __ordProductViewsCache = agg;
+      countEl.textContent = agg.length;
+      rowsEl.innerHTML = agg.length ? agg.map((pv,i)=>ordCardListRowHtml_productView(pv, i+1)).join('') : '<div class="glassEmpty">এখনো কোনো প্রোডাক্ট-ভিউ রেকর্ড হয়নি</div>';
+    }catch(e){ console.error('ordRenderCardListRows (productviews) failed:', e); rowsEl.innerHTML = '<div class="glassEmpty">লোড করতে সমস্যা হয়েছে</div>'; }
     return;
   }
   const cfg = ORD_STATUS_CARD_CONFIG[status];
@@ -15134,13 +15247,15 @@ function ordOpenCardListModal(status, title){
 const ORD_CARD_ID_TO_STATUS = {
   monOrdPendingCard: 'pending', monOrdPreparingCard: 'preparing', monOrdShippedCard: 'shipped',
   monOrdDeliveredCard: 'delivered', monOrdCancelledCard: 'cancelled', monOrdInvoiceCard: 'invoice',
+  monVisitorsCard: 'visitors', monProductViewsCard: 'productviews',
 };
+const ORD_CARD_LIST_TITLES = { invoice: '🧾 মোট ইনভয়েস', visitors: '👥 সাম্প্রতিক ভিজিটর', productviews: '👀 বেশি দেখা প্রোডাক্ট' };
 Object.keys(ORD_CARD_ID_TO_STATUS).forEach(cardId=>{
   const el = document.getElementById(cardId);
   if(!el) return;
   el.addEventListener('click', ()=>{
     const status = ORD_CARD_ID_TO_STATUS[cardId];
-    const title = status === 'invoice' ? '🧾 মোট ইনভয়েস' : `${ORD_STATUS_CARD_CONFIG[status].icon} ${ORD_STATUS_CARD_CONFIG[status].label}`;
+    const title = ORD_CARD_LIST_TITLES[status] || `${ORD_STATUS_CARD_CONFIG[status].icon} ${ORD_STATUS_CARD_CONFIG[status].label}`;
     ordOpenCardListModal(status, title);
   });
 });
@@ -15166,6 +15281,23 @@ document.getElementById('ordCardListPrintBtn').addEventListener('click', ()=>{
       return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(b.name||'—')}</td><td style="border:1px solid #ccc; padding:8px;">${b.items.length} আইটেম</td><td style="border:1px solid #ccc; padding:8px;">${ds}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(b.total)}</td></tr>`;
     }).join('');
     totalLine = `মোট ইনভয়েস: ${bills.length}টি — সর্বমোট: ${fmt(grandTotal)}`;
+  } else if(status === 'visitors'){
+    const visits = __ordVisitsCache || [];
+    if(!visits.length){ toast('কোনো তথ্য নেই'); return; }
+    const uniqueVisitors = new Set(visits.map(v=>v.visitorId)).size;
+    headCols = '<th style="border:1px solid #ccc; padding:8px; text-align:left;">#</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">ভিজিটর</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">তারিখ ও সময়</th>';
+    rows = visits.map((v,i)=>{
+      const ts = (v.timestamp && v.timestamp.toDate) ? v.timestamp.toDate() : null;
+      const ds = ts ? (ts.toLocaleDateString('bn-BD',{day:'numeric',month:'short',year:'numeric'}) + ' ' + ts.toLocaleTimeString('bn-BD',{hour:'2-digit',minute:'2-digit'})) : '';
+      return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml((v.visitorId||'').slice(0,10))}…</td><td style="border:1px solid #ccc; padding:8px;">${ds}</td></tr>`;
+    }).join('');
+    totalLine = `মোট ইউনিক ভিজিটর (সাম্প্রতিক ১০০০ রেকর্ড থেকে): ${uniqueVisitors} জন — মোট ভিজিট: ${visits.length}টি`;
+  } else if(status === 'productviews'){
+    const agg = __ordProductViewsCache || [];
+    if(!agg.length){ toast('কোনো তথ্য নেই'); return; }
+    headCols = '<th style="border:1px solid #ccc; padding:8px; text-align:left;">#</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">প্রোডাক্ট</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">কতবার দেখা হয়েছে</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">মোট সময়</th>';
+    rows = agg.map((pv,i)=> `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(pv.productName||'—')}</td><td style="border:1px solid #ccc; padding:8px;">${pv.viewCount}</td><td style="border:1px solid #ccc; padding:8px;">${ordFormatDuration(pv.totalDurationMs)}</td></tr>`).join('');
+    totalLine = `মোট ${agg.length}টি ভিন্ন প্রোডাক্ট দেখা হয়েছে (সাম্প্রতিক ১০০০ ভিউ থেকে হিসাব)`;
   } else {
     const items = status === 'pending' ? (__ordPendingOrders || []) : (__ordStatusArrays[status] || []);
     if(!items.length){ toast('কোনো তথ্য নেই'); return; }
