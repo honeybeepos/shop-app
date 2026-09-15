@@ -2450,6 +2450,8 @@
     <h3>📨 রসিদ পাঠান / প্রিন্ট করুন</h3>
     <p class="pin-desc" id="shareMsgPreview"></p>
     <button class="btn" id="sharePrint" style="margin-top:0;">🖨️ থার্মাল প্রিন্ট (রসিদ)</button>
+    <button class="btn secondary" id="shareBtPrint" style="margin-top:10px;">🔵 ব্লুটুথ প্রিন্টারে পাঠান (RawBT)</button>
+    <div style="font-size:10.5px; color:#8a7f6c; text-align:center; margin-top:4px;">প্রথমবার ব্যবহারের আগে ফোনে RawBT অ্যাপ ইন্সটল করে প্রিন্টার একবার বেছে নিতে হবে</div>
     <a class="btn" id="shareWhatsapp" style="text-decoration:none; display:block; text-align:center; margin-top:10px;" target="_blank">✅ Send via WhatsApp</a>
     <button class="btn secondary" id="shareSms" style="margin-top:10px;">💬 Send via SMS</button>
     <button class="mini-btn" id="shareSkip" style="margin-top:10px; width:100%;">Not Now</button>
@@ -5254,26 +5256,30 @@ function ordStartNotificationListener(){
     }, (err)=> console.warn('order notification listener error:', err));
 }
 
+// 🔗 আগে বেল থেকে প্রতিটা প্রোডাক্ট আলাদা আলাদাভাবে সরাসরি ordUpdateStatus(...,
+// 'preparing') কল করে "গ্রহণ" করা যেত — এটা "নতুন" ট্যাবের গ্রুপ-অ্যাকসেপ্ট
+// পপ-আপ (রাইডার/নিজে বেছে নেওয়া + প্রিন্ট + এক রসিদে এক রাইডার লজিক)
+// সম্পূর্ণ এড়িয়ে যেত। এখন বেল থেকেও ঠিক "নতুন" ট্যাবের মতোই কাস্টমার-গ্রুপ
+// করা কার্ড দেখানো হয়, আর "✅ সব গ্রহণ করুন"-এ চাপলে বেল বন্ধ হয়ে ঠিক একই
+// গ্রুপ-অ্যাকসেপ্ট পপ-আপ (ordOpenAcceptGroup) খোলে — তাই বেল আর "নতুন" ট্যাব
+// এখন থেকে একই পথ দিয়ে যায়, কোনো শর্টকাট বাইপাস নেই।
 function ordRenderBellList(){
   const area = document.getElementById('ordBellListArea');
   if(!__ordPendingOrders.length){
     area.innerHTML = '<div class="hbEmpty">এখন কোনো নতুন অর্ডার নেই</div>';
     return;
   }
-  area.innerHTML = __ordPendingOrders.map(o=>{
-    const time = o.createdAt ? o.createdAt.toDate().toLocaleTimeString('bn-BD',{hour:'2-digit',minute:'2-digit'}) : '';
-    return `
-      <div class="hbOrderRow" style="flex-direction:column; align-items:stretch; gap:8px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.08);">
-        <div>
-          <div style="font-weight:800; font-size:13.5px;">${escapeAttr(o.productName||'প্রোডাক্ট')}</div>
-          <div style="font-size:11.5px; color:rgba(255,255,255,0.55);">কাস্টমার: ${escapeAttr(o.customerName||'—')} · পরিমাণ: ${o.qty||1} · ${time}</div>
-          ${o.deliveryAddress ? `<div style="font-size:11px; color:#8ec9a8; margin-top:3px;">📍 ${escapeAttr(o.deliveryAddress)}${o.deliveryPhone ? ' · 📞 ' + escapeAttr(o.deliveryPhone) : ''}${o.deliveryLat!=null ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${o.deliveryLat},${o.deliveryLng}" target="_blank" style="color:#0ea5e9;">🗺️ ম্যাপে দেখুন</a>` : ''}</div>` : ''}
-        </div>
-        <button class="ordBellAcceptBtn" data-oid="${o.id}" style="width:100%; padding:10px; border:none; border-radius:9px; background:#22c55e; color:#08130d; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ গ্রহণ করুন</button>
-      </div>`;
-  }).join('');
-  area.querySelectorAll('.ordBellAcceptBtn').forEach(btn=>{
-    btn.addEventListener('click', ()=> ordUpdateStatus(btn.dataset.oid, 'preparing'));
+  const allProducts = (typeof bccLoadProducts === 'function') ? bccLoadProducts() : [];
+  const groups = ordGroupByCustomer(__ordPendingOrders);
+  area.innerHTML = groups.map(g=> ordBuildPendingGroupHtml(g, allProducts)).join('');
+  area.querySelectorAll('.ordItemRemoveBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ if(confirm('এই প্রোডাক্টটা বাতিল করবেন?')) ordUpdateStatus(btn.dataset.oid, 'cancelled'); });
+  });
+  area.querySelectorAll('.ordGroupAcceptBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.getElementById('ordBellModalOverlay').classList.remove('show');
+      ordOpenAcceptGroup(btn.dataset.gkey, groups);
+    });
   });
 }
 
@@ -5418,6 +5424,12 @@ function ordDispatchBlockHtml(o){
   if(o.dispatchState === 'searching_rider' || o.dispatchState === 'offer_sent' || o.dispatchState === 'assigned'){
     return `${label}<div style="padding:8px 10px; border-radius:8px; background:rgba(14,165,233,0.12); color:#7dd3fc; font-size:11.5px; font-weight:700;">${ORD_DISPATCH_STATE_LABEL[o.dispatchState]}</div>`;
   }
+  // 🔗 এই আইটেমটা একই রসিদের "লিডার" আইটেমের সাথে ব্যাচ করা — লিডারের রাইডার
+  // পাওয়ার সাথে সাথেই এটাও সেই রাইডারের কাছে চলে যাবে, আলাদা করে রাইডার
+  // খোঁজার প্রয়োজন নেই
+  if(o.dispatchState === 'batched'){
+    return `${label}<div style="padding:8px 10px; border-radius:8px; background:rgba(167,139,250,0.12); color:#c4b5fd; font-size:11.5px; font-weight:700;">🔗 এই রসিদের অন্য প্রোডাক্টের সাথে একই রাইডারে যাবে</div>`;
+  }
   return `
     ${label}
     ${o.dispatchState === 'waiting_for_rider' ? `<div style="padding:9px 10px; border-radius:8px; background:rgba(234,179,8,0.12); color:#fbbf24; font-size:11px; font-weight:700; line-height:1.5;">⚠️ এই মুহূর্তে কোনো Delivery Rider Duty-তে নেই — Rider এলে অটো এসাইন হবে।</div>` : ''}
@@ -5499,13 +5511,36 @@ async function ordPopulateRiderSelects(listEl){
       const riderId = sel.value;
       if(!riderId){ alert('আগে একজন রাইডার বেছে নিন।'); return; }
       const rider = riders.find(r=> r.id === riderId);
+      const orderId = btn.dataset.oid;
+      const assignData = {
+        status: 'shipped', assignedRiderId: riderId, assignedRiderName: rider ? rider.name : null,
+        riderAssignedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        shippedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        dispatchState: 'assigned' // ম্যানুয়ালি এসাইন করলেও dispatchState সমন্বিত থাকে
+      };
       try{
-        await db.collection('orderRequests').doc(btn.dataset.oid).update({
-          status: 'shipped', assignedRiderId: riderId, assignedRiderName: rider ? rider.name : null,
-          riderAssignedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          shippedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          dispatchState: 'assigned' // ম্যানুয়ালি এসাইন করলেও dispatchState সমন্বিত থাকে
-        });
+        await db.collection('orderRequests').doc(orderId).update(assignData);
+
+        // 🔗 এটা যদি একই রসিদের একাধিক-প্রোডাক্ট ব্যাচের "লিডার" আইটেম হয়
+        // (অটো-ডিসপ্যাচ রাইডার না পেয়ে এই ম্যানুয়াল ফলব্যাকে এসেছে), তাহলে
+        // এই ম্যানুয়ালি বাছাই করা রাইডারটাই ব্যাচের বাকি আইটেমগুলোতেও বসিয়ে
+        // দেওয়া হচ্ছে — Cloud Function-এর অটো-প্রপাগেশনের মতোই, যাতে পুরো
+        // রসিদ একজনের কাছেই যায়
+        const orderSnap = await db.collection('orderRequests').doc(orderId).get();
+        const orderData = orderSnap.exists ? orderSnap.data() : null;
+        if(orderData && orderData.groupBatchId){
+          const sibSnap = await db.collection('orderRequests').where('groupBatchId','==', orderData.groupBatchId).get();
+          const sBatch = db.batch();
+          let count = 0;
+          sibSnap.docs.forEach(d=>{
+            if(d.id === orderId) return;
+            const sib = d.data();
+            if(sib.status !== 'preparing' || sib.dispatchState !== 'batched') return;
+            sBatch.update(d.ref, assignData);
+            count++;
+          });
+          if(count > 0) await sBatch.commit();
+        }
       }catch(e){ alert('এসাইন করা যায়নি: ' + e.message); }
     });
   });
@@ -5547,12 +5582,25 @@ document.getElementById('ordAGConfirmBtn').addEventListener('click', async ()=>{
   btn.disabled = true; btn.textContent = 'গ্রহণ করা হচ্ছে...';
   try{
     const batch = db.batch();
-    __ordAGGroup.items.forEach(o=>{
-      batch.update(db.collection('orderRequests').doc(o.id), {
+    // 🚚 এক রসিদে একাধিক প্রোডাক্ট (আলাদা orderRequests ডকুমেন্ট) থাকলে আগে
+    // প্রতিটার জন্য Cloud Function আলাদাভাবে রাইডার খুঁজত — একই কাস্টমারের
+    // একই ডেলিভারিতে ২-৩ জন আলাদা রাইডার চলে আসতে পারত। এখন গ্রুপের প্রথম
+    // আইটেমটাকেই "লিডার" রাখা হচ্ছে (dispatchState ফাঁকা রেখে, তাই ওটাই
+    // একমাত্র রাইডার খুঁজবে); বাকি আইটেমগুলোতে dispatchState:'batched' লিখে
+    // দেওয়া হচ্ছে — Cloud Function-এর বিদ্যমান গার্ড (dispatchState থাকলে
+    // কিছু করে না) সেগুলোর জন্য নতুন করে রাইডার-খোঁজা শুরু করবে না। রাইডার
+    // পাওয়া গেলে functions/index.js-এর onOfferAccepted একই groupBatchId-এর
+    // সব ডকুমেন্টেই সেই রাইডার বসিয়ে দেয় — ফলে পুরো রসিদ একজনের কাছেই যায়।
+    const groupBatchId = (typeof genLineId === 'function') ? genLineId() : ('batch-'+Date.now());
+    __ordAGGroup.items.forEach((o, idx)=>{
+      const update = {
         status: 'preparing',
         preparingAt: firebase.firestore.FieldValue.serverTimestamp(),
-        selfDelivery: __ordAGMode === 'self'
-      });
+        selfDelivery: __ordAGMode === 'self',
+        groupBatchId
+      };
+      if(idx > 0) update.dispatchState = 'batched';
+      batch.update(db.collection('orderRequests').doc(o.id), update);
     });
     await batch.commit();
     document.getElementById('ordAcceptGroupModal').classList.remove('show');
@@ -13552,6 +13600,7 @@ const shareModal = document.getElementById('shareModal');
 function openShareModal(name, phone, message){
   document.getElementById('shareMsgPreview').textContent = message;
   document.getElementById('sharePrint').onclick = ()=> printSaleReceipt(name, phone, message);
+  document.getElementById('shareBtPrint').onclick = ()=> btPrintReceipt(name, phone, message);
   const waBtn = document.getElementById('shareWhatsapp');
   const smsBtn = document.getElementById('shareSms');
   if(phone){
@@ -13604,6 +13653,196 @@ function printSaleReceipt(name, phone, message){
   window.print();
   setTimeout(()=> printArea.classList.remove('printing'), 500);
 }
+
+/* ==================== 🔵🖨️ ব্লুটুথ থার্মাল প্রিন্টার (RawBT দিয়ে) ====================
+   ব্রাউজার থেকে সরাসরি ব্লুটুথ প্রিন্টারে লেখা পাঠানোর কোনো সাধারণ/নিরাপদ উপায় নেই —
+   Web Bluetooth শুধু BLE (নতুন ধরনের) ডিভাইসে কাজ করে, কিন্তু এই ধরনের সস্তা ৫৮মিমি
+   হ্যান্ডহেল্ড থার্মাল প্রিন্টার (যেমন GOOJPRT PT-210) সাধারণত পুরনো ধরনের ক্লাসিক
+   Bluetooth (SPP) ব্যবহার করে, যা কোনো ওয়েবসাইট থেকে সরাসরি ধরাই যায় না (এটা ব্রাউজারের
+   নিজের সীমাবদ্ধতা, কোড দিয়ে ঠিক করার উপায় নেই)। তাই এখানে RawBT নামের একটা ফ্রি Android
+   অ্যাপ ব্যবহার করা হচ্ছে (Google Play: "RawBT: inkless print service") — এটা নিজেই
+   প্রিন্টারের সাথে ব্লুটুথ কানেকশন সামলায়, ওয়েবসাইট শুধু ছবি/ডেটা পাঠিয়ে দেয়।
+
+   ব্যবহারের আগে একবার করতে হবেঃ
+   ১) ফোনে RawBT অ্যাপ ইন্সটল করুন (Google Play থেকে)
+   ২) ফোনের Bluetooth সেটিংস থেকে প্রিন্টারটা পেয়ার করুন
+   ৩) RawBT অ্যাপ খুলে "Select printer"-এ গিয়ে প্রিন্টারটা বেছে নিন
+   এরপর থেকে POS-এর এই বাটনে চাপলেই সরাসরি প্রিন্ট হয়ে যাবে, বারবার কিছু করতে হবে না।
+
+   বাংলা লেখা সরাসরি টেক্সট কমান্ড দিয়ে পাঠালে এই প্রিন্টারগুলোর ফার্মওয়্যারে বাংলা
+   ফন্ট না থাকায় ভুল/ভাঙা অক্ষর প্রিন্ট হয় — তাই রসিদটা প্রথমে ব্রাউজারের নিজের বাংলা
+   ফন্ট (Noto Sans Bengali) দিয়ে একটা ছবি (canvas বিটম্যাপ) হিসেবে আঁকা হয়, তারপর সেই
+   ছবিটাই ESC/POS-এর "raster bit image" কমান্ড (GS v 0) দিয়ে পাঠানো হয় — এতে বাংলা
+   ঠিকভাবেই আসে। */
+const BT_PRINTER_DOT_WIDTH = 384; // ৫৮মিমি থার্মাল প্রিন্টারের প্রায় সবগুলোই ৩৮৪ ডট চওড়া
+
+// 📶 রসিদ প্রিন্টের বাটনে চাপার পর যত কম async wait হয়, তত ভালো — Chrome কখনো কখনো
+// "user gesture" হারিয়ে গেলে intent: লিঙ্ক চালু করতে দেয় না। তাই পেজ লোড হওয়ার সময়েই
+// ফন্টটা একবার লোড করে রাখা হচ্ছে (আগে থেকে ব্যবহার হচ্ছেই, তাই এমনিতেই ক্যাশ হয়ে থাকে) —
+// আসল প্রিন্টের সময় document.fonts.ready তাৎক্ষণিকভাবেই resolve হয়ে যাবে
+if(typeof document !== 'undefined' && document.fonts && typeof document.fonts.load === 'function'){
+  try{
+    document.fonts.load("22px 'Noto Sans Bengali'");
+    document.fonts.load("800 26px 'Noto Sans Bengali'");
+  }catch(e){ /* ফন্ট প্রি-লোড ব্যর্থ হলেও সমস্যা নেই, প্রিন্টের সময় আবার await করা হবে */ }
+}
+
+// 🖌️ রসিদের লেখা (দোকানের নাম + মেসেজ + ধন্যবাদ লাইন) একটা ৩৮৪-ডট চওড়া canvas-এ
+// আঁকা হয় — ঠিক printSaleReceipt()-এ যেমন HTML রসিদ বানানো হয়, একই তথ্য এখানে
+// ছবি হিসেবে বানানো হচ্ছে
+async function btRenderReceiptCanvas(shopName, message){
+  if(document.fonts && document.fonts.ready) await document.fonts.ready;
+  const W = BT_PRINTER_DOT_WIDTH;
+  const marginX = 12;
+  const usableW = W - marginX*2;
+  const measureCanvas = document.createElement('canvas');
+  const mctx = measureCanvas.getContext('2d');
+
+  function wrapLine(text, font){
+    mctx.font = font;
+    if(!text) return [''];
+    const words = text.split(' ');
+    const out = [];
+    let cur = '';
+    words.forEach(w=>{
+      const test = cur ? cur + ' ' + w : w;
+      if(mctx.measureText(test).width <= usableW){ cur = test; return; }
+      if(cur) out.push(cur);
+      // একটা শব্দই যদি পুরো লাইনের চেয়ে চওড়া হয় (Bengali-তে সচরাচর হয় না, তবু
+      // সেফটির জন্য) — অক্ষর ধরে ধরে ভাঙা হচ্ছে, যাতে কিছু কাটা না পড়ে
+      if(mctx.measureText(w).width > usableW){
+        let chunk = '';
+        for(const ch of w){
+          const t2 = chunk + ch;
+          if(mctx.measureText(t2).width > usableW){ if(chunk) out.push(chunk); chunk = ch; }
+          else chunk = t2;
+        }
+        cur = chunk;
+      } else {
+        cur = w;
+      }
+    });
+    if(cur) out.push(cur);
+    return out.length ? out : [''];
+  }
+
+  const headerFont = "800 26px 'Noto Sans Bengali'";
+  const bodyFont = "22px 'Noto Sans Bengali'";
+  const footerFont = "20px 'Noto Sans Bengali'";
+  const lineH = { header:34, body:28, footer:26, gap:18 };
+
+  const headerLines = shopName ? wrapLine(shopName, headerFont) : [];
+  let bodyLines = [];
+  message.split('\n').forEach(l=> wrapLine(l, bodyFont).forEach(x=> bodyLines.push(x)));
+  const footerLines = wrapLine('ধন্যবাদ! আবার আসবেন 🙏', footerFont);
+
+  let totalH = 16;
+  if(headerLines.length) totalH += headerLines.length * lineH.header + lineH.gap;
+  totalH += bodyLines.length * lineH.body + lineH.gap;
+  totalH += footerLines.length * lineH.footer;
+  totalH += 46; // নিচে ছেঁড়ার জন্য একটু ফাঁকা জায়গা (এই প্রিন্টারে অটো-কাটার নেই)
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = Math.ceil(totalH);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000';
+  ctx.textBaseline = 'top';
+
+  function drawDashed(atY){
+    ctx.save();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6,5]);
+    ctx.beginPath();
+    ctx.moveTo(marginX, atY);
+    ctx.lineTo(W - marginX, atY);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  let cy = 16;
+  if(headerLines.length){
+    ctx.font = headerFont;
+    ctx.textAlign = 'center';
+    headerLines.forEach(l=>{ ctx.fillText(l, W/2, cy); cy += lineH.header; });
+    drawDashed(cy + 6);
+    cy += lineH.gap;
+  }
+
+  ctx.font = bodyFont;
+  ctx.textAlign = 'left';
+  bodyLines.forEach(l=>{ ctx.fillText(l, marginX, cy); cy += lineH.body; });
+  drawDashed(cy + 6);
+  cy += lineH.gap;
+
+  ctx.font = footerFont;
+  ctx.textAlign = 'center';
+  footerLines.forEach(l=>{ ctx.fillText(l, W/2, cy); cy += lineH.footer; });
+
+  return canvas;
+}
+
+// 🎞️ canvas-এর ছবিটাকে ১-বিট সাদা-কালো বিটম্যাপে বদলে ESC/POS-এর "GS v 0" raster
+// image কমান্ড ফরম্যাটে সাজানো হয় — প্রিন্টার এই ফরম্যাটেই ছবি বোঝে
+function btCanvasToEscposRaster(canvas){
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width, height = canvas.height;
+  const bytesPerRow = Math.ceil(width / 8);
+  const imgData = ctx.getImageData(0, 0, width, height).data;
+  const raster = new Uint8Array(bytesPerRow * height);
+  for(let yy=0; yy<height; yy++){
+    for(let xx=0; xx<width; xx++){
+      const idx = (yy*width + xx) * 4;
+      const r = imgData[idx], g = imgData[idx+1], b = imgData[idx+2], a = imgData[idx+3];
+      const luminance = r*0.299 + g*0.587 + b*0.114;
+      const isBlack = a > 10 && luminance < 160; // হালকা সাদার বদলে সামান্য থ্রেশহোল্ড, ফন্টের অ্যান্টি-অ্যালিয়াসিং যেন পাতলা না দেখায়
+      if(isBlack){
+        const byteIndex = yy*bytesPerRow + (xx >> 3);
+        const bitIndex = 7 - (xx % 8);
+        raster[byteIndex] |= (1 << bitIndex);
+      }
+    }
+  }
+  const xL = bytesPerRow & 0xFF, xH = (bytesPerRow >> 8) & 0xFF;
+  const yL = height & 0xFF, yH = (height >> 8) & 0xFF;
+  const init = new Uint8Array([0x1B, 0x40]); // ESC @ — প্রিন্টার রিসেট/ইনিশিয়ালাইজ
+  const header = new Uint8Array([0x1D, 0x76, 0x30, 0x00, xL, xH, yL, yH]); // GS v 0
+  const feed = new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A]); // ছেঁড়ার জন্য কিছুটা কাগজ ফিড
+  const out = new Uint8Array(init.length + header.length + raster.length + feed.length);
+  out.set(init, 0);
+  out.set(header, init.length);
+  out.set(raster, init.length + header.length);
+  out.set(feed, init.length + header.length + raster.length);
+  return out;
+}
+
+function btBytesToBase64(bytes){
+  let binary = '';
+  for(let i=0; i<bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+// 🚀 RawBT অ্যাপকে ডেটা পাঠানোর প্রকৃত পদ্ধতি — Android-এর "intent:" URL স্কিম দিয়ে,
+// যেখানে base64-এনকোড করা ESC/POS ডেটা "#Intent;scheme=rawbt;package=..." দিয়ে
+// সরাসরি RawBT অ্যাপে পাঠানো হয় (RawBT ইন্সটল না থাকলে Chrome নিজেই Play Store খুলে
+// দেয়) — এই একই পদ্ধতি ব্যবহার করে অনেক ছোট দোকানের ওয়েব-POS সিস্টেম, যাচাই করা প্যাটার্ন
+async function btPrintReceipt(name, phone, message){
+  try{
+    const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+    const canvas = await btRenderReceiptCanvas(shopName, message);
+    const bytes = btCanvasToEscposRaster(canvas);
+    const b64 = btBytesToBase64(bytes);
+    const intentUrl = `intent:base64,${b64}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+    window.location.href = intentUrl;
+  }catch(e){
+    console.error('btPrintReceipt failed:', e);
+    alert('ব্লুটুথ প্রিন্টে পাঠাতে সমস্যা হয়েছে।\n\nচেক করুনঃ ফোনে "RawBT: inkless print service" অ্যাপ ইন্সটল আছে কিনা, আর RawBT-এর ভিতরে প্রিন্টারটা একবার বেছে নেওয়া (Select printer) আছে কিনা।\n\nএরর: ' + (e && e.message || e));
+  }
+}
+
 document.getElementById('shareSkip').addEventListener('click', ()=> shareModal.classList.remove('show'));
 
 // 🔫 USB/Bluetooth বারকোড স্ক্যানার দিয়ে রসিদের বারকোড স্ক্যান করলে সেটা এই ফিল্ডেই
