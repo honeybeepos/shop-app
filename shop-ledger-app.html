@@ -14965,6 +14965,12 @@ document.querySelectorAll('#program-monitor .monSubtab').forEach(t=>{
     document.querySelectorAll('#program-monitor .monSection').forEach(s=>s.style.display='none');
     t.classList.add('active');
     document.getElementById('mtab-'+t.dataset.mtab).style.display='block';
+    // 🔧 সাজেশন ট্যাবে ঢোকার মুহূর্তেই একবার রিফ্রেশ করে দেওয়া হচ্ছে, যাতে
+    // monRenderAll()-এ এই ট্যাব শুধু active থাকলেই চলার নতুন নিয়মেও ট্যাব খোলার
+    // সাথে সাথেই সবশেষ ডেটা দেখা যায় (নিচে monRenderAll() দ্রষ্টব্য)।
+    if(t.dataset.mtab === 'reco'){
+      try{ if(typeof renderRecoTab === 'function') renderRecoTab(); }catch(e){ console.error('renderRecoTab failed:', e); }
+    }
   });
 });
 
@@ -15125,7 +15131,19 @@ function monRenderAll(){
   const oosCard = document.getElementById('monOutOfStock').closest('.glassCard');
   if(oosCard) oosCard.classList.toggle('pulseAlert', outOfStock.length > 0);
 
-  try{ if(typeof renderRecoTab === 'function') renderRecoTab(); }catch(e){ console.error('renderRecoTab failed:', e); }
+  // 🔧 renderRecoTab() (এবং তার ভেতরের ভারী buildCustomerProfiles/scoreAndSegmentCustomers
+  // হিসাব) আগে monRenderAll()-এর প্রতিটা কলেই আনকন্ডিশনালি চলত। কিন্তু monRenderAll()
+  // এখন প্রতিটা সেভ/অর্ডার-অ্যাকশনের পর cloud sync (watchAppDataChanges) থেকেও
+  // রিয়েল-টাইমে বারবার ট্রিগার হয় — অর্থাৎ ইউজার সাজেশন ট্যাব না খুললেও এই ভারী
+  // হিসাব ব্যাকগ্রাউন্ডে বারবার চলছিল, যেটা কিছুক্ষণ টানা ব্যবহারের পর ফোনের Chrome
+  // ক্র্যাশ ("Aw, Snap!") করার প্রধান কারণ হিসেবে শনাক্ত হয়েছে। এখন থেকে এটা শুধু তখনই
+  // চলবে যখন সাজেশন ট্যাবটা আসলেই খোলা/দৃশ্যমান আছে (ট্যাবে ক্লিক করলে উপরের হ্যান্ডলার
+  // থেকেও আলাদাভাবে একবার রিফ্রেশ হয়, তাই ট্যাব খোলা অবস্থায় ডেটা বাসি থাকবে না)।
+  try{
+    const recoSection = document.getElementById('mtab-reco');
+    const recoVisible = recoSection && recoSection.style.display !== 'none';
+    if(recoVisible && typeof renderRecoTab === 'function') renderRecoTab();
+  }catch(e){ console.error('renderRecoTab failed:', e); }
 }
 
 /* ================= 🐝 Customer Surprise Recommendation Engine (Phase 1) =================
