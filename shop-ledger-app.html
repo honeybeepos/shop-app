@@ -3604,6 +3604,9 @@
 
   <button class="hbAddBtn" id="hbAddOrderBtn">📞 ফোন/হাতে-অর্ডার যোগ করুন</button>
   <button class="hbAddBtn" id="hbCallDeliveryBtn" style="background:linear-gradient(145deg,#16a34a,#0f7a3a); margin-top:10px;">🔔 ডেলিভারি ম্যান কে ডাকুন</button>
+  <div style="text-align:center; margin-top:8px;">
+    <span id="hbProfitMarginBtn" style="font-size:11px; color:rgba(255,248,232,0.55); cursor:pointer; text-decoration:underline;">⚙️ ফোন/হাতে-অর্ডারের আনুমানিক লাভের হার: <b id="hbProfitMarginLbl">২০%</b> (বদলাতে ট্যাপ করুন)</span>
+  </div>
   <div id="hbConnectCodeRow" style="text-align:center; margin-top:4px;">
     <span id="hbRingStatusLbl" style="font-size:11px; color:rgba(255,248,232,0.4);"></span>
     <span id="hbShowConnectCodeBtn" style="font-size:11px; color:var(--hb-amber); cursor:pointer; text-decoration:underline; margin-left:8px;">🔗 ডেলিভারি অ্যাপ কানেক্ট কোড দেখুন</span>
@@ -6232,6 +6235,35 @@ function hbUpdateBellBadge(){
 }
 hbUpdateBellBadge();
 
+/* ==================== 📞 ফোন/হাতে-অর্ডারের আনুমানিক লাভের হার ====================
+   ফোন/হাতে-অর্ডারে কোন প্রোডাক্ট, কত দামে কেনা — এই হিসাব লেখা থাকে না (শুধু
+   মোট টাকা লেখা হয়), তাই সঠিক "লাভ" বের করার উপায় নেই। তাই দোকানদারকে একটা
+   আনুমানিক গড় লাভের হার (%) সেট করতে দেওয়া হচ্ছে (ডিফল্ট ২০%) — এই হার দিয়েই
+   প্রতিটা ফোন/হাতে-অর্ডারের "কেনা দাম" (cost) আন্দাজ করে Monitoring-এর লাভের
+   হিসাব বাস্তবের কাছাকাছি রাখা হবে। */
+function hbGetProfitMarginPct(){
+  const raw = localStorage.getItem('honeybee-phone-order-margin');
+  if(raw === null || raw === '') return 20; // এখনো সেট করা হয়নি — ডিফল্ট ২০%
+  const v = Number(raw);
+  return (Number.isFinite(v) && v >= 0 && v <= 100) ? v : 20;
+}
+function hbSetProfitMarginPct(pct){ localStorage.setItem('honeybee-phone-order-margin', String(pct)); }
+function hbRenderProfitMarginLbl(){
+  const el = document.getElementById('hbProfitMarginLbl');
+  if(el) el.textContent = hbGetProfitMarginPct() + '%';
+}
+hbRenderProfitMarginLbl();
+document.getElementById('hbProfitMarginBtn').addEventListener('click', ()=>{
+  const cur = hbGetProfitMarginPct();
+  const input = prompt('ফোন/হাতে-অর্ডারে গড়ে কত শতাংশ লাভ থাকে বলে মনে করেন? (০ থেকে ১০০ এর মধ্যে একটা সংখ্যা লিখুন)\n\nএই হার দিয়েই এখন থেকে Monitoring-এর লাভের হিসাব করা হবে — শুধু এই মুহূর্ত থেকে যোগ হওয়া নতুন অর্ডারগুলোর জন্য, আগের অর্ডারগুলো বদলাবে না।', String(cur));
+  if(input === null) return;
+  const pct = Number(input);
+  if(!Number.isFinite(pct) || pct < 0 || pct > 100){ toast('০ থেকে ১০০ এর মধ্যে একটা সঠিক সংখ্যা দিন'); return; }
+  hbSetProfitMarginPct(pct);
+  hbRenderProfitMarginLbl();
+  toast('✅ লাভের হার আপডেট হয়েছে: ' + pct + '%');
+});
+
 function hbRenderPendingList(){
   const pending = hbLoadPending().sort((a,b)=> new Date(b.date) - new Date(a.date));
   const area = document.getElementById('hbPendingListArea');
@@ -6301,15 +6333,18 @@ async function hbAcceptOrder(id){
 // প্রোডাক্ট/পরিমাণ লেখা থাকে না (শুধু টাকার অ্যামাউন্ট + অতিরিক্ত আয় + নোট) —
 // তাই এটাকে একটা "সাধারণ বিক্রি" এন্ট্রি হিসেবে যোগ করা হচ্ছে, প্রোডাক্ট স্টক
 // থেকে কিছু কমানো হয় না (কোন প্রোডাক্ট, তা জানা নেই)। অর্ডার অ্যামাউন্ট +
-// অতিরিক্ত আয়, দুটো মিলিয়েই মোট বিক্রির টাকা ধরা হচ্ছে, এবং যেহেতু এটার আসল
-// "cost"(কেনা দাম) জানা নেই, তাই cost শূন্য রাখা হলো — অর্থাৎ পুরোটাই লাভ হিসেবে
-// দেখাবে Monitoring-এ (এটা একটা সরলীকরণ, পরে চাইলে বদলানো যাবে)।
+// অতিরিক্ত আয়, দুটো মিলিয়েই মোট বিক্রির টাকা ধরা হচ্ছে। এটার আসল "cost"(কেনা
+// দাম) জানা নেই বলে দোকানদারের সেট করা আনুমানিক গড় লাভের হার (hbGetProfitMarginPct,
+// ডিফল্ট ২০%) দিয়ে cost আন্দাজ করা হয় — যাতে Monitoring-এর লাভের হিসাব পুরোপুরি
+// ১০০% লাভ না দেখিয়ে বাস্তবের কাছাকাছি থাকে (এটা তবুও একটা আন্দাজ, একদম নির্ভুল না)।
 function hbRecordOrderSale(order){
   try{
     // ⚠️ একই অর্ডার যেন ভুলবশত দুইবার হিসাবে যোগ না হয়
     if(retailEntries.some(e=> e.phoneOrderId === order.id)) return;
     const total = (Number(order.amount)||0) + (Number(order.income)||0);
     if(total <= 0) return;
+    const marginPct = hbGetProfitMarginPct();
+    const cost = Math.round(total * (1 - marginPct/100));
 
     const entry = {
       id: (typeof genLineId === 'function') ? genLineId() : ('phone-'+Date.now()),
@@ -6317,7 +6352,7 @@ function hbRecordOrderSale(order){
       phone: '',
       item: order.note ? order.note : '📞 ফোন/হাতে-অর্ডার',
       price: total,
-      cost: 0,
+      cost,
       qty: 1,
       unitPrice: total,
       paid: total,
@@ -6325,7 +6360,8 @@ function hbRecordOrderSale(order){
       paymentMethod: 'cash',
       date: order.date || new Date().toISOString(),
       soldBy: '🐝 Honey Bee Network (ফোন/হাতে-অর্ডার)',
-      phoneOrderId: order.id // ডুপ্লিকেট-চেক এই ফিল্ড দিয়েই হয়, উপরে দেখুন
+      phoneOrderId: order.id, // ডুপ্লিকেট-চেক এই ফিল্ড দিয়েই হয়, উপরে দেখুন
+      estimatedCost: true // মনে রাখার জন্য যে এই cost-টা আসল হিসাব না, আন্দাজ করা
     };
     retailEntries.push(entry);
     if(typeof backupRecentSaleEntries === 'function') backupRecentSaleEntries([entry]);
