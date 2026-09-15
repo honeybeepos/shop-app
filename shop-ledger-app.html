@@ -563,6 +563,8 @@
     #productLabelPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #ordReceiptPrintArea.printing, #ordReceiptPrintArea.printing *{visibility:visible;}
     #ordReceiptPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
+    #ordCardListPrintArea.printing, #ordCardListPrintArea.printing *{visibility:visible;}
+    #ordCardListPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     .no-print{display:none !important;}
   }
 </style>
@@ -2059,6 +2061,20 @@
 </div>
 <div id="damagedStockPrintArea"></div>
 
+<!-- 🔧 একটাই জেনেরিক লিস্ট+প্রিন্ট মডাল — Monitoring > 📦 অর্ডার ট্যাবের ৬টা কার্ড
+     (পেন্ডিং/প্রস্তুত/পথে/ডেলিভারী/বাতিল/ইনভয়েস) সবগুলাই এই একটা মডাল শেয়ার করে,
+     যাতে প্রতিটা কার্ডের জন্য আলাদা মডাল+প্রিন্ট কোড বানাতে না হয় -->
+<div class="modal-overlay" id="ordCardListModal">
+  <div class="modal-box" style="max-width:420px; text-align:left; max-height:85vh; display:flex; flex-direction:column;">
+    <h3 id="ordCardListTitle" style="margin:0 0 4px;">📦 অর্ডার লিস্ট</h3>
+    <p class="pin-desc" style="margin:0 0 10px;">মোট <b id="ordCardListCount">0</b>টি — নিচে থেকে দেখুন বা প্রিন্ট করুন।</p>
+    <button class="mini-btn" id="ordCardListPrintBtn" style="width:100%; margin-bottom:10px;">🖨️ Print</button>
+    <div id="ordCardListRows" style="overflow-y:auto; flex:1; min-height:60px;"></div>
+    <button class="mini-btn" id="ordCardListCloseBtn" style="width:100%; margin-top:12px;">বন্ধ করুন</button>
+  </div>
+</div>
+<div id="ordCardListPrintArea"></div>
+
 <div class="modal-overlay" id="productSaleModal">
   <div class="modal-box" style="max-width:420px; text-align:left; max-height:85vh; display:flex; flex-direction:column;">
     <h3 id="productSaleTitle" style="margin:0 0 4px;">🗓️ আজকের প্রোডাক্ট সেল</h3>
@@ -3356,6 +3372,7 @@
       <div class="monSubtab" data-mtab="customer">👥 Customer</div>
       <div class="monSubtab" data-mtab="performance">📈 Performance</div>
       <div class="monSubtab" data-mtab="alerts">🔔 Alerts</div>
+      <div class="monSubtab" data-mtab="orders">📦 অর্ডার</div>
       <div class="monSubtab" data-mtab="reco">🐝 সাজেশন</div>
     </div>
   </div>
@@ -3431,6 +3448,19 @@
       <div class="glassList" id="monAlertDuePayment"></div>
       <div class="monSectionTitle">🔄 Return / Refund Notification</div>
       <div class="glassList" id="monAlertReturns"></div>
+    </div>
+
+    <div class="monSection" id="mtab-orders" style="display:none;">
+      <div class="monSectionTitle">📦 অর্ডার স্ট্যাটাস</div>
+      <div class="glassGrid">
+        <div class="glassCard" id="monOrdPendingCard" style="cursor:pointer;"><div class="ic">⏳</div><div class="lbl">পেন্ডিং অর্ডার</div><div class="val" id="monOrdPendingCount">0</div></div>
+        <div class="glassCard" id="monOrdPreparingCard" style="cursor:pointer;"><div class="ic">👨‍🍳</div><div class="lbl">প্রস্তুত হচ্ছে</div><div class="val" id="monOrdPreparingCount">0</div></div>
+        <div class="glassCard" id="monOrdShippedCard" style="cursor:pointer;"><div class="ic">🛵</div><div class="lbl">পথে আছে</div><div class="val" id="monOrdShippedCount">0</div></div>
+        <div class="glassCard" id="monOrdDeliveredCard" style="cursor:pointer;"><div class="ic">✅</div><div class="lbl">ডেলিভারী সফল</div><div class="val" id="monOrdDeliveredCount">0</div></div>
+        <div class="glassCard alert" id="monOrdCancelledCard" style="cursor:pointer;"><div class="ic">❌</div><div class="lbl">রিজেক্ট/বাতিল</div><div class="val" id="monOrdCancelledCount">0</div></div>
+        <div class="glassCard" id="monOrdInvoiceCard" style="cursor:pointer;"><div class="ic">🧾</div><div class="lbl">মোট ইনভয়েস</div><div class="val" id="monOrdInvoiceCount">0</div></div>
+      </div>
+      <p style="font-size:10.5px; color:#c9c3f0; line-height:1.6; margin-top:6px;">💡 প্রতিটা কার্ডে ক্লিক করলে সেই তালিকার সব অর্ডার দেখাবে, আর সেখান থেকেই সরাসরি প্রিন্ট করা যাবে।</p>
     </div>
 
     <div class="monSection" id="mtab-reco" style="display:none;">
@@ -5236,6 +5266,14 @@ function ordStartNotificationListener(){
       });
       const bellBtn = document.getElementById('ordBellBtn');
       if(bellBtn) bellBtn.classList.toggle('hbRinging', n > 0);
+
+      // 📦 Monitoring > অর্ডার ট্যাবের "পেন্ডিং অর্ডার" কার্ডেও একই কাউন্ট বসানো হচ্ছে
+      const ordPendingCountEl = document.getElementById('monOrdPendingCount');
+      if(ordPendingCountEl) ordPendingCountEl.textContent = n;
+      const ordCardModal = document.getElementById('ordCardListModal');
+      if(ordCardModal && ordCardModal.classList.contains('show') && ordCardModal.dataset.status === 'pending' && typeof ordRenderCardListRows === 'function'){
+        ordRenderCardListRows('pending');
+      }
 
       // অর্ডার ব্যবস্থাপনা প্যানেল "নতুন" ট্যাবে খোলা থাকলে সেটাও লাইভ রিফ্রেশ হয়
       const ordersOpen = document.getElementById('program-orders') && document.getElementById('program-orders').style.display !== 'none';
@@ -14971,7 +15009,188 @@ document.querySelectorAll('#program-monitor .monSubtab').forEach(t=>{
     if(t.dataset.mtab === 'reco'){
       try{ if(typeof renderRecoTab === 'function') renderRecoTab(); }catch(e){ console.error('renderRecoTab failed:', e); }
     }
+    if(t.dataset.mtab === 'orders'){
+      try{
+        if(typeof ordStartStatusCountListeners === 'function') ordStartStatusCountListeners();
+        const pendingCountEl = document.getElementById('monOrdPendingCount');
+        if(pendingCountEl && typeof __ordPendingOrders !== 'undefined') pendingCountEl.textContent = __ordPendingOrders.length;
+        const invoiceCountEl = document.getElementById('monOrdInvoiceCount');
+        if(invoiceCountEl && typeof ordGetAllBills === 'function') invoiceCountEl.textContent = ordGetAllBills().length;
+      }catch(e){ console.error('orders tab open refresh failed:', e); }
+    }
   });
+});
+
+/* ================= 📦 অর্ডার স্ট্যাটাস কার্ড (Monitoring > 📦 অর্ডার) =================
+   পেন্ডিং/প্রস্তুত/পথে/ডেলিভারী/বাতিল/ইনভয়েস — প্রতিটা কার্ডে ক্লিক করলে সেই
+   তালিকার আসল অর্ডারগুলো একটা শেয়ার্ড মডালে দেখায়, আর সেই একই মডাল থেকেই প্রিন্ট
+   করা যায় — আলাদা করে প্রতিটা কার্ডের জন্য আলাদা মডাল/প্রিন্ট কোড বানাতে হয়নি।
+   পেন্ডিং বাদে বাকি ৪টা স্ট্যাটাসের জন্য হালকা onSnapshot লিস্টেনার (ঠিক
+   পেন্ডিং-অর্ডার বেল-এর মতোই) — শুধু সেই একটা স্ট্যাটাসের ডকুমেন্ট পাল্টালেই
+   ট্রিগার হয়, তাই এটা মনিটরিং ট্যাবের বারবার রিফ্রেশ (cloud sync echo) থেকে
+   স্বাধীন এবং নতুন কোনো পারফরম্যান্স সমস্যা তৈরি করবে না। এই লিস্টেনারগুলো
+   Monitoring > 📦 অর্ডার ট্যাব প্রথমবার খোলার সময় একবারই চালু হয়। */
+const ORD_STATUS_CARD_CONFIG = {
+  pending:   { label:'পেন্ডিং অর্ডার',   icon:'⏳',    emptyMsg:'কোনো পেন্ডিং অর্ডার নেই',        timeField:'createdAt',   countId:'monOrdPendingCount' },
+  preparing: { label:'প্রস্তুত হচ্ছে',    icon:'👨‍🍳', emptyMsg:'প্রস্তুত হচ্ছে এমন কোনো অর্ডার নেই', timeField:'preparingAt', countId:'monOrdPreparingCount' },
+  shipped:   { label:'পথে আছে',          icon:'🛵',   emptyMsg:'পথে কোনো অর্ডার নেই',              timeField:'shippedAt',   countId:'monOrdShippedCount' },
+  delivered: { label:'ডেলিভারী সফল',      icon:'✅',   emptyMsg:'ডেলিভারী সফল কোনো অর্ডার নেই',      timeField:'deliveredAt', countId:'monOrdDeliveredCount' },
+  cancelled: { label:'রিজেক্ট/বাতিল',      icon:'❌',   emptyMsg:'বাতিল/রিজেক্ট অর্ডার নেই',          timeField:'cancelledAt', countId:'monOrdCancelledCount' },
+};
+let __ordStatusArrays = { preparing:[], shipped:[], delivered:[], cancelled:[] };
+let __ordStatusListenersStarted = false;
+
+function ordStartStatusCountListeners(){
+  if(__ordStatusListenersStarted) return;
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId || typeof db === 'undefined') return;
+  __ordStatusListenersStarted = true;
+  ['preparing','shipped','delivered','cancelled'].forEach(status=>{
+    try{
+      db.collection('orderRequests').where('shopId','==',session.shopId).where('status','==',status)
+        .onSnapshot((qs)=>{
+          const cfg = ORD_STATUS_CARD_CONFIG[status];
+          const arr = qs.docs.map(d=>({id:d.id, ...d.data()}));
+          arr.sort((a,b)=>{
+            const at = (a[cfg.timeField] && a[cfg.timeField].toMillis) ? a[cfg.timeField].toMillis() : ((a.createdAt && a.createdAt.toMillis) ? a.createdAt.toMillis() : 0);
+            const bt = (b[cfg.timeField] && b[cfg.timeField].toMillis) ? b[cfg.timeField].toMillis() : ((b.createdAt && b.createdAt.toMillis) ? b.createdAt.toMillis() : 0);
+            return bt - at;
+          });
+          __ordStatusArrays[status] = arr;
+          const countEl = document.getElementById(cfg.countId);
+          if(countEl) countEl.textContent = arr.length;
+          const modal = document.getElementById('ordCardListModal');
+          if(modal && modal.classList.contains('show') && modal.dataset.status === status){
+            ordRenderCardListRows(status);
+          }
+        }, (err)=>{ console.error('ordStatusCountListener('+status+') failed:', err); });
+    }catch(e){ console.error('ordStartStatusCountListeners failed for', status, e); }
+  });
+}
+
+function ordGetAllBills(){
+  // monRenderAll()-এর billMap-এর মতোই হিসাব, কিন্তু ১০-এ ক্যাপ না করে পুরোটাই — ইনভয়েস কার্ডের জন্য
+  const billMap = {};
+  retailEntries.forEach(e=>{
+    if(!e.billId) return;
+    if(!billMap[e.billId]) billMap[e.billId] = { billId:e.billId, items:[], total:0, name:e.name, date:e.date };
+    billMap[e.billId].items.push({ item:e.item, qty:e.qty||1, price:e.price||0 });
+    billMap[e.billId].total += (e.price||0);
+  });
+  return Object.values(billMap).sort((a,b)=> new Date(b.date) - new Date(a.date));
+}
+
+function ordCardListRowHtml_order(o, status){
+  const cfg = ORD_STATUS_CARD_CONFIG[status];
+  const ts = (o[cfg.timeField] && o[cfg.timeField].toDate) ? o[cfg.timeField].toDate() : ((o.createdAt && o.createdAt.toDate) ? o.createdAt.toDate() : null);
+  const dateStr = ts ? ts.toLocaleDateString('bn-BD',{day:'numeric', month:'short', year:'numeric'}) : '';
+  const lineTotal = (o.price||0) * (o.qty||1);
+  return `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 4px; border-bottom:1px solid var(--line);">
+    <div style="min-width:0;">
+      <div style="font-weight:700; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(o.productName||'—')}${o.qty?(' × '+o.qty):''}</div>
+      <div style="font-size:11.5px; color:#7a6f63;">কাস্টমারঃ ${escapeHtml(o.customerName||'—')}${o.deliveryPhone?(' · '+escapeHtml(o.deliveryPhone)):''}</div>
+      <div style="font-size:11px; color:#8a7f6c;">${dateStr}</div>
+    </div>
+    <div style="font-weight:700; font-size:13px; white-space:nowrap;">${lineTotal?fmt(lineTotal):''}</div>
+  </div>`;
+}
+
+function ordCardListRowHtml_invoice(b){
+  const d = new Date(b.date);
+  const dateStr = isNaN(d) ? '' : d.toLocaleDateString('bn-BD',{day:'numeric', month:'short', year:'numeric'});
+  return `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 4px; border-bottom:1px solid var(--line);">
+    <div style="min-width:0;">
+      <div style="font-weight:700; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(b.name||'—')} — ${b.items.length} আইটেম</div>
+      <div style="font-size:11px; color:#8a7f6c;">${dateStr}</div>
+    </div>
+    <div style="font-weight:700; font-size:13px; white-space:nowrap;">${fmt(b.total)}</div>
+  </div>`;
+}
+
+function ordRenderCardListRows(status){
+  const rowsEl = document.getElementById('ordCardListRows');
+  const countEl = document.getElementById('ordCardListCount');
+  if(!rowsEl || !countEl) return;
+  if(status === 'invoice'){
+    const bills = ordGetAllBills();
+    countEl.textContent = bills.length;
+    rowsEl.innerHTML = bills.length ? bills.map(ordCardListRowHtml_invoice).join('') : '<div class="glassEmpty">কোনো ইনভয়েস নেই</div>';
+    return;
+  }
+  const cfg = ORD_STATUS_CARD_CONFIG[status];
+  const items = status === 'pending' ? (__ordPendingOrders || []) : (__ordStatusArrays[status] || []);
+  countEl.textContent = items.length;
+  rowsEl.innerHTML = items.length ? items.map(o=>ordCardListRowHtml_order(o,status)).join('') : `<div class="glassEmpty">${cfg.emptyMsg}</div>`;
+}
+
+function ordOpenCardListModal(status, title){
+  const modal = document.getElementById('ordCardListModal');
+  modal.dataset.status = status;
+  document.getElementById('ordCardListTitle').textContent = title;
+  ordRenderCardListRows(status);
+  modal.classList.add('show');
+}
+
+const ORD_CARD_ID_TO_STATUS = {
+  monOrdPendingCard: 'pending', monOrdPreparingCard: 'preparing', monOrdShippedCard: 'shipped',
+  monOrdDeliveredCard: 'delivered', monOrdCancelledCard: 'cancelled', monOrdInvoiceCard: 'invoice',
+};
+Object.keys(ORD_CARD_ID_TO_STATUS).forEach(cardId=>{
+  const el = document.getElementById(cardId);
+  if(!el) return;
+  el.addEventListener('click', ()=>{
+    const status = ORD_CARD_ID_TO_STATUS[cardId];
+    const title = status === 'invoice' ? '🧾 মোট ইনভয়েস' : `${ORD_STATUS_CARD_CONFIG[status].icon} ${ORD_STATUS_CARD_CONFIG[status].label}`;
+    ordOpenCardListModal(status, title);
+  });
+});
+document.getElementById('ordCardListCloseBtn').addEventListener('click', ()=> document.getElementById('ordCardListModal').classList.remove('show'));
+document.getElementById('ordCardListModal').addEventListener('click', (ev)=>{
+  if(ev.target === document.getElementById('ordCardListModal')) document.getElementById('ordCardListModal').classList.remove('show');
+});
+
+document.getElementById('ordCardListPrintBtn').addEventListener('click', ()=>{
+  const status = document.getElementById('ordCardListModal').dataset.status;
+  const title = document.getElementById('ordCardListTitle').textContent;
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  const dateStr = new Date().toLocaleDateString('bn-BD', {day:'numeric', month:'long', year:'numeric'});
+  let headCols = '', rows = '', totalLine = '';
+  if(status === 'invoice'){
+    const bills = ordGetAllBills();
+    if(!bills.length){ toast('কোনো তথ্য নেই'); return; }
+    headCols = '<th style="border:1px solid #ccc; padding:8px; text-align:left;">#</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">কাস্টমার</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">আইটেম</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">তারিখ</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">টাকা</th>';
+    let grandTotal = 0;
+    rows = bills.map((b,i)=>{
+      grandTotal += b.total;
+      const d = new Date(b.date); const ds = isNaN(d) ? '' : d.toLocaleDateString('bn-BD',{day:'numeric',month:'short',year:'numeric'});
+      return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(b.name||'—')}</td><td style="border:1px solid #ccc; padding:8px;">${b.items.length} আইটেম</td><td style="border:1px solid #ccc; padding:8px;">${ds}</td><td style="border:1px solid #ccc; padding:8px;">${fmt(b.total)}</td></tr>`;
+    }).join('');
+    totalLine = `মোট ইনভয়েস: ${bills.length}টি — সর্বমোট: ${fmt(grandTotal)}`;
+  } else {
+    const items = status === 'pending' ? (__ordPendingOrders || []) : (__ordStatusArrays[status] || []);
+    if(!items.length){ toast('কোনো তথ্য নেই'); return; }
+    headCols = '<th style="border:1px solid #ccc; padding:8px; text-align:left;">#</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">প্রোডাক্ট</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">পরিমাণ</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">কাস্টমার</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">ফোন</th><th style="border:1px solid #ccc; padding:8px; text-align:left;">টাকা</th>';
+    rows = items.map((o,i)=>{
+      const lineTotal = (o.price||0)*(o.qty||1);
+      return `<tr><td style="border:1px solid #ccc; padding:8px;">${i+1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(o.productName||'—')}</td><td style="border:1px solid #ccc; padding:8px;">${o.qty||1}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(o.customerName||'—')}</td><td style="border:1px solid #ccc; padding:8px;">${escapeHtml(o.deliveryPhone||'')}</td><td style="border:1px solid #ccc; padding:8px;">${lineTotal?fmt(lineTotal):''}</td></tr>`;
+    }).join('');
+    totalLine = `মোট: ${items.length}টি`;
+  }
+  const printArea = document.getElementById('ordCardListPrintArea');
+  printArea.innerHTML = `
+    <div style="padding:24px; font-family:sans-serif; color:#111;">
+      <h2 style="margin:0 0 4px;">${title}</h2>
+      ${shopName ? `<p style="margin:0 0 2px; color:#555;">${escapeHtml(shopName)}</p>` : ''}
+      <p style="margin:0 0 16px; color:#555;">তারিখ: ${dateStr}</p>
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <thead><tr style="background:#f0f0f0;">${headCols}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="margin-top:16px; font-weight:bold;">${totalLine}</p>
+    </div>`;
+  printArea.classList.add('printing');
+  window.print();
+  setTimeout(()=> printArea.classList.remove('printing'), 500);
 });
 
 function monRenderAll(){
