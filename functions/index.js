@@ -648,6 +648,47 @@ exports.onOfferAccepted = onDocumentUpdated(
       if (assigned) {
         console.log(JSON.stringify({ event: "ORDER_ASSIGNED", orderId: after.orderId, riderId: after.riderId }));
         console.log(JSON.stringify({ event: "OFFER_ACCEPTED", orderId: after.orderId, riderId: after.riderId }));
+
+        // 🔗 এক রসিদে একাধিক প্রোডাক্ট (আলাদা orderRequests ডকুমেন্ট) থাকলে
+        // POS-এর গ্রুপ-অ্যাকসেপ্ট শুধু প্রথম আইটেমটাকেই ("লিডার") রাইডার
+        // খোঁজার জন্য ছেড়ে দেয় (বাকিগুলোতে dispatchState:'batched' লেখা
+        // থাকে, shop-ledger-app.html-এর ordAGConfirmBtn দ্রষ্টব্য) — এখন
+        // লিডার রাইডার পেয়ে গেছে, তাই একই groupBatchId-এর বাকি
+        // "batched"-অবস্থার আইটেমগুলোতেও একই রাইডার বসিয়ে দেওয়া হচ্ছে, যাতে
+        // পুরো রসিদ একজন রাইডারের কাছেই যায় (আলাদা আলাদা রাইডার না)
+        try {
+          const leaderSnap = await orderRef.get();
+          const leaderData = leaderSnap.exists ? leaderSnap.data() : null;
+          if (leaderData && leaderData.groupBatchId) {
+            const siblingsSnap = await db.collection("orderRequests")
+              .where("groupBatchId", "==", leaderData.groupBatchId)
+              .get();
+            const sBatch = db.batch();
+            let count = 0;
+            siblingsSnap.docs.forEach((d) => {
+              if (d.id === after.orderId) return; // লিডার নিজেই, উপরে ইতিমধ্যে সেট হয়ে গেছে
+              const sib = d.data();
+              // বাতিল/অন্য কোনো অবস্থায় চলে যাওয়া আইটেম বাদ — শুধু এখনো
+              // "batched" অবস্থায় অপেক্ষমাণ আইটেমগুলোতেই বসানো হবে
+              if (sib.status !== "preparing" || sib.dispatchState !== "batched") return;
+              sBatch.update(d.ref, {
+                status: "shipped",
+                assignedRiderId: after.riderId,
+                assignedRiderName: riderName,
+                riderAssignedAt: FieldValue.serverTimestamp(),
+                shippedAt: FieldValue.serverTimestamp(),
+                dispatchState: "assigned",
+              });
+              count++;
+            });
+            if (count > 0) {
+              await sBatch.commit();
+              console.log(JSON.stringify({ event: "BATCH_SIBLINGS_ASSIGNED", groupBatchId: leaderData.groupBatchId, count, riderId: after.riderId }));
+            }
+          }
+        } catch (e) {
+          console.warn(JSON.stringify({ event: "BATCH_SIBLING_ASSIGN_FAILED", orderId: after.orderId, error: String(e && e.message || e) }));
+        }
       } else {
         console.log(JSON.stringify({ event: "DUPLICATE_ASSIGNMENT_BLOCKED", orderId: after.orderId, riderId: after.riderId }));
       }
