@@ -6280,6 +6280,12 @@ async function hbAcceptOrder(id){
   accepted.unshift(order);
   hbSaveOrders(accepted);
 
+  // 🐝🧾 ফোন/হাতে-অর্ডার একসেপ্ট হওয়ার সাথে সাথেই দোকানের মূল বিক্রির হিসাবেও
+  // (retailEntries → Monitoring) যোগ হয়ে যাবে — Bazar-এর অনলাইন অর্ডার যেভাবে
+  // "Delivered" হলে মূল হিসাবে যোগ হয়, ঠিক একইভাবে। এতে দোকানের ভিতরের বিক্রি,
+  // Bazar অনলাইন বিক্রি আর ফোন/হাতে-অর্ডার — সবগুলো মিলিয়ে একটাই মোট হিসাব দেখা যাবে।
+  hbRecordOrderSale(order);
+
   hbUpdateBellBadge();
   hbRenderPendingList();
   if(document.getElementById('program-honeybee').style.display !== 'none') hbRenderDashboard();
@@ -6288,6 +6294,45 @@ async function hbAcceptOrder(id){
   // একসেপ্ট করার সাথে সাথেই অর্ডার প্রিন্ট শুরু হবে
   const msg = `🐝 Honey Bee Network Order\n\nOrder Amount: ${HB_CUR} ${order.amount}${order.income ? `\nExtra Income: ${HB_CUR} ${order.income}` : ''}${order.note ? `\nNote: ${order.note}` : ''}\n\nTime: ${new Date(order.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}\nDate: ${new Date(order.date).toLocaleDateString('en-GB')}\n\nStatus: ✅ Accepted`;
   printSaleReceipt('Honey Bee Network', '', msg);
+}
+
+// 🐝🧾 Honey Bee Network-এর একসেপ্ট করা ফোন/হাতে-অর্ডারকে POS-এর মূল সেল-হিসাবে
+// (retailEntries) একটা এন্ট্রি হিসেবে যোগ করা হয়। এই অর্ডারগুলোতে আলাদা
+// প্রোডাক্ট/পরিমাণ লেখা থাকে না (শুধু টাকার অ্যামাউন্ট + অতিরিক্ত আয় + নোট) —
+// তাই এটাকে একটা "সাধারণ বিক্রি" এন্ট্রি হিসেবে যোগ করা হচ্ছে, প্রোডাক্ট স্টক
+// থেকে কিছু কমানো হয় না (কোন প্রোডাক্ট, তা জানা নেই)। অর্ডার অ্যামাউন্ট +
+// অতিরিক্ত আয়, দুটো মিলিয়েই মোট বিক্রির টাকা ধরা হচ্ছে, এবং যেহেতু এটার আসল
+// "cost"(কেনা দাম) জানা নেই, তাই cost শূন্য রাখা হলো — অর্থাৎ পুরোটাই লাভ হিসেবে
+// দেখাবে Monitoring-এ (এটা একটা সরলীকরণ, পরে চাইলে বদলানো যাবে)।
+function hbRecordOrderSale(order){
+  try{
+    // ⚠️ একই অর্ডার যেন ভুলবশত দুইবার হিসাবে যোগ না হয়
+    if(retailEntries.some(e=> e.phoneOrderId === order.id)) return;
+    const total = (Number(order.amount)||0) + (Number(order.income)||0);
+    if(total <= 0) return;
+
+    const entry = {
+      id: (typeof genLineId === 'function') ? genLineId() : ('phone-'+Date.now()),
+      name: order.note ? order.note : 'ফোন/হাতে-অর্ডার কাস্টমার',
+      phone: '',
+      item: order.note ? order.note : '📞 ফোন/হাতে-অর্ডার',
+      price: total,
+      cost: 0,
+      qty: 1,
+      unitPrice: total,
+      paid: total,
+      status: 'নগদ-বিক্রি',
+      paymentMethod: 'cash',
+      date: order.date || new Date().toISOString(),
+      soldBy: '🐝 Honey Bee Network (ফোন/হাতে-অর্ডার)',
+      phoneOrderId: order.id // ডুপ্লিকেট-চেক এই ফিল্ড দিয়েই হয়, উপরে দেখুন
+    };
+    retailEntries.push(entry);
+    if(typeof backupRecentSaleEntries === 'function') backupRecentSaleEntries([entry]);
+
+    persistData();
+    if(typeof monRenderAll === 'function') monRenderAll();
+  }catch(e){ console.error('hbRecordOrderSale failed:', e); }
 }
 
 async function hbRejectOrder(id){
