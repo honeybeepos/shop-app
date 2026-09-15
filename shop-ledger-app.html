@@ -3318,6 +3318,28 @@
     #program-monitor .glassRow .amt{ font-family:'Space Mono',monospace; font-weight:700; color:#a7f3d0; white-space:nowrap; }
     #program-monitor .glassRow .amt.red{ color:#fca5a5; }
     #program-monitor .glassEmpty{ padding:16px; text-align:center; color:#c9c3f0; font-size:12px; }
+
+    /* 🐝 Customer Surprise Recommendation — Phase 1 */
+    #program-monitor .recoSummaryGrid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:14px; }
+    #program-monitor .recoSummaryChip{ background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); border-radius:12px; padding:10px 6px; text-align:center; }
+    #program-monitor .recoSummaryChip .n{ font-size:15px; font-weight:800; color:#fff; font-family:'Space Mono',monospace; }
+    #program-monitor .recoSummaryChip .l{ font-size:9.5px; color:#c9c3f0; margin-top:3px; }
+    #program-monitor .recoCard{ border-radius:16px; padding:14px; margin-bottom:12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); backdrop-filter:blur(10px); }
+    #program-monitor .recoCard .recoTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px; }
+    #program-monitor .recoCard .recoName{ font-size:14px; font-weight:800; color:#fff; }
+    #program-monitor .recoCard .recoSeg{ font-size:10px; color:#e4e0ff; margin-top:2px; }
+    #program-monitor .recoCard .recoConf{ font-size:9.5px; font-weight:800; padding:3px 8px; border-radius:20px; white-space:nowrap; }
+    #program-monitor .recoCard .recoConf.high{ background:rgba(52,211,153,0.25); color:#a7f3d0; }
+    #program-monitor .recoCard .recoConf.medium{ background:rgba(250,204,21,0.25); color:#fde68a; }
+    #program-monitor .recoCard .recoWhat{ font-size:13.5px; font-weight:700; color:#facc15; margin:6px 0 4px; }
+    #program-monitor .recoCard .recoWhy{ list-style:none; margin:0 0 8px; padding:0; font-size:11px; color:#d8d3f5; }
+    #program-monitor .recoCard .recoWhy li{ padding:2px 0; }
+    #program-monitor .recoCard .recoWhy li::before{ content:"✓ "; color:#a7f3d0; }
+    #program-monitor .recoCard .recoCost{ font-size:11.5px; color:#c9c3f0; margin-bottom:10px; }
+    #program-monitor .recoCard .recoBtns{ display:flex; gap:8px; }
+    #program-monitor .recoCard .recoBtns button{ flex:1; padding:9px; border-radius:10px; border:none; font-size:12.5px; font-weight:800; cursor:pointer; font-family:inherit; }
+    #program-monitor .recoUseBtn{ background:linear-gradient(135deg,#34d399,#059669); color:#052e1c; }
+    #program-monitor .recoSkipBtn{ background:rgba(255,255,255,0.1); color:#e4e0ff; border:1px solid rgba(255,255,255,0.2) !important; }
   </style>
 
   <div class="monTopBar">
@@ -3332,6 +3354,7 @@
       <div class="monSubtab" data-mtab="customer">👥 Customer</div>
       <div class="monSubtab" data-mtab="performance">📈 Performance</div>
       <div class="monSubtab" data-mtab="alerts">🔔 Alerts</div>
+      <div class="monSubtab" data-mtab="reco">🐝 সাজেশন</div>
     </div>
   </div>
 
@@ -3406,6 +3429,14 @@
       <div class="glassList" id="monAlertDuePayment"></div>
       <div class="monSectionTitle">🔄 Return / Refund Notification</div>
       <div class="glassList" id="monAlertReturns"></div>
+    </div>
+
+    <div class="monSection" id="mtab-reco" style="display:none;">
+      <div class="monSectionTitle">🐝 Customer Pulse</div>
+      <div class="recoSummaryGrid" id="recoPulseGrid"></div>
+      <div class="monSectionTitle">🐝 আজকের কাস্টমার সাজেশন</div>
+      <div id="recoCardsWrap"></div>
+      <p style="font-size:10.5px; color:#c9c3f0; line-height:1.6; margin-top:6px;">💡 এগুলো শুধু Suggestion — সফটওয়্যার নিজে থেকে কোনো ছাড়/গিফট দেয় না। [Use] চাপলে সেটা হিসাবে লেখা থাকবে (একই কাস্টমারকে বারবার Recommend করা হবে না), [Skip] চাপলে আজকের মতো এই সাজেশনটা সরে যাবে।</p>
     </div>
   </div>
 </div>
@@ -14719,7 +14750,273 @@ function monRenderAll(){
 
   const oosCard = document.getElementById('monOutOfStock').closest('.glassCard');
   if(oosCard) oosCard.classList.toggle('pulseAlert', outOfStock.length > 0);
+
+  try{ if(typeof renderRecoTab === 'function') renderRecoTab(); }catch(e){ console.error('renderRecoTab failed:', e); }
 }
+
+/* ================= 🐝 Customer Surprise Recommendation Engine (Phase 1) =================
+   Monitoring > 🐝 সাজেশন ট্যাব। উদ্দেশ্য: কাস্টমারের কেনাকাটার ইতিহাস (retailEntries)
+   আর প্রোডাক্টের দাম/স্টক (bccLoadProducts) থেকে, কোন কাস্টমারকে কখন কী ধরনের ছোট
+   Reward (Coupon/Free Item) দিলে ভালো হতে পারে তার একটা Suggestion তৈরি করা — সফটওয়্যার
+   নিজে থেকে কিছু Apply করে না, শুধু "বিবেচনা করুন" বলে দেখায়; দোকানদার [Use]/[Skip]
+   চেপে সিদ্ধান্ত নেন। সম্পূর্ণ লোকাল ডেটা দিয়ে চলে, কোনো ইন্টারনেট/সার্ভার লাগে না।
+
+   ⚠️ Phase 1 — মাত্র ৩টা মূল কেস আছে: New Customer → Next-Order Coupon, Regular/VIP
+   Customer → Small Free Item, Inactive Customer → Comeback Coupon। Segment/Score
+   সব কাস্টমারের জন্যই গণনা হয় (Customer Pulse সামারিতে দেখা যাবে), কিন্তু Reward
+   Suggestion শুধু এই ৩ কেসের জন্যই তৈরি হয় — বাকি কেস (VIP Loyalty Point, Cross-sell,
+   Large Order ইত্যাদি) ধাপে ধাপে পরে যোগ হবে। */
+
+// 🔧 দোকানদার চাইলে এই সংখ্যাগুলো এখান থেকে বদলাতে পারবেন (ভবিষ্যতে একটা সেটিংস UI যোগ হবে)
+const RECO_SETTINGS_KEY = 'bcc-reco-settings';
+const RECO_HISTORY_KEY = 'bcc-reco-history';
+function recoLoadSettings(){
+  const defaults = {
+    rewardCooldownDays: 14,          // একই কাস্টমারকে এই কয়দিনের মধ্যে দ্বিতীয়বার Reward Recommend করা হবে না
+    inactivityMultiplier: 2,         // স্বাভাবিক কেনাকাটার ব্যবধানের কতগুণ পার হলে "Inactive" ধরা হবে
+    newCustomerCouponAmount: 50,     // নতুন কাস্টমারের জন্য পরের অর্ডারে কুপনের পরিমাণ (৳)
+    comebackCouponAmount: 100,       // Inactive কাস্টমারকে ফেরানোর কুপনের ন্যূনতম পরিমাণ (৳)
+    maxFreeItemCost: 20,             // Free Item হিসেবে সাজেস্ট করা প্রোডাক্টের কেনা দাম সর্বোচ্চ কত হতে পারবে (৳)
+    minMarginPercentForFreeItem: 40, // Free Item সাজেস্ট করার আগে প্রোডাক্টের Margin% কমপক্ষে কত থাকতে হবে
+    maxRewardCost: 150,              // যেকোনো এক Reward-এর সর্বোচ্চ সম্ভাব্য খরচ (Profit Protection)
+    regularMinOrders: 3              // কমপক্ষে এত অর্ডার করলে (Score কম থাকলেও) "Regular" ধরা হবে
+  };
+  try{ return Object.assign({}, defaults, JSON.parse(localStorage.getItem(RECO_SETTINGS_KEY) || '{}')); }
+  catch(e){ return defaults; }
+}
+function recoLoadHistory(){ try{ return JSON.parse(localStorage.getItem(RECO_HISTORY_KEY) || '[]'); }catch(e){ return []; } }
+function recoSaveHistory(list){ localStorage.setItem(RECO_HISTORY_KEY, JSON.stringify(list)); }
+function recoCustKey(name, phone){ return (phone && phone.trim()) ? ('p:'+phone.trim()) : ('n:'+(name||'').trim().toLowerCase()); }
+
+// 🐝 এই সেশনে যেসব সাজেশন "Skip"/"Use" করা হয়েছে সেগুলো আজকের মতো আর দেখাবে না
+// (পেজ রিলোড দিলে আবার হিসাব হবে — Use করা থাকলে সেটা recoLoadHistory()-এর কুলডাউন
+// এমনিতেই ধরে ফেলবে, তাই ডেটা হারানোর কোনো সমস্যা নেই)
+let recoDismissedKeys = new Set();
+
+/* ---- ধাপ ১: প্রতিটা কাস্টমারের Purchase History থেকে Profile বানানো ---- */
+function buildCustomerProfiles(){
+  const byKey = {};
+  retailEntries.forEach(e=>{
+    if(!SALE_STATUSES.includes(e.status)) return;
+    const key = recoCustKey(e.name, e.phone);
+    if(!byKey[key]) byKey[key] = { name:e.name, phone:e.phone||'', dates:[], totalPurchase:0, totalProfit:0, itemCounts:{} };
+    const p = byKey[key];
+    p.dates.push(new Date(e.date));
+    p.totalPurchase += (e.price||0);
+    p.totalProfit += ((e.price||0)-(e.cost||0));
+    p.itemCounts[e.item] = (p.itemCounts[e.item]||0) + (e.qty||0);
+  });
+
+  const now = new Date();
+  const profiles = {};
+  Object.keys(byKey).forEach(key=>{
+    const p = byKey[key];
+    const dates = p.dates.slice().sort((a,b)=>a-b);
+    const totalOrders = dates.length;
+    const firstOrder = dates[0], lastOrder = dates[dates.length-1];
+    let avgInterval = 0;
+    if(totalOrders >= 2){
+      let gaps = [];
+      for(let i=1;i<dates.length;i++) gaps.push((dates[i]-dates[i-1])/(24*60*60*1000));
+      avgInterval = gaps.reduce((s,g)=>s+g,0) / gaps.length;
+    }
+    profiles[key] = {
+      key, name:p.name, phone:p.phone, totalOrders,
+      totalPurchase:p.totalPurchase, totalProfit:p.totalProfit,
+      avgOrderValue: p.totalPurchase/totalOrders, avgInterval,
+      daysSinceLast: Math.floor((now-lastOrder)/(24*60*60*1000)),
+      customerSinceDays: Math.floor((now-firstOrder)/(24*60*60*1000)),
+      repeatOrderCount: Math.max(0, totalOrders-1)
+    };
+  });
+  return profiles;
+}
+
+/* ---- ধাপ ২: প্রতিটা কাস্টমারের জন্য Score (0-100) + Segment ---- */
+function scoreAndSegmentCustomers(profiles, settings){
+  const list = Object.values(profiles);
+  if(!list.length) return profiles;
+  const maxPurchase = Math.max(1, ...list.map(c=>c.totalPurchase));
+  const maxOrders = Math.max(1, ...list.map(c=>c.totalOrders));
+  const maxProfit = Math.max(1, ...list.map(c=>Math.max(0,c.totalProfit)));
+  const maxLifetimeDays = Math.max(1, ...list.map(c=>c.customerSinceDays));
+
+  list.forEach(c=>{
+    const valueScore    = 25 * (c.totalPurchase / maxPurchase);
+    const freqScore     = 20 * (c.totalOrders / maxOrders);
+    const recencyScore  = 20 * Math.max(0, 1 - (c.daysSinceLast/60));
+    const repeatScore   = 15 * Math.min(1, c.repeatOrderCount / Math.max(1, maxOrders-1));
+    const profitScore   = 10 * (Math.max(0,c.totalProfit) / maxProfit);
+    const lifetimeScore = 10 * (c.customerSinceDays / maxLifetimeDays);
+    c.valueScore = Math.round(valueScore+freqScore+recencyScore+repeatScore+profitScore+lifetimeScore);
+
+    const inactivityThreshold = c.avgInterval>0 ? c.avgInterval*settings.inactivityMultiplier : 30;
+    const dueSoonFrom = c.avgInterval>0 ? c.avgInterval*0.85 : 20;
+    if(c.totalOrders <= 1) c.segment = 'new';
+    else if(c.daysSinceLast >= inactivityThreshold) c.segment = 'inactive';
+    else if(c.daysSinceLast >= dueSoonFrom) c.segment = 'due';
+    else if(c.valueScore >= 80) c.segment = 'vip';
+    else if(c.valueScore >= 60 || c.totalOrders >= settings.regularMinOrders) c.segment = 'regular';
+    else c.segment = 'developing';
+  });
+  return profiles;
+}
+
+/* ---- ধাপ ৩: Free Item Candidate খোঁজা (Margin + Stock + Slow Moving চেক) ---- */
+function findFreeItemCandidate(settings, excludeItemName){
+  const prods = bccLoadProducts();
+  const since30 = new Date(); since30.setDate(since30.getDate()-30);
+  const soldLast30 = {};
+  retailEntries.forEach(e=>{
+    if(!SALE_STATUSES.includes(e.status)) return;
+    if(new Date(e.date) < since30) return;
+    soldLast30[e.item] = (soldLast30[e.item]||0) + (e.qty||0);
+  });
+  const candidates = prods.filter(p=>{
+    if(excludeItemName && p.name === excludeItemName) return false;
+    const qty = Number(p.qty)||0, buy = Number(p.buy)||0, sell = Number(p.sell)||0;
+    if(qty <= (Number(p.min)||0)) return false;               // কম স্টক হলে বাদ
+    if(buy <= 0 || sell <= 0) return false;
+    if(buy > settings.maxFreeItemCost) return false;           // খরচ বেশি হলে বাদ
+    if(((sell-buy)/sell)*100 < settings.minMarginPercentForFreeItem) return false; // Margin কম হলে বাদ
+    return true;
+  }).map(p=>{
+    const qty = Number(p.qty)||0;
+    return { p, soldRatio: qty>0 ? (soldLast30[p.name]||0)/qty : 999 }; // কম sold-to-stock অনুপাত = বেশি Slow Moving
+  }).sort((a,b)=> a.soldRatio-b.soldRatio || (Number(a.p.buy)-Number(b.p.buy)));
+  return candidates.length ? candidates[0].p : null;
+}
+
+/* ---- ধাপ ৪: ৩টা মূল Reward Case + Cooldown/History চেক ---- */
+function getLastRewardFor(key, history){
+  const mine = history.filter(h=>h.key===key).sort((a,b)=> new Date(b.date)-new Date(a.date));
+  return mine.length ? mine[0] : null;
+}
+
+function buildRecommendation(c, settings, history){
+  const lastReward = getLastRewardFor(c.key, history);
+  if(lastReward){
+    const daysSinceReward = Math.floor((new Date()-new Date(lastReward.date))/(24*60*60*1000));
+    if(daysSinceReward < settings.rewardCooldownDays) return null; // কুলডাউন চলছে
+  }
+
+  if(c.segment === 'new'){
+    const amount = settings.newCustomerCouponAmount;
+    if(amount > settings.maxRewardCost) return null;
+    return {
+      type:'coupon', emoji:'🎟️', label:'Next-Order Coupon', itemOrAmount:`৳${amount} পরের অর্ডারে ছাড়`,
+      estimatedCost: amount,
+      why: ['🆕 নতুন কাস্টমার (এই প্রথম অর্ডার)', 'দ্বিতীয়বার কেনাকাটায় ফিরিয়ে আনতে ছোট কুপন কার্যকর হতে পারে'],
+      confidence: c.phone ? 'high' : 'medium'
+    };
+  }
+  if(c.segment === 'regular' || c.segment === 'vip'){
+    const excludeName = (lastReward && lastReward.type==='freeitem') ? lastReward.itemOrAmount : null;
+    const item = findFreeItemCandidate(settings, excludeName);
+    if(!item) return null; // ভালো কোনো Candidate না পেলে কিছু Recommend করা হবে না
+    const marginPct = Math.round(((Number(item.sell)-Number(item.buy))/Number(item.sell))*100);
+    return {
+      type:'freeitem', emoji:'🎁', label:'Small Free Item', itemOrAmount:item.name,
+      estimatedCost: Number(item.buy)||0,
+      why: [
+        c.segment==='vip' ? '💎 VIP / High Value কাস্টমার' : '🔄 নিয়মিত কাস্টমার',
+        `Customer Value Score: ${c.valueScore}/100`,
+        `"${item.name}"-এর স্টক বেশি ও বিক্রি কম (Slow Moving)`,
+        `খরচ ৳${item.buy}, Margin ~${marginPct}%`
+      ],
+      confidence: marginPct>=60 ? 'high' : 'medium'
+    };
+  }
+  if(c.segment === 'inactive'){
+    const amount = Math.min(settings.maxRewardCost, Math.max(settings.comebackCouponAmount, Math.round((c.avgOrderValue||0)*0.1)));
+    return {
+      type:'coupon', emoji:'🎟️', label:'Comeback Coupon', itemOrAmount:`৳${amount} Comeback কুপন`,
+      estimatedCost: amount,
+      why: [
+        `🔴 শেষ অর্ডার ${c.daysSinceLast} দিন আগে (স্বাভাবিক ব্যবধান ~${Math.round(c.avgInterval)} দিন)`,
+        'ফিরিয়ে আনতে Comeback কুপন কার্যকর হতে পারে'
+      ],
+      confidence: c.phone ? 'high' : 'medium'
+    };
+  }
+  return null; // Due Soon / Developing — এই ধাপে এখনো কোনো Case নেই (পরে যোগ হবে)
+}
+
+function getTodaysRecommendations(){
+  const settings = recoLoadSettings();
+  const history = recoLoadHistory();
+  const profiles = scoreAndSegmentCustomers(buildCustomerProfiles(), settings);
+  const list = Object.values(profiles)
+    .filter(c=> !recoDismissedKeys.has(c.key))
+    .map(c=> ({ customer:c, reco: buildRecommendation(c, settings, history) }))
+    .filter(x=> x.reco)
+    .sort((a,b)=> b.customer.valueScore - a.customer.valueScore);
+  return { list, profiles, settings, history };
+}
+
+/* ---- ধাপ ৫: Monitoring > 🐝 সাজেশন ট্যাবের UI ---- */
+function recoSegLabel(seg){
+  return ({ new:'🆕 New Customer', regular:'🔄 Regular Customer', vip:'💎 VIP Customer',
+    due:'🟡 Due Soon', inactive:'🔴 Inactive Customer', developing:'🆕 Developing' })[seg] || seg;
+}
+
+function renderRecoTab(){
+  if(!document.getElementById('recoCardsWrap')) return; // মনিটরিং স্ক্রিন এখনো তৈরি হয়নি
+  const { list, profiles } = getTodaysRecommendations();
+  const segCounts = { new:0, regular:0, vip:0, due:0, inactive:0, developing:0 };
+  Object.values(profiles).forEach(c=>{ segCounts[c.segment] = (segCounts[c.segment]||0)+1; });
+
+  const pulseGrid = document.getElementById('recoPulseGrid');
+  if(pulseGrid){
+    pulseGrid.innerHTML = [
+      ['🆕', segCounts.new, 'New'], ['🔄', segCounts.regular, 'Regular'], ['💎', segCounts.vip, 'VIP'],
+      ['🟡', segCounts.due, 'Due Soon'], ['🔴', segCounts.inactive, 'Inactive'], ['🎁', list.length, 'আজকের সাজেশন']
+    ].map(([ic,n,l])=> `<div class="recoSummaryChip"><div class="n">${ic} ${n}</div><div class="l">${l}</div></div>`).join('');
+  }
+
+  const wrap = document.getElementById('recoCardsWrap');
+  if(!list.length){ wrap.innerHTML = `<div class="glassEmpty">আজকে কোনো বিশেষ Customer Suggestion নেই 🎉</div>`; return; }
+  wrap.innerHTML = list.map(({customer:c, reco:r})=>{
+    const confLabel = r.confidence==='high' ? 'HIGH' : 'MEDIUM';
+    return `<div class="recoCard">
+      <div class="recoTop">
+        <div><div class="recoName">👤 ${escapeHtml(c.name||'নাম নেই')}</div><div class="recoSeg">${recoSegLabel(c.segment)}</div></div>
+        <div class="recoConf ${r.confidence}">${confLabel}</div>
+      </div>
+      <div class="recoWhat">${r.emoji} ${escapeHtml(r.label)}: ${escapeHtml(r.itemOrAmount)}</div>
+      <ul class="recoWhy">${r.why.map(w=>`<li>${escapeHtml(w)}</li>`).join('')}</ul>
+      <div class="recoCost">💰 আনুমানিক খরচ: ৳${fmt(r.estimatedCost)}</div>
+      <div class="recoBtns">
+        <button class="recoUseBtn" data-act="use" data-key="${escapeHtml(c.key)}" data-name="${escapeHtml(c.name||'')}" data-type="${r.type}" data-item="${escapeHtml(r.itemOrAmount)}">✅ Use</button>
+        <button class="recoSkipBtn" data-act="skip" data-key="${escapeHtml(c.key)}">✕ Skip</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+(function initRecoCardEvents(){
+  const wrap = document.getElementById('recoCardsWrap');
+  if(!wrap) return;
+  wrap.addEventListener('click', (ev)=>{
+    const btn = ev.target.closest('button[data-act]');
+    if(!btn) return;
+    const key = btn.dataset.key;
+    if(btn.dataset.act === 'skip'){
+      recoDismissedKeys.add(key);
+      toast('⏭️ এই সাজেশনটা বাদ দেওয়া হলো');
+      renderRecoTab();
+      return;
+    }
+    if(btn.dataset.act === 'use'){
+      const history = recoLoadHistory();
+      history.push({ key, name:btn.dataset.name, type:btn.dataset.type, itemOrAmount:btn.dataset.item, date:new Date().toISOString() });
+      recoSaveHistory(history);
+      recoDismissedKeys.add(key);
+      toast(`✅ "${btn.dataset.name}"-এর জন্য Reward ব্যবহারের হিসাবে লেখা হলো`);
+      renderRecoTab();
+    }
+  });
+})();
 
 /* ---------------- Employee Sales (Monitoring) ----------------
    কে (এডমিন/সাব-ইউজার) কোন সেলটা করেছে তা প্রতিটা এন্ট্রির সাথে soldBy হিসেবে
