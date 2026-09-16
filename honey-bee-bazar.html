@@ -530,8 +530,19 @@
   .emptyMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:30px 12px; }
   .loadingMsg{ text-align:center; color:var(--muted); font-size:12.5px; padding:20px; }
 
-  #screenHome, #screenMarkets, #screenMarketFeed, #screenShops, #screenCategories, #screenSubcategories, #screenSubSubcategories, #screenProducts, #screenMarketCategories, #screenMarketSubcategories, #screenMarketProducts, #screenTransport, #screenTransportMedia, #screenSmartFlightInfo, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
-  #screenHome.active, #screenMarkets.active, #screenMarketFeed.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenSubSubcategories.active, #screenProducts.active, #screenMarketCategories.active, #screenMarketSubcategories.active, #screenMarketProducts.active, #screenTransport.active, #screenTransportMedia.active, #screenSmartFlightInfo.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
+  #screenHome, #screenSmartWatch, #screenMarkets, #screenMarketFeed, #screenShops, #screenCategories, #screenSubcategories, #screenSubSubcategories, #screenProducts, #screenMarketCategories, #screenMarketSubcategories, #screenMarketProducts, #screenTransport, #screenTransportMedia, #screenSmartFlightInfo, #screenJibonTori, #screenBloodBank, #screenHoneyMessenger, #screenAmbulance, #screenMedicalEquipment, #screenMedEqOrders{ display:none; }
+  #screenHome.active, #screenSmartWatch.active, #screenMarkets.active, #screenMarketFeed.active, #screenShops.active, #screenCategories.active, #screenSubcategories.active, #screenSubSubcategories.active, #screenProducts.active, #screenMarketCategories.active, #screenMarketSubcategories.active, #screenMarketProducts.active, #screenTransport.active, #screenTransportMedia.active, #screenSmartFlightInfo.active, #screenJibonTori.active, #screenBloodBank.active, #screenHoneyMessenger.active, #screenAmbulance.active, #screenMedicalEquipment.active, #screenMedEqOrders.active{ display:block; }
+
+  /* ⌚ Smart Watch ড্যাশবোর্ডের টগল সুইচ ও ভাষা-পিল বাটন */
+  .hbswToggle{ width:44px; height:25px; border-radius:20px; border:none; cursor:pointer; position:relative; padding:0; background:rgba(255,255,255,0.14); flex-shrink:0; }
+  .hbswToggle.on{ background:var(--ok); }
+  .hbswThumb{ position:absolute; top:3px; left:3px; width:19px; height:19px; border-radius:50%; background:#fff; display:block; transition:left 0.15s; }
+  .hbswToggle.on .hbswThumb{ left:22px; }
+  .hbswPill{
+    width:100%; text-align:center; font-family:inherit; font-weight:700; font-size:13px; padding:10px;
+    border-radius:10px; cursor:pointer; background:rgba(255,255,255,0.05); border:1.5px solid var(--border); color:var(--muted);
+  }
+  .hbswPill.active{ background:rgba(255,209,102,0.14); border-color:var(--amber); color:var(--amber); }
 
   /* 💬 Honey Messenger — সম্পূর্ণ ফুল-ভিউপোর্ট, Bazar-এর সীমাবদ্ধ width-এর
      বাইরে গিয়ে সম্পূর্ণ আলাদা একটা অ্যাপের মতো খোলে */
@@ -579,7 +590,7 @@
         <div class="lbl">House Rent</div>
         <div class="soonBadge">শীঘ্রই আসছে</div>
       </div>
-      <div class="serviceCard soon" data-svc="smartwatch">
+      <div class="serviceCard" data-svc="smartwatch">
         <div class="svcFrameWrap"><span class="svcHook"></span><div class="svcFrame">
           <svg class="svcMascot" viewBox="0 0 100 100" role="img" aria-label="Honey Bee Smart Watch" style="background:#141110;">
             <rect x="38" y="1" width="24" height="12" rx="4" fill="#caa136"/>
@@ -591,7 +602,6 @@
           </svg>
         </div></div>
         <div class="lbl">Smart Watch</div>
-        <div class="soonBadge">শীঘ্রই আসছে</div>
       </div>
       <div class="serviceCard" data-svc="favmarket" id="favMarketCard">
         <div class="svcFrameWrap"><span class="svcHook"></span><div class="svcFrame"><img src="fav-market-mascot.png" alt="আপনার পছন্দের বাজারে যান" class="svcMascot"></div></div>
@@ -601,6 +611,232 @@
         <div class="svcFrameWrap"><span class="svcHook"></span><div class="svcFrame"><img src="jibontori-mascot.png" alt="জীবন তরী" class="svcMascot"></div></div>
         <div class="lbl">জীবন তরী</div>
       </div>
+    </div>
+  </div>
+
+  <!-- ==================== ⌚ Honey Bee Smart Watch — ফুল-স্ক্রিন ড্যাশবোর্ড
+       (আপাতত ডেমো ডেটা দিয়ে; আসল ঘড়ি/GPS/প্যাঞ্জিকা ইঞ্জিন পরে যুক্ত হবে) ==================== -->
+  <div id="screenSmartWatch" style="padding:20px 16px;">
+    <button class="backBtn" id="backToHomeFromSmartWatch">← হোমে ফিরে যান</button>
+
+    <div style="text-align:center; margin-bottom:16px;">
+      <div style="font-size:32px;">⌚</div>
+      <div style="font-size:16px; font-weight:800;">Honey Bee Smart Watch</div>
+      <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">সময়কে কাজে লাগাও, জীবন সুন্দর হবে</div>
+    </div>
+
+    <!-- Digital Clock (hero) -->
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px;">⌚ ডিজিটাল ঘড়ি</div>
+        <button id="hbswHourToggleBtn" style="background:rgba(255,255,255,0.06); border:1px solid var(--border); color:#fff8e8; font-family:inherit; font-size:11px; font-weight:700; padding:6px 12px; border-radius:20px; cursor:pointer;">12 ঘন্টা</button>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:8px;">
+        <div id="hbswClockMain" style="font-weight:800; font-size:46px; line-height:1; color:#fff;">1:13</div>
+        <div id="hbswClockSuffix" style="font-weight:700; font-size:17px; color:var(--amber);">AM</div>
+      </div>
+      <div style="font-size:13.5px; font-weight:600; color:#e7e2d4; margin-top:8px;">Tue, 16 September 2026 · বুধবার</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+        <span style="background:rgba(96,165,250,0.14); color:#93c5fd; border:1px solid rgba(96,165,250,0.3); padding:6px 10px; border-radius:10px; font-size:11.5px; font-weight:700;">English · 16 Sep 2026</span>
+        <span style="background:rgba(47,191,113,0.14); color:#7ee7ac; border:1px solid rgba(47,191,113,0.3); padding:6px 10px; border-radius:10px; font-size:11.5px; font-weight:700;">বাংলা · ১ আশ্বিন ১৪৩৩</span>
+        <span style="background:rgba(180,140,255,0.16); color:#c9b3ff; border:1px solid rgba(180,140,255,0.32); padding:6px 10px; border-radius:10px; font-size:11.5px; font-weight:700;">হিজরি · ২৫ রবিউল আউয়াল ১৪৪৮</span>
+      </div>
+      <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border); font-size:12px;">
+        <span style="color:var(--muted);">🌤️ ঢাকা, ২৮°C</span>
+        <span style="color:var(--ok); font-weight:700;">🏢 আজ কর্মদিবস</span>
+        <span style="color:var(--amber); font-weight:700;">🔔 পরবর্তী ছুটি ৩ দিন পরে</span>
+      </div>
+    </div>
+
+    <!-- Analog Clock -->
+    <div class="card" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+      <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px; align-self:flex-start;">🕐 এনালগ ঘড়ি</div>
+      <svg width="130" height="130" viewBox="0 0 150 150" role="img" aria-label="এনালগ ঘড়ি, সময় ১:১৩">
+        <circle cx="75" cy="75" r="70" fill="#12100a" stroke="var(--gold)" stroke-width="2.5"/>
+        <line x1="75" y1="75" x2="93" y2="52" stroke="#fff8e8" stroke-width="4.5" stroke-linecap="round" transform="rotate(36.5 75 75)"/>
+        <line x1="75" y1="75" x2="75" y2="26" stroke="var(--amber)" stroke-width="3" stroke-linecap="round" transform="rotate(78 75 75)"/>
+        <line x1="75" y1="75" x2="75" y2="20" stroke="var(--danger)" stroke-width="1.5" stroke-linecap="round" transform="rotate(210 75 75)"/>
+        <circle cx="75" cy="75" r="4.5" fill="var(--amber)"/>
+        <text x="75" y="43" text-anchor="middle" fill="#8b94b8" font-size="9">12</text>
+        <text x="107" y="79" text-anchor="middle" fill="#8b94b8" font-size="9">3</text>
+        <text x="75" y="113" text-anchor="middle" fill="#8b94b8" font-size="9">6</text>
+        <text x="43" y="79" text-anchor="middle" fill="#8b94b8" font-size="9">9</text>
+      </svg>
+      <div id="hbswAnalogDayLabel" style="font-weight:700; font-size:13px; color:#fff8e8;">বুধবার, 16 Sep</div>
+    </div>
+
+    <!-- Multi Calendar -->
+    <div class="card">
+      <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px; margin-bottom:8px;">🗓️ বহু ক্যালেন্ডার</div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:12px; color:var(--muted); font-weight:600;">🌍 Gregorian</span>
+        <span style="font-size:13px; font-weight:700; color:#fff8e8;">16 September 2026</span>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:12px; color:var(--muted); font-weight:600;">🌙 বাংলা</span>
+        <span style="font-size:13px; font-weight:700; color:#fff8e8;">১ আশ্বিন ১৪৩৩</span>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:12px; color:var(--muted); font-weight:600;">☾ হিজরি</span>
+        <span style="font-size:13px; font-weight:700; color:#fff8e8;">২৫ রবিউল আউয়াল ১৪৪৮</span>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0;">
+        <span style="font-size:12px; color:var(--muted); font-weight:600;">🕉️ সনাতনী</span>
+        <span style="font-size:13px; font-weight:700; color:#fff8e8;">তিথি একাদশী</span>
+      </div>
+    </div>
+
+    <!-- Bar O Mash (Day & Month, multi-language) -->
+    <div class="card">
+      <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px; margin-bottom:10px;">📅 বার ও মাস</div>
+      <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">Today</div>
+      <div id="hbswDayEn" style="font-weight:800; font-size:17px; color:#6b7280;">Wednesday</div>
+      <div id="hbswDayBn" style="font-weight:700; font-size:15px; color:#fff8e8; margin-top:2px;">বুধবার</div>
+      <div id="hbswDayAr" dir="rtl" style="font-weight:600; font-size:14px; color:#6b7280; margin-top:2px;">الأربعاء</div>
+      <div style="border-top:1px dashed var(--border); margin-top:10px; padding-top:10px;">
+        <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">September</div>
+        <div id="hbswMonthEn" style="font-weight:700; font-size:14px; color:#6b7280;">September</div>
+        <div id="hbswMonthBn" style="font-weight:700; font-size:14px; color:var(--amber); margin-top:2px;">সেপ্টেম্বর</div>
+        <div id="hbswMonthAr" dir="rtl" style="font-weight:600; font-size:13px; color:#6b7280; margin-top:2px;">سبتمبر</div>
+      </div>
+    </div>
+
+    <!-- Prayer times -->
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px;">🕌 নামাজের সময়</div>
+        <span style="font-size:11px; color:var(--muted);">📍 ঢাকা, ১৬ Sep</span>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border);"><span style="font-size:12.5px; color:#cbd0dd; font-weight:600;">ফজর</span><span style="font-size:13px; font-weight:700; color:#fff8e8;">4:45 AM</span></div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border);"><span style="font-size:12.5px; color:#cbd0dd; font-weight:600;">যোহর</span><span style="font-size:13px; font-weight:700; color:#fff8e8;">12:05 PM</span></div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border);"><span style="font-size:12.5px; color:#cbd0dd; font-weight:600;">আসর</span><span style="font-size:13px; font-weight:700; color:#fff8e8;">4:30 PM</span></div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border);"><span style="font-size:12.5px; color:#cbd0dd; font-weight:600;">মাগরিব</span><span style="font-size:13px; font-weight:700; color:#fff8e8;">6:15 PM</span></div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 0;"><span style="font-size:12.5px; color:#cbd0dd; font-weight:600;">এশা</span><span style="font-size:13px; font-weight:700; color:#fff8e8;">7:30 PM</span></div>
+      <div style="display:flex; justify-content:space-between; padding-top:8px; margin-top:6px; border-top:1px dashed var(--border); font-size:11.5px; color:var(--muted);">
+        <span>🌅 সূর্যোদয় 5:42 AM</span>
+        <span>🌇 সূর্যাস্ত 6:05 PM</span>
+      </div>
+    </div>
+
+    <!-- Qibla -->
+    <div class="card" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+      <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px; align-self:flex-start;">🕋 কিবলা দিক</div>
+      <svg width="120" height="120" viewBox="0 0 140 140" role="img" aria-label="কিবলা দিক, ২৯৪ ডিগ্রি উত্তর-পশ্চিম">
+        <circle cx="70" cy="70" r="62" fill="#12100a" stroke="var(--border)" stroke-width="1.5"/>
+        <text x="70" y="18" text-anchor="middle" fill="#8b94b8" font-size="10">N</text>
+        <text x="122" y="74" text-anchor="middle" fill="#8b94b8" font-size="10">E</text>
+        <text x="70" y="130" text-anchor="middle" fill="#8b94b8" font-size="10">S</text>
+        <text x="18" y="74" text-anchor="middle" fill="#8b94b8" font-size="10">W</text>
+        <g transform="rotate(294 70 70)">
+          <line x1="70" y1="70" x2="70" y2="20" stroke="var(--ok)" stroke-width="4" stroke-linecap="round"/>
+          <polygon points="70,12 64,26 76,26" fill="var(--ok)"/>
+        </g>
+        <circle cx="70" cy="70" r="5" fill="var(--amber)"/>
+        <text x="70" y="75" text-anchor="middle" font-size="12">🕋</text>
+      </svg>
+      <div style="text-align:center;">
+        <div style="font-weight:700; font-size:13px; color:var(--ok);">294° (উত্তর-পশ্চিম)</div>
+        <div style="font-size:11px; color:var(--muted); margin-top:2px;">ঢাকা, বাংলাদেশ</div>
+      </div>
+    </div>
+
+    <!-- Sanatani Panchang -->
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+        <div style="font-size:12px; font-weight:800; color:#c9b3ff; letter-spacing:0.4px;">🕉️ সনাতনী পঞ্জিকা</div>
+        <span style="font-size:11px; color:var(--muted);">১৬ সেপ্টেম্বর ২০২৬</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">তিথি</span><span style="color:#e7e2d4; font-weight:700;">একাদশী</span></div>
+      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">পক্ষ</span><span style="color:#e7e2d4; font-weight:700;">কৃষ্ণ পক্ষ</span></div>
+      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">নক্ষত্র</span><span style="color:#e7e2d4; font-weight:700;">পূর্বভাদ্রপদ</span></div>
+      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">যোগ</span><span style="color:#e7e2d4; font-weight:700;">সর্বার্থ সিদ্ধি</span></div>
+      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">করণ</span><span style="color:#e7e2d4; font-weight:700;">বব</span></div>
+      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">হিন্দু মাস</span><span style="color:#e7e2d4; font-weight:700;">ভাদ্র</span></div>
+      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">বিক্রম সংবত</span><span style="color:#e7e2d4; font-weight:700;">২০৮৩</span></div>
+      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">শকাব্দ</span><span style="color:#e7e2d4; font-weight:700;">১৯৪৮</span></div>
+      <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">ঋতু</span><span style="color:#e7e2d4; font-weight:700;">শরৎ</span></div>
+    </div>
+
+    <!-- Government Calendar -->
+    <div class="card">
+      <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px; margin-bottom:10px;">🏛️ সরকারি ক্যালেন্ডার</div>
+      <div style="background:rgba(47,191,113,0.12); border:1px solid rgba(47,191,113,0.3); border-radius:10px; padding:9px 12px; display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span style="color:var(--ok);">⭐</span>
+        <span style="font-size:12.5px; font-weight:700; color:#7ee7ac;">আজ: কর্মদিবস</span>
+      </div>
+      <div style="font-size:13px; font-weight:700; color:#fff8e8;">পরবর্তী সরকারি ছুটি: দুর্গা পূজা (বিজয়া)</div>
+      <div style="font-size:11.5px; color:var(--muted); margin-top:4px;">আর ৩ দিন পরে · তারিখ: ১৯ Sep 2026</div>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button style="flex:1; background:rgba(255,209,102,0.14); border:1px solid var(--border); color:var(--amber); font-family:inherit; font-weight:700; font-size:12px; padding:9px 8px; border-radius:10px; cursor:pointer;">📋 সব সরকারি ছুটি</button>
+        <button style="flex:1; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:#e7e2d4; font-family:inherit; font-weight:700; font-size:12px; padding:9px 8px; border-radius:10px; cursor:pointer;">🗒️ ছুটির তালিকা</button>
+      </div>
+    </div>
+
+    <!-- Weather -->
+    <div class="card">
+      <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px; margin-bottom:10px;">🌤️ আবহাওয়া</div>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <div style="font-size:36px;">⛅</div>
+        <div>
+          <div style="font-weight:800; font-size:28px; color:#fff;">28°C</div>
+          <div style="font-size:12px; color:var(--muted);">ঢাকা · আংশিক মেঘলা</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; font-size:12px; color:#cbd0dd; padding-top:10px; margin-top:10px; border-top:1px dashed var(--border);">
+        <span>সর্বোচ্চ <b style="color:#f0a35c;">32°</b></span>
+        <span>সর্বনিম্ন <b style="color:#7ec8f2;">26°</b></span>
+      </div>
+    </div>
+
+    <!-- Language selector -->
+    <div class="card">
+      <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px; margin-bottom:10px;">🌐 ভাষা নির্বাচন</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button id="hbswLangBn" class="hbswPill active" data-lang="bn">বাংলা</button>
+        <button id="hbswLangEn" class="hbswPill" data-lang="en">English</button>
+        <button id="hbswLangAr" class="hbswPill" data-lang="ar" dir="rtl">العربية</button>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="card">
+      <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px; margin-bottom:8px;">⚙️ সেটিংস</div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border);">
+        <span id="hbswSettingsHourLbl" style="font-size:12.5px; color:#e7e2d4;">🕑 সময় ফরম্যাট (12 ঘন্টা)</span>
+        <button id="hbswHourToggleTrack" class="hbswToggle" aria-label="সময় ফরম্যাট টগল করুন"><span class="hbswThumb"></span></button>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:12.5px; color:#e7e2d4;">🔔 নোটিফিকেশন</span>
+        <button id="hbswNotifToggleTrack" class="hbswToggle on" aria-label="নোটিফিকেশন চালু/বন্ধ করুন"><span class="hbswThumb"></span></button>
+      </div>
+      <button style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border:none; border-bottom:1px solid var(--border); background:none; font-family:inherit; cursor:pointer; text-align:left; width:100%;">
+        <span style="font-size:12.5px; color:#e7e2d4;">📍 এলাকা / শহর</span>
+        <span style="font-size:12.5px; color:var(--muted);">ঢাকা ›</span>
+      </button>
+      <button style="display:flex; align-items:center; justify-content:space-between; padding:9px 0; border:none; background:none; font-family:inherit; cursor:pointer; text-align:left; width:100%;">
+        <span style="font-size:12.5px; color:#e7e2d4;">🖥️ ডিসপ্লে স্টাইল</span>
+        <span style="font-size:12.5px; color:var(--muted);">ডিজিটাল ›</span>
+      </button>
+    </div>
+
+    <!-- Menu -->
+    <div class="card">
+      <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px; margin-bottom:10px;">📋 মেনু</div>
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;">
+        <button style="background:rgba(96,165,250,0.14); border:none; border-radius:10px; padding:10px 2px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; font-family:inherit;"><span style="font-size:16px;">🕐</span><span style="font-size:9px; color:#e7e2d4; font-weight:600;">ঘড়ি</span></button>
+        <button style="background:rgba(226,84,61,0.14); border:none; border-radius:10px; padding:10px 2px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; font-family:inherit;"><span style="font-size:16px;">📅</span><span style="font-size:9px; color:#e7e2d4; font-weight:600;">ক্যালেন্ডার</span></button>
+        <button style="background:rgba(47,191,113,0.14); border:none; border-radius:10px; padding:10px 2px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; font-family:inherit;"><span style="font-size:16px;">🕌</span><span style="font-size:9px; color:#e7e2d4; font-weight:600;">নামাজ</span></button>
+        <button style="background:rgba(96,165,250,0.14); border:none; border-radius:10px; padding:10px 2px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; font-family:inherit;"><span style="font-size:16px;">🏛️</span><span style="font-size:9px; color:#e7e2d4; font-weight:600;">সরকারি ছুটি</span></button>
+        <button style="background:rgba(180,140,255,0.16); border:none; border-radius:10px; padding:10px 2px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; font-family:inherit;"><span style="font-size:16px;">🕉️</span><span style="font-size:9px; color:#e7e2d4; font-weight:600;">সনাতনী</span></button>
+        <button style="background:rgba(96,165,250,0.14); border:none; border-radius:10px; padding:10px 2px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; font-family:inherit;"><span style="font-size:16px;">🌤️</span><span style="font-size:9px; color:#e7e2d4; font-weight:600;">আবহাওয়া</span></button>
+        <button style="background:rgba(255,255,255,0.08); border:none; border-radius:10px; padding:10px 2px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; font-family:inherit;"><span style="font-size:16px;">⚙️</span><span style="font-size:9px; color:#e7e2d4; font-weight:600;">সেটিংস</span></button>
+        <button style="background:rgba(255,255,255,0.08); border:none; border-radius:10px; padding:10px 2px; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; font-family:inherit;"><span style="font-size:16px;">⋯</span><span style="font-size:9px; color:#e7e2d4; font-weight:600;">আরও</span></button>
+      </div>
+    </div>
+
+    <div style="text-align:center; padding:16px 0 6px;">
+      <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.4px;">সব সময় · সব ক্যালেন্ডার · সবার জন্য</div>
+      <div style="font-size:10.5px; color:var(--muted); margin-top:4px;">Honey Bee Smart Watch — Time Unites Us</div>
     </div>
   </div>
 
@@ -2006,7 +2242,7 @@ let __nearbyMarketId = null; // 📍 GPS-এ সবচেয়ে কাছে�
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenHome","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenMarketCategories","screenMarketSubcategories","screenMarketProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
+  ["screenHome","screenSmartWatch","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenMarketCategories","screenMarketSubcategories","screenMarketProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
   if(id === "screenTransportMedia") tmListenFeed(); // 📢 Phase 6 — স্ক্রিন খুললেই লাইভ ফিড লোড হয়
   // ✈️ Smart Flight Tracking — অন্য কোনো স্ক্রিনে গেলে auto-refresh টাইমার
@@ -2039,7 +2275,7 @@ function showScreen(id){
   // খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন লুকিয়ে যায়, যাতে
   // পুরোপুরি আলাদা একটা অ্যাপের মতো লাগে (Cart এখন hbCartScreen নিজস্ব
   // fixed overlay হিসেবে আলাদাভাবে ম্যানেজ হয়, showScreen()-এর অংশ না)
-  const isFullScreen = id === "screenHoneyMessenger" || id === "screenTransportMedia" || id === "screenSmartFlightInfo";
+  const isFullScreen = id === "screenHoneyMessenger" || id === "screenTransportMedia" || id === "screenSmartFlightInfo" || id === "screenSmartWatch";
   const headerEl = document.querySelector("header");
   if(headerEl) headerEl.style.display = isFullScreen ? "none" : "";
   const footerEl = document.querySelector(".footerNav");
@@ -2143,6 +2379,8 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
       goToFavoriteMarket();
     }else if(svc === "transport"){
       showScreen("screenTransport");
+    }else if(svc === "smartwatch"){
+      showScreen("screenSmartWatch");
     }else if(svc === "jibontori"){
       showScreen("screenJibonTori");
     }else if(svc === "bloodbank"){
@@ -2160,6 +2398,49 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
   });
 });
 document.getElementById("backToHomeFromMarkets") && document.getElementById("backToHomeFromMarkets").addEventListener("click", ()=> showScreen("screenHome"));
+document.getElementById("backToHomeFromSmartWatch") && document.getElementById("backToHomeFromSmartWatch").addEventListener("click", ()=> showScreen("screenHome"));
+
+/* ==================== ⌚ Honey Bee Smart Watch ড্যাশবোর্ড — ১২/২৪ ঘন্টা টগল ও ভাষা বাছাই ==================== */
+let hbswHour24 = false;
+function hbswRenderClock(){
+  const main = document.getElementById("hbswClockMain");
+  const suffix = document.getElementById("hbswClockSuffix");
+  const toggleBtn = document.getElementById("hbswHourToggleBtn");
+  const toggleTrack = document.getElementById("hbswHourToggleTrack");
+  const settingsLbl = document.getElementById("hbswSettingsHourLbl");
+  if(!main) return;
+  main.textContent = hbswHour24 ? "01:13" : "1:13";
+  suffix.textContent = hbswHour24 ? "" : "AM";
+  toggleBtn.textContent = hbswHour24 ? "24 ঘন্টা" : "12 ঘন্টা";
+  toggleTrack.classList.toggle("on", hbswHour24);
+  settingsLbl.textContent = "🕑 সময় ফরম্যাট (" + (hbswHour24 ? "24 ঘন্টা" : "12 ঘন্টা") + ")";
+}
+document.getElementById("hbswHourToggleBtn") && document.getElementById("hbswHourToggleBtn").addEventListener("click", ()=>{ hbswHour24 = !hbswHour24; hbswRenderClock(); });
+document.getElementById("hbswHourToggleTrack") && document.getElementById("hbswHourToggleTrack").addEventListener("click", ()=>{ hbswHour24 = !hbswHour24; hbswRenderClock(); });
+
+document.getElementById("hbswNotifToggleTrack") && document.getElementById("hbswNotifToggleTrack").addEventListener("click", (e)=> e.currentTarget.classList.toggle("on"));
+
+const HBSW_DAY_NAMES = { bn:"বুধবার", en:"Wednesday", ar:"الأربعاء" };
+const HBSW_MONTH_NAMES = { bn:"সেপ্টেম্বর", en:"September", ar:"سبتمبر" };
+function hbswRenderLanguage(lang){
+  ["Bn","En","Ar"].forEach(k=>{
+    const btn = document.getElementById("hbswLang"+k);
+    if(btn) btn.classList.toggle("active", k.toLowerCase()===lang);
+  });
+  ["en","bn","ar"].forEach(l=>{
+    const dayEl = document.getElementById("hbswDay"+l.charAt(0).toUpperCase()+l.slice(1));
+    const monthEl = document.getElementById("hbswMonth"+l.charAt(0).toUpperCase()+l.slice(1));
+    const active = l === lang;
+    if(dayEl) dayEl.style.color = active ? "#fff8e8" : "#6b7280";
+    if(monthEl) monthEl.style.color = active ? "var(--amber)" : "#6b7280";
+  });
+  const analogLbl = document.getElementById("hbswAnalogDayLabel");
+  if(analogLbl) analogLbl.textContent = HBSW_DAY_NAMES[lang] + ", 16 Sep";
+}
+["Bn","En","Ar"].forEach(k=>{
+  const btn = document.getElementById("hbswLang"+k);
+  if(btn) btn.addEventListener("click", ()=> hbswRenderLanguage(btn.dataset.lang));
+});
 document.getElementById("backToHomeFromJibonTori") && document.getElementById("backToHomeFromJibonTori").addEventListener("click", ()=> showScreen("screenHome"));
 document.getElementById("backToJibonToriFromBlood") && document.getElementById("backToJibonToriFromBlood").addEventListener("click", ()=> showScreen("screenJibonTori"));
 document.getElementById("backToJibonToriFromAmbulance") && document.getElementById("backToJibonToriFromAmbulance").addEventListener("click", ()=> showScreen("screenJibonTori"));
