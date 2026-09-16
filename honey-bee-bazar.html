@@ -204,6 +204,17 @@
   }
   .shopSocialBtn.liked{ background:rgba(220,38,38,0.18); color:#f87171; }
   .shopSocialBtn.saved{ background:rgba(217,119,6,0.18); color:var(--amber); }
+  /* 📞💬 দোকানের বিবরণে লেখা মোবাইল নম্বর পাওয়া গেলে সরাসরি কল/WhatsApp বাটন —
+     লাইক/কমেন্ট/শেয়ার/সংরক্ষণ সারির নিচে আলাদা সারি */
+  .shopContactRow{ display:flex; gap:6px; padding:0 12px 11px; }
+  .shopContactBtn{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+    padding:9px 4px; border:none; border-radius:9px; color:#fff; font-size:12.5px;
+    font-weight:800; cursor:pointer; font-family:inherit; text-decoration:none;
+    white-space:nowrap; overflow:hidden;
+  }
+  .shopContactBtn.call{ background:#2563eb; }
+  .shopContactBtn.whatsapp{ background:#16a34a; }
   .pCardStock.in{ color:var(--ok); } .pCardStock.low{ color:var(--amber); } .pCardStock.out{ color:var(--danger); }
   .pCardAddBtn{
     width:100%; padding:8px; border-radius:9px; border:none; cursor:pointer; font-family:inherit;
@@ -5519,6 +5530,22 @@ function getFilteredShops(){
 // 📢 বড় Facebook-পোস্ট-স্টাইল দোকান কার্ড — উপরে দোকানের ছোট গোল ছবি+নাম,
 // তারপর বড় (প্রায় ১৩০০×৫৫০ অনুপাত) মূল ছবি, নিচে বিবরণ ও লাইক/কমেন্ট/শেয়ার/
 // সংরক্ষণ বাটন — সবসময় দেখা যায় (কোনো লুকানো/টগল প্যানেল নেই)।
+// 📞 দোকানের বিবরণে (logoDescription) শোনরাসরি লেখা বাংলাদেশি মোবাইল নম্বর
+// (যেমনঃ "01829563832 imo whatsapp sms") থাকলে সেটা বের করে কল/WhatsApp
+// বাটনের জন্য ব্যবহার করা হয় — শপ সাইনআপে আলাদা কোনো ফোন-নম্বর ফিল্ড নেই,
+// দোকানদাররা এমনিতেই এই বিবরণের ঘরে নিজের নম্বর লিখে রাখেন, তাই নতুন কোনো
+// সেটিংস ফর্ম না বানিয়ে বিদ্যমান টেক্সট থেকেই এটা বের করা হচ্ছে।
+function hbExtractShopPhone(text){
+  if(!text) return null;
+  const m = String(text).match(/(?:\+?880)?(01[3-9]\d{8})/);
+  return m ? m[1] : null;
+}
+// wa.me লিংকের জন্য পূর্ণ আন্তর্জাতিক ফরম্যাট লাগে (দেশের কোড সহ, শুরুর ০ ছাড়া) —
+// নাহলে বাটনে চেপে WhatsApp সঠিক নম্বর খুঁজে পায় না
+function hbPhoneToWaLink(localPhone, text){
+  const digits = '880' + localPhone.replace(/^0/, '');
+  return `https://wa.me/${digits}${text ? '?text=' + encodeURIComponent(text) : ''}`;
+}
 function hbShopCardHTML(s, onClickExpr){
   const favs = (currentCustomer && currentCustomer.favoriteShops) || [];
   const isFav = favs.includes(s.id);
@@ -5532,6 +5559,13 @@ function hbShopCardHTML(s, onClickExpr){
   const liked = !!(myUid && (s.logoLikedBy||[]).includes(myUid));
   const desc = s.logoDescription || "";
   const descLong = desc.length > 90;
+  const shopPhone = hbExtractShopPhone(desc);
+  const shopNameForMsg = s.name || s.shopName || "দোকান";
+  const contactRow = shopPhone ? `
+      <div class="shopContactRow" onclick="event.stopPropagation();">
+        <a class="shopContactBtn call" href="tel:${escapeHtml(shopPhone)}">📞 কল করুন</a>
+        <a class="shopContactBtn whatsapp" href="${hbPhoneToWaLink(shopPhone, `${shopNameForMsg} থেকে Honey Bee Bazar-এ দেখে মেসেজ করছি।`)}" target="_blank" rel="noopener">💬 WhatsApp</a>
+      </div>` : '';
   return `
     <div class="shopPostCard" onclick="${onClickExpr}">
       <div class="shopPostHead">
@@ -5553,7 +5587,7 @@ function hbShopCardHTML(s, onClickExpr){
         <button type="button" class="shopSocialBtn" onclick="hbOpenShopComments(event,'${s.id}')">💬 কমেন্ট ${s.logoCommentCount||0}</button>
         <button type="button" class="shopSocialBtn" onclick="hbShareShop(event,'${s.id}')">↗️ শেয়ার</button>
         <button type="button" class="shopSocialBtn${isFav ? ' saved' : ''}" onclick="toggleFavoriteShop(event,'${s.id}')">🔖 সংরক্ষণ</button>
-      </div>
+      </div>${contactRow}
     </div>`;
 }
 
@@ -5787,6 +5821,34 @@ function catPlaceholderIcon(id){
   return CATEGORY_PLACEHOLDER_ICONS[hash];
 }
 
+// 🖼️ কোনো ক্যাটাগরি/সাব-ক্যাটাগরির নিজস্ব ছবি সেট করা না থাকলে (POS-এর "All
+// Category" প্রিসেটে emoji আইকন থাকে, ছবি না) আগে একটা জেনেরিক/এলোমেলো
+// প্লেসহোল্ডার-ইমোজি (id হ্যাশ করে বেছে নেওয়া) দেখানো হতো — যেমন "মোবাইল ও
+// গ্যাজেট" ক্যাটাগরিতে কাকতালীয়ভাবে 🧴 লোশনের বোতল, "ফল ও সবজি"-তে 🧃 জুসের
+// বাক্স দেখাতো, যা সম্পূর্ণ ভুল/অসঙ্গত ("ভুল-ভালো ক্যাটাগরিতে ছবি আসে")। এই
+// শপ-লেভেল ক্যাটাগরি স্ক্রিনটাতে মার্কেট-ওয়াইড "🗂️ ক্যাটাগরি" ট্যাবে
+// (loadMarketCategories) আগে থেকেই থাকা "সেই ক্যাটাগরির নিজের কোনো প্রোডাক্টের
+// আসল ছবি বসিয়ে দেওয়া" লজিকটা মিসিং ছিল — এখানে একই প্যাটার্ন যুক্ত করা হলো।
+async function hbFetchShopProductsForCatFallback(shopId){
+  if(window.__catFallbackProductsCache && window.__catFallbackProductsCache.shopId === shopId){
+    return window.__catFallbackProductsCache.products;
+  }
+  let products = [];
+  try{
+    const qs = await db.collection("shops").doc(shopId).collection("publicStock").get();
+    products = qs.docs.map(d=> d.data());
+  }catch(e){ console.warn("category-fallback প্রোডাক্ট লোড ব্যর্থ:", e); }
+  window.__catFallbackProductsCache = { shopId, products };
+  return products;
+}
+function hbApplyCatImageFallback(items, matchFn, products){
+  items.forEach(item=>{
+    if(item.imageUrl) return;
+    const rep = products.find(p=> p.imageUrl && matchFn(p, item));
+    if(rep) item.imageUrl = rep.imageUrl;
+  });
+}
+
 async function loadCategories(shopId, shopName){
   $("categoriesGrid").innerHTML = '<div class="loadingMsg">লোড হচ্ছে...</div>';
   showScreen("screenCategories");
@@ -5801,6 +5863,8 @@ async function loadCategories(shopId, shopName){
       return;
     }
     const cats = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+    const fallbackProducts = await hbFetchShopProductsForCatFallback(shopId);
+    hbApplyCatImageFallback(cats, (p, c)=> p.catId === c.id, fallbackProducts);
     $("categoriesGrid").innerHTML = cats.map(c=> `
       <div class="serviceCard" onclick="selectCategory('${c.id}','${escapeHtml(c.name||'').replace(/'/g,"")}')">
         <div class="ic">${c.imageUrl ? `<img src="${escapeHtml(c.imageUrl)}" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:8px;" onerror="this.parentElement.textContent='${catPlaceholderIcon(c.id)}'">` : catPlaceholderIcon(c.id)}</div>
@@ -5813,7 +5877,7 @@ async function loadCategories(shopId, shopName){
   }
 }
 
-window.selectCategory = function(catId, catName){
+window.selectCategory = async function(catId, catName){
   currentCatId = catId;
   currentSubId = null; currentSubSubId = null; currentSubName = null;
   $("currentCategoryName").textContent = catName;
@@ -5826,6 +5890,8 @@ window.selectCategory = function(catId, catName){
     loadProducts(currentShopId);
     return;
   }
+  const fallbackProducts = await hbFetchShopProductsForCatFallback(currentShopId);
+  hbApplyCatImageFallback(subs, (p, s)=> p.subId === s.id, fallbackProducts);
   $("subcategoriesGrid").innerHTML = subs.map(s=> `
     <div class="catListRow" onclick="selectSubcategory('${s.id}','${escapeHtml(s.name||'').replace(/'/g,"")}')">
       <div class="thumb">${s.imageUrl ? `<img src="${escapeHtml(s.imageUrl)}" alt="" style="width:100%; height:100%; object-fit:cover; border-radius:12px;" onerror="this.parentElement.textContent='${catPlaceholderIcon(s.id)}'">` : catPlaceholderIcon(s.id)}</div>
@@ -5838,7 +5904,7 @@ window.selectCategory = function(catId, catName){
 /* 🗂️ সাব-ক্যাটাগরি বাছার পর — POS-এ এর ভিতরে নেস্টেড সাব-সাব-ক্যাটাগরি থাকলে (long-press
    দিয়ে যোগ করা) আরেকটা ধাপ (screenSubSubcategories) দেখানো হয়; না থাকলে আগের মতোই
    সরাসরি প্রোডাক্টে চলে যায় — পুরনো দোকান/প্রোডাক্টের সাথে ব্যাকওয়ার্ড-কম্প্যাটিবল */
-window.selectSubcategory = function(subId, subName){
+window.selectSubcategory = async function(subId, subName){
   currentSubId = subId;
   currentSubName = subName;
   currentSubSubId = null;
@@ -5851,6 +5917,8 @@ window.selectSubcategory = function(subId, subName){
     loadProducts(currentShopId);
     return;
   }
+  const fallbackProducts = await hbFetchShopProductsForCatFallback(currentShopId);
+  hbApplyCatImageFallback(subSubs, (p, ss)=> p.subSubId === ss.id, fallbackProducts);
   $("currentSubcategoryName").textContent = $("currentShopNameCat").textContent + " · " + subName;
   $("subSubcategoriesGrid").innerHTML = subSubs.map(ss=> `
     <div class="catListRow" onclick="selectSubSubcategory('${ss.id}','${escapeHtml(ss.name||'').replace(/'/g,"")}')">
