@@ -572,6 +572,33 @@
 <style>
   #authGate{position:fixed;inset:0;background:#f6f1e7;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;font-family:'Noto Sans Bengali',sans-serif;}
   #authGate p{color:#1f4a48;font-weight:700;}
+  /* 🐝 ব্র্যান্ডেড ৩D স্বাগতম অ্যানিমেশন — লোডিং স্ক্রিনে শুধু সাদামাটা টেক্সটের বদলে */
+  #authGate .agBeeWrap{ perspective:700px; margin-bottom:2px; }
+  #authGate .agBeeGlow{
+    position:relative; width:104px; height:104px; display:flex; align-items:center; justify-content:center;
+  }
+  #authGate .agBeeGlow::before{
+    content:''; position:absolute; inset:0; border-radius:50%;
+    background:radial-gradient(circle, rgba(251,191,36,0.35) 0%, rgba(251,191,36,0) 70%);
+    animation: agGlowPulse 2.2s ease-in-out infinite;
+  }
+  #authGate .agBee{
+    font-size:60px; display:inline-block; position:relative; transform-style:preserve-3d;
+    animation: agBeeSpin3d 2.4s ease-in-out infinite;
+    filter: drop-shadow(0 10px 14px rgba(31,74,72,0.28));
+  }
+  @keyframes agBeeSpin3d{
+    0%{   transform: rotateY(0deg)   translateY(0px); }
+    25%{  transform: rotateY(180deg) translateY(-12px); }
+    50%{  transform: rotateY(360deg) translateY(0px); }
+    75%{  transform: rotateY(540deg) translateY(-12px); }
+    100%{ transform: rotateY(720deg) translateY(0px); }
+  }
+  @keyframes agGlowPulse{
+    0%, 100%{ transform: scale(0.85); opacity:0.6; }
+    50%{ transform: scale(1.15); opacity:1; }
+  }
+  #authGate .agTitle{ margin:4px 0 0; font-size:17px; font-weight:800; color:#1f4a48; letter-spacing:0.2px; text-align:center; padding:0 24px; }
   #blockedOverlay{position:fixed;inset:0;background:rgba(28,26,23,0.92);z-index:9998;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;color:#fff;text-align:center;padding:20px;}
   #blockedOverlay .box{max-width:340px;}
   #cloudTopBar{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#1f4a48;color:#fff;padding:8px 14px;font-size:12.5px;flex-wrap:wrap;}
@@ -671,7 +698,11 @@
 <script src="hb-currency.js"></script>
 <script src="firebase-init.js"></script>
 
-<div id="authGate"><p>যাচাই করা হচ্ছে, একটু অপেক্ষা করুন...</p></div>
+<div id="authGate">
+  <div class="agBeeWrap"><div class="agBeeGlow"><div class="agBee">🐝</div></div></div>
+  <h1 class="agTitle">Welcome to Honey Bee Ecosystem</h1>
+  <p>যাচাই করা হচ্ছে, একটু অপেক্ষা করুন...</p>
+</div>
 <div id="blockedOverlay"><div class="box"><h2>🔒 একাউন্ট ব্লক করা হয়েছে</h2><p id="blockedReasonText">এডমিনের সাথে যোগাযোগ করুন।</p></div></div>
 
 <div id="cloudTopBar">
