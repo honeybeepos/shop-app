@@ -10479,6 +10479,22 @@ async function hbCheckImageDuplicate(blob){
   return result;
 }
 
+/* ⏱️ দুর্বল/অস্থির মোবাইল নেটওয়ার্কে Firebase SDK নিজে থেকেই কয়েক মিনিট ধরে
+   নীরবে retry করতে থাকতে পারে (কোনো error/feedback ছাড়াই) — এর ফলে "ছবি
+   Storage-এ পাঠানো হচ্ছে..." বাটনটা অনেকক্ষণ আটকে থাকতে পারে, ব্যবহারকারী
+   বুঝতেই পারে না কী হচ্ছে বা কী করবে। তাই একটা নির্দিষ্ট সময় পার হলে স্পষ্ট
+   এরর দেখিয়ে বাটন আবার চালু করে দেওয়া হয়, যাতে সে ইন্টারনেট চেক করে আবার
+   চেষ্টা করতে পারে — বাটন কখনো চিরস্থায়ীভাবে আটকে না থাকে। */
+function hbWithTimeout(promise, ms, timeoutMsg){
+  return new Promise((resolve, reject)=>{
+    const timer = setTimeout(()=> reject(new Error(timeoutMsg)), ms);
+    promise.then(
+      (val)=>{ clearTimeout(timer); resolve(val); },
+      (err)=>{ clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
 /* ==================== ☁️ Real Firebase Storage Upload — Step 4 ====================
    ⚠️ এই ফাংশনটা এখনো Product Save বাটনে যুক্ত করা হয়নি (পরের ধাপের কাজ) —
    এখানে শুধু ফাংশনটা প্রস্তুত ও স্বতন্ত্রভাবে টেস্টযোগ্য করে রাখা হলো।
@@ -10503,7 +10519,7 @@ async function hbUploadOrReuseProductImage(processedResult, dupCheckResult, shop
   // একই মুহূর্তে একই ছবি আপলোড করে ফেলে থাকতে পারে) — থাকলে overwrite
   // না করে বিদ্যমানটাই DUPLICATE হিসেবে ব্যবহার করা হয়
   try{
-    const existingUrl = await storageRef.getDownloadURL();
+    const existingUrl = await hbWithTimeout(storageRef.getDownloadURL(), 15000, "ইন্টারনেট স্লো/বিচ্ছিন্ন — ছবি চেক করতে অনেক সময় লাগছে");
     const existingDoc = await db.collection("imageIndex").doc(sha256).get();
     if(existingDoc.exists){
       const d = existingDoc.data();
@@ -10523,8 +10539,18 @@ async function hbUploadOrReuseProductImage(processedResult, dupCheckResult, shop
   // 📤 আসল আপলোড
   let uploadedUrl;
   try{
-    await storageRef.put(processedResult.blob, { contentType: "image/webp" });
-    uploadedUrl = await storageRef.getDownloadURL();
+    const uploadTask = storageRef.put(processedResult.blob, { contentType: "image/webp" });
+    try{
+      await hbWithTimeout(
+        uploadTask,
+        30000,
+        "ইন্টারনেট স্লো/বিচ্ছিন্ন — ছবি আপলোড হতে অনেক সময় লাগছে, একটু ভালো নেটওয়ার্কে গিয়ে আবার চেষ্টা করুন"
+      );
+    }catch(timeoutOrUploadErr){
+      try{ uploadTask.cancel(); }catch(cancelErr){ /* টাস্ক ইতিমধ্যে শেষ/ব্যর্থ হয়ে থাকলে cancel() নিজেই এরর দিতে পারে — উপেক্ষা করা নিরাপদ */ }
+      throw timeoutOrUploadErr;
+    }
+    uploadedUrl = await hbWithTimeout(storageRef.getDownloadURL(), 15000, "ইন্টারনেট স্লো/বিচ্ছিন্ন — আপলোড হয়েছে কিন্তু লিংক আনতে সময় লাগছে, আবার চেষ্টা করুন");
   }catch(e){
     console.error("Storage upload ব্যর্থ:", e);
     if(e.code === "storage/unauthorized"){
