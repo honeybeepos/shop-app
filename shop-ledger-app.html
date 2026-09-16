@@ -4393,6 +4393,7 @@
         </div>
 
         <button class="bccBtnPrimary" id="bccSaveProductBtn" style="width:100%; margin-top:4px;">Save Product</button>
+        <button id="bccCancelUploadBtn" style="width:100%; margin-top:8px; display:none; background:#a3372c; color:#fff; border:none; border-radius:8px; padding:10px; font-weight:600;">✕ আপলোড বাতিল করুন</button>
       </div>
     </div>
   </div>
@@ -10495,6 +10496,10 @@ function hbWithTimeout(promise, ms, timeoutMsg){
   });
 }
 
+// 📶 বর্তমানে চলমান upload task — Cancel বাটনে চাপলে এটা ব্যবহার হয়
+// (একবারে একটাই upload চলতে পারে, তাই single global-ই যথেষ্ট)
+let __bccActiveUploadTask = null;
+
 /* ==================== ☁️ Real Firebase Storage Upload — Step 4 ====================
    ⚠️ এই ফাংশনটা এখনো Product Save বাটনে যুক্ত করা হয়নি (পরের ধাপের কাজ) —
    এখানে শুধু ফাংশনটা প্রস্তুত ও স্বতন্ত্রভাবে টেস্টযোগ্য করে রাখা হলো।
@@ -10540,6 +10545,17 @@ async function hbUploadOrReuseProductImage(processedResult, dupCheckResult, shop
   let uploadedUrl;
   try{
     const uploadTask = storageRef.put(processedResult.blob, { contentType: "image/webp" });
+    __bccActiveUploadTask = uploadTask;
+    // 📊 লাইভ প্রগ্রেস — শুধু "⏳ পাঠানো হচ্ছে..." স্ট্যাটিক টেক্সট দেখালে দুর্বল
+    // নেটওয়ার্কে সত্যিই কাজ হচ্ছে নাকি একদম আটকে গেছে বোঝা যায় না, এতে ইউজার
+    // বিভ্রান্ত হয়ে বারবার বাতিল/রিট্রাই করার চেষ্টা করে। % দেখালে স্পষ্ট বোঝা যায়
+    // ধীরে হলেও এগোচ্ছে, আর একদম আটকে থাকলে (০% থেকে না নড়লে) সেটাও বোঝা যায়।
+    const saveBtnForProgress = document.getElementById('bccSaveProductBtn');
+    uploadTask.on('state_changed', (snapshot)=>{
+      if(!saveBtnForProgress || !snapshot.totalBytes) return;
+      const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+      saveBtnForProgress.textContent = `⏳ ছবি আপলোড হচ্ছে… ${pct}%`;
+    });
     try{
       await hbWithTimeout(
         uploadTask,
@@ -10548,13 +10564,22 @@ async function hbUploadOrReuseProductImage(processedResult, dupCheckResult, shop
       );
     }catch(timeoutOrUploadErr){
       try{ uploadTask.cancel(); }catch(cancelErr){ /* টাস্ক ইতিমধ্যে শেষ/ব্যর্থ হয়ে থাকলে cancel() নিজেই এরর দিতে পারে — উপেক্ষা করা নিরাপদ */ }
+      if(timeoutOrUploadErr && timeoutOrUploadErr.code === "storage/canceled"){
+        throw new Error("আপলোড বাতিল করা হয়েছে");
+      }
       throw timeoutOrUploadErr;
+    }finally{
+      __bccActiveUploadTask = null;
     }
     uploadedUrl = await hbWithTimeout(storageRef.getDownloadURL(), 15000, "ইন্টারনেট স্লো/বিচ্ছিন্ন — আপলোড হয়েছে কিন্তু লিংক আনতে সময় লাগছে, আবার চেষ্টা করুন");
   }catch(e){
+    __bccActiveUploadTask = null;
     console.error("Storage upload ব্যর্থ:", e);
     if(e.code === "storage/unauthorized"){
       throw new Error("Storage আপলোডের অনুমতি নেই — Storage Rules-এ এই পাথে write অনুমোদিত কিনা চেক করুন");
+    }
+    if(e.message === "আপলোড বাতিল করা হয়েছে"){
+      throw e;
     }
     throw new Error("ছবি আপলোড ব্যর্থ: " + (e.message || e.code || e));
   }
@@ -10770,6 +10795,14 @@ function setupProductNameSuggest(inputId, resultsId, excludeIdFn){
 }
 setupProductNameSuggest('bccPName', 'bccPNameResults', ()=> bccEditingProductId);
 setupProductNameSuggest('bccQName', 'bccQNameResults', ()=> null);
+// 🛑 ছবি আপলোড চলাকালীন দেখানো "বাতিল করুন" বাটন — চাপলে সাথে সাথেই চলমান
+// upload বাতিল হয়ে যায় (hbUploadOrReuseProductImage-এর ভেতরের catch এটা
+// ধরে "আপলোড বাতিল করা হয়েছে" মেসেজ দেখায় ও Save বাটন আবার চালু করে)
+document.getElementById('bccCancelUploadBtn').addEventListener('click', ()=>{
+  if(__bccActiveUploadTask){
+    try{ __bccActiveUploadTask.cancel(); }catch(e){ /* উপেক্ষা করা নিরাপদ */ }
+  }
+});
 document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=>{
   const name = document.getElementById('bccPName').value.trim();
   if(!name){ toast('প্রোডাক্টের নাম দিন'); return; }
@@ -10822,15 +10855,22 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
       return;
     }
     saveBtn.disabled = true; saveBtn.textContent = '⏳ ছবি Storage-এ পাঠানো হচ্ছে...';
+    // 🛑 আপলোড চলাকালীন "বাতিল করুন" বাটন দেখানো হয় — নেটওয়ার্ক স্লো/আটকে গেলে
+    // ব্যবহারকারী যেন ৩০-৪৫ সেকেন্ড টাইমআউটের জন্য অসহায়ভাবে বসে না থাকে,
+    // নিজেই যেকোনো সময় বাতিল করে আবার চেষ্টা করতে পারে
+    const cancelBtn = document.getElementById('bccCancelUploadBtn');
+    if(cancelBtn) cancelBtn.style.display = 'block';
     try{
       imageIntegrationResult = await bccIntegrateProductImage(session.shopId);
     }catch(imgErr){
       console.error('Product image integration ব্যর্থ:', imgErr);
       saveBtn.disabled = false; saveBtn.textContent = originalBtnText;
-      toast('❌ Product সেভ হয়নি — ছবি আপলোড ব্যর্থ: ' + imgErr.message);
+      if(cancelBtn) cancelBtn.style.display = 'none';
+      toast(imgErr.message === 'আপলোড বাতিল করা হয়েছে' ? '↩️ আপলোড বাতিল করা হয়েছে' : ('❌ Product সেভ হয়নি — ছবি আপলোড ব্যর্থ: ' + imgErr.message));
       return; // ⚠️ Product data একদমই সেভ করা হচ্ছে না, যাতে অসম্পূর্ণ/ভাঙা অবস্থায় না থাকে
     }
     saveBtn.disabled = false; saveBtn.textContent = originalBtnText;
+    if(cancelBtn) cancelBtn.style.display = 'none';
   }
 
   // একই নামের প্রোডাক্ট আগে থেকেই আছে কিনা চেক করা হচ্ছে (নতুন প্রোডাক্ট এড করার সময়ই,
