@@ -5036,7 +5036,7 @@ function hbRenderPublicProductBody(){
   const orderBtn = document.getElementById('hbPubOrderBtn');
   if(orderBtn) orderBtn.addEventListener('click', ()=>{ __hbPubView = 'order'; hbRenderPublicProductBody(); });
   if(isVariant) hbWirePublicVariantPicker();
-  hbInitLikeComment('pub', __hbPubShopId, __hbPubProductId);
+  hbInitLikeComment('pub', __hbPubShopId, __hbPubProductId, p.name, __hbPubShopName);
   if(p.imageUrl) hbBindImageZoomTap(document.getElementById('hbPubDetailImgWrap'), p.imageUrl);
 }
 async function hbSubmitGuestOrder(){
@@ -5110,6 +5110,9 @@ function hbLikeCommentHTML(key){
           <span id="hbLikeIcon_${key}">👍</span> <span id="hbLikeCount_${key}">0</span>
         </button>
         <span style="font-size:12px; color:var(--muted);">💬 <span id="hbCommentCount_${key}">0</span> কমেন্ট</span>
+        <button type="button" onclick="hbShareProduct('${key}')" style="display:flex; align-items:center; gap:6px; padding:7px 14px; border-radius:20px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:#fff; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; margin-left:auto;">
+          ↗️ শেয়ার
+        </button>
       </div>
       <div id="hbCommentList_${key}" style="display:flex; flex-direction:column; gap:8px; max-height:220px; overflow-y:auto; margin-bottom:10px;"></div>
       <div id="hbCommentInputWrap_${key}"></div>
@@ -5178,8 +5181,8 @@ function hbRenderLikeCommentFromCache(key){
     }
   }
 }
-async function hbInitLikeComment(key, shopId, productId){
-  __hbLcRegistry[key] = { shopId, productId };
+async function hbInitLikeComment(key, shopId, productId, productName, shopName){
+  __hbLcRegistry[key] = { shopId, productId, productName: productName || '', shopName: shopName || '' };
   hbRenderCommentInput(key);
   const pid = shopId + '_' + productId;
   const cached = __hbLcCache[key];
@@ -5202,6 +5205,27 @@ async function hbInitLikeComment(key, shopId, productId){
   }catch(e){ console.warn('like/comment load failed:', e); }
   hbRenderLikeCommentFromCache(key);
 }
+// 🔗 প্রোডাক্ট শেয়ার — /p/{shopId}/{productId} ডিপ-লিংক (উপরে
+// hbDetectPublicProductDeepLink()-এ যেটা হ্যান্ডল হয়) কপি/শেয়ার করে, যাতে
+// যে কেউ লিংকে ক্লিক করলে সরাসরি লগইন ছাড়াই এই প্রোডাক্টের পেজ খুলে যায়
+// — hbShareShop()-এর ঠিক একই প্যাটার্ন (নেটিভ শেয়ার শিট, না থাকলে ক্লিপবোর্ড কপি)
+window.hbShareProduct = function(key){
+  const reg = __hbLcRegistry[key];
+  if(!reg || !reg.shopId || !reg.productId) return;
+  const productName = reg.productName || "প্রোডাক্ট";
+  const shopName = reg.shopName || "দোকান";
+  const shareUrl = `${location.origin}/p/${reg.shopId}/${reg.productId}`;
+  const shareText = `🐝 ${productName} — ${shopName} (Honey Bee Bazar): ${shareUrl}`;
+  if(navigator.share){
+    navigator.share({ title: productName, text: shareText, url: shareUrl }).catch(()=>{});
+  }else if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(shareText).then(()=> alert('লিংক কপি হয়েছে — এখন যেকোনো জায়গায় পেস্ট করে শেয়ার করুন।')).catch(()=>{
+      prompt('এই লিংকটা কপি করে শেয়ার করুন:', shareText);
+    });
+  }else{
+    prompt('এই লিংকটা কপি করে শেয়ার করুন:', shareText);
+  }
+};
 async function hbToggleLike(key){
   if(!currentCustomer || !currentCustomer.uid){ hbLcGoogleLogin(key); return; }
   const cache = __hbLcCache[key];
@@ -5398,7 +5422,7 @@ window.hbOpenMarketProductDetail = function(shopId, productId){
       ${hbLikeCommentHTML('detail')}
     `;
     if(isVariant) hbWireVariantPicker(render);
-    hbInitLikeComment('detail', p.__shopId, p.id);
+    hbInitLikeComment('detail', p.__shopId, p.id, p.name, p.__shopName);
     if(p.imageUrl) hbBindImageZoomTap(document.getElementById('mfDetailImgWrap'), p.imageUrl);
   };
   render();
