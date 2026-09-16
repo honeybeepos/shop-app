@@ -2728,50 +2728,47 @@
 
     /* 🧾 একই কাস্টমারের একাধিক প্রোডাক্ট-অর্ডার এখন একসাথে একটা কার্ডে/রসিদে —
        আগে প্রতিটা প্রোডাক্ট আলাদা কার্ড হয়ে "নতুন"/"প্রস্তুত হচ্ছে" ট্যাবে
-       ছড়িয়ে থাকতো, একটা একটা করে গ্রহণ করতে হতো */
-    #program-orders .ordGroupCard{ background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:14px; margin-bottom:14px; color:#fff; }
-    #program-orders .ordGroupHead{ margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed rgba(255,255,255,0.15); }
-    #program-orders .ordGroupCustomer{ font-weight:800; font-size:14px; }
-    #program-orders .ordGroupMeta{ font-size:11.5px; color:#8ec9a8; margin-top:3px; }
-    #program-orders .ordItemRow{ display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
-    #program-orders .ordItemRow:last-child{ border-bottom:none; }
-    #program-orders .ordItemThumb{ width:40px; height:40px; border-radius:8px; overflow:hidden; background:rgba(255,255,255,0.06); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:18px; }
-    #program-orders .ordItemThumb img{ width:100%; height:100%; object-fit:cover; }
-    #program-orders .ordItemInfo{ flex:1; min-width:0; }
-    #program-orders .ordItemName{ font-weight:700; font-size:12.5px; }
-    #program-orders .ordItemMeta{ font-size:11px; color:#fbbf24; font-weight:700; }
-    #program-orders .ordItemRemoveBtn{ flex-shrink:0; width:26px; height:26px; border-radius:50%; background:rgba(220,38,38,0.2); color:#fca5a5; border:none; font-size:13px; cursor:pointer; }
-    #program-orders .ordGroupAcceptBtn{ width:100%; margin-top:12px; padding:11px; border:none; border-radius:10px; background:#22c55e; color:#08130d; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit; }
+       ছড়িয়ে থাকতো, একটা একটা করে গ্রহণ করতে হতো।
+       ⚠️ এই .ordGroupCard/.ordItemRow/.ordItemThumb... ক্লাসগুলো শুধু
+       #program-orders স্ক্রিনেই না — ordItemRowHtml()/ordBuildPendingGroupHtml()
+       ফাংশন দুটো এই একই HTML #ordAcceptGroupModal (গ্রুপ-অ্যাকসেপ্ট পপ-আপ) আর
+       #ordBellModalOverlay (হোম স্ক্রিনের 🔔 বেল-এ ক্লিক করলে খোলা পপ-আপ) —
+       এই দুটো #program-orders-এর সম্পূর্ণ বাইরের আলাদা .modal-overlay-তেও বসায়।
+       আগে এই রুলগুলো "#program-orders .ordItemThumb" আকারে স্কোপ করা ছিল, তাই
+       ওই দুই পপ-আপে এসব প্রযোজ্যই হতো না — ফলে প্রোডাক্ট ছবি কোনো width/height/
+       overflow না পেয়ে আসল সাইজে বিশাল হয়ে পুরো পপ-আপ/স্ক্রিন জুড়ে দেখাতো
+       ("অর্ডার এলে ছবি পুরা ডিসপ্লে হয়ে আসে", "হোম নোটিফিকেশনে ক্লিক করলে পুরো
+       স্ক্রিন জুড়ে আসে")। এখন থেকে এই কম্পোনেন্ট-ক্লাসগুলো #program-orders
+       স্কোপ ছাড়াই গ্লোবাল রাখা হলো, যাতে যেকোনো পপ-আপে reuse করলেও ঠিক দেখায়। */
+    .ordGroupCard{ background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:14px; margin-bottom:14px; color:#fff; }
+    .ordGroupHead{ margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed rgba(255,255,255,0.15); }
+    .ordGroupCustomer{ font-weight:800; font-size:14px; }
+    .ordGroupMeta{ font-size:11.5px; color:#8ec9a8; margin-top:3px; }
+    .ordItemRow{ display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
+    .ordItemRow:last-child{ border-bottom:none; }
+    .ordItemThumb{ width:40px; height:40px; border-radius:8px; overflow:hidden; background:rgba(255,255,255,0.06); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:18px; }
+    .ordItemThumb img{ width:100%; height:100%; object-fit:cover; }
+    .ordItemInfo{ flex:1; min-width:0; }
+    .ordItemName{ font-weight:700; font-size:12.5px; }
+    .ordItemMeta{ font-size:11px; color:#fbbf24; font-weight:700; }
+    .ordItemRemoveBtn{ flex-shrink:0; width:26px; height:26px; border-radius:50%; background:rgba(220,38,38,0.2); color:#fca5a5; border:none; font-size:13px; cursor:pointer; }
+    .ordGroupAcceptBtn{ width:100%; margin-top:12px; padding:11px; border:none; border-radius:10px; background:#22c55e; color:#08130d; font-weight:800; font-size:13px; cursor:pointer; font-family:inherit; }
 
     /* 🔁 "রসিদ" আগে থেকেই ছিল, কিন্তু কাস্টমার আবার অর্ডার করায় নতুন
        প্রোডাক্ট যোগ হলো — এটা আলাদা রঙ+হালকা এনিমেশন দিয়ে বোঝানো হয়, যাতে
        দোকানদার সহজেই "লেগে থাকা" (পুরনো/repeat) কাস্টমার চিনতে পারেন */
-    #program-orders .ordAddOnBadge{ font-size:10.5px; font-weight:800; color:#0d1b1e; background:linear-gradient(135deg,#fcd34d,#f59e0b); display:inline-block; padding:3px 9px; border-radius:20px; margin:8px 0 4px; }
-    #program-orders .ordAddOnBatch .ordItemRow{ background:rgba(245,158,11,0.10); border-radius:10px; padding:8px 8px; animation: ordAddOnPulse 1.6s ease-in-out 2; }
+    .ordAddOnBadge{ font-size:10.5px; font-weight:800; color:#0d1b1e; background:linear-gradient(135deg,#fcd34d,#f59e0b); display:inline-block; padding:3px 9px; border-radius:20px; margin:8px 0 4px; }
+    .ordAddOnBatch .ordItemRow{ background:rgba(245,158,11,0.10); border-radius:10px; padding:8px 8px; animation: ordAddOnPulse 1.6s ease-in-out 2; }
     @keyframes ordAddOnPulse{
       0%,100%{ box-shadow:0 0 0 0 rgba(245,158,11,0.0); }
       50%{ box-shadow:0 0 0 5px rgba(245,158,11,0.25); }
     }
-    #program-orders .ordPackagingDoneBtn{ width:100%; margin-top:10px; padding:10px; border-radius:9px; border:1px solid rgba(96,165,250,0.4); background:rgba(96,165,250,0.12); color:#93c5fd; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; }
-    #program-orders .ordPackagingDoneBtn.done{ border-color:rgba(34,197,94,0.4); background:rgba(34,197,94,0.12); color:#86efac; cursor:default; }
-    #program-orders .ordSelfDeliveryTag{ display:inline-block; font-size:10.5px; font-weight:800; color:#0d1b1e; background:#a78bfa; padding:3px 9px; border-radius:20px; margin-top:8px; }
+    .ordPackagingDoneBtn{ width:100%; margin-top:10px; padding:10px; border-radius:9px; border:1px solid rgba(96,165,250,0.4); background:rgba(96,165,250,0.12); color:#93c5fd; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; }
+    .ordPackagingDoneBtn.done{ border-color:rgba(34,197,94,0.4); background:rgba(34,197,94,0.12); color:#86efac; cursor:default; }
+    .ordSelfDeliveryTag{ display:inline-block; font-size:10.5px; font-weight:800; color:#0d1b1e; background:#a78bfa; padding:3px 9px; border-radius:20px; margin-top:8px; }
 
-    /* ✅ গ্রহণ-করার পপ-আপ (গ্রুপ-অ্যাকসেপ্ট) — এই পপ-আপ (#ordAcceptGroupModal)
-       #program-orders-এর বাইরে আলাদা একটা .modal-overlay (উপরের div-টা
-       #program-orders বন্ধ হওয়ার পরেই শুরু), কিন্তু ordItemRowHtml() ফাংশনটা
-       একই .ordItemRow/.ordItemThumb ক্লাস দিয়ে HTML বানায় যা #program-orders-এর
-       ভেতরের তালিকাতেও ব্যবহার হয়। উপরের স্টাইলগুলো "#program-orders .ordItemThumb"
-       আকারে স্কোপ করা থাকায় এই পপ-আপে সেগুলো প্রযোজ্যই হতো না — ফলে ছবির কোনো
-       width/height/object-fit না থাকায় এখানে ছবি তার আসল সাইজে বিশাল/অসংকুচিত
-       হয়ে দেখাতো ("চবি পুরা ডিসপ্লে নি আসে" রিপোর্ট)। এখানে একই রুলগুলো এই
-       পপ-আপের জন্যও আলাদাভাবে যুক্ত করা হলো। */
-    #ordAcceptGroupModal .ordItemRow{ display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06); }
-    #ordAcceptGroupModal .ordItemRow:last-child{ border-bottom:none; }
-    #ordAcceptGroupModal .ordItemThumb{ width:40px; height:40px; border-radius:8px; overflow:hidden; background:rgba(255,255,255,0.06); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:18px; }
-    #ordAcceptGroupModal .ordItemThumb img{ width:100%; height:100%; object-fit:cover; }
-    #ordAcceptGroupModal .ordItemInfo{ flex:1; min-width:0; }
-    #ordAcceptGroupModal .ordItemName{ font-weight:700; font-size:12.5px; }
-    #ordAcceptGroupModal .ordItemMeta{ font-size:11px; color:#fbbf24; font-weight:700; }
+    /* ✅ গ্রহণ-করার পপ-আপ (গ্রুপ-অ্যাকসেপ্ট) — বাকি স্টাইল উপরে গ্লোবাল হওয়ায় এখানে
+       শুধু এই পপ-আপের নিজস্ব ডেলিভারি-অপশন বাটনের অ্যাক্টিভ-স্টেট বাকি থাকল */
     #ordAcceptGroupModal .ordAGDeliveryOpt.active{ background:rgba(34,197,94,0.18) !important; border-color:#22c55e !important; color:#4ade80; }
   </style>
   <div class="ordTopBar">
