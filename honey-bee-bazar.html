@@ -143,7 +143,10 @@
   }
   .pCard:active{ transform:scale(0.97); }
   .pCardImgWrap{ position:relative; width:100%; aspect-ratio:1/1; background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center; font-size:44px; overflow:hidden; }
-  .pCardImgWrap img{ width:100%; height:100%; object-fit:cover; }
+  /* 🖼️ cover এর বদলে contain — সাপ্লায়ারের ব্যানার-স্টাইল ছবি (একাধিক রং/টেক্সট/মডেল-শট)
+     স্কয়ার বক্সে জোর করে ক্রপ করলে "জুম হয়ে গেছে"/গুরুত্বপূর্ণ অংশ কাটা পড়ার সমস্যা হতো —
+     contain দিয়ে পুরো ছবিটাই দেখানো হয় */
+  .pCardImgWrap img{ width:100%; height:100%; object-fit:contain; }
   .pCardImgInner{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
   .pCardFav{ position:absolute; top:8px; right:8px; font-size:17px; cursor:pointer; background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
   .pCardBadges{ position:absolute; top:8px; left:8px; display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
@@ -206,7 +209,7 @@
 
   /* 📄 প্রোডাক্ট বিস্তারিত পেজ */
   .pDetailImgWrap{ width:100%; aspect-ratio:1/1; border-radius:18px; overflow:hidden; background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center; font-size:72px; margin-bottom:14px; }
-  .pDetailImgWrap img{ width:100%; height:100%; object-fit:cover; }
+  .pDetailImgWrap img{ width:100%; height:100%; object-fit:contain; }
 
   /* 🚚 অর্ডার ট্র্যাকার — এনিমেটেড স্টেপ (পুরনো ভার্টিক্যাল, অন্য কোথাও ব্যবহার হলে রেখে দেওয়া) */
   .trackerStep{ display:flex; gap:14px; }
@@ -5014,7 +5017,7 @@ function hbRenderPublicProductBody(){
 
   body.innerHTML = `
     <div id="hbPubDetailImgWrap" style="width:100%; aspect-ratio:1/1; max-height:220px; border-radius:14px; overflow:hidden; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:60px; margin-bottom:14px;">
-      ${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.parentElement.textContent='🛍️'">` : '🛍️'}
+      ${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" style="width:100%; height:100%; object-fit:contain;" onerror="this.parentElement.textContent='🛍️'">` : '🛍️'}
     </div>
     <div style="font-size:11.5px; font-weight:700; color:var(--muted); margin-bottom:4px;">🏪 ${escapeHtml(__hbPubShopName)}</div>
     <div style="font-size:17px; font-weight:800; margin-bottom:8px;">${escapeHtml(p.name||'প্রোডাক্ট')}</div>
@@ -7138,7 +7141,7 @@ function medEqRenderList(items){
     return `
       <div class="card" style="padding:0; overflow:hidden;">
         <div style="width:100%; aspect-ratio:16/9; background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center; overflow:hidden;">
-          ${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:44px;">🩼</span>`}
+          ${it.imageUrl ? `<img src="${escapeHtml(it.imageUrl)}" style="width:100%; height:100%; object-fit:contain;">` : `<span style="font-size:44px;">🩼</span>`}
         </div>
         <div style="padding:14px;">
           <div style="font-weight:800; font-size:14.5px; margin-bottom:3px;">${escapeHtml(it.title||"")}</div>
