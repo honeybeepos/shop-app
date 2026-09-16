@@ -10486,19 +10486,37 @@ async function hbCheckImageDuplicate(blob){
    বুঝতেই পারে না কী হচ্ছে বা কী করবে। তাই একটা নির্দিষ্ট সময় পার হলে স্পষ্ট
    এরর দেখিয়ে বাটন আবার চালু করে দেওয়া হয়, যাতে সে ইন্টারনেট চেক করে আবার
    চেষ্টা করতে পারে — বাটন কখনো চিরস্থায়ীভাবে আটকে না থাকে। */
-function hbWithTimeout(promise, ms, timeoutMsg){
+// cancelToken (ঐচ্ছিক) থাকলে সেটার .forceReject(err) কল করেও এই promise-টা
+// সাথে সাথে বাতিল করা যায় — এটা Firebase-এর নিজস্ব uploadTask.cancel()-এর
+// উপর নির্ভর করে না, কারণ বাস্তবে দেখা গেছে upload ~১০০% bytes পাঠানো হয়ে
+// গিয়ে server-এর ফাইনাল কনফার্মেশনের অপেক্ষায় আটকে থাকলে uploadTask.cancel()
+// নিজেই কোনো effect ফেলে না (Firebase SDK-এর নিয়ম অনুযায়ী প্রায়-সম্পন্ন
+// task বাতিল করা যায় না) — ইউজারের কাছে তখন "বাতিল" বাটনে কোনো reaction
+// দেখা যেত না। এখন cancelToken নিজেই জোর করে reject করে দেয়, Firebase task
+// আসলে থেমেছে কি না তার সাথে সম্পর্কহীনভাবে — তাই বাটন সবসময় কাজ করবে।
+function hbWithTimeout(promise, ms, timeoutMsg, cancelToken){
   return new Promise((resolve, reject)=>{
-    const timer = setTimeout(()=> reject(new Error(timeoutMsg)), ms);
+    let settled = false;
+    const timer = setTimeout(()=>{ if(settled) return; settled = true; reject(new Error(timeoutMsg)); }, ms);
+    if(cancelToken){
+      cancelToken.forceReject = (err)=>{
+        if(settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(err);
+      };
+    }
     promise.then(
-      (val)=>{ clearTimeout(timer); resolve(val); },
-      (err)=>{ clearTimeout(timer); reject(err); }
+      (val)=>{ if(settled) return; settled = true; clearTimeout(timer); resolve(val); },
+      (err)=>{ if(settled) return; settled = true; clearTimeout(timer); reject(err); }
     );
   });
 }
 
-// 📶 বর্তমানে চলমান upload task — Cancel বাটনে চাপলে এটা ব্যবহার হয়
-// (একবারে একটাই upload চলতে পারে, তাই single global-ই যথেষ্ট)
+// 📶 বর্তমানে চলমান upload task ও তার cancelToken — Cancel বাটনে চাপলে এগুলো
+// ব্যবহার হয় (একবারে একটাই upload চলতে পারে, তাই single global-ই যথেষ্ট)
 let __bccActiveUploadTask = null;
+let __bccUploadCancelToken = null;
 
 /* ==================== ☁️ Real Firebase Storage Upload — Step 4 ====================
    ⚠️ এই ফাংশনটা এখনো Product Save বাটনে যুক্ত করা হয়নি (পরের ধাপের কাজ) —
@@ -10519,12 +10537,19 @@ async function hbUploadOrReuseProductImage(processedResult, dupCheckResult, shop
 
   const storageRef = storage.ref(storagePath);
 
+  // 🛑 এই পুরো ফাংশনের যেকোনো ধাপে (existence-check, upload, বা upload-শেষের
+  // getDownloadURL) Cancel বাটনে চাপলে এই একটা cancelToken দিয়েই সাথে সাথে
+  // বাতিল করা যায় — Firebase-এর নিজস্ব uploadTask.cancel() আদৌ কাজ করুক বা
+  // না করুক (প্রায়-সম্পন্ন upload-এ সেটা কোনো effect ফেলে না)
+  const cancelToken = {};
+  __bccUploadCancelToken = cancelToken;
+
   // ⚠️ রেস-কন্ডিশন সুরক্ষা #১ — আপলোডের ঠিক আগে এই deterministic path-এ
   // ফাইল ইতিমধ্যে আছে কিনা আরেকবার যাচাই (অন্য কোনো ট্যাব/কাস্টমার
   // একই মুহূর্তে একই ছবি আপলোড করে ফেলে থাকতে পারে) — থাকলে overwrite
   // না করে বিদ্যমানটাই DUPLICATE হিসেবে ব্যবহার করা হয়
   try{
-    const existingUrl = await hbWithTimeout(storageRef.getDownloadURL(), 15000, "ইন্টারনেট স্লো/বিচ্ছিন্ন — ছবি চেক করতে অনেক সময় লাগছে");
+    const existingUrl = await hbWithTimeout(storageRef.getDownloadURL(), 15000, "ইন্টারনেট স্লো/বিচ্ছিন্ন — ছবি চেক করতে অনেক সময় লাগছে", cancelToken);
     const existingDoc = await db.collection("imageIndex").doc(sha256).get();
     if(existingDoc.exists){
       const d = existingDoc.data();
@@ -10534,6 +10559,7 @@ async function hbUploadOrReuseProductImage(processedResult, dupCheckResult, shop
     // তাও ফাইলের URL দিয়ে একটা নিরাপদ DUPLICATE-সদৃশ রেজাল্ট দেওয়া হচ্ছে, দ্বিতীয় ফাইল বানানো হয় না
     return { status: "DUPLICATE", imageId: sha256, sha256, storagePath, imageUrl: existingUrl, referenceCount: 0 };
   }catch(e){
+    if(e.code === "storage/canceled") throw e; // ব্যবহারকারী নিজেই বাতিল করেছে — সরাসরি প্রচার হবে
     if(e.code !== "storage/object-not-found"){
       console.error("Storage existence-check ব্যর্থ:", e);
       throw new Error("Storage যাচাই করা যায়নি: " + (e.message || e.code));
@@ -10560,10 +10586,11 @@ async function hbUploadOrReuseProductImage(processedResult, dupCheckResult, shop
       await hbWithTimeout(
         uploadTask,
         30000,
-        "ইন্টারনেট স্লো/বিচ্ছিন্ন — ছবি আপলোড হতে অনেক সময় লাগছে, একটু ভালো নেটওয়ার্কে গিয়ে আবার চেষ্টা করুন"
+        "ইন্টারনেট স্লো/বিচ্ছিন্ন — ছবি আপলোড হতে অনেক সময় লাগছে, একটু ভালো নেটওয়ার্কে গিয়ে আবার চেষ্টা করুন",
+        cancelToken
       );
     }catch(timeoutOrUploadErr){
-      try{ uploadTask.cancel(); }catch(cancelErr){ /* টাস্ক ইতিমধ্যে শেষ/ব্যর্থ হয়ে থাকলে cancel() নিজেই এরর দিতে পারে — উপেক্ষা করা নিরাপদ */ }
+      try{ uploadTask.cancel(); }catch(cancelErr){ /* টাস্ক ইতিমধ্যে শেষ/ব্যর্থ হয়ে থাকলে cancel() নিজেই এরর দিতে পারে বা কোনো effect নাও ফেলতে পারে — cancelToken-ই আসল ভরসা, এখানে শুধু best-effort */ }
       if(timeoutOrUploadErr && timeoutOrUploadErr.code === "storage/canceled"){
         throw new Error("আপলোড বাতিল করা হয়েছে");
       }
@@ -10571,18 +10598,20 @@ async function hbUploadOrReuseProductImage(processedResult, dupCheckResult, shop
     }finally{
       __bccActiveUploadTask = null;
     }
-    uploadedUrl = await hbWithTimeout(storageRef.getDownloadURL(), 15000, "ইন্টারনেট স্লো/বিচ্ছিন্ন — আপলোড হয়েছে কিন্তু লিংক আনতে সময় লাগছে, আবার চেষ্টা করুন");
+    uploadedUrl = await hbWithTimeout(storageRef.getDownloadURL(), 15000, "ইন্টারনেট স্লো/বিচ্ছিন্ন — আপলোড হয়েছে কিন্তু লিংক আনতে সময় লাগছে, আবার চেষ্টা করুন", cancelToken);
   }catch(e){
     __bccActiveUploadTask = null;
+    if(__bccUploadCancelToken === cancelToken) __bccUploadCancelToken = null;
+    if(e.code === "storage/canceled" || e.message === "আপলোড বাতিল করা হয়েছে"){
+      throw new Error("আপলোড বাতিল করা হয়েছে");
+    }
     console.error("Storage upload ব্যর্থ:", e);
     if(e.code === "storage/unauthorized"){
       throw new Error("Storage আপলোডের অনুমতি নেই — Storage Rules-এ এই পাথে write অনুমোদিত কিনা চেক করুন");
     }
-    if(e.message === "আপলোড বাতিল করা হয়েছে"){
-      throw e;
-    }
     throw new Error("ছবি আপলোড ব্যর্থ: " + (e.message || e.code || e));
   }
+  if(__bccUploadCancelToken === cancelToken) __bccUploadCancelToken = null;
 
   // 📝 imageIndex ডকুমেন্ট তৈরি — রেস-কন্ডিশন সুরক্ষা #২ (লেখার ঠিক আগে আরেকবার চেক)
   const imageIndexRef = db.collection("imageIndex").doc(sha256);
@@ -10796,11 +10825,21 @@ function setupProductNameSuggest(inputId, resultsId, excludeIdFn){
 setupProductNameSuggest('bccPName', 'bccPNameResults', ()=> bccEditingProductId);
 setupProductNameSuggest('bccQName', 'bccQNameResults', ()=> null);
 // 🛑 ছবি আপলোড চলাকালীন দেখানো "বাতিল করুন" বাটন — চাপলে সাথে সাথেই চলমান
-// upload বাতিল হয়ে যায় (hbUploadOrReuseProductImage-এর ভেতরের catch এটা
-// ধরে "আপলোড বাতিল করা হয়েছে" মেসেজ দেখায় ও Save বাটন আবার চালু করে)
+// upload বাতিল হয়ে যায়। শুধু Firebase-এর নিজস্ব uploadTask.cancel()-এর
+// ওপর ভরসা করা হয় না (upload প্রায় ১০০% হয়ে server-এর ফাইনাল কনফার্মেশনের
+// অপেক্ষায় আটকে থাকলে সেটা no-op হয়ে যায়, তখন বাটনে কোনো reaction পাওয়া
+// যেত না) — বরং cancelToken.forceReject() দিয়ে সরাসরি অপেক্ষারত promise-টাই
+// বাতিল করে দেওয়া হয়, যা নিশ্চিতভাবে কাজ করে। hbUploadOrReuseProductImage-এর
+// ভেতরের catch এটা ধরে "আপলোড বাতিল করা হয়েছে" মেসেজ দেখায় ও Save বাটন
+// আবার চালু করে।
 document.getElementById('bccCancelUploadBtn').addEventListener('click', ()=>{
   if(__bccActiveUploadTask){
-    try{ __bccActiveUploadTask.cancel(); }catch(e){ /* উপেক্ষা করা নিরাপদ */ }
+    try{ __bccActiveUploadTask.cancel(); }catch(e){ /* best-effort, নিচের forceReject-ই আসল ভরসা */ }
+  }
+  if(__bccUploadCancelToken && __bccUploadCancelToken.forceReject){
+    const err = new Error("আপলোড বাতিল করা হয়েছে");
+    err.code = "storage/canceled";
+    __bccUploadCancelToken.forceReject(err);
   }
 });
 document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=>{
@@ -10866,11 +10905,13 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
       console.error('Product image integration ব্যর্থ:', imgErr);
       saveBtn.disabled = false; saveBtn.textContent = originalBtnText;
       if(cancelBtn) cancelBtn.style.display = 'none';
+      __bccActiveUploadTask = null; __bccUploadCancelToken = null; // 🧹 এই সেভ-প্রচেষ্টা শেষ — পুরনো টোকেন/টাস্কের রেফারেন্স রাখা হবে না
       toast(imgErr.message === 'আপলোড বাতিল করা হয়েছে' ? '↩️ আপলোড বাতিল করা হয়েছে' : ('❌ Product সেভ হয়নি — ছবি আপলোড ব্যর্থ: ' + imgErr.message));
       return; // ⚠️ Product data একদমই সেভ করা হচ্ছে না, যাতে অসম্পূর্ণ/ভাঙা অবস্থায় না থাকে
     }
     saveBtn.disabled = false; saveBtn.textContent = originalBtnText;
     if(cancelBtn) cancelBtn.style.display = 'none';
+    __bccActiveUploadTask = null; __bccUploadCancelToken = null; // 🧹 সফল হলেও পুরনো রেফারেন্স পরিষ্কার রাখা হয়
   }
 
   // একই নামের প্রোডাক্ট আগে থেকেই আছে কিনা চেক করা হচ্ছে (নতুন প্রোডাক্ট এড করার সময়ই,
