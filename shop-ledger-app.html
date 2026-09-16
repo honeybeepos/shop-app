@@ -8414,6 +8414,26 @@ function bccFindOwnCategoryByName(name){
 // থাকে) — এই দুই হেল্পার দিয়ে দুই ফরম্যাটই একইভাবে হ্যান্ডেল করা যায়
 function bccSubEntryName(s){ return (typeof s === 'string') ? s : s.name; }
 function bccSubEntrySubs(s){ return (s && typeof s === 'object' && s.subs) ? s.subs : []; }
+// 🏷️ কিছু Main Category-তে প্রায় সব প্রোডাক্টই একই "ধরনের" হয় (গার্মেন্টস মানেই প্রায়
+// সবসময় রং/সাইজ ভ্যারিয়েন্ট, ফার্মেসি মানেই প্রায় সবসময় ব্যাচ/মেয়াদ ট্র্যাকিং) — তাই
+// All Category থেকে এই ক্যাটাগরিগুলো বাছলে "প্রোডাক্টের ধরন"-ও নিজে থেকে বসে যায় (আগে যে
+// ধরন শেষবার ব্যবহার হয়েছিল, তার চেয়ে ক্যাটাগরির প্রাসঙ্গিকতা এখানে বেশি নির্ভরযোগ্য)।
+// যেসব ক্যাটাগরিতে একাধিক আলাদা ধরনের প্রোডাক্ট মিশ্রিত থাকে (যেমন "মোবাইল ও গ্যাজেট" —
+// ফোনের IMEI লাগে কিন্তু কভার/চার্জারের লাগে না), ইচ্ছাকৃতভাবে এখানে রাখা হয়নি — ভুল
+// অনুমান করার চেয়ে আগের/ডিফল্ট ধরনই থাকা ভালো।
+const BCC_CATEGORY_PRODUCT_TYPE_HINT = {
+  'গার্মেন্টস ও ফ্যাশন': 'variant',
+  'ফার্মেসি ও ওষুধ': 'batch',
+};
+function bccApplyCategoryProductTypeHint(categoryName){
+  const norm = bccNormalizeCatName(categoryName);
+  const hintKey = Object.keys(BCC_CATEGORY_PRODUCT_TYPE_HINT).find(k=> bccNormalizeCatName(k) === norm);
+  if(!hintKey) return;
+  const typeSel = document.getElementById('bccPType');
+  if(!typeSel) return;
+  typeSel.value = BCC_CATEGORY_PRODUCT_TYPE_HINT[hintKey];
+  if(typeof bccApplyAppMode === 'function') bccApplyAppMode();
+}
 // null হলে লিস্ট-ভিউ (সব Main Category), নাম্বার হলে সেই ইনডেক্সের ক্যাটাগরির সাব-ক্যাটাগরি ডিটেইল-ভিউ
 let bccACCurrentIdx = null;
 // 🗂️ All Category থেকে (কোনো সাব/সাব-সাব-ক্যাটাগরি ট্যাপ করে) Add Product খোলা হলে এখানে
@@ -8694,6 +8714,7 @@ function bccAllCategorySelect(idx, subName, branchSIdx){
   catSel.value = own.id;
   bccPopulateSubSelect(document.getElementById('bccPSub'), own.id, subId);
   bccPopulateSubSubSelect(document.getElementById('bccPSubSub'), own.id, subId, '');
+  bccApplyCategoryProductTypeHint(mc.name);
   toast('✅ Category বসানো হলো — এখন প্রোডাক্টের তথ্য দিন');
 }
 // একটা branch sub-category-র ভিতরের leaf আইটেম (যেমন "মহিলাদের পোশাক" > "কুর্তি")
@@ -8727,6 +8748,7 @@ function bccAllCategorySelectLeaf(idx, subName, leafName, sIdx){
   catSel.value = own.id;
   bccPopulateSubSelect(document.getElementById('bccPSub'), own.id, ownSub.id);
   bccPopulateSubSubSelect(document.getElementById('bccPSubSub'), own.id, ownSub.id, ownLeaf.id);
+  bccApplyCategoryProductTypeHint(mc.name);
   toast('✅ Category/Sub-category বসানো হলো — এখন প্রোডাক্টের তথ্য দিন');
 }
 // একটা যোগ-করা leaf (সাব-সাব-ক্যাটাগরি) ✕ চাপলে বাদ দেওয়া — প্রোডাক্ট থাকলে ব্লক করে
