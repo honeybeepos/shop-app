@@ -12935,9 +12935,25 @@ let __backStateCounter = 0;
 // প্রতিবার আলাদা hash দিয়ে state পুশ করা হয় — একই URL বারবার পুশ করলে কিছু
 // ব্রাউজার/WebView সেটাকে নতুন হিস্ট্রি এন্ট্রি হিসেবে গণ্য নাও করতে পারে, তাতে
 // ব্যাক-ট্র্যাপ কাজ না করে অ্যাপ এক্সিট হয়ে যাওয়ার ঝুঁকি থাকে।
+//
+// একবারে ৩টা এন্ট্রি পুশ করা হয় (একটার বদলে) — কারণ Android-এ হার্ডওয়্যার
+// ব্যাক বাটন কখনো কখনো একটার পর একটা দ্রুত চাপা হয় (Business Management-এর
+// ভারী সাব-স্ক্রিন যেমন Monitor/Report রেন্ডার হতে একটু সময় নেয়, ততক্ষণে
+// দ্বিতীয় ব্যাক-চাপ পড়ে যেতে পারে)। নেটিভ সাইড JS চালানোর আগেই canGoBack()
+// চেক করে ফেলে — তখন যদি বাফারে মাত্র ১টা এন্ট্রি থাকে, দ্রুত দুইবার ব্যাক
+// চাপলে তলানিতে পৌঁছে গিয়ে পুরো অ্যাপটাই বন্ধ (ও রিফ্রেশ/নতুন লগইন) হয়ে
+// যেতে পারে — এটাই সম্ভবত ব্যবহারকারীর রিপোর্ট করা বাগ। ৩টা এন্ট্রির বাফার
+// রাখলে এই রেসের ঝুঁকি অনেক কমে যায়।
+const __BACK_TRAP_BUFFER = 3;
 function pushBackTrap(){
-  __backStateCounter++;
-  history.pushState({ bccNav: __backStateCounter }, '', '#nav' + __backStateCounter);
+  // try/catch: কিছু ব্রাউজার অতি দ্রুত অনেকবার pushState কল করলে থ্রটল/এরর
+  // দিতে পারে — সেটা হলেও যেন বাকি পুরো অ্যাপ ভেঙে না পড়ে
+  try{
+    for(let i=0; i<__BACK_TRAP_BUFFER; i++){
+      __backStateCounter++;
+      history.pushState({ bccNav: __backStateCounter }, '', '#nav' + __backStateCounter);
+    }
+  }catch(e){ console.error('pushBackTrap failed:', e); }
 }
 
 function initBackButtonHandling(){
