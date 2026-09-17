@@ -689,7 +689,7 @@
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px;">
       <div>
         <div style="font-size:14px; font-weight:800; color:var(--amber); letter-spacing:0.3px;">🏛️ সরকারি ছুটি</div>
-        <div style="font-size:12.5px; font-weight:600; color:#e7e2d4; margin-top:2px;">দুর্গা পূজা (বিজয়া) · ৩ দিন পরে</div>
+        <div id="hbswTopGovInfo" style="font-size:12.5px; font-weight:600; color:#e7e2d4; margin-top:2px;">লোড হচ্ছে…</div>
       </div>
       <div style="display:flex; gap:8px; flex-shrink:0;">
         <button id="hbswTopSettingsBtn" aria-label="সেটিংস" style="width:36px; height:36px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:inherit;">⚙️</button>
@@ -880,16 +880,18 @@
         <h3 style="margin:0; font-size:16px;">🏛️ সরকারি ছুটি</h3>
         <span id="hbswGovtOverlayClose" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
       </div>
-      <div style="background:rgba(47,191,113,0.12); border:1px solid rgba(47,191,113,0.3); border-radius:10px; padding:9px 12px; display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-        <span style="color:var(--ok);">⭐</span>
-        <span style="font-size:12.5px; font-weight:700; color:#7ee7ac;">আজ: কর্মদিবস</span>
+      <div id="hbswGovBadge" style="background:rgba(47,191,113,0.12); border:1px solid rgba(47,191,113,0.3); border-radius:10px; padding:9px 12px; display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span id="hbswGovBadgeIcon" style="color:var(--ok);">⭐</span>
+        <span id="hbswGovBadgeText" style="font-size:12.5px; font-weight:700; color:#7ee7ac;">লোড হচ্ছে…</span>
       </div>
-      <div style="font-size:13px; font-weight:700; color:#fff8e8;">পরবর্তী সরকারি ছুটি: দুর্গা পূজা (বিজয়া)</div>
-      <div style="font-size:11.5px; color:var(--muted); margin-top:4px;">আর ৩ দিন পরে · তারিখ: ১৯ Sep 2026</div>
+      <div id="hbswGovNextName" style="font-size:13px; font-weight:700; color:#fff8e8;">লোড হচ্ছে…</div>
+      <div id="hbswGovNextMeta" style="font-size:11.5px; color:var(--muted); margin-top:4px;">&nbsp;</div>
+      <div style="font-size:9.5px; color:var(--muted); margin-top:6px; line-height:1.4;">* চাঁদ দেখার উপর ভিত্তি করে ইসলামিক ছুটির তারিখ ১ দিন এদিক-ওদিক হতে পারে</div>
       <div style="display:flex; gap:8px; margin-top:12px;">
-        <button style="flex:1; background:rgba(255,209,102,0.14); border:1px solid var(--border); color:var(--amber); font-family:inherit; font-weight:700; font-size:12px; padding:9px 8px; border-radius:10px; cursor:pointer;">📋 সব সরকারি ছুটি</button>
-        <button style="flex:1; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:#e7e2d4; font-family:inherit; font-weight:700; font-size:12px; padding:9px 8px; border-radius:10px; cursor:pointer;">🗒️ ছুটির তালিকা</button>
+        <button id="hbswGovAllBtn" style="flex:1; background:rgba(255,209,102,0.14); border:1px solid var(--border); color:var(--amber); font-family:inherit; font-weight:700; font-size:12px; padding:9px 8px; border-radius:10px; cursor:pointer;">📋 সব সরকারি ছুটি</button>
+        <button id="hbswGovAllBtn2" style="flex:1; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:#e7e2d4; font-family:inherit; font-weight:700; font-size:12px; padding:9px 8px; border-radius:10px; cursor:pointer;">🗒️ ছুটির তালিকা</button>
       </div>
+      <div id="hbswGovAllList" style="display:none; margin-top:12px; max-height:260px; overflow-y:auto; border-top:1px dashed var(--border); padding-top:10px;"></div>
     </div>
   </div>
 
@@ -3703,6 +3705,112 @@ function hbswRenderLanguage(lang){
   const btn = document.getElementById("hbswLang"+k);
   if(btn) btn.addEventListener("click", ()=> hbswRenderLanguage(btn.dataset.lang));
 });
+
+/* 🏛️ সরকারি ছুটি — সত্যিকারের ২০২৬ সালের বাংলাদেশ সরকারি ছুটির তালিকা (বিভিন্ন
+   পাবলিক সোর্স থেকে যাচাই করা), আর সত্যিকারের আজকের তারিখ (new Date()) দিয়ে
+   হিসাব হয় — এটা আর ডেমো/স্ট্যাটিক তথ্য নয়, প্রতিবার পেজ খোলার সময় লাইভ হিসাব হয়।
+   ⚠️ ইসলামিক ছুটিগুলো (শবে বরাত/কদর, ঈদ, আশুরা, মিলাদুন্নবী) চাঁদ দেখার উপর
+   নির্ভরশীল, তাই সরকারি ঘোষণায় ১ দিন এদিক-ওদিক হতে পারে। */
+const BD_GOVT_HOLIDAYS_2026 = [
+  { date:"2026-02-04", name:"শবে বরাত" },
+  { date:"2026-02-21", name:"ভাষা শহীদ দিবস (আন্তর্জাতিক মাতৃভাষা দিবস)" },
+  { date:"2026-03-17", name:"শবে কদর" },
+  { date:"2026-03-18", name:"ঈদ-উল-ফিতর ছুটি" },
+  { date:"2026-03-19", name:"ঈদ-উল-ফিতর" },
+  { date:"2026-03-20", name:"ঈদ-উল-ফিতর ছুটি" },
+  { date:"2026-03-21", name:"ঈদ-উল-ফিতর ছুটি" },
+  { date:"2026-03-22", name:"ঈদ-উল-ফিতর ছুটি" },
+  { date:"2026-03-23", name:"ঈদ-উল-ফিতর ছুটি" },
+  { date:"2026-03-26", name:"স্বাধীনতা দিবস" },
+  { date:"2026-04-14", name:"পহেলা বৈশাখ (বাংলা নববর্ষ)" },
+  { date:"2026-05-01", name:"মে দিবস / বুদ্ধ পূর্ণিমা" },
+  { date:"2026-05-25", name:"ঈদ-উল-আযহা ছুটি" },
+  { date:"2026-05-26", name:"ঈদ-উল-আযহা ছুটি" },
+  { date:"2026-05-27", name:"ঈদ-উল-আযহা" },
+  { date:"2026-05-28", name:"ঈদ-উল-আযহা ছুটি" },
+  { date:"2026-05-29", name:"ঈদ-উল-আযহা ছুটি" },
+  { date:"2026-05-30", name:"ঈদ-উল-আযহা ছুটি" },
+  { date:"2026-05-31", name:"ঈদ-উল-আযহা ছুটি" },
+  { date:"2026-06-26", name:"আশুরা" },
+  { date:"2026-08-05", name:"জুলাই গণঅভ্যুত্থান দিবস" },
+  { date:"2026-08-26", name:"ঈদে মিলাদুন্নবী" },
+  { date:"2026-09-04", name:"জন্মাষ্টমী" },
+  { date:"2026-10-20", name:"দুর্গা পূজা (নবমী)" },
+  { date:"2026-10-21", name:"দুর্গা পূজা (বিজয়া দশমী)" },
+  { date:"2026-11-07", name:"জাতীয় বিপ্লব ও সংহতি দিবস" },
+  { date:"2026-12-16", name:"বিজয় দিবস" },
+  { date:"2026-12-25", name:"বড়দিন (ক্রিসমাস)" },
+];
+function hbGovGetLiveInfo(){
+  const now = new Date();
+  const todayStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0") + "-" + String(now.getDate()).padStart(2,"0");
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayHoliday = BD_GOVT_HOLIDAYS_2026.find(h=> h.date === todayStr);
+  const upcoming = BD_GOVT_HOLIDAYS_2026
+    .filter(h=> h.date > todayStr)
+    .sort((a,b)=> a.date.localeCompare(b.date))[0];
+  let daysUntil = null, nextDateLabel = null;
+  if(upcoming){
+    const [y,m,d] = upcoming.date.split("-").map(Number);
+    const upcomingDate = new Date(y, m-1, d);
+    daysUntil = Math.round((upcomingDate - todayMidnight) / 86400000);
+    nextDateLabel = d + " " + ["জানুয়ারি","ফেব্রুয়ারি","মার্চ","এপ্রিল","মে","জুন","জুলাই","আগস্ট","সেপ্টেম্বর","অক্টোবর","নভেম্বর","ডিসেম্বর"][m-1] + " " + y;
+  }
+  return { isHolidayToday: !!todayHoliday, todayHolidayName: todayHoliday ? todayHoliday.name : null, next: upcoming || null, daysUntil, nextDateLabel };
+}
+function hbGovRenderLive(){
+  const info = hbGovGetLiveInfo();
+  const topEl = document.getElementById("hbswTopGovInfo");
+  if(topEl){
+    if(info.isHolidayToday){ topEl.textContent = "🎉 আজ: " + info.todayHolidayName; }
+    else if(info.next){ topEl.textContent = info.next.name + " · " + info.daysUntil + " দিন পরে"; }
+    else{ topEl.textContent = "এই বছরের আর কোনো তালিকাভুক্ত ছুটি নেই"; }
+  }
+  const badgeEl = document.getElementById("hbswGovBadge");
+  const badgeIconEl = document.getElementById("hbswGovBadgeIcon");
+  const badgeTextEl = document.getElementById("hbswGovBadgeText");
+  const nextNameEl = document.getElementById("hbswGovNextName");
+  const nextMetaEl = document.getElementById("hbswGovNextMeta");
+  if(badgeEl && badgeTextEl){
+    if(info.isHolidayToday){
+      badgeEl.style.background = "rgba(255,209,102,0.14)"; badgeEl.style.borderColor = "rgba(255,209,102,0.32)";
+      badgeIconEl.textContent = "🎉"; badgeIconEl.style.color = "var(--amber)";
+      badgeTextEl.textContent = "আজ: ছুটির দিন (" + info.todayHolidayName + ")"; badgeTextEl.style.color = "var(--amber)";
+    }else{
+      badgeEl.style.background = "rgba(47,191,113,0.12)"; badgeEl.style.borderColor = "rgba(47,191,113,0.3)";
+      badgeIconEl.textContent = "⭐"; badgeIconEl.style.color = "var(--ok)";
+      badgeTextEl.textContent = "আজ: কর্মদিবস"; badgeTextEl.style.color = "#7ee7ac";
+    }
+  }
+  if(nextNameEl) nextNameEl.textContent = info.next ? ("পরবর্তী সরকারি ছুটি: " + info.next.name) : "এই বছরের আর কোনো তালিকাভুক্ত ছুটি নেই";
+  if(nextMetaEl) nextMetaEl.textContent = info.next ? ("আর " + info.daysUntil + " দিন পরে · তারিখ: " + info.nextDateLabel) : " ";
+}
+function hbGovRenderAllList(){
+  const listEl = document.getElementById("hbswGovAllList");
+  if(!listEl) return;
+  const now = new Date();
+  const todayStr = now.getFullYear() + "-" + String(now.getMonth()+1).padStart(2,"0") + "-" + String(now.getDate()).padStart(2,"0");
+  listEl.innerHTML = BD_GOVT_HOLIDAYS_2026.map(h=>{
+    const isPast = h.date < todayStr;
+    const isToday = h.date === todayStr;
+    const [y,m,d] = h.date.split("-").map(Number);
+    const label = d + " " + ["জানু","ফেব্রু","মার্চ","এপ্রিল","মে","জুন","জুলাই","আগস্ট","সেপ্ট","অক্টো","নভে","ডিসে"][m-1];
+    return `<div style="display:flex; justify-content:space-between; padding:6px 0; font-size:12px; ${isPast ? "opacity:0.4;" : ""}">
+      <span style="color:${isToday ? "var(--amber)" : "#e7e2d4"}; font-weight:${isToday ? "800" : "600"};">${escapeHtml(h.name)}${isToday ? " (আজ)" : ""}</span>
+      <span style="color:var(--muted);">${label}</span>
+    </div>`;
+  }).join("");
+}
+["hbswGovAllBtn","hbswGovAllBtn2"].forEach(id=>{
+  document.getElementById(id) && document.getElementById(id).addEventListener("click", ()=>{
+    const listEl = document.getElementById("hbswGovAllList");
+    if(!listEl) return;
+    const showing = listEl.style.display !== "none";
+    if(!showing) hbGovRenderAllList();
+    listEl.style.display = showing ? "none" : "block";
+  });
+});
+hbGovRenderLive();
 document.getElementById("backToHomeFromJibonTori") && document.getElementById("backToHomeFromJibonTori").addEventListener("click", ()=> showScreen("screenHome"));
 document.getElementById("backToJibonToriFromBlood") && document.getElementById("backToJibonToriFromBlood").addEventListener("click", ()=> showScreen("screenJibonTori"));
 document.getElementById("backToJibonToriFromAmbulance") && document.getElementById("backToJibonToriFromAmbulance").addEventListener("click", ()=> showScreen("screenJibonTori"));
