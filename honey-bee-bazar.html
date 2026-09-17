@@ -725,7 +725,7 @@
     <!-- Digital Clock (hero) -->
     <div class="card">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-        <div style="font-size:14px; font-weight:800; color:var(--amber); letter-spacing:0.4px;">⌚ ডিজিটাল ঘড়ি</div>
+        <button class="backBtn" id="backToHomeFromSmartWatch" style="margin:0;">← হোমে ফিরে যান</button>
         <button id="hbswHourToggleBtn" style="background:rgba(255,255,255,0.06); border:1px solid var(--border); color:#fff8e8; font-family:inherit; font-size:13px; font-weight:700; padding:6px 12px; border-radius:20px; cursor:pointer;">12 ঘন্টা</button>
       </div>
       <div style="display:flex; align-items:baseline; gap:8px;">
@@ -733,9 +733,12 @@
         <div id="hbswClockSuffix" style="font-weight:700; font-size:20px; color:var(--amber);">AM</div>
       </div>
       <div id="hbswClockDateLine" style="font-size:15.5px; font-weight:600; color:#e7e2d4; margin-top:10px;">লোড হচ্ছে…</div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+      <!-- English/বাংলা/হিজরি চিপ — ⚙️ সেটিংস আইকন English চিপের পাশে, ☰ মেনু আইকন বাংলা চিপের পাশে -->
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; align-items:center;">
         <span id="hbswClockChipEn" style="background:rgba(96,165,250,0.14); color:#93c5fd; border:1px solid rgba(96,165,250,0.3); padding:7px 12px; border-radius:10px; font-size:13.5px; font-weight:700;">English · …</span>
+        <button id="hbswTopSettingsBtn" aria-label="সেটিংস" style="width:32px; height:32px; border-radius:50%; border:1px solid rgba(96,165,250,0.3); background:rgba(96,165,250,0.14); color:#93c5fd; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:inherit; flex-shrink:0;">⚙️</button>
         <span style="background:rgba(47,191,113,0.14); color:#7ee7ac; border:1px solid rgba(47,191,113,0.3); padding:7px 12px; border-radius:10px; font-size:13.5px; font-weight:700;">বাংলা · ১ আশ্বিন ১৪৩৩</span>
+        <button id="hbswTopMenuBtn" aria-label="মেনু" style="width:32px; height:32px; border-radius:50%; border:1px solid rgba(47,191,113,0.3); background:rgba(47,191,113,0.14); color:#7ee7ac; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:inherit; flex-shrink:0;">☰</button>
         <span style="background:rgba(180,140,255,0.16); color:#c9b3ff; border:1px solid rgba(180,140,255,0.32); padding:7px 12px; border-radius:10px; font-size:13.5px; font-weight:700;">হিজরি · ২৫ রবিউল আউয়াল ১৪৪৮</span>
       </div>
       <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:14px; padding-top:14px; border-top:1px dashed var(--border); font-size:14px;">
@@ -744,17 +747,12 @@
         <span id="hbswHeroNextHoliday" style="color:var(--amber); font-weight:700;">🔔 লোড হচ্ছে…</span>
       </div>
 
-      <!-- ডিজিটাল ঘড়ি কার্ডের সাথেই জুক্ত: হোমে ফিরে যাওয়ার বাটন + সরকারি ছুটি তথ্য + ⚙️/☰ —
-           স্পষ্ট দেখা যায় এমন কালারে, কিন্তু উপরের বড় সনাতনী/নামাজ টাইলের চেয়ে ছোট/শান্ত -->
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:14px; padding-top:14px; border-top:1px dashed var(--border);">
-        <button class="backBtn" id="backToHomeFromSmartWatch" style="margin:0; padding:6px 12px; font-size:11.5px;">← হোমে ফিরে যান</button>
-        <div style="display:flex; align-items:center; gap:9px; flex-shrink:0;">
-          <div style="text-align:right;">
-            <div style="font-size:10.5px; font-weight:700; color:var(--amber); letter-spacing:0.2px;">🏛️ সরকারি ছুটি</div>
-            <div id="hbswTopGovInfo" style="font-size:10.5px; font-weight:600; color:#e7e2d4;">লোড হচ্ছে…</div>
-          </div>
-          <button id="hbswTopSettingsBtn" aria-label="সেটিংস" style="width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.08); color:#fff8e8; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:inherit; flex-shrink:0;">⚙️</button>
-          <button id="hbswTopMenuBtn" aria-label="মেনু" style="width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.08); color:#fff8e8; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:inherit; flex-shrink:0;">☰</button>
+      <!-- 🏛️ সরকারি ছুটি — বড়, সুন্দর ব্যাজ আকারে কার্ডের সাথে মিলিয়ে দেওয়া -->
+      <div style="display:flex; align-items:center; gap:12px; margin-top:14px; padding:13px 15px; border-radius:14px; background:rgba(245,166,35,0.13); border:1px solid rgba(245,166,35,0.35);">
+        <span style="font-size:26px; flex-shrink:0;">🏛️</span>
+        <div>
+          <div style="font-size:12px; font-weight:800; color:var(--amber); letter-spacing:0.3px;">সরকারি ছুটি</div>
+          <div id="hbswTopGovInfo" style="font-size:15.5px; font-weight:800; color:#fff8e8; margin-top:3px;">লোড হচ্ছে…</div>
         </div>
       </div>
     </div>
