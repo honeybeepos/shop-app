@@ -5140,6 +5140,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    if(typeof saveLastTab === 'function') saveLastTab(btn.dataset.tab);
   });
 });
 
@@ -5163,14 +5164,17 @@ document.getElementById('headerQrShortcut').addEventListener('click', ()=>{
 function openMiniProgram(id){
   document.getElementById('mainApp').style.display = 'none';
   document.getElementById(id).style.display = 'flex';
+  if(typeof saveLastProgram === 'function') saveLastProgram(id);
 }
 function closeMiniProgram(id){
   document.getElementById(id).style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
+  if(typeof saveLastProgram === 'function') saveLastProgram(null);
 }
 function switchProgram(fromId, toId){
   document.getElementById(fromId).style.display = 'none';
   document.getElementById(toId).style.display = 'flex';
+  if(typeof saveLastProgram === 'function') saveLastProgram(toId);
 }
 
 document.getElementById('bizMgmtCard').addEventListener('click', ()=>{
@@ -12925,7 +12929,7 @@ document.getElementById('esAddItemBtn').addEventListener('click', ()=>{
    5) হোম ট্যাবে থাকলে — এখানেই থেমে থাকবে, ব্যাক বাটনে অ্যাপ কখনো বন্ধ হবে না
       (বিক্রি করার মাঝখানে ভুলবশত ব্যাক চেপে অ্যাপ থেকে বের হয়ে গেলে ডেটা হারানোর
       ঝুঁকি থাকে — তাই ইচ্ছা করেই এখানে এক্সিট করার কোনো পথ রাখা হয়নি) */
-const __BIZ_SUB_PROGRAMS = ['program-bcc', 'program-monitor', 'program-extraincome', 'program-ops', 'program-report', 'program-orders'];
+const __BIZ_SUB_PROGRAMS = ['program-bcc', 'program-monitor', 'program-extraincome', 'program-ops', 'program-report', 'program-orders', 'program-honeybee'];
 let __backStateCounter = 0;
 
 // প্রতিবার আলাদা hash দিয়ে state পুশ করা হয় — একই URL বারবার পুশ করলে কিছু
@@ -12940,44 +12944,101 @@ function initBackButtonHandling(){
   pushBackTrap();
 
   window.addEventListener('popstate', ()=>{
-    const openModal = document.querySelector('.modal-overlay.show');
-    if(openModal){
-      openModal.classList.remove('show');
-      pushBackTrap();
-      return;
-    }
-
-    const openSub = __BIZ_SUB_PROGRAMS.find(id=>{
-      const el = document.getElementById(id);
-      return el && el.style.display !== 'none';
-    });
-    if(openSub){
-      switchProgram(openSub, 'program-bizmgmt');
-      pushBackTrap();
-      return;
-    }
-
-    const bizMgmtEl = document.getElementById('program-bizmgmt');
-    if(bizMgmtEl && bizMgmtEl.style.display !== 'none'){
-      closeMiniProgram('program-bizmgmt');
-      pushBackTrap();
-      return;
-    }
-
-    const activeTabBtn = document.querySelector('.tab-btn.active');
-    const currentTab = activeTabBtn ? activeTabBtn.dataset.tab : 'dash';
-
-    if(currentTab !== 'dash' && currentTab !== 'print'){
-      const dashBtn = document.querySelector('.tab-btn[data-tab="dash"]');
-      if(dashBtn) dashBtn.click();
-      pushBackTrap();
-      return;
-    }
-
-    // হোম (ড্যাশবোর্ড) বা প্রিন্ট ট্যাবে থাকলে ব্যাক বাটনে কিছুই হবে না —
-    // এখানেই লক হয়ে থাকবে, কোনো ট্যাব বদল/টোস্ট ছাড়াই, অ্যাপ কখনো এক্সিট হবে না
+    // 🛟 হিস্ট্রি-এন্ট্রি সবার আগেই আবার বসিয়ে দেওয়া হচ্ছে — নিচের কোনো ধাপে
+    // (যেমন কোনো রেন্ডার ফাংশনে) অপ্রত্যাশিত এরর হলেও এটা যেন ঠিকই চলে, নাহলে
+    // হিস্ট্রি খালি হয়ে যাওয়ার (canGoBack() false হয়ে যাওয়ার) কারণে ঠিক পরের
+    // ব্যাক-চাপেই পুরো অ্যাপ বন্ধ হয়ে যাওয়ার (ও ফিরে এসে নতুন করে লগইন/রিসেট
+    // হয়ে যাওয়ার) ঝুঁকি থাকে
     pushBackTrap();
+
+    try{
+      const openModal = document.querySelector('.modal-overlay.show');
+      if(openModal){
+        openModal.classList.remove('show');
+        return;
+      }
+
+      const openSub = __BIZ_SUB_PROGRAMS.find(id=>{
+        const el = document.getElementById(id);
+        return el && el.style.display !== 'none';
+      });
+      if(openSub){
+        switchProgram(openSub, 'program-bizmgmt');
+        return;
+      }
+
+      const bizMgmtEl = document.getElementById('program-bizmgmt');
+      if(bizMgmtEl && bizMgmtEl.style.display !== 'none'){
+        closeMiniProgram('program-bizmgmt');
+        return;
+      }
+
+      const activeTabBtn = document.querySelector('.tab-btn.active');
+      const currentTab = activeTabBtn ? activeTabBtn.dataset.tab : 'dash';
+
+      if(currentTab !== 'dash' && currentTab !== 'print'){
+        const dashBtn = document.querySelector('.tab-btn[data-tab="dash"]');
+        if(dashBtn) dashBtn.click();
+        return;
+      }
+
+      // হোম (ড্যাশবোর্ড) বা প্রিন্ট ট্যাবে থাকলে ব্যাক বাটনে আর কিছুই হবে না —
+      // এখানেই লক হয়ে থাকবে, কোনো ট্যাব বদল/টোস্ট ছাড়াই, অ্যাপ কখনো এক্সিট হবে না
+    }catch(e){
+      console.error('ব্যাক বাটন হ্যান্ডলিং-এ সমস্যা হয়েছে (হিস্ট্রি-ট্র্যাপ তবুও বসানো আছে):', e);
+    }
   });
+}
+
+/* ============================================================
+   অ্যাপ বন্ধ হয়ে গেলেও (বা রিলোড হলেও) শেষ কোথায় ছিলেন সেটা মনে রাখা
+   ============================================================
+   নিচের ট্যাব (হোম/এড/লিস্ট/প্রিন্ট/QR/সেটিংস) এবং Business Management-এর
+   কোন সাব-স্ক্রিনে ছিলেন — দুটোই localStorage-এ সেভ থাকে, আর অ্যাপ চালু
+   হওয়ার সময় (restoreLastScreen) সেটাই ফিরিয়ে আনা হয়। ব্যতিক্রম: Business
+   Control Center (program-bcc) পাসওয়ার্ড-সুরক্ষিত — তাই এটা মনে রাখা হয়
+   ঠিকই, কিন্তু ফিরিয়ে আনার সময় সরাসরি ভেতরে না ঢুকিয়ে Business Management
+   হাবেই ফিরিয়ে আনা হয়, যাতে পাসওয়ার্ড এড়িয়ে যাওয়া না হয়। */
+function saveLastTab(tab){
+  try{ localStorage.setItem('bcc-last-tab', tab); }catch(e){}
+}
+function saveLastProgram(programId){
+  try{
+    if(programId) localStorage.setItem('bcc-last-program', programId);
+    else localStorage.removeItem('bcc-last-program');
+  }catch(e){}
+}
+function restoreLastScreen(){
+  try{
+    const lastTab = localStorage.getItem('bcc-last-tab');
+    if(lastTab && lastTab !== 'dash'){
+      const btn = document.querySelector('.tab-btn[data-tab="'+lastTab+'"]');
+      if(btn) btn.click();
+    }
+
+    let lastProgram = localStorage.getItem('bcc-last-program');
+    if(!lastProgram) return;
+    if(lastProgram === 'program-bcc') lastProgram = 'program-bizmgmt'; // পাসওয়ার্ড এড়িয়ে সরাসরি ঢোকানো হবে না
+
+    if(lastProgram === 'program-bizmgmt'){
+      openMiniProgram('program-bizmgmt');
+      return;
+    }
+
+    const el = document.getElementById(lastProgram);
+    if(!el) return;
+    openMiniProgram('program-bizmgmt');
+    switchProgram('program-bizmgmt', lastProgram);
+    // প্রতিটা সাব-প্রোগ্রামের নিজস্ব রেন্ডার ফাংশন — নাহলে স্ক্রিন খালি দেখাবে
+    try{
+      if(lastProgram === 'program-monitor' && typeof monRenderAll === 'function') monRenderAll();
+      else if(lastProgram === 'program-extraincome' && typeof eiRenderAll === 'function') eiRenderAll();
+      else if(lastProgram === 'program-ops' && typeof opsRenderAll === 'function') opsRenderAll();
+      else if(lastProgram === 'program-report' && typeof repRenderAll === 'function') repRenderAll();
+      else if(lastProgram === 'program-orders' && typeof ordListen === 'function') ordListen();
+      else if(lastProgram === 'program-honeybee' && typeof hbRenderDashboard === 'function') hbRenderDashboard();
+    }catch(e){ console.error('সাব-প্রোগ্রাম রিস্টোর রেন্ডারে সমস্যা:', e); }
+  }catch(e){ console.error('restoreLastScreen failed:', e); }
 }
 
 function showMoneyCalcModal({title, summaryHtml, showInput, prefill, computeResult}){
@@ -19677,6 +19738,12 @@ auth.onAuthStateChanged(async (user)=>{
 
   document.getElementById("authGate").style.display = "none";
   loadSystemData();
+
+  // অ্যাপ বন্ধ হয়ে গিয়ে আবার খুললেও (বা রিলোড হলেও) শেষ যে ট্যাব/স্ক্রিনে ছিলেন
+  // সেটাই ফিরিয়ে আনা হচ্ছে — ডেটা লোড হওয়ার পরে, যাতে খালি স্ক্রিন না দেখায়
+  if(typeof restoreLastScreen === 'function'){
+    try{ restoreLastScreen(); }catch(e){ console.error('restoreLastScreen failed:', e); }
+  }
 
   // ক্লাউড থেকে সর্বশেষ ডেটা সিঙ্ক হয়ে আসার পর, স্টাফদের এই মাসের বেতন স্বয়ংক্রিয়ভাবে
   // "বাকি"-তে যোগ হয়ে গেছে কিনা তা একবার চেক করা হয় (শুধু এডমিনের সেশনে — সাব-ইউজার
