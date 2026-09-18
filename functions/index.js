@@ -2234,3 +2234,119 @@ exports.getPanchangData = onCall({ secrets: [vedikaApiKey] }, async (request) =>
 
   return { source: "live", cityKey, date, city: cityLabel, country, ...normalized };
 });
+
+/* ==================== 🔔 পঞ্জিকা রিমাইন্ডার নোটিফিকেশন (Phase 3) ====================
+   একাদশী/পূর্ণিমা/অমাবস্যার ঠিক আগের দিন সকাল ৮টায় (ব্যবহারকারীর নিজের টাইমজোন
+   অনুযায়ী) পুশ নোটিফিকেশন যায়।
+
+   ⚙️ কেন Vedika API ব্যবহার করা হচ্ছে না: তিথি বের করতে কোনো এক্সটার্নাল API
+   লাগে না — এটা বিশুদ্ধ জ্যোতির্বৈজ্ঞানিক গণিত। honey-bee-bazar.html-এ যে
+   ফাংশনগুলো দিয়ে মাসিক ক্যালেন্ডার ও উৎসবের তালিকা বানানো হয় (hbNorm360,
+   hbJulianDay, hbSunLonTropical, hbMoonLonTropical), হুবহু সেগুলোই এখানে পোর্ট
+   করা হয়েছে। ফলে প্রতিদিনের রিমাইন্ডারে কোনো API খরচ/নির্ভরতা নেই, আর
+   অ্যাপে যা দেখা যায় নোটিফিকেশনেও ঠিক সেটাই যায় (দুই জায়গায় দুই রকম হবে না)। */
+function panNorm360(x){ x = x % 360; return x < 0 ? x + 360 : x; }
+function panJulianDay(date){ return date.getTime() / 86400000 + 2440587.5; }
+function panSunLonTropical(jd){
+  const d = jd - 2451545.0;
+  const g = panNorm360(357.529 + 0.98560028 * d) * Math.PI / 180;
+  const L = panNorm360(280.459 + 0.98564736 * d);
+  return panNorm360(L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g));
+}
+function panMoonLonTropical(jd){
+  const d = jd - 2451545.0;
+  const r = (x)=> x * Math.PI / 180;
+  const Lp = panNorm360(218.316 + 13.176396 * d);
+  const Mp = panNorm360(134.963 + 13.064993 * d);
+  const D = panNorm360(297.850 + 12.190749 * d);
+  const M = panNorm360(357.529 + 0.985600 * d);
+  const lam = Lp + 6.289 * Math.sin(r(Mp)) - 1.274 * Math.sin(r(Mp - 2 * D)) + 0.658 * Math.sin(r(2 * D))
+    - 0.186 * Math.sin(r(M)) - 0.059 * Math.sin(r(2 * Mp - 2 * D)) - 0.057 * Math.sin(r(Mp - 2 * D + M))
+    + 0.053 * Math.sin(r(Mp + 2 * D)) + 0.046 * Math.sin(r(2 * D - M)) + 0.041 * Math.sin(r(Mp - M));
+  return panNorm360(lam);
+}
+const PAN_TITHI_LIGHT = ["প্রতিপদ","দ্বিতীয়া","তৃতীয়া","চতুর্থী","পঞ্চমী","ষষ্ঠী","সপ্তমী","অষ্টমী","নবমী","দশমী","একাদশী","দ্বাদশী","ত্রয়োদশী","চতুর্দশী","পূর্ণিমা"];
+const PAN_TITHI_DARK = ["প্রতিপদ","দ্বিতীয়া","তৃতীয়া","চতুর্থী","পঞ্চমী","ষষ্ঠী","সপ্তমী","অষ্টমী","নবমী","দশমী","একাদশী","দ্বাদশী","ত্রয়োদশী","চতুর্দশী","অমাবস্যা"];
+
+function panGetTithi(dateUtc){
+  const jd = panJulianDay(dateUtc);
+  const diff = panNorm360(panMoonLonTropical(jd) - panSunLonTropical(jd));
+  const tithiIdx = Math.floor(diff / 12);
+  return {
+    tithiName: tithiIdx < 15 ? PAN_TITHI_LIGHT[tithiIdx] : PAN_TITHI_DARK[tithiIdx - 15],
+    paksha: tithiIdx < 15 ? "শুক্লপক্ষ" : "কৃষ্ণপক্ষ",
+  };
+}
+
+// ব্যবহারকারীর টাইমজোনে "এখন" কত — tzOffsetMinutes হলো UTC থেকে কত মিনিট এগিয়ে
+// (ঢাকা = ৩৬০, রিয়াদ = ১৮০)
+function panLocalParts(nowUtc, tzOffsetMinutes){
+  const offsetMs = tzOffsetMinutes * 60000;
+  const localMs = nowUtc.getTime() + offsetMs;        // ব্যবহারকারীর ওয়াল-ক্লক (UTC হিসেবে পড়তে হবে)
+  const localMidnightMs = Math.floor(localMs / 86400000) * 86400000; // আজ স্থানীয় ১২টা রাত
+  // তিথি দিনের মাঝেও বদলায়, তাই আগামীকালের প্রতিনিধি সময় হিসেবে স্থানীয় দুপুর ১২টা নেওয়া হচ্ছে
+  const tomorrowLocalNoonMs = localMidnightMs + 86400000 + 12 * 3600000;
+  return {
+    hour: new Date(localMs).getUTCHours(),
+    dateKey: new Date(localMs).toISOString().slice(0, 10),
+    tomorrowNoonUtc: new Date(tomorrowLocalNoonMs - offsetMs),   // আসল UTC ইনস্ট্যান্টে ফেরত
+    tomorrowDateKey: new Date(localMs + 86400000).toISOString().slice(0, 10),
+  };
+}
+
+const PAN_REMINDER_HOUR = 8; // ব্যবহারকারীর স্থানীয় সকাল ৮টা
+
+/* প্রতি ঘণ্টায় একবার চলে — প্রতিটি সাবস্ক্রাইবারের নিজের টাইমজোনে যখন সকাল ৮টা,
+   তখনই তার রিমাইন্ডার যায় (ঢাকা ও রিয়াদ — দুই জায়গার ব্যবহারকারীর জন্যই সঠিক
+   সময়ে)। একই দিনে দুইবার যাতে না যায়, তাই customers/{uid}-এ lastSentDate রাখা হয়। */
+exports.panchangDailyReminder = onSchedule("every 60 minutes", async () => {
+  const nowUtc = new Date();
+  let subs;
+  try {
+    subs = await db.collection("customers").where("panchangNotifyEnabled", "==", true).get();
+  } catch (e) {
+    console.error(JSON.stringify({ event: "PANCHANG_REMINDER_QUERY_FAILED", error: String((e && e.message) || e) }));
+    return;
+  }
+  if (subs.empty) return;
+
+  let sent = 0;
+  for (const doc of subs.docs) {
+    try {
+      const c = doc.data() || {};
+      const prefs = c.panchangNotify || {};
+      if (!c.fcmToken) continue;
+
+      const tzOffsetMinutes = Number.isFinite(Number(prefs.tzOffsetMinutes)) ? Number(prefs.tzOffsetMinutes) : 360;
+      const local = panLocalParts(nowUtc, tzOffsetMinutes);
+      if (local.hour !== PAN_REMINDER_HOUR) continue;
+      if (prefs.lastSentDate === local.dateKey) continue; // আজকের রিমাইন্ডার আগেই গেছে
+
+      const tomorrow = panGetTithi(local.tomorrowNoonUtc);
+      let title = null, body = null;
+      if (tomorrow.tithiName === "একাদশী" && prefs.ekadashi) {
+        title = "🌸 আগামীকাল একাদশী";
+        body = "আগামীকাল " + tomorrow.paksha + " একাদশী — উপবাস ও পূজার প্রস্তুতি নিয়ে রাখুন।";
+      } else if (tomorrow.tithiName === "পূর্ণিমা" && prefs.moon) {
+        title = "🌕 আগামীকাল পূর্ণিমা";
+        body = "আগামীকাল পূর্ণিমা তিথি।";
+      } else if (tomorrow.tithiName === "অমাবস্যা" && prefs.moon) {
+        title = "🌑 আগামীকাল অমাবস্যা";
+        body = "আগামীকাল অমাবস্যা তিথি।";
+      }
+      if (!title) continue;
+
+      const ok = await sendFcmToCustomer(doc.id, title, body, {
+        type: "panchang-reminder",
+        dateKey: local.tomorrowDateKey,
+        tithi: tomorrow.tithiName,
+      });
+      // পাঠানো হোক বা টোকেন মরা থাকুক — একই দিনে বারবার চেষ্টা করার দরকার নেই
+      await doc.ref.update({ "panchangNotify.lastSentDate": local.dateKey }).catch(()=>{});
+      if (ok) sent++;
+    } catch (e) {
+      console.warn(JSON.stringify({ event: "PANCHANG_REMINDER_ONE_FAILED", customerUid: doc.id, error: String((e && e.message) || e) }));
+    }
+  }
+  if (sent > 0) console.log(JSON.stringify({ event: "PANCHANG_REMINDERS_SENT", count: sent }));
+});
