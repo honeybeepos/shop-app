@@ -19762,20 +19762,30 @@ auth.onAuthStateChanged(async (user)=>{
 
   if("serviceWorker" in navigator){
     navigator.serviceWorker.register("service-worker.js").then((reg)=>{
-      // প্রতি ৫ মিনিট পরপর, আর ট্যাব আবার সামনে আসলেই, নতুন ভার্সন আছে কিনা চেক করে
-      setInterval(()=> reg.update().catch(()=>{}), 5*60*1000);
+      // প্রতি ৫ মিনিট পরপর নতুন ভার্সন আছে কিনা দেখা — তবে অ্যাপ পর্দায় না
+      // থাকলে (মিনিমাইজ/স্ক্রিন বন্ধ) চেক করে লাভ নেই, শুধু ব্যাটারি খরচ হয়
+      setInterval(()=>{
+        if(document.visibilityState === "visible") reg.update().catch(()=>{});
+      }, 5*60*1000);
       document.addEventListener("visibilitychange", ()=>{
         if(document.visibilityState === "visible") reg.update().catch(()=>{});
       });
     }).catch(()=>{});
 
-    // নতুন সার্ভিস ওয়ার্কার একটিভ হওয়া মাত্রই (মানে নতুন কোড এসে গেছে) পেজটা
-    // নিজে থেকেই একবার রিফ্রেশ হয়ে যাবে, যাতে ইউজার সাথে সাথেই নতুন ভার্সন পায়
-    // — ম্যানুয়ালি ক্যাশ ক্লিয়ার করার দরকার হবে না।
-    let __swRefreshing = false;
+    /* নতুন সার্ভিস ওয়ার্কার একটিভ হলে পেজটা একবার নিজে থেকে রিফ্রেশ হয়, যাতে
+       ইউজার সাথে সাথেই নতুন ভার্সন পায়।
+
+       ⚠️ আগে এই "একবার" পাহারাটা (__swRefreshing) শুধু মেমরিতে ছিল — রিফ্রেশ
+       হওয়ার সাথে সাথেই সেটা মুছে যেত। ফলে রিফ্রেশের পর আবার controllerchange
+       এলে আবার রিফ্রেশ — এভাবে বারবার রিলোড হয়ে ব্যাটারি শেষ হতে পারত, আর
+       এই ভারী পেজ বারবার লোড হয়ে "Aw, Snap!" পর্যন্ত গড়াতে পারত। এখন পাহারাটা
+       sessionStorage-এ রাখা হচ্ছে, তাই রিফ্রেশের পরেও মনে থাকে — এক দফায়
+       সর্বোচ্চ একবারই রিলোড হবে। */
     navigator.serviceWorker.addEventListener("controllerchange", ()=>{
-      if(__swRefreshing) return;
-      __swRefreshing = true;
+      try{
+        if(sessionStorage.getItem("bcc-sw-reloaded") === "1") return;
+        sessionStorage.setItem("bcc-sw-reloaded", "1");
+      }catch(e){ /* sessionStorage না থাকলেও নিচের রিলোড একবার হবে */ }
       window.location.reload();
     });
   }

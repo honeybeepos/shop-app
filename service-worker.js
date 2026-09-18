@@ -9,7 +9,7 @@
 /* গুরুত্বপূর্ণ: প্রতিবার কোড আপডেট করে সার্ভারে দেওয়ার সময় এই ভার্সন নাম্বারটা
    বাড়িয়ে দিন (v2 → v3 → v4 ...)। এটা বাড়ালে পুরনো ক্যাশ মুছে ফেলা হয় এবং
    ইউজার নতুন ভার্সন পায়। */
-const CACHE_VERSION = "shop-app-v120";
+const CACHE_VERSION = "shop-app-v121";
 
 const APP_SHELL = [
   "login.html",
@@ -87,8 +87,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  /* 🔋 ব্যাটারি/ডেটা বাঁচানো: লাইব্রেরি আর ফন্টের ঠিকানায় ভার্সন নম্বর লেখা
+     থাকে (যেমন .../Chart.js/4.4.0/...) — অর্থাৎ একই ঠিকানার ফাইল কোনোদিন
+     বদলায় না। আগে ক্যাশে থাকা সত্ত্বেও প্রতিবার ব্যাকগ্রাউন্ডে আবার ডাউনলোড
+     হতো (Chart.js, jsPDF, JsBarcode, html5-qrcode, Leaflet, ফন্ট, Firebase
+     SDK — প্রতিবার অ্যাপ খুললেই)। এখন ক্যাশে পেলে নেটওয়ার্কে আর যাওয়াই হয় না। */
+  const isVersionedAsset = /cdnjs\.cloudflare\.com|unpkg\.com|fonts\.gstatic\.com|fonts\.googleapis\.com|gstatic\.com\/firebasejs/.test(url);
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
+      if (cached && isVersionedAsset) return cached;   // ক্যাশেই আছে, নেটওয়ার্কে যাওয়ার দরকার নেই
+
       const networkFetch = fetch(event.request)
         .then((res) => {
           if (res && res.status === 200) {
@@ -99,8 +108,7 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => cached); // অফলাইনে নেটওয়ার্ক ফেইল করলে ক্যাশ থেকে দাও
 
-      // stale-while-revalidate: ক্যাশ থাকলে সাথে সাথে সেটা দেখাও (দ্রুত + অফলাইনে কাজ করে),
-      // পাশাপাশি নেটওয়ার্ক থেকে আপডেট আনার চেষ্টা চলতে থাকে পরের বারের জন্য
+      // বাকি ফাইলের জন্য আগের মতোই stale-while-revalidate
       return cached || networkFetch;
     })
   );
