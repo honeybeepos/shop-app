@@ -9,12 +9,8 @@
 <link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <!-- 🔖 রসিদে কাস্টমারের বারকোড প্রিন্ট করার জন্য (স্ক্যান করলে কাস্টমারের হিসাব খুঁজে পাওয়া যাবে) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.3/JsBarcode.all.min.js"></script>
 <!-- 📷 মোবাইলের ক্যামেরা দিয়ে বারকোড/QR স্ক্যান করার জন্য -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root{
     --ink:#2b2308;
@@ -647,6 +643,44 @@
 </style>
 <!-- Leaflet.js (OpenStreetMap) — এখনো "ডেলিভারি লোকেশন পিন" মোডালে ব্যবহার হয় -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script>
+/* 📦 ভারী লাইব্রেরি — শুরুতেই লোড না করে, যখন সত্যিই দরকার তখন লোড করা হয়।
+   আগে Chart.js, jsPDF, JsBarcode আর html5-qrcode অ্যাপ খোলার সাথে সাথেই
+   নামত ও মেমরিতে বসে থাকত, যদিও চার্ট/PDF/বারকোড/স্ক্যানার ব্যবহার না করলে
+   একটাও লাগে না। এতে ফোনের মেমরি অকারণে ভরে থাকত।
+
+   একবার লোড হলে ব্রাউজার ও সার্ভিস ওয়ার্কার দুই জায়গাতেই ক্যাশে থাকে, তাই
+   পরের বার সাথে সাথেই পাওয়া যায়। লোড করতে না পারলে (ইন্টারনেট না থাকলে)
+   চুপচাপ কিছু না করে ব্যবহারকারীকে পরিষ্কার বার্তা দেখানো হয়। */
+window.__hbLibPromises = {};
+window.HB_LIBS = {
+  chart:   { url: "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js",       ready: function(){ return typeof Chart !== "undefined"; } },
+  jspdf:   { url: "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",          ready: function(){ return !!(window.jspdf && window.jspdf.jsPDF); } },
+  barcode: { url: "https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.3/JsBarcode.all.min.js", ready: function(){ return typeof JsBarcode !== "undefined"; } },
+  qrscan:  { url: "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js",ready: function(){ return typeof Html5Qrcode !== "undefined"; } }
+};
+window.hbLoadLib = function(name){
+  var lib = window.HB_LIBS[name];
+  if(!lib) return Promise.reject(new Error("অজানা লাইব্রেরি: " + name));
+  if(lib.ready()) return Promise.resolve(true);
+  if(window.__hbLibPromises[name]) return window.__hbLibPromises[name];
+  window.__hbLibPromises[name] = new Promise(function(resolve, reject){
+    var sc = document.createElement("script");
+    sc.src = lib.url;
+    sc.async = true;
+    sc.onload = function(){
+      if(lib.ready()) resolve(true);
+      else { delete window.__hbLibPromises[name]; reject(new Error(name + " লোড হয়েছে কিন্তু চালু হয়নি")); }
+    };
+    sc.onerror = function(){
+      delete window.__hbLibPromises[name];   // পরে আবার চেষ্টা করা যাবে
+      reject(new Error(name + " লোড করা যায়নি"));
+    };
+    document.head.appendChild(sc);
+  });
+  return window.__hbLibPromises[name];
+};
+</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- 🗺️ Google Maps JavaScript API — লাইভ ম্যাপে ব্যবহার হয় (Bee Flying থিম +
      স্মুথ ইন্টারপোলেশন সহ)। এই key HTTP-referrer রেস্ট্রিকশন দিয়ে সুরক্ষিত
@@ -5141,6 +5175,10 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
     if(typeof saveLastTab === 'function') saveLastTab(btn.dataset.tab);
+    // 📈 সাপ্তাহিক বিক্রির চার্ট শুধু ড্যাশবোর্ড খোলা থাকলেই আঁকা হয় (লুকানো
+    // অবস্থায় চার্ট লাইব্রেরিটা অকারণে নামে না) — তাই ড্যাশবোর্ডে ফিরলে
+    // এখানেই আবার আঁকার কথা বলা হয়
+    if(btn.dataset.tab === 'dash' && typeof renderWeeklySalesChart === 'function') renderWeeklySalesChart();
   });
 });
 
@@ -9102,7 +9140,7 @@ function bccNextProductCode(){
 // 🖨️ প্রোডাক্টের নাম+দাম+বারকোড দিয়ে একটা ছোট প্রিন্টযোগ্য স্টিকার বানানো হয় (নতুন
 // কোড না থাকলে প্রথমে bccNextProductCode() দিয়ে একটা বানিয়ে প্রোডাক্টে সেভ করে
 // নেওয়া হয়, যাতে ভবিষ্যতে এই একই বারকোড স্ক্যান করলে প্রোডাক্টটা চেনা যায়)
-function bccPrintProductLabel(id){
+async function bccPrintProductLabel(id){
   const prods = bccLoadProducts();
   const p = prods.find(x=>x.id===id);
   if(!p) return;
@@ -9128,6 +9166,8 @@ function bccPrintProductLabel(id){
     </div>`;
   }
   printArea.innerHTML = labelsHtml;
+  // 📦 বারকোড লাইব্রেরি এখন দরকারের সময় লোড হয় (প্রিন্টের ঠিক আগে)
+  try{ await hbLoadLib('barcode'); }catch(e){ toast('⚠️ বারকোড লোড করা যায়নি — লেবেল বারকোড ছাড়াই প্রিন্ট হবে'); }
   if(typeof JsBarcode !== 'undefined'){
     for(let i=0;i<copies;i++){
       try{
@@ -9241,7 +9281,7 @@ document.getElementById('qrPrintTicketBtn').addEventListener('click', async ()=>
   qrUpdatePricePreview();
 });
 
-function qrPrintTicketLabel(code, name, grams, price){
+async function qrPrintTicketLabel(code, name, grams, price){
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
   const weightText = grams >= 1000 ? (grams/1000).toFixed(3)+' kg' : grams+' g';
   const printArea = document.getElementById('productLabelPrintArea');
@@ -9253,6 +9293,8 @@ function qrPrintTicketLabel(code, name, grams, price){
       <div style="font-size:13px; font-weight:700; margin-bottom:4px;">৳${price.toFixed(2)}</div>
       <svg id="ticketBarcodeSvg"></svg>
     </div>`;
+  // 📦 বারকোড লাইব্রেরি এখন দরকারের সময় লোড হয় (প্রিন্টের ঠিক আগে)
+  try{ await hbLoadLib('barcode'); }catch(e){ toast('⚠️ বারকোড লোড করা যায়নি — স্টিকার বারকোড ছাড়াই প্রিন্ট হবে'); }
   if(typeof JsBarcode !== 'undefined'){
     try{ JsBarcode('#ticketBarcodeSvg', code, { format:'CODE128', displayValue:true, fontSize:11, height:32, margin:2 }); }
     catch(e){ console.warn('ওজন-স্টিকারের বারকোড রেন্ডার ব্যর্থ:', e); }
@@ -14054,7 +14096,7 @@ function openShareModal(name, phone, message){
 // থার্মাল/POS প্রিন্টারে ছোট রসিদ প্রিন্ট করার জন্য — WhatsApp/SMS-এর জন্য বানানো
 // একই বার্তাটাই (ইনভয়েস নাম্বার, আইটেম, দাম, বাকি সব থাকে) রসিদ আকারে প্রিন্ট হয়,
 // ফোন নাম্বার থাকুক বা না থাকুক — সব সেলেই এই অপশন কাজ করবে
-function printSaleReceipt(name, phone, message){
+async function printSaleReceipt(name, phone, message){
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
   const printArea = document.getElementById('saleReceiptPrintArea');
   // 🔖 কাস্টমারের নাম্বার দিয়েই বারকোড বানানো হয় (Bangla নাম CODE128-এ ঠিকভাবে
@@ -14075,6 +14117,10 @@ function printSaleReceipt(name, phone, message){
       </div>` : ''}
       <div style="text-align:center; font-size:10.5px; margin-top:4px;">ধন্যবাদ! আবার আসবেন 🙏</div>
     </div>`;
+  // 📦 বারকোড লাইব্রেরি এখন দরকারের সময় লোড হয় (প্রিন্টের ঠিক আগে)
+  if(barcodeValue){
+    try{ await hbLoadLib('barcode'); }catch(e){ /* বারকোড ছাড়াই রসিদ প্রিন্ট হবে */ }
+  }
   if(barcodeValue && typeof JsBarcode !== 'undefined'){
     try{
       JsBarcode('#saleReceiptBarcode', barcodeValue, { format:'CODE128', displayValue:true, fontSize:12, height:38, margin:2 });
@@ -14292,10 +14338,13 @@ document.getElementById('printName').addEventListener('keydown', (e)=>{
 let barcodeScannerInstance = null;
 let barcodeScanTargetInputId = null;
 
-function openBarcodeScanner(targetInputId){
+async function openBarcodeScanner(targetInputId){
   barcodeScanTargetInputId = targetInputId;
-  document.getElementById('barcodeScanStatus').textContent = 'ক্যামেরার অনুমতি দিন এবং বারকোডটা ফ্রেমে ধরুন';
+  document.getElementById('barcodeScanStatus').textContent = 'স্ক্যানার প্রস্তুত হচ্ছে…';
   document.getElementById('barcodeScanOverlay').classList.add('show');
+  // 📦 স্ক্যানার লাইব্রেরি এখন দরকারের সময় লোড হয় (সবচেয়ে ভারী ফাইলটাই এটা)
+  try{ await hbLoadLib('qrscan'); }catch(e){ /* নিচের চেকটাই বার্তা দেখাবে */ }
+  document.getElementById('barcodeScanStatus').textContent = 'ক্যামেরার অনুমতি দিন এবং বারকোডটা ফ্রেমে ধরুন';
   if(typeof Html5Qrcode === 'undefined'){
     document.getElementById('barcodeScanStatus').textContent = '⚠️ ক্যামেরা স্ক্যানার লোড হয়নি — ইন্টারনেট কানেকশন চেক করুন';
     return;
@@ -14686,7 +14735,10 @@ document.getElementById('permCustPrintBtn').addEventListener('click', ()=>{
   setTimeout(()=> printArea.classList.remove('printing'), 500);
 });
 
-document.getElementById('permCustDownloadBtn').addEventListener('click', ()=>{
+document.getElementById('permCustDownloadBtn').addEventListener('click', async ()=>{
+  // 📦 PDF লাইব্রেরি এখন দরকারের সময় লোড হয়
+  try{ await hbLoadLib('jspdf'); }
+  catch(e){ alert('PDF তৈরির অংশটা লোড করা যায়নি — ইন্টারনেট কানেকশন চেক করে আবার চেষ্টা করুন।'); return; }
   const list = getFilteredPermCustList(permCustLastQuery);
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || 'Customer List';
   const dateStr = new Date().toLocaleDateString('en-GB');
@@ -16333,9 +16385,16 @@ document.getElementById('empSalesWaBtn').addEventListener('click', ()=>{
 });
 
 let weeklyChartInstance = null;
-function renderWeeklySalesChart(){
+async function renderWeeklySalesChart(){
   const canvas = document.getElementById('weeklySalesChart');
-  if(!canvas || typeof Chart === 'undefined') return;
+  // ⚠️ আগে এখানে "typeof Chart === 'undefined'" চেকও ছিল — লাইব্রেরি এখন শুরুতে
+  // লোড হয় না বলে সেই চেক থাকলে চার্ট কোনোদিনই আঁকা হতো না। লোড করার কাজটা
+  // নিচে হয়, তাই এখানে শুধু canvas আছে কিনা দেখলেই চলে।
+  if(!canvas) return;
+  // ড্যাশবোর্ড ট্যাব খোলা না থাকলে চার্ট আঁকার দরকার নেই — ট্যাবে ফিরলে
+  // tab-btn হ্যান্ডলার আবার এই ফাংশনটা ডাকে
+  const dashPanel = document.getElementById('tab-dash');
+  if(dashPanel && !dashPanel.classList.contains('active')) return;
 
   const labels = [];
   const data = [];
@@ -16351,6 +16410,13 @@ function renderWeeklySalesChart(){
     data.push(daySales);
   }
 
+  // 📦 চার্ট লাইব্রেরি এখন দরকারের সময় লোড হয়
+  try{ await hbLoadLib('chart'); }
+  catch(e){
+    const box = canvas.parentElement;
+    if(box) box.insertAdjacentHTML('beforeend', '<div style="font-size:12px; color:#f5c6bd; padding:8px;">চার্ট দেখানোর অংশটা লোড করা যায়নি — ইন্টারনেট কানেকশন চেক করুন।</div>');
+    return;
+  }
   if(weeklyChartInstance) weeklyChartInstance.destroy();
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0,0,0,180);
