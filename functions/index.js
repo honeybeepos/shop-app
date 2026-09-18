@@ -62,6 +62,14 @@ const geminiApiKey = defineSecret("GEMINI_API_KEY");
 // সেট করতে: firebase functions:secrets:set AVIATIONSTACK_API_KEY
 const aviationstackApiKey = defineSecret("AVIATIONSTACK_API_KEY");
 
+// 🔑 🕉️ Vedika Panchang API key — একই নীতিতে Secrets Manager-এ, কখনো
+// ক্লায়েন্ট (honey-bee-bazar.html)-এ থাকবে না — ক্লায়েন্ট সরাসরি Vedika-কে
+// কল করে না, সবসময় নিচের getPanchangData Cloud Function দিয়েই যায়।
+// সেট করতে: firebase functions:secrets:set VEDIKA_API_KEY
+// (এই একটা সেটআপ-স্টেপ — firebase CLI দিয়ে — একবার ম্যানুয়ালি করতে হবে,
+// কোডে দেওয়া সম্ভব না।)
+const vedikaApiKey = defineSecret("VEDIKA_API_KEY");
+
 const OFFER_TIMEOUT_SECONDS = 60;
 // রাইডার/এজেন্ট/হানি-বি — আয়ের ভাগ (Phase 5 ব্লুপ্রিন্ট অনুযায়ী: ৭০/২০/১০)
 const RIDER_SHARE = 0.7;
@@ -2034,3 +2042,195 @@ exports.onTripChatMessageCreated = onDocumentCreated(
     }
   }
 );
+
+/* ==================== 🕉️ Sanatani Panchang — STEP 1 (Vedika API → Firestore → শর্ট কার্ড) ====================
+   এই ফাংশন ক্লায়েন্ট (honey-bee-bazar.html)-এর "সনাতনী" শর্ট কার্ড থেকে কল
+   হবে — Vedika Panchang API-কে সরাসরি ক্লায়েন্ট থেকে কখনো কল করা হয় না,
+   API key-ও কখনো ক্লায়েন্টে যায় না (Secrets Manager-এ, উপরের vedikaApiKey)।
+
+   প্রবাহ:
+   1) client পাঠায় { date, latitude, longitude, timezone, cityKey }
+   2) panchangDays/{cityKey}_{date}-এ আগে থেকেই আজকের ডেটা ক্যাশ আছে কিনা
+      চেক করা হয় — থাকলে সরাসরি সেটাই ফেরত (source:"cache"), Vedika-কে
+      আর কল করা হয় না (একই শহরের সব ব্যবহারকারীর জন্য দিনে একবারই কল লাগে)।
+   3) না থাকলে Vedika API কল হয়, রেজাল্ট normalize করে panchangDays-এ সেভ
+      হয় (source:"live")।
+
+   ⚠️ গুরুত্বপূর্ণ নোট (সততার সাথে বলা দরকার): Vedika-র Panchang এন্ডপয়েন্টের
+   ঠিক path আর রেসপন্স ফিল্ডের নাম এই কোড লেখার সময় সরাসরি টেস্ট করে
+   নিশ্চিত করা যায়নি — Vedika-র ডকুমেন্টেশন সাইট (vedika.io/docs) পুরোটাই
+   জাভাস্ক্রিপ্ট দিয়ে রেন্ডার হয় (স্ট্যাটিক লোড দিয়ে ভেতরের ডিটেইল দেখা যায়
+   না), আর তাদের আসল API সার্ভারেও (api.vedika.io) এই ডেভেলপমেন্ট
+   পরিবেশ থেকে নেটওয়ার্ক এক্সেস নেই। যা নিশ্চিতভাবে জানা গেছে (তাদের Kundli
+   এন্ডপয়েন্টের ডকুমেন্টেড উদাহরণ থেকে): base URL "https://api.vedika.io",
+   auth হেডার "Authorization: Bearer vk_live_...", প্যাটার্ন
+   "/v2/astrology/{feature}"। তাই নিচে "/v2/astrology/panchang" ধরে নেওয়া
+   হয়েছে (Kundli-র প্যাটার্ন অনুসরণ করে) — এটা প্রথম ডিপ্লয়ের পরে Dhaka/Riyadh
+   দিয়ে টেস্ট করে raw রেসপন্স (নিচে panchangDays ডকুমেন্টে rawResponse ফিল্ডে
+   সেভ থাকে) দেখে normalizePanchangResponse()-এর ফিল্ড-ম্যাপিং মিলিয়ে/ঠিক
+   করে নেওয়া জরুরি — এটাই STEP 1-এর "API response দেখাও" ধাপ। */
+const VEDIKA_API_BASE = "https://api.vedika.io";
+
+// Vedika-র রেসপন্সে ঠিক কোন key-তে কোন তথ্য আসবে তা নিশ্চিত না হওয়া পর্যন্ত,
+// কয়েকটা সম্ভাব্য বিকল্প নাম চেক করে প্রথমটা যেটা পাওয়া যায় সেটা নেওয়া হচ্ছে —
+// আসল রেসপন্স দেখার পর এই ফাংশনটাই ঠিক করে দিতে হবে।
+function normalizePanchangResponse(raw) {
+  const d = (raw && (raw.data || raw.panchang || raw)) || {};
+  const pick = (obj, keys) => {
+    for (const k of keys) {
+      if (obj && obj[k] != null) return obj[k];
+    }
+    return null;
+  };
+  const nameOf = (v) => {
+    if (v == null) return null;
+    if (typeof v === "string") return v;
+    if (typeof v === "object") return v.name || v.title || v.value || null;
+    return null;
+  };
+  // events/festivals অ্যারে — Vedika-র রেসপন্সে ঠিক কোন key/shape-এ আসবে অজানা,
+  // তাই সম্ভাব্য array/object দুই ফরম্যাটই চেষ্টা করা হচ্ছে; না পেলে খালি অ্যারে
+  const rawEvents = pick(d, ["events", "festivals", "specialDays", "special_days"]);
+  let events = [];
+  if (Array.isArray(rawEvents)) {
+    events = rawEvents.map((ev) => ({
+      name: nameOf(ev) || (ev && (ev.title || ev.eventName)) || null,
+      description: (ev && (ev.description || ev.desc)) || null,
+    })).filter((ev) => ev.name);
+  }
+
+  return {
+    tithi: nameOf(pick(d, ["tithi", "Tithi"])),
+    // পক্ষ (শুক্ল/কৃষ্ণ) — Vedika-র রেসপন্সে থাকলেই মিলবে; না থাকলে null,
+    // ক্লায়েন্ট তখন এই রো-টা লুকিয়ে রাখবে (কোনো তথ্য বানিয়ে দেখানো হবে না)
+    paksha: nameOf(pick(d, ["paksha", "Paksha"])),
+    nakshatra: nameOf(pick(d, ["nakshatra", "Nakshatra"])),
+    yoga: nameOf(pick(d, ["yoga", "Yoga"])),
+    karana: nameOf(pick(d, ["karana", "karna", "Karana"])),
+    sunrise: pick(d, ["sunrise", "sun_rise", "sunRise"]),
+    sunset: pick(d, ["sunset", "sun_set", "sunSet"]),
+    moonrise: pick(d, ["moonrise", "moon_rise", "moonRise"]),
+    moonset: pick(d, ["moonset", "moon_set", "moonSet"]),
+    rahuKaal: pick(d, ["rahu_kaal", "rahuKaal", "rahuKalam", "rahu_kalam"]),
+    events,
+  };
+}
+
+exports.getPanchangData = onCall({ secrets: [vedikaApiKey] }, async (request) => {
+  const data = request.data || {};
+  const date = typeof data.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.date)
+    ? data.date
+    : new Date().toISOString().slice(0, 10);
+  const latitude = Number(data.latitude);
+  const longitude = Number(data.longitude);
+  const timezone = typeof data.timezone === "string" && data.timezone ? data.timezone : "+00:00";
+  const cityKey = (typeof data.cityKey === "string" && data.cityKey.trim())
+    ? data.cityKey.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_")
+    : null;
+  // city/country শুধু প্রদর্শনের জন্য (Firestore ডকুমেন্টে সেভ থাকে, প্যাঞ্জিকা
+  // ক্যালকুলেশনে কোনো প্রভাব নেই — সেটা lat/lng/timezone দিয়েই হয়)
+  const cityLabel = typeof data.city === "string" && data.city.trim() ? data.city.trim() : null;
+  const country = typeof data.country === "string" && data.country.trim() ? data.country.trim() : null;
+
+  if (!cityKey || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new HttpsError(
+      "invalid-argument",
+      "cityKey, latitude, longitude দরকার — সঠিকভাবে পাঠানো হয়নি।"
+    );
+  }
+
+  const docId = `${cityKey}_${date}`;
+  const cacheRef = db.collection("panchangDays").doc(docId);
+
+  // ধাপ ২: আজকের এই শহরের জন্য আগে থেকেই সেভ করা আছে কিনা
+  try {
+    const cacheDoc = await cacheRef.get();
+    if (cacheDoc.exists) {
+      const cached = cacheDoc.data();
+      return {
+        source: "cache",
+        cityKey,
+        date,
+        city: cached.city || cityLabel,
+        country: cached.country || country,
+        tithi: cached.tithi,
+        paksha: cached.paksha,
+        nakshatra: cached.nakshatra,
+        yoga: cached.yoga,
+        karana: cached.karana,
+        sunrise: cached.sunrise,
+        sunset: cached.sunset,
+        moonrise: cached.moonrise,
+        moonset: cached.moonset,
+        rahuKaal: cached.rahuKaal,
+        events: cached.events || [],
+      };
+    }
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "PANCHANG_CACHE_READ_FAILED", error: String((e && e.message) || e) }));
+  }
+
+  // ধাপ ৩: Vedika API কল
+  const apiKey = vedikaApiKey.value();
+  if (!apiKey) {
+    console.warn(JSON.stringify({ event: "PANCHANG_NO_API_KEY" }));
+    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  let apiRes;
+  try {
+    apiRes = await fetch(`${VEDIKA_API_BASE}/v2/astrology/panchang`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        datetime: `${date}T00:00:00`,
+        latitude,
+        longitude,
+        timezone,
+      }),
+    });
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "PANCHANG_NETWORK_ERROR", error: String((e && e.message) || e) }));
+    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  if (!apiRes.ok) {
+    console.warn(JSON.stringify({ event: "PANCHANG_API_ERROR", status: apiRes.status }));
+    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  let rawJson;
+  try {
+    rawJson = await apiRes.json();
+  } catch (e) {
+    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  const normalized = normalizePanchangResponse(rawJson);
+
+  // ধাপ ৩ (শেষ): panchangDays-এ সেভ — rawResponse-ও রাখা হচ্ছে (সাময়িকভাবে,
+  // ডিবাগের জন্য) যাতে প্রথম ডিপ্লয়ের পরে আসল ফিল্ড-নাম মিলিয়ে
+  // normalizePanchangResponse() ঠিক করা যায়
+  try {
+    await cacheRef.set({
+      cityKey,
+      date,
+      city: cityLabel,
+      country,
+      latitude,
+      longitude,
+      timezone,
+      ...normalized,
+      rawResponse: rawJson,
+      source: "vedika-api",
+      fetchedAt: FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "PANCHANG_CACHE_WRITE_FAILED", error: String((e && e.message) || e) }));
+  }
+
+  return { source: "live", cityKey, date, city: cityLabel, country, ...normalized };
+});
