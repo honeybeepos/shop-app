@@ -3870,7 +3870,36 @@ function hbCalcSetupTabs(tabsWrapId, panePrefix){
   const starsEl = document.getElementById("ckStars");
   if(!qEl) return;
   let currentAnswer = 0;
+  let answeredRight = false;   // ঠিক উত্তরের পর নতুন প্রশ্ন আসার আগ পর্যন্ত আর ক্লিক নেওয়া হয় না
   const KID_COLORS = ["#ff6b6b","#4dabf7","#69db7c","#ffd43b"];
+
+  /* 🎲 নিরপেক্ষ শাফল (Fisher–Yates)। আগে sort(()=>Math.random()-0.5) ব্যবহার
+     হতো — ওটা সত্যিকারের এলোমেলো নয়, ঠিক উত্তরটা বারবার একই দিকে থেকে যেত,
+     বাচ্চারা ধরন বুঝে ফেলতে পারত। */
+  function hbKidsShuffle(arr){
+    const a = arr.slice();
+    for(let i = a.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  /* ভুল অপশন বানানো। আগের কোড লুপ চালিয়ে যেত যতক্ষণ না ৪টা অপশন হয় — কিন্তু
+     উত্তর ০ হলে (যেমন "৭ − ৭") ঋণাত্মক বাদ দিয়ে মাত্র ৩টা সম্ভব ছিল, তাই
+     লুপটা কখনো শেষ হতো না, অ্যাপ ওখানেই জমে যেত। এখন আগে সম্ভাব্য সংখ্যার
+     তালিকা বানানো হয়, তারপর বেছে নেওয়া হয় — আটকে থাকার সুযোগ নেই। */
+  function hbKidsBuildOptions(answer){
+    const spread = Math.max(3, Math.ceil(Math.abs(answer) * 0.25));
+    const pool = [];
+    for(let d = -spread; d <= spread; d++){
+      const v = answer + d;
+      if(v !== answer && v >= 0) pool.push(v);
+    }
+    let next = answer + spread + 1;
+    while(pool.length < 3) pool.push(next++);   // সর্বোচ্চ ৩ বার, নিশ্চিতভাবে শেষ হয়
+    return hbKidsShuffle([answer].concat(hbKidsShuffle(pool).slice(0, 3)));
+  }
 
   function getStars(){ return hbCalcStorageGet("kids_stars", 0); }
   function setStars(n){ hbCalcStorageSet("kids_stars", n); starsEl.textContent = "⭐ " + n; }
@@ -3886,20 +3915,18 @@ function hbCalcSetupTabs(tabsWrapId, panePrefix){
     else currentAnswer = a * b;
     qEl.textContent = `${a} ${op} ${b} = ?`;
     fbEl.textContent = "";
-    const options = new Set([currentAnswer]);
-    while(options.size < 4){
-      const delta = Math.floor(Math.random() * 6) - 3;
-      const fake = currentAnswer + delta;
-      if(fake !== currentAnswer && fake >= 0) options.add(fake);
-    }
-    const optArr = Array.from(options).sort(()=> Math.random() - 0.5);
+    answeredRight = false;
+    const optArr = hbKidsBuildOptions(currentAnswer);
     gridEl.innerHTML = optArr.map((opt, idx)=>
       `<button class="hbCalcKey" data-ckans="${opt}" style="background:${KID_COLORS[idx % KID_COLORS.length]}; color:#1a1206; font-size:18px; padding:16px 0;">${opt}</button>`
     ).join("");
     gridEl.querySelectorAll("[data-ckans]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
+        // ঠিক উত্তরের পর বারবার চাপলে আগে প্রতিবারই তারা বাড়ত — এখন আর বাড়ে না
+        if(answeredRight) return;
         const chosen = Number(btn.dataset.ckans);
         if(chosen === currentAnswer){
+          answeredRight = true;
           fbEl.style.color = "#69db7c";
           fbEl.textContent = "🎉 ঠিক হয়েছে!";
           setStars(getStars() + 1);
@@ -3907,6 +3934,8 @@ function hbCalcSetupTabs(tabsWrapId, panePrefix){
         }else{
           fbEl.style.color = "#ff6b6b";
           fbEl.textContent = "❌ আরেকবার চেষ্টা করো!";
+          btn.style.opacity = "0.35";   // ভুল অপশনটা নিভে যায়
+          btn.disabled = true;
         }
       });
     });
