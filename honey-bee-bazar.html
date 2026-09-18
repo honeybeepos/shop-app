@@ -1069,9 +1069,10 @@
       <div class="card">
         <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:#e7e2d4;">একাদশী রিমাইন্ডার <input type="checkbox" id="hbPanNotifEkadashi" checked></label>
         <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:#e7e2d4; border-top:1px dashed var(--border);">পূর্ণিমা/অমাবস্যা রিমাইন্ডার <input type="checkbox" id="hbPanNotifMoon" checked></label>
-        <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:#e7e2d4; border-top:1px dashed var(--border);">উৎসব রিমাইন্ডার <input type="checkbox" id="hbPanNotifFestival" checked></label>
-        <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:#e7e2d4; border-top:1px dashed var(--border);">শুভ সময় নোটিফিকেশন <input type="checkbox" id="hbPanNotifShubho"></label>
-        <div style="font-size:9.5px; color:var(--muted); margin-top:8px;">* নোটিফিকেশন পাঠানোর সিস্টেম পরের ধাপে আসবে — এখন শুধু পছন্দ সেভ হচ্ছে</div>
+        <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:var(--muted); border-top:1px dashed var(--border);"><span>উৎসব রিমাইন্ডার <span style="font-size:9.5px;">(শীঘ্রই)</span></span> <input type="checkbox" id="hbPanNotifFestival" checked></label>
+        <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:var(--muted); border-top:1px dashed var(--border);"><span>শুভ সময় নোটিফিকেশন <span style="font-size:9.5px;">(শীঘ্রই)</span></span> <input type="checkbox" id="hbPanNotifShubho"></label>
+        <div id="hbPanNotifStatus" style="font-size:10.5px; color:#7ee7ac; margin-top:10px; line-height:1.4;"></div>
+        <div style="font-size:9.5px; color:var(--muted); margin-top:6px; line-height:1.4;">* একাদশী আর পূর্ণিমা/অমাবস্যার রিমাইন্ডার এখন কাজ করছে — আগের দিন সকাল ৮টায় (আপনার নিজের সময় অনুযায়ী) পুশ নোটিফিকেশন যাবে। উৎসব ও শুভ সময়ের রিমাইন্ডার পরের ধাপে যুক্ত হবে। রিমাইন্ডার পেতে লগইন করা ও নোটিফিকেশনের অনুমতি দেওয়া দরকার।</div>
       </div>
     </div>
   </div>
@@ -2906,6 +2907,10 @@ auth.onAuthStateChanged(async (user)=>{
   renderAuthArea();
   hmSetupFcm(user.uid); // 🔔 Honey Messenger — অ্যাপ বন্ধ/ব্যাকগ্রাউন্ডে থাকলেও নতুন মেসেজের পুশ নোটিফিকেশন পেতে
   tmSetupFcm(user.uid); // 🔔 Phase 7 — Transport ট্রিপ কনফার্ম/অফারের পুশ নোটিফিকেশন পেতে
+  // 🔔 পঞ্জিকা রিমাইন্ডার — কেউ লগইন করার আগেই টগল চালু করে রাখলে সেই পছন্দ
+  // এতক্ষণ শুধু এই ফোনেই ছিল; লগইন হওয়ার সাথে সাথে সেটা সার্ভারে পাঠানো হয়,
+  // নাহলে রিমাইন্ডার কখনোই চালু হতো না
+  if(typeof hbPanSyncNotifPrefsOnLogin === "function") hbPanSyncNotifPrefsOnLogin();
   // 🩸 Blood Bank স্ক্রিনে থাকা অবস্থায় লগইন সম্পন্ন হলে প্রোফাইল কার্ডটা
   // নিজে থেকেই রিফ্রেশ হয় — আগে লগইন resolve হওয়ার আগেই স্ক্রিনে ঢুকলে
   // কার্ড খালি/ভুল অবস্থায় আটকে থাকত
@@ -4272,8 +4277,104 @@ hbPanShowTab("today");
     }catch(e){}
     el.addEventListener("change", ()=>{
       try{ localStorage.setItem(storeKey, el.checked ? "1" : "0"); }catch(e){}
+      hbPanSaveNotifPrefs(el.checked); // ✅ Phase 3 — পছন্দ Firestore-এ সেভ হয়ে আসল পুশ চালু/বন্ধ হয়
     });
   });
+})();
+
+/* ==================== 🔔 পঞ্জিকা রিমাইন্ডার — ক্লায়েন্ট পাশ (Phase 3)
+   টগল চালু করলে: (১) নোটিফিকেশনের অনুমতি চাওয়া হয়, (২) FCM টোকেন
+   customers/{uid}-এ সেভ হয় (লগইনের সময় tmSetupFcm যা করে, ঠিক সেভাবেই),
+   (৩) পছন্দ + টাইমজোন customers/{uid}.panchangNotify-তে যায়। এরপর সার্ভারের
+   panchangDailyReminder শিডিউল ফাংশন ব্যবহারকারীর নিজের সকাল ৮টায় পুশ পাঠায়। ==================== */
+async function hbPanEnsureFcmToken(uid){
+  if(!("Notification" in window) || !("serviceWorker" in navigator)) return false;
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== "granted") return false;
+    const registration = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({ vapidKey: HM_FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+    if(!token) return false;
+    await db.collection("customers").doc(uid).set({ fcmToken: token }, { merge: true });
+    return true;
+  }catch(e){
+    console.warn("পঞ্জিকা রিমাইন্ডারের FCM সেটআপ ব্যর্থ:", e);
+    return false;
+  }
+}
+
+function hbPanSetNotifStatus(msg, isError){
+  const el = document.getElementById("hbPanNotifStatus");
+  if(!el) return;
+  el.textContent = msg || "";
+  el.style.color = isError ? "#f0a35c" : "#7ee7ac";
+}
+
+async function hbPanSaveNotifPrefs(justTurnedOn){
+  const read = (id)=>{ const el = document.getElementById(id); return !!(el && el.checked); };
+  const prefs = {
+    ekadashi: read("hbPanNotifEkadashi"),
+    moon: read("hbPanNotifMoon"),
+    festival: read("hbPanNotifFestival"),
+    shubho: read("hbPanNotifShubho"),
+    // সার্ভার এই অফসেট দিয়েই বোঝে ব্যবহারকারীর ওখানে কখন সকাল ৮টা
+    tzOffsetMinutes: -new Date().getTimezoneOffset(),
+  };
+  // এখন যে দুটো রিমাইন্ডার সত্যিই কাজ করে, সেগুলোর কোনোটা চালু থাকলেই সার্ভার এই ব্যবহারকারীকে দেখবে
+  const enabled = prefs.ekadashi || prefs.moon;
+
+  if(!currentCustomer || !currentCustomer.uid){
+    hbPanSetNotifStatus("রিমাইন্ডার পেতে আগে লগইন করুন — পছন্দ এই ফোনে সেভ থাকল।", true);
+    return;
+  }
+
+  if(justTurnedOn && enabled){
+    hbPanSetNotifStatus("নোটিফিকেশনের অনুমতি নেওয়া হচ্ছে…", false);
+    const ok = await hbPanEnsureFcmToken(currentCustomer.uid);
+    if(!ok){
+      hbPanSetNotifStatus("নোটিফিকেশনের অনুমতি পাওয়া যায়নি — ব্রাউজারের সেটিংস থেকে অনুমতি দিন।", true);
+      return;
+    }
+  }
+
+  try{
+    await db.collection("customers").doc(currentCustomer.uid).set({
+      panchangNotifyEnabled: enabled,
+      panchangNotify: prefs,
+    }, { merge: true });
+    hbPanSetNotifStatus(enabled ? "✅ রিমাইন্ডার চালু — আগের দিন সকাল ৮টায় জানিয়ে দেওয়া হবে" : "রিমাইন্ডার বন্ধ করা হয়েছে", false);
+  }catch(e){
+    console.warn("পঞ্জিকা রিমাইন্ডারের পছন্দ সেভ করা যায়নি:", e);
+    hbPanSetNotifStatus("সেভ করা যায়নি — ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।", true);
+  }
+}
+
+/* লগইনের সময় ডাকা হয় — এই ফোনে আগে থেকে টগল চালু থাকলে (লগইন ছাড়াই) সেই
+   পছন্দটা তখন সার্ভারে পৌঁছে যায়। কোনো টগল চালু না থাকলে কিছুই করে না, তাই
+   অকারণে অনুমতির পপআপ বা লেখালেখি হয় না। */
+async function hbPanSyncNotifPrefsOnLogin(){
+  try{
+    const on = (k)=>{ try{ return localStorage.getItem(k) === "1"; }catch(e){ return false; } };
+    if(!on("hb-pan-notif-ekadashi") && !on("hb-pan-notif-moon")) return;
+    await hbPanSaveNotifPrefs(true);
+  }catch(e){ /* রিমাইন্ডার সিঙ্ক ব্যর্থ হলেও বাকি অ্যাপ স্বাভাবিকভাবে চলবে */ }
+}
+
+/* অ্যাপ খোলা থাকা অবস্থায় রিমাইন্ডার এলে সেটাও দেখানো হয় — অন্য onMessage
+   listener-গুলোর মতোই শুধু নিজের টাইপেই সাড়া দেয় (ডাবল popup এড়াতে) */
+(function hbPanWireForegroundPush(){
+  try{
+    if(!("Notification" in window) || typeof firebase === "undefined" || !firebase.messaging) return;
+    const messaging = firebase.messaging();
+    messaging.onMessage((payload)=>{
+      const type = payload.data && payload.data.type;
+      if(type !== "panchang-reminder") return;
+      const title = (payload.notification && payload.notification.title) || "🔔 পঞ্জিকা রিমাইন্ডার";
+      const body = (payload.notification && payload.notification.body) || "";
+      try{ new Notification(title, { body, icon: "bazar-icon-192.png" }); }catch(e){}
+    });
+  }catch(e){ /* messaging সাপোর্ট না থাকলে চুপচাপ বাদ */ }
 })();
 
 // হোম পেজের Today Widget-এ ট্যাপ করলে সরাসরি সনাতনী পঞ্জিকা পেজে চলে যাবে

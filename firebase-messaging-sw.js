@@ -31,13 +31,16 @@ messaging.onBackgroundMessage((payload) => {
   // ব্রাউজার আগেরটাকে নতুনটা দিয়ে চুপচাপ replace করে ফেলত, ইউজার
   // প্রথমটা মিস করে যেতেন
   // 📢 Honey Bee Transport Media Phase 7 — tripId/postId-ও tagId হিসেবে ব্যবহার হয়
-  const tagId = (payload.data && (payload.data.chatId || payload.data.offerId || payload.data.orderId || payload.data.tripId || payload.data.postId)) || "general";
+  // 🔔 পঞ্জিকা রিমাইন্ডারে dateKey (যেদিনের তিথির কথা বলা হচ্ছে) tagId হিসেবে
+  // যায়, নাহলে পরপর কয়েক দিনের রিমাইন্ডার একটা আরেকটাকে replace করে ফেলত
+  const tagId = (payload.data && (payload.data.chatId || payload.data.offerId || payload.data.orderId || payload.data.tripId || payload.data.postId || payload.data.dateKey)) || "general";
   const tag = `honeybee-${type}-${tagId}`;
 
   // 🔕 মেসেজ/মন্তব্যের মতো হালকা নোটিফিকেশন নিজে থেকেই কিছুক্ষণ পর সরে
   // যাক — শুধু ডেলিভারি-কল আর ট্রিপ-কনফার্মের মতো সরাসরি অ্যাকশন-দরকার
   // নোটিফিকেশন থেকেই যাবে যতক্ষণ না ব্যবহারকারী নিজে সরান
-  const softTypes = ["messenger-message", "tm-comment"];
+  // পঞ্জিকা রিমাইন্ডারও হালকা ধরনের — সাথে সাথে কিছু করার নেই, তাই নিজে থেকেই সরে যাবে
+  const softTypes = ["messenger-message", "tm-comment", "panchang-reminder"];
 
   self.registration.showNotification(title, {
     body,
@@ -59,7 +62,7 @@ self.addEventListener("notificationclick", (event) => {
   // 📢 Honey Bee Transport Media Phase 7 — যাত্রী-মুখী পুশ (নতুন ভাড়া
   // অফার, ট্রিপ কনফার্ম) Bazar অ্যাপে যাবে; ড্রাইভার-মুখী পুশ (ট্রিপ
   // কনফার্ম, পোস্টে মন্তব্য) Rider/Driver Mode-এ (shop-ledger-app.html)
-  const passengerFacingTypes = ["messenger-message", "trip-offer", "trip-confirmed", "trip-chat-passenger", "flight-update"];
+  const passengerFacingTypes = ["messenger-message", "trip-offer", "trip-confirmed", "trip-chat-passenger", "flight-update", "panchang-reminder"];
   const targetFile = passengerFacingTypes.includes(type) ? "honey-bee-bazar.html" : "shop-ledger-app.html";
 
   event.waitUntil(
