@@ -1010,9 +1010,23 @@
       <div style="font-size:9.5px; color:var(--muted); margin-top:8px; line-height:1.4;">* জ্যোতির্বৈজ্ঞানিক গাণিতিক হিসাব (Lahiri অয়নাংশ) — সঠিক তিথি/মুহুর্তের জন্য স্থানীয় পুরোহিত/পঞ্জিকা যাচাই করুন</div>
     </div>
 
-    <!-- ===== মাসিক (পরের ধাপে সম্পূর্ণ হবে) ===== -->
+    <!-- ===== মাসিক — লোকাল গাণিতিক হিসাব (Lahiri) দিয়ে পুরো মাসের তিথি ফ্রি/অফলাইনে
+         দেখানো হয় (কোনো API কল লাগে না); কোনো তারিখে ট্যাপ করলে সেই দিনের
+         সূর্যোদয়/সূর্যাস্ত/রাহুকাল Vedika API/Firestore ক্যাশ থেকে লাইভ আসবে ===== -->
     <div class="hbPanTabPane" id="hbPanTabMonthly" style="display:none;">
-      <div style="text-align:center; padding:50px 12px; color:var(--muted); font-size:13px; line-height:1.6;">📅<br>মাসিক ক্যালেন্ডার — পরের ধাপে আসছে</div>
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <button id="hbPanCalPrevBtn" style="background:rgba(255,255,255,0.06); border:1px solid var(--border); color:#fff8e8; width:34px; height:34px; border-radius:50%; font-size:16px; cursor:pointer; font-family:inherit;">←</button>
+        <div id="hbPanCalMonthLabel" style="font-size:15px; font-weight:800; color:#fff8e8;">…</div>
+        <button id="hbPanCalNextBtn" style="background:rgba(255,255,255,0.06); border:1px solid var(--border); color:#fff8e8; width:34px; height:34px; border-radius:50%; font-size:16px; cursor:pointer; font-family:inherit;">→</button>
+      </div>
+      <div id="hbPanCalWeekdayRow" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:6px; text-align:center; font-size:10px; color:var(--muted); font-weight:700;"></div>
+      <div id="hbPanCalGrid" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px;"></div>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; font-size:10.5px; color:var(--muted);">
+        <span>🟢 একাদশী</span>
+        <span>⚫ অমাবস্যা</span>
+        <span>🟣 পূর্ণিমা</span>
+      </div>
+      <div style="font-size:9.5px; color:var(--muted); margin-top:8px; line-height:1.4;">* তিথি স্থানীয় গাণিতিক হিসাব (Lahiri অয়নাংশ) থেকে, সম্পূর্ণ অফলাইনে কাজ করে — কোনো তারিখে ট্যাপ করলে সেদিনের সূর্যোদয়/সূর্যাস্ত/রাহুকালের লাইভ তথ্য দেখাবে</div>
     </div>
 
     <!-- ===== উৎসব (পরের ধাপে সম্পূর্ণ হবে) ===== -->
@@ -1048,6 +1062,27 @@
         <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:#e7e2d4; border-top:1px dashed var(--border);">শুভ সময় নোটিফিকেশন <input type="checkbox" id="hbPanNotifShubho"></label>
         <div style="font-size:9.5px; color:var(--muted); margin-top:8px;">* নোটিফিকেশন পাঠানোর সিস্টেম পরের ধাপে আসবে — এখন শুধু পছন্দ সেভ হচ্ছে</div>
       </div>
+    </div>
+  </div>
+
+  <!-- 📅 মাসিক ক্যালেন্ডারে কোনো তারিখে ট্যাপ করলে এই ওভারলে খুলে সেদিনের পঞ্জিকা দেখাবে -->
+  <div class="menuOverlay" id="hbPanDayDetailOverlay">
+    <div class="menuPanel">
+      <div style="display:flex; align-items:center; margin-bottom:14px;">
+        <div id="hbPanDayDetailDate" style="font-size:14.5px; font-weight:800; color:#fff8e8;">…</div>
+        <span id="hbPanDayDetailClose" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
+      </div>
+      <div id="hbPanDayDetailTithiBig" style="font-size:20px; font-weight:800; color:#c9b3ff; margin-bottom:2px;">…</div>
+      <div id="hbPanDayDetailPaksha" style="font-size:12px; color:var(--muted); margin-bottom:10px;"></div>
+      <div style="display:flex; flex-direction:column; gap:7px; font-size:12.5px; border-top:1px dashed var(--border); padding-top:10px;">
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">☀️ সূর্যোদয়</span><span id="hbPanDayDetailSunrise" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">🌇 সূর্যাস্ত</span><span id="hbPanDayDetailSunset" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">🕐 রাহুকাল</span><span id="hbPanDayDetailRahuKaal" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">⭐ নক্ষত্র</span><span id="hbPanDayDetailNakshatra" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">🔮 যোগ</span><span id="hbPanDayDetailYoga" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">◈ করণ</span><span id="hbPanDayDetailKarana" style="color:#e7e2d4; font-weight:700;">…</span></div>
+      </div>
+      <div id="hbPanDayDetailNote" style="font-size:9.5px; color:var(--muted); margin-top:10px; line-height:1.4;"></div>
     </div>
   </div>
 
@@ -4085,6 +4120,9 @@ const HB_PAN_CITY_PRESETS = {
 function hbPanGetCityOverride(){
   try{ return localStorage.getItem("hb-pan-city-override") || "auto"; }catch(e){ return "auto"; }
 }
+// hbLoadPanchangShortCard() রেজলভ হওয়ার সাথে সাথে আপডেট হয় — মাসিক ক্যালেন্ডারে
+// কোনো তারিখে ট্যাপ করলে GPS আবার না চেয়ে এই লোকেশনটাই পুনরায় ব্যবহার হয়
+let HB_PAN_ACTIVE_LOC = { lat: 23.8103, lon: 90.4125, cityKey: "dhaka", cityLabel: "ঢাকা", country: null }; // ঢাকা ডিফল্ট (HB_DEFAULT_LAT/LON-এর মতোই), hbLoadPanchangShortCard() রিজলভ হলে আপডেট হয়
 
 async function hbLoadPanchangShortCard(){
   const now = new Date();
@@ -4119,6 +4157,9 @@ async function hbLoadPanchangShortCard(){
 
   const settingsLocEl = document.getElementById("hbPanSettingsLocLabel");
   if(settingsLocEl) settingsLocEl.textContent = "📍 " + cityLabel + (country ? ", " + country : "");
+
+  // মাসিক ক্যালেন্ডারে কোনো তারিখে ট্যাপ করলে এই লোকেশনটাই ব্যবহার হবে (GPS বারবার চাওয়া লাগবে না)
+  HB_PAN_ACTIVE_LOC = { lat, lon, cityKey, cityLabel, country };
 
   const docId = cityKey + "_" + date;
   const timezone = hbPanTimezoneOffsetStr(now);
@@ -4158,7 +4199,10 @@ function hbPanShowTab(tab){
   });
 }
 document.querySelectorAll(".hbPanTabBtn").forEach((btn)=>{
-  btn.addEventListener("click", ()=> hbPanShowTab(btn.dataset.pantab));
+  btn.addEventListener("click", ()=>{
+    hbPanShowTab(btn.dataset.pantab);
+    if(btn.dataset.pantab === "monthly" && typeof hbPanRenderMonthlyCalendar === "function") hbPanRenderMonthlyCalendar();
+  });
 });
 hbPanShowTab("today");
 
@@ -4192,6 +4236,131 @@ hbPanShowTab("today");
 
 // হোম পেজের Today Widget-এ ট্যাপ করলে সরাসরি সনাতনী পঞ্জিকা পেজে চলে যাবে
 document.getElementById("hbHomePanWidget") && document.getElementById("hbHomePanWidget").addEventListener("click", ()=>{ showScreen("screenPanchang"); if(typeof hbLoadPanchangShortCard === "function") hbLoadPanchangShortCard(); });
+
+/* ==================== 📅 সনাতনী পঞ্জিকা — মাসিক ক্যালেন্ডার (৩য় ধাপ)
+   গ্রিডের সব তিথি স্থানীয় গাণিতিক হিসাব (hbGetPanchang) থেকে — সম্পূর্ণ ফ্রি,
+   ইন্টারনেট ছাড়াই কাজ করে। কোনো তারিখে ট্যাপ করলে সেদিনের সূর্যোদয়/সূর্যাস্ত/
+   রাহুকাল Vedika API/Firestore ক্যাশ থেকে লাইভ আনা হয় (getPanchangData-কে
+   আজকের বদলে ওই নির্দিষ্ট তারিখ পাঠিয়ে) — অফলাইন থাকলে লোকাল হিসাবই দেখাবে। ==================== */
+let hbPanCalViewDate = new Date();
+const HB_PAN_WEEKDAY_SHORT = ["রবি","সোম","মঙ্গল","বুধ","বৃহঃ","শুক্র","শনি"];
+
+function hbPanRenderMonthlyCalendar(){
+  const y = hbPanCalViewDate.getFullYear(), m = hbPanCalViewDate.getMonth();
+  const label = document.getElementById("hbPanCalMonthLabel");
+  if(label) label.textContent = HB_MONTH_BN_GREG[m] + " " + y.toLocaleString("bn-BD", { useGrouping: false });
+
+  const weekdayRow = document.getElementById("hbPanCalWeekdayRow");
+  if(weekdayRow && !weekdayRow.dataset.built){
+    weekdayRow.innerHTML = HB_PAN_WEEKDAY_SHORT.map((d)=> "<div>" + d + "</div>").join("");
+    weekdayRow.dataset.built = "1";
+  }
+
+  const grid = document.getElementById("hbPanCalGrid");
+  if(!grid) return;
+  const firstDay = new Date(y, m, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const today = new Date();
+  const isThisMonth = today.getFullYear() === y && today.getMonth() === m;
+
+  let html = "";
+  for(let i = 0; i < startOffset; i++) html += "<div></div>";
+  for(let d = 1; d <= daysInMonth; d++){
+    const cellDate = new Date(y, m, d);
+    const pan = hbGetPanchang(cellDate);
+    let dot = "";
+    if(pan.tithiName === "পূর্ণিমা") dot = "🟣";
+    else if(pan.tithiName === "অমাবস্যা") dot = "⚫";
+    else if(pan.tithiName === "একাদশী") dot = "🟢";
+    const isToday = isThisMonth && d === today.getDate();
+    const isoDate = y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+    html += "<button type='button' class='hbPanCalDay' data-date='" + isoDate + "' style='background:" +
+      (isToday ? "rgba(180,140,255,0.25)" : "rgba(255,255,255,0.04)") + "; border:" +
+      (isToday ? "1px solid rgba(180,140,255,0.6)" : "1px solid var(--border)") +
+      "; border-radius:10px; padding:6px 2px; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; font-family:inherit; color:#e7e2d4; font-size:12px; font-weight:" +
+      (isToday ? "800" : "600") + ";'><span>" + d + "</span><span style='font-size:9px; min-height:9px;'>" + dot + "</span></button>";
+  }
+  grid.innerHTML = html;
+
+  grid.querySelectorAll(".hbPanCalDay").forEach((btn)=>{
+    btn.addEventListener("click", ()=>{
+      const [yy, mm, dd] = btn.dataset.date.split("-").map(Number);
+      hbPanShowDayDetail(new Date(yy, mm - 1, dd));
+    });
+  });
+}
+document.getElementById("hbPanCalPrevBtn") && document.getElementById("hbPanCalPrevBtn").addEventListener("click", ()=>{
+  hbPanCalViewDate = new Date(hbPanCalViewDate.getFullYear(), hbPanCalViewDate.getMonth() - 1, 1);
+  hbPanRenderMonthlyCalendar();
+});
+document.getElementById("hbPanCalNextBtn") && document.getElementById("hbPanCalNextBtn").addEventListener("click", ()=>{
+  hbPanCalViewDate = new Date(hbPanCalViewDate.getFullYear(), hbPanCalViewDate.getMonth() + 1, 1);
+  hbPanRenderMonthlyCalendar();
+});
+
+async function hbPanShowDayDetail(dateObj){
+  const overlay = document.getElementById("hbPanDayDetailOverlay");
+  if(!overlay) return;
+  overlay.classList.add("show");
+  const setTxt = (id, v)=>{ const el = document.getElementById(id); if(el) el.textContent = v; };
+
+  setTxt("hbPanDayDetailDate", dateObj.toLocaleDateString("bn-BD", { day:"numeric", month:"long", year:"numeric", weekday:"long" }));
+
+  // প্রথমে লোকাল গাণিতিক হিসাব দিয়ে সাথে সাথে দেখানো হয় (ইন্টারনেট লাগে না)
+  const pan = hbGetPanchang(dateObj);
+  setTxt("hbPanDayDetailTithiBig", pan.tithiName);
+  setTxt("hbPanDayDetailPaksha", pan.paksha);
+  setTxt("hbPanDayDetailNakshatra", pan.nakshatraName);
+  setTxt("hbPanDayDetailYoga", pan.yogaName);
+  setTxt("hbPanDayDetailKarana", pan.karanaName);
+  setTxt("hbPanDayDetailSunrise", "…");
+  setTxt("hbPanDayDetailSunset", "…");
+  setTxt("hbPanDayDetailRahuKaal", "…");
+  setTxt("hbPanDayDetailNote", "লাইভ সূর্যোদয়/সূর্যাস্ত লোড হচ্ছে…");
+
+  const isoDate = dateObj.getFullYear() + "-" + String(dateObj.getMonth() + 1).padStart(2, "0") + "-" + String(dateObj.getDate()).padStart(2, "0");
+  const loc = HB_PAN_ACTIVE_LOC;
+  const docId = loc.cityKey + "_" + isoDate;
+
+  const cached = await hbPanIdbGet(docId);
+  if(cached){
+    setTxt("hbPanDayDetailSunrise", hbPanFmtTime(cached.sunrise));
+    setTxt("hbPanDayDetailSunset", hbPanFmtTime(cached.sunset));
+    setTxt("hbPanDayDetailRahuKaal", hbPanFmtTime(cached.rahuKaal));
+    if(cached.nakshatra) setTxt("hbPanDayDetailNakshatra", cached.nakshatra);
+    if(cached.yoga) setTxt("hbPanDayDetailYoga", cached.yoga);
+    if(cached.karana) setTxt("hbPanDayDetailKarana", cached.karana);
+    setTxt("hbPanDayDetailNote", "🗄️ ক্যাশ করা লাইভ তথ্য");
+  }
+
+  try{
+    const callable = functionsInstance.httpsCallable("getPanchangData");
+    const result = await callable({
+      date: isoDate, latitude: loc.lat, longitude: loc.lon,
+      timezone: hbPanTimezoneOffsetStr(dateObj),
+      cityKey: loc.cityKey, city: loc.cityLabel, country: loc.country,
+    });
+    const data = result.data || {};
+    setTxt("hbPanDayDetailSunrise", hbPanFmtTime(data.sunrise));
+    setTxt("hbPanDayDetailSunset", hbPanFmtTime(data.sunset));
+    setTxt("hbPanDayDetailRahuKaal", hbPanFmtTime(data.rahuKaal));
+    if(data.nakshatra) setTxt("hbPanDayDetailNakshatra", data.nakshatra);
+    if(data.yoga) setTxt("hbPanDayDetailYoga", data.yoga);
+    if(data.karana) setTxt("hbPanDayDetailKarana", data.karana);
+    setTxt("hbPanDayDetailNote", data.source === "cache" ? "🗄️ Firestore ক্যাশ" : "🌐 লাইভ");
+    hbPanIdbSet(docId, data);
+  }catch(e){
+    if(!cached){
+      setTxt("hbPanDayDetailSunrise", "পাওয়া যায়নি");
+      setTxt("hbPanDayDetailSunset", "পাওয়া যায়নি");
+      setTxt("hbPanDayDetailRahuKaal", "পাওয়া যায়নি");
+      setTxt("hbPanDayDetailNote", "* ইন্টারনেট/লাইভ তথ্য পাওয়া যায়নি — তিথি/নক্ষত্র স্থানীয় গণনা থেকে দেখানো হচ্ছে");
+    }
+  }
+}
+document.getElementById("hbPanDayDetailClose") && document.getElementById("hbPanDayDetailClose").addEventListener("click", ()=> document.getElementById("hbPanDayDetailOverlay").classList.remove("show"));
+document.getElementById("hbPanDayDetailOverlay") && document.getElementById("hbPanDayDetailOverlay").addEventListener("click", (e)=>{ if(e.target.id === "hbPanDayDetailOverlay") document.getElementById("hbPanDayDetailOverlay").classList.remove("show"); });
 
 /* ===== সনাতনী পঞ্জিকা — তিথি/পক্ষ/নক্ষত্র/যোগ/করণ/হিন্দু মাস/ঋতু ===== */
 const HB_TITHI_LIGHT = ["প্রতিপদ","দ্বিতীয়া","তৃতীয়া","চতুর্থী","পঞ্চমী","ষষ্ঠী","সপ্তমী","অষ্টমী","নবমী","দশমী","একাদশী","দ্বাদশী","ত্রয়োদশী","চতুর্দশী","পূর্ণিমা"];
