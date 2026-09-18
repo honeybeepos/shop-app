@@ -3431,20 +3431,63 @@ function hbCalcSetupBasicLike(cfg){
       return;
     }
     if(key === "paren"){
+      if(justEvaluated){ expr = ""; justEvaluated = false; }
       const opens = (expr.match(/\(/g) || []).length;
       const closes = (expr.match(/\)/g) || []).length;
-      if(justEvaluated){ expr = ""; justEvaluated = false; }
-      expr += (opens > closes) ? ")" : "(";
+      const endsVal = /[0-9)πe%]$/.test(expr);
+      if(opens > closes && endsVal){
+        expr += ")";
+      }else{
+        if(endsVal) expr += "*";   // "5(" মানে "5×(" — বাস্তব ক্যালকুলেটরের মতো
+        expr += "(";
+      }
       updateDisplay();
       return;
     }
-    const isOperator = ["+","-","*","/","%","^"].includes(key);
-    const isFnOpen = key.endsWith("(");
-    const isContinuation = isOperator || key === "^2" || isFnOpen;
+    /* ⌨️ বাস্তব ক্যালকুলেটরের মতো ইনপুট যাচাই — আগে যা চাপা হতো তা-ই হুবহু
+       জুড়ে যেত, তাই "+" পরপর চাপলে "5+++" হয়ে যেত। এখন পরপর অপারেটর চাপলে
+       আগেরটাই বদলে যায়, এক সংখ্যায় দুটো দশমিক বসে না, শুরুতে গুণ/ভাগ বসে না। */
+    const OPS = ["+","-","*","/","^"];
+    const isOperator = OPS.includes(key);
+    const isFnOpen = key.endsWith("(");            // sin( cos( log( sqrt( …
+    const isConst = (key === "π" || key === "e");
+    const isDigit = /^[0-9]$/.test(key);
+
     if(justEvaluated){
-      if(isContinuation){ justEvaluated = false; }
+      // "=" এর পরে অপারেটর দিলে ফলটা নিয়েই হিসাব চলতে থাকে, সংখ্যা দিলে নতুন শুরু
+      if(isOperator || key === "^2" || key === "%"){ justEvaluated = false; }
       else{ expr = ""; justEvaluated = false; }
     }
+
+    const last = expr.slice(-1);
+    const endsWithOp = OPS.includes(last);
+    const endsWithValue = /[0-9)πe%]$/.test(expr);
+
+    if(isOperator){
+      if(expr === "" || last === "("){
+        // শুরুতে বা বন্ধনীর পরে শুধু বিয়োগ চিহ্ন বসতে পারে (ঋণাত্মক সংখ্যা)
+        if(key !== "-") return;
+      }else if(endsWithOp){
+        // গুণ/ভাগ/ঘাতের পরে বিয়োগ মানে ঋণাত্মক সংখ্যা — সেটা থাকতে দেওয়া হয়
+        const canNegate = (key === "-" && (last === "*" || last === "/" || last === "^"));
+        if(!canNegate){
+          expr = expr.replace(/[+\-*/^]+$/, "");  // আগের অপারেটর মুছে নতুনটা বসবে
+          if(expr === "" && key !== "-") return;
+        }
+      }
+    }else if(key === "."){
+      const seg = (expr.match(/[0-9.]*$/) || [""])[0];
+      if(seg.indexOf(".") !== -1) return;   // এক সংখ্যায় একটাই দশমিক বিন্দু
+      if(seg === "") expr += "0";           // ".৫" নয়, "০.৫"
+    }else if(isDigit){
+      const seg = (expr.match(/[0-9.]*$/) || [""])[0];
+      if(seg === "0") expr = expr.slice(0, -1);  // "05" নয়, "5"
+    }else if(key === "%" || key === "^2"){
+      if(!endsWithValue) return;            // সংখ্যার পরেই কেবল বসতে পারে
+    }else if(isConst || isFnOpen){
+      if(endsWithValue) expr += "*";        // "5π" মানে "5×π"
+    }
+
     expr += key;
     updateDisplay();
   }
