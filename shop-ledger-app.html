@@ -641,8 +641,8 @@
     100%{ box-shadow:0 0 0 0 rgba(39,214,127,0); }
   }
 </style>
-<!-- Leaflet.js (OpenStreetMap) — এখনো "ডেলিভারি লোকেশন পিন" মোডালে ব্যবহার হয় -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- 🗺️ Leaflet (OpenStreetMap) আর শুরুতে লোড হয় না — নিচের hbLoadLib('leaflet')
+     দিয়ে ম্যাপ খোলার ঠিক আগে JS আর CSS দুটোই একসাথে আনা হয় -->
 <script>
 /* 📦 ভারী লাইব্রেরি — শুরুতেই লোড না করে, যখন সত্যিই দরকার তখন লোড করা হয়।
    আগে Chart.js, jsPDF, JsBarcode আর html5-qrcode অ্যাপ খোলার সাথে সাথেই
@@ -657,13 +657,24 @@ window.HB_LIBS = {
   chart:   { url: "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js",       ready: function(){ return typeof Chart !== "undefined"; } },
   jspdf:   { url: "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",          ready: function(){ return !!(window.jspdf && window.jspdf.jsPDF); } },
   barcode: { url: "https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.3/JsBarcode.all.min.js", ready: function(){ return typeof JsBarcode !== "undefined"; } },
-  qrscan:  { url: "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js",ready: function(){ return typeof Html5Qrcode !== "undefined"; } }
+  qrscan:  { url: "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js",ready: function(){ return typeof Html5Qrcode !== "undefined"; } },
+  /* 🗺️ ম্যাপ (Leaflet) — শুধু ডেলিভারি/রাইডার মোডে, লোকেশন পিন করা বা যাত্রী
+     রাডার খোলার সময় লাগে। সাথে নিজের CSS ফাইলটাও একই সময়ে আনা হয়, নাহলে
+     ম্যাপের টাইলগুলো এলোমেলো হয়ে বসে। */
+  leaflet: { url: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+             css: "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+             ready: function(){ return typeof L !== "undefined" && !!L.map; } }
 };
 window.hbLoadLib = function(name){
   var lib = window.HB_LIBS[name];
   if(!lib) return Promise.reject(new Error("অজানা লাইব্রেরি: " + name));
   if(lib.ready()) return Promise.resolve(true);
   if(window.__hbLibPromises[name]) return window.__hbLibPromises[name];
+  if(lib.css && !document.querySelector('link[data-hblib="' + name + '"]')){
+    var ln = document.createElement("link");
+    ln.rel = "stylesheet"; ln.href = lib.css; ln.setAttribute("data-hblib", name);
+    document.head.appendChild(ln);
+  }
   window.__hbLibPromises[name] = new Promise(function(resolve, reject){
     var sc = document.createElement("script");
     sc.src = lib.url;
@@ -681,7 +692,6 @@ window.hbLoadLib = function(name){
   return window.__hbLibPromises[name];
 };
 </script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- 🗺️ Google Maps JavaScript API — লাইভ ম্যাপে ব্যবহার হয় (Bee Flying থিম +
      স্মুথ ইন্টারপোলেশন সহ)। এই key HTTP-referrer রেস্ট্রিকশন দিয়ে সুরক্ষিত
      রাখা জরুরি (Google Cloud Console → Credentials)। -->
@@ -6076,8 +6086,11 @@ document.getElementById('hbCallDeliveryBtn').addEventListener('click', async ()=
   const storeLatLng = await hbGetStoreLatLng();
   const center = storeLatLng || [24.7136, 46.6753]; // ফলব্যাক: রিয়াদ (দোকানের অবস্থান সেট না থাকলে)
 
-  setTimeout(()=>{
+  setTimeout(async ()=>{
     const mapEl = document.getElementById('hbPickLocationMapEl');
+    // 🗺️ ম্যাপ লাইব্রেরি এখন দরকারের সময় লোড হয়
+    try{ await hbLoadLib('leaflet'); }
+    catch(e){ mapEl.innerHTML = '<div style="padding:16px; text-align:center; font-size:13px;">ম্যাপ লোড করা যায়নি — ইন্টারনেট কানেকশন চেক করে আবার চেষ্টা করুন।</div>'; return; }
     if(__hbPickMap){ __hbPickMap.remove(); __hbPickMap = null; }
     __hbPickMap = L.map(mapEl).setView(center, storeLatLng ? 14 : 6);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -6206,6 +6219,9 @@ document.getElementById('hbOpenLiveMapBtn').addEventListener('click', async ()=>
 
   setTimeout(async ()=>{
     const mapEl = document.getElementById('hbLiveMapEl');
+    // 🗺️ ম্যাপ লাইব্রেরি এখন দরকারের সময় লোড হয়
+    try{ await hbLoadLib('leaflet'); }
+    catch(e){ mapEl.innerHTML = '<div style="padding:16px; text-align:center; font-size:13px;">ম্যাপ লোড করা যায়নি — ইন্টারনেট কানেকশন চেক করে আবার চেষ্টা করুন।</div>'; return; }
     if(__hbLiveMap){ __hbLiveMap.remove(); __hbLiveMap = null; }
     __hbLiveMarkers = { store:null, rider:null, customer:null };
     __hbLiveMap = L.map(mapEl).setView([24.7136, 46.6753], 6);
@@ -18114,11 +18130,13 @@ document.getElementById("dmTripChatInput").addEventListener("keydown", (e)=>{
 // দিকনির্দেশনার একটা visual ইঙ্গিত। আসল ন্যাভিগেশনের জন্য "🧭 Navigate"
 // বাটন থেকে Google Maps-এ পাঠানো হয়।
 let dmTripRouteMap = null;
-function dmDrawTripRoute(trip){
+async function dmDrawTripRoute(trip){
   const loc = trip.pickupLocation;
   if(!loc || loc.lat == null || !__dmMyLatLng) return;
   const mapEl = document.getElementById("dmTripRouteMapEl");
   if(!mapEl) return;
+  // 🗺️ ম্যাপ লাইব্রেরি এখন দরকারের সময় লোড হয়
+  try{ await hbLoadLib('leaflet'); }catch(e){ return; }
   if(dmTripRouteMap){ dmTripRouteMap.remove(); dmTripRouteMap = null; }
   dmTripRouteMap = L.map("dmTripRouteMapEl", { zoomControl:false, dragging:false, scrollWheelZoom:false }).setView(__dmMyLatLng, 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(dmTripRouteMap);
@@ -18185,15 +18203,20 @@ let __dmRadarMarkers = [];
 let __dmRadarUnsub = null;
 const __dmGeocodeCache = {}; // "lat,lng" (রাউন্ড করা) -> label
 
-function dmInitRadarMap(){
+async function dmInitRadarMap(){
   if(__dmRadarMap) return;
+  // 🗺️ ম্যাপ লাইব্রেরি এখন দরকারের সময় লোড হয়
+  try{ await hbLoadLib('leaflet'); }catch(e){ return; }
+  if(__dmRadarMap) return;   // লোড হওয়ার ফাঁকে আরেকবার ডাকা হয়ে থাকতে পারে
   const center = __dmMyLatLng || [23.8103, 90.4125]; // ডিফল্ট: ঢাকা (GPS না পাওয়া পর্যন্ত)
   __dmRadarMap = L.map("dmRadarMapEl").setView(center, 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(__dmRadarMap);
 }
 
-function dmStartRadar(){
-  dmInitRadarMap();
+async function dmStartRadar(){
+  // ম্যাপ তৈরি না হওয়া পর্যন্ত অপেক্ষা — নাহলে নিচের লিসেনার পিন বসাতে গিয়ে
+  // ম্যাপ খুঁজে পাবে না
+  await dmInitRadarMap();
   document.getElementById("dmRadarHint").textContent = "📡 লাইভ — কাছের অপেক্ষমাণ যাত্রী খোঁজা হচ্ছে...";
   dmLoadHotspots(); // দোকানগুলো Pickup Hotspot হিসেবে ম্যাপে বসানো
   if(__dmRadarUnsub) return; // ইতিমধ্যে চালু আছে
@@ -18220,7 +18243,7 @@ function dmStopRadar(){
    ব্যাজ দিয়ে দেখানো হয় — এটা স্থায়ী রেফারেন্স পয়েন্ট, লাইভ যাত্রীর পিন না। */
 let __dmHotspotMarkers = [];
 async function dmLoadHotspots(){
-  if(!__dmMyLatLng) return;
+  if(!__dmMyLatLng || !__dmRadarMap) return;   // ম্যাপ এখনো তৈরি হয়নি
   __dmHotspotMarkers.forEach(m=> __dmRadarMap.removeLayer(m));
   __dmHotspotMarkers = [];
   try{
@@ -18505,6 +18528,7 @@ function dmHaversineKm(lat1, lng1, lat2, lng2){
 let __dmKnownPassengerIds = new Set();
 let __dmRadarInitialized = false;
 async function dmRenderRadar(passengers){
+  if(!__dmRadarMap) return;   // ম্যাপ এখনো তৈরি হয়নি
   __dmRadarMarkers.forEach(m=> __dmRadarMap.removeLayer(m));
   __dmRadarMarkers = [];
   if(!__dmMyLatLng) return; // নিজের লোকেশন না জানা পর্যন্ত দূরত্ব হিসাব করা যাবে না
@@ -18762,9 +18786,12 @@ function dmRenderTrip(tripId, trip){
   document.getElementById("dmStartTripBtn").style.display = trip.status === "accepted" ? "block" : "none";
   document.getElementById("dmEndTripBtn").style.display = trip.status === "ongoing" ? "block" : "none";
 
-  setTimeout(()=>{
+  setTimeout(async ()=>{
     const mapEl = document.getElementById("dmTripMapEl");
     if(!__dmTripMap){
+      // 🗺️ ম্যাপ লাইব্রেরি এখন দরকারের সময় লোড হয়
+      try{ await hbLoadLib('leaflet'); }catch(e){ return; }
+      if(__dmTripMap) return;   // লোড হওয়ার ফাঁকে আরেকবার তৈরি হয়ে থাকতে পারে
       __dmTripMap = L.map(mapEl).setView([trip.pickupLat, trip.pickupLng], 13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(__dmTripMap);
       __dmTripMarkers.pickup = L.marker([trip.pickupLat, trip.pickupLng]).addTo(__dmTripMap).bindPopup("📍 Pickup");
@@ -19547,11 +19574,13 @@ async function rmResetActiveTripStatus(){
 }
 
 let rmTripRouteMap = null;
-function rmDrawTripRoute(trip){
+async function rmDrawTripRoute(trip){
   const loc = trip.pickupLocation;
   if(!loc || loc.lat == null || !__rmMyLatLng) return;
   const mapEl = document.getElementById("rmTripRouteMapEl");
   if(!mapEl) return;
+  // 🗺️ ম্যাপ লাইব্রেরি এখন দরকারের সময় লোড হয়
+  try{ await hbLoadLib('leaflet'); }catch(e){ return; }
   if(rmTripRouteMap){ rmTripRouteMap.remove(); rmTripRouteMap = null; }
   rmTripRouteMap = L.map("rmTripRouteMapEl", { zoomControl:false, dragging:false, scrollWheelZoom:false }).setView(__rmMyLatLng, 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(rmTripRouteMap);
@@ -19571,15 +19600,20 @@ async function rmCompleteTrip(tripId){
   }catch(e){ alert("ট্রিপ শেষ করা যায়নি: " + e.message); }
 }
 
-function rmTmInitMap(){
+async function rmTmInitMap(){
   if(rmTmMap) return;
+  // 🗺️ ম্যাপ লাইব্রেরি এখন দরকারের সময় লোড হয়
+  try{ await hbLoadLib('leaflet'); }catch(e){ return; }
+  if(rmTmMap) return;   // লোড হওয়ার ফাঁকে আরেকবার ডাকা হয়ে থাকতে পারে
   const center = __rmMyLatLng || [23.8103, 90.4125];
   rmTmMap = L.map("rmRadarMapEl").setView(center, 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(rmTmMap);
 }
 
-function rmTmStartRadar(){
-  rmTmInitMap();
+async function rmTmStartRadar(){
+  // ম্যাপ তৈরি না হওয়া পর্যন্ত অপেক্ষা — নাহলে নিচের লিসেনার পিন বসাতে গিয়ে
+  // ম্যাপ খুঁজে পাবে না
+  await rmTmInitMap();
   document.getElementById("rmRadarHint").textContent = "📡 লাইভ — কাছের অপেক্ষমাণ যাত্রী খোঁজা হচ্ছে...";
   if(__rmMyLatLng) rmTmLoadHotspots();
   if(rmTmUnsub) return;
@@ -19617,6 +19651,7 @@ async function rmTmLoadHotspots(){
 let __rmKnownPassengerIds = new Set();
 let __rmRadarInitialized = false;
 async function rmTmRenderRadar(passengers){
+  if(!rmTmMap) return;   // ম্যাপ এখনো তৈরি হয়নি
   rmTmMarkers.forEach(m=> rmTmMap.removeLayer(m)); rmTmMarkers = [];
   if(!__rmMyLatLng) return;
   const nearby = passengers.filter(p=>{
