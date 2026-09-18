@@ -1025,6 +1025,7 @@
       <div id="hbPanCalWeekdayRow" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:6px; text-align:center; font-size:10px; color:var(--muted); font-weight:700;"></div>
       <div id="hbPanCalGrid" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px;"></div>
       <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; font-size:10.5px; color:var(--muted);">
+        <span>🔴 উৎসব</span>
         <span>🟢 একাদশী</span>
         <span>⚫ অমাবস্যা</span>
         <span>🟣 পূর্ণিমা</span>
@@ -4004,24 +4005,67 @@ const HB_MONTH_AR_GREG = ["يناير","فبراير","مارس","أبريل","�
 
 function hbNorm360(x){ x = x % 360; return x < 0 ? x + 360 : x; }
 function hbJulianDay(date){ return date.getTime() / 86400000 + 2440587.5; }
+/* ☀️🌙 সূর্য ও চন্দ্রের দ্রাঘিমাংশ — Meeus, Astronomical Algorithms
+   (সূর্য অধ্যায় ২৫, চন্দ্র অধ্যায় ৪৭ / ELP-2000/82 সংক্ষিপ্ত রূপ)।
+   প্রকাশিত অমাবস্যা-পূর্ণিমার সময়ের সাথে মিলিয়ে দেখা হয়েছে — পার্থক্য ১ মিনিটের
+   মধ্যে। functions/index.js-এও হুবহু এই একই সূত্র আছে (panSunLonTropical /
+   panMoonLonTropical); একটা বদলালে অন্যটাও বদলাতে হবে। */
+const HB_RAD = Math.PI / 180;
+const HB_DELTA_T_DAYS = 72 / 86400; // পার্থিব সময় ও UTC-র পার্থক্য (২০২৬)
+
 function hbSunLonTropical(jd){
-  const d = jd - 2451545.0;
-  const g = hbNorm360(357.529 + 0.98560028*d) * Math.PI/180;
-  const L = hbNorm360(280.459 + 0.98564736*d);
-  return hbNorm360(L + 1.915*Math.sin(g) + 0.020*Math.sin(2*g));
+  const T = (jd + HB_DELTA_T_DAYS - 2451545.0) / 36525;
+  const L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T * T;
+  const M = hbNorm360(357.52911 + 35999.05029 * T - 0.0001537 * T * T) * HB_RAD;
+  const C = (1.914602 - 0.004817 * T - 0.000014 * T * T) * Math.sin(M)
+          + (0.019993 - 0.000101 * T) * Math.sin(2 * M)
+          + 0.000289 * Math.sin(3 * M);
+  return hbNorm360(L0 + C);
 }
+
+// [D, M, M', F, সহগ (১০⁻⁶ ডিগ্রিতে)]
+const HB_MOON_TERMS = [
+  [0,0,1,0,6288774],[2,0,-1,0,1274027],[2,0,0,0,658314],[0,0,2,0,213618],
+  [0,1,0,0,-185116],[0,0,0,2,-114332],[2,0,-2,0,58793],[2,-1,-1,0,57066],
+  [2,0,1,0,53322],[2,-1,0,0,45758],[0,1,-1,0,-40923],[1,0,0,0,-34720],
+  [0,1,1,0,-30383],[2,0,0,-2,15327],[0,0,1,2,-12528],[0,0,1,-2,10980],
+  [4,0,-1,0,10675],[0,0,3,0,10034],[4,0,-2,0,8548],[2,1,-1,0,-7888],
+  [2,1,0,0,-6766],[1,0,-1,0,-5163],[1,1,0,0,4987],[2,-1,1,0,4036],
+  [2,0,2,0,3994],[4,0,0,0,3861],[2,0,-3,0,3665],[0,1,-2,0,-2689],
+  [2,0,-1,2,-2602],[2,-1,-2,0,2390],[1,0,1,0,-2348],[2,-2,0,0,2236],
+  [0,1,2,0,-2120],[0,2,0,0,-2069],[2,-2,-1,0,2048],[2,0,1,-2,-1773],
+  [2,0,0,2,-1595],[4,-1,-1,0,1215],[0,0,2,2,-1110],[3,0,-1,0,-892],
+  [2,1,1,0,-810],[4,-1,-2,0,759],[0,2,-1,0,-713],[2,2,-1,0,-700],
+  [2,1,-2,0,691],[2,-1,0,-2,596],[4,0,1,0,549],[0,0,4,0,537],
+  [4,-1,0,0,520],[1,0,-2,0,-487],[2,1,0,-2,-399],[0,0,2,-2,-381],
+  [1,1,1,0,351],[3,0,-2,0,-340],[4,0,-3,0,330],[2,-1,2,0,327],
+  [0,2,1,0,-323],[1,1,-1,0,299],[2,0,3,0,294]
+];
+
 function hbMoonLonTropical(jd){
-  const d = jd - 2451545.0;
-  const r = x=> x * Math.PI/180;
-  const Lp = hbNorm360(218.316 + 13.176396*d);
-  const Mp = hbNorm360(134.963 + 13.064993*d);
-  const D  = hbNorm360(297.850 + 12.190749*d);
-  const M  = hbNorm360(357.529 + 0.985600*d);
-  const lam = Lp + 6.289*Math.sin(r(Mp)) - 1.274*Math.sin(r(Mp-2*D)) + 0.658*Math.sin(r(2*D))
-    - 0.186*Math.sin(r(M)) - 0.059*Math.sin(r(2*Mp-2*D)) - 0.057*Math.sin(r(Mp-2*D+M))
-    + 0.053*Math.sin(r(Mp+2*D)) + 0.046*Math.sin(r(2*D-M)) + 0.041*Math.sin(r(Mp-M));
-  return hbNorm360(lam);
+  const T = (jd + HB_DELTA_T_DAYS - 2451545.0) / 36525;
+  const T2 = T*T, T3 = T2*T, T4 = T3*T;
+  const Lp = hbNorm360(218.3164477 + 481267.88123421*T - 0.0015786*T2 + T3/538841 - T4/65194000);
+  const D  = hbNorm360(297.8501921 + 445267.1114034*T - 0.0018819*T2 + T3/545868 - T4/113065000);
+  const M  = hbNorm360(357.5291092 + 35999.0502909*T - 0.0001536*T2 + T3/24490000);
+  const Mp = hbNorm360(134.9633964 + 477198.8675055*T + 0.0087414*T2 + T3/69699 - T4/14712000);
+  const F  = hbNorm360(93.2720950 + 483202.0175233*T - 0.0036539*T2 - T3/3526000 + T4/863310000);
+  const A1 = hbNorm360(119.75 + 131.849*T);
+  const A2 = hbNorm360(53.09 + 479264.290*T);
+  const E = 1 - 0.002516*T - 0.0000074*T2;
+
+  let sigmaL = 0;
+  for(let i = 0; i < HB_MOON_TERMS.length; i++){
+    const t = HB_MOON_TERMS[i];
+    const arg = (t[0]*D + t[1]*M + t[2]*Mp + t[3]*F) * HB_RAD;
+    const am = t[1] < 0 ? -t[1] : t[1];
+    const e = am === 1 ? E : (am === 2 ? E * E : 1);
+    sigmaL += t[4] * e * Math.sin(arg);
+  }
+  sigmaL += 3958 * Math.sin(A1 * HB_RAD) + 1962 * Math.sin((Lp - F) * HB_RAD) + 318 * Math.sin(A2 * HB_RAD);
+  return hbNorm360(Lp + sigmaL / 1000000);
 }
+
 function hbAyanamsaLahiri(year){ return 23.85 + (year - 2000) * 0.0137; }
 
 /* ===== বাংলা সৌর ক্যালেন্ডার (বাংলাদেশ ২০১৯ সংস্কার) ===== */
@@ -4426,7 +4470,8 @@ function hbPanRenderMonthlyCalendar(){
     const cellDate = new Date(y, m, d);
     const pan = hbGetPanchang(cellDate);
     let dot = "";
-    if(pan.tithiName === "পূর্ণিমা") dot = "🟣";
+    if(hbFestivalsOn(cellDate).length) dot = "🔴";           // বড় উৎসব
+    else if(pan.tithiName === "পূর্ণিমা") dot = "🟣";
     else if(pan.tithiName === "অমাবস্যা") dot = "⚫";
     else if(pan.tithiName === "একাদশী") dot = "🟢";
     const isToday = isThisMonth && d === today.getDate();
@@ -4546,6 +4591,61 @@ document.getElementById("hbPanDayDetailOverlay") && document.getElementById("hbP
    API কল করা হয় না, শুধু ট্যাপ করলেই একটার কল হয়। ==================== */
 function hbPanIsoDate(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
 
+/* 🌸 হিন্দু উৎসবের নিয়ম — (চান্দ্র মাস + পক্ষ + তিথি + আচারের সময়)।
+   functions/index.js-এর PAN_FESTIVALS তালিকার সাথে হুবহু এক — একটা বদলালে
+   অন্যটাও বদলাতে হবে, নাহলে অ্যাপে আর নোটিফিকেশনে দুই রকম তারিখ দেখাবে।
+   ২০২৬-এর প্রকাশিত তারিখের সাথে ১৭টার ১৭টাই মিলিয়ে দেখা হয়েছে। */
+const HB_OBSERVE_WINDOWS = {
+  sunrise:  [[5,30],[7,0]], noon: [[10,30],[13,30]], aparahna: [[13,30],[16,0]],
+  pradosh:  [[17,30],[20,0]], midnight: [[23,0],[24,30]],
+};
+const HB_FESTIVALS = [
+  { month:"মাঘ",     paksha:"শুক্লপক্ষ", tithi:"পঞ্চমী",    at:"sunrise",  name:"সরস্বতী পূজা (বসন্ত পঞ্চমী)" },
+  { month:"মাঘ",     paksha:"কৃষ্ণপক্ষ", tithi:"চতুর্দশী",  at:"midnight", name:"মহা শিবরাত্রি" },
+  { month:"ফাল্গুন", paksha:"শুক্লপক্ষ", tithi:"পূর্ণিমা",  at:"sunrise",  name:"দোল পূর্ণিমা" },
+  { month:"চৈত্র",   paksha:"শুক্লপক্ষ", tithi:"নবমী",      at:"noon",     name:"রাম নবমী" },
+  { month:"বৈশাখ",   paksha:"শুক্লপক্ষ", tithi:"তৃতীয়া",   at:"noon",     name:"অক্ষয় তৃতীয়া" },
+  { month:"আষাঢ়",   paksha:"শুক্লপক্ষ", tithi:"দ্বিতীয়া", at:"noon",     name:"রথযাত্রা" },
+  { month:"শ্রাবণ",  paksha:"শুক্লপক্ষ", tithi:"পূর্ণিমা",  at:"sunrise",  name:"রাখি পূর্ণিমা / ঝুলন" },
+  { month:"শ্রাবণ",  paksha:"কৃষ্ণপক্ষ", tithi:"অষ্টমী",    at:"midnight", name:"জন্মাষ্টমী" },
+  { month:"ভাদ্রপদ", paksha:"শুক্লপক্ষ", tithi:"চতুর্থী",   at:"noon",     name:"গণেশ চতুর্থী" },
+  { month:"ভাদ্রপদ", paksha:"কৃষ্ণপক্ষ", tithi:"অমাবস্যা",  at:"noon",     name:"মহালয়া" },
+  { month:"আশ্বিন",  paksha:"শুক্লপক্ষ", tithi:"ষষ্ঠী",     at:"noon",     name:"দুর্গা পূজা — মহাষষ্ঠী" },
+  { month:"আশ্বিন",  paksha:"শুক্লপক্ষ", tithi:"সপ্তমী",    at:"noon",     name:"দুর্গা পূজা — মহাসপ্তমী" },
+  { month:"আশ্বিন",  paksha:"শুক্লপক্ষ", tithi:"অষ্টমী",    at:"noon",     name:"দুর্গা পূজা — মহাষ্টমী" },
+  { month:"আশ্বিন",  paksha:"শুক্লপক্ষ", tithi:"নবমী",      at:"noon",     name:"দুর্গা পূজা — মহানবমী" },
+  { month:"আশ্বিন",  paksha:"শুক্লপক্ষ", tithi:"দশমী",      at:"aparahna", name:"বিজয়া দশমী" },
+  { month:"আশ্বিন",  paksha:"শুক্লপক্ষ", tithi:"পূর্ণিমা",  at:"midnight", name:"কোজাগরী লক্ষ্মী পূজা" },
+  { month:"আশ্বিন",  paksha:"কৃষ্ণপক্ষ", tithi:"অমাবস্যা",  at:"midnight", name:"কালী পূজা / দীপাবলি" },
+  { month:"কার্তিক", paksha:"শুক্লপক্ষ", tithi:"দ্বিতীয়া", at:"sunrise",  name:"ভাই ফোঁটা" },
+  { month:"কার্তিক", paksha:"শুক্লপক্ষ", tithi:"ষষ্ঠী",     at:"pradosh",  name:"ছট পূজা" },
+];
+// স্থানীয় দিনের নির্দিষ্ট ঘণ্টা-মিনিটের Date (ব্রাউজারের নিজের টাইমজোনে)
+function hbLocalMoment(dateObj, hour, minute){
+  const d = new Date(dateObj);
+  d.setHours(hour, minute, 0, 0);
+  return d;
+}
+/* জানালার শুরু ও শেষ — দুটো মুহূর্ত দেখলেই ভেতরের সব তিথি জানা হয়ে যায় */
+function hbTithiInWindow(dateObj, kind, tithiName, paksha){
+  const w = HB_OBSERVE_WINDOWS[kind];
+  const a = hbGetPanchang(hbLocalMoment(dateObj, w[0][0], w[0][1]));
+  const b = hbGetPanchang(hbLocalMoment(dateObj, w[1][0], w[1][1]));
+  return (a.tithiName === tithiName && a.paksha === paksha) || (b.tithiName === tithiName && b.paksha === paksha);
+}
+function hbFestivalsOn(dateObj){
+  const prev = new Date(dateObj); prev.setDate(prev.getDate() - 1);
+  const month = hbGetPanchang(hbLocalMoment(dateObj, 12, 0)).hinduMonthName;
+  const out = [];
+  for(const fv of HB_FESTIVALS){
+    if(fv.month !== month) continue;
+    if(!hbTithiInWindow(dateObj, fv.at, fv.tithi, fv.paksha)) continue;
+    if(hbTithiInWindow(prev, fv.at, fv.tithi, fv.paksha)) continue; // প্রথম দিনটাই আসল
+    out.push(fv.name);
+  }
+  return out;
+}
+
 function hbPanBuildFestivalList(filter){
   const today = new Date(); today.setHours(0,0,0,0);
   const items = [];
@@ -4559,6 +4659,8 @@ function hbPanBuildFestivalList(filter){
     else if(pan.tithiName === "পূর্ণিমা"){ name = "পূর্ণিমা"; icon = "🌕"; }
     else if(pan.tithiName === "ত্রয়োদশী"){ name = "প্রদোষ"; icon = "🌿"; }
     if(name) items.push({ date: d, icon, name, sub: pan.paksha, type: "religious" });
+    // বড় উৎসব (দুর্গা পূজা, কালী পূজা, জন্মাষ্টমী…) — নিয়মভিত্তিক হিসাব থেকে
+    hbFestivalsOn(d).forEach((fname)=> items.push({ date: new Date(d), icon: "🎉", name: fname, sub: pan.hinduMonthName, type: "religious" }));
   }
 
   if(typeof BD_GOVT_HOLIDAYS_2026 !== "undefined"){
