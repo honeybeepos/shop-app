@@ -2168,26 +2168,103 @@ function panFmtLocalTime(dateUtc, tzOffsetMinutes){
   return h12 + ":" + String(mi).padStart(2, "0") + " " + suffix;
 }
 
-/* রাহুকাল — সূর্যোদয় থেকে সূর্যাস্ত পর্যন্ত দিনটাকে ৮ ভাগ করে, বার অনুযায়ী
-   কোন ভাগটা রাহুকাল তা নির্ধারিত (রবি=৮ম, সোম=২য়, মঙ্গল=৭ম, বুধ=৫ম,
-   বৃহস্পতি=৬ষ্ঠ, শুক্র=৪র্থ, শনি=৩য়) */
-const PAN_RAHU_SEGMENT_BY_WEEKDAY = [7, 1, 6, 4, 5, 3, 2]; // রবি→শনি, 0-ভিত্তিক ভাগ নম্বর
-function panRahuKaal(sunrise, sunset, weekday, tzOffsetMinutes){
+/* ⏱️ শুভ/অশুভ সময় (মুহূর্ত) — সবই সূর্যোদয়-সূর্যাস্ত আর বার থেকে নির্ধারিত
+   প্রচলিত নিয়ম। এখানে কোনো আনুমানিকতা নেই — দিনটাকে নির্দিষ্ট সংখ্যক ভাগে
+   ভাগ করে বার অনুযায়ী ভাগ বেছে নেওয়া, ব্যস।
+
+   রাহুকাল/যমগণ্ড/গুলিক — দিন ৮ ভাগ। অভিজিৎ মুহূর্ত — দিন ১৫ ভাগের ৮ম ভাগ
+   (দুপুরের আশেপাশে), সাধারণত দিনের সবচেয়ে শুভ সময় ধরা হয়। */
+const PAN_RAHU_SEGMENT_BY_WEEKDAY = [7, 1, 6, 4, 5, 3, 2];      // রবি→শনি (০-ভিত্তিক)
+const PAN_YAMAGANDA_SEGMENT_BY_WEEKDAY = [4, 3, 2, 1, 0, 6, 5];
+const PAN_GULIKA_SEGMENT_BY_WEEKDAY = [6, 5, 4, 3, 2, 1, 0];
+
+function panDaySegment(sunrise, sunset, totalParts, index, tzOffsetMinutes){
   if (!sunrise || !sunset) return null;
-  const segMs = (sunset.getTime() - sunrise.getTime()) / 8;
-  const idx = PAN_RAHU_SEGMENT_BY_WEEKDAY[weekday];
-  const start = new Date(sunrise.getTime() + idx * segMs);
+  const segMs = (sunset.getTime() - sunrise.getTime()) / totalParts;
+  const start = new Date(sunrise.getTime() + index * segMs);
   const end = new Date(start.getTime() + segMs);
   return panFmtLocalTime(start, tzOffsetMinutes) + " - " + panFmtLocalTime(end, tzOffsetMinutes);
 }
+function panRahuKaal(sunrise, sunset, weekday, tzOffsetMinutes){
+  return panDaySegment(sunrise, sunset, 8, PAN_RAHU_SEGMENT_BY_WEEKDAY[weekday], tzOffsetMinutes);
+}
+function panMuhurats(sunrise, sunset, weekday, tzOffsetMinutes){
+  return {
+    abhijit: panDaySegment(sunrise, sunset, 15, 7, tzOffsetMinutes),
+    rahuKaal: panRahuKaal(sunrise, sunset, weekday, tzOffsetMinutes),
+    yamaganda: panDaySegment(sunrise, sunset, 8, PAN_YAMAGANDA_SEGMENT_BY_WEEKDAY[weekday], tzOffsetMinutes),
+    gulika: panDaySegment(sunrise, sunset, 8, PAN_GULIKA_SEGMENT_BY_WEEKDAY[weekday], tzOffsetMinutes),
+  };
+}
 
-/* বিশেষ দিন — তিথি থেকেই বের হয় (অ্যাপের উৎসব তালিকার সাথে হুবহু একই নিয়ম) */
-function panEventsForTithi(tithiName, paksha){
-  if (tithiName === "একাদশী") return [{ name: "একাদশী", description: paksha + " একাদশী — উপবাস, বিষ্ণু পূজা ও দানের দিন।" }];
-  if (tithiName === "পূর্ণিমা") return [{ name: "পূর্ণিমা", description: "পূর্ণিমা তিথি।" }];
-  if (tithiName === "অমাবস্যা") return [{ name: "অমাবস্যা", description: "অমাবস্যা তিথি — পিতৃ তর্পণের দিন।" }];
-  if (tithiName === "ত্রয়োদশী") return [{ name: "প্রদোষ", description: "প্রদোষ — শিব পূজার শুভ সময়।" }];
-  return [];
+/* 🌕 চান্দ্র মাস — পরবর্তী অমাবস্যার সময় সূর্য কোন রাশিতে, তা দিয়ে মাসের নাম
+   (amanta রীতি — honey-bee-bazar.html-এর hbGetPanchang-ও ঠিক এই নিয়মেই চলে) */
+const PAN_HINDU_MONTHS = ["চৈত্র","বৈশাখ","জ্যৈষ্ঠ","আষাঢ়","শ্রাবণ","ভাদ্রপদ","আশ্বিন","কার্তিক","অগ্রহায়ণ","পৌষ","মাঘ","ফাল্গুন"];
+function panDiffAt(jd){ return panNorm360(panMoonLonTropical(jd) - panSunLonTropical(jd)); }
+function panFindNextNewMoon(jdNow){
+  let step = 0.5, jd1 = jdNow, d1 = panDiffAt(jd1);
+  for (let i = 0; i < 200; i++) {
+    const jd2 = jd1 + step, d2 = panDiffAt(jd2);
+    if (d2 < d1 - 180) {
+      let lo = jd1, hi = jd2;
+      for (let k = 0; k < 40; k++) { const mid = (lo + hi) / 2; if (panDiffAt(mid) < 180) hi = mid; else lo = mid; }
+      return hi;
+    }
+    jd1 = jd2; d1 = d2;
+  }
+  return jdNow;
+}
+function panHinduMonth(dateUtc){
+  const nm = panFindNextNewMoon(panJulianDay(dateUtc));
+  const sunSid = panNorm360(panSunLonTropical(nm) - panAyanamsaLahiri(dateUtc.getUTCFullYear()));
+  return PAN_HINDU_MONTHS[Math.floor(sunSid / 30) % 12];
+}
+
+/* 🌸 উৎসবের তালিকা — (চান্দ্র মাস + পক্ষ + তিথি) নিয়মে, তাই প্রতি বছর নিজে
+   থেকেই ঠিক তারিখে পড়ে, কোনো বছরভিত্তিক তালিকা হাতে আপডেট করতে হয় না।
+
+   ⚠️ সীমাবদ্ধতা (গোপন করার মতো নয়): আমাদের তিথির হিসাব কখনো কখনো এক দিন
+   আগে-পরে হতে পারে — তিথি বদলের মুহূর্ত যখন দিনের সন্ধিক্ষণে পড়ে তখন।
+   ২০২৬-এর প্রকাশিত তারিখের সাথে মিলিয়ে দেখা গেছে: মহালয়া, মহাসপ্তমী,
+   মহাষ্টমী, মহানবমী, কালী পূজা, পূর্ণিমা — সব ঠিক, কিন্তু বিজয়া দশমী এক
+   দিন আগে এসেছে। তাই উৎসবের নোটিফিকেশন "আজই করুন" বলে না, বরং কয়েক দিন
+   আগে প্রস্তুতির জন্য জানায় আর স্থানীয় পঞ্জিকা মিলিয়ে নিতে বলে। */
+const PAN_FESTIVALS = [
+  { month: "চৈত্র",    paksha: "শুক্লপক্ষ", tithi: "নবমী",      name: "রাম নবমী" },
+  { month: "বৈশাখ",    paksha: "শুক্লপক্ষ", tithi: "তৃতীয়া",    name: "অক্ষয় তৃতীয়া" },
+  { month: "আষাঢ়",    paksha: "শুক্লপক্ষ", tithi: "দ্বিতীয়া",  name: "রথযাত্রা" },
+  { month: "শ্রাবণ",   paksha: "শুক্লপক্ষ", tithi: "পূর্ণিমা",   name: "রাখি পূর্ণিমা / ঝুলন" },
+  { month: "শ্রাবণ",   paksha: "কৃষ্ণপক্ষ", tithi: "অষ্টমী",     name: "জন্মাষ্টমী" },
+  { month: "ভাদ্রপদ",  paksha: "শুক্লপক্ষ", tithi: "চতুর্থী",    name: "গণেশ চতুর্থী" },
+  { month: "ভাদ্রপদ",  paksha: "কৃষ্ণপক্ষ", tithi: "অমাবস্যা",   name: "মহালয়া" },
+  { month: "আশ্বিন",   paksha: "শুক্লপক্ষ", tithi: "ষষ্ঠী",      name: "দুর্গা পূজা — মহাষষ্ঠী" },
+  { month: "আশ্বিন",   paksha: "শুক্লপক্ষ", tithi: "সপ্তমী",     name: "দুর্গা পূজা — মহাসপ্তমী" },
+  { month: "আশ্বিন",   paksha: "শুক্লপক্ষ", tithi: "অষ্টমী",     name: "দুর্গা পূজা — মহাষ্টমী" },
+  { month: "আশ্বিন",   paksha: "শুক্লপক্ষ", tithi: "নবমী",       name: "দুর্গা পূজা — মহানবমী" },
+  { month: "আশ্বিন",   paksha: "শুক্লপক্ষ", tithi: "দশমী",       name: "বিজয়া দশমী" },
+  { month: "আশ্বিন",   paksha: "শুক্লপক্ষ", tithi: "পূর্ণিমা",   name: "কোজাগরী লক্ষ্মী পূজা" },
+  { month: "আশ্বিন",   paksha: "কৃষ্ণপক্ষ", tithi: "অমাবস্যা",   name: "কালী পূজা / দীপাবলি" },
+  { month: "কার্তিক",  paksha: "শুক্লপক্ষ", tithi: "দ্বিতীয়া",  name: "ভাই ফোঁটা" },
+  { month: "কার্তিক",  paksha: "শুক্লপক্ষ", tithi: "ষষ্ঠী",      name: "ছট পূজা" },
+  { month: "মাঘ",      paksha: "শুক্লপক্ষ", tithi: "পঞ্চমী",     name: "সরস্বতী পূজা (বসন্ত পঞ্চমী)" },
+  { month: "মাঘ",      paksha: "কৃষ্ণপক্ষ", tithi: "চতুর্দশী",   name: "মহা শিবরাত্রি" },
+  { month: "ফাল্গুন",  paksha: "শুক্লপক্ষ", tithi: "পূর্ণিমা",   name: "দোল পূর্ণিমা / হোলি" },
+];
+function panFestivalsFor(dateUtc){
+  const p = panGetFullPanchang(dateUtc);
+  const month = panHinduMonth(dateUtc);
+  return PAN_FESTIVALS.filter((fv)=> fv.month === month && fv.paksha === p.paksha && fv.tithi === p.tithi);
+}
+
+/* বিশেষ দিন — তিথিভিত্তিক নিয়মিত দিন + উপরের উৎসব, দুটোই */
+function panEventsForDay(dateUtc){
+  const p = panGetFullPanchang(dateUtc);
+  const events = panFestivalsFor(dateUtc).map((fv)=> ({ name: fv.name, description: "স্থানীয় পঞ্জিকা মিলিয়ে নিন।" }));
+  if (p.tithi === "একাদশী") events.push({ name: "একাদশী", description: p.paksha + " একাদশী — উপবাস, বিষ্ণু পূজা ও দানের দিন।" });
+  else if (p.tithi === "পূর্ণিমা") events.push({ name: "পূর্ণিমা", description: "পূর্ণিমা তিথি।" });
+  else if (p.tithi === "অমাবস্যা") events.push({ name: "অমাবস্যা", description: "অমাবস্যা তিথি — পিতৃ তর্পণের দিন।" });
+  else if (p.tithi === "ত্রয়োদশী") events.push({ name: "প্রদোষ", description: "প্রদোষ — শিব পূজার শুভ সময়।" });
+  return events;
 }
 
 /* ==================== 🕉️ getPanchangData — ক্লায়েন্টের "আজ" কার্ড ও দিনের বিস্তারিত ====================
@@ -2229,10 +2306,12 @@ exports.getPanchangData = onCall(async (request) => {
         source: "cache", cityKey, date,
         city: cached.city || cityLabel, country: cached.country || country,
         tithi: cached.tithi, paksha: cached.paksha, nakshatra: cached.nakshatra,
-        yoga: cached.yoga, karana: cached.karana,
+        yoga: cached.yoga, karana: cached.karana, hinduMonth: cached.hinduMonth || null,
         sunrise: cached.sunrise, sunset: cached.sunset,
         moonrise: cached.moonrise || null, moonset: cached.moonset || null,
-        rahuKaal: cached.rahuKaal, events: cached.events || [],
+        rahuKaal: cached.rahuKaal,
+        abhijit: cached.abhijit || null, yamaganda: cached.yamaganda || null, gulika: cached.gulika || null,
+        events: cached.events || [],
       };
     }
   } catch (e) {
@@ -2246,19 +2325,24 @@ exports.getPanchangData = onCall(async (request) => {
   const sun = panSunTimes(date, latitude, longitude);
   const weekday = new Date(date + "T12:00:00Z").getUTCDay();
 
+  const muhurats = panMuhurats(sun.sunrise, sun.sunset, weekday, tzOffsetMinutes);
   const computed = {
     tithi: pan.tithi,
     paksha: pan.paksha,
     nakshatra: pan.nakshatra,
     yoga: pan.yoga,
     karana: pan.karana,
+    hinduMonth: panHinduMonth(localNoonUtc),
     sunrise: panFmtLocalTime(sun.sunrise, tzOffsetMinutes),
     sunset: panFmtLocalTime(sun.sunset, tzOffsetMinutes),
     // চন্দ্রোদয়/চন্দ্রাস্ত এখনো হিসাব করা হয় না (অ্যাপে কোথাও দেখানোও হয় না)
     moonrise: null,
     moonset: null,
-    rahuKaal: panRahuKaal(sun.sunrise, sun.sunset, weekday, tzOffsetMinutes),
-    events: panEventsForTithi(pan.tithi, pan.paksha),
+    rahuKaal: muhurats.rahuKaal,
+    abhijit: muhurats.abhijit,       // ⏱️ দিনের সবচেয়ে শুভ সময়
+    yamaganda: muhurats.yamaganda,   // অশুভ
+    gulika: muhurats.gulika,         // অশুভ
+    events: panEventsForDay(localNoonUtc),
   };
 
   try {
@@ -2288,13 +2372,19 @@ function panLocalParts(nowUtc, tzOffsetMinutes){
   const offsetMs = tzOffsetMinutes * 60000;
   const localMs = nowUtc.getTime() + offsetMs;        // ব্যবহারকারীর ওয়াল-ক্লক (UTC হিসেবে পড়তে হবে)
   const localMidnightMs = Math.floor(localMs / 86400000) * 86400000; // আজ স্থানীয় ১২টা রাত
-  // তিথি দিনের মাঝেও বদলায়, তাই আগামীকালের প্রতিনিধি সময় হিসেবে স্থানীয় দুপুর ১২টা নেওয়া হচ্ছে
-  const tomorrowLocalNoonMs = localMidnightMs + 86400000 + 12 * 3600000;
+  // তিথি দিনের মাঝেও বদলায়, তাই প্রতিটি দিনের প্রতিনিধি সময় স্থানীয় দুপুর ১২টা
+  const noonOf = (dayOffset)=> new Date(localMidnightMs + dayOffset * 86400000 + 12 * 3600000 - offsetMs);
+  const keyOf = (dayOffset)=> new Date(localMs + dayOffset * 86400000).toISOString().slice(0, 10);
   return {
     hour: new Date(localMs).getUTCHours(),
-    dateKey: new Date(localMs).toISOString().slice(0, 10),
-    tomorrowNoonUtc: new Date(tomorrowLocalNoonMs - offsetMs),   // আসল UTC ইনস্ট্যান্টে ফেরত
-    tomorrowDateKey: new Date(localMs + 86400000).toISOString().slice(0, 10),
+    dateKey: keyOf(0),
+    todayNoonUtc: noonOf(0),
+    tomorrowNoonUtc: noonOf(1),
+    tomorrowDateKey: keyOf(1),
+    // উৎসবের খবর দুদিন আগে যায় — প্রস্তুতির জন্য, আর আমাদের তিথির হিসাব এক
+    // দিন এদিক-ওদিক হলেও "কবে" প্রশ্নটা তখন আর জরুরি থাকে না
+    dayAfterNoonUtc: noonOf(2),
+    dayAfterDateKey: keyOf(2),
   };
 }
 
@@ -2314,7 +2404,9 @@ exports.panchangDailyReminder = onSchedule("every 60 minutes", async () => {
   }
   if (subs.empty) return;
 
+  const CONFIRM_LINE = " (স্থানীয় পঞ্জিকা মিলিয়ে নিন)";
   let sent = 0;
+
   for (const doc of subs.docs) {
     try {
       const c = doc.data() || {};
@@ -2324,30 +2416,59 @@ exports.panchangDailyReminder = onSchedule("every 60 minutes", async () => {
       const tzOffsetMinutes = Number.isFinite(Number(prefs.tzOffsetMinutes)) ? Number(prefs.tzOffsetMinutes) : 360;
       const local = panLocalParts(nowUtc, tzOffsetMinutes);
       if (local.hour !== PAN_REMINDER_HOUR) continue;
-      if (prefs.lastSentDate === local.dateKey) continue; // আজকের রিমাইন্ডার আগেই গেছে
 
+      const lastSent = prefs.lastSent || {};
+      const messages = []; // { kind, title, body, dateKey }
+
+      // ১) আগামীকালের তিথি — একাদশী / পূর্ণিমা / অমাবস্যা
       const tomorrow = panGetTithi(local.tomorrowNoonUtc);
-      let title = null, body = null;
       if (tomorrow.tithiName === "একাদশী" && prefs.ekadashi) {
-        title = "🌸 আগামীকাল একাদশী";
-        body = "আগামীকাল " + tomorrow.paksha + " একাদশী — উপবাস ও পূজার প্রস্তুতি নিয়ে রাখুন।";
+        messages.push({ kind: "ekadashi", title: "🌸 আগামীকাল একাদশী",
+          body: "আগামীকাল " + tomorrow.paksha + " একাদশী — উপবাস ও পূজার প্রস্তুতি নিয়ে রাখুন।" + CONFIRM_LINE,
+          dateKey: local.tomorrowDateKey });
       } else if (tomorrow.tithiName === "পূর্ণিমা" && prefs.moon) {
-        title = "🌕 আগামীকাল পূর্ণিমা";
-        body = "আগামীকাল পূর্ণিমা তিথি।";
+        messages.push({ kind: "moon", title: "🌕 আগামীকাল পূর্ণিমা",
+          body: "আগামীকাল পূর্ণিমা তিথি।" + CONFIRM_LINE, dateKey: local.tomorrowDateKey });
       } else if (tomorrow.tithiName === "অমাবস্যা" && prefs.moon) {
-        title = "🌑 আগামীকাল অমাবস্যা";
-        body = "আগামীকাল অমাবস্যা তিথি।";
+        messages.push({ kind: "moon", title: "🌑 আগামীকাল অমাবস্যা",
+          body: "আগামীকাল অমাবস্যা তিথি।" + CONFIRM_LINE, dateKey: local.tomorrowDateKey });
       }
-      if (!title) continue;
 
-      const ok = await sendFcmToCustomer(doc.id, title, body, {
-        type: "panchang-reminder",
-        dateKey: local.tomorrowDateKey,
-        tithi: tomorrow.tithiName,
-      });
-      // পাঠানো হোক বা টোকেন মরা থাকুক — একই দিনে বারবার চেষ্টা করার দরকার নেই
-      await doc.ref.update({ "panchangNotify.lastSentDate": local.dateKey }).catch(()=>{});
-      if (ok) sent++;
+      // ২) উৎসব — দুদিন আগে প্রস্তুতির খবর ("আজই করুন" বলা হয় না, কারণ
+      //    আমাদের তিথির হিসাব এক দিন এদিক-ওদিক হতে পারে)
+      if (prefs.festival) {
+        const fests = panFestivalsFor(local.dayAfterNoonUtc);
+        if (fests.length) {
+          const names = fests.map((fv)=> fv.name).join(", ");
+          messages.push({ kind: "festival", title: "🎉 সামনে " + fests[0].name,
+            body: names + " — কয়েক দিনের মধ্যেই। প্রস্তুতি নিয়ে রাখুন।" + CONFIRM_LINE,
+            dateKey: local.dayAfterDateKey });
+        }
+      }
+
+      // ৩) আজকের শুভ সময় — সূর্যোদয়/সূর্যাস্ত থেকে হিসাব, তাই একদম নির্ভুল
+      if (prefs.shubho) {
+        const lat = Number.isFinite(Number(prefs.latitude)) ? Number(prefs.latitude) : 23.8103;
+        const lon = Number.isFinite(Number(prefs.longitude)) ? Number(prefs.longitude) : 90.4125;
+        const sun = panSunTimes(local.dateKey, lat, lon);
+        const weekday = new Date(local.dateKey + "T12:00:00Z").getUTCDay();
+        const m = panMuhurats(sun.sunrise, sun.sunset, weekday, tzOffsetMinutes);
+        if (m.abhijit) {
+          messages.push({ kind: "shubho", title: "⏱️ আজকের শুভ সময়",
+            body: "অভিজিৎ মুহূর্ত " + m.abhijit + " · রাহুকাল " + m.rahuKaal + " · যমগণ্ড " + m.yamaganda,
+            dateKey: local.dateKey });
+        }
+      }
+
+      for (const msg of messages) {
+        if (lastSent[msg.kind] === local.dateKey) continue; // এই ধরনের রিমাইন্ডার আজ আগেই গেছে
+        const ok = await sendFcmToCustomer(doc.id, msg.title, msg.body, {
+          type: "panchang-reminder", dateKey: msg.dateKey, kind: msg.kind,
+        });
+        // পাঠানো হোক বা টোকেন মরা থাকুক — আজ আর একই ধরনের চেষ্টা করার দরকার নেই
+        await doc.ref.update({ ["panchangNotify.lastSent." + msg.kind]: local.dateKey }).catch(()=>{});
+        if (ok) sent++;
+      }
     } catch (e) {
       console.warn(JSON.stringify({ event: "PANCHANG_REMINDER_ONE_FAILED", customerUid: doc.id, error: String((e && e.message) || e) }));
     }
