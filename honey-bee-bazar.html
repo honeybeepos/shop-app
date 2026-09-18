@@ -667,7 +667,7 @@
          নেওয়া হয়েছে, তাই এখানে আর আলাদা এন্ট্রির দরকার নেই -->
 
     <!-- 📅 আজকের পঞ্জিকা — Home Page Today Widget (ছোট, compact — মূল Bazar UI
-         নষ্ট না করে)। Vedika API → getPanchangData → Firestore → IndexedDB,
+         নষ্ট না করে)। getPanchangData → Firestore → IndexedDB,
          একই পাইপলাইন যেটা সনাতনী পঞ্জিকা পেজেও ব্যবহার হয়। -->
     <div id="hbHomePanWidget" style="margin:0 16px 14px; border:1px solid rgba(180,140,255,0.3); background:rgba(180,140,255,0.07); border-radius:14px; padding:12px 14px; cursor:pointer;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
@@ -968,7 +968,7 @@
 
     <!-- ===== আজ ===== -->
     <div class="hbPanTabPane" id="hbPanTabToday">
-      <!-- 🔴 লাইভ পঞ্জিকা কার্ড — Vedika API → Cloud Function (getPanchangData) →
+      <!-- 🔴 আজকের পঞ্জিকা কার্ড — Cloud Function (getPanchangData, সম্পূর্ণ গাণিতিক) →
            Firestore (panchangDays) → IndexedDB অফলাইন ক্যাশ -->
       <div id="hbswPanShortCard" style="border:1px solid rgba(180,140,255,0.35); background:rgba(180,140,255,0.08); border-radius:16px; padding:16px; margin-bottom:14px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
@@ -1015,7 +1015,7 @@
 
     <!-- ===== মাসিক — লোকাল গাণিতিক হিসাব (Lahiri) দিয়ে পুরো মাসের তিথি ফ্রি/অফলাইনে
          দেখানো হয় (কোনো API কল লাগে না); কোনো তারিখে ট্যাপ করলে সেই দিনের
-         সূর্যোদয়/সূর্যাস্ত/রাহুকাল Vedika API/Firestore ক্যাশ থেকে লাইভ আসবে ===== -->
+         সূর্যোদয়/সূর্যাস্ত/রাহুকাল getPanchangData/Firestore ক্যাশ থেকে আসবে ===== -->
     <div class="hbPanTabPane" id="hbPanTabMonthly" style="display:none;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
         <button id="hbPanCalPrevBtn" style="background:rgba(255,255,255,0.06); border:1px solid var(--border); color:#fff8e8; width:34px; height:34px; border-radius:50%; font-size:16px; cursor:pointer; font-family:inherit;">←</button>
@@ -4053,7 +4053,7 @@ function hbGetHijriDate(gDateOnly){
   return { year, monthIdx: month - 1, monthName: HB_HIJRI_MONTHS[month - 1], day };
 }
 
-/* ===== 🕉️ সনাতনী পঞ্জিকা — লাইভ শর্ট কার্ড (STEP 1: Vedika API → Cloud Function
+/* ===== 🕉️ সনাতনী পঞ্জিকা — আজকের শর্ট কার্ড (Cloud Function
    getPanchangData → Firestore panchangDays → IndexedDB অফলাইন ক্যাশ)।
    এই ব্লকটা উপরের local গাণিতিক হিসাবের থেকে আলাদা ও স্বাধীন — একটাতে সমস্যা
    হলে অন্যটার উপর কোনো প্রভাব পড়বে না। */
@@ -4383,7 +4383,7 @@ document.getElementById("hbHomePanWidget") && document.getElementById("hbHomePan
 /* ==================== 📅 সনাতনী পঞ্জিকা — মাসিক ক্যালেন্ডার (৩য় ধাপ)
    গ্রিডের সব তিথি স্থানীয় গাণিতিক হিসাব (hbGetPanchang) থেকে — সম্পূর্ণ ফ্রি,
    ইন্টারনেট ছাড়াই কাজ করে। কোনো তারিখে ট্যাপ করলে সেদিনের সূর্যোদয়/সূর্যাস্ত/
-   রাহুকাল Vedika API/Firestore ক্যাশ থেকে লাইভ আনা হয় (getPanchangData-কে
+   রাহুকাল getPanchangData/Firestore ক্যাশ থেকে আনা হয় (ফাংশনটাকে
    আজকের বদলে ওই নির্দিষ্ট তারিখ পাঠিয়ে) — অফলাইন থাকলে লোকাল হিসাবই দেখাবে। ==================== */
 let hbPanCalViewDate = new Date();
 const HB_PAN_WEEKDAY_SHORT = ["রবি","সোম","মঙ্গল","বুধ","বৃহঃ","শুক্র","শনি"];

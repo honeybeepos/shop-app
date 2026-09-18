@@ -62,13 +62,11 @@ const geminiApiKey = defineSecret("GEMINI_API_KEY");
 // সেট করতে: firebase functions:secrets:set AVIATIONSTACK_API_KEY
 const aviationstackApiKey = defineSecret("AVIATIONSTACK_API_KEY");
 
-// 🔑 🕉️ Vedika Panchang API key — একই নীতিতে Secrets Manager-এ, কখনো
-// ক্লায়েন্ট (honey-bee-bazar.html)-এ থাকবে না — ক্লায়েন্ট সরাসরি Vedika-কে
-// কল করে না, সবসময় নিচের getPanchangData Cloud Function দিয়েই যায়।
-// সেট করতে: firebase functions:secrets:set VEDIKA_API_KEY
-// (এই একটা সেটআপ-স্টেপ — firebase CLI দিয়ে — একবার ম্যানুয়ালি করতে হবে,
-// কোডে দেওয়া সম্ভব না।)
-const vedikaApiKey = defineSecret("VEDIKA_API_KEY");
+// 🕉️ পঞ্জিকার জন্য কোনো API key লাগে না — তিথি/নক্ষত্র/যোগ/করণ/সূর্যোদয়/
+// সূর্যাস্ত/রাহুকাল সবই জ্যোতির্বৈজ্ঞানিক গণিত দিয়ে নিচেই হিসাব হয় (আগে
+// Vedika API ব্যবহারের পরিকল্পনা ছিল, কিন্তু ওদের ফ্রি প্ল্যানে আসল ডেটা
+// আসে না আর পেইড প্ল্যানে মাসিক খরচ — গণিতে একই ফল বিনামূল্যে পাওয়া যায়
+// বলে নির্ভরতাটা বাদ দেওয়া হয়েছে)।
 
 const OFFER_TIMEOUT_SECONDS = 60;
 // রাইডার/এজেন্ট/হানি-বি — আয়ের ভাগ (Phase 5 ব্লুপ্রিন্ট অনুযায়ী: ৭০/২০/১০)
@@ -2043,63 +2041,165 @@ exports.onTripChatMessageCreated = onDocumentCreated(
   }
 );
 
-/* ==================== 🕉️ Sanatani Panchang — STEP 1 (Vedika API → Firestore → শর্ট কার্ড) ====================
-   এই ফাংশন ক্লায়েন্ট (honey-bee-bazar.html)-এর "সনাতনী" শর্ট কার্ড থেকে কল
-   হবে — Vedika Panchang API-কে সরাসরি ক্লায়েন্ট থেকে কখনো কল করা হয় না,
-   API key-ও কখনো ক্লায়েন্টে যায় না (Secrets Manager-এ, উপরের vedikaApiKey)।
+/* ==================== 🕉️ সনাতনী পঞ্জিকা — সম্পূর্ণ গাণিতিক হিসাব (API-মুক্ত) ====================
+   এখানকার সব কিছুই — তিথি, পক্ষ, নক্ষত্র, যোগ, করণ, সূর্যোদয়, সূর্যাস্ত,
+   রাহুকাল — জ্যোতির্বৈজ্ঞানিক সূত্র দিয়ে হিসাব হয়। কোনো এক্সটার্নাল API,
+   কোনো API key, কোনো মাসিক খরচ, কোনো দৈনিক লিমিট নেই।
 
-   প্রবাহ:
-   1) client পাঠায় { date, latitude, longitude, timezone, cityKey }
-   2) panchangDays/{cityKey}_{date}-এ আগে থেকেই আজকের ডেটা ক্যাশ আছে কিনা
-      চেক করা হয় — থাকলে সরাসরি সেটাই ফেরত (source:"cache"), Vedika-কে
-      আর কল করা হয় না (একই শহরের সব ব্যবহারকারীর জন্য দিনে একবারই কল লাগে)।
-   3) না থাকলে Vedika API কল হয়, রেজাল্ট normalize করে panchangDays-এ সেভ
-      হয় (source:"live")।
+   ⚠️ honey-bee-bazar.html-এও ঠিক এই একই সূত্রগুলো আছে (hbGetPanchang ইত্যাদি)।
+   একটা বদলালে অন্যটাও বদলাতে হবে, নাহলে অ্যাপ আর নোটিফিকেশনে দুই রকম তিথি
+   দেখাবে। (একই ফাইলে রাখা যায় না — একটা ব্রাউজারে চলে, আরেকটা সার্ভারে।)
 
-   ⚠️ গুরুত্বপূর্ণ নোট (সততার সাথে বলা দরকার): Vedika-র Panchang এন্ডপয়েন্টের
-   ঠিক path আর রেসপন্স ফিল্ডের নাম এই কোড লেখার সময় সরাসরি টেস্ট করে
-   নিশ্চিত করা যায়নি — Vedika-র ডকুমেন্টেশন সাইট (vedika.io/docs) পুরোটাই
-   জাভাস্ক্রিপ্ট দিয়ে রেন্ডার হয় (স্ট্যাটিক লোড দিয়ে ভেতরের ডিটেইল দেখা যায়
-   না), আর তাদের আসল API সার্ভারেও (api.vedika.io) এই ডেভেলপমেন্ট
-   পরিবেশ থেকে নেটওয়ার্ক এক্সেস নেই। যা নিশ্চিতভাবে জানা গেছে (তাদের Kundli
-   এন্ডপয়েন্টের ডকুমেন্টেড উদাহরণ থেকে): base URL "https://api.vedika.io",
-   auth হেডার "Authorization: Bearer vk_live_...", প্যাটার্ন
-   "/v2/astrology/{feature}"। তাই নিচে "/v2/astrology/panchang" ধরে নেওয়া
-   হয়েছে (Kundli-র প্যাটার্ন অনুসরণ করে) — এটা প্রথম ডিপ্লয়ের পরে Dhaka/Riyadh
-   দিয়ে টেস্ট করে raw রেসপন্স (নিচে panchangDays ডকুমেন্টে rawResponse ফিল্ডে
-   সেভ থাকে) দেখে normalizePanchangResponse()-এর ফিল্ড-ম্যাপিং মিলিয়ে/ঠিক
-   করে নেওয়া জরুরি — এটাই STEP 1-এর "API response দেখাও" ধাপ। */
-const VEDIKA_API_BASE = "https://api.vedika.io";
+   নির্ভুলতা: তিথি/নক্ষত্র/যোগ/করণ Lahiri অয়নাংশ ধরে হিসাব — প্রচলিত ছাপা
+   পঞ্জিকার সাথে সাধারণত মিলে যায়, তবে তিথি বদলের ঠিক মুহূর্ত নিয়ে সামান্য
+   পার্থক্য থাকতে পারে। সূর্যোদয়/সূর্যাস্ত প্রমিত সূত্রে (refraction ধরে
+   -0.833°) — বাস্তবের সাথে সাধারণত ১-২ মিনিটের মধ্যে থাকে। */
 
-// Vedika-র রেসপন্সে ঠিক কোন key-তে কোন তথ্য আসবে তা নিশ্চিত না হওয়া পর্যন্ত,
-// কয়েকটা সম্ভাব্য বিকল্প নাম চেক করে প্রথমটা যেটা পাওয়া যায় সেটা নেওয়া হচ্ছে —
-// আসল রেসপন্স দেখার পর এই ফাংশনটাই ঠিক করে দিতে হবে।
-function normalizePanchangResponse(raw) {
-  const d = (raw && (raw.data || raw.panchang || raw)) || {};
-  const pick = (obj, keys) => {
-    for (const k of keys) {
-      if (obj && obj[k] != null) return obj[k];
-    }
-    return null;
-  };
-  const nameOf = (v) => {
-    if (v == null) return null;
-    if (typeof v === "string") return v;
-    if (typeof v === "object") return v.name || v.title || v.value || null;
-    return null;
-  };
+function panNorm360(x){ x = x % 360; return x < 0 ? x + 360 : x; }
+function panJulianDay(date){ return date.getTime() / 86400000 + 2440587.5; }
+function panJdToDate(jd){ return new Date((jd - 2440587.5) * 86400000); }
+const PAN_RAD = Math.PI / 180;
+
+function panSunLonTropical(jd){
+  const d = jd - 2451545.0;
+  const g = panNorm360(357.529 + 0.98560028 * d) * PAN_RAD;
+  const L = panNorm360(280.459 + 0.98564736 * d);
+  return panNorm360(L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g));
+}
+function panMoonLonTropical(jd){
+  const d = jd - 2451545.0;
+  const r = (x)=> x * PAN_RAD;
+  const Lp = panNorm360(218.316 + 13.176396 * d);
+  const Mp = panNorm360(134.963 + 13.064993 * d);
+  const D = panNorm360(297.850 + 12.190749 * d);
+  const M = panNorm360(357.529 + 0.985600 * d);
+  const lam = Lp + 6.289 * Math.sin(r(Mp)) - 1.274 * Math.sin(r(Mp - 2 * D)) + 0.658 * Math.sin(r(2 * D))
+    - 0.186 * Math.sin(r(M)) - 0.059 * Math.sin(r(2 * Mp - 2 * D)) - 0.057 * Math.sin(r(Mp - 2 * D + M))
+    + 0.053 * Math.sin(r(Mp + 2 * D)) + 0.046 * Math.sin(r(2 * D - M)) + 0.041 * Math.sin(r(Mp - M));
+  return panNorm360(lam);
+}
+function panAyanamsaLahiri(year){ return 23.85 + (year - 2000) * 0.0137; }
+
+const PAN_TITHI_LIGHT = ["প্রতিপদ","দ্বিতীয়া","তৃতীয়া","চতুর্থী","পঞ্চমী","ষষ্ঠী","সপ্তমী","অষ্টমী","নবমী","দশমী","একাদশী","দ্বাদশী","ত্রয়োদশী","চতুর্দশী","পূর্ণিমা"];
+const PAN_TITHI_DARK = ["প্রতিপদ","দ্বিতীয়া","তৃতীয়া","চতুর্থী","পঞ্চমী","ষষ্ঠী","সপ্তমী","অষ্টমী","নবমী","দশমী","একাদশী","দ্বাদশী","ত্রয়োদশী","চতুর্দশী","অমাবস্যা"];
+const PAN_NAKSHATRA = ["অশ্বিনী","ভরণী","কৃত্তিকা","রোহিণী","মৃগশিরা","আর্দ্রা","পুনর্বসু","পুষ্যা","আশ্লেষা","মঘা","পূর্বাফাল্গুনী","উত্তরাফাল্গুনী","হস্তা","চিত্রা","স্বাতী","বিশাখা","অনুরাধা","জ্যেষ্ঠা","মূলা","পূর্বাষাঢ়া","উত্তরাষাঢ়া","শ্রবণা","ধনিষ্ঠা","শতভিষা","পূর্বভাদ্রপদ","উত্তরভাদ্রপদ","রেবতী"];
+const PAN_YOGA = ["বিষ্কম্ভ","প্রীতি","আয়ুষ্মান","সৌভাগ্য","শোভন","অতিগণ্ড","সুকর্মা","ধৃতি","শূল","গণ্ড","বৃদ্ধি","ধ্রুব","ব্যাঘাত","হর্ষণ","বজ্র","সিদ্ধি","ব্যতীপাত","বরীয়ান","পরিঘ","শিব","সিদ্ধ","সাধ্য","শুভ","শুক্ল","ব্রহ্ম","ঐন্দ্র","বৈধৃতি"];
+const PAN_KARANA_REPEAT = ["বব","বালব","কৌলব","তৈতিল","গর","বণিজ","বিষ্টি"];
+
+// শুধু তিথি+পক্ষ (রিমাইন্ডার ফাংশনের জন্য যথেষ্ট)
+function panGetTithi(dateUtc){
+  const jd = panJulianDay(dateUtc);
+  const diff = panNorm360(panMoonLonTropical(jd) - panSunLonTropical(jd));
+  const tithiIdx = Math.floor(diff / 12);
   return {
-    tithi: nameOf(pick(d, ["tithi", "Tithi"])),
-    nakshatra: nameOf(pick(d, ["nakshatra", "Nakshatra"])),
-    yoga: nameOf(pick(d, ["yoga", "Yoga"])),
-    karana: nameOf(pick(d, ["karana", "karna", "Karana"])),
-    sunrise: pick(d, ["sunrise", "sun_rise", "sunRise"]),
-    sunset: pick(d, ["sunset", "sun_set", "sunSet"]),
-    rahuKaal: pick(d, ["rahu_kaal", "rahuKaal", "rahuKalam", "rahu_kalam"]),
+    tithiName: tithiIdx < 15 ? PAN_TITHI_LIGHT[tithiIdx] : PAN_TITHI_DARK[tithiIdx - 15],
+    paksha: tithiIdx < 15 ? "শুক্লপক্ষ" : "কৃষ্ণপক্ষ",
   };
 }
 
-exports.getPanchangData = onCall({ secrets: [vedikaApiKey] }, async (request) => {
+// তিথি + নক্ষত্র + যোগ + করণ
+function panGetFullPanchang(dateUtc){
+  const jd = panJulianDay(dateUtc);
+  const sunT = panSunLonTropical(jd);
+  const moonT = panMoonLonTropical(jd);
+  const diff = panNorm360(moonT - sunT);
+
+  const tithiIdx = Math.floor(diff / 12);
+  const tithiName = tithiIdx < 15 ? PAN_TITHI_LIGHT[tithiIdx] : PAN_TITHI_DARK[tithiIdx - 15];
+  const paksha = tithiIdx < 15 ? "শুক্লপক্ষ" : "কৃষ্ণপক্ষ";
+
+  const karanaIdx = Math.floor(diff / 6);
+  let karanaName;
+  if (karanaIdx === 0) karanaName = "কিংস্তুঘ্ন";
+  else if (karanaIdx >= 57) karanaName = ["শকুনি","চতুষ্পদ","নাগ"][karanaIdx - 57];
+  else karanaName = PAN_KARANA_REPEAT[(karanaIdx - 1) % 7];
+
+  const ayan = panAyanamsaLahiri(dateUtc.getUTCFullYear());
+  const sunSid = panNorm360(sunT - ayan);
+  const moonSid = panNorm360(moonT - ayan);
+  const nakIdx = Math.floor(moonSid / (360 / 27)) % 27;
+  const yogaIdx = Math.floor(panNorm360(sunSid + moonSid) / (360 / 27)) % 27;
+
+  return {
+    tithi: tithiName,
+    paksha,
+    nakshatra: PAN_NAKSHATRA[nakIdx],
+    yoga: PAN_YOGA[yogaIdx],
+    karana: karanaName,
+  };
+}
+
+/* সূর্যোদয়/সূর্যাস্ত — প্রমিত "sunrise equation"। dateStr ওই জায়গার স্থানীয়
+   তারিখ (YYYY-MM-DD), lon পূর্ব-ধনাত্মক (ঢাকা = +90.41)। ফেরত আসে UTC Date। */
+function panSunTimes(dateStr, lat, lon){
+  const jdMid = panJulianDay(new Date(dateStr + "T00:00:00Z"));
+  const n = Math.round(jdMid - 2451545.0 + 0.0008);
+  const Jstar = n - lon / 360;
+  const M = panNorm360(357.5291 + 0.98560028 * Jstar);
+  const C = 1.9148 * Math.sin(M * PAN_RAD) + 0.0200 * Math.sin(2 * M * PAN_RAD) + 0.0003 * Math.sin(3 * M * PAN_RAD);
+  const lambda = panNorm360(M + C + 180 + 102.9372);
+  const Jtransit = 2451545.0 + Jstar + 0.0053 * Math.sin(M * PAN_RAD) - 0.0069 * Math.sin(2 * lambda * PAN_RAD);
+  const delta = Math.asin(Math.sin(lambda * PAN_RAD) * Math.sin(23.4397 * PAN_RAD));
+  const cosOmega = (Math.sin(-0.833 * PAN_RAD) - Math.sin(lat * PAN_RAD) * Math.sin(delta)) /
+                   (Math.cos(lat * PAN_RAD) * Math.cos(delta));
+  // মেরু অঞ্চলে কোনো কোনো দিন সূর্য ওঠে/ডোবে না — তখন সময় দেওয়া হয় না
+  if (cosOmega > 1 || cosOmega < -1) return { sunrise: null, sunset: null };
+  const omegaDeg = Math.acos(cosOmega) / PAN_RAD;
+  return {
+    sunrise: panJdToDate(Jtransit - omegaDeg / 360),
+    sunset: panJdToDate(Jtransit + omegaDeg / 360),
+  };
+}
+
+// "+06:00" → 360 মিনিট
+function panParseTzOffsetMinutes(tz){
+  const m = /^([+-])(\d{2}):?(\d{2})$/.exec(String(tz || "").trim());
+  if (!m) return 0;
+  return (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]));
+}
+
+// UTC Date → ওই জায়গার স্থানীয় সময়, "6:10 AM" ফরম্যাটে
+function panFmtLocalTime(dateUtc, tzOffsetMinutes){
+  if (!dateUtc) return null;
+  const d = new Date(dateUtc.getTime() + tzOffsetMinutes * 60000);
+  const h = d.getUTCHours(), mi = d.getUTCMinutes();
+  const suffix = h >= 12 ? "PM" : "AM";
+  let h12 = h % 12; if (h12 === 0) h12 = 12;
+  return h12 + ":" + String(mi).padStart(2, "0") + " " + suffix;
+}
+
+/* রাহুকাল — সূর্যোদয় থেকে সূর্যাস্ত পর্যন্ত দিনটাকে ৮ ভাগ করে, বার অনুযায়ী
+   কোন ভাগটা রাহুকাল তা নির্ধারিত (রবি=৮ম, সোম=২য়, মঙ্গল=৭ম, বুধ=৫ম,
+   বৃহস্পতি=৬ষ্ঠ, শুক্র=৪র্থ, শনি=৩য়) */
+const PAN_RAHU_SEGMENT_BY_WEEKDAY = [7, 1, 6, 4, 5, 3, 2]; // রবি→শনি, 0-ভিত্তিক ভাগ নম্বর
+function panRahuKaal(sunrise, sunset, weekday, tzOffsetMinutes){
+  if (!sunrise || !sunset) return null;
+  const segMs = (sunset.getTime() - sunrise.getTime()) / 8;
+  const idx = PAN_RAHU_SEGMENT_BY_WEEKDAY[weekday];
+  const start = new Date(sunrise.getTime() + idx * segMs);
+  const end = new Date(start.getTime() + segMs);
+  return panFmtLocalTime(start, tzOffsetMinutes) + " - " + panFmtLocalTime(end, tzOffsetMinutes);
+}
+
+/* বিশেষ দিন — তিথি থেকেই বের হয় (অ্যাপের উৎসব তালিকার সাথে হুবহু একই নিয়ম) */
+function panEventsForTithi(tithiName, paksha){
+  if (tithiName === "একাদশী") return [{ name: "একাদশী", description: paksha + " একাদশী — উপবাস, বিষ্ণু পূজা ও দানের দিন।" }];
+  if (tithiName === "পূর্ণিমা") return [{ name: "পূর্ণিমা", description: "পূর্ণিমা তিথি।" }];
+  if (tithiName === "অমাবস্যা") return [{ name: "অমাবস্যা", description: "অমাবস্যা তিথি — পিতৃ তর্পণের দিন।" }];
+  if (tithiName === "ত্রয়োদশী") return [{ name: "প্রদোষ", description: "প্রদোষ — শিব পূজার শুভ সময়।" }];
+  return [];
+}
+
+/* ==================== 🕉️ getPanchangData — ক্লায়েন্টের "আজ" কার্ড ও দিনের বিস্তারিত ====================
+   ক্লায়েন্ট পাঠায় { date, latitude, longitude, timezone, cityKey, city, country }।
+   আগে এখানে Vedika API কল হতো; এখন পুরোটাই উপরের গণিতে হিসাব হয়, তাই কোনো
+   API key বা নেটওয়ার্ক কল লাগে না। ফেরতের শেপ আগের মতোই রাখা হয়েছে, যাতে
+   honey-bee-bazar.html-এ কোনো পরিবর্তন করতে না হয়।
+
+   panchangDays ক্যাশ রাখা হচ্ছে আগের মতোই — এখন খরচ বাঁচানোর জন্য নয়, বরং
+   একই শহরের সবাই একই ফল দেখে সেটা নিশ্চিত করতে ও ভবিষ্যতে অ্যাডমিন চাইলে
+   কোনো দিনের তথ্য নিজে সংশোধন করে রাখতে পারবেন বলে। */
+exports.getPanchangData = onCall(async (request) => {
   const data = request.data || {};
   const date = typeof data.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.date)
     ? data.date
@@ -2110,98 +2210,147 @@ exports.getPanchangData = onCall({ secrets: [vedikaApiKey] }, async (request) =>
   const cityKey = (typeof data.cityKey === "string" && data.cityKey.trim())
     ? data.cityKey.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_")
     : null;
+  const cityLabel = typeof data.city === "string" && data.city.trim() ? data.city.trim() : null;
+  const country = typeof data.country === "string" && data.country.trim() ? data.country.trim() : null;
 
   if (!cityKey || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    throw new HttpsError(
-      "invalid-argument",
-      "cityKey, latitude, longitude দরকার — সঠিকভাবে পাঠানো হয়নি।"
-    );
+    throw new HttpsError("invalid-argument", "cityKey, latitude, longitude দরকার — সঠিকভাবে পাঠানো হয়নি।");
   }
 
   const docId = `${cityKey}_${date}`;
   const cacheRef = db.collection("panchangDays").doc(docId);
 
-  // ধাপ ২: আজকের এই শহরের জন্য আগে থেকেই সেভ করা আছে কিনা
+  // আগে সেভ করা থাকলে সেটাই (অ্যাডমিন কিছু সংশোধন করে থাকলে তা-ও এখানেই থাকবে)
   try {
     const cacheDoc = await cacheRef.get();
     if (cacheDoc.exists) {
       const cached = cacheDoc.data();
       return {
-        source: "cache",
-        cityKey,
-        date,
-        tithi: cached.tithi,
-        nakshatra: cached.nakshatra,
-        yoga: cached.yoga,
-        karana: cached.karana,
-        sunrise: cached.sunrise,
-        sunset: cached.sunset,
-        rahuKaal: cached.rahuKaal,
+        source: "cache", cityKey, date,
+        city: cached.city || cityLabel, country: cached.country || country,
+        tithi: cached.tithi, paksha: cached.paksha, nakshatra: cached.nakshatra,
+        yoga: cached.yoga, karana: cached.karana,
+        sunrise: cached.sunrise, sunset: cached.sunset,
+        moonrise: cached.moonrise || null, moonset: cached.moonset || null,
+        rahuKaal: cached.rahuKaal, events: cached.events || [],
       };
     }
   } catch (e) {
     console.warn(JSON.stringify({ event: "PANCHANG_CACHE_READ_FAILED", error: String((e && e.message) || e) }));
   }
 
-  // ধাপ ৩: Vedika API কল
-  const apiKey = vedikaApiKey.value();
-  if (!apiKey) {
-    console.warn(JSON.stringify({ event: "PANCHANG_NO_API_KEY" }));
-    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
-  }
+  const tzOffsetMinutes = panParseTzOffsetMinutes(timezone);
+  // তিথি দিনের মাঝেও বদলায় — দিনটার প্রতিনিধি সময় হিসেবে স্থানীয় দুপুর ১২টা ধরা হচ্ছে
+  const localNoonUtc = new Date(new Date(date + "T12:00:00Z").getTime() - tzOffsetMinutes * 60000);
+  const pan = panGetFullPanchang(localNoonUtc);
+  const sun = panSunTimes(date, latitude, longitude);
+  const weekday = new Date(date + "T12:00:00Z").getUTCDay();
 
-  let apiRes;
-  try {
-    apiRes = await fetch(`${VEDIKA_API_BASE}/v2/astrology/panchang`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        datetime: `${date}T00:00:00`,
-        latitude,
-        longitude,
-        timezone,
-      }),
-    });
-  } catch (e) {
-    console.warn(JSON.stringify({ event: "PANCHANG_NETWORK_ERROR", error: String((e && e.message) || e) }));
-    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
-  }
+  const computed = {
+    tithi: pan.tithi,
+    paksha: pan.paksha,
+    nakshatra: pan.nakshatra,
+    yoga: pan.yoga,
+    karana: pan.karana,
+    sunrise: panFmtLocalTime(sun.sunrise, tzOffsetMinutes),
+    sunset: panFmtLocalTime(sun.sunset, tzOffsetMinutes),
+    // চন্দ্রোদয়/চন্দ্রাস্ত এখনো হিসাব করা হয় না (অ্যাপে কোথাও দেখানোও হয় না)
+    moonrise: null,
+    moonset: null,
+    rahuKaal: panRahuKaal(sun.sunrise, sun.sunset, weekday, tzOffsetMinutes),
+    events: panEventsForTithi(pan.tithi, pan.paksha),
+  };
 
-  if (!apiRes.ok) {
-    console.warn(JSON.stringify({ event: "PANCHANG_API_ERROR", status: apiRes.status }));
-    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
-  }
-
-  let rawJson;
-  try {
-    rawJson = await apiRes.json();
-  } catch (e) {
-    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
-  }
-
-  const normalized = normalizePanchangResponse(rawJson);
-
-  // ধাপ ৩ (শেষ): panchangDays-এ সেভ — rawResponse-ও রাখা হচ্ছে (সাময়িকভাবে,
-  // ডিবাগের জন্য) যাতে প্রথম ডিপ্লয়ের পরে আসল ফিল্ড-নাম মিলিয়ে
-  // normalizePanchangResponse() ঠিক করা যায়
   try {
     await cacheRef.set({
-      cityKey,
-      date,
-      latitude,
-      longitude,
-      timezone,
-      ...normalized,
-      rawResponse: rawJson,
-      source: "vedika-api",
+      cityKey, date, city: cityLabel, country,
+      latitude, longitude, timezone,
+      ...computed,
+      source: "local-calc",
       fetchedAt: FieldValue.serverTimestamp(),
     });
   } catch (e) {
     console.warn(JSON.stringify({ event: "PANCHANG_CACHE_WRITE_FAILED", error: String((e && e.message) || e) }));
   }
 
-  return { source: "live", cityKey, date, ...normalized };
+  return { source: "live", cityKey, date, city: cityLabel, country, ...computed };
+});
+
+/* ==================== 🔔 পঞ্জিকা রিমাইন্ডার নোটিফিকেশন (Phase 3) ====================
+   একাদশী/পূর্ণিমা/অমাবস্যার ঠিক আগের দিন সকাল ৮টায় (ব্যবহারকারীর নিজের টাইমজোন
+   অনুযায়ী) পুশ নোটিফিকেশন যায়। তিথি বের করতে উপরের একই গণিতই (panGetTithi)
+   ব্যবহার হয়, তাই অ্যাপে যা দেখা যায় নোটিফিকেশনেও ঠিক সেটাই যায় — কোনো API
+   কল বা খরচ নেই। */
+
+// ব্যবহারকারীর টাইমজোনে "এখন" কত — tzOffsetMinutes হলো UTC থেকে কত মিনিট এগিয়ে
+// (ঢাকা = ৩৬০, রিয়াদ = ১৮০)
+function panLocalParts(nowUtc, tzOffsetMinutes){
+  const offsetMs = tzOffsetMinutes * 60000;
+  const localMs = nowUtc.getTime() + offsetMs;        // ব্যবহারকারীর ওয়াল-ক্লক (UTC হিসেবে পড়তে হবে)
+  const localMidnightMs = Math.floor(localMs / 86400000) * 86400000; // আজ স্থানীয় ১২টা রাত
+  // তিথি দিনের মাঝেও বদলায়, তাই আগামীকালের প্রতিনিধি সময় হিসেবে স্থানীয় দুপুর ১২টা নেওয়া হচ্ছে
+  const tomorrowLocalNoonMs = localMidnightMs + 86400000 + 12 * 3600000;
+  return {
+    hour: new Date(localMs).getUTCHours(),
+    dateKey: new Date(localMs).toISOString().slice(0, 10),
+    tomorrowNoonUtc: new Date(tomorrowLocalNoonMs - offsetMs),   // আসল UTC ইনস্ট্যান্টে ফেরত
+    tomorrowDateKey: new Date(localMs + 86400000).toISOString().slice(0, 10),
+  };
+}
+
+const PAN_REMINDER_HOUR = 8; // ব্যবহারকারীর স্থানীয় সকাল ৮টা
+
+/* প্রতি ঘণ্টায় একবার চলে — প্রতিটি সাবস্ক্রাইবারের নিজের টাইমজোনে যখন সকাল ৮টা,
+   তখনই তার রিমাইন্ডার যায় (ঢাকা ও রিয়াদ — দুই জায়গার ব্যবহারকারীর জন্যই সঠিক
+   সময়ে)। একই দিনে দুইবার যাতে না যায়, তাই customers/{uid}-এ lastSentDate রাখা হয়। */
+exports.panchangDailyReminder = onSchedule("every 60 minutes", async () => {
+  const nowUtc = new Date();
+  let subs;
+  try {
+    subs = await db.collection("customers").where("panchangNotifyEnabled", "==", true).get();
+  } catch (e) {
+    console.error(JSON.stringify({ event: "PANCHANG_REMINDER_QUERY_FAILED", error: String((e && e.message) || e) }));
+    return;
+  }
+  if (subs.empty) return;
+
+  let sent = 0;
+  for (const doc of subs.docs) {
+    try {
+      const c = doc.data() || {};
+      const prefs = c.panchangNotify || {};
+      if (!c.fcmToken) continue;
+
+      const tzOffsetMinutes = Number.isFinite(Number(prefs.tzOffsetMinutes)) ? Number(prefs.tzOffsetMinutes) : 360;
+      const local = panLocalParts(nowUtc, tzOffsetMinutes);
+      if (local.hour !== PAN_REMINDER_HOUR) continue;
+      if (prefs.lastSentDate === local.dateKey) continue; // আজকের রিমাইন্ডার আগেই গেছে
+
+      const tomorrow = panGetTithi(local.tomorrowNoonUtc);
+      let title = null, body = null;
+      if (tomorrow.tithiName === "একাদশী" && prefs.ekadashi) {
+        title = "🌸 আগামীকাল একাদশী";
+        body = "আগামীকাল " + tomorrow.paksha + " একাদশী — উপবাস ও পূজার প্রস্তুতি নিয়ে রাখুন।";
+      } else if (tomorrow.tithiName === "পূর্ণিমা" && prefs.moon) {
+        title = "🌕 আগামীকাল পূর্ণিমা";
+        body = "আগামীকাল পূর্ণিমা তিথি।";
+      } else if (tomorrow.tithiName === "অমাবস্যা" && prefs.moon) {
+        title = "🌑 আগামীকাল অমাবস্যা";
+        body = "আগামীকাল অমাবস্যা তিথি।";
+      }
+      if (!title) continue;
+
+      const ok = await sendFcmToCustomer(doc.id, title, body, {
+        type: "panchang-reminder",
+        dateKey: local.tomorrowDateKey,
+        tithi: tomorrow.tithiName,
+      });
+      // পাঠানো হোক বা টোকেন মরা থাকুক — একই দিনে বারবার চেষ্টা করার দরকার নেই
+      await doc.ref.update({ "panchangNotify.lastSentDate": local.dateKey }).catch(()=>{});
+      if (ok) sent++;
+    } catch (e) {
+      console.warn(JSON.stringify({ event: "PANCHANG_REMINDER_ONE_FAILED", customerUid: doc.id, error: String((e && e.message) || e) }));
+    }
+  }
+  if (sent > 0) console.log(JSON.stringify({ event: "PANCHANG_REMINDERS_SENT", count: sent }));
 });
