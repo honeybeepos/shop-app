@@ -62,6 +62,14 @@ const geminiApiKey = defineSecret("GEMINI_API_KEY");
 // সেট করতে: firebase functions:secrets:set AVIATIONSTACK_API_KEY
 const aviationstackApiKey = defineSecret("AVIATIONSTACK_API_KEY");
 
+// 🔑 🕉️ Vedika Panchang API key — একই নীতিতে Secrets Manager-এ, কখনো
+// ক্লায়েন্ট (honey-bee-bazar.html)-এ থাকবে না — ক্লায়েন্ট সরাসরি Vedika-কে
+// কল করে না, সবসময় নিচের getPanchangData Cloud Function দিয়েই যায়।
+// সেট করতে: firebase functions:secrets:set VEDIKA_API_KEY
+// (এই একটা সেটআপ-স্টেপ — firebase CLI দিয়ে — একবার ম্যানুয়ালি করতে হবে,
+// কোডে দেওয়া সম্ভব না।)
+const vedikaApiKey = defineSecret("VEDIKA_API_KEY");
+
 const OFFER_TIMEOUT_SECONDS = 60;
 // রাইডার/এজেন্ট/হানি-বি — আয়ের ভাগ (Phase 5 ব্লুপ্রিন্ট অনুযায়ী: ৭০/২০/১০)
 const RIDER_SHARE = 0.7;
@@ -533,8 +541,16 @@ exports.onOrderConfirmed = onDocumentUpdated(
     // ইতিমধ্যে dispatch শুরু হয়ে থাকলে (রেট্রি/ডুপ্লিকেট ইভেন্ট) আবার শুরু করব না
     if (after.dispatchState) return;
 
-    console.log(JSON.stringify({ event: "ORDER_DISPATCH_STARTED", orderId }));
-    await db.collection("orderRequests").doc(orderId).set({ dispatchState: "searching_rider" }, { merge: true });
+    // 🤝 দোকানদার POS-এর গ্রুপ-অ্যাকসেপ্ট পপ-আপে "নিজে/অন্য মাধ্যমে পাঠাবো"
+    // বেছে নিলে এই অর্ডারে selfDelivery:true লেখা হয় (শপ-ledger-app.html-এর
+    // ordConfirmAcceptGroup())। তখন এখানে অটো-রাইডার-ডিসপ্যাচ শুরু হবে না —
+    // শুধু কাস্টমারকে আলাদা মেসেজ দিয়ে জানানো হবে।
+    const isSelfDelivery = after.selfDelivery === true;
+    console.log(JSON.stringify({ event: "ORDER_DISPATCH_STARTED", orderId, selfDelivery: isSelfDelivery }));
+    await db.collection("orderRequests").doc(orderId).set(
+      { dispatchState: isSelfDelivery ? "self_delivery" : "searching_rider" },
+      { merge: true }
+    );
 
     // 🔔 কাস্টমারকে জানানো — দোকানদার অর্ডারটি গ্রহণ করেছেন। আগে এই মুহূর্তে
     // কাস্টমারের কাছে কোনো সংকেতই যেত না (শুধু "নিরবতা"), অ্যাপ নিজে খুলে
@@ -544,16 +560,21 @@ exports.onOrderConfirmed = onDocumentUpdated(
       try {
         const shopSnap = await db.collection("shops").doc(after.shopId).get();
         const shopName = shopSnap.exists ? (shopSnap.data().name || shopSnap.data().shopName || "দোকান") : "দোকান";
+        const body = isSelfDelivery
+          ? `${shopName} আপনার "${after.productName || "প্রোডাক্ট"}" অর্ডারটি গ্রহণ করেছে — রাইডার ছাড়াই (নিজে/অন্য মাধ্যমে) পাঠানো হবে।`
+          : `${shopName} আপনার "${after.productName || "প্রোডাক্ট"}" অর্ডারটি গ্রহণ করেছে — এখন প্রস্তুত করা হচ্ছে।`;
         await sendFcmToMessengerUser(
           after.customerUid,
           "✅ অর্ডার গ্রহণ করা হয়েছে",
-          `${shopName} আপনার "${after.productName || "প্রোডাক্ট"}" অর্ডারটি গ্রহণ করেছে — এখন প্রস্তুত করা হচ্ছে।`,
+          body,
           { type: "order-accepted", orderId }
         );
       } catch (e) {
         console.warn(JSON.stringify({ event: "CUSTOMER_ACCEPT_NOTIFY_FAILED", orderId, error: String(e && e.message || e) }));
       }
     }
+
+    if (isSelfDelivery) return; // 🤝 রাইডার খোঁজা লাগবে না — দোকানদার নিজে/অন্য মাধ্যমে পাঠাবেন
 
     await dispatchOrderToNearestRider(orderId, after, []);
   }
@@ -635,6 +656,47 @@ exports.onOfferAccepted = onDocumentUpdated(
       if (assigned) {
         console.log(JSON.stringify({ event: "ORDER_ASSIGNED", orderId: after.orderId, riderId: after.riderId }));
         console.log(JSON.stringify({ event: "OFFER_ACCEPTED", orderId: after.orderId, riderId: after.riderId }));
+
+        // 🔗 এক রসিদে একাধিক প্রোডাক্ট (আলাদা orderRequests ডকুমেন্ট) থাকলে
+        // POS-এর গ্রুপ-অ্যাকসেপ্ট শুধু প্রথম আইটেমটাকেই ("লিডার") রাইডার
+        // খোঁজার জন্য ছেড়ে দেয় (বাকিগুলোতে dispatchState:'batched' লেখা
+        // থাকে, shop-ledger-app.html-এর ordAGConfirmBtn দ্রষ্টব্য) — এখন
+        // লিডার রাইডার পেয়ে গেছে, তাই একই groupBatchId-এর বাকি
+        // "batched"-অবস্থার আইটেমগুলোতেও একই রাইডার বসিয়ে দেওয়া হচ্ছে, যাতে
+        // পুরো রসিদ একজন রাইডারের কাছেই যায় (আলাদা আলাদা রাইডার না)
+        try {
+          const leaderSnap = await orderRef.get();
+          const leaderData = leaderSnap.exists ? leaderSnap.data() : null;
+          if (leaderData && leaderData.groupBatchId) {
+            const siblingsSnap = await db.collection("orderRequests")
+              .where("groupBatchId", "==", leaderData.groupBatchId)
+              .get();
+            const sBatch = db.batch();
+            let count = 0;
+            siblingsSnap.docs.forEach((d) => {
+              if (d.id === after.orderId) return; // লিডার নিজেই, উপরে ইতিমধ্যে সেট হয়ে গেছে
+              const sib = d.data();
+              // বাতিল/অন্য কোনো অবস্থায় চলে যাওয়া আইটেম বাদ — শুধু এখনো
+              // "batched" অবস্থায় অপেক্ষমাণ আইটেমগুলোতেই বসানো হবে
+              if (sib.status !== "preparing" || sib.dispatchState !== "batched") return;
+              sBatch.update(d.ref, {
+                status: "shipped",
+                assignedRiderId: after.riderId,
+                assignedRiderName: riderName,
+                riderAssignedAt: FieldValue.serverTimestamp(),
+                shippedAt: FieldValue.serverTimestamp(),
+                dispatchState: "assigned",
+              });
+              count++;
+            });
+            if (count > 0) {
+              await sBatch.commit();
+              console.log(JSON.stringify({ event: "BATCH_SIBLINGS_ASSIGNED", groupBatchId: leaderData.groupBatchId, count, riderId: after.riderId }));
+            }
+          }
+        } catch (e) {
+          console.warn(JSON.stringify({ event: "BATCH_SIBLING_ASSIGN_FAILED", orderId: after.orderId, error: String(e && e.message || e) }));
+        }
       } else {
         console.log(JSON.stringify({ event: "DUPLICATE_ASSIGNMENT_BLOCKED", orderId: after.orderId, riderId: after.riderId }));
       }
@@ -839,6 +901,22 @@ function ruleBasedParse(text) {
 // কড়াকড়িভাবে বলা হয় শুধু {itemQuery, qty, unit} ফেরত দিতে, কোনো
 // productId/price/stock বানাতে বলা হয় না (ওগুলো AI-এর প্রম্পটেও নেই,
 // AI-এর আউটপুট শুধু items array হিসেবে পার্স হয়, অন্য কিছু গ্রহণ করা হয় না)।
+//
+// 🐛 বাগ-ফিক্স (২০২৬-০৯-১৩, দুই ধাপে):
+// ধাপ ১ — মডেল আগে "gemini-2.0-flash" ছিল, যেটা Google ২০২৬-০৬-০১ থেকে
+// সম্পূর্ণ বন্ধ (shut down) করে দিয়েছে — তাই এতদিন এই ফাংশনের Gemini কল
+// সবসময় ব্যর্থ হয়ে rule-based fallback-এ পড়ে যাচ্ছিল, আর মৌ-চ্যাট
+// (mouChat) প্রতিটা মেসেজেই ফলব্যাক জবাব দিচ্ছিল। প্রথমে "gemini-3.5-flash"
+// এ পরিবর্তন করা হয়েছিল (Google-এর সুপারিশকৃত দুটো replacement-এর একটা)।
+// ধাপ ২ — কিন্তু "gemini-3.5-flash" নতুন API key দিয়েও বারবার
+// "Gemini API status 429" (rate-limit/quota exceeded) দিচ্ছিল — সম্ভবত
+// ফ্রি-টায়ারে এই মডেলের কোটা খুব কম/উপলব্ধ না। তাই Google-এর অন্য
+// সুপারিশকৃত replacement "gemini-3.1-flash-lite"-এ পরিবর্তন করা হলো, যেটার
+// ফ্রি-টায়ারে ডকুমেন্টেড higher quota আছে (মৌ-চ্যাট/শপিং-পার্সের মতো ছোট,
+// হালকা কাজের জন্য এটাই যথেষ্ট)। ভবিষ্যতে আবার সমস্যা হলে Firebase
+// Functions log-এ "MOU_CHAT_FAILED"/"Gemini parse ব্যর্থ" ইভেন্ট খুঁজলে
+// exact এরর মেসেজ পাওয়া যাবে (৪০৪ = মডেল-নাম ভ্যালিড না, ৪০১ = key ভুল/
+// বাতিল, ৪২৯ = rate-limit/quota শেষ)।
 async function geminiParse(text, apiKey) {
   const prompt = `তুমি একটা বাংলা মুদি-বাজারের শপিং লিস্ট পার্সার। নিচের কাস্টমারের কথা থেকে প্রতিটা প্রোডাক্টের নাম, পরিমাণ ও একক বের করো।
 নিয়ম:
@@ -852,7 +930,7 @@ async function geminiParse(text, apiKey) {
 
 শুধু JSON array রিটার্ন করো, যেমন: [{"itemQuery":"চাল","qty":5,"unit":"কেজি"}]`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -861,7 +939,13 @@ async function geminiParse(text, apiKey) {
       generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
     }),
   });
-  if (!res.ok) throw new Error(`Gemini API status ${res.status}`);
+  if (!res.ok) {
+    // 🔎 আগে শুধু status নম্বর (যেমন 400) লগ হতো — আসল কারণ (Google-এর error
+    // body) দেখা যেত না। এখন body টেক্সট-ও ধরে এরর মেসেজে জোড়া হচ্ছে, যাতে
+    // পরের বার লগ চেক করলেই সঠিক কারণ পাওয়া যায়, আন্দাজ করতে না হয়।
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Gemini API status ${res.status}: ${errBody.slice(0, 300)}`);
+  }
   const data = await res.json();
   const rawText = data.candidates && data.candidates[0] && data.candidates[0].content
     && data.candidates[0].content.parts && data.candidates[0].content.parts[0]
@@ -898,7 +982,7 @@ exports.parseShoppingIntent = onCall({ secrets: [geminiApiKey] }, async (request
   if (apiKey) {
     try {
       const items = await geminiParse(text, apiKey);
-      if (items.length > 0) return { items, engine: "gemini-2.0-flash" };
+      if (items.length > 0) return { items, engine: "gemini-3.1-flash-lite" };
       // AI খালি রেজাল্ট দিলে নিচে rule-based ফলব্যাকে যাওয়া হয়
     } catch (e) {
       console.warn("Gemini parse ব্যর্থ, rule-based fallback ব্যবহার হচ্ছে:", String(e && e.message || e));
@@ -911,37 +995,68 @@ exports.parseShoppingIntent = onCall({ secrets: [geminiApiKey] }, async (request
   return { items, engine: "rule-based-fallback" };
 });
 
-/* ==================== 🐝 মৌ — Text Chat via Gemini (Development #2A) ====================
+/* ==================== 🐝 মৌ — Text Chat via Gemini (Development #4) ====================
    ⚠️ ইচ্ছাকৃতভাবে parseShoppingIntent থেকে সম্পূর্ণ আলাদা ফাংশন — উদ্দেশ্য
    ভিন্ন (এটা সাধারণ কথোপকথন, ওটা structured shopping-list বের করা)।
    একই GEMINI_API_KEY secret পুনর্ব্যবহার করা হচ্ছে (নতুন কোনো key/secret
-   তৈরি করা হয়নি)। কোনো conversation-history/memory পাঠানো হয় না —
-   প্রতিটা বার্তা স্বতন্ত্রভাবে প্রসেস হয় (Development #2A-এর সুযোগের মধ্যেই)। */
-async function mouGeminiReply(text, apiKey) {
-  const prompt = `তুমি "মৌ" — Honey Bee Bazar-এর একটা বন্ধুত্বপূর্ণ, উষ্ণ মৌমাছি সহকারী।
+   তৈরি করা হয়নি)।
+   🧠 Development #4 — এখন ক্লায়েন্ট (mou.js) সাম্প্রতিক কথোপকথনের ইতিহাস
+   (history) পাঠায় (Firestore-এ mouChats/{uid}/messages-এ সেভ থাকা), সেটা
+   Gemini-এর multi-turn `contents` array-তে বসিয়ে দেওয়া হয় (persona/ফরম্যাট
+   নিয়ম আলাদা systemInstruction-এ) — যাতে Gemini আগের কথা মনে রেখে উত্তর
+   দিতে পারে। history খালি থাকলে (নতুন কাস্টমার) আগের মতোই single-turn আচরণ।
+   🖼️ Development #5 — image (ঐচ্ছিক {mimeType, data(base64)}) দেওয়া থাকলে
+   চলতি টার্নের parts-এ inlineData হিসেবে যোগ হয় — gemini-3.1-flash-lite
+   মাল্টিমোডাল (ছবি+টেক্সট ইনপুট বুঝতে পারে), তাই আলাদা কোনো মডেল/এন্ডপয়েন্ট
+   লাগে না। */
+async function mouGeminiReply(text, apiKey, history, image) {
+  const systemInstruction = `তুমি "মৌ" — Honey Bee Bazar-এর একটা বন্ধুত্বপূর্ণ, উষ্ণ মৌমাছি সহকারী।
 নিয়ম:
 - শুধু বাংলায় উত্তর দেবে, ছোট (১-২ বাক্য), আন্তরিক ও সহজ ভাষায়।
 - মাঝেমধ্যে ইমোজি ব্যবহার করতে পারো (🐝 😊 ইত্যাদি), বেশি না।
 - তুমি কোনো প্রোডাক্টের দাম/স্টক বানিয়ে বলবে না (সেটা তোমার কাজ না, এখানে তুমি শুধু গল্প করছ)।
+- নিচে থাকলে আগের কথোপকথন খেয়াল রেখে উত্তর দেবে (যেমন গ্রাহক আগে নিজের নাম/
+  পছন্দ বললে, সেটা মনে রেখে প্রাসঙ্গিকভাবে ব্যবহার করবে) — আগে কিছু জিজ্ঞেস
+  করা না হলে নতুন প্রসঙ্গ ধরে নেবে না।
+- গ্রাহক ছবি পাঠালে সেটা মন দিয়ে দেখে সহজ, ছোট বাক্যে বলবে ছবিতে কী দেখছ —
+  তবে ছবিতে কোনো প্রোডাক্ট/দাম থাকলেও সেটার দাম/স্টক অনুমান করে বলবে না।
 - শুধু JSON রিটার্ন করবে, অন্য কোনো টেক্সট না।
 
 ফরম্যাট: {"reply": "তোমার উত্তর", "mood": "happy" অথবা "idle" অথবা "serious"}
 - সাধারণ/হাসিখুশি কথায় mood হবে "happy"
 - গুরুত্বপূর্ণ/সমস্যার কথায় mood হবে "serious"
-- বাকি সব ক্ষেত্রে "idle"
+- বাকি সব ক্ষেত্রে "idle"`;
 
-গ্রাহকের কথা: "${text}"`;
+  // 🧠 history-র প্রতিটা টার্ন Gemini-এর role-ভিত্তিক contents-এ বসানো হয়
+  // (আমাদের "mou" role → Gemini-এর "model" role) — এরপর সবশেষে চলতি বার্তাটা
+  // (ছবি থাকলে সেটাও এই সবশেষ টার্নেই inlineData হিসেবে জোড়া হয়)
+  const contents = (history || []).map((h) => ({
+    role: h.role === "mou" ? "model" : "user",
+    parts: [{ text: h.text }],
+  }));
+  const currentParts = [{ text }];
+  if (image && image.mimeType && image.data) {
+    currentParts.push({ inlineData: { mimeType: image.mimeType, data: image.data } });
+  }
+  contents.push({ role: "user", parts: currentParts });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`;
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      systemInstruction: { parts: [{ text: systemInstruction }] },
+      contents,
       generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
     }),
   });
-  if (!res.ok) throw new Error(`Gemini API status ${res.status}`);
+  if (!res.ok) {
+    // 🔎 আগে শুধু status নম্বর (যেমন 400) লগ হতো — আসল কারণ (Google-এর error
+    // body) দেখা যেত না। এখন body টেক্সট-ও ধরে এরর মেসেজে জোড়া হচ্ছে, যাতে
+    // পরের বার লগ চেক করলেই সঠিক কারণ পাওয়া যায়, আন্দাজ করতে না হয়।
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Gemini API status ${res.status}: ${errBody.slice(0, 300)}`);
+  }
   const data = await res.json();
   const rawText = data.candidates && data.candidates[0] && data.candidates[0].content
     && data.candidates[0].content.parts && data.candidates[0].content.parts[0]
@@ -976,6 +1091,34 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
     throw new HttpsError("invalid-argument", "বার্তাটা একটু ছোট করে লিখুন।");
   }
 
+  // 🧠 Development #4 — history ক্লায়েন্ট থেকে আসা ঐচ্ছিক ডেটা, তাই অন্ধভাবে
+  // বিশ্বাস না করে যাচাই/ছেঁকে নেওয়া হচ্ছে (shape ভুল হলে বা কেউ অস্বাভাবিক
+  // বড় পেলোড পাঠালেও Gemini কলে যেন সমস্যা না হয়) — সর্বোচ্চ ১২টা টার্ন,
+  // প্রতিটা মেসেজ সর্বোচ্চ ৫০০ ক্যারেক্টার
+  const rawHistory = Array.isArray(request.data && request.data.history) ? request.data.history : [];
+  const history = rawHistory
+    .filter((h) => h && (h.role === "user" || h.role === "mou") && typeof h.text === "string" && h.text.trim())
+    .slice(-12)
+    .map((h) => ({ role: h.role, text: h.text.trim().slice(0, 500) }));
+
+  // 🖼️ Development #5 — image ঐচ্ছিক, ক্লায়েন্ট থেকে আসা তাই এখানেও অন্ধভাবে
+  // বিশ্বাস না করে shape/সাইজ/টাইপ যাচাই করা হচ্ছে। ক্লায়েন্ট WebP-এ
+  // কম্প্রেস করেই পাঠায় (~১৫০KB টার্গেট, ৩৫০KB হার্ড ক্যাপ) — base64
+  // এনকোডিং সাধারণত আসল সাইজের ~৪/৩ গুণ হয়, তাই এখানে ৬,00,000 ক্যারেক্টার
+  // (~৪৫০KB raw) ক্যাপ যথেষ্ট নিরাপদ মার্জিন রাখে অথচ অস্বাভাবিক বড় পেলোড আটকায়
+  const rawImage = request.data && request.data.image;
+  const MOU_ALLOWED_IMAGE_TYPES = ["image/webp", "image/jpeg", "image/png"];
+  let image = null;
+  if (rawImage && typeof rawImage.data === "string" && typeof rawImage.mimeType === "string") {
+    if (!MOU_ALLOWED_IMAGE_TYPES.includes(rawImage.mimeType)) {
+      throw new HttpsError("invalid-argument", "ছবির ফরম্যাট সমর্থিত না।");
+    }
+    if (rawImage.data.length > 600000) {
+      throw new HttpsError("invalid-argument", "ছবিটা অনেক বড় — একটু ছোট/সহজ ছবি চেষ্টা করুন।");
+    }
+    image = { mimeType: rawImage.mimeType, data: rawImage.data };
+  }
+
   const apiKey = geminiApiKey.value();
   if (!apiKey) {
     // 🛟 key সেট করা না থাকলেও ফাংশনটা crash না করে পরিষ্কার fallback দেয়
@@ -984,9 +1127,11 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   }
 
   try {
-    const result = await mouGeminiReply(text.trim(), apiKey);
-    console.log(JSON.stringify({ event: "MOU_CHAT_REPLIED", uid: request.auth.uid }));
-    return { reply: result.reply, mood: result.mood, engine: "gemini-2.0-flash" };
+    const result = await mouGeminiReply(text.trim(), apiKey, history, image);
+    console.log(JSON.stringify({
+      event: "MOU_CHAT_REPLIED", uid: request.auth.uid, historyLen: history.length, hasImage: !!image,
+    }));
+    return { reply: result.reply, mood: result.mood, engine: "gemini-3.1-flash-lite" };
   } catch (e) {
     console.warn(JSON.stringify({ event: "MOU_CHAT_FAILED", error: String(e && e.message || e) }));
     // 🛟 Step 7 — error হলেও গ্রাহক খালি হাতে ফেরত যান না, একটা উষ্ণ fallback বার্তা পান
@@ -1461,6 +1606,50 @@ exports.adminUpdateShopOwnerEmail = onCall(async (request) => {
   }
 });
 
+// 📦 "প্রস্তুত হচ্ছে" ট্যাবে একটা কাস্টমারের পুরো রসিদ (একাধিক প্রোডাক্ট/orderRequests
+// ডকুমেন্ট) প্যাকেজিং শেষ হলে দোকানদার একবার এই callable-টা ডাকেন (প্রতিটা
+// প্রোডাক্টের জন্য আলাদা আলাদা না — নাহলে কাস্টমার একই কথায় ৩-৪টা নোটিফিকেশন
+// পেতেন) যাতে কাস্টমার ঠিক একটাই "প্যাকেজিং শেষ" পুশ নোটিফিকেশন পান।
+exports.notifyOrderPackagingDone = onCall(async (request) => {
+  try {
+    const callerUid = request.auth && request.auth.uid;
+    if (!callerUid) throw new HttpsError("unauthenticated", "লগইন করা নেই।");
+
+    const { shopId, customerUid, itemCount } = request.data || {};
+    if (!shopId || !customerUid) {
+      throw new HttpsError("invalid-argument", "shopId ও customerUid দিতে হবে।");
+    }
+
+    // 🔒 কলারকে অবশ্যই এই shopId-র মালিক অথবা স্টাফ (members) হতে হবে —
+    // নাহলে যে কেউ যেকোনো কাস্টমারকে ইচ্ছামতো নোটিফিকেশন পাঠাতে পারতো
+    const shopDoc = await db.collection("shops").doc(shopId).get();
+    if (!shopDoc.exists) throw new HttpsError("not-found", "দোকান পাওয়া যায়নি।");
+    const shopData = shopDoc.data();
+    const isOwner = shopData.ownerUid === callerUid || shopId === callerUid;
+    let isStaff = isOwner;
+    if (!isStaff) {
+      const memberDoc = await db.collection("shops").doc(shopId).collection("members").doc(callerUid).get();
+      isStaff = memberDoc.exists;
+    }
+    if (!isStaff) throw new HttpsError("permission-denied", "এই দোকানের স্টাফ না।");
+
+    const shopName = shopData.name || shopData.shopName || "দোকান";
+    const n = Number(itemCount) || 1;
+    await sendFcmToMessengerUser(
+      customerUid,
+      "📦 প্যাকেজিং শেষ",
+      `${shopName} আপনার ${n > 1 ? n + "টা প্রোডাক্টের " : ""}অর্ডার প্যাকেজিং শেষ করেছে — এখন পাঠানোর অপেক্ষায়।`,
+      { type: "order-packaging-done", shopId }
+    );
+
+    return { success: true };
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    console.error("notifyOrderPackagingDone ব্যর্থ হয়েছে:", err);
+    throw new HttpsError("internal", "নোটিফিকেশন পাঠানো যায়নি — " + (err && err.message ? err.message : String(err)));
+  }
+});
+
 async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
   if (tripData.pickupLat == null || tripData.pickupLng == null) {
     console.log("পিকআপ লোকেশন নেই — trip dispatch স্কিপ করা হচ্ছে");
@@ -1853,3 +2042,166 @@ exports.onTripChatMessageCreated = onDocumentCreated(
     }
   }
 );
+
+/* ==================== 🕉️ Sanatani Panchang — STEP 1 (Vedika API → Firestore → শর্ট কার্ড) ====================
+   এই ফাংশন ক্লায়েন্ট (honey-bee-bazar.html)-এর "সনাতনী" শর্ট কার্ড থেকে কল
+   হবে — Vedika Panchang API-কে সরাসরি ক্লায়েন্ট থেকে কখনো কল করা হয় না,
+   API key-ও কখনো ক্লায়েন্টে যায় না (Secrets Manager-এ, উপরের vedikaApiKey)।
+
+   প্রবাহ:
+   1) client পাঠায় { date, latitude, longitude, timezone, cityKey }
+   2) panchangDays/{cityKey}_{date}-এ আগে থেকেই আজকের ডেটা ক্যাশ আছে কিনা
+      চেক করা হয় — থাকলে সরাসরি সেটাই ফেরত (source:"cache"), Vedika-কে
+      আর কল করা হয় না (একই শহরের সব ব্যবহারকারীর জন্য দিনে একবারই কল লাগে)।
+   3) না থাকলে Vedika API কল হয়, রেজাল্ট normalize করে panchangDays-এ সেভ
+      হয় (source:"live")।
+
+   ⚠️ গুরুত্বপূর্ণ নোট (সততার সাথে বলা দরকার): Vedika-র Panchang এন্ডপয়েন্টের
+   ঠিক path আর রেসপন্স ফিল্ডের নাম এই কোড লেখার সময় সরাসরি টেস্ট করে
+   নিশ্চিত করা যায়নি — Vedika-র ডকুমেন্টেশন সাইট (vedika.io/docs) পুরোটাই
+   জাভাস্ক্রিপ্ট দিয়ে রেন্ডার হয় (স্ট্যাটিক লোড দিয়ে ভেতরের ডিটেইল দেখা যায়
+   না), আর তাদের আসল API সার্ভারেও (api.vedika.io) এই ডেভেলপমেন্ট
+   পরিবেশ থেকে নেটওয়ার্ক এক্সেস নেই। যা নিশ্চিতভাবে জানা গেছে (তাদের Kundli
+   এন্ডপয়েন্টের ডকুমেন্টেড উদাহরণ থেকে): base URL "https://api.vedika.io",
+   auth হেডার "Authorization: Bearer vk_live_...", প্যাটার্ন
+   "/v2/astrology/{feature}"। তাই নিচে "/v2/astrology/panchang" ধরে নেওয়া
+   হয়েছে (Kundli-র প্যাটার্ন অনুসরণ করে) — এটা প্রথম ডিপ্লয়ের পরে Dhaka/Riyadh
+   দিয়ে টেস্ট করে raw রেসপন্স (নিচে panchangDays ডকুমেন্টে rawResponse ফিল্ডে
+   সেভ থাকে) দেখে normalizePanchangResponse()-এর ফিল্ড-ম্যাপিং মিলিয়ে/ঠিক
+   করে নেওয়া জরুরি — এটাই STEP 1-এর "API response দেখাও" ধাপ। */
+const VEDIKA_API_BASE = "https://api.vedika.io";
+
+// Vedika-র রেসপন্সে ঠিক কোন key-তে কোন তথ্য আসবে তা নিশ্চিত না হওয়া পর্যন্ত,
+// কয়েকটা সম্ভাব্য বিকল্প নাম চেক করে প্রথমটা যেটা পাওয়া যায় সেটা নেওয়া হচ্ছে —
+// আসল রেসপন্স দেখার পর এই ফাংশনটাই ঠিক করে দিতে হবে।
+function normalizePanchangResponse(raw) {
+  const d = (raw && (raw.data || raw.panchang || raw)) || {};
+  const pick = (obj, keys) => {
+    for (const k of keys) {
+      if (obj && obj[k] != null) return obj[k];
+    }
+    return null;
+  };
+  const nameOf = (v) => {
+    if (v == null) return null;
+    if (typeof v === "string") return v;
+    if (typeof v === "object") return v.name || v.title || v.value || null;
+    return null;
+  };
+  return {
+    tithi: nameOf(pick(d, ["tithi", "Tithi"])),
+    nakshatra: nameOf(pick(d, ["nakshatra", "Nakshatra"])),
+    yoga: nameOf(pick(d, ["yoga", "Yoga"])),
+    karana: nameOf(pick(d, ["karana", "karna", "Karana"])),
+    sunrise: pick(d, ["sunrise", "sun_rise", "sunRise"]),
+    sunset: pick(d, ["sunset", "sun_set", "sunSet"]),
+    rahuKaal: pick(d, ["rahu_kaal", "rahuKaal", "rahuKalam", "rahu_kalam"]),
+  };
+}
+
+exports.getPanchangData = onCall({ secrets: [vedikaApiKey] }, async (request) => {
+  const data = request.data || {};
+  const date = typeof data.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.date)
+    ? data.date
+    : new Date().toISOString().slice(0, 10);
+  const latitude = Number(data.latitude);
+  const longitude = Number(data.longitude);
+  const timezone = typeof data.timezone === "string" && data.timezone ? data.timezone : "+00:00";
+  const cityKey = (typeof data.cityKey === "string" && data.cityKey.trim())
+    ? data.cityKey.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_")
+    : null;
+
+  if (!cityKey || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new HttpsError(
+      "invalid-argument",
+      "cityKey, latitude, longitude দরকার — সঠিকভাবে পাঠানো হয়নি।"
+    );
+  }
+
+  const docId = `${cityKey}_${date}`;
+  const cacheRef = db.collection("panchangDays").doc(docId);
+
+  // ধাপ ২: আজকের এই শহরের জন্য আগে থেকেই সেভ করা আছে কিনা
+  try {
+    const cacheDoc = await cacheRef.get();
+    if (cacheDoc.exists) {
+      const cached = cacheDoc.data();
+      return {
+        source: "cache",
+        cityKey,
+        date,
+        tithi: cached.tithi,
+        nakshatra: cached.nakshatra,
+        yoga: cached.yoga,
+        karana: cached.karana,
+        sunrise: cached.sunrise,
+        sunset: cached.sunset,
+        rahuKaal: cached.rahuKaal,
+      };
+    }
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "PANCHANG_CACHE_READ_FAILED", error: String((e && e.message) || e) }));
+  }
+
+  // ধাপ ৩: Vedika API কল
+  const apiKey = vedikaApiKey.value();
+  if (!apiKey) {
+    console.warn(JSON.stringify({ event: "PANCHANG_NO_API_KEY" }));
+    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  let apiRes;
+  try {
+    apiRes = await fetch(`${VEDIKA_API_BASE}/v2/astrology/panchang`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        datetime: `${date}T00:00:00`,
+        latitude,
+        longitude,
+        timezone,
+      }),
+    });
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "PANCHANG_NETWORK_ERROR", error: String((e && e.message) || e) }));
+    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  if (!apiRes.ok) {
+    console.warn(JSON.stringify({ event: "PANCHANG_API_ERROR", status: apiRes.status }));
+    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  let rawJson;
+  try {
+    rawJson = await apiRes.json();
+  } catch (e) {
+    throw new HttpsError("unavailable", "পঞ্জিকার তথ্য এখন পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  }
+
+  const normalized = normalizePanchangResponse(rawJson);
+
+  // ধাপ ৩ (শেষ): panchangDays-এ সেভ — rawResponse-ও রাখা হচ্ছে (সাময়িকভাবে,
+  // ডিবাগের জন্য) যাতে প্রথম ডিপ্লয়ের পরে আসল ফিল্ড-নাম মিলিয়ে
+  // normalizePanchangResponse() ঠিক করা যায়
+  try {
+    await cacheRef.set({
+      cityKey,
+      date,
+      latitude,
+      longitude,
+      timezone,
+      ...normalized,
+      rawResponse: rawJson,
+      source: "vedika-api",
+      fetchedAt: FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "PANCHANG_CACHE_WRITE_FAILED", error: String((e && e.message) || e) }));
+  }
+
+  return { source: "live", cityKey, date, ...normalized };
+});

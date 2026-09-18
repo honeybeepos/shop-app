@@ -935,6 +935,28 @@
       <span style="font-size:26px;">🕉️</span>
       <h2 style="margin:0; font-size:19px; color:#c9b3ff;">সনাতনী পঞ্জিকা</h2>
     </div>
+
+    <!-- 🔴 লাইভ পঞ্জিকা শর্ট কার্ড — Vedika API → Cloud Function (getPanchangData) →
+         Firestore (panchangDays) → IndexedDB অফলাইন ক্যাশ। STEP 1 এই কার্ডটাই। -->
+    <div id="hbswPanShortCard" style="border:1px solid rgba(180,140,255,0.35); background:rgba(180,140,255,0.08); border-radius:16px; padding:14px 16px; margin-bottom:16px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <span style="font-size:12px; font-weight:800; color:#c9b3ff;">🔴 লাইভ পঞ্জিকা (API)</span>
+        <span id="hbswPanShortSource" style="font-size:9.5px; color:var(--muted);"></span>
+      </div>
+      <div id="hbswPanShortLocDate" style="font-size:11px; color:var(--muted); margin-bottom:8px;">লোড হচ্ছে…</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; font-size:12px;">
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">তিথি</span><span id="hbswPanShortTithi" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">নক্ষত্র</span><span id="hbswPanShortNakshatra" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">যোগ</span><span id="hbswPanShortYoga" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">করণ</span><span id="hbswPanShortKarana" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">সূর্যোদয়</span><span id="hbswPanShortSunrise" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">সূর্যাস্ত</span><span id="hbswPanShortSunset" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        <div style="display:flex; justify-content:space-between; grid-column:1 / -1;"><span style="color:var(--muted);">রাহু কাল</span><span id="hbswPanShortRahuKaal" style="color:#e7e2d4; font-weight:700;">…</span></div>
+      </div>
+      <div id="hbswPanShortNote" style="font-size:9.5px; color:var(--muted); margin-top:8px; line-height:1.4;"></div>
+    </div>
+
+    <div style="font-size:9.5px; color:var(--muted); margin-bottom:6px;">🧮 নিচের সব তথ্য স্থানীয় গাণিতিক হিসাব (উপরের লাইভ কার্ড থেকে আলাদা):</div>
       <div id="hbswPanDate" style="text-align:right; font-size:11px; color:var(--muted); margin-bottom:8px;">লোড হচ্ছে…</div>
       <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">তিথি</span><span id="hbswPanTithi" style="color:#e7e2d4; font-weight:700;">…</span></div>
       <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">পক্ষ</span><span id="hbswPanPaksha" style="color:#e7e2d4; font-weight:700;">…</span></div>
@@ -3687,11 +3709,11 @@ document.getElementById("hbswMenuPageSettingsBtn") && document.getElementById("h
 /* 🕌🕉️ নামাজ ও সনাতনী — এই দুটো আগে বটম-শিট ওভারলে ছিল, এখন আলাদা ফুল-স্ক্রিন
    ড্যাশবোর্ড হিসেবে খোলে (Menu-র ছোট টাইল আর নিচের বড় eye-catching টাইল, দুটোই) */
 document.getElementById("hbswMenuPrayerBtn") && document.getElementById("hbswMenuPrayerBtn").addEventListener("click", ()=> showScreen("screenPrayer"));
-document.getElementById("hbswMenuPanchangBtn") && document.getElementById("hbswMenuPanchangBtn").addEventListener("click", ()=> showScreen("screenPanchang"));
+document.getElementById("hbswMenuPanchangBtn") && document.getElementById("hbswMenuPanchangBtn").addEventListener("click", ()=>{ showScreen("screenPanchang"); if(typeof hbLoadPanchangShortCard === "function") hbLoadPanchangShortCard(); });
 document.getElementById("backFromPrayerScreen") && document.getElementById("backFromPrayerScreen").addEventListener("click", ()=> showScreen("screenSmartWatchMenu"));
 document.getElementById("backFromPanchangScreen") && document.getElementById("backFromPanchangScreen").addEventListener("click", ()=> showScreen("screenSmartWatchMenu"));
 document.getElementById("hbswBigPrayerTile") && document.getElementById("hbswBigPrayerTile").addEventListener("click", ()=> showScreen("screenPrayer"));
-document.getElementById("hbswBigPanchangTile") && document.getElementById("hbswBigPanchangTile").addEventListener("click", ()=> showScreen("screenPanchang"));
+document.getElementById("hbswBigPanchangTile") && document.getElementById("hbswBigPanchangTile").addEventListener("click", ()=>{ showScreen("screenPanchang"); if(typeof hbLoadPanchangShortCard === "function") hbLoadPanchangShortCard(); });
 
 /* 📋 Smart Watch মেনু-র বাকি আইটেম (ঘড়ি/ক্যালেন্ডার/সরকারি ছুটি/আবহাওয়া)
    চাপলে তার নিজের প্যানেল খোলে — সেটিংসের মতোই বটম-শিট ওভারলে প্যাটার্ন */
@@ -3867,6 +3889,135 @@ function hbGetHijriDate(gDateOnly){
   const day = l - Math.floor((709 * month) / 24);
   const year = 30 * n + j - 30;
   return { year, monthIdx: month - 1, monthName: HB_HIJRI_MONTHS[month - 1], day };
+}
+
+/* ===== 🕉️ সনাতনী পঞ্জিকা — লাইভ শর্ট কার্ড (STEP 1: Vedika API → Cloud Function
+   getPanchangData → Firestore panchangDays → IndexedDB অফলাইন ক্যাশ)।
+   এই ব্লকটা উপরের local গাণিতিক হিসাবের থেকে আলাদা ও স্বাধীন — একটাতে সমস্যা
+   হলে অন্যটার উপর কোনো প্রভাব পড়বে না। */
+const HB_PAN_IDB_NAME = "hbPanchangCache";
+const HB_PAN_IDB_STORE = "shortCard";
+
+function hbPanOpenIdb(){
+  return new Promise((resolve, reject)=>{
+    if(!window.indexedDB){ reject(new Error("no indexeddb")); return; }
+    const req = indexedDB.open(HB_PAN_IDB_NAME, 1);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      if(!db.objectStoreNames.contains(HB_PAN_IDB_STORE)) db.createObjectStore(HB_PAN_IDB_STORE, { keyPath: "docId" });
+    };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error || new Error("indexeddb open failed"));
+  });
+}
+async function hbPanIdbGet(docId){
+  try{
+    const db = await hbPanOpenIdb();
+    return await new Promise((resolve, reject)=>{
+      const tx = db.transaction(HB_PAN_IDB_STORE, "readonly");
+      const req = tx.objectStore(HB_PAN_IDB_STORE).get(docId);
+      req.onsuccess = ()=> resolve(req.result || null);
+      req.onerror = ()=> reject(req.error);
+    });
+  }catch(e){ return null; }
+}
+async function hbPanIdbSet(docId, data){
+  try{
+    const db = await hbPanOpenIdb();
+    await new Promise((resolve, reject)=>{
+      const tx = db.transaction(HB_PAN_IDB_STORE, "readwrite");
+      tx.objectStore(HB_PAN_IDB_STORE).put(Object.assign({ docId }, data));
+      tx.oncomplete = ()=> resolve();
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }catch(e){ /* IndexedDB না থাকলেও শর্ট কার্ড লোড হতে সমস্যা নেই, শুধু অফলাইন ক্যাশ পাওয়া যাবে না */ }
+}
+
+// "+06:00" স্টাইলে UTC অফসেট — getPanchangData ফাংশন এই ফরম্যাট আশা করে (ডিফল্ট "+00:00")
+function hbPanTimezoneOffsetStr(date){
+  const mins = -date.getTimezoneOffset();
+  const sign = mins >= 0 ? "+" : "-";
+  const abs = Math.abs(mins);
+  const hh = String(Math.floor(abs / 60)).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  return sign + hh + ":" + mm;
+}
+
+function hbPanFmtTime(t){
+  if(!t) return "…";
+  if(typeof t === "string" && /^\d{4}-\d{2}-\d{2}T/.test(t)){
+    const d = new Date(t);
+    if(!isNaN(d.getTime())) return d.toLocaleTimeString("bn-BD", { hour:"2-digit", minute:"2-digit" });
+  }
+  return String(t);
+}
+
+function hbPanRenderShortCard(data, cityLabel){
+  const setTxt = (id, v)=>{ const el = document.getElementById(id); if(el) el.textContent = v; };
+  setTxt("hbswPanShortTithi", data.tithi || "তথ্য নেই");
+  setTxt("hbswPanShortNakshatra", data.nakshatra || "তথ্য নেই");
+  setTxt("hbswPanShortYoga", data.yoga || "তথ্য নেই");
+  setTxt("hbswPanShortKarana", data.karana || "তথ্য নেই");
+  setTxt("hbswPanShortSunrise", hbPanFmtTime(data.sunrise));
+  setTxt("hbswPanShortSunset", hbPanFmtTime(data.sunset));
+  setTxt("hbswPanShortRahuKaal", hbPanFmtTime(data.rahuKaal));
+  const now = new Date();
+  setTxt("hbswPanShortLocDate", "📍 " + (cityLabel || "ঢাকা") + " · " + now.toLocaleDateString("bn-BD", { day:"numeric", month:"long", year:"numeric" }));
+  const srcEl = document.getElementById("hbswPanShortSource");
+  if(srcEl){
+    if(data.__offline) srcEl.textContent = "📴 অফলাইন ক্যাশ";
+    else if(data.source === "cache") srcEl.textContent = "🗄️ Firestore ক্যাশ";
+    else if(data.source === "live") srcEl.textContent = "🌐 লাইভ";
+    else srcEl.textContent = "";
+  }
+  const noteEl = document.getElementById("hbswPanShortNote");
+  if(noteEl) noteEl.textContent = data.__offline ? "* ইন্টারনেট না থাকায় শেষ সেভ করা তথ্য দেখানো হচ্ছে" : "";
+}
+
+async function hbLoadPanchangShortCard(){
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  let lat = HB_DEFAULT_LAT, lon = HB_DEFAULT_LON, cityKey = "dhaka", cityLabel = "ঢাকা";
+  try{
+    const pos = await Promise.race([
+      new Promise((resolve, reject)=>{
+        if(!navigator.geolocation){ reject(new Error("no geo")); return; }
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 600000 });
+      }),
+      new Promise((_, reject)=> setTimeout(()=> reject(new Error("geo timeout (fallback)")), 8500))
+    ]);
+    lat = pos.coords.latitude; lon = pos.coords.longitude;
+    try{
+      const geoRes = await fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=" + lat + "&longitude=" + lon + "&localityLanguage=bn");
+      if(geoRes.ok){
+        const geoData = await geoRes.json();
+        cityLabel = geoData.city || geoData.locality || geoData.principalSubdivision || "আপনার এলাকা";
+        cityKey = (geoData.city || geoData.locality || "loc").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      }
+    }catch(e){ cityLabel = "আপনার এলাকা"; cityKey = "loc_" + Math.round(lat) + "_" + Math.round(lon); }
+  }catch(e){ /* GPS না পেলে ঢাকার ডিফল্ট কোঅর্ডিনেট */ }
+
+  const docId = cityKey + "_" + date;
+  const timezone = hbPanTimezoneOffsetStr(now);
+
+  // অফলাইন ক্যাশ আগে দেখিয়ে দেওয়া হয় (যদি থাকে) — যাতে নেটওয়ার্ক ধীর/না থাকলেও কিছু দেখা যায়
+  const cached = await hbPanIdbGet(docId);
+  if(cached) hbPanRenderShortCard(cached, cityLabel);
+
+  try{
+    const callable = functionsInstance.httpsCallable("getPanchangData");
+    const result = await callable({ date, latitude: lat, longitude: lon, timezone, cityKey });
+    const data = result.data || {};
+    hbPanRenderShortCard(data, cityLabel);
+    hbPanIdbSet(docId, data);
+  }catch(e){
+    if(cached){
+      hbPanRenderShortCard(Object.assign({}, cached, { __offline: true }), cityLabel);
+    }else{
+      const noteEl = document.getElementById("hbswPanShortNote");
+      if(noteEl) noteEl.textContent = (e && e.message) || "লাইভ পঞ্জিকা এখন লোড করা যাচ্ছে না।";
+    }
+  }
 }
 
 /* ===== সনাতনী পঞ্জিকা — তিথি/পক্ষ/নক্ষত্র/যোগ/করণ/হিন্দু মাস/ঋতু ===== */

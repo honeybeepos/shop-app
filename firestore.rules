@@ -574,5 +574,15 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    // 🕉️ সনাতনী পঞ্জিকা (Panchang) — STEP 1।
+    // panchangDays শুধু functions/index.js-এর getPanchangData Cloud
+    // Function (Admin SDK, rules বাইপাস করে) লেখে — ক্লায়েন্ট থেকে
+    // সরাসরি লেখা যাবে না, শুধু পড়া যাবে (IndexedDB ক্যাশের আগে
+    // ক্লায়েন্ট চাইলে সরাসরি Firestore থেকেও পড়তে পারবে)।
+    match /panchangDays/{dayId} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }

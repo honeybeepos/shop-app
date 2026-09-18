@@ -12926,11 +12926,17 @@ document.getElementById('esAddItemBtn').addEventListener('click', ()=>{
       Management হাবে ফিরে আসবে
    3) Business Management হাব খোলা থাকলে — বন্ধ হয়ে মূল অ্যাপে ফিরে আসবে
    4) হোম (ড্যাশবোর্ড) ছাড়া অন্য ট্যাবে থাকলে — হোম ট্যাবে ফিরে আসবে
-   5) হোম ট্যাবে থাকলে — এখানেই থেমে থাকবে, ব্যাক বাটনে অ্যাপ কখনো বন্ধ হবে না
-      (বিক্রি করার মাঝখানে ভুলবশত ব্যাক চেপে অ্যাপ থেকে বের হয়ে গেলে ডেটা হারানোর
-      ঝুঁকি থাকে — তাই ইচ্ছা করেই এখানে এক্সিট করার কোনো পথ রাখা হয়নি) */
+   5) হোম/প্রিন্ট ট্যাবে থাকলে — "🚪 অ্যাপ থেকে বের হবেন? হ্যাঁ/না" পপআপ
+      দেখাবে। "না" চাপলে আগের মতোই এখানে লক থেকে যাবে (বিক্রি করার মাঝখানে
+      ভুলবশত ব্যাক চেপে ডেটা হারানোর ঝুঁকি নেই), আর "হ্যাঁ" চাপলে সত্যিই বের
+      হয়ে যাবে */
 const __BIZ_SUB_PROGRAMS = ['program-bcc', 'program-monitor', 'program-extraincome', 'program-ops', 'program-report', 'program-orders', 'program-honeybee'];
 let __backStateCounter = 0;
+// আমরা নিজেরাই কতগুলো pushState করেছি (position0 — আসল পেজ-লোড — থেকে
+// এখন কতদূর এগিয়ে আছি) তার হিসাব — এক্সিট কনফার্ম করলে ঠিক এতটাই পেছনে
+// একবারে চলে যাওয়ার জন্য (history.go) দরকার
+let __appHistoryDepth = 0;
+let __exitArmed = false; // "হ্যাঁ" চাপার পরে true — তখন আর নতুন ট্র্যাপ বসবে না
 
 // প্রতিবার আলাদা hash দিয়ে state পুশ করা হয় — একই URL বারবার পুশ করলে কিছু
 // ব্রাউজার/WebView সেটাকে নতুন হিস্ট্রি এন্ট্রি হিসেবে গণ্য নাও করতে পারে, তাতে
@@ -12952,14 +12958,58 @@ function pushBackTrap(){
     for(let i=0; i<__BACK_TRAP_BUFFER; i++){
       __backStateCounter++;
       history.pushState({ bccNav: __backStateCounter }, '', '#nav' + __backStateCounter);
+      __appHistoryDepth++;
     }
   }catch(e){ console.error('pushBackTrap failed:', e); }
 }
+
+/* 🚪 অ্যাপ থেকে বের হওয়ার আগে "হ্যাঁ/না" কনফার্মেশন — HTML-এ আগে থেকেই বানানো
+   #exitConfirmModal ব্যবহার করা হচ্ছে (আগে এটা তৈরি করা ছিল কিন্তু কোথাও
+   জোড়া লাগানো ছিল না)। হোম/প্রিন্ট ট্যাবে ব্যাক চাপলে এখন এই মডাল দেখানো হয়;
+   "না" চাপলে আগের মতোই লক থেকে যাবে, "হ্যাঁ" চাপলে আমাদের নিজেদের বসানো সব
+   ট্র্যাপ-এন্ট্রি একবারে পার হয়ে (history.go) আসল পেজ-লোডের জায়গায় চলে
+   যাওয়া হয় — তারপরের পরবর্তী ব্যাক-চাপেই (JS থেকে সরাসরি "ট্যাব বন্ধ করো"
+   বলার কোনো ওয়েব-স্ট্যান্ডার্ড উপায় নেই, তাই এটাই সবচেয়ে কাছাকাছি) অ্যাপ
+   সত্যিই বন্ধ হয়ে যাবে। */
+function showExitConfirmModal(){
+  const modal = document.getElementById('exitConfirmModal');
+  if(!modal){ return; } // মডাল না থাকলে আগের মতোই লক থাকা নিরাপদ ডিফল্ট
+  modal.classList.add('show');
+}
+(function wireExitConfirmModal(){
+  const noBtn = document.getElementById('exitNoBtn');
+  const yesBtn = document.getElementById('exitYesBtn');
+  const modal = document.getElementById('exitConfirmModal');
+  if(noBtn){
+    noBtn.addEventListener('click', ()=>{
+      if(modal) modal.classList.remove('show');
+      pushBackTrap(); // লক থেকে যাওয়ার জন্য ট্র্যাপ আবার বসানো
+    });
+  }
+  if(yesBtn){
+    yesBtn.addEventListener('click', ()=>{
+      if(modal) modal.classList.remove('show');
+      __exitArmed = true;
+      try{ window.close(); }catch(e){} // কিছু ব্রাউজার/WebView-এ কাজ করে, না করলে নিচেরটা আছে
+      try{ if(__appHistoryDepth > 0) history.go(-__appHistoryDepth); }catch(e){}
+    });
+  }
+})();
 
 function initBackButtonHandling(){
   pushBackTrap();
 
   window.addEventListener('popstate', ()=>{
+    // পপস্টেট মানেই ব্রাউজার ঠিক একধাপ পেছনে গেছে — তাই আমাদের নিজের
+    // ট্র্যাক-করা ডেপথ থেকেও একধাপ কমিয়ে দেওয়া হচ্ছে (history.go(-N)-এর
+    // হিসাব সঠিক রাখার জন্য)
+    if(__appHistoryDepth > 0) __appHistoryDepth--;
+
+    // "হ্যাঁ" চেপে এক্সিট আর্ম করা থাকলে — এই পপস্টেট আমাদেরই history.go(-N)
+    // কলের ফল, তাই এখানে নতুন করে ট্র্যাপ বসানো বা ডায়ালগ দেখানো হবে না;
+    // পরের সত্যিকারের ব্যাক-চাপেই অ্যাপ বন্ধ হয়ে যাবে
+    if(__exitArmed) return;
+
     // 🛟 হিস্ট্রি-এন্ট্রি সবার আগেই আবার বসিয়ে দেওয়া হচ্ছে — নিচের কোনো ধাপে
     // (যেমন কোনো রেন্ডার ফাংশনে) অপ্রত্যাশিত এরর হলেও এটা যেন ঠিকই চলে, নাহলে
     // হিস্ট্রি খালি হয়ে যাওয়ার (canGoBack() false হয়ে যাওয়ার) কারণে ঠিক পরের
@@ -12998,8 +13048,9 @@ function initBackButtonHandling(){
         return;
       }
 
-      // হোম (ড্যাশবোর্ড) বা প্রিন্ট ট্যাবে থাকলে ব্যাক বাটনে আর কিছুই হবে না —
-      // এখানেই লক হয়ে থাকবে, কোনো ট্যাব বদল/টোস্ট ছাড়াই, অ্যাপ কখনো এক্সিট হবে না
+      // হোম (ড্যাশবোর্ড) বা প্রিন্ট ট্যাবে থাকলে — সরাসরি এক্সিট না করে
+      // "হ্যাঁ/না" পপআপ দেখানো হচ্ছে, ব্যবহারকারী নিশ্চিত করলেই বের হবে
+      showExitConfirmModal();
     }catch(e){
       console.error('ব্যাক বাটন হ্যান্ডলিং-এ সমস্যা হয়েছে (হিস্ট্রি-ট্র্যাপ তবুও বসানো আছে):', e);
     }
