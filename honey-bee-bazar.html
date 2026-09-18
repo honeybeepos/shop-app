@@ -666,6 +666,22 @@
     <!-- 🐝 মৌ — Home-এর বড় ব্যানার এন্ট্রি সরিয়ে টাইটেল বারের headerMouBtn-এ
          নেওয়া হয়েছে, তাই এখানে আর আলাদা এন্ট্রির দরকার নেই -->
 
+    <!-- 📅 আজকের পঞ্জিকা — Home Page Today Widget (ছোট, compact — মূল Bazar UI
+         নষ্ট না করে)। Vedika API → getPanchangData → Firestore → IndexedDB,
+         একই পাইপলাইন যেটা সনাতনী পঞ্জিকা পেজেও ব্যবহার হয়। -->
+    <div id="hbHomePanWidget" style="margin:0 16px 14px; border:1px solid rgba(180,140,255,0.3); background:rgba(180,140,255,0.07); border-radius:14px; padding:12px 14px; cursor:pointer;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+        <span style="font-size:11.5px; font-weight:800; color:#c9b3ff;">📅 আজকের পঞ্জিকা</span>
+        <span style="font-size:11px; color:var(--muted);">বিস্তারিত দেখুন →</span>
+      </div>
+      <div id="hbHomePanDateLine" style="font-size:13px; font-weight:700; color:#fff8e8;">লোড হচ্ছে…</div>
+      <div id="hbHomePanTithiLine" style="font-size:12px; color:#e7e2d4; margin-top:2px;">…</div>
+      <div style="display:flex; gap:14px; margin-top:8px; font-size:11.5px; color:var(--muted);">
+        <span>☀️ <span id="hbHomePanSunrise" style="color:#e7e2d4; font-weight:700;">…</span></span>
+        <span>🌇 <span id="hbHomePanSunset" style="color:#e7e2d4; font-weight:700;">…</span></span>
+      </div>
+    </div>
+
     <div class="serviceCardGrid homeSvcGrid">
       <div class="serviceCard" data-svc="transport">
         <div class="svcFrameWrap"><span class="svcHook"></span><div class="svcFrame"><img src="transport-mascot.png" alt="Transport" class="svcMascot"></div></div>
@@ -931,32 +947,56 @@
        eye-catching টাইল, দুটোই এখানে আসে) -->
   <div id="screenPanchang" style="padding:20px 16px;">
     <button class="backBtn" id="backFromPanchangScreen">← ফিরে যান</button>
-    <div style="display:flex; align-items:center; margin-bottom:16px; gap:10px;">
+    <div style="display:flex; align-items:center; margin-bottom:12px; gap:10px;">
       <span style="font-size:26px;">🕉️</span>
       <h2 style="margin:0; font-size:19px; color:#c9b3ff;">সনাতনী পঞ্জিকা</h2>
     </div>
 
-    <!-- 🔴 লাইভ পঞ্জিকা শর্ট কার্ড — Vedika API → Cloud Function (getPanchangData) →
-         Firestore (panchangDays) → IndexedDB অফলাইন ক্যাশ। STEP 1 এই কার্ডটাই। -->
-    <div id="hbswPanShortCard" style="border:1px solid rgba(180,140,255,0.35); background:rgba(180,140,255,0.08); border-radius:16px; padding:14px 16px; margin-bottom:16px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-        <span style="font-size:12px; font-weight:800; color:#c9b3ff;">🔴 লাইভ পঞ্জিকা (API)</span>
-        <span id="hbswPanShortSource" style="font-size:9.5px; color:var(--muted);"></span>
-      </div>
-      <div id="hbswPanShortLocDate" style="font-size:11px; color:var(--muted); margin-bottom:8px;">লোড হচ্ছে…</div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; font-size:12px;">
-        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">তিথি</span><span id="hbswPanShortTithi" style="color:#e7e2d4; font-weight:700;">…</span></div>
-        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">নক্ষত্র</span><span id="hbswPanShortNakshatra" style="color:#e7e2d4; font-weight:700;">…</span></div>
-        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">যোগ</span><span id="hbswPanShortYoga" style="color:#e7e2d4; font-weight:700;">…</span></div>
-        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">করণ</span><span id="hbswPanShortKarana" style="color:#e7e2d4; font-weight:700;">…</span></div>
-        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">সূর্যোদয়</span><span id="hbswPanShortSunrise" style="color:#e7e2d4; font-weight:700;">…</span></div>
-        <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">সূর্যাস্ত</span><span id="hbswPanShortSunset" style="color:#e7e2d4; font-weight:700;">…</span></div>
-        <div style="display:flex; justify-content:space-between; grid-column:1 / -1;"><span style="color:var(--muted);">রাহু কাল</span><span id="hbswPanShortRahuKaal" style="color:#e7e2d4; font-weight:700;">…</span></div>
-      </div>
-      <div id="hbswPanShortNote" style="font-size:9.5px; color:var(--muted); margin-top:8px; line-height:1.4;"></div>
+    <!-- 🐝 মৌ — ছোট companion greeting, তথ্যের উপর বসবে না -->
+    <div style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.04); border-radius:14px; padding:10px 12px; margin-bottom:14px;">
+      <span style="font-size:22px; flex-shrink:0;">🐝</span>
+      <div style="font-size:12px; color:#e7e2d4; line-height:1.4;">নমস্কার! আজকের দিনের পঞ্জিকা দেখে নিন ✨</div>
     </div>
 
-    <div style="font-size:9.5px; color:var(--muted); margin-bottom:6px;">🧮 নিচের সব তথ্য স্থানীয় গাণিতিক হিসাব (উপরের লাইভ কার্ড থেকে আলাদা):</div>
+    <!-- Tab bar: আজ / মাসিক / উৎসব / সেটিংস -->
+    <div style="display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;">
+      <button class="hbPanTabBtn" data-pantab="today" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:12.5px; padding:8px 16px; border-radius:20px; cursor:pointer;">আজ</button>
+      <button class="hbPanTabBtn" data-pantab="monthly" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:12.5px; padding:8px 16px; border-radius:20px; cursor:pointer;">মাসিক</button>
+      <button class="hbPanTabBtn" data-pantab="festival" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:12.5px; padding:8px 16px; border-radius:20px; cursor:pointer;">উৎসব</button>
+      <button class="hbPanTabBtn" data-pantab="settings" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:12.5px; padding:8px 16px; border-radius:20px; cursor:pointer;">সেটিংস</button>
+    </div>
+
+    <!-- ===== আজ ===== -->
+    <div class="hbPanTabPane" id="hbPanTabToday">
+      <!-- 🔴 লাইভ পঞ্জিকা কার্ড — Vedika API → Cloud Function (getPanchangData) →
+           Firestore (panchangDays) → IndexedDB অফলাইন ক্যাশ -->
+      <div id="hbswPanShortCard" style="border:1px solid rgba(180,140,255,0.35); background:rgba(180,140,255,0.08); border-radius:16px; padding:16px; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+          <span id="hbswPanShortLocDate" style="font-size:11px; color:var(--muted);">লোড হচ্ছে…</span>
+          <span id="hbswPanShortSource" style="font-size:9.5px; color:var(--muted);"></span>
+        </div>
+        <div id="hbswPanShortTithiBig" style="font-size:21px; font-weight:800; color:#fff8e8; margin:6px 0 2px;">…</div>
+        <div id="hbswPanShortPakshaLine" style="font-size:12.5px; color:#c9b3ff; font-weight:700; margin-bottom:10px;"></div>
+
+        <div style="display:flex; flex-direction:column; gap:7px; font-size:12.5px; border-top:1px dashed var(--border); padding-top:10px;">
+          <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">☀️ সূর্যোদয়</span><span id="hbswPanShortSunrise" style="color:#e7e2d4; font-weight:700;">…</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">🌇 সূর্যাস্ত</span><span id="hbswPanShortSunset" style="color:#e7e2d4; font-weight:700;">…</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">🕐 রাহুকাল</span><span id="hbswPanShortRahuKaal" style="color:#e7e2d4; font-weight:700;">…</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">⭐ নক্ষত্র</span><span id="hbswPanShortNakshatra" style="color:#e7e2d4; font-weight:700;">…</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">🔮 যোগ</span><span id="hbswPanShortYoga" style="color:#e7e2d4; font-weight:700;">…</span></div>
+          <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">◈ করণ</span><span id="hbswPanShortKarana" style="color:#e7e2d4; font-weight:700;">…</span></div>
+        </div>
+        <div id="hbswPanShortNote" style="font-size:9.5px; color:var(--muted); margin-top:8px; line-height:1.4;"></div>
+      </div>
+
+      <!-- 🌸 বিশেষ দিন — API-তে event থাকলেই দেখাবে, না থাকলে সম্পূর্ণ hidden -->
+      <div id="hbswPanSpecialDayCard" style="display:none; border:1px solid rgba(245,166,35,0.35); background:rgba(245,166,35,0.1); border-radius:16px; padding:14px 16px; margin-bottom:14px;">
+        <div style="font-size:12px; font-weight:800; color:var(--amber);">🌸 বিশেষ দিন</div>
+        <div id="hbswPanSpecialDayName" style="font-size:15px; font-weight:800; color:#fff8e8; margin-top:4px;"></div>
+        <div id="hbswPanSpecialDayDesc" style="font-size:11.5px; color:#e7e2d4; margin-top:4px; line-height:1.4;"></div>
+      </div>
+
+      <div style="font-size:9.5px; color:var(--muted); margin-bottom:6px;">🧮 নিচের সব তথ্য স্থানীয় গাণিতিক হিসাব (উপরের লাইভ কার্ড থেকে আলাদা):</div>
       <div id="hbswPanDate" style="text-align:right; font-size:11px; color:var(--muted); margin-bottom:8px;">লোড হচ্ছে…</div>
       <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">তিথি</span><span id="hbswPanTithi" style="color:#e7e2d4; font-weight:700;">…</span></div>
       <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">পক্ষ</span><span id="hbswPanPaksha" style="color:#e7e2d4; font-weight:700;">…</span></div>
@@ -968,6 +1008,47 @@
       <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">শকাব্দ</span><span id="hbswPanShaka" style="color:#e7e2d4; font-weight:700;">…</span></div>
       <div style="display:flex; justify-content:space-between; padding:4px 0; font-size:12px;"><span style="color:var(--muted);">ঋতু</span><span id="hbswPanRitu" style="color:#e7e2d4; font-weight:700;">…</span></div>
       <div style="font-size:9.5px; color:var(--muted); margin-top:8px; line-height:1.4;">* জ্যোতির্বৈজ্ঞানিক গাণিতিক হিসাব (Lahiri অয়নাংশ) — সঠিক তিথি/মুহুর্তের জন্য স্থানীয় পুরোহিত/পঞ্জিকা যাচাই করুন</div>
+    </div>
+
+    <!-- ===== মাসিক (পরের ধাপে সম্পূর্ণ হবে) ===== -->
+    <div class="hbPanTabPane" id="hbPanTabMonthly" style="display:none;">
+      <div style="text-align:center; padding:50px 12px; color:var(--muted); font-size:13px; line-height:1.6;">📅<br>মাসিক ক্যালেন্ডার — পরের ধাপে আসছে</div>
+    </div>
+
+    <!-- ===== উৎসব (পরের ধাপে সম্পূর্ণ হবে) ===== -->
+    <div class="hbPanTabPane" id="hbPanTabFestival" style="display:none;">
+      <div style="text-align:center; padding:50px 12px; color:var(--muted); font-size:13px; line-height:1.6;">🌸<br>উৎসব ও বিশেষ দিনের লিস্ট — পরের ধাপে আসছে</div>
+    </div>
+
+    <!-- ===== সেটিংস ===== -->
+    <div class="hbPanTabPane" id="hbPanTabSettings" style="display:none;">
+      <div style="font-size:12px; font-weight:800; color:#e7e2d4; margin-bottom:8px;">📍 আপনার অবস্থান</div>
+      <div class="card" style="margin-bottom:16px;">
+        <div id="hbPanSettingsLocLabel" style="font-size:13.5px; font-weight:700; color:#fff8e8; margin-bottom:10px;">লোড হচ্ছে…</div>
+        <select id="hbPanCitySelect" style="width:100%; background:rgba(255,255,255,0.06); border:1px solid var(--border); color:#fff8e8; font-family:inherit; font-size:13px; padding:9px 10px; border-radius:10px;">
+          <option value="auto">📡 আমার লোকেশন (GPS)</option>
+          <option value="dhaka">ঢাকা, বাংলাদেশ</option>
+          <option value="riyadh">রিয়াদ, সৌদি আরব</option>
+        </select>
+      </div>
+
+      <div style="font-size:12px; font-weight:800; color:#e7e2d4; margin-bottom:8px;">🧮 গণনার পদ্ধতি</div>
+      <div class="card" style="margin-bottom:16px;">
+        <select disabled style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--muted); font-family:inherit; font-size:13px; padding:9px 10px; border-radius:10px;">
+          <option>Drik (প্রস্তাবিত)</option>
+        </select>
+        <div style="font-size:9.5px; color:var(--muted); margin-top:6px;">* ভবিষ্যতে আরও পদ্ধতি যুক্ত হবে</div>
+      </div>
+
+      <div style="font-size:12px; font-weight:800; color:#e7e2d4; margin-bottom:8px;">🔔 নোটিফিকেশন</div>
+      <div class="card">
+        <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:#e7e2d4;">একাদশী রিমাইন্ডার <input type="checkbox" id="hbPanNotifEkadashi" checked></label>
+        <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:#e7e2d4; border-top:1px dashed var(--border);">পূর্ণিমা/অমাবস্যা রিমাইন্ডার <input type="checkbox" id="hbPanNotifMoon" checked></label>
+        <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:#e7e2d4; border-top:1px dashed var(--border);">উৎসব রিমাইন্ডার <input type="checkbox" id="hbPanNotifFestival" checked></label>
+        <label style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:13px; color:#e7e2d4; border-top:1px dashed var(--border);">শুভ সময় নোটিফিকেশন <input type="checkbox" id="hbPanNotifShubho"></label>
+        <div style="font-size:9.5px; color:var(--muted); margin-top:8px;">* নোটিফিকেশন পাঠানোর সিস্টেম পরের ধাপে আসবে — এখন শুধু পছন্দ সেভ হচ্ছে</div>
+      </div>
+    </div>
   </div>
 
   <!-- 🌤️ Menu → আবহাওয়া: আবহাওয়া প্যানেল -->
@@ -3954,7 +4035,9 @@ function hbPanFmtTime(t){
 
 function hbPanRenderShortCard(data, cityLabel){
   const setTxt = (id, v)=>{ const el = document.getElementById(id); if(el) el.textContent = v; };
-  setTxt("hbswPanShortTithi", data.tithi || "তথ্য নেই");
+  const tithiText = data.tithi || "তথ্য নেই";
+  setTxt("hbswPanShortTithiBig", tithiText);
+  setTxt("hbswPanShortPakshaLine", data.paksha || "");
   setTxt("hbswPanShortNakshatra", data.nakshatra || "তথ্য নেই");
   setTxt("hbswPanShortYoga", data.yoga || "তথ্য নেই");
   setTxt("hbswPanShortKarana", data.karana || "তথ্য নেই");
@@ -3962,7 +4045,8 @@ function hbPanRenderShortCard(data, cityLabel){
   setTxt("hbswPanShortSunset", hbPanFmtTime(data.sunset));
   setTxt("hbswPanShortRahuKaal", hbPanFmtTime(data.rahuKaal));
   const now = new Date();
-  setTxt("hbswPanShortLocDate", "📍 " + (cityLabel || "ঢাকা") + " · " + now.toLocaleDateString("bn-BD", { day:"numeric", month:"long", year:"numeric" }));
+  const dateStr = now.toLocaleDateString("bn-BD", { day:"numeric", month:"long", year:"numeric" });
+  setTxt("hbswPanShortLocDate", "📍 " + (cityLabel || "ঢাকা") + " · " + dateStr);
   const srcEl = document.getElementById("hbswPanShortSource");
   if(srcEl){
     if(data.__offline) srcEl.textContent = "📴 অফলাইন ক্যাশ";
@@ -3972,30 +4056,69 @@ function hbPanRenderShortCard(data, cityLabel){
   }
   const noteEl = document.getElementById("hbswPanShortNote");
   if(noteEl) noteEl.textContent = data.__offline ? "* ইন্টারনেট না থাকায় শেষ সেভ করা তথ্য দেখানো হচ্ছে" : "";
+
+  // 🌸 বিশেষ দিন কার্ড — API-তে event থাকলেই দেখাবে
+  const specialCard = document.getElementById("hbswPanSpecialDayCard");
+  const events = Array.isArray(data.events) ? data.events : [];
+  if(specialCard){
+    if(events.length > 0){
+      setTxt("hbswPanSpecialDayName", events[0].name || "");
+      setTxt("hbswPanSpecialDayDesc", events[0].description || "");
+      specialCard.style.display = "block";
+    }else{
+      specialCard.style.display = "none";
+    }
+  }
+
+  // 📅 Home Page Today Widget — একই ডেটা সংক্ষেপে হোম স্ক্রিনে
+  setTxt("hbHomePanDateLine", dateStr);
+  setTxt("hbHomePanTithiLine", [data.paksha, tithiText].filter(Boolean).join(" · "));
+  setTxt("hbHomePanSunrise", hbPanFmtTime(data.sunrise));
+  setTxt("hbHomePanSunset", hbPanFmtTime(data.sunset));
+}
+
+// সেটিংস ট্যাবে user নিজে যদি শহর বেছে নেয় (ঢাকা/রিয়াদ/GPS), সেটাই override হিসেবে ব্যবহার হবে
+const HB_PAN_CITY_PRESETS = {
+  dhaka:  { lat: 23.8103, lon: 90.4125, cityKey: "dhaka",  cityLabel: "ঢাকা",  country: "বাংলাদেশ" },
+  riyadh: { lat: 24.7136, lon: 46.6753, cityKey: "riyadh", cityLabel: "রিয়াদ", country: "সৌদি আরব" },
+};
+function hbPanGetCityOverride(){
+  try{ return localStorage.getItem("hb-pan-city-override") || "auto"; }catch(e){ return "auto"; }
 }
 
 async function hbLoadPanchangShortCard(){
   const now = new Date();
   const date = now.toISOString().slice(0, 10);
-  let lat = HB_DEFAULT_LAT, lon = HB_DEFAULT_LON, cityKey = "dhaka", cityLabel = "ঢাকা";
-  try{
-    const pos = await Promise.race([
-      new Promise((resolve, reject)=>{
-        if(!navigator.geolocation){ reject(new Error("no geo")); return; }
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 600000 });
-      }),
-      new Promise((_, reject)=> setTimeout(()=> reject(new Error("geo timeout (fallback)")), 8500))
-    ]);
-    lat = pos.coords.latitude; lon = pos.coords.longitude;
+  let lat = HB_DEFAULT_LAT, lon = HB_DEFAULT_LON, cityKey = "dhaka", cityLabel = "ঢাকা", country = null;
+
+  const override = hbPanGetCityOverride();
+  if(override !== "auto" && HB_PAN_CITY_PRESETS[override]){
+    const preset = HB_PAN_CITY_PRESETS[override];
+    lat = preset.lat; lon = preset.lon; cityKey = preset.cityKey; cityLabel = preset.cityLabel; country = preset.country;
+  }else{
     try{
-      const geoRes = await fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=" + lat + "&longitude=" + lon + "&localityLanguage=bn");
-      if(geoRes.ok){
-        const geoData = await geoRes.json();
-        cityLabel = geoData.city || geoData.locality || geoData.principalSubdivision || "আপনার এলাকা";
-        cityKey = (geoData.city || geoData.locality || "loc").toLowerCase().replace(/[^a-z0-9]+/g, "_");
-      }
-    }catch(e){ cityLabel = "আপনার এলাকা"; cityKey = "loc_" + Math.round(lat) + "_" + Math.round(lon); }
-  }catch(e){ /* GPS না পেলে ঢাকার ডিফল্ট কোঅর্ডিনেট */ }
+      const pos = await Promise.race([
+        new Promise((resolve, reject)=>{
+          if(!navigator.geolocation){ reject(new Error("no geo")); return; }
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000, maximumAge: 600000 });
+        }),
+        new Promise((_, reject)=> setTimeout(()=> reject(new Error("geo timeout (fallback)")), 8500))
+      ]);
+      lat = pos.coords.latitude; lon = pos.coords.longitude;
+      try{
+        const geoRes = await fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=" + lat + "&longitude=" + lon + "&localityLanguage=bn");
+        if(geoRes.ok){
+          const geoData = await geoRes.json();
+          cityLabel = geoData.city || geoData.locality || geoData.principalSubdivision || "আপনার এলাকা";
+          cityKey = (geoData.city || geoData.locality || "loc").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+          country = geoData.countryName || null;
+        }
+      }catch(e){ cityLabel = "আপনার এলাকা"; cityKey = "loc_" + Math.round(lat) + "_" + Math.round(lon); }
+    }catch(e){ /* GPS না পেলে ঢাকার ডিফল্ট কোঅর্ডিনেট */ }
+  }
+
+  const settingsLocEl = document.getElementById("hbPanSettingsLocLabel");
+  if(settingsLocEl) settingsLocEl.textContent = "📍 " + cityLabel + (country ? ", " + country : "");
 
   const docId = cityKey + "_" + date;
   const timezone = hbPanTimezoneOffsetStr(now);
@@ -4006,7 +4129,7 @@ async function hbLoadPanchangShortCard(){
 
   try{
     const callable = functionsInstance.httpsCallable("getPanchangData");
-    const result = await callable({ date, latitude: lat, longitude: lon, timezone, cityKey });
+    const result = await callable({ date, latitude: lat, longitude: lon, timezone, cityKey, city: cityLabel, country });
     const data = result.data || {};
     hbPanRenderShortCard(data, cityLabel);
     hbPanIdbSet(docId, data);
@@ -4019,6 +4142,56 @@ async function hbLoadPanchangShortCard(){
     }
   }
 }
+
+/* ==================== 🕉️ সনাতনী পঞ্জিকা — ট্যাব বার (আজ/মাসিক/উৎসব/সেটিংস) ও
+   সেটিংস ট্যাবের লোকেশন/নোটিফিকেশন — সবই "আজ" ট্যাবের সাথে সম্পর্কিত, তাই এখানেই ==================== */
+const HB_PAN_TABS = ["today", "monthly", "festival", "settings"];
+function hbPanShowTab(tab){
+  HB_PAN_TABS.forEach((t)=>{
+    const pane = document.getElementById("hbPanTab" + t.charAt(0).toUpperCase() + t.slice(1));
+    if(pane) pane.style.display = (t === tab) ? "block" : "none";
+    const btn = document.querySelector('.hbPanTabBtn[data-pantab="' + t + '"]');
+    if(btn){
+      if(t === tab){ btn.style.background = "rgba(180,140,255,0.22)"; btn.style.color = "#c9b3ff"; }
+      else{ btn.style.background = "rgba(255,255,255,0.05)"; btn.style.color = "var(--muted)"; }
+    }
+  });
+}
+document.querySelectorAll(".hbPanTabBtn").forEach((btn)=>{
+  btn.addEventListener("click", ()=> hbPanShowTab(btn.dataset.pantab));
+});
+hbPanShowTab("today");
+
+(function hbPanWireSettingsTab(){
+  const citySelect = document.getElementById("hbPanCitySelect");
+  if(citySelect){
+    try{ citySelect.value = hbPanGetCityOverride(); }catch(e){}
+    citySelect.addEventListener("change", ()=>{
+      try{ localStorage.setItem("hb-pan-city-override", citySelect.value); }catch(e){}
+      hbLoadPanchangShortCard();
+    });
+  }
+  const notifIds = {
+    hbPanNotifEkadashi: "hb-pan-notif-ekadashi",
+    hbPanNotifMoon: "hb-pan-notif-moon",
+    hbPanNotifFestival: "hb-pan-notif-festival",
+    hbPanNotifShubho: "hb-pan-notif-shubho",
+  };
+  Object.entries(notifIds).forEach(([elId, storeKey])=>{
+    const el = document.getElementById(elId);
+    if(!el) return;
+    try{
+      const saved = localStorage.getItem(storeKey);
+      if(saved != null) el.checked = saved === "1";
+    }catch(e){}
+    el.addEventListener("change", ()=>{
+      try{ localStorage.setItem(storeKey, el.checked ? "1" : "0"); }catch(e){}
+    });
+  });
+})();
+
+// হোম পেজের Today Widget-এ ট্যাপ করলে সরাসরি সনাতনী পঞ্জিকা পেজে চলে যাবে
+document.getElementById("hbHomePanWidget") && document.getElementById("hbHomePanWidget").addEventListener("click", ()=>{ showScreen("screenPanchang"); if(typeof hbLoadPanchangShortCard === "function") hbLoadPanchangShortCard(); });
 
 /* ===== সনাতনী পঞ্জিকা — তিথি/পক্ষ/নক্ষত্র/যোগ/করণ/হিন্দু মাস/ঋতু ===== */
 const HB_TITHI_LIGHT = ["প্রতিপদ","দ্বিতীয়া","তৃতীয়া","চতুর্থী","পঞ্চমী","ষষ্ঠী","সপ্তমী","অষ্টমী","নবমী","দশমী","একাদশী","দ্বাদশী","ত্রয়োদশী","চতুর্দশী","পূর্ণিমা"];
@@ -4366,6 +4539,8 @@ async function hbLoadLiveLocationFeatures(){
 }
 hbLoadLiveLocationFeatures();
 setInterval(hbLoadLiveLocationFeatures, 15 * 60 * 1000); // ১৫ মিনিট পর পর রিফ্রেশ
+// 📅 Home Page Today Widget + সনাতনী পঞ্জিকা পেজ — অ্যাপ খোলার সাথে সাথেই একবার লোড
+if(typeof hbLoadPanchangShortCard === "function") hbLoadPanchangShortCard();
 
 document.getElementById("backToHomeFromJibonTori") && document.getElementById("backToHomeFromJibonTori").addEventListener("click", ()=> showScreen("screenHome"));
 document.getElementById("backToJibonToriFromBlood") && document.getElementById("backToJibonToriFromBlood").addEventListener("click", ()=> showScreen("screenJibonTori"));
