@@ -204,12 +204,23 @@ function activeDeletedKeys(deletedList, restoredList) {
     .map(({ key }) => key);
 }
 
+/* 🇸🇦 কর চালানের খাতা (ZATCA) এই ব্লব-সিঙ্কের বাইরে থাকে।
+   কারণ এই সিঙ্কটা "শেষে যে লিখল সে জিতল" ধরনের — পুরো localStorage একসাথে
+   ওঠে আর নামার সময় localStorage মুছে নতুন করে বসে। সাধারণ হিসাবে সেটা চলে,
+   কিন্তু কর চালানের খাতায় চলে না: দুই ফোন থেকে একসাথে বিক্রি হলে একটা চালান
+   হারিয়ে যেতে পারত, আর চালানের ক্রমিক নম্বর পুরনো ব্লব দিয়ে পিছিয়ে গিয়ে
+   একই নম্বর দুইবার ব্যবহার হয়ে যেত — ZATCA যেটা স্পষ্ট নিষেধ করেছে।
+   এই চালানগুলো ক্লাউডে যায় নিজের আলাদা আলাদা ডকুমেন্ট হিসেবে
+   (shops/{shopId}/zatcaInvoices), যেগুলো কখনো একে অপরকে চাপা দেয় না। */
+const ZATCA_LOCAL_KEYS = ["zatca-egs-unit", "zatca-icv", "zatca-ledger"];
+
 async function pushLocalStorageToCloud() {
   if (!__syncShopId) return;
   const blob = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (k === "bcc-session") continue; // এটা এই ডিভাইসের লগইন সেশন, দোকানের ডেটা না — সিঙ্ক হবে না
+    if (ZATCA_LOCAL_KEYS.indexOf(k) !== -1) continue; // কর চালানের খাতা ব্লবে যায় না (উপরের নোট দেখুন)
     blob[k] = localStorage.getItem(k);
   }
 
@@ -302,9 +313,16 @@ async function pullCloudToLocalStorage(shopId) {
   // bcc-session এখন localStorage-এ থাকে (মিনিমাইজ করলে যেন লগইন না হারায়), কিন্তু নিচের
   // clear() পুরো localStorage মুছে দেয় — তাই সাময়িক ব্যাকআপ রেখে পরে আবার বসানো হচ্ছে
   const savedSession = __origGetItem.call(localStorage, "bcc-session");
+  // কর চালানের খাতাও সরিয়ে রাখা হচ্ছে — নিচের clear() যেন এটা মুছে না ফেলে
+  const savedZatca = {};
+  ZATCA_LOCAL_KEYS.forEach(k => {
+    const v = __origGetItem.call(localStorage, k);
+    if (v !== null) savedZatca[k] = v;
+  });
   __origClear.call(localStorage);
   Object.keys(blob).forEach(k => __origSetItem.call(localStorage, k, blob[k]));
   if (savedSession) __origSetItem.call(localStorage, "bcc-session", savedSession);
+  Object.keys(savedZatca).forEach(k => __origSetItem.call(localStorage, k, savedZatca[k]));
   return true;
 }
 

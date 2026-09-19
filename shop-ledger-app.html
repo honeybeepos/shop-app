@@ -750,6 +750,7 @@ window.hbLoadLib = function(name){
      ওটা সৌদি আইনে বাধ্যতামূলক। -->
 <script src="hb-qr.js"></script>
 <script src="zatca-qr.js"></script>
+<script src="zatca-ledger.js"></script>
 <script src="firebase-init.js"></script>
 
 <div id="authGate">
@@ -2086,11 +2087,39 @@ window.hbLoadLib = function(name){
           অর্থাৎ মোট টাকার ভেতর থেকেই ভ্যাট আলাদা করে দেখানো হয়, দামের উপর
           বাড়তি যোগ করা হয় না।
         </p>
+        <div style="border-top:1px dashed var(--line); margin:14px 0 10px;"></div>
+        <p class="pin-desc" style="margin:0 0 10px;">
+          <b>দোকানের ঠিকানা</b> — এখন রসিদে লাগে না, কিন্তু দ্বিতীয় ধাপে
+          (ZATCA-র সার্ভারে চালান পাঠানোর সময়) প্রতিটা ঘর লাগবে। এখনই দিয়ে
+          রাখলে তখন আর খুঁজতে হবে না।
+        </p>
+        <label>বিল্ডিং নম্বর (৪ অঙ্ক)</label>
+        <input type="text" id="zatcaBuildingNo" inputmode="numeric" maxlength="4" placeholder="1234">
+        <label style="margin-top:8px; display:block;">রাস্তার নাম</label>
+        <input type="text" id="zatcaStreet" placeholder="King Fahd Road">
+        <label style="margin-top:8px; display:block;">এলাকা / ডিস্ট্রিক্ট</label>
+        <input type="text" id="zatcaDistrict" placeholder="Al Olaya">
+        <label style="margin-top:8px; display:block;">শহর</label>
+        <input type="text" id="zatcaCity" placeholder="Riyadh">
+        <label style="margin-top:8px; display:block;">পোস্টাল কোড (৫ অঙ্ক)</label>
+        <input type="text" id="zatcaPostal" inputmode="numeric" maxlength="5" placeholder="12211">
+        <label style="margin-top:8px; display:block;">CR নম্বর (কমার্শিয়াল রেজিস্ট্রেশন)</label>
+        <input type="text" id="zatcaCrNumber" inputmode="numeric" placeholder="1010101010">
+
         <button class="btn" id="zatcaSaveBtn" style="margin-top:12px;">সেভ করুন</button>
         <div id="zatcaSaveMsg" style="font-size:12.5px; margin-top:8px; min-height:18px;"></div>
         <div style="border-top:1px dashed var(--line); margin:14px 0 10px;"></div>
         <button class="btn secondary" id="zatcaTestBtn">নমুনা রসিদের QR দেখে নিন</button>
         <div id="zatcaTestArea" style="margin-top:10px; text-align:center;"></div>
+
+        <div style="border-top:1px dashed var(--line); margin:16px 0 10px;"></div>
+        <h3 style="margin:0 0 6px; font-size:15px;">🧾 কর চালানের খাতা</h3>
+        <p class="pin-desc" style="margin:0 0 10px;">
+          প্রতিটা কর চালান এখানে আলাদা করে লেখা থাকে — বদলানো বা মোছা যায় না।
+          দ্বিতীয় ধাপে এই খাতা থেকেই ZATCA-র সার্ভারে চালান যাবে।
+        </p>
+        <div id="zatcaLedgerBox" style="font-size:13px; line-height:1.9;"></div>
+        <button class="btn secondary" id="zatcaLedgerSyncBtn" style="margin-top:10px;">জমে থাকা চালান এখনই পাঠান</button>
       </div>
     </div>
 
@@ -9960,6 +9989,32 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
            + `Total (excl. VAT) : SAR ${b.net.toFixed(2)}\n`
            + `VAT ${b.rate}%          : SAR ${b.vat.toFixed(2)}\n`
            + `Total (incl. VAT) : SAR ${b.total.toFixed(2)}`;
+      /* 🧾 চালানটা কর খাতায় তোলা। এটা রসিদের চেহারা বা বিক্রির কোনো কিছুই
+         বদলায় না — শুধু আলাদা একটা খাতায় লিখে রাখে, যাতে পরে দ্বিতীয় ধাপে
+         (ZATCA-র সার্ভারে পাঠানোর সময়) প্রতিটা চালানের পূর্ণ তথ্য হাতে থাকে।
+         খাতায় তুলতে না পারলেও রসিদ ছাপা আটকায় না — কিন্তু চুপ করেও থাকা হয় না। */
+      try{
+        if(typeof ZatcaLedger !== 'undefined'){
+          const cfgNow = hbZatcaLoad();
+          const rec = ZatcaLedger.record({
+            invoiceType: 'simplified',              // দোকানের খুচরা বিক্রি = B2C
+            invoiceNumber: invoiceNo || '',
+            issuedAt: saleTime || new Date(),
+            sellerName: z.sellerName,
+            vatNumber: z.vatNumber,
+            sellerAddress: cfgNow.address || null,
+            vatRate: b.rate,
+            netAmount: b.net, vatAmount: b.vat, totalAmount: b.total,
+            qr: z.qr
+          });
+          z.ledgerId = rec.id;
+          z.icv = rec.icv;
+          if(typeof hbZatcaPushLedger === 'function') hbZatcaPushLedger();
+        }
+      }catch(ledgerErr){
+        console.error('ZATCA ledger লিখতে পারেনি:', ledgerErr);
+        try{ toast('⚠️ চালান কর খাতায় তোলা যায়নি — সেটিংসে খাতাটা একবার দেখুন'); }catch(_){}
+      }
       __hbZatcaForMessage = { message: msg, zatca: z };
     }catch(e){
       /* কর চালানে QR না থাকা মানে নিয়ম ভাঙা — তাই ব্যর্থতাটা চুপচাপ গিলে
@@ -14671,6 +14726,42 @@ document.getElementById('forgotPinBtn').addEventListener('click', ()=>{
   toast('পাসওয়ার্ড রিসেট হয়ে ডিফল্ট 12345 হয়েছে।');
 });
 
+/* ---------- 🇸🇦 কর চালান ক্লাউডে পাঠানো ----------
+   প্রতিটা চালান নিজের আলাদা ডকুমেন্টে যায়, তাই দুই ফোন থেকে একসাথে বিক্রি
+   হলেও একটা আরেকটাকে চাপা দেয় না। ইন্টারনেট না থাকলে ফোনেই জমা থাকে, আর
+   পরে সুযোগ পেলে পাঠানো হয় — বিক্রি কখনো আটকায় না। */
+let __hbZatcaPushing = false;
+async function hbZatcaPushLedger(){
+  if(__hbZatcaPushing || typeof ZatcaLedger === 'undefined') return;
+  if(!navigator.onLine) return;
+  const pending = ZatcaLedger.pendingSync();
+  if(!pending.length) return;
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId || typeof db === 'undefined') return;
+
+  __hbZatcaPushing = true;
+  try{
+    const col = db.collection('shops').doc(session.shopId).collection('zatcaInvoices');
+    const done = [];
+    // একবারে বেশি না পাঠিয়ে অল্প অল্প করে — ধীর সংযোগে যাতে আটকে না যায়
+    for(const rec of pending.slice(0, 25)){
+      try{
+        await col.doc(rec.id).set(rec);
+        done.push(rec.id);
+      }catch(e){
+        console.warn('চালান পাঠানো যায়নি (পরে আবার চেষ্টা হবে):', rec.icv, e && e.message);
+        break;   // একটা আটকালে বাকিগুলোও আটকাবে, বারবার চেষ্টা করে লাভ নেই
+      }
+    }
+    if(done.length) ZatcaLedger.markSynced(done);
+    if(typeof hbZatcaRefreshLedgerUi === 'function') hbZatcaRefreshLedgerUi();
+  }finally{
+    __hbZatcaPushing = false;
+  }
+}
+// ইন্টারনেট ফিরে এলে জমে থাকা চালানগুলো নিজে থেকেই চলে যাবে
+window.addEventListener('online', ()=>{ hbZatcaPushLedger(); });
+
 /* ---------- 🇸🇦 সৌদি ভ্যাট / ZATCA সেটিংস ---------- */
 (function hbZatcaSettingsInit(){
   const chk = document.getElementById('zatcaEnabled');
@@ -14682,12 +14773,24 @@ document.getElementById('forgotPinBtn').addEventListener('click', ()=>{
   const hintEl = document.getElementById('zatcaVatHint');
   const msgEl  = document.getElementById('zatcaSaveMsg');
 
+  const addrEls = {
+    buildingNumber: 'zatcaBuildingNo', streetName: 'zatcaStreet', district: 'zatcaDistrict',
+    city: 'zatcaCity', postalCode: 'zatcaPostal'
+  };
   function fill(){
     const c = hbZatcaLoad();
     chk.checked = !!c.enabled;
     nameEl.value = c.legalName || '';
     vatEl.value  = c.vatNumber || '';
     rateEl.value = (c.vatRate == null) ? 15 : c.vatRate;
+    const a = c.address || {};
+    Object.keys(addrEls).forEach(k => {
+      const el = document.getElementById(addrEls[k]);
+      if(el) el.value = a[k] || '';
+    });
+    const cr = document.getElementById('zatcaCrNumber');
+    if(cr) cr.value = c.crNumber || '';
+    renderLedger();
     fields.style.display = chk.checked ? 'block' : 'none';
     checkVat();
     checkCurrency();
@@ -14724,11 +14827,20 @@ document.getElementById('forgotPinBtn').addEventListener('click', ()=>{
   vatEl.addEventListener('input', ()=>{ vatEl.value = vatEl.value.replace(/\D/g,'').slice(0,15); checkVat(); });
 
   document.getElementById('zatcaSaveBtn').addEventListener('click', async ()=>{
+    const addr = {};
+    Object.keys(addrEls).forEach(k => {
+      const el = document.getElementById(addrEls[k]);
+      if(el && el.value.trim()) addr[k] = el.value.trim();
+    });
+    if(Object.keys(addr).length) addr.countryCode = 'SA';
+    const crEl = document.getElementById('zatcaCrNumber');
     const cfg = {
       enabled: chk.checked,
       legalName: nameEl.value.trim(),
       vatNumber: (vatEl.value || '').replace(/\s/g,''),
-      vatRate: Number(rateEl.value)
+      vatRate: Number(rateEl.value),
+      address: Object.keys(addr).length ? addr : null,
+      crNumber: crEl ? crEl.value.replace(/\D/g,'') : ''
     };
     /* ভুল সেটিং কাউন্টারে ধরা পড়লে দেরি হয়ে যায় — তাই সেভ করার সময়েই
        পুরো তথ্যটা ZATCA-এর নিয়মে চালিয়ে দেখা হয়। নাম লম্বা হলে চুপচাপ
@@ -14792,6 +14904,36 @@ document.getElementById('forgotPinBtn').addEventListener('click', ()=>{
     }finally{
       hbZatcaCfg = saved;
     }
+  });
+
+  /* খাতার অবস্থা দেখানো — কয়টা চালান, ক্রম ঠিক আছে কিনা, কয়টা এখনো
+     ক্লাউডে যায়নি। ক্রমে গণ্ডগোল থাকলে সেটা লাল করে দেখানো হয়, কারণ
+     কর খাতায় নম্বর পিছিয়ে যাওয়া বা দুইবার আসা গুরুতর ব্যাপার। */
+  function renderLedger(){
+    const box = document.getElementById('zatcaLedgerBox');
+    if(!box || typeof ZatcaLedger === 'undefined') return;
+    const st = ZatcaLedger.stats();
+    const audit = ZatcaLedger.audit();
+    const last = st.lastInvoice;
+    box.innerHTML =
+      `<div>এই ফোনের ইউনিট: <code style="font-size:11px;">${escapeHtml(st.egsUnitId || '(এখনো তৈরি হয়নি)')}</code></div>` +
+      `<div>মোট চালান: <b>${st.localCount}</b> · ক্রমিক নম্বর এখন <b>${st.counter}</b></div>` +
+      (last ? `<div>সর্বশেষ: #${last.icv} · ${escapeHtml(last.invoiceNumber || '')} · SAR ${Number(last.total).toFixed(2)}<br>
+               <span style="font-size:11.5px; color:#8a7f6c;">${escapeHtml(last.at)}</span></div>` : '<div>এখনো কোনো চালান হয়নি।</div>') +
+      `<div style="margin-top:4px;">ক্লাউডে যায়নি: <b style="color:${st.pendingSync ? 'var(--due)' : 'var(--paid)'};">${st.pendingSync}</b></div>` +
+      (audit.ok
+        ? `<div style="color:var(--paid);">✅ ক্রম ঠিক আছে (${audit.checked}টি দেখা হয়েছে)</div>`
+        : `<div style="color:var(--due);">⚠️ ${escapeHtml(audit.problems.slice(0,3).join(' · '))}</div>`);
+  }
+  window.hbZatcaRefreshLedgerUi = renderLedger;
+
+  const syncBtn = document.getElementById('zatcaLedgerSyncBtn');
+  if(syncBtn) syncBtn.addEventListener('click', async ()=>{
+    if(!navigator.onLine){ toast('ইন্টারনেট নেই — পরে নিজে থেকেই চলে যাবে'); return; }
+    syncBtn.disabled = true;
+    try{ await hbZatcaPushLedger(); toast('✅ পাঠানো হয়েছে'); }
+    catch(e){ toast('পাঠানো যায়নি: ' + (e && e.message || e)); }
+    finally{ syncBtn.disabled = false; renderLedger(); }
   });
 
   fill();
