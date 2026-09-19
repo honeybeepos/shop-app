@@ -620,6 +620,19 @@
       margin:0 !important; max-width:none;
     }
 
+    /* তার ভেতরের তালিকাটা ঠিক নিচেই খুলে থাকে */
+    #deskBizMenu{
+      grid-column:1; grid-row:3;
+      display:block;
+      margin-top:8px;
+      background:rgba(36,23,5,0.42);
+      border:1px solid rgba(255,209,102,0.22);
+      border-radius:16px;
+      padding:8px;
+    }
+    #deskBizMenu.collapsed{ display:none; }
+    #bizDeskArrow{ display:block; }
+
     /* কাজের জায়গা — ডান কলাম, পুরোটা জুড়ে */
     /* একই কারণে এখানেও গুনে গুনে সারি জোড়া — "-1" দিলে কাজের
        জায়গাটা প্রথম সারিতেই আটকে যেত আর মেনুর নিচের কার্ডটা
@@ -705,8 +718,51 @@
     display:none; text-align:center; padding:30px 10px;
     font-size:13px; line-height:1.9; color:rgba(255,248,232,0.45);
   }
+  /* ফোনে এই দুইটার কোনো অস্তিত্বই নেই — সাইডবারের তালিকা আর
+     কার্ডের ▾ তীরটা শুধু কম্পিউটারের জিনিস।
+     খেয়াল রাখার মতো: একই ওজনের নিয়ম হলে পরেরটা জেতে। তাই লুকানোর
+     নিয়ম আগে, আর দেখানোর নিয়ম (মিডিয়া কোয়েরি) তার পরে — উল্টো
+     লিখলে বড় পর্দাতেও কিছু দেখা যেত না। */
   #deskBillCol{ display:none; }
-  @media (min-width: 1000px){ #deskBillCol{ display:block; } }
+  #deskBizMenu{ display:none; }
+  @media (min-width: 1000px){
+    #deskBillCol{ display:block; }
+    #deskBizMenu{ display:block; }
+    #deskBizMenu.collapsed{ display:none; }
+  }
+  .bizDeskArrow{
+    display:none; margin-left:auto; flex-shrink:0;
+    color:rgba(255,255,255,0.55); font-size:15px;
+    transition:transform .2s ease;
+  }
+  #bizMgmtCard.deskCollapsed .bizDeskArrow{ transform:rotate(-90deg); }
+
+  .deskBizItem{
+    display:flex; align-items:center; gap:10px;
+    padding:9px 10px; border-radius:11px; cursor:pointer;
+    color:rgba(255,248,232,0.82);
+    transition:background .15s ease, color .15s ease;
+  }
+  .deskBizItem:hover{ background:rgba(255,209,102,0.12); color:#fff; }
+  .deskBizItem .ic{
+    width:28px; height:28px; border-radius:9px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:15px;
+  }
+  .deskBizItem .tx{ flex:1; min-width:0; }
+  .deskBizItem .t1{
+    font-size:12.5px; font-weight:800; line-height:1.3;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .deskBizItem .t2{
+    font-size:9.5px; letter-spacing:0.4px; margin-top:2px;
+    color:rgba(255,248,232,0.45);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .deskBizItem .bdg{
+    background:#e0433c; color:#fff; font-size:10px; font-weight:800;
+    min-width:18px; height:18px; border-radius:9px; line-height:18px;
+    text-align:center; padding:0 4px; flex-shrink:0;
+  }
 
   @media (min-width: 1600px){
     .wrap{ max-width:1480px; }
@@ -1702,8 +1758,15 @@ window.hbLoadLib = function(name){
       <div style="flex-shrink:0; width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg,#ffb347,#ff6f61); display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 6px 14px rgba(0,0,0,0.3), inset 0 1px 2px rgba(255,255,255,0.5); animation:bizFloat 3.2s ease-in-out infinite;">🏢</div>
       <div class="label" style="font-size:15px; text-transform:none; letter-spacing:0; color:#fff; font-weight:800;">Business Management</div>
       <span class="pulseDot" id="bizMgmtAlertDot" style="display:none;"></span>
+      <span class="bizDeskArrow" id="bizDeskArrow">▾</span>
     </div>
   </div>
+
+  <!-- 🖥️ Business Management-এর ভেতরের তালিকাটা কম্পিউটারে মেনুর নিচেই
+       খুলে থাকে — আলাদা পাতায় যেতে হয় না। ভেতরের নামগুলো এখানে হাতে
+       লেখা হয়নি; আসল পাতা থেকে পড়ে নিয়ে বানানো হয় (hbBuildDeskBizMenu),
+       তাই ওখানে নতুন কিছু যোগ হলে এখানেও আপনাআপনি চলে আসবে। -->
+  <div id="deskBizMenu"></div>
 
   <div class="tabs">
     <div class="tab-btn active" data-tab="dash">🏠 ড্যাশবোর্ড</div>
@@ -5443,7 +5506,10 @@ function openMiniProgram(id){
 }
 function closeMiniProgram(id){
   document.getElementById(id).style.display = 'none';
-  document.getElementById('mainApp').style.display = 'block';
+  /* 'block' নয়, ফাঁকা — ফাঁকা মানে "CSS যা বলে তাই"। কম্পিউটারে CSS
+     বলে grid (বাঁয়ে মেনু, ডানে কাজ); এখানে 'block' লিখে দিলে কোনো
+     ভেতরের পাতা থেকে ফিরে আসার পরেই সাইডবারটা ভেঙে যেত। */
+  document.getElementById('mainApp').style.display = '';
   if(typeof saveLastProgram === 'function') saveLastProgram(null);
 }
 function switchProgram(fromId, toId){
@@ -14935,6 +15001,106 @@ document.getElementById('forgotPinBtn').addEventListener('click', ()=>{
   localStorage.setItem('phone-shop-pin', JSON.stringify(systemMasterPin));
   toast('পাসওয়ার্ড রিসেট হয়ে ডিফল্ট 12345 হয়েছে।');
 });
+
+/* ---------- 🖥️ কম্পিউটারে Business Management মেনুর নিচেই ----------
+   ফোনে Business Management একটা আলাদা পাতা — কার্ডে চাপলে পুরো পর্দা
+   জুড়ে খোলে। ছোট পর্দায় ওটাই ঠিক। কিন্তু কম্পিউটারে বাঁ পাশে অনেক
+   জায়গা পড়ে থাকে, আর ভেতরে ঢুকে-বেরিয়ে আসাটা বাড়তি খাটুনি। তাই
+   চওড়া পর্দায় ভেতরের নামগুলো মেনুর নিচেই দেখানো হয়।
+
+   নামগুলো এখানে আবার লেখা হয়নি — আসল পাতার কার্ডগুলো পড়ে নিয়ে
+   বানানো হয়, আর চাপ দিলে ওই আসল কার্ডটাকেই ক্লিক করা হয়। তাই
+   ভবিষ্যতে ওখানে নতুন কিছু যোগ হলে এখানেও নিজে থেকেই চলে আসবে,
+   আর কোনো পাতার নিজস্ব কাজ এখানে নকল করতে হয়নি। */
+function hbBuildDeskBizMenu(){
+  const box = document.getElementById('deskBizMenu');
+  const src = document.getElementById('program-bizmgmt');
+  if(!box || !src || box.dataset.built === '1') return;
+
+  src.querySelectorAll('.bizNavCard').forEach(function(card){
+    const title = card.querySelector('.bizCardTitle');
+    if(!title) return;
+    const sub  = card.querySelector('.bizCardSub');
+    const icon = card.querySelector('.bizIconBadge');
+
+    const row = document.createElement('div');
+    row.className = 'deskBizItem';
+    row.title = title.textContent.trim();
+
+    const ic = document.createElement('div');
+    ic.className = 'ic';
+    ic.textContent = icon ? icon.textContent.trim() : '•';
+    if(icon) ic.style.background = icon.style.background;
+
+    const tx = document.createElement('div');
+    tx.className = 'tx';
+    const t1 = document.createElement('div');
+    t1.className = 't1'; t1.textContent = title.textContent.trim();
+    tx.appendChild(t1);
+    if(sub && sub.textContent.trim()){
+      const t2 = document.createElement('div');
+      t2.className = 't2'; t2.textContent = sub.textContent.trim();
+      tx.appendChild(t2);
+    }
+
+    row.appendChild(ic); row.appendChild(tx);
+
+    /* অর্ডারের লাল সংখ্যাটা আসল কার্ডে বসে। সেটার দিকে নজর রেখে
+       এখানেও একই সংখ্যা দেখানো হয় — দুই জায়গায় আলাদা হিসাব নয়। */
+    const srcBadge = card.querySelector('#ordNewBadge');
+    if(srcBadge){
+      const bdg = document.createElement('span');
+      bdg.className = 'bdg';
+      const sync = function(){
+        const hidden = getComputedStyle(srcBadge).display === 'none';
+        bdg.style.display = hidden ? 'none' : '';
+        bdg.textContent = srcBadge.textContent;
+      };
+      sync();
+      new MutationObserver(sync).observe(srcBadge,
+        { attributes:true, childList:true, characterData:true, subtree:true });
+      row.appendChild(bdg);
+    }
+
+    /* ভেতরের পাতাগুলো switchProgram('program-bizmgmt', …) দিয়ে খোলে,
+       অর্থাৎ ওরা ধরে নেয় Business Management পাতাটা এখন খোলা আছে।
+       তাই আগে সেটা খুলে নিয়ে তারপর আসল কার্ডে চাপ — এতে ফিরে আসার
+       পথটাও ফোনের মতোই থাকে (← চাপলে Business Management, আবার ←
+       চাপলে মূল পর্দা)। */
+    row.addEventListener('click', function(){
+      openMiniProgram('program-bizmgmt');
+      card.click();
+    });
+
+    box.appendChild(row);
+  });
+
+  box.dataset.built = '1';
+}
+
+/* কার্ডে চাপ দিলে কম্পিউটারে তালিকাটা খোলে/বন্ধ হয় — পুরো পাতা খোলে না।
+   ফোনে পুরনো আচরণই থাকে। capture ধাপে ধরা হচ্ছে যাতে পুরনো লিসেনারটা
+   কম্পিউটারে চলার সুযোগই না পায়; ওটাকে মুছতে হয়নি। */
+(function hbDeskBizToggle(){
+  const card = document.getElementById('bizMgmtCard');
+  const box  = document.getElementById('deskBizMenu');
+  if(!card || !box) return;
+  card.addEventListener('click', function(e){
+    if(!window.matchMedia('(min-width: 1000px)').matches) return;   // ফোন — হাত দেব না
+    e.stopPropagation();
+    const nowCollapsed = box.classList.toggle('collapsed');
+    card.classList.toggle('deskCollapsed', nowCollapsed);
+    try{ localStorage.setItem('desk-biz-collapsed', nowCollapsed ? '1' : '0'); }catch(_){}
+  }, true);
+
+  try{
+    if(localStorage.getItem('desk-biz-collapsed') === '1'){
+      box.classList.add('collapsed'); card.classList.add('deskCollapsed');
+    }
+  }catch(_){}
+})();
+
+hbBuildDeskBizMenu();
 
 /* ---------- 🖥️ কম্পিউটারে চলতি বিল ডান পাশে ----------
    চওড়া পর্দায় বিক্রির তালিকাগুলো ফর্মের ভেতর থেকে তুলে এনে ডান
