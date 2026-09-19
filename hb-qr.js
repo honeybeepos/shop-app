@@ -381,10 +381,30 @@
     }
   }
 
+  /* ZATCA-র নিয়মে QR-এ ৭০০ অক্ষর পর্যন্ত থাকতে পারে। দ্বিতীয় ধাপে সই আর
+     পাবলিক কী যোগ হলে লেখাটা ওই মাপের কাছাকাছি চলে যায়। "M" স্তরে আমাদের
+     সর্বোচ্চ ভার্সনে (২০) ধরে ৬৬৮ বাইট — অর্থাৎ সবচেয়ে বড় চালানের QR
+     বানানোই যেত না। তাই না ধরলে নিজে থেকেই এক ধাপ নিচের স্তরে নেমে যায়
+     ("L"), যেখানে ৮৫৮ বাইট পর্যন্ত ধরে। ছোট QR-এ আগের মতোই "M" থাকে, তাই
+     সাধারণ রসিদের QR আগের মতোই মজবুত। */
+  var ECL_FALLBACK = { H: "Q", Q: "M", M: "L", L: null };
+
   function encode(text, opts) {
     opts = opts || {};
     var ecl = opts.ecl || "M";
     if (!EC_TABLE[ecl]) throw new Error("QR: অজানা error correction level " + ecl);
+
+    if (opts.allowLowerEcl !== false && !opts.version) {
+      var tryEcl = ecl;
+      while (tryEcl) {
+        var fits = false;
+        for (var tv = 1; tv <= MAX_VERSION; tv++) {
+          if (buildCodewords(text, tv, tryEcl)) { fits = true; break; }
+        }
+        if (fits) { ecl = tryEcl; break; }
+        tryEcl = ECL_FALLBACK[tryEcl];
+      }
+    }
 
     var version = opts.version || 0, cw = null, v;
     if (version) {
