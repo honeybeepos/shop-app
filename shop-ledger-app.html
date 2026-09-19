@@ -9252,7 +9252,7 @@ async function bccPrintProductLabel(id){
     <div style="width:220px; padding:8px; margin:0 auto 6px; font-family:'Space Mono',monospace; font-size:12px; color:#000; border:1px dashed #999; text-align:center; page-break-inside:avoid;">
       ${shopName ? `<div style="font-size:10px; margin-bottom:2px;">${escapeHtml(shopName)}</div>` : ''}
       <div style="font-weight:800; font-size:13px; margin-bottom:2px; word-break:break-word;">${escapeHtml(p.name)}</div>
-      <div style="font-size:13px; font-weight:700; margin-bottom:4px;">৳${fmt(p.sell)}${p.unit==='kg' ? '/kg' : ''}</div>
+      <div style="font-size:13px; font-weight:700; margin-bottom:4px;">${fmt(p.sell)}${p.unit==='kg' ? '/kg' : ''}</div>
       <svg id="productLabelBarcode${i}"></svg>
     </div>`;
   }
@@ -9309,7 +9309,7 @@ function qrSelectProduct(id){
   qrSelectedProduct = p;
   document.getElementById('qrProductSearch').value = p.name;
   document.getElementById('qrProductResults').classList.remove('show');
-  document.getElementById('qrSelectedProductInfo').textContent = `${p.name} — বর্তমান স্টক: ${(Number(p.qty)||0).toFixed(3)} kg, দাম: ৳${fmt(p.sell)}/kg`;
+  document.getElementById('qrSelectedProductInfo').textContent = `${p.name} — বর্তমান স্টক: ${(Number(p.qty)||0).toFixed(3)} kg, দাম: ${fmt(p.sell)}/kg`;
   document.getElementById('qrSelectedProductBox').style.display = 'block';
   document.getElementById('qrWeightKg').value = 0;
   document.getElementById('qrWeightGram').value = 0;
@@ -9381,7 +9381,7 @@ async function qrPrintTicketLabel(code, name, grams, price){
       ${shopName ? `<div style="font-size:10px; margin-bottom:2px;">${escapeHtml(shopName)}</div>` : ''}
       <div style="font-weight:800; font-size:13px; margin-bottom:2px; word-break:break-word;">${escapeHtml(name)}</div>
       <div style="font-size:12px; margin-bottom:2px;">ওজন: ${weightText}</div>
-      <div style="font-size:13px; font-weight:700; margin-bottom:4px;">৳${price.toFixed(2)}</div>
+      <div style="font-size:13px; font-weight:700; margin-bottom:4px;">${HB_CUR} ${price.toFixed(2)}</div>
       <svg id="ticketBarcodeSvg"></svg>
     </div>`;
   // 📦 বারকোড লাইব্রেরি এখন দরকারের সময় লোড হয় (প্রিন্টের ঠিক আগে)
@@ -9876,6 +9876,57 @@ function fixBrokenInvoiceNumbers(){
 // - সবসময় Product Master Database-এর ফুল নাম ব্যবহার হয় — শর্ট নেম কখনো দেখানো হয় না
 // - invoiceNo বিল তৈরি হওয়ার সময়েই একবার জেনারেট হয়ে এন্ট্রির সাথে সেভ থাকে (প্রিন্ট/শেয়ার
 //   যতবারই করা হোক, একই ইনভয়েস নাম্বার থাকবে) — সেটাই এখানে parameter হিসেবে আসে
+/* ==================== 🖨️ ছাপার ভাষা ====================
+   অ্যাপের পর্দা বাংলাতেই থাকে — দোকানদার বাংলাতেই কাজ করেন। কিন্তু
+   **ছাপা কাগজটা** যায় কাস্টমারের হাতে, আর কর অফিসে। সেখানে দোকানের
+   দেশের ভাষাই লাগে। তাই সাইনআপে বাছাই করা দেশ দিয়ে ঠিক হয়:
+
+     বাংলাদেশ  → বাংলা
+     সৌদি আরব  → ইংরেজি, সাথে আরবি
+     অন্য দেশ  → ইংরেজি
+
+   পুরনো দোকান (যাদের দেশ সেভ করা নেই) বাংলাদেশ ধরে নেওয়া হয়, তাই
+   তাদের রসিদ আগের মতোই বাংলায় ছাপবে — কিছুই বদলায় না। */
+function hbShopCountry(){
+  return localStorage.getItem('shop-country-code') || 'BD';
+}
+function hbPrintLang(){
+  return hbShopCountry() === 'BD' ? 'bn' : 'en';
+}
+function hbIsSaudiShop(){ return hbShopCountry() === 'SA'; }
+
+const HB_PRINT_TXT = {
+  bn: {
+    thanks:      'ধন্যবাদ! আবার আসবেন 🙏',
+    barcodeHint: '🔖 এই বারকোড স্ক্যান করলে কাস্টমারের হিসাব বের হবে',
+    qrCaption:   'ZATCA e-invoice QR',
+    qrFailed:    'ZATCA QR তৈরি করা যায়নি',
+    qrFixHint:   'সেটিংস ঠিক করে আবার প্রিন্ট করুন।'
+  },
+  en: {
+    thanks:      'Thank you — please visit again',
+    barcodeHint: 'Scan this barcode to open the customer account',
+    qrCaption:   'ZATCA e-invoice QR',
+    qrFailed:    'ZATCA QR could not be generated',
+    qrFixHint:   'Fix the settings and print again.'
+  }
+};
+// সৌদি দোকানের কাগজে ইংরেজির পাশে আরবিও থাকে
+const HB_PRINT_AR = {
+  thanks:    'شكراً لزيارتكم',
+  qrCaption: 'رمز الفاتورة'
+};
+
+function hbPT(key){
+  return (HB_PRINT_TXT[hbPrintLang()] || HB_PRINT_TXT.en)[key] || '';
+}
+/* আরবি লেখাটা আলাদা লাইনে বসে — এক লাইনে ইংরেজির সাথে জুড়ে দিলে সরু
+   রসিদে মাঝখান থেকে ভেঙে যায়, আর আরবি ডান-থেকে-বাঁয়ে লেখা বলে ভাঙা
+   অংশটা পড়তে অস্বস্তি লাগে। */
+function hbPTAr(key){
+  return hbIsSaudiShop() ? (HB_PRINT_AR[key] || '') : '';
+}
+
 /* ==================== 🇸🇦 সৌদি ভ্যাট / ZATCA (ফাতুরা) ====================
    সৌদি আরবে ২০২১ সালের ৪ ডিসেম্বর থেকে প্রতিটা ভ্যাট-নিবন্ধিত দোকানের
    সরলীকৃত কর চালানে (খুচরা বিক্রির রসিদ) ZATCA-এর নিয়মের QR ছাপানো
@@ -10025,8 +10076,7 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
       const why = (e && e.zatcaErrors) ? e.zatcaErrors.join(' · ') : (e && e.message) || 'অজানা সমস্যা';
       __hbZatcaForMessage = null;
       __hbZatcaLastError = why;
-      msg += `\n\n${DIVIDER}\n⚠️ ZATCA QR তৈরি করা যায়নি — ${why}\n`
-           + `সেটিংস ঠিক করে আবার প্রিন্ট করুন।`;
+      msg += `\n\n${DIVIDER}\n⚠️ ${hbPT('qrFailed')} — ${why}\n` + hbPT('qrFixHint');
       try{ toast('⚠️ ZATCA QR তৈরি হয়নি — ' + why); }catch(_){}
     }
   }
@@ -14332,7 +14382,8 @@ async function printSaleReceipt(name, phone, message){
       zatcaQrHtml = `
       <div style="text-align:center; margin:10px 0 6px;">
         <img src="${HBQR.toDataURL(zat.qr, { scale:3, margin:2 })}" alt="ZATCA QR" style="width:128px; height:128px; image-rendering:pixelated;">
-        <div style="font-size:9px; margin-top:2px;">ZATCA e-invoice QR · رمز الفاتورة</div>
+        <div style="font-size:9px; margin-top:2px;">${escapeHtml(hbPT('qrCaption'))}</div>
+        ${hbPTAr('qrCaption') ? `<div dir="rtl" style="font-size:9px;">${escapeHtml(hbPTAr('qrCaption'))}</div>` : ''}
       </div>`;
     }catch(e){ console.warn('ZATCA QR render failed:', e); }
   }
@@ -14346,9 +14397,10 @@ async function printSaleReceipt(name, phone, message){
       ${barcodeValue ? `
       <div style="text-align:center; margin-top:8px;">
         <svg id="saleReceiptBarcode"></svg>
-        <div style="font-size:9px; margin-top:2px;">🔖 এই বারকোড স্ক্যান করলে কাস্টমারের হিসাব বের হবে</div>
+        <div style="font-size:9px; margin-top:2px;">${escapeHtml(hbPT('barcodeHint'))}</div>
       </div>` : ''}
-      <div style="text-align:center; font-size:10.5px; margin-top:4px;">ধন্যবাদ! আবার আসবেন 🙏</div>
+      <div style="text-align:center; font-size:10.5px; margin-top:4px;">${escapeHtml(hbPT('thanks'))}</div>
+      ${hbPTAr('thanks') ? `<div dir="rtl" style="text-align:center; font-size:10.5px;">${escapeHtml(hbPTAr('thanks'))}</div>` : ''}
     </div>`;
   // 📦 বারকোড লাইব্রেরি এখন দরকারের সময় লোড হয় (প্রিন্টের ঠিক আগে)
   if(barcodeValue){
@@ -14454,7 +14506,8 @@ async function btRenderReceiptCanvas(shopName, message, zatca){
   const headerLines = shopName ? wrapLine(shopName, headerFont) : [];
   let bodyLines = [];
   message.split('\n').forEach(l=> wrapLine(l, bodyFont).forEach(x=> bodyLines.push(x)));
-  const footerLines = wrapLine('ধন্যবাদ! আবার আসবেন 🙏', footerFont);
+  const footerLines = wrapLine(hbPT('thanks'), footerFont)
+    .concat(hbPTAr('thanks') ? wrapLine(hbPTAr('thanks'), footerFont) : []);
 
   let totalH = 16;
   if(headerLines.length) totalH += headerLines.length * lineH.header + lineH.gap;
@@ -14514,7 +14567,8 @@ async function btRenderReceiptCanvas(shopName, message, zatca){
     cy += qrPx + 8;
     ctx.font = footerFont;
     ctx.textAlign = 'center';
-    ctx.fillText('ZATCA e-invoice QR', W/2, cy);
+    ctx.fillText(hbPT('qrCaption'), W/2, cy);
+    if(hbPTAr('qrCaption')){ cy += lineH.footer; ctx.fillText(hbPTAr('qrCaption'), W/2, cy); }
     cy += lineH.footer + 6;
   }
 
@@ -20302,6 +20356,10 @@ auth.onAuthStateChanged(async (user)=>{
     HB_CUR = curSymbol;
     localStorage.setItem('shop-currency-symbol', curSymbol);
     if(shopInfo.currencyCode) localStorage.setItem('shop-currency-code', shopInfo.currencyCode);
+    /* 🌍 দোকানের দেশ — ছাপার ভাষা এটা দিয়েই ঠিক হয় (বাংলাদেশ → বাংলা,
+       সৌদি → ইংরেজি+আরবি)। পুরনো দোকানে ফিল্ডটা না থাকলে হাত দেওয়া হয় না,
+       তখন ডিফল্ট বাংলাদেশ ধরে আগের মতোই বাংলায় ছাপবে। */
+    if(shopInfo.countryCode) localStorage.setItem('shop-country-code', shopInfo.countryCode);
 
     // 🇸🇦 সৌদি ভ্যাট/ZATCA সেটিং — দোকানের রেকর্ডে থাকলে সেটাই আসল, যাতে
     // নতুন ফোনে লগইন করলেও ভ্যাট নম্বর আর QR ঠিকঠাক থাকে
