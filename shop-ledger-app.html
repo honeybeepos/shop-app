@@ -9909,6 +9909,7 @@ function hbZatcaPayload(totalWithVat, saleTime){
    মোডাল পরে শুধু তখনই QR বসায় যখন তার হাতের লেখাটা হুবহু ওটাই — অন্য কোনো
    বার্তা (যেমন বাকি মনে করানোর মেসেজ) হলে পুরনো QR বসে যাওয়ার সুযোগ নেই। */
 let __hbZatcaForMessage = null;
+let __hbZatcaLastError = null;
 
 function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared, invoiceNo, saleTime}){
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || 'Mumen Electronics';
@@ -9946,6 +9947,7 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
      দোকানের আইনি নাম, ভ্যাট নম্বর, ভ্যাট ছাড়া দাম, ভ্যাটের অঙ্ক, ভ্যাটসহ
      মোট — আর রসিদের নামে "Simplified Tax Invoice" লেখা। */
   __hbZatcaForMessage = null;
+  __hbZatcaLastError = null;
   if(hbZatcaActive()){
     try{
       const z = hbZatcaPayload(billTotalPrice, saleTime);
@@ -9960,9 +9962,17 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
            + `Total (incl. VAT) : SAR ${b.total.toFixed(2)}`;
       __hbZatcaForMessage = { message: msg, zatca: z };
     }catch(e){
-      // QR বানাতে না পারলেও রসিদ ছাপা বন্ধ হবে না — শুধু QR ছাড়া যাবে
+      /* কর চালানে QR না থাকা মানে নিয়ম ভাঙা — তাই ব্যর্থতাটা চুপচাপ গিলে
+         ফেলা হয় না। বিক্রি আটকে দেওয়া হয় না (দোকানের সামনে লাইন দাঁড়িয়ে
+         থাকে), কিন্তু দোকানদার যেন সাথে সাথেই জানতে পারেন — পর্দায় বার্তা,
+         আর রসিদের গায়েই লেখা থাকে কেন QR নেই। */
       console.warn('ZATCA payload failed:', e);
+      const why = (e && e.zatcaErrors) ? e.zatcaErrors.join(' · ') : (e && e.message) || 'অজানা সমস্যা';
       __hbZatcaForMessage = null;
+      __hbZatcaLastError = why;
+      msg += `\n\n${DIVIDER}\n⚠️ ZATCA QR তৈরি করা যায়নি — ${why}\n`
+           + `সেটিংস ঠিক করে আবার প্রিন্ট করুন।`;
+      try{ toast('⚠️ ZATCA QR তৈরি হয়নি — ' + why); }catch(_){}
     }
   }
 
@@ -14720,10 +14730,22 @@ document.getElementById('forgotPinBtn').addEventListener('click', ()=>{
       vatNumber: (vatEl.value || '').replace(/\s/g,''),
       vatRate: Number(rateEl.value)
     };
-    if(cfg.enabled && !ZatcaQR.isValidVatNumber(cfg.vatNumber)){
-      msgEl.textContent = '❌ আগে সঠিক ভ্যাট নম্বরটা দিন — ভুল নম্বর দিয়ে রসিদ ছাপলে সেটা নিয়ম মানবে না।';
-      msgEl.style.color = 'var(--due)';
-      return;
+    /* ভুল সেটিং কাউন্টারে ধরা পড়লে দেরি হয়ে যায় — তাই সেভ করার সময়েই
+       পুরো তথ্যটা ZATCA-এর নিয়মে চালিয়ে দেখা হয়। নাম লম্বা হলে চুপচাপ
+       ছেঁটে না দিয়ে বলা হয় ছোট করতে। */
+    if(cfg.enabled){
+      const check = ZatcaQR.validate({
+        sellerName: cfg.legalName || hbZatcaSellerName(),
+        vatNumber: cfg.vatNumber,
+        timestamp: new Date(),
+        totalWithVat: 115,
+        vatTotal: 15
+      });
+      if(!check.ok){
+        msgEl.textContent = '❌ ' + check.errors.join(' · ');
+        msgEl.style.color = 'var(--due)';
+        return;
+      }
     }
     if(cfg.enabled && !isFinite(cfg.vatRate)){ cfg.vatRate = 15; }
     hbZatcaCfg = cfg;

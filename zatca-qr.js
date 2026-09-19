@@ -114,9 +114,46 @@
     return /^3\d{13}3$/.test(s);
   }
 
+  /* ---------- আগে যাচাই, তারপর QR ----------
+     কর চালানের QR-এ ভুল তথ্য চুপচাপ ঢুকে যাওয়া সবচেয়ে বিপজ্জনক — ছাপা
+     রসিদটা দেখতে ঠিকই লাগবে, কিন্তু স্ক্যান করলে ভুল ধরা পড়বে, আর ততক্ষণে
+     শত শত রসিদ বেরিয়ে গেছে। তাই সন্দেহজনক কিছু পেলে চুপচাপ ঠিক করে নেওয়ার
+     বদলে পরিষ্কার ভুলের বার্তা দেওয়া হয়। */
+  function zatcaValidate(inv) {
+    inv = inv || {};
+    var errors = [];
+    var name = String(inv.sellerName == null ? "" : inv.sellerName).trim();
+    if (!name) errors.push("বিক্রেতার নাম খালি — কর চালানে দোকানের আইনি নাম থাকতেই হবে");
+    else if (utf8Bytes(name).length > 255) {
+      errors.push("বিক্রেতার নাম খুব লম্বা (" + utf8Bytes(name).length +
+                  " বাইট, সর্বোচ্চ ২৫৫) — ছোট করে দিন, কেটে দেওয়া হবে না");
+    }
+    var vat = String(inv.vatNumber == null ? "" : inv.vatNumber).replace(/\s/g, "");
+    if (!isValidVatNumber(vat)) errors.push("Invalid Saudi VAT Registration Number — ১৫ অঙ্ক, ৩ দিয়ে শুরু ও শেষ");
+    var dt = (inv.timestamp instanceof Date) ? inv.timestamp : new Date(inv.timestamp);
+    if (!inv.timestamp || isNaN(dt.getTime())) errors.push("চালানের সময় পড়া যায়নি");
+    var tot = Number(inv.totalWithVat), v = Number(inv.vatTotal);
+    if (!isFinite(tot)) errors.push("মোট টাকার অঙ্ক পড়া যায়নি");
+    else if (tot < 0) errors.push("মোট টাকা ঋণাত্মক হতে পারে না");
+    if (!isFinite(v)) errors.push("ভ্যাটের অঙ্ক পড়া যায়নি");
+    else if (v < 0) errors.push("ভ্যাট ঋণাত্মক হতে পারে না");
+    if (isFinite(tot) && isFinite(v) && v > tot + 0.005) errors.push("ভ্যাট মোট টাকার চেয়ে বেশি হতে পারে না");
+    return { ok: errors.length === 0, errors: errors };
+  }
+
+  function assertValid(inv) {
+    var r = zatcaValidate(inv);
+    if (!r.ok) {
+      var e = new Error("ZATCA QR: " + r.errors.join(" | "));
+      e.zatcaErrors = r.errors;
+      throw e;
+    }
+  }
+
   /* মূল কাজ — প্রথম ধাপের পাঁচটা ট্যাগ দিয়ে QR-এর লেখা বানানো */
   function zatcaQrBase64(inv) {
     inv = inv || {};
+    assertValid(inv);
     return bytesToBase64(concatBytes([
       tlv(1, inv.sellerName),
       tlv(2, String(inv.vatNumber == null ? "" : inv.vatNumber).replace(/\s/g, "")),
@@ -128,6 +165,7 @@
 
   /* দ্বিতীয় ধাপে বাড়তি ট্যাগ (৬-৯) জোড়া দেওয়ার জন্য — extra = {6:"...",7:"..."} */
   function zatcaQrFromTlv(inv, extra) {
+    assertValid(inv);
     var parts = [
       tlv(1, inv.sellerName),
       tlv(2, String(inv.vatNumber == null ? "" : inv.vatNumber).replace(/\s/g, "")),
@@ -175,6 +213,7 @@
     timestamp: zatcaTimestamp,
     money: money,
     isValidVatNumber: isValidVatNumber,
+    validate: zatcaValidate,
     vatFromInclusive: vatFromInclusive,
     _utf8Bytes: utf8Bytes,
     _truncateToBytes: truncateToBytes
