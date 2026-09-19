@@ -568,6 +568,73 @@
     #ordCardListPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     .no-print{display:none !important;}
   }
+
+  /* ═══════════════════════════════════════════════════════════════
+     🖥️ বড় পর্দা (কম্পিউটার / উইন্ডোজ) — ধাপ ১
+
+     এতদিন অ্যাপটা যেকোনো পর্দাতেই ৫২০ পিক্সেলের একটা সরু কলাম হয়ে
+     মাঝখানে দাঁড়িয়ে থাকত, দুই পাশে বিরাট জায়গা খালি পড়ে থাকত।
+     কারণটা সহজ: পুরো অ্যাপে বড় পর্দার জন্য একটাও নিয়ম লেখা ছিল না।
+
+     নিচের নিয়মগুলো শুধু ১০০০ পিক্সেলের চওড়া পর্দায় চালু হয়। ফোনে
+     কিচ্ছু বদলায় না — ফোনের পর্দা কখনো এত চওড়া হয় না, তাই এই
+     ব্লকের ভেতরে ঢোকেই না। একই ফাইল, একই কোড, দুই চেহারা।
+
+     এখানে শুধু জায়গাটা কাজে লাগানো হয়েছে — কার্ডগুলো পাশাপাশি বসেছে,
+     লেখার আকার বাড়েনি। বিক্রির পর্দাটা আসল দোকানের মতো তিন কলামে
+     সাজানো পরের ধাপের কাজ।
+     ═══════════════════════════════════════════════════════════════ */
+  @media (min-width: 1000px){
+    .wrap{ max-width:1240px; padding:20px 24px 48px; }
+
+    /* উপরের কার্ডগুলো যেন টেনে লম্বা হয়ে না যায় */
+    .summary{ max-width:640px; margin-left:auto; margin-right:auto; }
+
+    /* ট্যাবের বোতামগুলো একটু বড়, মাউসে চাপার মতো */
+    .tab-btn{ font-size:14px; padding:12px 18px; }
+
+    /* ড্যাশবোর্ড: বাকির তালিকা আর আজকের রিপোর্ট পাশাপাশি,
+       বিক্রির লেখচিত্রটা নিচে পুরো চওড়ায় — ওটার জায়গা দরকার */
+    #tab-dash.active{
+      display:grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap:18px;
+      align-items:start;
+    }
+    #tab-dash .panel{ margin-bottom:0; }
+    #tab-dash .chart-panel{ grid-column:1 / -1; }
+    #tab-dash .chart-panel canvas{ max-height:320px; }
+
+    /* সেটিংস, প্রিন্ট, QR — কার্ডগুলো দুই কলামে */
+    #tab-settings.active, #tab-print.active, #tab-qr.active{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap:18px;
+      align-items:start;
+    }
+    #tab-settings.active > .panel,
+    #tab-print.active > .panel,
+    #tab-qr.active > .panel{ margin-bottom:0; }
+
+    /* হিসাবের লম্বা তালিকা পুরো চওড়ায় ছড়িয়ে পড়লে চোখ হারিয়ে যায়,
+       তাই পড়ার মতো চওড়ায় বেঁধে রাখা হলো */
+    #tab-list .panel{ max-width:900px; margin-left:auto; margin-right:auto; }
+
+    /* বিক্রির পর্দা — এখনো আগের মতোই উপর থেকে নিচে একটা ফর্ম। পুরো
+       ১২৪০ পিক্সেল জুড়ে টেনে দিলে নামের ঘরটাও হাত-লম্বা হয়ে যেত,
+       দেখতে ভাঙা লাগত। তাই আপাতত পড়ার মতো চওড়ায় বেঁধে মাঝখানে
+       রাখা হলো। আসল দোকানের মতো তিন কলাম — বাঁয়ে কাস্টমার, মাঝে
+       মালামাল, ডানে চলতি বিল — পরের ধাপের কাজ। */
+    #tab-add > .panel{ max-width:920px; margin-left:auto; margin-right:auto; }
+
+    /* উপরের Business Management কার্ডটার নিজের inline margin আছে,
+       তাই সেটাকে টপকে মাঝখানে আনতে হলো */
+    #extraOptionsRow{ margin-left:auto !important; margin-right:auto !important; }
+  }
+
+  @media (min-width: 1600px){
+    .wrap{ max-width:1480px; }
+  }
 </style>
 
 <style>
