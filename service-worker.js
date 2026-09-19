@@ -9,7 +9,7 @@
 /* গুরুত্বপূর্ণ: প্রতিবার কোড আপডেট করে সার্ভারে দেওয়ার সময় এই ভার্সন নাম্বারটা
    বাড়িয়ে দিন (v2 → v3 → v4 ...)। এটা বাড়ালে পুরনো ক্যাশ মুছে ফেলা হয় এবং
    ইউজার নতুন ভার্সন পায়। */
-const CACHE_VERSION = "shop-app-v122";
+const CACHE_VERSION = "shop-app-v124";
 
 const APP_SHELL = [
   "login.html",
@@ -18,6 +18,9 @@ const APP_SHELL = [
   "delivery-man-app.html",
   "honey-bee-track.html",
   "firebase-init.js",
+  "hb-currency.js",
+  "hb-qr.js",
+  "zatca-qr.js",
   "manifest.json",
   "icon-192.png",
   "icon-512.png",
@@ -31,11 +34,25 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => {
       return Promise.all(
-        APP_SHELL.map((url) =>
-          fetch(url, { mode: url.startsWith("http") ? "no-cors" : "same-origin" })
+        APP_SHELL.map((url) => {
+          if (!url.startsWith("http")) {
+            return fetch(url, { mode: "same-origin" })
+              .then((res) => cache.put(url, res))
+              .catch(() => {}); // একটা ফাইল ফেইল করলেও বাকিগুলো ক্যাশ হবে
+          }
+          /* বাইরের ফাইল (Google ফন্টের CSS, Firebase SDK) — এরা সবাই
+             CORS অনুমতি পাঠায়, তাই স্বাভাবিকভাবেই আনা যায়। আগে সবসময়
+             "no-cors" দিয়ে আনা হতো, তাতে ক্যাশে একটা "অস্বচ্ছ" (opaque)
+             কপি জমা হতো — ব্রাউজার সেটার ভেতরটা পড়তে পারে না। এখন আগে
+             স্বাভাবিকভাবে চেষ্টা হয়, না পারলে তবেই আগের নিয়মে। */
+          return fetch(url)
             .then((res) => cache.put(url, res))
-            .catch(() => {}) // একটা ফাইল ফেইল করলেও বাকিগুলো ক্যাশ হবে
-        )
+            .catch(() =>
+              fetch(url, { mode: "no-cors" })
+                .then((res) => cache.put(url, res))
+                .catch(() => {})
+            );
+        })
       );
     }).then(() => self.skipWaiting())
   );

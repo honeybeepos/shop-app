@@ -745,6 +745,11 @@ window.hbLoadLib = function(name){
      আছে সেভাবেই -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script src="hb-currency.js"></script>
+<!-- 🇸🇦 সৌদি ভ্যাট (ZATCA/ফাতুরা) — QR তৈরির অংশ। দুটোই অ্যাপের নিজের ফাইল,
+     বাইরের CDN থেকে আসে না — কারণ ইন্টারনেট না থাকলেও রসিদে QR থাকতেই হবে,
+     ওটা সৌদি আইনে বাধ্যতামূলক। -->
+<script src="hb-qr.js"></script>
+<script src="zatca-qr.js"></script>
 <script src="firebase-init.js"></script>
 
 <div id="authGate">
@@ -2051,6 +2056,42 @@ window.hbLoadLib = function(name){
       <p class="pin-desc">ডিফল্ট পাসওয়ার্ড 12345। এটি দিয়ে হিসাব মোছা ও মোট অংক দেখা যায়।</p>
       <button class="btn" id="changePinBtn">পাসওয়ার্ড পরিবর্তন করুন</button>
       <button class="btn secondary" id="forgotPinBtn" style="margin-top:10px;">পাসওয়ার্ড রিসেট করুন (ডিফল্ট 12345)</button>
+    </div>
+
+    <!-- 🇸🇦 সৌদি আরবের দোকানের জন্য — ZATCA (ফাতুরা) ই-ইনভয়েস।
+         ২০২১ সালের ৪ ডিসেম্বর থেকে সৌদির প্রতিটা ভ্যাট-নিবন্ধিত দোকানের
+         রসিদে ZATCA-এর নিয়মের QR ছাপানো বাধ্যতামূলক। চালু না করলে অ্যাপ
+         আগের মতোই চলে — বাংলাদেশের দোকানে কিছুই বদলায় না। -->
+    <div class="panel">
+      <h2><span class="num">🇸🇦</span> সৌদি ভ্যাট ও ই-ইনভয়েস (ZATCA)</h2>
+      <p class="pin-desc" style="margin:0 0 12px;">
+        সৌদি আরবে ভ্যাট-নিবন্ধিত দোকান হলে এটা চালু করুন। তখন প্রতিটা রসিদে
+        ভ্যাটের হিসাব আর ZATCA-এর নিয়মের QR কোড আসবে। অন্য দেশের দোকান হলে
+        বন্ধ রাখুন।
+      </p>
+      <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin-bottom:12px;">
+        <input type="checkbox" id="zatcaEnabled" style="width:20px; height:20px;">
+        <span style="font-weight:700;">সৌদি ই-ইনভয়েস চালু করুন</span>
+      </label>
+      <div id="zatcaFields" style="display:none;">
+        <label>দোকানের আইনি নাম (ভ্যাট সনদে যেমন লেখা)</label>
+        <input type="text" id="zatcaLegalName" placeholder="مؤسسة ... / Al Noor Trading Est.">
+        <label style="margin-top:10px; display:block;">ভ্যাট রেজিস্ট্রেশন নম্বর (১৫ অঙ্ক)</label>
+        <input type="text" id="zatcaVatNumber" inputmode="numeric" maxlength="15" placeholder="310122393500003">
+        <div id="zatcaVatHint" style="font-size:12px; margin-top:4px; min-height:16px;"></div>
+        <label style="margin-top:10px; display:block;">ভ্যাটের হার (%)</label>
+        <input type="number" id="zatcaVatRate" inputmode="decimal" value="15" step="0.1" min="0" max="100">
+        <p class="pin-desc" style="margin:10px 0 0;">
+          দোকানে টাঙানো দামে ভ্যাট ধরা আছে বলেই হিসাব করা হয় (সৌদিতে এটাই নিয়ম) —
+          অর্থাৎ মোট টাকার ভেতর থেকেই ভ্যাট আলাদা করে দেখানো হয়, দামের উপর
+          বাড়তি যোগ করা হয় না।
+        </p>
+        <button class="btn" id="zatcaSaveBtn" style="margin-top:12px;">সেভ করুন</button>
+        <div id="zatcaSaveMsg" style="font-size:12.5px; margin-top:8px; min-height:18px;"></div>
+        <div style="border-top:1px dashed var(--line); margin:14px 0 10px;"></div>
+        <button class="btn secondary" id="zatcaTestBtn">নমুনা রসিদের QR দেখে নিন</button>
+        <div id="zatcaTestArea" style="margin-top:10px; text-align:center;"></div>
+      </div>
     </div>
 
     <div class="panel">
@@ -9806,6 +9847,69 @@ function fixBrokenInvoiceNumbers(){
 // - সবসময় Product Master Database-এর ফুল নাম ব্যবহার হয় — শর্ট নেম কখনো দেখানো হয় না
 // - invoiceNo বিল তৈরি হওয়ার সময়েই একবার জেনারেট হয়ে এন্ট্রির সাথে সেভ থাকে (প্রিন্ট/শেয়ার
 //   যতবারই করা হোক, একই ইনভয়েস নাম্বার থাকবে) — সেটাই এখানে parameter হিসেবে আসে
+/* ==================== 🇸🇦 সৌদি ভ্যাট / ZATCA (ফাতুরা) ====================
+   সৌদি আরবে ২০২১ সালের ৪ ডিসেম্বর থেকে প্রতিটা ভ্যাট-নিবন্ধিত দোকানের
+   সরলীকৃত কর চালানে (খুচরা বিক্রির রসিদ) ZATCA-এর নিয়মের QR ছাপানো
+   বাধ্যতামূলক। এটা শুধু তখনই চালু হয় যখন দোকানমালিক সেটিংসে নিজে চালু করে
+   ভ্যাট নম্বর দেন — নাহলে অ্যাপ হুবহু আগের মতোই চলে। */
+const HB_ZATCA_KEY = 'zatca-config';
+let hbZatcaCfg = null;
+
+function hbZatcaLoad(){
+  if(hbZatcaCfg) return hbZatcaCfg;
+  try{ hbZatcaCfg = JSON.parse(localStorage.getItem(HB_ZATCA_KEY) || 'null'); }catch(e){ hbZatcaCfg = null; }
+  if(!hbZatcaCfg) hbZatcaCfg = { enabled:false, legalName:'', vatNumber:'', vatRate:15 };
+  return hbZatcaCfg;
+}
+
+// চালু আছে ধরা হবে তখনই যখন সুইচ অন, ভ্যাট নম্বর নিয়ম মেনে আছে, আর QR
+// বানানোর অংশটাও লোড হয়েছে — যেকোনো একটা না মিললে আগের মতোই রসিদ ছাপে
+function hbZatcaActive(){
+  const c = hbZatcaLoad();
+  return !!(c.enabled && typeof ZatcaQR !== 'undefined' && typeof HBQR !== 'undefined'
+            && ZatcaQR.isValidVatNumber(c.vatNumber));
+}
+
+/* দোকানে টাঙানো দামে ভ্যাট ধরা থাকে (সৌদির নিয়ম), তাই মোট টাকার ভেতর
+   থেকেই ভ্যাট আলাদা করতে হয় — দামের উপর বাড়তি যোগ করা হয় না */
+function hbZatcaBreakdown(totalWithVat){
+  const c = hbZatcaLoad();
+  const rate = Number(c.vatRate);
+  const total = Math.round(((Number(totalWithVat)||0) + Number.EPSILON) * 100) / 100;
+  const vat = ZatcaQR.vatFromInclusive(total, isFinite(rate) ? rate : 15);
+  return { rate: isFinite(rate) ? rate : 15, net: Math.round((total - vat) * 100) / 100, vat: vat, total: total };
+}
+
+function hbZatcaSellerName(){
+  const c = hbZatcaLoad();
+  if(c.legalName && c.legalName.trim()) return c.legalName.trim();
+  const el = document.getElementById('shopTitle');
+  return (el && el.textContent.trim()) || 'Shop';
+}
+
+function hbZatcaPayload(totalWithVat, saleTime){
+  const b = hbZatcaBreakdown(totalWithVat);
+  const c = hbZatcaLoad();
+  return {
+    qr: ZatcaQR.base64({
+      sellerName: hbZatcaSellerName(),
+      vatNumber: c.vatNumber,
+      timestamp: saleTime ? new Date(saleTime) : new Date(),
+      totalWithVat: b.total,
+      vatTotal: b.vat
+    }),
+    breakdown: b,
+    sellerName: hbZatcaSellerName(),
+    vatNumber: c.vatNumber
+  };
+}
+
+/* রসিদের লেখা আর তার QR যাতে কখনো মিলে-মিশে না যায়: buildSalesInvoiceMessage
+   যে লেখাটা বানায়, ঠিক সেই লেখাটার সাথেই QR-এর তথ্য বেঁধে রাখা হয়। শেয়ার
+   মোডাল পরে শুধু তখনই QR বসায় যখন তার হাতের লেখাটা হুবহু ওটাই — অন্য কোনো
+   বার্তা (যেমন বাকি মনে করানোর মেসেজ) হলে পুরনো QR বসে যাওয়ার সুযোগ নেই। */
+let __hbZatcaForMessage = null;
+
 function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared, invoiceNo, saleTime}){
   const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || 'Mumen Electronics';
   const shopSubtitle = (document.getElementById('shopSubtitle') && document.getElementById('shopSubtitle').textContent.trim()) || '';
@@ -9838,7 +9942,37 @@ function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid,
     ? `\n\n✅ Your balance has been fully paid. Thank you so much for doing business with us!`
     : `\n\n📌 Please clear your due balance soon.`;
 
+  /* 🇸🇦 সৌদি ই-ইনভয়েস চালু থাকলে ZATCA-এর চাওয়া ঘরগুলো রসিদে যোগ হয়:
+     দোকানের আইনি নাম, ভ্যাট নম্বর, ভ্যাট ছাড়া দাম, ভ্যাটের অঙ্ক, ভ্যাটসহ
+     মোট — আর রসিদের নামে "Simplified Tax Invoice" লেখা। */
+  __hbZatcaForMessage = null;
+  if(hbZatcaActive()){
+    try{
+      const z = hbZatcaPayload(billTotalPrice, saleTime);
+      const b = z.breakdown;
+      msg = msg.replace('🧾 SALES INVOICE', '🧾 SIMPLIFIED TAX INVOICE\nفاتورة ضريبية مبسطة');
+      /* সৌদি কর চালান আইনত সৌদি রিয়ালেই (SAR) হতে হয়। দোকানের মুদ্রা-চিহ্ন
+         অন্য কিছু সেট করা থাকলেও ভ্যাটের এই ঘরগুলোয় SAR-ই লেখা হয়, যাতে
+         চালানটা ভুল মুদ্রায় না যায়। */
+      msg += `\n\n${DIVIDER}\n\n${z.sellerName}\nVAT No: ${z.vatNumber}\n`
+           + `Total (excl. VAT) : SAR ${b.net.toFixed(2)}\n`
+           + `VAT ${b.rate}%          : SAR ${b.vat.toFixed(2)}\n`
+           + `Total (incl. VAT) : SAR ${b.total.toFixed(2)}`;
+      __hbZatcaForMessage = { message: msg, zatca: z };
+    }catch(e){
+      // QR বানাতে না পারলেও রসিদ ছাপা বন্ধ হবে না — শুধু QR ছাড়া যাবে
+      console.warn('ZATCA payload failed:', e);
+      __hbZatcaForMessage = null;
+    }
+  }
+
   return msg;
+}
+
+// শেয়ার/প্রিন্টের সময় এই বার্তাটার সাথে বাঁধা ZATCA তথ্য আছে কিনা
+function hbZatcaFor(message){
+  return (__hbZatcaForMessage && __hbZatcaForMessage.message === message)
+    ? __hbZatcaForMessage.zatca : null;
 }
 
 function bccLogDueCollection(name, amount){
@@ -14125,11 +14259,24 @@ async function printSaleReceipt(name, phone, message){
   // রসিদ প্রিন্ট হবে, কিছু ভাঙবে না। এই একই নাম্বার দিয়েই "🌐 গ্লোবাল সার্চ" বক্সে
   // (Print ট্যাব) কাস্টমারের পুরো হিসাব/ইতিহাস বের করা যায়।
   const barcodeValue = (phone || '').trim();
+  // 🇸🇦 সৌদি ই-ইনভয়েস চালু থাকলে ZATCA-এর QR — আইনত এটা রসিদে থাকতেই হবে
+  const zat = hbZatcaFor(message);
+  let zatcaQrHtml = '';
+  if(zat){
+    try{
+      zatcaQrHtml = `
+      <div style="text-align:center; margin:10px 0 6px;">
+        <img src="${HBQR.toDataURL(zat.qr, { scale:3, margin:2 })}" alt="ZATCA QR" style="width:128px; height:128px; image-rendering:pixelated;">
+        <div style="font-size:9px; margin-top:2px;">ZATCA e-invoice QR · رمز الفاتورة</div>
+      </div>`;
+    }catch(e){ console.warn('ZATCA QR render failed:', e); }
+  }
   printArea.innerHTML = `
     <div style="width:280px; margin:0 auto; padding:10px; font-family:'Space Mono',monospace; font-size:12px; color:#000;">
       ${shopName ? `<div style="text-align:center; font-weight:800; font-size:14px; margin-bottom:6px;">${escapeHtml(shopName)}</div>` : ''}
       <div style="border-top:1px dashed #000; margin:6px 0;"></div>
       <div style="white-space:pre-wrap; word-break:break-word; line-height:1.5;">${escapeHtml(message)}</div>
+      ${zatcaQrHtml}
       <div style="border-top:1px dashed #000; margin:8px 0 4px;"></div>
       ${barcodeValue ? `
       <div style="text-align:center; margin-top:8px;">
@@ -14188,7 +14335,17 @@ if(typeof document !== 'undefined' && document.fonts && typeof document.fonts.lo
 // 🖌️ রসিদের লেখা (দোকানের নাম + মেসেজ + ধন্যবাদ লাইন) একটা ৩৮৪-ডট চওড়া canvas-এ
 // আঁকা হয় — ঠিক printSaleReceipt()-এ যেমন HTML রসিদ বানানো হয়, একই তথ্য এখানে
 // ছবি হিসেবে বানানো হচ্ছে
-async function btRenderReceiptCanvas(shopName, message){
+async function btRenderReceiptCanvas(shopName, message, zatca){
+  /* 🇸🇦 ZATCA-এর QR থার্মাল রসিদেও ছাপতে হয়। প্রিন্টারটা শুধু সাদা-কালো ছবি
+     বোঝে, তাই QR-এর প্রতিটা ঘর সরাসরি canvas-এ আঁকা হয় — ছবি স্কেল করলে
+     ঘরগুলো ঘোলা হয়ে স্ক্যান হয় না, তাই প্রতিটা ঘর পুরো পিক্সেলে বসানো হয়। */
+  let __zq = null, __zqBlock = 0;
+  if(zatca && typeof HBQR !== 'undefined'){
+    try{
+      __zq = HBQR.encode(zatca.qr, { ecl: 'M' });
+      __zqBlock = Math.max(2, Math.floor((BT_PRINTER_DOT_WIDTH - 48) / __zq.size));
+    }catch(e){ console.warn('ZATCA QR (thermal) failed:', e); __zq = null; }
+  }
   if(document.fonts && document.fonts.ready) await document.fonts.ready;
   const W = BT_PRINTER_DOT_WIDTH;
   const marginX = 12;
@@ -14238,6 +14395,7 @@ async function btRenderReceiptCanvas(shopName, message){
   if(headerLines.length) totalH += headerLines.length * lineH.header + lineH.gap;
   totalH += bodyLines.length * lineH.body + lineH.gap;
   totalH += footerLines.length * lineH.footer;
+  if(__zq) totalH += __zq.size * __zqBlock + 34;   // QR + তার নিচের ছোট লেখা
   totalH += 46; // নিচে ছেঁড়ার জন্য একটু ফাঁকা জায়গা (এই প্রিন্টারে অটো-কাটার নেই)
 
   const canvas = document.createElement('canvas');
@@ -14275,6 +14433,25 @@ async function btRenderReceiptCanvas(shopName, message){
   bodyLines.forEach(l=>{ ctx.fillText(l, marginX, cy); cy += lineH.body; });
   drawDashed(cy + 6);
   cy += lineH.gap;
+
+  // QR বসে বডি আর ফুটারের মাঝখানে — যাতে রসিদ ছিঁড়লেও QR কাটা না পড়ে
+  if(__zq){
+    const qrPx = __zq.size * __zqBlock;
+    const x0 = Math.floor((W - qrPx) / 2);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x0 - 6, cy - 6, qrPx + 12, qrPx + 12);   // QR-এর চারপাশে সাদা পাড়
+    ctx.fillStyle = '#000';
+    for(let r = 0; r < __zq.size; r++){
+      for(let c = 0; c < __zq.size; c++){
+        if(__zq.get(r, c)) ctx.fillRect(x0 + c * __zqBlock, cy + r * __zqBlock, __zqBlock, __zqBlock);
+      }
+    }
+    cy += qrPx + 8;
+    ctx.font = footerFont;
+    ctx.textAlign = 'center';
+    ctx.fillText('ZATCA e-invoice QR', W/2, cy);
+    cy += lineH.footer + 6;
+  }
 
   ctx.font = footerFont;
   ctx.textAlign = 'center';
@@ -14330,7 +14507,7 @@ function btBytesToBase64(bytes){
 async function btPrintReceipt(name, phone, message){
   try{
     const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
-    const canvas = await btRenderReceiptCanvas(shopName, message);
+    const canvas = await btRenderReceiptCanvas(shopName, message, hbZatcaFor(message));
     const bytes = btCanvasToEscposRaster(canvas);
     const b64 = btBytesToBase64(bytes);
     const intentUrl = `intent:base64,${b64}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
@@ -14483,6 +14660,121 @@ document.getElementById('forgotPinBtn').addEventListener('click', ()=>{
   localStorage.setItem('phone-shop-pin', JSON.stringify(systemMasterPin));
   toast('পাসওয়ার্ড রিসেট হয়ে ডিফল্ট 12345 হয়েছে।');
 });
+
+/* ---------- 🇸🇦 সৌদি ভ্যাট / ZATCA সেটিংস ---------- */
+(function hbZatcaSettingsInit(){
+  const chk = document.getElementById('zatcaEnabled');
+  if(!chk) return;
+  const fields = document.getElementById('zatcaFields');
+  const nameEl = document.getElementById('zatcaLegalName');
+  const vatEl  = document.getElementById('zatcaVatNumber');
+  const rateEl = document.getElementById('zatcaVatRate');
+  const hintEl = document.getElementById('zatcaVatHint');
+  const msgEl  = document.getElementById('zatcaSaveMsg');
+
+  function fill(){
+    const c = hbZatcaLoad();
+    chk.checked = !!c.enabled;
+    nameEl.value = c.legalName || '';
+    vatEl.value  = c.vatNumber || '';
+    rateEl.value = (c.vatRate == null) ? 15 : c.vatRate;
+    fields.style.display = chk.checked ? 'block' : 'none';
+    checkVat();
+    checkCurrency();
+  }
+  /* সৌদি চালান রিয়ালে হতে হয় — দোকানের মুদ্রা অন্য কিছু থাকলে রসিদের
+     বাকি অংশ ভুল মুদ্রায় ছাপবে, তাই সেটা আগেই জানিয়ে দেওয়া */
+  function checkCurrency(){
+    let el = document.getElementById('zatcaCurHint');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'zatcaCurHint';
+      el.style.cssText = 'font-size:12.5px; margin-top:10px; line-height:1.6;';
+      rateEl.parentNode.insertBefore(el, rateEl.nextSibling);
+    }
+    const cur = (typeof HB_CUR !== 'undefined') ? HB_CUR : '';
+    if(chk.checked && cur && !/SAR|﷼|ر\.س/i.test(cur)){
+      el.style.color = 'var(--due)';
+      el.textContent = '⚠️ দোকানের মুদ্রা এখন "' + cur + '" — সৌদি কর চালান রিয়ালে (SAR) হতে হয়। '
+        + 'ভ্যাটের ঘরগুলো SAR-এই ছাপবে, কিন্তু রসিদের বাকি অংশ ঠিক করতে দোকানের মুদ্রা SAR করে নিন।';
+    } else { el.textContent = ''; }
+  }
+  function checkVat(){
+    const v = (vatEl.value || '').replace(/\s/g, '');
+    if(!v){ hintEl.textContent = ''; return; }
+    if(typeof ZatcaQR !== 'undefined' && ZatcaQR.isValidVatNumber(v)){
+      hintEl.textContent = '✅ নম্বরটা সৌদি ভ্যাট নম্বরের নিয়ম মানছে';
+      hintEl.style.color = 'var(--paid)';
+    } else {
+      hintEl.textContent = '⚠️ সৌদি ভ্যাট নম্বর ১৫ অঙ্কের হয়, ৩ দিয়ে শুরু আর ৩ দিয়েই শেষ';
+      hintEl.style.color = 'var(--due)';
+    }
+  }
+  chk.addEventListener('change', ()=>{ fields.style.display = chk.checked ? 'block' : 'none'; checkCurrency(); });
+  vatEl.addEventListener('input', ()=>{ vatEl.value = vatEl.value.replace(/\D/g,'').slice(0,15); checkVat(); });
+
+  document.getElementById('zatcaSaveBtn').addEventListener('click', async ()=>{
+    const cfg = {
+      enabled: chk.checked,
+      legalName: nameEl.value.trim(),
+      vatNumber: (vatEl.value || '').replace(/\s/g,''),
+      vatRate: Number(rateEl.value)
+    };
+    if(cfg.enabled && !ZatcaQR.isValidVatNumber(cfg.vatNumber)){
+      msgEl.textContent = '❌ আগে সঠিক ভ্যাট নম্বরটা দিন — ভুল নম্বর দিয়ে রসিদ ছাপলে সেটা নিয়ম মানবে না।';
+      msgEl.style.color = 'var(--due)';
+      return;
+    }
+    if(cfg.enabled && !isFinite(cfg.vatRate)){ cfg.vatRate = 15; }
+    hbZatcaCfg = cfg;
+    localStorage.setItem(HB_ZATCA_KEY, JSON.stringify(cfg));
+    msgEl.style.color = 'var(--paid)';
+    msgEl.textContent = '✅ সেভ হয়েছে — এখন থেকে প্রতিটা রসিদে ভ্যাটের হিসাব আর QR আসবে।';
+    // দোকানের রেকর্ডেও রাখা, যাতে অন্য ফোনে লগইন করলেও একই সেটিং থাকে
+    try{
+      const session = (typeof getSession === 'function') ? getSession() : null;
+      if(session && session.shopId && typeof db !== 'undefined'){
+        await db.collection('shops').doc(session.shopId).set({ zatca: cfg }, { merge: true });
+      }
+    }catch(e){
+      console.warn('ZATCA config cloud save failed:', e);
+      msgEl.textContent = '✅ এই ফোনে সেভ হয়েছে। ইন্টারনেট এলে অন্য ফোনেও যাবে।';
+    }
+  });
+
+  document.getElementById('zatcaTestBtn').addEventListener('click', ()=>{
+    const area = document.getElementById('zatcaTestArea');
+    const cfg = {
+      enabled: true,
+      legalName: nameEl.value.trim() || hbZatcaSellerName(),
+      vatNumber: (vatEl.value || '').replace(/\s/g,''),
+      vatRate: Number(rateEl.value) || 15
+    };
+    if(!ZatcaQR.isValidVatNumber(cfg.vatNumber)){
+      area.innerHTML = '<div style="font-size:12.5px; color:var(--due);">আগে সঠিক ভ্যাট নম্বর দিন।</div>';
+      return;
+    }
+    const saved = hbZatcaCfg;
+    hbZatcaCfg = cfg;
+    try{
+      const z = hbZatcaPayload(115, new Date());
+      area.innerHTML = `
+        <img src="${HBQR.toDataURL(z.qr, { scale:4, margin:2 })}" style="width:160px; height:160px; image-rendering:pixelated; background:#fff; padding:6px; border-radius:8px;">
+        <div style="font-size:12px; margin-top:8px; line-height:1.6;">
+          নমুনা: ১১৫ টাকার একটা বিক্রি<br>
+          ভ্যাট ছাড়া ${z.breakdown.net.toFixed(2)} · ভ্যাট ${z.breakdown.vat.toFixed(2)} · মোট ${z.breakdown.total.toFixed(2)}
+        </div>
+        <div style="font-size:11px; color:#8a7f6c; margin-top:6px;">ফোনের ক্যামেরা দিয়ে স্ক্যান করে দেখতে পারেন।</div>`;
+    }catch(e){
+      area.innerHTML = '<div style="font-size:12.5px; color:var(--due);">QR বানানো যায়নি: ' + escapeHtml(e.message) + '</div>';
+    }finally{
+      hbZatcaCfg = saved;
+    }
+  });
+
+  fill();
+  window.hbZatcaRefreshSettingsUi = fill;
+})();
 
 document.getElementById('backupBtn').addEventListener('click', ()=>{
   const blob = new Blob([JSON.stringify({app:'হিসাব খাতা', entries:retailEntries, customers:shopCustomers, globalPin:systemMasterPin}, null, 2)], {type: 'application/json'});
@@ -19846,6 +20138,14 @@ auth.onAuthStateChanged(async (user)=>{
     HB_CUR = curSymbol;
     localStorage.setItem('shop-currency-symbol', curSymbol);
     if(shopInfo.currencyCode) localStorage.setItem('shop-currency-code', shopInfo.currencyCode);
+
+    // 🇸🇦 সৌদি ভ্যাট/ZATCA সেটিং — দোকানের রেকর্ডে থাকলে সেটাই আসল, যাতে
+    // নতুন ফোনে লগইন করলেও ভ্যাট নম্বর আর QR ঠিকঠাক থাকে
+    if(shopInfo.zatca && typeof shopInfo.zatca === 'object'){
+      hbZatcaCfg = shopInfo.zatca;
+      localStorage.setItem(HB_ZATCA_KEY, JSON.stringify(shopInfo.zatca));
+      if(typeof window.hbZatcaRefreshSettingsUi === 'function') window.hbZatcaRefreshSettingsUi();
+    }
   }catch(e){ console.warn('appMode fetch failed:', e); }
 
   function updateNetLabel(){
