@@ -1107,10 +1107,6 @@ window.hbLoadLib = function(name){
   <input type="file" id="logoInput" accept="image/*" style="display:none;">
   <!-- 🖨️🏷️ প্রিন্ট আর QR ড্যাশবোর্ডে সরাসরি যাওয়ার শর্টকাট — লোগোর পাশে খালি
        জায়গায় (আগে নিচের ট্যাব-বারে ছিল, এখন সেখান থেকে সরিয়ে এখানে আনা হলো) -->
-  <!-- 🔍 সব জায়গায় একসাথে খোঁজা — প্রোডাক্ট, কাস্টমার, সাপ্লায়ার,
-       বিক্রি, নোট, স্টাফ। রঙটা ইচ্ছে করেই আলাদা (নীল-বেগুনি), যাতে
-       সোনালি সারির মধ্যে চোখে পড়ে। -->
-  <div id="headerSearchShortcut" title="🔍 সব কিছু খুঁজুন" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border:2px solid rgba(165,180,252,.75);display:flex;align-items:center;justify-content:center;font-size:20px; box-shadow:0 4px 14px rgba(79,70,229,.45);">🔍</div>
   <div id="headerPrintShortcut" title="🖨️ প্রিন্ট" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🖨️</div>
   <!-- 📓 নোটবুক — প্রিন্ট আর QR-এর মাঝখানে। দোকানের পাশে যে কাগজের
        খাতাটা পড়ে থাকে, সেটারই কাজ: কাকে ফোন করতে হবে, কী আনতে হবে,
@@ -3022,6 +3018,21 @@ window.hbLoadLib = function(name){
     }
     #program-notebook .nbMeta button.danger{ border-color:rgba(224,67,60,0.6); color:#ffb4b0; }
     #program-notebook .nbEmpty{ text-align:center; padding:50px 20px; color:rgba(255,248,232,0.45); font-size:14px; line-height:2; }
+    /* খোঁজার বার — রঙটা খাতার সোনালি নয়, খোঁজার নিজের নীল-বেগুনি,
+       যাতে বোঝা যায় এটা আলাদা একটা জায়গায় নিয়ে যাচ্ছে */
+    #program-notebook .nbSearchAll{
+      display:flex; align-items:center; gap:11px; cursor:pointer;
+      background:linear-gradient(135deg, rgba(79,70,229,0.32), rgba(124,58,237,0.28));
+      border:1px solid rgba(165,180,252,0.45);
+      border-radius:14px; padding:12px 14px; margin-bottom:14px;
+      box-shadow:0 4px 16px rgba(79,70,229,0.22);
+    }
+    #program-notebook .nbSearchAll .ic{ font-size:17px; flex-shrink:0; }
+    #program-notebook .nbSearchAll .tx{
+      flex:1; min-width:0; color:#e0e7ff; font-size:13px; font-weight:700;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    #program-notebook .nbSearchAll .go{ color:rgba(199,210,254,0.7); font-size:17px; flex-shrink:0; }
     #program-notebook .nbEditWrap{ display:none; margin-bottom:14px; }
     #program-notebook .nbEditWrap.show{ display:block; }
     #program-notebook textarea{
@@ -3045,6 +3056,14 @@ window.hbLoadLib = function(name){
   </div>
 
   <div class="nbBody">
+    <!-- 🔍 সব কিছু খোঁজা — নোটবুকের ভেতর থেকেই। খাতাটা এখন শুধু নোট
+         রাখার জায়গা নয়, এখান থেকেই পুরো দোকান খুঁজে পাওয়া যায়। -->
+    <div class="nbSearchAll" id="nbSearchAllBtn">
+      <span class="ic">🔍</span>
+      <span class="tx">সব কিছু খুঁজুন — প্রোডাক্ট, কাস্টমার, বিক্রি, নোট</span>
+      <span class="go">›</span>
+    </div>
+
     <div class="nbEditWrap" id="nbEditWrap">
       <textarea id="nbEditText" placeholder="যা মনে রাখতে চান লিখুন — যেমন: রহিম ভাইয়ের ৫টা ব্যাটারি আনতে হবে"></textarea>
       <div class="nbEditBtns">
@@ -5794,7 +5813,7 @@ function hbSearchAll(rawQuery){
     push({ type:'product', icon:'📦', score:score, title:p.name || '(নামহীন)',
            sub:[p.code ? '🏷️ ' + p.code : '', (p.qty !== undefined ? 'স্টক ' + p.qty : ''),
                 (p.sell ? (typeof fmt === 'function' ? fmt(p.sell) : p.sell) : '')].filter(Boolean).join(' · '),
-           go:function(){ openMiniProgram('program-bcc'); bccOpenProductModal(p.id); } });
+           go:function(){ hbGsGoProgram('program-bcc', function(){ bccOpenProductModal(p.id); }); } });
   });
 
   // 👤 কাস্টমার
@@ -5803,7 +5822,7 @@ function hbSearchAll(rawQuery){
   custs.forEach(function(c){
     const score = hbScore(q, qSkel, qDig, [{ v:c.name, w:1 }, { v:c.phone, id:true }]);
     push({ type:'customer', icon:'👤', score:score, title:c.name || '(নামহীন)',
-           sub:c.phone || '', go:function(){ closeMiniProgram('program-gsearch'); openCustDetail(c.name, c.phone||''); } });
+           sub:c.phone || '', go:function(){ hbGsGoMain(function(){ openCustDetail(c.name, c.phone||''); }); } });
   });
 
   // 🧾 বিক্রি / ইনভয়েস
@@ -5818,10 +5837,10 @@ function hbSearchAll(rawQuery){
            title:(e.invoiceNo ? e.invoiceNo + ' — ' : '') + (e.item || e.name || 'বিক্রি'),
            sub:[e.name, when && !isNaN(when) ? when.toLocaleDateString('bn-BD') : '',
                 (e.price ? (typeof fmt === 'function' ? fmt(e.price) : e.price) : '')].filter(Boolean).join(' · '),
-           go:function(){ closeMiniProgram('program-gsearch');
+           go:function(){ hbGsGoMain(function(){
                           const b = document.querySelector('.tab-btn[data-tab="list"]'); if(b) b.click();
                           const sb = document.getElementById('searchBox');
-                          if(sb){ sb.value = e.invoiceNo || e.name || ''; sb.dispatchEvent(new Event('input')); sb.scrollIntoView({block:'center'}); } } });
+                          if(sb){ sb.value = e.invoiceNo || e.name || ''; sb.dispatchEvent(new Event('input')); sb.scrollIntoView({block:'center'}); } }); } });
   });
 
   // 🚚 সাপ্লায়ার
@@ -5829,7 +5848,7 @@ function hbSearchAll(rawQuery){
     const score = hbScore(q, qSkel, qDig, [{ v:s.name, w:1 }, { v:s.phone, id:true }, { v:s.note, w:0.5 }]);
     push({ type:'supplier', icon:'🚚', score:score, title:s.name || '(নামহীন)',
            sub:[s.phone || '', (s.due ? 'বাকি ' + (typeof fmt === 'function' ? fmt(s.due) : s.due) : '')].filter(Boolean).join(' · '),
-           go:function(){ openMiniProgram('program-ops'); if(typeof opsShowSupplierHistory === 'function') opsShowSupplierHistory(s.id); } });
+           go:function(){ hbGsGoProgram('program-ops', function(){ if(typeof opsShowSupplierHistory === 'function') opsShowSupplierHistory(s.id); }); } });
   });
 
   // 🧑‍💼 স্টাফ
@@ -5837,7 +5856,7 @@ function hbSearchAll(rawQuery){
     const score = hbScore(q, qSkel, qDig, [{ v:s.name, w:1 }, { v:s.phone, id:true }, { v:s.role, w:0.6 }]);
     push({ type:'staff', icon:'🧑‍💼', score:score, title:s.name || '(নামহীন)',
            sub:[s.role || '', s.phone || ''].filter(Boolean).join(' · '),
-           go:function(){ openMiniProgram('program-ops'); } });
+           go:function(){ hbGsGoProgram('program-ops'); } });
   });
 
   // 📓 নোট
@@ -5847,14 +5866,30 @@ function hbSearchAll(rawQuery){
     push({ type:'note', icon:'📓', score:score,
            title:first.length > 60 ? first.slice(0,60) + '…' : first,
            sub:(typeof hbNbWhen === 'function' ? hbNbWhen(n.updatedAt || n.createdAt) : ''),
-           go:function(){ closeMiniProgram('program-gsearch');
-                          document.getElementById('headerNoteShortcut').click();
+           go:function(){ hbGsGoProgram('program-notebook', function(){
                           const s = document.getElementById('nbSearch');
-                          if(s){ s.value = rawQuery; s.dispatchEvent(new Event('input')); } } });
+                          if(s){ s.value = rawQuery; s.dispatchEvent(new Event('input')); }
+                          if(typeof hbNbRender === 'function') hbNbRender(); }); } });
   });
 
   out.sort((a,b)=> b.score - a.score);
   return out;
+}
+
+/* খোঁজার পাতা থেকে অন্য কোনো পাতায় যাওয়া। এটা আলাদা করে লেখা জরুরি:
+   খোঁজার পাতাটা অন্য পাতাগুলোর চেয়ে উপরে বসে (z-index বেশি), তাই শুধু
+   নতুন পাতা খুললে সেটা খোঁজার পাতার নিচে ঢাকা পড়ে থাকত — চোখে পড়ত না।
+   তাই আগে খোঁজার পাতাটা সরিয়ে তবেই নতুনটা দেখানো হয়। */
+function hbGsGoProgram(programId, after){
+  switchProgram('program-gsearch', programId);
+  hbGsCameFrom = null;
+  if(typeof after === 'function') setTimeout(after, 30);
+}
+/* মূল পর্দায় ফিরে গিয়ে কিছু করা (কাস্টমারের খাতা, হিসাবের তালিকা) */
+function hbGsGoMain(after){
+  closeMiniProgram('program-gsearch');
+  hbGsCameFrom = null;
+  if(typeof after === 'function') setTimeout(after, 30);
 }
 
 const HB_GS_GROUPS = [
@@ -5866,6 +5901,8 @@ const HB_GS_GROUPS = [
   { type:'note',     label:'📓 নোট',       cap:3 }
 ];
 let hbGsExpanded = {};
+let hbGsOpen = null;   // নোটবুকের বার চাপলে যেটা চলে
+let hbGsBack = null;
 
 function hbGsMark(text, q){
   const el = document.createElement('span');
@@ -5904,17 +5941,19 @@ function hbGsRender(){
     const b1 = document.createElement('button');
     b1.textContent = '➕ এই নামে নতুন প্রোডাক্ট';
     b1.addEventListener('click', function(){
-      closeMiniProgram('program-gsearch'); openMiniProgram('program-bcc');
-      bccOpenProductModal();
-      const n = document.getElementById('bccPName'); if(n) n.value = raw.trim();
+      hbGsGoProgram('program-bcc', function(){
+        bccOpenProductModal();
+        const n = document.getElementById('bccPName'); if(n) n.value = raw.trim();
+      });
     });
     const b2 = document.createElement('button');
     b2.textContent = '➕ নতুন কাস্টমার যোগ করুন';
     b2.addEventListener('click', function(){
-      closeMiniProgram('program-gsearch');
-      const t = document.querySelector('.tab-btn[data-tab="add"]'); if(t) t.click();
-      const chip = document.querySelector('#customerModeGroup .status-chip[data-m="addcust"]'); if(chip) chip.click();
-      const n = document.getElementById('acName'); if(n){ n.value = raw.trim(); n.scrollIntoView({block:'center'}); }
+      hbGsGoMain(function(){
+        const t = document.querySelector('.tab-btn[data-tab="add"]'); if(t) t.click();
+        const chip = document.querySelector('#customerModeGroup .status-chip[data-m="addcust"]'); if(chip) chip.click();
+        const n = document.getElementById('acName'); if(n){ n.value = raw.trim(); n.scrollIntoView({block:'center'}); }
+      });
     });
     make.appendChild(b1); make.appendChild(b2);
     body.appendChild(box); body.appendChild(make);
@@ -5959,20 +5998,37 @@ function hbGsRender(){
   });
 }
 
+/* কোথা থেকে খোঁজা শুরু হয়েছিল, সেটা মনে রাখা — নোটবুকের ভেতর থেকে
+   এলে ← চাপলে নোটবুকেই ফিরবে, মূল পর্দায় ছিটকে যাবে না। */
+let hbGsCameFrom = null;
+
 (function hbGsInit(){
-  const btn = document.getElementById('headerSearchShortcut');
+  const btn = document.getElementById('nbSearchAllBtn');
   if(!btn) return;
   const input = document.getElementById('gsInput');
 
-  function open(){
+  function open(from){
+    hbGsCameFrom = from || null;
     hbGsExpanded = {};
     input.value = '';
     hbGsRender();
     openMiniProgram('program-gsearch');
     setTimeout(function(){ input.focus(); }, 120);
   }
-  btn.addEventListener('click', open);
-  document.getElementById('gsBackBtn').addEventListener('click', function(){ closeMiniProgram('program-gsearch'); });
+  hbGsOpen = open;
+  btn.addEventListener('click', function(){ open('program-notebook'); });
+
+  function back(){
+    if(hbGsCameFrom){
+      // এক পাতা থেকে আরেক পাতায় — মাঝখানে মূল পর্দা দেখিয়ে ঝিলিক দেওয়ার দরকার নেই
+      switchProgram('program-gsearch', hbGsCameFrom);
+      hbGsCameFrom = null;
+    }else{
+      closeMiniProgram('program-gsearch');
+    }
+  }
+  hbGsBack = back;
+  document.getElementById('gsBackBtn').addEventListener('click', back);
   document.getElementById('gsClearBtn').addEventListener('click', function(){
     input.value = ''; hbGsExpanded = {}; hbGsRender(); input.focus();
   });
@@ -5989,10 +6045,8 @@ function hbGsRender(){
 
   // কম্পিউটারে Ctrl+K — হাত কি-বোর্ড থেকে সরাতে হয় না
   document.addEventListener('keydown', function(ev){
-    if((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')){ ev.preventDefault(); open(); }
-    if(ev.key === 'Escape' && getComputedStyle(document.getElementById('program-gsearch')).display !== 'none'){
-      closeMiniProgram('program-gsearch');
-    }
+    if((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')){ ev.preventDefault(); open(null); }
+    if(ev.key === 'Escape' && getComputedStyle(document.getElementById('program-gsearch')).display !== 'none'){ back(); }
   });
 })();
 
