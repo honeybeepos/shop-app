@@ -1108,6 +1108,11 @@ window.hbLoadLib = function(name){
   <!-- 🖨️🏷️ প্রিন্ট আর QR ড্যাশবোর্ডে সরাসরি যাওয়ার শর্টকাট — লোগোর পাশে খালি
        জায়গায় (আগে নিচের ট্যাব-বারে ছিল, এখন সেখান থেকে সরিয়ে এখানে আনা হলো) -->
   <div id="headerPrintShortcut" title="🖨️ প্রিন্ট" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🖨️</div>
+  <!-- 📓 নোটবুক — প্রিন্ট আর QR-এর মাঝখানে। দোকানের পাশে যে কাগজের
+       খাতাটা পড়ে থাকে, সেটারই কাজ: কাকে ফোন করতে হবে, কী আনতে হবে,
+       কার কাছে কী কথা আছে — যা মনে রাখা দরকার কিন্তু হিসাবের ঘরে
+       বসে না। চাপ দিলে পুরো পর্দা জুড়ে খোলে। -->
+  <div id="headerNoteShortcut" title="📓 নোটবুক" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px; position:relative;">📓<span id="headerNoteCount" style="display:none; position:absolute; top:-5px; right:-5px; background:#2fbf71; color:#fff; font-size:10px; font-weight:800; min-width:17px; height:17px; border-radius:9px; line-height:17px; text-align:center; padding:0 3px;">0</span></div>
   <div id="headerQrShortcut" title="🏷️ QR (ওজন স্টিকার)" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🏷️</div>
   <!-- 🟢🔴 দোকান খোলা/বন্ধ সুইচ — শপকিপার এখান থেকে টগল করলে shops/{shopId}.isShopOpen
        আপডেট হয়, Bazar-এ কাস্টমাররা তখন দোকান বন্ধ থাকলে দেখতে/বুঝতে পারবেন -->
@@ -2899,6 +2904,80 @@ window.hbLoadLib = function(name){
       <button class="mini-btn" id="factoryResetCancelBtn" style="flex:1;">বাতিল</button>
       <button class="btn" id="factoryResetConfirmBtn" style="flex:1; margin-top:0; background:#c0392b;">🗑️ সব মুছে ফেলুন</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══ 📓 নোটবুক — পুরো পর্দার পাতা ═══
+     লেখাগুলো ফোনেই (localStorage) জমা থাকে, তাই ইন্টারনেট ছাড়াও চলে;
+     আর ক্লাউড-সিঙ্ক চালু থাকলে অন্য ফোনেও পৌঁছে যায়, আলাদা কিছু করতে
+     হয় না। -->
+<div id="program-notebook" style="display:none; position:fixed; inset:0; z-index:500; background:radial-gradient(circle at 15% -10%, #3a2d12 0%, #241a08 45%, #140e04 100%); flex-direction:column;">
+  <style>
+    #program-notebook .nbHead{
+      background:rgba(30,22,8,0.78); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+      color:#fff; padding:16px; display:flex; align-items:center; gap:12px;
+      border-bottom:1px solid rgba(255,209,102,0.22); flex-shrink:0;
+    }
+    #program-notebook .nbBody{ flex:1; padding:16px; overflow:auto; }
+    #program-notebook .nbSearch{
+      width:100%; box-sizing:border-box; padding:11px 13px; margin-bottom:12px;
+      border-radius:12px; border:1px solid rgba(255,209,102,0.25);
+      background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:14px;
+    }
+    #program-notebook .nbAddBtn{
+      width:100%; padding:13px; margin-bottom:14px; border:none; border-radius:13px;
+      background:linear-gradient(135deg,#ffb703,#ffd166); color:#1a1206;
+      font-family:inherit; font-size:15px; font-weight:800; cursor:pointer;
+    }
+    #program-notebook .nbCard{
+      background:rgba(255,255,255,0.07); border:1px solid rgba(255,209,102,0.2);
+      border-radius:14px; padding:13px 14px; margin-bottom:11px;
+    }
+    #program-notebook .nbCard.pin{ border-color:rgba(255,209,102,0.6); background:rgba(255,209,102,0.1); }
+    #program-notebook .nbText{ color:#fff8e8; font-size:14.5px; line-height:1.65; white-space:pre-wrap; word-break:break-word; }
+    #program-notebook .nbMeta{ margin-top:9px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    #program-notebook .nbDate{ font-size:11px; color:rgba(255,248,232,0.45); flex:1; min-width:0; }
+    #program-notebook .nbMeta button{
+      background:rgba(255,255,255,0.1); border:1px solid rgba(255,209,102,0.25);
+      color:#fff8e8; border-radius:9px; padding:6px 11px;
+      font-family:inherit; font-size:12px; cursor:pointer;
+    }
+    #program-notebook .nbMeta button.danger{ border-color:rgba(224,67,60,0.6); color:#ffb4b0; }
+    #program-notebook .nbEmpty{ text-align:center; padding:50px 20px; color:rgba(255,248,232,0.45); font-size:14px; line-height:2; }
+    #program-notebook .nbEditWrap{ display:none; margin-bottom:14px; }
+    #program-notebook .nbEditWrap.show{ display:block; }
+    #program-notebook textarea{
+      width:100%; box-sizing:border-box; min-height:130px; padding:13px;
+      border-radius:13px; border:1px solid rgba(255,209,102,0.3);
+      background:rgba(255,255,255,0.07); color:#fff8e8;
+      font-family:inherit; font-size:14.5px; line-height:1.65; resize:vertical;
+    }
+    #program-notebook .nbEditBtns{ display:flex; gap:9px; margin-top:10px; }
+    #program-notebook .nbEditBtns button{
+      flex:1; padding:11px; border-radius:11px; border:none;
+      font-family:inherit; font-size:14px; font-weight:800; cursor:pointer;
+    }
+    #program-notebook .nbSave{ background:linear-gradient(135deg,#34d399,#06b6d4); color:#07281f; }
+    #program-notebook .nbCancel{ background:rgba(255,255,255,0.12); color:#fff8e8; }
+  </style>
+
+  <div class="nbHead">
+    <button id="nbBackBtn" style="background:none; border:none; color:#fff; font-size:20px; cursor:pointer;">←</button>
+    <h2 style="margin:0; font-size:18px;">📓 নোটবুক</h2>
+  </div>
+
+  <div class="nbBody">
+    <div class="nbEditWrap" id="nbEditWrap">
+      <textarea id="nbEditText" placeholder="যা মনে রাখতে চান লিখুন — যেমন: রহিম ভাইয়ের ৫টা ব্যাটারি আনতে হবে"></textarea>
+      <div class="nbEditBtns">
+        <button class="nbSave" id="nbSaveBtn">✅ সেভ করুন</button>
+        <button class="nbCancel" id="nbCancelBtn">বাতিল</button>
+      </div>
+    </div>
+
+    <button class="nbAddBtn" id="nbAddBtn">➕ নতুন নোট</button>
+    <input class="nbSearch" id="nbSearch" type="text" placeholder="🔍 লেখা দিয়ে খুঁজুন...">
+    <div id="nbList"></div>
   </div>
 </div>
 
@@ -5532,6 +5611,174 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
    নিচের আসল (এখন লুকানো) .tab-btn এলিমেন্টেই .click() করে, তাই active-class
    টগল করা, QR ট্যাবের qrLoadRecentTickets() লোড হওয়া ইত্যাদি সব পুরনো লজিক
    অপরিবর্তিত থাকে। */
+/* ==================== 📓 নোটবুক ====================
+   দোকানের পাশে যে কাগজের খাতাটা পড়ে থাকে, এটা তারই কাজ — কাকে ফোন
+   করতে হবে, কী আনতে হবে, কার কাছে কী কথা আছে। হিসাবের ঘরে যা বসে না,
+   অথচ ভুলে গেলে ক্ষতি।
+
+   লেখা জমা থাকে ফোনেই (localStorage), তাই ইন্টারনেট ছাড়াও চলে। আর
+   ক্লাউড-সিঙ্ক চালু থাকলে পুরো localStorage-এর সাথে এটাও অন্য ফোনে
+   পৌঁছে যায় — আলাদা করে কিছু করতে হয়নি।
+
+   মোছার আগে একবার জিজ্ঞেস করা হয়: প্রথম চাপে বাটনটা "নিশ্চিত?" হয়ে
+   যায়, দ্বিতীয় চাপে মোছে। ভুল করে আঙুল লেগে নোট হারানোর ভয় থাকে না,
+   অথচ আলাদা পপ-আপও লাগে না। */
+const HB_NB_KEY = 'hb-notebook';
+let hbNbEditingId = null;
+let hbNbConfirmId = null;      // এখন কোন নোটের মোছা "নিশ্চিত?" অবস্থায় আছে
+
+function hbNbLoad(){
+  try{ const a = JSON.parse(localStorage.getItem(HB_NB_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  catch(e){ return []; }
+}
+function hbNbSave(list){
+  try{ localStorage.setItem(HB_NB_KEY, JSON.stringify(list)); }catch(e){}
+  hbNbUpdateCount();
+}
+
+function hbNbUpdateCount(){
+  const badge = document.getElementById('headerNoteCount');
+  if(!badge) return;
+  const n = hbNbLoad().length;
+  badge.textContent = n > 99 ? '99+' : n;
+  badge.style.display = n > 0 ? 'block' : 'none';
+}
+
+function hbNbWhen(iso){
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  const time = d.toLocaleTimeString('bn-BD', { hour:'2-digit', minute:'2-digit' });
+  if(sameDay) return 'আজ, ' + time;
+  return d.toLocaleDateString('bn-BD', { day:'numeric', month:'short', year:'numeric' }) + ', ' + time;
+}
+
+function hbNbRender(){
+  const box = document.getElementById('nbList');
+  if(!box) return;
+  const q = (document.getElementById('nbSearch').value || '').trim().toLowerCase();
+  let list = hbNbLoad();
+  if(q) list = list.filter(n => (n.text || '').toLowerCase().includes(q));
+  // পিন করা উপরে, তারপর যেটা শেষে বদলানো হয়েছে সেটা
+  list.sort(function(a, b){
+    if(!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
+    return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+  });
+
+  if(!list.length){
+    box.innerHTML = '<div class="nbEmpty">' +
+      (q ? '🔍<br>এই লেখায় কিছু পাওয়া যায়নি'
+         : '📓<br>খাতাটা এখনো খালি<br>উপরের "নতুন নোট"-এ চাপ দিন') + '</div>';
+    return;
+  }
+
+  box.innerHTML = '';
+  list.forEach(function(n){
+    const card = document.createElement('div');
+    card.className = 'nbCard' + (n.pinned ? ' pin' : '');
+
+    const tx = document.createElement('div');
+    tx.className = 'nbText';
+    tx.textContent = n.text || '';
+    card.appendChild(tx);
+
+    const meta = document.createElement('div');
+    meta.className = 'nbMeta';
+
+    const dt = document.createElement('div');
+    dt.className = 'nbDate';
+    dt.textContent = (n.pinned ? '📌 ' : '') + hbNbWhen(n.updatedAt || n.createdAt);
+    meta.appendChild(dt);
+
+    const pinBtn = document.createElement('button');
+    pinBtn.textContent = n.pinned ? '📌 নামান' : '📌 উপরে';
+    pinBtn.addEventListener('click', function(){
+      const all = hbNbLoad();
+      const it = all.find(x => x.id === n.id);
+      if(it){ it.pinned = !it.pinned; hbNbSave(all); hbNbRender(); }
+    });
+    meta.appendChild(pinBtn);
+
+    const edBtn = document.createElement('button');
+    edBtn.textContent = '✏️ বদলান';
+    edBtn.addEventListener('click', function(){ hbNbOpenEditor(n.id); });
+    meta.appendChild(edBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'danger';
+    delBtn.textContent = (hbNbConfirmId === n.id) ? '🗑️ নিশ্চিত?' : '🗑️ মুছুন';
+    delBtn.addEventListener('click', function(){
+      if(hbNbConfirmId !== n.id){ hbNbConfirmId = n.id; hbNbRender(); return; }
+      hbNbConfirmId = null;
+      hbNbSave(hbNbLoad().filter(x => x.id !== n.id));
+      hbNbRender();
+      if(typeof toast === 'function') toast('নোটটা মুছে ফেলা হয়েছে');
+    });
+    meta.appendChild(delBtn);
+
+    card.appendChild(meta);
+    box.appendChild(card);
+  });
+}
+
+function hbNbOpenEditor(id){
+  hbNbEditingId = id || null;
+  const wrap = document.getElementById('nbEditWrap');
+  const ta = document.getElementById('nbEditText');
+  const existing = id ? hbNbLoad().find(x => x.id === id) : null;
+  ta.value = existing ? (existing.text || '') : '';
+  wrap.classList.add('show');
+  document.getElementById('nbAddBtn').style.display = 'none';
+  ta.focus();
+}
+
+function hbNbCloseEditor(){
+  hbNbEditingId = null;
+  document.getElementById('nbEditWrap').classList.remove('show');
+  document.getElementById('nbAddBtn').style.display = '';
+  document.getElementById('nbEditText').value = '';
+}
+
+(function hbNotebookInit(){
+  const openBtn = document.getElementById('headerNoteShortcut');
+  if(!openBtn) return;
+
+  openBtn.addEventListener('click', function(){
+    hbNbConfirmId = null;
+    hbNbCloseEditor();
+    document.getElementById('nbSearch').value = '';
+    hbNbRender();
+    openMiniProgram('program-notebook');
+  });
+  document.getElementById('nbBackBtn').addEventListener('click', function(){
+    closeMiniProgram('program-notebook');
+  });
+  document.getElementById('nbAddBtn').addEventListener('click', function(){ hbNbOpenEditor(null); });
+  document.getElementById('nbCancelBtn').addEventListener('click', hbNbCloseEditor);
+  document.getElementById('nbSearch').addEventListener('input', function(){ hbNbConfirmId = null; hbNbRender(); });
+
+  document.getElementById('nbSaveBtn').addEventListener('click', function(){
+    const text = document.getElementById('nbEditText').value.trim();
+    if(!text){ if(typeof toast === 'function') toast('কিছু তো লিখুন'); return; }
+    const all = hbNbLoad();
+    const now = new Date().toISOString();
+    if(hbNbEditingId){
+      const it = all.find(x => x.id === hbNbEditingId);
+      if(it){ it.text = text; it.updatedAt = now; }
+    }else{
+      all.unshift({ id: (typeof genLineId === 'function' ? genLineId() : String(Date.now())),
+                    text: text, pinned: false, createdAt: now, updatedAt: now });
+    }
+    hbNbSave(all);
+    hbNbCloseEditor();
+    hbNbRender();
+    if(typeof toast === 'function') toast('📓 খাতায় লেখা হলো');
+  });
+
+  hbNbUpdateCount();
+})();
+
 document.getElementById('headerPrintShortcut').addEventListener('click', ()=>{
   document.querySelector('.tab-btn[data-tab="print"]').click();
 });
