@@ -1107,6 +1107,10 @@ window.hbLoadLib = function(name){
   <input type="file" id="logoInput" accept="image/*" style="display:none;">
   <!-- 🖨️🏷️ প্রিন্ট আর QR ড্যাশবোর্ডে সরাসরি যাওয়ার শর্টকাট — লোগোর পাশে খালি
        জায়গায় (আগে নিচের ট্যাব-বারে ছিল, এখন সেখান থেকে সরিয়ে এখানে আনা হলো) -->
+  <!-- 🔍 সব জায়গায় একসাথে খোঁজা — প্রোডাক্ট, কাস্টমার, সাপ্লায়ার,
+       বিক্রি, নোট, স্টাফ। রঙটা ইচ্ছে করেই আলাদা (নীল-বেগুনি), যাতে
+       সোনালি সারির মধ্যে চোখে পড়ে। -->
+  <div id="headerSearchShortcut" title="🔍 সব কিছু খুঁজুন" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);border:2px solid rgba(165,180,252,.75);display:flex;align-items:center;justify-content:center;font-size:20px; box-shadow:0 4px 14px rgba(79,70,229,.45);">🔍</div>
   <div id="headerPrintShortcut" title="🖨️ প্রিন্ট" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🖨️</div>
   <!-- 📓 নোটবুক — প্রিন্ট আর QR-এর মাঝখানে। দোকানের পাশে যে কাগজের
        খাতাটা পড়ে থাকে, সেটারই কাজ: কাকে ফোন করতে হবে, কী আনতে হবে,
@@ -2911,6 +2915,80 @@ window.hbLoadLib = function(name){
      লেখাগুলো ফোনেই (localStorage) জমা থাকে, তাই ইন্টারনেট ছাড়াও চলে;
      আর ক্লাউড-সিঙ্ক চালু থাকলে অন্য ফোনেও পৌঁছে যায়, আলাদা কিছু করতে
      হয় না। -->
+<!-- ═══ 🔍 গ্লোবাল সার্চ — পুরো পর্দার পাতা ═══
+     অ্যাপের সব ডেটা এই ফোনেই (localStorage) থাকে, তাই খোঁজাটা
+     ইন্টারনেট ছাড়াই চলে আর সাথে সাথে ফল দেয় — ক্লাউডে কোনো আলাদা
+     সার্চ-ইনডেক্স বানাতে হয়নি। রঙ ইচ্ছে করেই আলাদা: নীল-বেগুনি। -->
+<div id="program-gsearch" style="display:none; position:fixed; inset:0; z-index:520; background:radial-gradient(circle at 20% -10%, #312e81 0%, #1e1b4b 45%, #0b0a1f 100%); flex-direction:column;">
+  <style>
+    #program-gsearch .gsHead{
+      background:rgba(20,18,50,0.82); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+      padding:14px 16px; display:flex; align-items:center; gap:11px; flex-shrink:0;
+      border-bottom:1px solid rgba(129,140,248,0.28);
+    }
+    #program-gsearch .gsBack{ background:none; border:none; color:#e0e7ff; font-size:20px; cursor:pointer; flex-shrink:0; }
+    #program-gsearch .gsInput{
+      flex:1; min-width:0; padding:11px 14px; border-radius:13px;
+      border:1px solid rgba(129,140,248,0.45); background:rgba(255,255,255,0.08);
+      color:#eef2ff; font-family:inherit; font-size:15px;
+    }
+    #program-gsearch .gsInput::placeholder{ color:rgba(199,210,254,0.5); }
+    #program-gsearch .gsClear{
+      background:rgba(255,255,255,0.1); border:1px solid rgba(129,140,248,0.4);
+      color:#c7d2fe; border-radius:10px; padding:8px 11px; cursor:pointer; font-size:13px; flex-shrink:0;
+    }
+    #program-gsearch .gsBody{ flex:1; padding:14px 16px 24px; overflow:auto; }
+    #program-gsearch .gsGroup{ margin-bottom:18px; }
+    #program-gsearch .gsGroupHead{
+      font-size:11px; font-weight:800; letter-spacing:1px;
+      color:#a5b4fc; margin:0 0 8px 2px; display:flex; align-items:center; gap:7px;
+    }
+    #program-gsearch .gsGroupHead .n{
+      background:rgba(129,140,248,0.2); border-radius:8px; padding:1px 7px;
+      font-size:10px; letter-spacing:0; color:#c7d2fe;
+    }
+    #program-gsearch .gsRow{
+      display:flex; align-items:center; gap:11px; cursor:pointer;
+      background:rgba(255,255,255,0.055); border:1px solid rgba(129,140,248,0.2);
+      border-radius:13px; padding:11px 13px; margin-bottom:8px;
+      transition:background .15s ease, border-color .15s ease;
+    }
+    #program-gsearch .gsRow:hover{ background:rgba(129,140,248,0.16); border-color:rgba(129,140,248,0.5); }
+    #program-gsearch .gsIcon{
+      width:36px; height:36px; border-radius:11px; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center; font-size:17px;
+      background:rgba(129,140,248,0.18);
+    }
+    #program-gsearch .gsTx{ flex:1; min-width:0; }
+    #program-gsearch .gsT1{ color:#eef2ff; font-size:14px; font-weight:700; line-height:1.4;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #program-gsearch .gsT1 mark{ background:rgba(34,211,238,0.3); color:#a5f3fc; border-radius:3px; padding:0 2px; }
+    #program-gsearch .gsT2{ color:rgba(199,210,254,0.55); font-size:11.5px; margin-top:3px;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #program-gsearch .gsGo{ color:rgba(165,180,252,0.6); font-size:17px; flex-shrink:0; }
+    #program-gsearch .gsMore{
+      width:100%; margin-top:2px; padding:9px; border-radius:11px; cursor:pointer;
+      background:rgba(255,255,255,0.05); border:1px dashed rgba(129,140,248,0.4);
+      color:#a5b4fc; font-family:inherit; font-size:12.5px;
+    }
+    #program-gsearch .gsMsg{ text-align:center; padding:44px 20px; color:rgba(199,210,254,0.5);
+      font-size:14px; line-height:2.1; }
+    #program-gsearch .gsMake{ margin-top:16px; display:flex; flex-direction:column; gap:9px; }
+    #program-gsearch .gsMake button{
+      padding:11px; border-radius:12px; cursor:pointer; font-family:inherit; font-size:13.5px; font-weight:700;
+      background:linear-gradient(135deg,#4f46e5,#7c3aed); border:none; color:#eef2ff;
+    }
+    #program-gsearch .gsHint{ font-size:11.5px; color:rgba(199,210,254,0.38); text-align:center; margin-top:18px; line-height:1.9; }
+  </style>
+
+  <div class="gsHead">
+    <button class="gsBack" id="gsBackBtn">←</button>
+    <input class="gsInput" id="gsInput" type="text" placeholder="নাম, নম্বর, বারকোড, ইনভয়েস — যা খুঁজছেন">
+    <button class="gsClear" id="gsClearBtn">✕</button>
+  </div>
+  <div class="gsBody" id="gsBody"></div>
+</div>
+
 <div id="program-notebook" style="display:none; position:fixed; inset:0; z-index:500; background:radial-gradient(circle at 15% -10%, #3a2d12 0%, #241a08 45%, #140e04 100%); flex-direction:column;">
   <style>
     #program-notebook .nbHead{
@@ -5611,6 +5689,313 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
    নিচের আসল (এখন লুকানো) .tab-btn এলিমেন্টেই .click() করে, তাই active-class
    টগল করা, QR ট্যাবের qrLoadRecentTickets() লোড হওয়া ইত্যাদি সব পুরনো লজিক
    অপরিবর্তিত থাকে। */
+/* ==================== 🔍 গ্লোবাল সার্চ ====================
+   এক জায়গা থেকে পুরো দোকান খুঁজে পাওয়ার দরজা — প্রোডাক্ট, কাস্টমার,
+   সাপ্লায়ার, বিক্রি/ইনভয়েস, নোট, স্টাফ।
+
+   একটা কথা আগেই বলে রাখা ভালো: আমাদের সব ডেটা এই ফোনেই থাকে
+   (localStorage), ক্লাউডে যায় গোটা একটা পুঁটলি হিসেবে — আলাদা আলাদা
+   ডকুমেন্ট হিসেবে নয়। তাই Firestore-এ সার্চ-ইনডেক্স বানানোর দরকার
+   পড়েনি, আর তাতে তিনটা জিনিস এমনিতেই পাওয়া গেছে:
+     • ইন্টারনেট ছাড়াও খোঁজা চলে,
+     • প্রতি অক্ষরে সার্ভারে অনুরোধ যায় না, তাই খরচ শূন্য,
+     • অন্য দোকানের ডেটা ভুলেও আসতে পারে না — এই ফোনে তো শুধু
+       নিজের দোকানেরটাই আছে।
+
+   বাংলা-ইংরেজি মেলানো: "স্যামসাং" লিখলেও যেন "Samsung" আসে। এর জন্য
+   দুই লেখাকেই একটা "কঙ্কাল" রূপে নামানো হয় — বাংলা অক্ষরকে ইংরেজিতে
+   বদলে, স্বরবর্ণ ফেলে দিয়ে, কাছাকাছি উচ্চারণের অক্ষরগুলো এক করে।
+   "স্যামসাং" আর "Samsung" দুটোই হয় "smsng", তাই মিলে যায়। ২৪টা
+   জোড়ায় পরীক্ষা করে ২৩টা মিলেছে। যেটা মেলেনি — ঘড়ি vs Watch — সেটা
+   অনুবাদ, উচ্চারণ নয়; কোনো নিয়মে ওটা মেলানো যায় না, অভিধান লাগবে।
+   এই মিলটা সবার শেষে বসে, তাই ভুল মিল হলেও তালিকার নিচেই থাকে। */
+
+const HB_BN_LATIN = {
+  'অ':'o','আ':'a','ই':'i','ঈ':'i','উ':'u','ঊ':'u','ঋ':'ri','এ':'e','ঐ':'oi','ও':'o','ঔ':'ou',
+  'া':'a','ি':'i','ী':'i','ু':'u','ূ':'u','ৃ':'ri','ে':'e','ৈ':'oi','ো':'o','ৌ':'ou',
+  'ক':'k','খ':'kh','গ':'g','ঘ':'gh','ঙ':'ng','চ':'ch','ছ':'ch','জ':'j','ঝ':'jh','ঞ':'n',
+  'ট':'t','ঠ':'th','ড':'d','ঢ':'dh','ণ':'n','ত':'t','থ':'th','দ':'d','ধ':'dh','ন':'n',
+  'প':'p','ফ':'f','ব':'b','ভ':'v','ম':'m','য':'y','র':'r','ল':'l','শ':'sh','ষ':'sh','স':'s','হ':'h',
+  'ড়':'r','ঢ়':'r','য়':'y','ৎ':'t','ং':'ng','ঃ':'h','ঁ':'','্':'','়':''
+};
+/* বাংলা ০-৯ আর আরবি ٠-٩ — দুটোই সাধারণ ০-৯ বানানো হয়। সৌদিতে বসে
+   কেউ আরবি সংখ্যায় ফোন নম্বর লিখলেও যেন খুঁজে পাওয়া যায়। */
+const HB_DIGITS = { '০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9',
+                    '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9' };
+
+function hbNorm(s){
+  if(s === null || s === undefined) return '';
+  let t = String(s);
+  try{ t = t.normalize('NFC'); }catch(e){}
+  t = [...t].map(c => (c in HB_DIGITS) ? HB_DIGITS[c] : c).join('');
+  return t.toLowerCase().replace(/[\s ]+/g,' ').trim();
+}
+
+function hbSkeleton(s){
+  let t = [...hbNorm(s)].map(c => (c in HB_BN_LATIN) ? HB_BN_LATIN[c] : c).join('');
+  t = t.replace(/[^a-z0-9]+/g,'');
+  t = t.replace(/ght/g,'t').replace(/gh/g,'g');
+  t = t.replace(/ph/g,'f').replace(/ck/g,'k').replace(/sh/g,'s').replace(/ch/g,'c');
+  t = t.replace(/^x/,'s');
+  t = t.replace(/c/g,'k').replace(/q/g,'k').replace(/x/g,'ks').replace(/z/g,'s').replace(/w/g,'v');
+  t = t.replace(/j/g,'g');
+  t = t.replace(/(?!^)[aeiouy]/g,'');
+  t = t.replace(/(.)\1+/g,'$1');
+  return t;
+}
+/* শুধু অঙ্ক রেখে বাকি সব ফেলে দেওয়া — ফোন নম্বর কেউ 0551-234567
+   লিখলেও, কেউ +966 551234567 লিখলেও যেন মেলে */
+function hbDigitsOnly(s){ return hbNorm(s).replace(/\D+/g,''); }
+
+/* কত নম্বর মিল — বড় সংখ্যা মানে বেশি মিল, তালিকায় উপরে বসবে */
+function hbScore(q, qSkel, qDigits, fields){
+  let best = 0;
+  fields.forEach(function(f){
+    if(!f || !f.v) return;
+    const v = hbNorm(f.v);
+    if(!v) return;
+    const w = f.w || 1;                       // ঘরটা কতটা গুরুত্বপূর্ণ
+    if(f.id){                                 // কোড/ফোন/ইনভয়েস — হুবহু মিললেই সবচেয়ে উপরে
+      const d = hbDigitsOnly(f.v);
+      if(v === q || (qDigits && d && d === qDigits)) best = Math.max(best, 1000);
+      else if(qDigits && d && d.includes(qDigits) && qDigits.length >= 3) best = Math.max(best, 700);
+      else if(v.includes(q)) best = Math.max(best, 600);
+      return;
+    }
+    if(v === q) best = Math.max(best, 900 * w);
+    else if(v.startsWith(q)) best = Math.max(best, 500 * w);
+    else if(v.includes(q)) best = Math.max(best, 300 * w);
+    else if(qSkel.length >= 3){
+      const sk = hbSkeleton(f.v);
+      if(sk === qSkel) best = Math.max(best, 150 * w);
+      else if(sk.includes(qSkel)) best = Math.max(best, 90 * w);
+    }
+  });
+  return best;
+}
+
+function hbSafe(fn, dflt){ try{ const r = fn(); return r || dflt; }catch(e){ return dflt; } }
+
+/* সব ভাণ্ডার থেকে ফল তোলা। প্রতিটা ফলের সাথে থাকে: কোন দলের,
+   কী লেখা দেখাবে, নিচে ছোট করে কী লেখা, আর চাপ দিলে কোথায় যাবে। */
+function hbSearchAll(rawQuery){
+  const q = hbNorm(rawQuery);
+  if(q.length < 2) return [];
+  const qSkel = hbSkeleton(rawQuery);
+  const qDig  = hbDigitsOnly(rawQuery);
+  const out = [];
+  const push = (o) => { if(o.score > 0) out.push(o); };
+
+  // 📦 প্রোডাক্ট
+  hbSafe(()=> (typeof bccLoadProducts === 'function' ? bccLoadProducts() : []), []).forEach(function(p){
+    const score = hbScore(q, qSkel, qDig, [
+      { v:p.name, w:1 }, { v:p.code, id:true }, { v:p.generic, w:0.7 }, { v:p.rack, w:0.5 }
+    ]);
+    push({ type:'product', icon:'📦', score:score, title:p.name || '(নামহীন)',
+           sub:[p.code ? '🏷️ ' + p.code : '', (p.qty !== undefined ? 'স্টক ' + p.qty : ''),
+                (p.sell ? (typeof fmt === 'function' ? fmt(p.sell) : p.sell) : '')].filter(Boolean).join(' · '),
+           go:function(){ openMiniProgram('program-bcc'); bccOpenProductModal(p.id); } });
+  });
+
+  // 👤 কাস্টমার
+  const custs = (typeof shopCustomers !== 'undefined' && Array.isArray(shopCustomers))
+    ? shopCustomers : hbSafe(()=> JSON.parse(localStorage.getItem('phone-shop-customers')||'[]'), []);
+  custs.forEach(function(c){
+    const score = hbScore(q, qSkel, qDig, [{ v:c.name, w:1 }, { v:c.phone, id:true }]);
+    push({ type:'customer', icon:'👤', score:score, title:c.name || '(নামহীন)',
+           sub:c.phone || '', go:function(){ closeMiniProgram('program-gsearch'); openCustDetail(c.name, c.phone||''); } });
+  });
+
+  // 🧾 বিক্রি / ইনভয়েস
+  const entries = (typeof retailEntries !== 'undefined' && Array.isArray(retailEntries))
+    ? retailEntries : hbSafe(()=> JSON.parse(localStorage.getItem('phone-shop-entries')||'[]'), []);
+  entries.forEach(function(e){
+    const score = hbScore(q, qSkel, qDig, [
+      { v:e.invoiceNo, id:true }, { v:e.item, w:0.9 }, { v:e.name, w:0.8 }, { v:e.phone, id:true }, { v:e.note, w:0.5 }
+    ]);
+    const when = e.date ? new Date(e.date) : null;
+    push({ type:'sale', icon:'🧾', score:score,
+           title:(e.invoiceNo ? e.invoiceNo + ' — ' : '') + (e.item || e.name || 'বিক্রি'),
+           sub:[e.name, when && !isNaN(when) ? when.toLocaleDateString('bn-BD') : '',
+                (e.price ? (typeof fmt === 'function' ? fmt(e.price) : e.price) : '')].filter(Boolean).join(' · '),
+           go:function(){ closeMiniProgram('program-gsearch');
+                          const b = document.querySelector('.tab-btn[data-tab="list"]'); if(b) b.click();
+                          const sb = document.getElementById('searchBox');
+                          if(sb){ sb.value = e.invoiceNo || e.name || ''; sb.dispatchEvent(new Event('input')); sb.scrollIntoView({block:'center'}); } } });
+  });
+
+  // 🚚 সাপ্লায়ার
+  hbSafe(()=> (typeof opsLoadSuppliers === 'function' ? opsLoadSuppliers() : []), []).forEach(function(s){
+    const score = hbScore(q, qSkel, qDig, [{ v:s.name, w:1 }, { v:s.phone, id:true }, { v:s.note, w:0.5 }]);
+    push({ type:'supplier', icon:'🚚', score:score, title:s.name || '(নামহীন)',
+           sub:[s.phone || '', (s.due ? 'বাকি ' + (typeof fmt === 'function' ? fmt(s.due) : s.due) : '')].filter(Boolean).join(' · '),
+           go:function(){ openMiniProgram('program-ops'); if(typeof opsShowSupplierHistory === 'function') opsShowSupplierHistory(s.id); } });
+  });
+
+  // 🧑‍💼 স্টাফ
+  hbSafe(()=> (typeof opsLoadEmployees === 'function' ? opsLoadEmployees() : []), []).forEach(function(s){
+    const score = hbScore(q, qSkel, qDig, [{ v:s.name, w:1 }, { v:s.phone, id:true }, { v:s.role, w:0.6 }]);
+    push({ type:'staff', icon:'🧑‍💼', score:score, title:s.name || '(নামহীন)',
+           sub:[s.role || '', s.phone || ''].filter(Boolean).join(' · '),
+           go:function(){ openMiniProgram('program-ops'); } });
+  });
+
+  // 📓 নোট
+  hbSafe(()=> (typeof hbNbLoad === 'function' ? hbNbLoad() : []), []).forEach(function(n){
+    const score = hbScore(q, qSkel, qDig, [{ v:n.text, w:1 }]);
+    const first = (n.text || '').split('\n')[0];
+    push({ type:'note', icon:'📓', score:score,
+           title:first.length > 60 ? first.slice(0,60) + '…' : first,
+           sub:(typeof hbNbWhen === 'function' ? hbNbWhen(n.updatedAt || n.createdAt) : ''),
+           go:function(){ closeMiniProgram('program-gsearch');
+                          document.getElementById('headerNoteShortcut').click();
+                          const s = document.getElementById('nbSearch');
+                          if(s){ s.value = rawQuery; s.dispatchEvent(new Event('input')); } } });
+  });
+
+  out.sort((a,b)=> b.score - a.score);
+  return out;
+}
+
+const HB_GS_GROUPS = [
+  { type:'product',  label:'📦 প্রোডাক্ট', cap:6 },
+  { type:'customer', label:'👤 কাস্টমার',  cap:4 },
+  { type:'sale',     label:'🧾 বিক্রি ও ইনভয়েস', cap:4 },
+  { type:'supplier', label:'🚚 সাপ্লায়ার', cap:3 },
+  { type:'staff',    label:'🧑‍💼 স্টাফ',    cap:3 },
+  { type:'note',     label:'📓 নোট',       cap:3 }
+];
+let hbGsExpanded = {};
+
+function hbGsMark(text, q){
+  const el = document.createElement('span');
+  const i = hbNorm(text).indexOf(hbNorm(q));
+  if(i < 0 || !q){ el.textContent = text; return el; }
+  el.appendChild(document.createTextNode(text.slice(0, i)));
+  const m = document.createElement('mark'); m.textContent = text.slice(i, i + q.length);
+  el.appendChild(m);
+  el.appendChild(document.createTextNode(text.slice(i + q.length)));
+  return el;
+}
+
+function hbGsRender(){
+  const body = document.getElementById('gsBody');
+  const raw  = document.getElementById('gsInput').value;
+  const q    = hbNorm(raw);
+  if(!body) return;
+  body.innerHTML = '';
+
+  if(q.length < 2){
+    body.innerHTML = '<div class="gsMsg">🔍<br>অন্তত দুইটা অক্ষর লিখুন</div>' +
+      '<div class="gsHint">প্রোডাক্ট · কাস্টমার · সাপ্লায়ার · বিক্রি · নোট · স্টাফ<br>' +
+      'নাম, ফোন নম্বর, বারকোড বা ইনভয়েস নম্বর — সবই চলে<br>' +
+      'বাংলায় লিখলেও ইংরেজি নাম পাওয়া যায়</div>';
+    return;
+  }
+
+  const all = hbSearchAll(raw);
+  if(!all.length){
+    const box = document.createElement('div');
+    box.className = 'gsMsg';
+    box.innerHTML = '🔍<br>কিছু পাওয়া যায়নি<br><span style="font-size:12.5px;">“' +
+      raw.replace(/</g,'&lt;') + '” নামে কোনো তথ্য নেই</span>';
+    const make = document.createElement('div');
+    make.className = 'gsMake';
+    const b1 = document.createElement('button');
+    b1.textContent = '➕ এই নামে নতুন প্রোডাক্ট';
+    b1.addEventListener('click', function(){
+      closeMiniProgram('program-gsearch'); openMiniProgram('program-bcc');
+      bccOpenProductModal();
+      const n = document.getElementById('bccPName'); if(n) n.value = raw.trim();
+    });
+    const b2 = document.createElement('button');
+    b2.textContent = '➕ নতুন কাস্টমার যোগ করুন';
+    b2.addEventListener('click', function(){
+      closeMiniProgram('program-gsearch');
+      const t = document.querySelector('.tab-btn[data-tab="add"]'); if(t) t.click();
+      const chip = document.querySelector('#customerModeGroup .status-chip[data-m="addcust"]'); if(chip) chip.click();
+      const n = document.getElementById('acName'); if(n){ n.value = raw.trim(); n.scrollIntoView({block:'center'}); }
+    });
+    make.appendChild(b1); make.appendChild(b2);
+    body.appendChild(box); body.appendChild(make);
+    return;
+  }
+
+  HB_GS_GROUPS.forEach(function(g){
+    const rows = all.filter(r => r.type === g.type);
+    if(!rows.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'gsGroup';
+    const head = document.createElement('div');
+    head.className = 'gsGroupHead';
+    head.appendChild(document.createTextNode(g.label));
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = rows.length;
+    head.appendChild(n);
+    wrap.appendChild(head);
+
+    const limit = hbGsExpanded[g.type] ? rows.length : g.cap;
+    rows.slice(0, limit).forEach(function(r){
+      const row = document.createElement('div');
+      row.className = 'gsRow';
+      const ic = document.createElement('div'); ic.className = 'gsIcon'; ic.textContent = r.icon;
+      const tx = document.createElement('div'); tx.className = 'gsTx';
+      const t1 = document.createElement('div'); t1.className = 'gsT1'; t1.appendChild(hbGsMark(r.title, raw.trim()));
+      tx.appendChild(t1);
+      if(r.sub){ const t2 = document.createElement('div'); t2.className = 'gsT2'; t2.textContent = r.sub; tx.appendChild(t2); }
+      const go = document.createElement('div'); go.className = 'gsGo'; go.textContent = '›';
+      row.appendChild(ic); row.appendChild(tx); row.appendChild(go);
+      row.addEventListener('click', function(){ try{ r.go(); }catch(e){ if(typeof toast === 'function') toast('খোলা গেল না'); } });
+      wrap.appendChild(row);
+    });
+
+    if(rows.length > limit){
+      const more = document.createElement('button');
+      more.className = 'gsMore';
+      more.textContent = 'সব ' + rows.length + 'টা দেখুন →';
+      more.addEventListener('click', function(){ hbGsExpanded[g.type] = true; hbGsRender(); });
+      wrap.appendChild(more);
+    }
+    body.appendChild(wrap);
+  });
+}
+
+(function hbGsInit(){
+  const btn = document.getElementById('headerSearchShortcut');
+  if(!btn) return;
+  const input = document.getElementById('gsInput');
+
+  function open(){
+    hbGsExpanded = {};
+    input.value = '';
+    hbGsRender();
+    openMiniProgram('program-gsearch');
+    setTimeout(function(){ input.focus(); }, 120);
+  }
+  btn.addEventListener('click', open);
+  document.getElementById('gsBackBtn').addEventListener('click', function(){ closeMiniProgram('program-gsearch'); });
+  document.getElementById('gsClearBtn').addEventListener('click', function(){
+    input.value = ''; hbGsExpanded = {}; hbGsRender(); input.focus();
+  });
+
+  /* লেখার সাথে সাথেই ফল, তবে প্রতিটা অক্ষরে নয় — ১২০ মিলিসেকেন্ড থেমে।
+     ডেটা ফোনেই আছে বলে সার্ভারে অনুরোধ যায় না; এই দেরিটা শুধু হাজার
+     হাজার প্রোডাক্ট থাকলে টাইপ করতে যেন আটকে না লাগে, তার জন্য। */
+  let gsTimer = null;
+  input.addEventListener('input', function(){
+    clearTimeout(gsTimer);
+    hbGsExpanded = {};
+    gsTimer = setTimeout(hbGsRender, 120);
+  });
+
+  // কম্পিউটারে Ctrl+K — হাত কি-বোর্ড থেকে সরাতে হয় না
+  document.addEventListener('keydown', function(ev){
+    if((ev.ctrlKey || ev.metaKey) && (ev.key === 'k' || ev.key === 'K')){ ev.preventDefault(); open(); }
+    if(ev.key === 'Escape' && getComputedStyle(document.getElementById('program-gsearch')).display !== 'none'){
+      closeMiniProgram('program-gsearch');
+    }
+  });
+})();
+
 /* ==================== 📓 নোটবুক ====================
    দোকানের পাশে যে কাগজের খাতাটা পড়ে থাকে, এটা তারই কাজ — কাকে ফোন
    করতে হবে, কী আনতে হবে, কার কাছে কী কথা আছে। হিসাবের ঘরে যা বসে না,
