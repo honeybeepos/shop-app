@@ -718,6 +718,38 @@
     display:none; text-align:center; padding:30px 10px;
     font-size:13px; line-height:1.9; color:rgba(255,248,232,0.45);
   }
+  /* ═══ 🗂️ ভাঁজ করা অংশ (hbFold) ═══
+     যে ঘরগুলো একবার ঠিক করলেই চলে, সেগুলো গুটিয়ে রাখার জন্য। মাথায়
+     চাপ দিলে খোলে, আবার চাপলে বন্ধ। বন্ধ থাকলেও মাথার ডানে এক লাইনে
+     এখন কী বাছা আছে সেটা লেখা থাকে — না খুলেও দেখে নেওয়া যায়। */
+  .hbFold{
+    border:1px solid rgba(255,209,102,0.25);
+    border-radius:14px;
+    margin:6px 0 12px;
+    overflow:hidden;
+    background:rgba(36,23,5,0.28);
+  }
+  .hbFoldHead{
+    display:flex; align-items:center; gap:8px;
+    padding:11px 13px; cursor:pointer;
+    user-select:none; -webkit-user-select:none;
+  }
+  .hbFoldTitle{ font-size:13.5px; font-weight:800; flex-shrink:0; }
+  .hbFoldSum{
+    flex:1; min-width:0; text-align:right;
+    font-size:11.5px; opacity:0.62;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .hbFoldArrow{
+    flex-shrink:0; font-size:15px; opacity:0.6;
+    transition:transform .2s ease;
+  }
+  .hbFold.open .hbFoldArrow{ transform:rotate(180deg); }
+  .hbFoldBody{ display:none; padding:0 13px 10px; }
+  .hbFold.open .hbFoldBody{ display:block; }
+  /* খোলা থাকলে মাথার ডানের সারাংশটা আর দরকার নেই — নিচেই সব দেখা যাচ্ছে */
+  .hbFold.open .hbFoldSum{ display:none; }
+
   /* ফোনে এই দুইটার কোনো অস্তিত্বই নেই — সাইডবারের তালিকা আর
      কার্ডের ▾ তীরটা শুধু কম্পিউটারের জিনিস।
      খেয়াল রাখার মতো: একই ওজনের নিয়ম হলে পরেরটা জেতে। তাই লুকানোর
@@ -4689,6 +4721,18 @@ window.hbLoadLib = function(name){
              টাইপ করার দরকার নেই — সেভ করার পর প্রোডাক্ট লিস্টে 🔖 বাটনে চাপলে এটার
              স্টিকার প্রিন্ট করা যাবে -->
         <p class="pin-desc" style="margin:2px 0 10px;">কোনো বারকোড নেই? পাশের 🏷️ বাটনে চেপে নিজে থেকে একটা কোড বানিয়ে নিন।</p>
+        <!-- 🗂️ চারটা বাছাই একসাথে গুটিয়ে রাখা — ক্যাটাগরি, সাব, সাব-সাব আর
+             প্রোডাক্টের ধরন। বেশিরভাগ সময় এগুলো একবার ঠিক করলেই হয়, বারবার
+             বদলাতে হয় না; অথচ পর্দার অনেকখানি জায়গা খেয়ে ফেলত। তাই ভাঁজ করে
+             রাখা হলো, দরকার হলে মাথায় চাপ দিলেই খুলবে।
+             ভেতরের ঘরগুলোর আইডি বা কাজ কিছুই বদলায়নি — শুধু একটা মোড়ক জুড়েছে। -->
+        <div class="hbFold" id="bccCatFold">
+          <div class="hbFoldHead" id="bccCatFoldHead">
+            <span class="hbFoldTitle">🗂️ ক্যাটাগরি ও প্রোডাক্টের ধরন</span>
+            <span class="hbFoldSum" id="bccCatFoldSum">— বাছাই করা হয়নি —</span>
+            <span class="hbFoldArrow">▾</span>
+          </div>
+          <div class="hbFoldBody" id="bccCatFoldBody">
         <label>🏷️ Category (Optional)</label><select id="bccPCat"></select>
         <p class="pin-desc" style="margin:2px 0 10px;">ক্যাটাগরি সিলেক্ট করা বাধ্যতামূলক (এটাই Invoice-এ Brand হিসেবে দেখানো হয়)।</p>
         <label>📂 Sub-Category</label><select id="bccPSub"></select>
@@ -4703,6 +4747,8 @@ window.hbLoadLib = function(name){
           <option value="variant">👕 কালার/সাইজ ভ্যারিয়েন্ট (গার্মেন্টস ইত্যাদি)</option>
         </select>
         <p class="pin-desc" style="margin:2px 0 10px;">প্রতিটা প্রোডাক্টের ধরন আলাদাভাবে বেছে নেওয়া যায় — তাই একই দোকান-অ্যাকাউন্টে মুদি, ফার্মেসি, গার্মেন্টস ইত্যাদি সবরকম প্রোডাক্ট একসাথে রাখা যায়।</p>
+          </div>
+        </div>
 
         <div id="bccPUnitRow" style="display:none;">
           <label>⚖️ বিক্রয় একক</label>
@@ -10842,6 +10888,9 @@ function bccOpenProductModal(editId){
   // বেছে নেওয়া হয়েছিল সেটাই প্রি-সিলেক্ট থাকে (একই ধরনের অনেক প্রোডাক্ট পরপর যোগ করার
   // সময় বারবার বেছে নিতে না হয়), প্রথমবার হলে দোকানের ডিফল্ট ধরন দেখাবে
   document.getElementById('bccPType').value = p ? (p.productType || bccGetAppMode()) : (bccLastUsedProductType || bccGetAppMode());
+  // ভাঁজের মাথার সারাংশটা নতুন করে লেখা — উপরের ঘরগুলো কোড দিয়ে ভরা হয়েছে,
+  // হাতে বদলানো হয়নি, তাই change ইভেন্ট আসে না; নিজে থেকেই ডাকতে হয়
+  if(typeof hbCatFoldSummary === 'function') hbCatFoldSummary();
   // 👕 ভ্যারিয়েন্ট (রং/সাইজ) — এডিট করা প্রোডাক্টে আগের ভ্যারিয়েন্ট থাকলে রং/সাইজ ফিল্ড ও
   // টেবিল দুটোই আগের সেভ করা ডেটা দিয়ে প্রি-ফিল করা হয়
   const editVariants = (p && p.variants) ? p.variants : [];
@@ -11394,6 +11443,50 @@ async function bccIntegrateProductImage(shopId){
   await hbIncrementImageRef(result.imageId, +1); // নতুন হোক (0→1) বা reuse (N→N+1), সংযুক্তি-প্রতি +1
   return { imageId: result.imageId, imageUrl: result.imageUrl };
 }
+
+/* ---------- 🗂️ ক্যাটাগরি ও ধরনের ভাঁজ ----------
+   চারটা বাছাই সাধারণত বন্ধ থাকে। মাথায় চাপ দিলে খোলে, আবার চাপলে বন্ধ।
+   বন্ধ অবস্থাতেও ডান পাশে এক লাইনে লেখা থাকে এখন কী বাছা আছে, তাই
+   না খুলেও দেখে নেওয়া যায় — লুকানো মানে ভুলে যাওয়া নয়।
+
+   খোলা না বন্ধ, সেই পছন্দটা মনে রাখা হয়। যে দোকানে সব প্রোডাক্ট একই
+   ক্যাটাগরির, সে একবার বন্ধ করে দিলে আর খুলতে হবে না; যার প্রতিবার
+   বদলাতে হয়, সে খোলা রেখে দেবে। */
+function hbCatFoldSummary(){
+  const sum = document.getElementById('bccCatFoldSum');
+  if(!sum) return;
+  const pick = (id) => {
+    const el = document.getElementById(id);
+    if(!el || !el.value) return '';
+    const op = el.options[el.selectedIndex];
+    return op ? op.textContent.trim() : '';
+  };
+  const parts = [pick('bccPCat'), pick('bccPSub'), pick('bccPSubSub')].filter(Boolean);
+  const type = pick('bccPType');
+  let txt = parts.join(' › ');
+  if(type) txt = txt ? (txt + ' · ' + type) : type;
+  sum.textContent = txt || '— বাছাই করা হয়নি —';
+}
+
+function hbCatFoldOpen(open){
+  const fold = document.getElementById('bccCatFold');
+  if(!fold) return;
+  fold.classList.toggle('open', !!open);
+  try{ localStorage.setItem('bcc-catfold-open', open ? '1' : '0'); }catch(_){}
+}
+
+(function hbCatFoldInit(){
+  const head = document.getElementById('bccCatFoldHead');
+  const fold = document.getElementById('bccCatFold');
+  if(!head || !fold) return;
+  head.addEventListener('click', ()=> hbCatFoldOpen(!fold.classList.contains('open')));
+  ['bccPCat','bccPSub','bccPSubSub','bccPType'].forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('change', hbCatFoldSummary);
+  });
+  try{ if(localStorage.getItem('bcc-catfold-open') === '1') fold.classList.add('open'); }catch(_){}
+  hbCatFoldSummary();
+})();
 
 document.getElementById('bccPCat').addEventListener('change', (e)=>{
   bccPopulateSubSelect(document.getElementById('bccPSub'), e.target.value, '');
