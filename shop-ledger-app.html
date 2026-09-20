@@ -560,6 +560,8 @@
     #permCustPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #saleReceiptPrintArea.printing, #saleReceiptPrintArea.printing *{visibility:visible;}
     #saleReceiptPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
+    #nbPrintArea.printing, #nbPrintArea.printing *{visibility:visible;}
+    #nbPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #productLabelPrintArea.printing, #productLabelPrintArea.printing *{visibility:visible;}
     #productLabelPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
     #ordReceiptPrintArea.printing, #ordReceiptPrintArea.printing *{visibility:visible;}
@@ -2876,6 +2878,8 @@ window.hbLoadLib = function(name){
   </div>
 </div>
 <div id="saleReceiptPrintArea"></div>
+<!-- 📓 নোট ছাপার জায়গা — বাকি সব প্রিন্ট-এরিয়ার মতোই -->
+<div id="nbPrintArea"></div>
 <div id="productLabelPrintArea"></div>
 
 <!-- 📷 ক্যামেরা দিয়ে বারকোড/QR স্ক্যান করার শেয়ার্ড মোডাল — প্রোডাক্ট কোড, সেল আইটেম,
@@ -3017,6 +3021,33 @@ window.hbLoadLib = function(name){
       font-family:inherit; font-size:12px; cursor:pointer;
     }
     #program-notebook .nbMeta button.danger{ border-color:rgba(224,67,60,0.6); color:#ffb4b0; }
+    /* দ্বিতীয় সারি — প্রিন্ট, শেয়ার, লক। কাজগুলো আলাদা ধরনের, তাই
+       আলাদা সারিতে; উপরের সারিতে ঠেসে দিলে ছোট পর্দায় ভেঙে যেত। */
+    #program-notebook .nbMeta2{
+      margin-top:8px; padding-top:9px; display:flex; gap:8px; flex-wrap:wrap;
+      border-top:1px dashed rgba(255,209,102,0.18);
+    }
+    #program-notebook .nbMeta2 button{
+      flex:1; min-width:84px;
+      background:rgba(255,255,255,0.08); border:1px solid rgba(255,209,102,0.22);
+      color:#fff8e8; border-radius:9px; padding:7px 6px;
+      font-family:inherit; font-size:12px; cursor:pointer;
+    }
+    #program-notebook .nbMeta2 button.locked{
+      background:rgba(255,209,102,0.18); border-color:rgba(255,209,102,0.6); color:#ffd166;
+    }
+    /* তালা দেওয়া নোট — চোখেই বোঝা যায় */
+    #program-notebook .nbCard.locked{ border-color:rgba(255,209,102,0.55); }
+    #program-notebook .nbCard.locked .nbText{ opacity:0.92; }
+
+    /* লেখার মাপ — চোখে কম দেখলে বড় করে নেওয়া যায় */
+    #program-notebook .nbZoom{ display:flex; align-items:center; gap:7px; margin-left:auto; }
+    #program-notebook .nbZoom button{
+      width:32px; height:32px; border-radius:9px; cursor:pointer;
+      background:rgba(255,255,255,0.1); border:1px solid rgba(255,209,102,0.28);
+      color:#fff8e8; font-family:inherit; font-size:14px; font-weight:800;
+    }
+    #program-notebook .nbZoom .lbl{ font-size:11px; color:rgba(255,248,232,0.5); min-width:34px; text-align:center; }
     #program-notebook .nbEmpty{ text-align:center; padding:50px 20px; color:rgba(255,248,232,0.45); font-size:14px; line-height:2; }
     /* খোঁজার বার — রঙটা খাতার সোনালি নয়, খোঁজার নিজের নীল-বেগুনি,
        যাতে বোঝা যায় এটা আলাদা একটা জায়গায় নিয়ে যাচ্ছে */
@@ -3053,6 +3084,11 @@ window.hbLoadLib = function(name){
   <div class="nbHead">
     <button id="nbBackBtn" style="background:none; border:none; color:#fff; font-size:20px; cursor:pointer;">←</button>
     <h2 style="margin:0; font-size:18px;">📓 নোটবুক</h2>
+    <div class="nbZoom">
+      <button id="nbZoomOut" title="লেখা ছোট">A−</button>
+      <span class="lbl" id="nbZoomLbl">100%</span>
+      <button id="nbZoomIn" title="লেখা বড়">A+</button>
+    </div>
   </div>
 
   <div class="nbBody">
@@ -6115,7 +6151,7 @@ function hbNbRender(){
   box.innerHTML = '';
   list.forEach(function(n){
     const card = document.createElement('div');
-    card.className = 'nbCard' + (n.pinned ? ' pin' : '');
+    card.className = 'nbCard' + (n.pinned ? ' pin' : '') + (n.locked ? ' locked' : '');
 
     const tx = document.createElement('div');
     tx.className = 'nbText';
@@ -6127,7 +6163,7 @@ function hbNbRender(){
 
     const dt = document.createElement('div');
     dt.className = 'nbDate';
-    dt.textContent = (n.pinned ? '📌 ' : '') + hbNbWhen(n.updatedAt || n.createdAt);
+    dt.textContent = (n.pinned ? '📌 ' : '') + (n.locked ? '🔒 ' : '') + hbNbWhen(n.updatedAt || n.createdAt);
     meta.appendChild(dt);
 
     const pinBtn = document.createElement('button');
@@ -6141,13 +6177,17 @@ function hbNbRender(){
 
     const edBtn = document.createElement('button');
     edBtn.textContent = '✏️ বদলান';
-    edBtn.addEventListener('click', function(){ hbNbOpenEditor(n.id); });
+    edBtn.addEventListener('click', async function(){
+      if(!(await hbNbAllowChange(n))) return;
+      hbNbOpenEditor(n.id);
+    });
     meta.appendChild(edBtn);
 
     const delBtn = document.createElement('button');
     delBtn.className = 'danger';
     delBtn.textContent = (hbNbConfirmId === n.id) ? '🗑️ নিশ্চিত?' : '🗑️ মুছুন';
-    delBtn.addEventListener('click', function(){
+    delBtn.addEventListener('click', async function(){
+      if(!(await hbNbAllowChange(n))) return;
       if(hbNbConfirmId !== n.id){ hbNbConfirmId = n.id; hbNbRender(); return; }
       hbNbConfirmId = null;
       hbNbSave(hbNbLoad().filter(x => x.id !== n.id));
@@ -6157,7 +6197,146 @@ function hbNbRender(){
     meta.appendChild(delBtn);
 
     card.appendChild(meta);
+
+    /* ---- দ্বিতীয় সারি: প্রিন্ট · শেয়ার · লক ---- */
+    const meta2 = document.createElement('div');
+    meta2.className = 'nbMeta2';
+
+    const prBtn = document.createElement('button');
+    prBtn.textContent = '🖨️ প্রিন্ট';
+    prBtn.addEventListener('click', function(){ hbNbPrint(n); });
+    meta2.appendChild(prBtn);
+
+    const shBtn = document.createElement('button');
+    shBtn.textContent = '📤 শেয়ার';
+    shBtn.addEventListener('click', function(){ hbNbShare(n); });
+    meta2.appendChild(shBtn);
+
+    const lkBtn = document.createElement('button');
+    lkBtn.className = n.locked ? 'locked' : '';
+    lkBtn.textContent = n.locked ? '🔒 খুলুন' : '🔓 লক';
+    lkBtn.addEventListener('click', function(){ hbNbToggleLock(n.id); });
+    meta2.appendChild(lkBtn);
+
+    card.appendChild(meta2);
     box.appendChild(card);
+  });
+  hbNbZoomApply(hbNbZoomGet());     // নতুন করে আঁকা হলো, মাপটা আবার বসাই
+}
+
+/* ---------- 🔒 তালা ----------
+   তালা দেওয়া নোট ভুল করেও বদলানো বা মোছা যায় না — বদলাতে বা মুছতে
+   গেলে আগে পাসওয়ার্ড দিয়ে তালা খুলতে হয়। তালা দিতে পাসওয়ার্ড লাগে না,
+   কারণ কিছু রক্ষা করা সহজ হওয়া উচিত; খোলাটাই কঠিন হওয়া দরকার। */
+async function hbNbToggleLock(id){
+  const all = hbNbLoad();
+  const it = all.find(x => x.id === id);
+  if(!it) return;
+  if(it.locked){
+    const entered = await openPinModal('পাসওয়ার্ড দিন', 'এই নোটের তালা খুলতে পাসওয়ার্ড দিন।');
+    if(entered === null) return;
+    if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, তালা খোলেনি'); return; }
+    it.locked = false;
+    toast('🔓 তালা খুলে গেল');
+  }else{
+    it.locked = true;
+    toast('🔒 নোটটা তালা দেওয়া হলো');
+  }
+  hbNbSave(all);
+  hbNbRender();
+}
+
+/* তালা দেওয়া থাকলে আগে পাসওয়ার্ড — বদলানো বা মোছার আগে ডাকা হয় */
+async function hbNbAllowChange(n){
+  if(!n || !n.locked) return true;
+  const entered = await openPinModal('পাসওয়ার্ড দিন', 'নোটটা তালা দেওয়া। বদলাতে বা মুছতে পাসওয়ার্ড দিন।');
+  if(entered === null) return false;
+  if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড'); return false; }
+  return true;
+}
+
+/* ---------- 🖨️ ছাপা ----------
+   পুরো নোটটা এক পাতায় — লাইনগুলো যেমন লেখা আছে ঠিক তেমনই। কাগজে
+   কালো-সাদা, বড় লেখা, যাতে যে কেউ পড়তে পারে। */
+function hbNbPrint(n){
+  const area = document.getElementById('nbPrintArea');
+  if(!area) return;
+  const shop = (document.getElementById('shopTitle') || {}).textContent || '';
+  const when = hbNbWhen(n.updatedAt || n.createdAt);
+  const lines = String(n.text || '').split('\n');
+
+  area.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'font-family:inherit; color:#000; padding:18px 16px; font-size:15px; line-height:1.85;';
+
+  const h = document.createElement('div');
+  h.style.cssText = 'text-align:center; border-bottom:2px solid #000; padding-bottom:9px; margin-bottom:14px;';
+  const h1 = document.createElement('div');
+  h1.style.cssText = 'font-size:17px; font-weight:800;';
+  h1.textContent = shop.trim() || 'নোটবুক';
+  const h2 = document.createElement('div');
+  h2.style.cssText = 'font-size:12px; margin-top:4px;';
+  h2.textContent = '📓 নোট' + (when ? ' — ' + when : '');
+  h.appendChild(h1); h.appendChild(h2);
+  wrap.appendChild(h);
+
+  /* একটা করে লাইন, আগে নম্বর — ৫০ লাইনের তালিকা হলে কোনটা কোনটা
+     গুনতে সুবিধা হয়, আর কাউকে দিলে সে-ও লাইন ধরে মিলিয়ে নিতে পারে */
+  lines.forEach(function(ln, i){
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; gap:9px; padding:3px 0; border-bottom:1px dotted #bbb;';
+    const no = document.createElement('span');
+    no.style.cssText = 'min-width:24px; text-align:right; color:#555; font-size:13px;';
+    no.textContent = ln.trim() ? (i + 1) + '.' : '';
+    const tx = document.createElement('span');
+    tx.style.cssText = 'flex:1; white-space:pre-wrap; word-break:break-word;';
+    tx.textContent = ln;
+    row.appendChild(no); row.appendChild(tx);
+    wrap.appendChild(row);
+  });
+
+  const f = document.createElement('div');
+  f.style.cssText = 'margin-top:14px; padding-top:8px; border-top:1px solid #000; font-size:11px; text-align:center; color:#444;';
+  f.textContent = 'মোট ' + lines.filter(function(x){ return x.trim(); }).length + ' লাইন';
+  wrap.appendChild(f);
+  area.appendChild(wrap);
+
+  area.classList.add('printing');
+  window.print();
+  setTimeout(function(){ area.classList.remove('printing'); area.innerHTML = ''; }, 600);
+}
+
+/* ---------- 📤 শেয়ার ----------
+   ফোনে শেয়ারের পর্দা খোলে (হোয়াটসঅ্যাপ, মেসেজ, যা আছে)। কম্পিউটারে
+   বা পুরনো ব্রাউজারে ওটা থাকে না, তখন লেখাটা কপি হয়ে যায় — হাতে
+   বেছে কপি করার ঝামেলা থাকে না। */
+async function hbNbShare(n){
+  const shop = ((document.getElementById('shopTitle') || {}).textContent || '').trim();
+  const text = (shop ? shop + '\n' : '') + '📓 নোট\n\n' + String(n.text || '');
+  try{
+    if(navigator.share){ await navigator.share({ title: shop || 'নোট', text: text }); return; }
+  }catch(e){ if(e && e.name === 'AbortError') return; }   // নিজে বাতিল করেছে — কিছু বলার নেই
+  try{
+    await navigator.clipboard.writeText(text);
+    toast('📋 লেখাটা কপি হয়ে গেছে — যেখানে খুশি পেস্ট করুন');
+  }catch(e){
+    toast('শেয়ার করা গেল না');
+  }
+}
+
+/* ---------- 🔍 লেখার মাপ ----------
+   ৫০ লাইনের নোট ছোট পর্দায় পড়া কষ্ট। মাপটা মনে রাখা হয়, প্রতিবার
+   বদলাতে হয় না। */
+function hbNbZoomGet(){
+  const v = parseInt(localStorage.getItem('hb-notebook-zoom') || '100', 10);
+  return (isFinite(v) && v >= 80 && v <= 180) ? v : 100;
+}
+function hbNbZoomApply(v){
+  try{ localStorage.setItem('hb-notebook-zoom', String(v)); }catch(e){}
+  const lbl = document.getElementById('nbZoomLbl');
+  if(lbl) lbl.textContent = v + '%';
+  document.querySelectorAll('#program-notebook .nbText').forEach(function(el){
+    el.style.fontSize = (14.5 * v / 100).toFixed(1) + 'px';
   });
 }
 
@@ -6196,6 +6375,14 @@ function hbNbCloseEditor(){
   document.getElementById('nbAddBtn').addEventListener('click', function(){ hbNbOpenEditor(null); });
   document.getElementById('nbCancelBtn').addEventListener('click', hbNbCloseEditor);
   document.getElementById('nbSearch').addEventListener('input', function(){ hbNbConfirmId = null; hbNbRender(); });
+
+  document.getElementById('nbZoomIn').addEventListener('click', function(){
+    hbNbZoomApply(Math.min(180, hbNbZoomGet() + 10));
+  });
+  document.getElementById('nbZoomOut').addEventListener('click', function(){
+    hbNbZoomApply(Math.max(80, hbNbZoomGet() - 10));
+  });
+  hbNbZoomApply(hbNbZoomGet());
 
   document.getElementById('nbSaveBtn').addEventListener('click', function(){
     const text = document.getElementById('nbEditText').value.trim();
