@@ -720,6 +720,36 @@
     display:none; text-align:center; padding:30px 10px;
     font-size:13px; line-height:1.9; color:rgba(255,248,232,0.45);
   }
+  /* ═══ 📱 সরু পর্দায় উপরের সারি ═══
+     উপরের সোনালি সারিতে পাঁচটা জিনিস: লোগো, প্রিন্ট, নোটবুক, QR, আর
+     দোকান খোলা/বন্ধের সুইচ। header-এ overflow:hidden থাকায় জায়গা না
+     কুলালে শেষেরটা চুপচাপ কেটে যায় — কোনো স্ক্রলবারও আসে না, বোতামটা
+     শুধু হারিয়ে যায়। নোটবুকের বোতাম যোগ হওয়ার পর সরু পর্দায় ঠিক
+     সেটাই হয়েছিল: খোলা/বন্ধ সুইচটা কিনারার বাইরে চলে গিয়েছিল।
+
+     তাই পর্দা যত সরু, জিনিসগুলোও তত ছোট। মাপগুলো হাতে গুনে বসানো —
+     ৩২০ পিক্সেলের পর্দাতেও পাঁচটাই পুরো দেখা যায়। */
+  @media (max-width: 420px){
+    header#posHeader{ gap:9px !important; }
+    header{ padding-left:12px; padding-right:12px; }
+    #logoWrap #shopLogo, #logoWrap #logoPlaceholder{ width:46px !important; height:46px !important; font-size:19px !important; }
+    #headerPrintShortcut, #headerNoteShortcut, #headerQrShortcut{
+      width:42px !important; height:42px !important; font-size:18px !important;
+    }
+    #headerShopOpenToggle{ width:74px !important; }
+  }
+  @media (max-width: 350px){
+    header#posHeader{ gap:7px !important; }
+    header{ padding-left:9px; padding-right:9px; }
+    #logoWrap #shopLogo, #logoWrap #logoPlaceholder{ width:40px !important; height:40px !important; font-size:17px !important; }
+    #headerPrintShortcut, #headerNoteShortcut, #headerQrShortcut{
+      width:37px !important; height:37px !important; font-size:16px !important;
+    }
+    #headerShopOpenToggle{ width:64px !important; height:28px !important; }
+    #headerShopOpenKnob{ width:20px !important; height:20px !important; }
+    #headerShopOpenLabel{ font-size:9.5px !important; padding-left:8px !important; }
+  }
+
   /* ═══ 🗂️ ভাঁজ করা অংশ (hbFold) ═══
      যে ঘরগুলো একবার ঠিক করলেই চলে, সেগুলো গুটিয়ে রাখার জন্য। মাথায়
      চাপ দিলে খোলে, আবার চাপলে বন্ধ। বন্ধ থাকলেও মাথার ডানে এক লাইনে
@@ -1121,7 +1151,7 @@ window.hbLoadLib = function(name){
   <div id="headerShopOpenWrap" title="দোকান খোলা/বন্ধ করুন" style="cursor:pointer; flex-shrink:0;">
     <div id="headerShopOpenToggle" style="width:82px; height:32px; border-radius:20px; background:#2fbf71; position:relative; border:2px solid rgba(255,255,255,.5); box-sizing:border-box; transition:background .2s ease; overflow:hidden;">
       <span id="headerShopOpenLabel" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-start; padding-left:10px; font-size:10.5px; font-weight:800; color:#fff; white-space:nowrap;">খোলা</span>
-      <div id="headerShopOpenKnob" style="width:24px; height:24px; border-radius:50%; background:#fff; position:absolute; top:2px; left:52px; transition:left .25s cubic-bezier(.34,1.56,.64,1); box-shadow:0 1px 3px rgba(0,0,0,.35); z-index:2;"></div>
+      <div id="headerShopOpenKnob" style="width:24px; height:24px; border-radius:50%; background:#fff; position:absolute; top:2px; right:3px; transition:left .25s cubic-bezier(.34,1.56,.64,1); box-shadow:0 1px 3px rgba(0,0,0,.35); z-index:2;"></div>
     </div>
   </div>
 </header>
@@ -18768,7 +18798,13 @@ function hbApplyShopOpenToggleUI(isOpen){
     label.style.paddingLeft = "10px";
     label.style.paddingRight = "0";
     track.style.background = "#2fbf71";
-    knob.style.left = "51px";
+    /* ৫১ পিক্সেল হাতে লেখা ছিল — সুইচটা ৮২ পিক্সেল চওড়া থাকলে ঠিক।
+       সরু পর্দায় সুইচ ছোট হয়ে যায়, তখন নবটা বাইরে বেরিয়ে যেত। তাই
+       এখন সুইচের আসল মাপ দেখে হিসাব — যত চওড়াই হোক, নব ডান কিনারায়। */
+    const trackW = track.clientWidth || 82;
+    const knobW = knob.offsetWidth || 24;
+    knob.style.right = "";                 // দুই দিক থেকে একসাথে টানলে নব লম্বা হয়ে যায়
+    knob.style.left = Math.max(3, trackW - knobW - 3) + "px";
     track.classList.remove("hbFlashClosed");
     track.classList.add("hbFlashOpen");
   }else{
@@ -18777,6 +18813,7 @@ function hbApplyShopOpenToggleUI(isOpen){
     label.style.paddingLeft = "0";
     label.style.paddingRight = "10px";
     track.style.background = "#e53935";
+    knob.style.right = "";
     knob.style.left = "3px";
     track.classList.remove("hbFlashOpen");
     track.classList.add("hbFlashClosed");
