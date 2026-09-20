@@ -3072,6 +3072,57 @@ window.hbLoadLib = function(name){
       background:rgba(255,255,255,0.07); color:#fff8e8;
       font-family:inherit; font-size:14.5px; line-height:1.65; resize:vertical;
     }
+    #program-notebook .nbTitleInput{
+      width:100%; box-sizing:border-box; padding:11px 13px; margin-bottom:9px;
+      border-radius:12px; border:1px solid rgba(255,209,102,0.35);
+      background:rgba(255,255,255,0.08); color:#fff8e8;
+      font-family:inherit; font-size:14.5px; font-weight:700;
+    }
+    /* আগে লেখা একই কথা — পরামর্শ */
+    #program-notebook .nbSuggest{ display:none; margin-top:8px; }
+    #program-notebook .nbSuggest.show{ display:block; }
+    #program-notebook .nbSuggest .hd{ font-size:11px; color:rgba(255,248,232,0.5); margin-bottom:5px; }
+    #program-notebook .nbSuggest button{
+      display:block; width:100%; text-align:left; margin-bottom:5px;
+      background:rgba(255,209,102,0.12); border:1px solid rgba(255,209,102,0.3);
+      color:#fff8e8; border-radius:10px; padding:8px 11px;
+      font-family:inherit; font-size:12.5px; cursor:pointer;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    /* একই কথা দুইবার — সতর্কবার্তা */
+    #program-notebook .nbDupWarn{ display:none; margin-top:9px; }
+    #program-notebook .nbDupWarn.show{ display:block; }
+    #program-notebook .nbDupWarn .bx{
+      background:rgba(224,67,60,0.14); border:1px solid rgba(224,67,60,0.45);
+      border-radius:12px; padding:11px 13px;
+    }
+    #program-notebook .nbDupWarn .ttl{ font-size:13px; font-weight:800; color:#ffb4b0; margin-bottom:6px; }
+    #program-notebook .nbDupWarn .ls{ font-size:12px; color:rgba(255,248,232,0.75); line-height:1.8; }
+    #program-notebook .nbDupWarn .bts{ display:flex; gap:8px; margin-top:10px; }
+    #program-notebook .nbDupWarn .bts button{
+      flex:1; padding:9px; border-radius:10px; border:none; cursor:pointer;
+      font-family:inherit; font-size:12.5px; font-weight:800;
+    }
+    #program-notebook .nbDupWarn .yes{ background:linear-gradient(135deg,#f59e0b,#f97316); color:#2a1503; }
+    #program-notebook .nbDupWarn .no{ background:rgba(255,255,255,0.14); color:#fff8e8; }
+
+    /* নোটের নাম কার্ডের উপরে */
+    #program-notebook .nbTitle{
+      font-size:15px; font-weight:800; color:#ffd166; margin-bottom:7px; line-height:1.45;
+    }
+    /* লাইন ধরে খোঁজা — মিলে যাওয়া লাইন আলাদা রঙে, না-মেলা লাইন লুকানো */
+    #program-notebook .nbLine{ padding:3px 0; color:#fff8e8; line-height:1.7; }
+    #program-notebook .nbLine.hit{
+      background:rgba(34,211,238,0.12); border-left:3px solid #22d3ee;
+      border-radius:0 8px 8px 0; padding:4px 9px; margin:3px 0;
+    }
+    #program-notebook .nbLine mark{
+      background:#22d3ee; color:#06282e; border-radius:3px; padding:0 3px; font-weight:800;
+    }
+    #program-notebook .nbHidden{
+      font-size:11.5px; color:rgba(255,248,232,0.4); cursor:pointer;
+      padding:6px 0 2px; text-decoration:underline dotted; text-underline-offset:3px;
+    }
     #program-notebook .nbEditBtns{ display:flex; gap:9px; margin-top:10px; }
     #program-notebook .nbEditBtns button{
       flex:1; padding:11px; border-radius:11px; border:none;
@@ -3101,7 +3152,11 @@ window.hbLoadLib = function(name){
     </div>
 
     <div class="nbEditWrap" id="nbEditWrap">
-      <textarea id="nbEditText" placeholder="যা মনে রাখতে চান লিখুন — যেমন: রহিম ভাইয়ের ৫টা ব্যাটারি আনতে হবে"></textarea>
+      <input id="nbEditTitle" class="nbTitleInput" type="text" placeholder="📝 নোটের নাম — যেমন: এই সপ্তাহে যা আনতে হবে">
+      <textarea id="nbEditText" placeholder="এক লাইনে একটা জিনিস। এন্টার চেপে পরের লাইনে যান।&#10;যেমন:&#10;samsung battery 5 পিস&#10;vivo y55 black 2টা"></textarea>
+      <!-- আগে একই কথা লেখা থাকলে এখানে দেখাবে — চাপ দিলে বসে যাবে -->
+      <div class="nbSuggest" id="nbSuggest"></div>
+      <div class="nbDupWarn" id="nbDupWarn"></div>
       <div class="nbEditBtns">
         <button class="nbSave" id="nbSaveBtn">✅ সেভ করুন</button>
         <button class="nbCancel" id="nbCancelBtn">বাতিল</button>
@@ -5897,8 +5952,8 @@ function hbSearchAll(rawQuery){
 
   // 📓 নোট
   hbSafe(()=> (typeof hbNbLoad === 'function' ? hbNbLoad() : []), []).forEach(function(n){
-    const score = hbScore(q, qSkel, qDig, [{ v:n.text, w:1 }]);
-    const first = (n.text || '').split('\n')[0];
+    const score = hbScore(q, qSkel, qDig, [{ v:n.title, w:1 }, { v:n.text, w:0.9 }]);
+    const first = (n.title && n.title.trim()) ? n.title.trim() : (n.text || '').split('\n')[0];
     push({ type:'note', icon:'📓', score:score,
            title:first.length > 60 ? first.slice(0,60) + '…' : first,
            sub:(typeof hbNbWhen === 'function' ? hbNbWhen(n.updatedAt || n.createdAt) : ''),
@@ -6129,12 +6184,28 @@ function hbNbWhen(iso){
   return d.toLocaleDateString('bn-BD', { day:'numeric', month:'short', year:'numeric' }) + ', ' + time;
 }
 
+/* মিলে যাওয়া অক্ষরটুকু আলাদা রঙে দেখানো */
+function hbNbMark(text, q){
+  const span = document.createElement('span');
+  const s = String(text == null ? '' : text);
+  if(!q){ span.textContent = s; return span; }
+  const i = hbNorm(s).indexOf(q);
+  if(i < 0){ span.textContent = s; return span; }
+  span.appendChild(document.createTextNode(s.slice(0, i)));
+  const m = document.createElement('mark');
+  m.textContent = s.slice(i, i + q.length);
+  span.appendChild(m);
+  span.appendChild(document.createTextNode(s.slice(i + q.length)));
+  return span;
+}
+
 function hbNbRender(){
   const box = document.getElementById('nbList');
   if(!box) return;
-  const q = (document.getElementById('nbSearch').value || '').trim().toLowerCase();
+  // hbNorm ব্যবহার — বাংলা/আরবি অঙ্ক আর বাড়তি ফাঁকা একরকম হয়ে যায়
+  const q = hbNorm(document.getElementById('nbSearch').value || '');
   let list = hbNbLoad();
-  if(q) list = list.filter(n => (n.text || '').toLowerCase().includes(q));
+  if(q) list = list.filter(n => hbNorm((n.title || '') + ' ' + (n.text || '')).includes(q));
   // পিন করা উপরে, তারপর যেটা শেষে বদলানো হয়েছে সেটা
   list.sort(function(a, b){
     if(!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
@@ -6153,9 +6224,55 @@ function hbNbRender(){
     const card = document.createElement('div');
     card.className = 'nbCard' + (n.pinned ? ' pin' : '') + (n.locked ? ' locked' : '');
 
+    // নোটের নাম — থাকলে উপরে আলাদা করে
+    if(n.title && n.title.trim()){
+      const ti = document.createElement('div');
+      ti.className = 'nbTitle';
+      ti.appendChild(hbNbMark(n.title, q));
+      card.appendChild(ti);
+    }
+
+    /* লেখাটা লাইন ধরে দেখানো হয়। খোঁজা চললে যে লাইনগুলো মেলে সেগুলোই
+       দেখায় — আলাদা রঙে, মিলে যাওয়া অক্ষরটুকু জ্বলজ্বল করে। বাকি
+       লাইনগুলো গুটিয়ে থাকে, চাপ দিলে খোলে। ৫০ লাইনের নোটে "y55"
+       খুঁজলে ওই কয়টা লাইনই সামনে আসে, বাকিগুলো চোখে পড়ে না। */
     const tx = document.createElement('div');
     tx.className = 'nbText';
-    tx.textContent = n.text || '';
+    const lines = String(n.text || '').split('\n');
+    const hits = q ? lines.map(function(l, i){ return hbNorm(l).includes(q) ? i : -1; }).filter(function(i){ return i >= 0; }) : [];
+
+    if(q && hits.length){
+      hits.forEach(function(i){
+        const ln = document.createElement('div');
+        ln.className = 'nbLine hit';
+        ln.appendChild(hbNbMark(lines[i], q));
+        tx.appendChild(ln);
+      });
+      const rest = lines.length - hits.length;
+      if(rest > 0){
+        const more = document.createElement('div');
+        more.className = 'nbHidden';
+        more.textContent = 'আরও ' + rest + ' লাইন আছে — দেখতে চাপ দিন';
+        more.addEventListener('click', function(){
+          tx.innerHTML = '';
+          lines.forEach(function(l, i){
+            const ln = document.createElement('div');
+            ln.className = 'nbLine' + (hits.indexOf(i) >= 0 ? ' hit' : '');
+            ln.appendChild(hbNbMark(l, q));
+            tx.appendChild(ln);
+          });
+          hbNbZoomApply(hbNbZoomGet());
+        });
+        tx.appendChild(more);
+      }
+    }else{
+      lines.forEach(function(l){
+        const ln = document.createElement('div');
+        ln.className = 'nbLine';
+        ln.textContent = l;
+        tx.appendChild(ln);
+      });
+    }
     card.appendChild(tx);
 
     const meta = document.createElement('div');
@@ -6344,11 +6461,14 @@ function hbNbOpenEditor(id){
   hbNbEditingId = id || null;
   const wrap = document.getElementById('nbEditWrap');
   const ta = document.getElementById('nbEditText');
+  const ti = document.getElementById('nbEditTitle');
   const existing = id ? hbNbLoad().find(x => x.id === id) : null;
   ta.value = existing ? (existing.text || '') : '';
+  ti.value = existing ? (existing.title || '') : '';
+  hbNbHideSuggest(); hbNbHideDup();
   wrap.classList.add('show');
   document.getElementById('nbAddBtn').style.display = 'none';
-  ta.focus();
+  ti.focus();                                  // আগে নাম, তারপর লেখা
 }
 
 function hbNbCloseEditor(){
@@ -6356,6 +6476,119 @@ function hbNbCloseEditor(){
   document.getElementById('nbEditWrap').classList.remove('show');
   document.getElementById('nbAddBtn').style.display = '';
   document.getElementById('nbEditText').value = '';
+  document.getElementById('nbEditTitle').value = '';
+  hbNbHideSuggest(); hbNbHideDup();
+}
+
+/* ---------- একই কথা দুইবার যেন না লেখা হয় ----------
+   দোকানে একই মাল বা একই নম্বর দুইবার তালিকায় উঠে যাওয়াটা খুব সাধারণ
+   ভুল — আর ধরা পড়ে অনেক পরে, যখন দুইবার মাল এসে যায়।
+
+   তাই দুই জায়গায় ধরা হয়:
+   ১) লেখার সময় — যে লাইনটা এখন টাইপ হচ্ছে, সেটার মতো কিছু আগে লেখা
+      থাকলে নিচে দেখায়। চাপ দিলে ওটাই বসে যায়, আবার টাইপ করতে হয় না।
+   ২) সেভ করার সময় — একই লাইন দুইবার থাকলে আটকে দিয়ে জিজ্ঞেস করে।
+      "না" বললে বাড়তিগুলো বাদ, "হ্যাঁ" বললে যেমন আছে তেমনই থাকে।
+      জোর করে বাদ দেওয়া হয় না — কখনো ইচ্ছে করেই দুইবার লাগে। */
+function hbNbNormLine(s){ return hbNorm(s).replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); }
+
+function hbNbHideSuggest(){ const b = document.getElementById('nbSuggest'); if(b){ b.classList.remove('show'); b.innerHTML = ''; } }
+function hbNbHideDup(){ const b = document.getElementById('nbDupWarn'); if(b){ b.classList.remove('show'); b.innerHTML = ''; } }
+
+/* এখন কোন লাইনটা টাইপ হচ্ছে */
+function hbNbCurrentLine(ta){
+  const pos = ta.selectionStart || 0;
+  const upto = ta.value.slice(0, pos);
+  return upto.slice(upto.lastIndexOf('\n') + 1);
+}
+
+/* খাতার সব নোট থেকে আগের লাইনগুলো — এই নোটেরটা বাদ দিয়েও নয়,
+   কারণ একই নোটের ভেতরেও দুইবার হতে পারে */
+function hbNbAllLines(excludeCurrentText){
+  const seen = {};
+  const out = [];
+  hbNbLoad().forEach(function(n){
+    if(n.id === hbNbEditingId) return;              // এইটার লেখা তো সামনেই আছে
+    String(n.text || '').split('\n').forEach(function(l){
+      const k = hbNbNormLine(l);
+      if(!k || seen[k]) return;
+      seen[k] = true;
+      out.push({ line: l.trim(), title: n.title || '' });
+    });
+  });
+  return out;
+}
+
+function hbNbSuggest(){
+  const ta = document.getElementById('nbEditText');
+  const box = document.getElementById('nbSuggest');
+  if(!ta || !box) return;
+  const cur = hbNbNormLine(hbNbCurrentLine(ta));
+  if(cur.length < 2){ hbNbHideSuggest(); return; }
+
+  // এই নোটের ভেতরের আগের লাইনগুলোও মেলানো দরকার
+  const own = [];
+  const ownSeen = {};
+  String(ta.value || '').split('\n').forEach(function(l){
+    const k = hbNbNormLine(l);
+    if(!k || k === cur || ownSeen[k]) return;
+    ownSeen[k] = true;
+    own.push({ line: l.trim(), title: '' });
+  });
+
+  const pool = own.concat(hbNbAllLines());
+  const hits = pool.filter(function(x){ return hbNbNormLine(x.line).includes(cur); }).slice(0, 4);
+  if(!hits.length){ hbNbHideSuggest(); return; }
+
+  box.innerHTML = '';
+  const hd = document.createElement('div');
+  hd.className = 'hd';
+  hd.textContent = '💡 আগে এগুলো লেখা আছে — চাপ দিলে বসে যাবে';
+  box.appendChild(hd);
+  hits.forEach(function(x){
+    const b = document.createElement('button');
+    b.textContent = x.line + (x.title ? '   (' + x.title + ')' : '');
+    b.addEventListener('click', function(){
+      // এখনকার লাইনটা পুরোটা বদলে দেওয়া
+      const pos = ta.selectionStart || 0;
+      const before = ta.value.slice(0, pos);
+      const after = ta.value.slice(pos);
+      const start = before.lastIndexOf('\n') + 1;
+      const endRel = after.indexOf('\n');
+      const end = endRel < 0 ? ta.value.length : pos + endRel;
+      ta.value = ta.value.slice(0, start) + x.line + ta.value.slice(end);
+      const caret = start + x.line.length;
+      ta.focus(); ta.setSelectionRange(caret, caret);
+      hbNbHideSuggest();
+    });
+    box.appendChild(b);
+  });
+  box.classList.add('show');
+}
+
+/* একই লাইন কয়বার আছে — সেভের আগে দেখা */
+function hbNbFindDupes(text){
+  const seen = {};
+  const dup = {};
+  String(text || '').split('\n').forEach(function(l){
+    const k = hbNbNormLine(l);
+    if(!k) return;
+    if(seen[k]){ dup[k] = (dup[k] || 1) + 1; }
+    else seen[k] = l.trim();
+  });
+  return Object.keys(dup).map(function(k){ return { line: seen[k], times: dup[k] }; });
+}
+
+/* বাড়তিগুলো ফেলে দেওয়া — প্রথমটা রেখে */
+function hbNbDropDupes(text){
+  const seen = {};
+  return String(text || '').split('\n').filter(function(l){
+    const k = hbNbNormLine(l);
+    if(!k) return true;                 // খালি লাইন থাকুক, ওটা ফাঁক
+    if(seen[k]) return false;
+    seen[k] = true;
+    return true;
+  }).join('\n');
 }
 
 (function hbNotebookInit(){
@@ -6384,22 +6617,79 @@ function hbNbCloseEditor(){
   });
   hbNbZoomApply(hbNbZoomGet());
 
-  document.getElementById('nbSaveBtn').addEventListener('click', function(){
-    const text = document.getElementById('nbEditText').value.trim();
-    if(!text){ if(typeof toast === 'function') toast('কিছু তো লিখুন'); return; }
+  function hbNbDoSave(text){
+    const title = document.getElementById('nbEditTitle').value.trim();
     const all = hbNbLoad();
     const now = new Date().toISOString();
     if(hbNbEditingId){
       const it = all.find(x => x.id === hbNbEditingId);
-      if(it){ it.text = text; it.updatedAt = now; }
+      if(it){ it.title = title; it.text = text; it.updatedAt = now; }
     }else{
       all.unshift({ id: (typeof genLineId === 'function' ? genLineId() : String(Date.now())),
-                    text: text, pinned: false, createdAt: now, updatedAt: now });
+                    title: title, text: text, pinned: false, createdAt: now, updatedAt: now });
     }
     hbNbSave(all);
     hbNbCloseEditor();
     hbNbRender();
     if(typeof toast === 'function') toast('📓 খাতায় লেখা হলো');
+  }
+
+  document.getElementById('nbSaveBtn').addEventListener('click', function(){
+    const text = document.getElementById('nbEditText').value.trim();
+    if(!text){ if(typeof toast === 'function') toast('কিছু তো লিখুন'); return; }
+
+    const dupes = hbNbFindDupes(text);
+    if(!dupes.length){ hbNbDoSave(text); return; }
+
+    /* একই কথা দুইবার পাওয়া গেছে — নিজে থেকে মুছে দিই না, জিজ্ঞেস করি।
+       কখনো ইচ্ছে করেই দুইবার লাগে (দুই কাস্টমারের একই মাল), তাই
+       সিদ্ধান্তটা দোকানদারের হাতেই থাকুক। */
+    const box = document.getElementById('nbDupWarn');
+    box.innerHTML = '';
+    const bx = document.createElement('div'); bx.className = 'bx';
+    const t = document.createElement('div'); t.className = 'ttl';
+    t.textContent = '⚠️ একই কথা একাধিকবার লেখা আছে';
+    bx.appendChild(t);
+    const ls = document.createElement('div'); ls.className = 'ls';
+    dupes.slice(0, 5).forEach(function(d){
+      const r = document.createElement('div');
+      r.textContent = '• ' + d.line + ' — ' + d.times + ' বার';
+      ls.appendChild(r);
+    });
+    if(dupes.length > 5){
+      const r = document.createElement('div');
+      r.textContent = '• আরও ' + (dupes.length - 5) + 'টা';
+      ls.appendChild(r);
+    }
+    bx.appendChild(ls);
+    const bts = document.createElement('div'); bts.className = 'bts';
+    const yes = document.createElement('button'); yes.className = 'yes';
+    yes.textContent = '✔️ থাক, এভাবেই সেভ করুন';
+    yes.addEventListener('click', function(){ hbNbHideDup(); hbNbDoSave(text); });
+    const no = document.createElement('button'); no.className = 'no';
+    no.textContent = '🧹 বাড়তিগুলো বাদ দিন';
+    no.addEventListener('click', function(){
+      const cleaned = hbNbDropDupes(text).trim();
+      document.getElementById('nbEditText').value = cleaned;
+      hbNbHideDup();
+      hbNbDoSave(cleaned);
+    });
+    bts.appendChild(yes); bts.appendChild(no);
+    bx.appendChild(bts);
+    box.appendChild(bx);
+    box.classList.add('show');
+    box.scrollIntoView({ block:'center' });
+  });
+
+  // লেখার সময় পরামর্শ — থামার পরে, প্রতিটা অক্ষরে নয়
+  let nbSugTimer = null;
+  const taEl = document.getElementById('nbEditText');
+  ['input','click','keyup'].forEach(function(ev){
+    taEl.addEventListener(ev, function(){
+      hbNbHideDup();
+      clearTimeout(nbSugTimer);
+      nbSugTimer = setTimeout(hbNbSuggest, 180);
+    });
   });
 
   hbNbUpdateCount();
