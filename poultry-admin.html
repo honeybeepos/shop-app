@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Honey Bee Poultry — অ্যাডমিন</title>
+<meta name="theme-color" content="#1f2937">
+<style>
+  :root{
+    --ink:#111827; --ink-2:#374151; --muted:#6b7280; --line:#e5e7eb;
+    --bg:#f3f4f6; --card:#fff; --amber:#b45309; --amber-l:#fef3c7;
+    --green:#0f7b3d; --green-l:#e8f5ee; --danger:#b91c1c; --danger-l:#fee2e2;
+    --shadow:0 1px 3px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:"Noto Sans Bengali","Hind Siliguri",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+       background:var(--bg);color:var(--ink);line-height:1.6;-webkit-text-size-adjust:100%}
+  .wrap{max-width:920px;margin:0 auto;padding:16px}
+
+  .top{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:2px solid var(--ink);margin-bottom:4px}
+  .top h1{font-size:17px;margin:0;flex:1}
+  .top .tag{font-size:11px;background:var(--ink);color:#fff;padding:3px 9px;border-radius:999px;font-weight:700}
+  .top button{padding:7px 11px;font:inherit;font-size:13px;border:1px solid var(--line);
+              background:#fff;border-radius:7px;cursor:pointer}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:16px;box-shadow:var(--shadow);margin-top:14px}
+  .card h2{font-size:15px;margin:0 0 3px}
+  .card p.sub{margin:0 0 12px;color:var(--muted);font-size:13px}
+
+  label{display:block;font-size:12px;font-weight:600;margin:10px 0 4px;color:var(--ink-2)}
+  input,select,textarea{width:100%;padding:10px 11px;font:inherit;font-size:15px;
+    border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:2px solid var(--ink);outline-offset:1px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:420px){ .row2{grid-template-columns:1fr} }
+
+  .btn{padding:11px 16px;font:inherit;font-size:15px;font-weight:700;border:0;border-radius:8px;
+       background:var(--ink);color:#fff;cursor:pointer;margin-top:14px;width:100%}
+  .btn:active{opacity:.85}
+  .btn[disabled]{opacity:.5;cursor:default}
+  .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);font-weight:600}
+  .btn.sm{padding:7px 11px;font-size:13px;margin-top:0;width:auto}
+  .btn.warn{background:#fff;color:var(--danger);border:1px solid #f3c8c8}
+
+  .msg{margin-top:12px;padding:10px 12px;border-radius:8px;font-size:14px;display:none}
+  .msg.err{display:block;background:var(--danger-l);color:var(--danger);border:1px solid #f3c8c8}
+  .msg.ok{display:block;background:var(--green-l);color:var(--green);border:1px solid #bfe3ce}
+  .msg.info{display:block;background:var(--amber-l);color:var(--amber);border:1px solid #f5dc9a}
+  .hint{font-size:12px;color:var(--muted);margin-top:5px}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+  .stat{border:1px solid var(--line);border-radius:9px;padding:11px;text-align:center;min-width:0}
+  .stat .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+  .stat .k{font-size:11px;color:var(--muted)}
+
+  .tw{overflow-x:auto;margin-top:10px}
+  table{border-collapse:collapse;width:100%;font-size:13px;min-width:460px}
+  th{text-align:left;font-size:11px;color:var(--muted);font-weight:700;padding:7px 8px;
+     border-bottom:2px solid var(--line);white-space:nowrap}
+  td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  td.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+  tr:last-child td{border-bottom:0}
+
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700;white-space:nowrap}
+  .pill.stock{background:var(--amber-l);color:var(--amber)}
+  .pill.claimed{background:var(--green-l);color:var(--green)}
+  .pill.released{background:var(--line);color:var(--muted)}
+  .pill.blocked{background:var(--danger-l);color:var(--danger)}
+
+  .screen{display:none}
+  .screen.on{display:block}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+  .tabs button{padding:8px 13px;font:inherit;font-size:14px;border:1px solid var(--line);
+               background:#fff;border-radius:999px;cursor:pointer}
+  .tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:700}
+
+  #printArea{display:none}
+  @media print{
+    body{background:#fff}
+    .noprint{display:none !important}
+    #printArea{display:block !important}
+    #printArea table{min-width:0;font-size:12px}
+    #printArea td.mono{font-size:14px;font-weight:700}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top noprint">
+    <span class="tag">অ্যাডমিন</span>
+    <h1>Honey Bee Smart Poultry</h1>
+    <button id="btnOut" style="display:none">বের হন</button>
+  </div>
+
+  <!-- ── লগইন ── -->
+  <section class="screen on" id="scrLogin">
+    <div class="card">
+      <h2>সুপার অ্যাডমিন লগইন</h2>
+      <p class="sub">শুধু অনুমোদিত অ্যাকাউন্ট ঢুকতে পারবে</p>
+      <label for="email">ইমেইল</label>
+      <input id="email" type="email" inputmode="email" autocomplete="username">
+      <label for="pass">পাসওয়ার্ড</label>
+      <input id="pass" type="password" autocomplete="current-password">
+      <button class="btn" id="btnIn">লগইন</button>
+      <div class="msg" id="loginMsg"></div>
+    </div>
+  </section>
+
+  <!-- ── মূল ── -->
+  <section class="screen" id="scrMain">
+    <div class="tabs noprint">
+      <button class="on" data-tab="tabHome">এক নজরে</button>
+      <button data-tab="tabNew">নতুন সিরিয়াল</button>
+      <button data-tab="tabDev">যন্ত্রের তালিকা</button>
+      <button data-tab="tabUsers">গ্রাহক</button>
+    </div>
+
+    <!-- এক নজরে -->
+    <div class="tab on" id="tabHome">
+      <div class="card">
+        <h2>এক নজরে</h2>
+        <div class="stats" id="stats"></div>
+        <button class="btn ghost sm" id="btnRefresh" style="margin-top:12px">নতুন করে আনুন</button>
+      </div>
+    </div>
+
+    <!-- নতুন সিরিয়াল -->
+    <div class="tab" id="tabNew" style="display:none">
+      <div class="card noprint">
+        <h2>নতুন সিরিয়াল ও দখল-কোড</h2>
+        <p class="sub">যতগুলো যন্ত্র বানাবেন, ততগুলো একসাথে তৈরি করে নিন</p>
+        <div class="row2">
+          <div>
+            <label for="genCount">কয়টা</label>
+            <select id="genCount"></select>
+          </div>
+          <div>
+            <label for="genModel">মডেল</label>
+            <input id="genModel" type="text" value="HB-ESP32-GW-V1">
+          </div>
+        </div>
+        <label for="genMonths">দখল-কোডের মেয়াদ (মাস)</label>
+        <select id="genMonths"></select>
+        <button class="btn" id="btnGen">তৈরি করুন</button>
+        <div class="msg" id="genMsg"></div>
+        <div class="hint">সিরিয়ালের শেষ অঙ্কটা হিসাব করে বসানো — গ্রাহক টাইপ করতে
+          ভুল করলে অ্যাপেই ধরা পড়বে, সার্ভারে যাওয়ার আগে।</div>
+      </div>
+
+      <div class="card" id="genOutCard" style="display:none">
+        <h2 class="noprint">এইমাত্র যা তৈরি হলো</h2>
+        <p class="sub noprint">ছাপিয়ে বাক্সে দিন। <b>সিরিয়াল যন্ত্রের গায়ে, দখল-কোড আলাদা কাগজে।</b></p>
+        <div class="tw"><table id="genOut"></table></div>
+        <button class="btn ghost sm noprint" id="btnPrint" style="margin-top:12px">ছাপুন</button>
+      </div>
+    </div>
+
+    <!-- যন্ত্রের তালিকা -->
+    <div class="tab" id="tabDev" style="display:none">
+      <div class="card">
+        <h2>যন্ত্রের তালিকা</h2>
+        <div class="row2">
+          <div>
+            <label for="fltStatus">অবস্থা</label>
+            <select id="fltStatus">
+              <option value="">সব</option>
+              <option value="STOCK">স্টকে</option>
+              <option value="CLAIMED">দখল করা</option>
+              <option value="RELEASED">ছাড়ানো</option>
+              <option value="BLOCKED">বন্ধ</option>
+            </select>
+          </div>
+          <div>
+            <label for="fltText">সিরিয়াল খুঁজুন</label>
+            <input id="fltText" type="text" placeholder="HBP-0001">
+          </div>
+        </div>
+        <div class="tw"><table id="devTable"></table></div>
+        <div class="msg" id="devMsg"></div>
+      </div>
+    </div>
+
+    <!-- গ্রাহক -->
+    <div class="tab" id="tabUsers" style="display:none">
+      <div class="card">
+        <h2>গ্রাহক</h2>
+        <div class="tw"><table id="userTable"></table></div>
+        <div class="msg" id="userMsg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ছাপার জন্য -->
+  <div id="printArea"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDXNlXwNMapFQs5ez2GHohe19Ud04ip_PU",
+    authDomain: "honeybee-poultry.firebaseapp.com",
+    projectId: "honeybee-poultry",
+    storageBucket: "honeybee-poultry.firebasestorage.app",
+    messagingSenderId: "845877967187",
+    appId: "1:845877967187:web:4c87e884f40dc2138449a6"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+  const TS   = function(){ return firebase.firestore.FieldValue.serverTimestamp(); };
+
+  const $ = function(id){ return document.getElementById(id); };
+  function bn(x){ return String(x==null?"":x).replace(/[0-9]/g, function(d){ return "০১২৩৪৫৬৭৮৯".charAt(+d); }); }
+  function msg(el,t,k){ el.className = "msg " + (k||"err"); el.textContent = t; }
+  function clearMsg(el){ el.className = "msg"; el.textContent = ""; }
+  function busy(b,on,l){ b.disabled=!!on; if(on){b.dataset.old=b.textContent;b.textContent=l||"অপেক্ষা…";}
+                         else if(b.dataset.old){b.textContent=b.dataset.old;} }
+  function bnError(e){
+    const c=(e&&e.code)||"";
+    if (c==="permission-denied") return "অনুমতি নেই — এই অ্যাকাউন্ট সুপার অ্যাডমিন নয়।";
+    if (c==="auth/invalid-credential"||c==="auth/wrong-password"||c==="auth/user-not-found") return "ইমেইল বা পাসওয়ার্ড ভুল।";
+    if (c==="auth/network-request-failed"||c==="unavailable") return "ইন্টারনেট পাওয়া যাচ্ছে না।";
+    if (c==="auth/too-many-requests") return "অনেকবার চেষ্টা হয়েছে। কিছুক্ষণ পরে করুন।";
+    return "কিছু একটা ভুল হয়েছে" + (c?" ("+c+")":"") + "।";
+  }
+
+  /* ─── সিরিয়াল ও কোড ─── */
+  // শেষ অঙ্কটা Luhn নিয়মে — একটা অঙ্ক ভুল লিখলে, বা পাশাপাশি দুইটা উল্টে
+  // গেলে, সাথে সাথে ধরা পড়ে।
+  function luhn(numStr){
+    let sum = 0, dbl = true;
+    for (let i = numStr.length - 1; i >= 0; i--){
+      let d = +numStr.charAt(i);
+      if (dbl){ d *= 2; if (d > 9) d -= 9; }
+      sum += d; dbl = !dbl;
+    }
+    return (10 - (sum % 10)) % 10;
+  }
+  function makeSerial(seq){
+    const n = String(seq).padStart(4, "0");
+    return "HBP-" + n + "-" + luhn(n);
+  }
+  // বিভ্রান্তিকর অক্ষর বাদ: O/0, I/1/L
+  const ALPHA = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  function makeCode(){
+    const buf = new Uint32Array(8);
+    (window.crypto || window.msCrypto).getRandomValues(buf);
+    let out = "";
+    for (let i=0;i<8;i++){
+      out += ALPHA.charAt(buf[i] % ALPHA.length);
+      if (i === 3) out += "-";
+    }
+    return out;
+  }
+
+  /* ─── অবস্থা ─── */
+  let ME = null;
+  let DEVICES = [], USERS = [], FARMS = [];
+
+  function statusPill(st){
+    const map = { STOCK:["stock","স্টকে"], CLAIMED:["claimed","দখল করা"],
+                  RELEASED:["released","ছাড়ানো"], BLOCKED:["blocked","বন্ধ"] };
+    const m = map[st] || ["released", st || "—"];
+    return '<span class="pill ' + m[0] + '">' + m[1] + '</span>';
+  }
+
+  function loadAll(){
+    clearMsg($("devMsg")); clearMsg($("userMsg"));
+    return Promise.all([
+      db.collection("devices").orderBy("seq","desc").limit(500).get()
+        .then(function(s){ DEVICES = []; s.forEach(function(d){ const x=d.data(); x.__id=d.id; DEVICES.push(x); }); })
+        .catch(function(e){ DEVICES = []; msg($("devMsg"), bnError(e)); }),
+      db.collection("users").limit(500).get()
+        .then(function(s){ USERS = []; s.forEach(function(d){ const x=d.data(); x.__id=d.id; USERS.push(x); }); })
+        .catch(function(e){ USERS = []; msg($("userMsg"), bnError(e)); }),
+      db.collection("farms").limit(500).get()
+        .then(function(s){ FARMS = []; s.forEach(function(d){ const x=d.data(); x.__id=d.id; FARMS.push(x); }); })
+        .catch(function(){ FARMS = []; })
+    ]).then(paintAll);
+  }
+
+  function paintAll(){ paintStats(); paintDevices(); paintUsers(); }
+
+  function paintStats(){
+    const by = { STOCK:0, CLAIMED:0, RELEASED:0, BLOCKED:0 };
+    DEVICES.forEach(function(d){ if (by[d.status] !== undefined) by[d.status]++; });
+    const items = [
+      ["গ্রাহক", USERS.length], ["খামার", FARMS.length],
+      ["মোট যন্ত্র", DEVICES.length], ["স্টকে", by.STOCK],
+      ["দখল করা", by.CLAIMED], ["ছাড়ানো", by.RELEASED]
+    ];
+    $("stats").innerHTML = items.map(function(it){
+      return '<div class="stat"><div class="v">' + bn(it[1]) + '</div><div class="k">' + it[0] + '</div></div>';
+    }).join("");
+  }
+
+  function ownerOf(d){
+    if (!d.claimedByUid) return "—";
+    const u = USERS.filter(function(x){ return x.__id === d.claimedByUid; })[0];
+    if (!u) return d.claimedByUid.slice(0,8) + "…";
+    return (u.name || "—") + (u.phone ? " · " + u.phone : "");
+  }
+
+  function paintDevices(){
+    const st = $("fltStatus").value;
+    const q  = $("fltText").value.trim().toUpperCase();
+    const rows = DEVICES.filter(function(d){
+      if (st && d.status !== st) return false;
+      if (q && String(d.__id).toUpperCase().indexOf(q) === -1) return false;
+      return true;
+    });
+    const t = $("devTable");
+    if (!rows.length){ t.innerHTML = "<tbody><tr><td>কিছু পাওয়া যায়নি।</td></tr></tbody>"; return; }
+    let h = "<thead><tr><th>সিরিয়াল</th><th>অবস্থা</th><th>দখল-কোড</th><th>কার নামে</th><th></th></tr></thead><tbody>";
+    rows.forEach(function(d){
+      h += "<tr><td class='mono'>" + d.__id + "</td>" +
+           "<td>" + statusPill(d.status) + "</td>" +
+           "<td class='mono'>" + (d.claimCode || "—") + "</td>" +
+           "<td>" + ownerOf(d) + "</td>" +
+           "<td>" + ((d.status === "CLAIMED")
+              ? "<button class='btn warn sm' data-rel='" + d.__id + "'>ছাড়িয়ে দিন</button>" : "") +
+           "</td></tr>";
+    });
+    t.innerHTML = h + "</tbody>";
+
+    const bs = t.querySelectorAll("[data-rel]");
+    for (let i=0;i<bs.length;i++){
+      bs[i].addEventListener("click", function(){ release(this, this.getAttribute("data-rel")); });
+    }
+  }
+
+  const armed = {};
+  function release(btn, serial){
+    const box = $("devMsg");
+    if (!armed[serial]){
+      armed[serial] = true;
+      btn.textContent = "সত্যিই? আবার চাপুন";
+      msg(box, serial + " ছাড়িয়ে দিলে গ্রাহকের সাথে যোগ কেটে যাবে, আর নতুন দখল-কোড তৈরি হবে। " +
+               "গ্রাহকের খামারের তথ্য মুছবে না।", "info");
+      setTimeout(function(){ armed[serial] = false; btn.textContent = "ছাড়িয়ে দিন"; }, 6000);
+      return;
+    }
+    armed[serial] = false;
+    busy(btn, true, "ছাড়ছি…");
+    const newCode = makeCode();
+    const exp = new Date(); exp.setMonth(exp.getMonth() + 12);
+    db.collection("devices").doc(serial).update({
+      status: "RELEASED", claimCode: newCode,
+      claimCodeExpiresAt: firebase.firestore.Timestamp.fromDate(exp),
+      claimedByUid: null, farmId: null, controllerId: null,
+      releasedAt: TS(), releasedBy: ME.uid
+    })
+    .then(function(){
+      return db.collection("adminLogs").add({
+        action: "RELEASE_DEVICE", serial: serial,
+        byUid: ME.uid, byEmail: ME.email, at: TS()
+      });
+    })
+    .then(function(){ busy(btn,false); msg(box, "✅ " + serial + " ছাড়ানো হয়েছে। নতুন দখল-কোড তালিকায় দেখা যাচ্ছে।", "ok"); return loadAll(); })
+    .catch(function(e){ busy(btn,false); btn.textContent = "ছাড়িয়ে দিন"; msg(box, bnError(e)); });
+  }
+
+  function paintUsers(){
+    const t = $("userTable");
+    if (!USERS.length){ t.innerHTML = "<tbody><tr><td>কোনো গ্রাহক নেই।</td></tr></tbody>"; return; }
+    let h = "<thead><tr><th>নাম</th><th>ফোন</th><th>এলাকা</th><th>খামার</th></tr></thead><tbody>";
+    USERS.forEach(function(u){
+      const f = FARMS.filter(function(x){ return x.ownerUid === u.__id; })[0];
+      h += "<tr><td>" + (u.name || "—") + "<br><span class='hint'>" + (u.email || "") + "</span></td>" +
+           "<td class='mono'>" + (u.phone || "—") + "</td>" +
+           "<td>" + [u.upazila, u.district].filter(Boolean).join(", ") + "</td>" +
+           "<td>" + (f ? (f.name || "—") + "<br><span class='hint'>" + bn(f.zoneCount || 0) + " জোন</span>" : "—") + "</td></tr>";
+    });
+    t.innerHTML = h + "</tbody>";
+  }
+
+  /* ─── নতুন সিরিয়াল ─── */
+  function nextSeq(){
+    return db.collection("devices").orderBy("seq","desc").limit(1).get()
+      .then(function(s){
+        if (s.empty) return 1;
+        const d = s.docs[0].data();
+        return (Number(d.seq) || 0) + 1;
+      });
+  }
+
+  $("btnGen").addEventListener("click", function(){
+    const btn = this, box = $("genMsg");
+    clearMsg(box);
+    const count  = parseInt($("genCount").value,10) || 1;
+    const model  = $("genModel").value.trim() || "HB-ESP32-GW-V1";
+    const months = parseInt($("genMonths").value,10) || 12;
+    busy(btn, true, "তৈরি হচ্ছে…");
+
+    nextSeq().then(function(start){
+      const exp = new Date(); exp.setMonth(exp.getMonth() + months);
+      const expTs = firebase.firestore.Timestamp.fromDate(exp);
+      const made = [];
+      const batch = db.batch();
+      for (let i=0;i<count;i++){
+        const seq = start + i;
+        const serial = makeSerial(seq);
+        const code = makeCode();
+        made.push({ serial:serial, code:code });
+        batch.set(db.collection("devices").doc(serial), {
+          serial: serial, seq: seq, model: model, role: "GATEWAY",
+          status: "STOCK", claimCode: code, claimCodeExpiresAt: expTs,
+          claimedByUid: null, farmId: null, controllerId: null,
+          firmwareVersion: null, lastSeenAt: null, lastIp: null,
+          createdBy: ME.uid, createdAt: TS()
+        });
+      }
+      return batch.commit().then(function(){
+        return db.collection("adminLogs").add({
+          action: "CREATE_DEVICES", count: count,
+          from: made[0].serial, to: made[made.length-1].serial,
+          byUid: ME.uid, byEmail: ME.email, at: TS()
+        }).catch(function(){ /* লগ না হলেও কাজ আটকাবে না */ });
+      }).then(function(){ return made; });
+    })
+    .then(function(made){
+      busy(btn,false);
+      msg(box, "✅ " + bn(made.length) + " টা তৈরি হয়েছে।", "ok");
+      paintGenOut(made);
+      return loadAll();
+    })
+    .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+  });
+
+  function paintGenOut(made){
+    let h = "<thead><tr><th>সিরিয়াল (যন্ত্রের গায়ে)</th><th>দখল-কোড (আলাদা কাগজে)</th></tr></thead><tbody>";
+    made.forEach(function(m){
+      h += "<tr><td class='mono'>" + m.serial + "</td><td class='mono'>" + m.code + "</td></tr>";
+    });
+    h += "</tbody>";
+    $("genOut").innerHTML = h;
+    $("genOutCard").style.display = "";
+    $("printArea").innerHTML = "<h3>Honey Bee Smart Poultry — সিরিয়াল ও দখল-কোড</h3><table>" + h + "</table>";
+  }
+
+  $("btnPrint").addEventListener("click", function(){ window.print(); });
+  $("fltStatus").addEventListener("change", paintDevices);
+  $("fltText").addEventListener("input", paintDevices);
+  $("btnRefresh").addEventListener("click", function(){
+    const b = this; busy(b, true, "আনছি…");
+    loadAll().then(function(){ busy(b,false); });
+  });
+
+  /* ─── ট্যাব ─── */
+  const tabBtns = document.querySelectorAll(".tabs button");
+  for (let i=0;i<tabBtns.length;i++){
+    tabBtns[i].addEventListener("click", function(){
+      for (let j=0;j<tabBtns.length;j++) tabBtns[j].classList.remove("on");
+      this.classList.add("on");
+      const ids = ["tabHome","tabNew","tabDev","tabUsers"];
+      const want = this.getAttribute("data-tab");
+      ids.forEach(function(id){ $(id).style.display = (id === want) ? "" : "none"; });
+    });
+  }
+
+  /* ─── লগইন ─── */
+  function show(id){
+    const l = document.querySelectorAll(".screen");
+    for (let i=0;i<l.length;i++) l[i].classList.remove("on");
+    $(id).classList.add("on");
+  }
+  $("btnIn").addEventListener("click", function(){
+    const btn = this, box = $("loginMsg");
+    clearMsg(box);
+    const em = $("email").value.trim(), pw = $("pass").value;
+    if (!em || !pw){ msg(box, "ইমেইল আর পাসওয়ার্ড দুইটাই দিন।"); return; }
+    busy(btn, true, "ঢুকছি…");
+    auth.signInWithEmailAndPassword(em, pw)
+      .then(function(){ busy(btn,false); })
+      .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+  });
+  $("pass").addEventListener("keydown", function(e){ if (e.key === "Enter") $("btnIn").click(); });
+  $("btnOut").addEventListener("click", function(){ auth.signOut(); });
+
+  /* ─── শুরু ─── */
+  (function fillSelects(){
+    let h = "";
+    [1,2,5,10,20,25,50].forEach(function(n){ h += '<option value="'+n+'">'+bn(n)+' টা</option>'; });
+    $("genCount").innerHTML = h;
+    h = "";
+    [6,12,24].forEach(function(n){ h += '<option value="'+n+'"'+(n===12?' selected':'')+'>'+bn(n)+' মাস</option>'; });
+    $("genMonths").innerHTML = h;
+  })();
+
+  auth.onAuthStateChanged(function(user){
+    if (!user){ ME = null; $("btnOut").style.display = "none"; show("scrLogin"); return; }
+    // সত্যিই সুপার অ্যাডমিন কিনা দেখে নাও
+    db.collection("superAdmins").doc(user.uid).get()
+      .then(function(d){
+        if (!d.exists){
+          msg($("loginMsg"), "এই অ্যাকাউন্ট সুপার অ্যাডমিন নয়।");
+          show("scrLogin");
+          return auth.signOut();
+        }
+        ME = { uid:user.uid, email:user.email };
+        $("btnOut").style.display = "";
+        show("scrMain");
+        return loadAll();
+      })
+      .catch(function(e){
+        msg($("loginMsg"), bnError(e));
+        show("scrLogin");
+        auth.signOut();
+      });
+  });
+
+})();
+</script>
+</body>
+</html>
