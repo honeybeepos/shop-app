@@ -7,61 +7,63 @@
 <meta name="theme-color" content="#0f7b3d">
 <style>
   :root{
-    --green:#0f7b3d; --green-d:#0a5c2d; --amber:#f0a500; --amber-d:#c98500;
+    --green:#0f7b3d; --green-d:#0a5c2d; --green-l:#e8f5ee;
+    --amber:#f0a500; --amber-d:#c98500;
     --bg:#f4f6f5; --card:#fff; --ink:#15211b; --muted:#5d6b63;
-    --line:#dde4e0; --danger:#c0392b; --ok:#0f7b3d;
+    --line:#dde4e0; --danger:#c0392b;
     --shadow:0 2px 10px rgba(15,40,25,.08);
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
   body{
     font-family:"Noto Sans Bengali","Hind Siliguri",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    background:var(--bg); color:var(--ink); line-height:1.65;
-    -webkit-text-size-adjust:100%;
+    background:var(--bg); color:var(--ink); line-height:1.65; -webkit-text-size-adjust:100%;
   }
   .wrap{max-width:460px;margin:0 auto;padding:16px}
-  @media(min-width:900px){ .wrap{max-width:560px;padding:32px 16px} }
+  @media(min-width:900px){ .wrap{max-width:600px;padding:28px 16px} }
 
-  .brand{display:flex;align-items:center;gap:10px;justify-content:center;margin:18px 0 6px}
-  .brand .bee{font-size:30px;line-height:1}
-  .brand h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.2px}
-  .brand small{display:block;font-size:12px;color:var(--muted);font-weight:400}
+  /* ── উপরের বার ── */
+  .top{display:flex;align-items:center;gap:10px;margin:10px 0 4px;min-height:44px}
+  .top .bee{font-size:26px;line-height:1;flex:none}
+  .top .ttl{flex:1;min-width:0}
+  .top h1{font-size:17px;margin:0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top small{display:block;font-size:11px;color:var(--muted)}
+  .backBtn{flex:none;width:40px;height:40px;border:1px solid var(--line);background:#fff;
+           border-radius:10px;font-size:19px;cursor:pointer;display:none;line-height:1}
+  body.sub .backBtn{display:block}
+  body.sub .top .bee{display:none}
 
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
-        padding:18px;box-shadow:var(--shadow);margin-top:14px}
+        padding:16px;box-shadow:var(--shadow);margin-top:14px}
   .card h2{font-size:17px;margin:0 0 4px}
-  .card p.sub{margin:0 0 14px;color:var(--muted);font-size:13px}
+  .card p.sub{margin:0 0 12px;color:var(--muted);font-size:13px}
+  .card.tap{cursor:pointer}
+  .card.tap:active{background:var(--green-l)}
 
   label{display:block;font-size:13px;font-weight:600;margin:12px 0 5px}
   label .opt{font-weight:400;color:var(--muted)}
-  input,select{
-    width:100%;padding:11px 12px;font:inherit;font-size:15px;
-    border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);
-  }
+  input,select{width:100%;padding:11px 12px;font:inherit;font-size:15px;
+    border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
   input:focus,select:focus{outline:2px solid var(--green);outline-offset:1px;border-color:var(--green)}
   input[disabled],select[disabled]{background:#f0f2f1;color:var(--muted)}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   @media(max-width:360px){ .row2{grid-template-columns:1fr} }
 
-  .btn{
-    width:100%;padding:13px;font:inherit;font-size:16px;font-weight:700;
-    border:0;border-radius:10px;background:var(--green);color:#fff;cursor:pointer;
-    margin-top:18px;
-  }
+  .btn{width:100%;padding:13px;font:inherit;font-size:16px;font-weight:700;border:0;
+       border-radius:10px;background:var(--green);color:#fff;cursor:pointer;margin-top:18px}
   .btn:active{background:var(--green-d)}
   .btn[disabled]{opacity:.55;cursor:default}
-  .btn.alt{background:var(--amber);color:#2a1d00}
-  .btn.alt:active{background:var(--amber-d)}
-  .btn.ghost{background:transparent;color:var(--green);border:1px solid var(--line);font-weight:600}
+  .btn.ghost{background:#fff;color:var(--green);border:1px solid var(--line);font-weight:600}
+  .btn.danger{background:#fff;color:var(--danger);border:1px solid #f0cdc8;font-weight:600}
+  .btn.sm{padding:9px;font-size:14px;margin-top:10px}
 
   .linkrow{text-align:center;margin-top:14px;font-size:14px}
   .linkrow a{color:var(--green);font-weight:600;text-decoration:none;cursor:pointer}
 
   .msg{margin-top:14px;padding:11px 12px;border-radius:9px;font-size:14px;display:none}
   .msg.err{display:block;background:#fdecea;color:var(--danger);border:1px solid #f5c6c0}
-  .msg.ok{display:block;background:#e8f5ee;color:var(--ok);border:1px solid #bfe3ce}
+  .msg.ok{display:block;background:var(--green-l);color:var(--green);border:1px solid #bfe3ce}
   .msg.info{display:block;background:#fff6e0;color:#7a5600;border:1px solid #f2dfae}
-
   .hint{font-size:12px;color:var(--muted);margin-top:5px}
 
   .net{position:fixed;left:0;right:0;top:0;padding:7px 12px;text-align:center;
@@ -76,19 +78,30 @@
            background:var(--card);border:1px solid var(--line);border-radius:12px;
            padding:12px 14px;box-shadow:var(--shadow)}
   .userbar b{display:block;font-size:15px}
-  .userbar span{font-size:12px;color:var(--muted)}
-  .userbar button{padding:8px 12px;font:inherit;font-size:13px;font-weight:600;
+  .userbar span{font-size:12px;color:var(--muted);word-break:break-all}
+  .userbar button{flex:none;padding:8px 12px;font:inherit;font-size:13px;font-weight:600;
                   border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer}
 
-  .zone{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
-  .zone:last-child{border-bottom:0}
-  .zone .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
-  .zone .nm{font-weight:600}
-  .zone .meta{font-size:12px;color:var(--muted)}
+  /* ── জোনের সারি ── */
+  .zrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .zrow:last-child{border-bottom:0}
+  .zrow:active{background:var(--green-l)}
+  .zrow .dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none}
+  .zrow .body{flex:1;min-width:0}
+  .zrow .nm{font-weight:600;display:block}
+  .zrow .meta{font-size:12px;color:var(--muted)}
+  .zrow .go{flex:none;color:var(--muted);font-size:18px}
 
-  .spin{width:22px;height:22px;border:3px solid var(--line);border-top-color:var(--green);
-        border-radius:50%;animation:sp .8s linear infinite;margin:26px auto}
-  @keyframes sp{to{transform:rotate(360deg)}}
+  /* ── রিলের স্লট ── */
+  .slot{display:grid;grid-template-columns:64px 1fr;gap:10px;align-items:start;
+        padding:10px 0;border-bottom:1px solid var(--line)}
+  .slot:last-child{border-bottom:0}
+  .slot .num{font-size:12px;color:var(--muted);padding-top:11px;
+             font-variant-numeric:tabular-nums;line-height:1.3}
+  .slot .num b{display:block;font-size:14px;color:var(--ink)}
+  .slot .fields{min-width:0;display:grid;gap:7px}
+  .slot select,.slot input{font-size:14px;padding:9px 10px}
+  .slot.empty{opacity:.55}
 
   .foot{text-align:center;font-size:12px;color:var(--muted);margin:22px 0 10px}
 </style>
@@ -99,128 +112,183 @@
 
 <div class="wrap">
 
-  <div class="brand">
+  <div class="top">
+    <button class="backBtn" id="backBtn" aria-label="পেছনে">←</button>
     <div class="bee">🐝</div>
-    <div>
-      <h1>Honey Bee Smart Poultry</h1>
-      <small>স্মার্ট পোলট্রি খামার ব্যবস্থাপনা</small>
+    <div class="ttl">
+      <h1 id="topTitle">Honey Bee Smart Poultry</h1>
+      <small id="topSub">স্মার্ট পোলট্রি খামার ব্যবস্থাপনা</small>
     </div>
   </div>
 
-  <!-- ══════════ লোডিং ══════════ -->
   <section class="screen on" id="scrLoad">
-    <div class="spin"></div>
-    <p style="text-align:center;color:var(--muted);font-size:14px">অপেক্ষা করুন…</p>
+    <div class="card"><p class="sub" style="margin:0">অপেক্ষা করুন…</p></div>
   </section>
 
-  <!-- ══════════ লগইন ══════════ -->
+  <!-- ══════ লগইন ══════ -->
   <section class="screen" id="scrLogin">
     <div class="card">
       <h2>লগইন করুন</h2>
       <p class="sub">আপনার ইমেইল আর পাসওয়ার্ড দিন</p>
-
       <label for="lgEmail">ইমেইল</label>
       <input id="lgEmail" type="email" inputmode="email" autocomplete="username" placeholder="apnar@email.com">
-
       <label for="lgPass">পাসওয়ার্ড</label>
       <input id="lgPass" type="password" autocomplete="current-password" placeholder="••••••">
-
       <button class="btn" id="lgBtn">লগইন</button>
       <div class="msg" id="lgMsg"></div>
-
       <div class="linkrow"><a id="toForgot">পাসওয়ার্ড ভুলে গেছেন?</a></div>
       <div class="linkrow">অ্যাকাউন্ট নেই? <a id="toReg">নতুন নিবন্ধন করুন</a></div>
     </div>
   </section>
 
-  <!-- ══════════ পাসওয়ার্ড ভুলে গেলে ══════════ -->
+  <!-- ══════ পাসওয়ার্ড ══════ -->
   <section class="screen" id="scrForgot">
     <div class="card">
       <h2>পাসওয়ার্ড ঠিক করুন</h2>
       <p class="sub">ইমেইল দিন — নতুন পাসওয়ার্ড বসানোর লিংক পাঠানো হবে</p>
-
       <label for="fgEmail">ইমেইল</label>
       <input id="fgEmail" type="email" inputmode="email" placeholder="apnar@email.com">
-
       <button class="btn" id="fgBtn">লিংক পাঠান</button>
       <div class="msg" id="fgMsg"></div>
-
       <div class="linkrow"><a class="backLogin">← লগইনে ফিরে যান</a></div>
     </div>
   </section>
 
-  <!-- ══════════ নিবন্ধন ══════════ -->
+  <!-- ══════ নিবন্ধন ══════ -->
   <section class="screen" id="scrReg">
     <div class="card">
       <h2>নতুন নিবন্ধন</h2>
       <p class="sub">একবারই লাগবে। পরে শুধু ইমেইল-পাসওয়ার্ড দিয়ে ঢুকবেন।</p>
-
       <label for="rgName">আপনার নাম</label>
       <input id="rgName" type="text" autocomplete="name" placeholder="যেমন: ফরিদ হোসেন">
-
       <label for="rgPhone">ফোন নম্বর</label>
       <input id="rgPhone" type="tel" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX">
-
       <label for="rgEmail">ইমেইল</label>
       <input id="rgEmail" type="email" inputmode="email" autocomplete="email" placeholder="apnar@email.com">
-
       <div class="row2">
-        <div>
-          <label for="rgPass">পাসওয়ার্ড</label>
-          <input id="rgPass" type="password" autocomplete="new-password" placeholder="৬ অক্ষরের বেশি">
-        </div>
-        <div>
-          <label for="rgPass2">আবার লিখুন</label>
-          <input id="rgPass2" type="password" autocomplete="new-password" placeholder="একই পাসওয়ার্ড">
-        </div>
+        <div><label for="rgPass">পাসওয়ার্ড</label>
+          <input id="rgPass" type="password" autocomplete="new-password" placeholder="৬ অক্ষরের বেশি"></div>
+        <div><label for="rgPass2">আবার লিখুন</label>
+          <input id="rgPass2" type="password" autocomplete="new-password" placeholder="একই পাসওয়ার্ড"></div>
       </div>
-
       <label for="rgFarm">খামারের নাম</label>
       <input id="rgFarm" type="text" placeholder="যেমন: ফরিদ পোলট্রি">
-
       <label for="rgDist">জেলা</label>
       <select id="rgDist"><option value="">— বেছে নিন —</option></select>
-
       <label for="rgUpa">উপজেলা / থানা</label>
       <select id="rgUpa" disabled><option value="">— আগে জেলা বেছে নিন —</option></select>
-
       <label for="rgVill">গ্রাম / এলাকা <span class="opt">(ঐচ্ছিক)</span></label>
       <input id="rgVill" type="text" placeholder="যেমন: বরকামতা">
-
       <label for="rgZones">কয়টা জোন (ঘর/ভাগ)</label>
       <select id="rgZones"></select>
       <div class="hint">এক ঘরের ভেতরেও কয়েকটা জোন হতে পারে। পরে বাড়ানো-কমানো যাবে।</div>
-
       <button class="btn" id="rgBtn">নিবন্ধন করুন</button>
       <div class="msg" id="rgMsg"></div>
-
       <div class="linkrow">অ্যাকাউন্ট আছে? <a class="backLogin">লগইন করুন</a></div>
     </div>
   </section>
 
-  <!-- ══════════ ঢোকার পর ══════════ -->
+  <!-- ══════ হোম ══════ -->
   <section class="screen" id="scrHome">
     <div class="userbar">
-      <div>
-        <b id="hmName">—</b>
-        <span id="hmEmail">—</span>
-      </div>
+      <div><b id="hmName">—</b><span id="hmEmail">—</span></div>
       <button id="hmOut">বের হন</button>
     </div>
 
-    <div class="card">
+    <div class="card tap" id="hmFarmCard">
       <h2 id="hmFarm">—</h2>
-      <p class="sub" id="hmPlace">—</p>
+      <p class="sub" id="hmPlace" style="margin:0">—</p>
+      <p class="hint" id="hmBatch"></p>
+    </div>
+
+    <div class="card">
+      <h2>জোন</h2>
+      <p class="sub">নামের উপর চাপ দিলে ভেতরে যাবেন</p>
       <div id="hmZones"></div>
+      <button class="btn ghost sm" id="hmAddZone">➕ নতুন জোন</button>
+      <div class="msg" id="hmMsg"></div>
     </div>
 
     <div class="msg info" style="display:block">
-      ⚙️ এখন পর্যন্ত শুধু লগইন আর খামার তৈরি হয়েছে। যন্ত্র যোগ করা, তাপমাত্রা
-      দেখা আর নিয়ন্ত্রণ — এগুলো পরের ধাপে আসবে।
+      ⚙️ যন্ত্র যোগ করা, তাপমাত্রা দেখা আর নিয়ন্ত্রণ — পরের ধাপে আসবে।
     </div>
   </section>
 
-  <div class="foot">Honey Bee Smart Poultry · সংস্করণ ০.১</div>
+  <!-- ══════ খামারের সেটিংস ══════ -->
+  <section class="screen" id="scrFarm">
+    <div class="card">
+      <h2>খামারের তথ্য</h2>
+      <label for="fmName">খামারের নাম</label>
+      <input id="fmName" type="text">
+      <label for="fmDist">জেলা</label>
+      <select id="fmDist"><option value="">— বেছে নিন —</option></select>
+      <label for="fmUpa">উপজেলা / থানা</label>
+      <select id="fmUpa" disabled><option value="">— আগে জেলা বেছে নিন —</option></select>
+      <label for="fmVill">গ্রাম / এলাকা <span class="opt">(ঐচ্ছিক)</span></label>
+      <input id="fmVill" type="text">
+    </div>
+
+    <div class="card">
+      <h2>এই ব্যাচ</h2>
+      <p class="sub">দিন গোনা হবে শুরুর তারিখ থেকে — আলাদা করে লিখতে হবে না</p>
+      <label for="fmBatch">ব্যাচের নাম <span class="opt">(ঐচ্ছিক)</span></label>
+      <input id="fmBatch" type="text" placeholder="যেমন: Batch-001">
+      <div class="row2">
+        <div><label for="fmBirds">কয়টা বাচ্চা</label>
+          <input id="fmBirds" type="number" inputmode="numeric" min="0" placeholder="2000"></div>
+        <div><label for="fmDays">কত দিনের</label>
+          <input id="fmDays" type="number" inputmode="numeric" min="1" max="120" placeholder="36"></div>
+      </div>
+      <label for="fmStart">ব্যাচ শুরুর তারিখ</label>
+      <input id="fmStart" type="date">
+      <p class="hint" id="fmDayNow"></p>
+    </div>
+
+    <button class="btn" id="fmSave">সেভ করুন</button>
+    <div class="msg" id="fmMsg"></div>
+  </section>
+
+  <!-- ══════ জোনের ভেতরে ══════ -->
+  <section class="screen" id="scrZone">
+    <div class="card">
+      <h2>জোনের তথ্য</h2>
+      <label for="znName">জোনের নাম</label>
+      <input id="znName" type="text">
+      <label for="znControl">এই জোনে যন্ত্র চালানো হবে?</label>
+      <select id="znControl">
+        <option value="1">হ্যাঁ — ফ্যান, হিটার সব চলবে</option>
+        <option value="0">না — শুধু তাপমাত্রা দেখা হবে</option>
+      </select>
+      <div class="hint">"না" দিলে এই জোনে কোনো রিলে নেই ধরা হবে।</div>
+    </div>
+
+    <div class="card" id="znDevCard">
+      <h2>রিলের স্লট</h2>
+      <p class="sub">কোন তারে কী লাগানো — ফ্যান বা আলো যতগুলো দরকার বসান</p>
+      <label for="znCount">রিলে বোর্ডে কয়টা স্লট</label>
+      <select id="znCount"></select>
+      <div class="hint" id="znPinNote"></div>
+      <div id="znSlots" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <h2>তাপমাত্রার নিয়ম</h2>
+      <label for="znStrat">কোন থার্মোমিটার দেখে চলবে</label>
+      <select id="znStrat">
+        <option value="SAFE">নিরাপদ — গরম করার সময় সবচেয়ে ঠান্ডা, ঠান্ডা করার সময় সবচেয়ে গরম</option>
+        <option value="AVG">সবগুলোর গড়</option>
+        <option value="PRIMARY">শুধু প্রধান বিন্দুটা</option>
+      </select>
+      <label for="znGrad">ঘরের দুই মাথায় কত ডিগ্রি তফাত হলে সতর্ক করবে</label>
+      <input id="znGrad" type="number" inputmode="decimal" min="1" max="15" step="0.5">
+    </div>
+
+    <button class="btn" id="znSave">সেভ করুন</button>
+    <button class="btn danger sm" id="znDel">এই জোনটা মুছে ফেলুন</button>
+    <div class="msg" id="znMsg"></div>
+  </section>
+
+  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.২</span></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -231,7 +299,7 @@
 (function(){
   "use strict";
 
-  /* ─────────── Firebase ─────────── */
+  /* ════════════ ১. Firebase ════════════ */
   const firebaseConfig = {
     apiKey: "AIzaSyDXNlXwNMapFQs5ez2GHohe19Ud04ip_PU",
     authDomain: "honeybee-poultry.firebaseapp.com",
@@ -243,32 +311,36 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db   = firebase.firestore();
-  const TS   = () => firebase.firestore.FieldValue.serverTimestamp();
+  const TS   = function(){ return firebase.firestore.FieldValue.serverTimestamp(); };
+  db.enablePersistence({ synchronizeTabs: true }).catch(function(){});
 
-  // অফলাইনে পড়া যাবে — ফায়ারবেসে বারবার যেতে হবে না
-  db.enablePersistence({ synchronizeTabs: true }).catch(function(){ /* একাধিক ট্যাব বা পুরনো ব্রাউজার — সমস্যা নেই */ });
-
-  /* ─────────── ছোট সাহায্যকারী ─────────── */
+  /* ════════════ ২. ছোট সাহায্যকারী ════════════ */
   const $ = function(id){ return document.getElementById(id); };
 
-  function show(id){
-    const list = document.querySelectorAll(".screen");
-    for (let i=0;i<list.length;i++) list[i].classList.remove("on");
-    $(id).classList.add("on");
-    window.scrollTo(0,0);
+  // ইংরেজি অঙ্ক → বাংলা অঙ্ক (পুরনো নামেও কাজ করবে)
+  function bn(x){
+    return String(x == null ? "" : x).replace(/[0-9]/g, function(d){
+      return "০১২৩৪৫৬৭৮৯".charAt(+d);
+    });
   }
-  function msg(el, text, kind){
-    el.className = "msg " + (kind || "err");
-    el.textContent = text;
-  }
+  function msg(el, text, kind){ el.className = "msg " + (kind || "err"); el.textContent = text; }
   function clearMsg(el){ el.className = "msg"; el.textContent = ""; }
   function busy(btn, on, label){
     btn.disabled = !!on;
     if (on){ btn.dataset.old = btn.textContent; btn.textContent = label || "অপেক্ষা করুন…"; }
     else if (btn.dataset.old){ btn.textContent = btn.dataset.old; }
   }
+  function fillSelect(sel, items, current){
+    sel.innerHTML = "";
+    items.forEach(function(it){
+      const o = document.createElement("option");
+      o.value = it.v; o.textContent = it.label;
+      if (String(it.v) === String(current)) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
 
-  /* ─────────── ফায়ারবেসের ভুল → বাংলা ─────────── */
+  /* ════════════ ৩. ভুলের বাংলা ════════════ */
   function bnError(e){
     const c = (e && e.code) || "";
     switch(c){
@@ -283,12 +355,11 @@
       case "auth/network-request-failed": return "ইন্টারনেট পাওয়া যাচ্ছে না।";
       case "permission-denied":           return "অনুমতি নেই। নিয়ম (rules) ঠিকমতো বসেছে কিনা দেখুন।";
       case "unavailable":                 return "ইন্টারনেট পাওয়া যাচ্ছে না।";
-      default:
-        return "কিছু একটা ভুল হয়েছে" + (c ? " (" + c + ")" : "") + "। আবার চেষ্টা করুন।";
+      default: return "কিছু একটা ভুল হয়েছে" + (c ? " (" + c + ")" : "") + "। আবার চেষ্টা করুন।";
     }
   }
 
-  /* ─────────── নেট আছে কিনা ─────────── */
+  /* ════════════ ৪. নেট ════════════ */
   function netPaint(){
     const off = !navigator.onLine;
     $("netBar").classList.toggle("show", off);
@@ -298,275 +369,256 @@
   window.addEventListener("offline", netPaint);
   netPaint();
 
-  /* ─────────── জেলা-উপজেলা ─────────── */
-  function fillDistricts(){
-    const sel = $("rgDist");
+  /* ════════════ ৫. পর্দা বদল ════════════ */
+  const ST = { user:null, farmRef:null, farm:null, zones:[], zoneRef:null, zone:null };
+  let backTo = null;
+
+  function show(id, opts){
+    const o = opts || {};
+    const list = document.querySelectorAll(".screen");
+    for (let i=0;i<list.length;i++) list[i].classList.remove("on");
+    $(id).classList.add("on");
+    backTo = o.back || null;
+    document.body.classList.toggle("sub", !!backTo);
+    $("topTitle").textContent = o.title || "Honey Bee Smart Poultry";
+    $("topSub").textContent   = o.sub   || "স্মার্ট পোলট্রি খামার ব্যবস্থাপনা";
+    window.scrollTo(0,0);
+  }
+  $("backBtn").addEventListener("click", function(){ if (backTo) backTo(); });
+
+  /* ════════════ ৬. জেলা-উপজেলা ════════════ */
+  function allDistricts(){
     const names = [];
-    for (const div in BD_LOCATIONS){
-      for (const dist in BD_LOCATIONS[div]) names.push(dist);
-    }
+    for (const div in BD_LOCATIONS){ for (const d in BD_LOCATIONS[div]) names.push(d); }
     names.sort(function(a,b){ return a.localeCompare(b, "bn"); });
-    for (let i=0;i<names.length;i++){
-      const o = document.createElement("option");
-      o.value = names[i]; o.textContent = names[i];
-      sel.appendChild(o);
-    }
+    return names;
   }
   function upazilasOf(dist){
-    for (const div in BD_LOCATIONS){
-      if (BD_LOCATIONS[div][dist]) return BD_LOCATIONS[div][dist];
-    }
+    for (const div in BD_LOCATIONS){ if (BD_LOCATIONS[div][dist]) return BD_LOCATIONS[div][dist]; }
     return [];
   }
-  $("rgDist").addEventListener("change", function(){
-    const sel = $("rgUpa");
-    sel.innerHTML = "";
-    const list = upazilasOf(this.value);
+  function wireLocation(distSel, upaSel){
+    const items = [{v:"",label:"— বেছে নিন —"}].concat(
+      allDistricts().map(function(d){ return {v:d,label:d}; }));
+    fillSelect(distSel, items, distSel.value);
+    distSel.addEventListener("change", function(){ paintUpa(distSel, upaSel, ""); });
+  }
+  function paintUpa(distSel, upaSel, current){
+    const list = upazilasOf(distSel.value);
     if (!list.length){
-      sel.disabled = true;
-      sel.innerHTML = '<option value="">— আগে জেলা বেছে নিন —</option>';
+      upaSel.disabled = true;
+      fillSelect(upaSel, [{v:"",label:"— আগে জেলা বেছে নিন —"}], "");
       return;
     }
-    sel.disabled = false;
-    const head = document.createElement("option");
-    head.value = ""; head.textContent = "— বেছে নিন —";
-    sel.appendChild(head);
-    for (let i=0;i<list.length;i++){
-      const o = document.createElement("option");
-      o.value = list[i]; o.textContent = list[i];
-      sel.appendChild(o);
-    }
-  });
-
-  function fillZoneCount(){
-    const sel = $("rgZones");
-    for (let i=1;i<=20;i++){
-      const o = document.createElement("option");
-      o.value = String(i);
-      o.textContent = i + " টা জোন";
-      if (i === 3) o.selected = true;
-      sel.appendChild(o);
-    }
+    upaSel.disabled = false;
+    fillSelect(upaSel, [{v:"",label:"— বেছে নিন —"}].concat(
+      list.map(function(u){ return {v:u,label:u}; })), current);
   }
 
-  /* ─────────── জোনের যন্ত্রের তালিকা (৮ রিলে) ─────────── */
+  /* ════════════ ৭. যন্ত্রের ধরন ও পিন ════════════ */
+  const DEV_TYPES = [
+    { v:"",              label:"— খালি —" },
+    { v:"HEATER",        label:"হিটার" },
+    { v:"FAN",           label:"ফ্যান" },
+    { v:"MIST",          label:"মিস্ট" },
+    { v:"LIGHT",         label:"আলো" },
+    { v:"WATER",         label:"পানির পাম্প" },
+    { v:"FEEDER",        label:"খাবার" },
+    { v:"CURTAIN_OPEN",  label:"পর্দা খোলা" },
+    { v:"CURTAIN_CLOSE", label:"পর্দা বন্ধ" }
+  ];
+  function typeLabel(v){
+    for (let i=0;i<DEV_TYPES.length;i++) if (DEV_TYPES[i].v === v) return DEV_TYPES[i].label;
+    return v || "খালি";
+  }
+  // ESP32-র নিরাপদ আউটপুট পিন। strapping (0,2,5,12,15), শুধু-ইনপুট (34-39)
+  // আর বাজারের পিন (4) বাদ দেওয়া হয়েছে।
+  const PINS = [25,26,27,14,18,13,19,23,16,17,21,22];
+  function pinOf(slot){ return (slot <= PINS.length) ? ("GPIO" + PINS[slot-1]) : "সম্প্রসারক"; }
+
   function defaultDevices(){
     return [
-      { slot:1, type:"HEATER",        name:"হিটার",      mode:"AUTO" },
-      { slot:2, type:"FAN",           name:"ফ্যান ১",    stage:1, mode:"AUTO" },
-      { slot:3, type:"MIST",          name:"মিস্ট",      mode:"AUTO" },
-      { slot:4, type:"LIGHT",         name:"আলো ১",      group:1, mode:"AUTO" },
+      { slot:1, type:"HEATER",        name:"হিটার",       mode:"AUTO" },
+      { slot:2, type:"FAN",           name:"ফ্যান ১",     mode:"AUTO" },
+      { slot:3, type:"MIST",          name:"মিস্ট",        mode:"AUTO" },
+      { slot:4, type:"LIGHT",         name:"আলো ১",       mode:"AUTO" },
       { slot:5, type:"WATER",         name:"পানির পাম্প", mode:"AUTO" },
-      { slot:6, type:"FEEDER",        name:"খাবার",      mode:"AUTO" },
-      { slot:7, type:"CURTAIN_OPEN",  name:"পর্দা খোলা", pair:8,  mode:"AUTO" },
-      { slot:8, type:"CURTAIN_CLOSE", name:"পর্দা বন্ধ", pair:7,  mode:"AUTO" }
+      { slot:6, type:"FEEDER",        name:"খাবার",       mode:"AUTO" },
+      { slot:7, type:"CURTAIN_OPEN",  name:"পর্দা খোলা",  mode:"AUTO" },
+      { slot:8, type:"CURTAIN_CLOSE", name:"পর্দা বন্ধ",  mode:"AUTO" }
     ];
   }
 
-  /* ─────────── যাচাই ─────────── */
+  /* ════════════ ৮. নিবন্ধন ও লগইন ════════════ */
   function validReg(v){
-    if (!v.name)                      return "আপনার নাম লিখুন।";
-    if (!/^01[3-9]\d{8}$/.test(v.phone)) return "ফোন নম্বর ১১ সংখ্যার হতে হবে, 01 দিয়ে শুরু।";
-    if (!v.email)                     return "ইমেইল লিখুন।";
-    if (v.pass.length < 6)            return "পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে।";
-    if (v.pass !== v.pass2)           return "দুইটা পাসওয়ার্ড এক হয়নি।";
-    if (!v.farm)                      return "খামারের নাম লিখুন।";
-    if (!v.dist)                      return "জেলা বেছে নিন।";
-    if (!v.upa)                       return "উপজেলা বেছে নিন।";
+    if (!v.name)                          return "আপনার নাম লিখুন।";
+    if (!/^01[3-9]\d{8}$/.test(v.phone))  return "ফোন নম্বর ১১ সংখ্যার হতে হবে, 01 দিয়ে শুরু।";
+    if (!v.email)                         return "ইমেইল লিখুন।";
+    if (v.pass.length < 6)                return "পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে।";
+    if (v.pass !== v.pass2)               return "দুইটা পাসওয়ার্ড এক হয়নি।";
+    if (!v.farm)                          return "খামারের নাম লিখুন।";
+    if (!v.dist)                          return "জেলা বেছে নিন।";
+    if (!v.upa)                           return "উপজেলা বেছে নিন।";
     return "";
   }
 
-  /* ─────────── নিবন্ধন ─────────── */
   $("rgBtn").addEventListener("click", function(){
     const btn = this, box = $("rgMsg");
     clearMsg(box);
-
     const v = {
-      name:  $("rgName").value.trim(),
-      phone: $("rgPhone").value.trim(),
-      email: $("rgEmail").value.trim(),
-      pass:  $("rgPass").value,
-      pass2: $("rgPass2").value,
-      farm:  $("rgFarm").value.trim(),
-      dist:  $("rgDist").value,
-      upa:   $("rgUpa").value,
-      vill:  $("rgVill").value.trim(),
-      zones: parseInt($("rgZones").value, 10) || 3
+      name:$("rgName").value.trim(), phone:$("rgPhone").value.trim(),
+      email:$("rgEmail").value.trim(), pass:$("rgPass").value, pass2:$("rgPass2").value,
+      farm:$("rgFarm").value.trim(), dist:$("rgDist").value, upa:$("rgUpa").value,
+      vill:$("rgVill").value.trim(), zones:parseInt($("rgZones").value,10)||3
     };
-
     const bad = validReg(v);
     if (bad){ msg(box, bad); return; }
     if (!navigator.onLine){ msg(box, "নিবন্ধন করতে ইন্টারনেট লাগবে।"); return; }
 
     busy(btn, true, "তৈরি হচ্ছে…");
-
     auth.createUserWithEmailAndPassword(v.email, v.pass)
       .then(function(cred){
-        // ১) খামার সবার আগে — জোন লেখার আগে এটা তৈরি হতেই হবে, কারণ নিয়ম
-        //    খামারের নথি দেখে অনুমতি দেয়। আর এর আইডিটা পরের ধাপে লাগবে।
+        // খামার সবার আগে — জোনের অনুমতি খামারের নথি দেখেই আসে
         const uid = cred.user.uid;
         const farmRef = db.collection("farms").doc();
         return farmRef.set({
-          code: "F01",
-          name: v.farm,
-          ownerUid: uid,
-          memberUids: [],
-          district: v.dist, upazila: v.upa, village: v.vill,
-          zoneCount: v.zones,
-          batch: "", birds: 0, batchStartDate: null, batchDays: 36,
-          createdAt: TS(), updatedAt: TS()
-        }).then(function(){ return { uid: uid, farmRef: farmRef }; });
+          code:"F01", name:v.farm, ownerUid:uid, memberUids:[],
+          district:v.dist, upazila:v.upa, village:v.vill, zoneCount:v.zones,
+          batch:"", birds:0, batchStartDate:null, batchDays:36,
+          createdAt:TS(), updatedAt:TS()
+        }).then(function(){ return { uid:uid, farmRef:farmRef }; });
       })
       .then(function(o){
-        // ২) ব্যবহারকারীর নথি — সাথে খামারের আইডি, যাতে পরে তালিকা না খুঁজে
-        //    সরাসরি ওই খামারটাই আনা যায় (একটা পড়া বাঁচে, নিয়মও সহজ থাকে)
         return db.collection("users").doc(o.uid).set({
-          email: v.email, name: v.name, phone: v.phone,
-          district: v.dist, upazila: v.upa, village: v.vill,
-          primaryFarmId: o.farmRef.id,
-          createdAt: TS(), updatedAt: TS()
+          email:v.email, name:v.name, phone:v.phone,
+          district:v.dist, upazila:v.upa, village:v.vill,
+          primaryFarmId:o.farmRef.id, createdAt:TS(), updatedAt:TS()
         }).then(function(){ return o.farmRef; });
       })
       .then(function(farmRef){
-        // ৩) এখন জোনগুলো — খামার তৈরি হয়ে গেছে, তাই অনুমতি মিলবে
         const batch = db.batch();
         for (let i=1; i<=v.zones; i++){
           const zid = "Z" + (i < 10 ? "0" + i : i);
           batch.set(farmRef.collection("zones").doc(zid), {
-            code: zid,
-            name: "জোন " + i,
-            controllerId: null,
-            nodeId: null,
-            controlEnabled: true,
-            tempStrategy: "SAFE",
-            gradientAlertC: 3,
-            devices: defaultDevices(),
-            points: {},
-            feedTimes: ["06:00","10:00","14:00","18:00","22:00"],
-            settings: {},
-            emergencyRequest: false,
-            createdAt: TS(), updatedAt: TS()
+            code:zid, name:"জোন " + bn(i), controllerId:null, nodeId:null,
+            controlEnabled:true, tempStrategy:"SAFE", gradientAlertC:3,
+            relaySlots:8, devices:defaultDevices(), points:{},
+            feedTimes:["06:00","10:00","14:00","18:00","22:00"],
+            settings:{}, emergencyRequest:false, createdAt:TS(), updatedAt:TS()
           });
         }
         return batch.commit();
       })
-      .then(function(){
-        busy(btn, false);
-        msg(box, "✅ হয়ে গেছে! আপনার খামার তৈরি।", "ok");
-        // onAuthStateChanged নিজেই হোম স্ক্রিনে নিয়ে যাবে
-      })
-      .catch(function(e){
-        busy(btn, false);
-        msg(box, bnError(e));
-        // অ্যাকাউন্ট তৈরি হয়ে গিয়ে পরের ধাপ আটকালে, লগইন থাকা অবস্থাতেই
-        // আবার চেষ্টা করা যাবে — তাই এখানে অ্যাকাউন্ট মোছা হচ্ছে না
-      });
+      .then(function(){ busy(btn,false); msg(box, "✅ হয়ে গেছে! আপনার খামার তৈরি।", "ok"); })
+      .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
   });
 
-  /* ─────────── লগইন ─────────── */
   $("lgBtn").addEventListener("click", function(){
     const btn = this, box = $("lgMsg");
     clearMsg(box);
-
-    const em = $("lgEmail").value.trim();
-    const pw = $("lgPass").value;
+    const em = $("lgEmail").value.trim(), pw = $("lgPass").value;
     if (!em || !pw){ msg(box, "ইমেইল আর পাসওয়ার্ড দুইটাই দিন।"); return; }
     if (!navigator.onLine){ msg(box, "লগইন করতে ইন্টারনেট লাগবে।"); return; }
-
     busy(btn, true, "ঢুকছি…");
     auth.signInWithEmailAndPassword(em, pw)
-      .then(function(){ busy(btn, false); })
-      .catch(function(e){ busy(btn, false); msg(box, bnError(e)); });
+      .then(function(){ busy(btn,false); })
+      .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
   });
 
-  /* ─────────── পাসওয়ার্ড ভুলে গেলে ─────────── */
   $("fgBtn").addEventListener("click", function(){
     const btn = this, box = $("fgMsg");
     clearMsg(box);
     const em = $("fgEmail").value.trim();
     if (!em){ msg(box, "ইমেইল লিখুন।"); return; }
-
     busy(btn, true, "পাঠাচ্ছি…");
     auth.sendPasswordResetEmail(em)
-      .then(function(){
-        busy(btn, false);
-        msg(box, "ইমেইলে লিংক পাঠানো হয়েছে। ইনবক্স আর স্প্যাম — দুই জায়গাতেই দেখুন।", "ok");
-      })
-      .catch(function(e){ busy(btn, false); msg(box, bnError(e)); });
+      .then(function(){ busy(btn,false); msg(box, "ইমেইলে লিংক পাঠানো হয়েছে। ইনবক্স আর স্প্যাম — দুই জায়গাতেই দেখুন।", "ok"); })
+      .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
   });
 
-  /* ─────────── পাতা বদল ─────────── */
   $("toReg").addEventListener("click", function(){ clearMsg($("rgMsg")); show("scrReg"); });
   $("toForgot").addEventListener("click", function(){
-    clearMsg($("fgMsg"));
-    $("fgEmail").value = $("lgEmail").value.trim();
-    show("scrForgot");
+    clearMsg($("fgMsg")); $("fgEmail").value = $("lgEmail").value.trim(); show("scrForgot");
   });
   const backs = document.querySelectorAll(".backLogin");
-  for (let i=0;i<backs.length;i++){
-    backs[i].addEventListener("click", function(){ clearMsg($("lgMsg")); show("scrLogin"); });
-  }
+  for (let i=0;i<backs.length;i++) backs[i].addEventListener("click", function(){ clearMsg($("lgMsg")); show("scrLogin"); });
   $("hmOut").addEventListener("click", function(){ auth.signOut(); });
+  $("lgPass").addEventListener("keydown", function(e){ if (e.key==="Enter") $("lgBtn").click(); });
+  $("fgEmail").addEventListener("keydown", function(e){ if (e.key==="Enter") $("fgBtn").click(); });
 
-  // Enter চাপলেই কাজ হবে
-  $("lgPass").addEventListener("keydown", function(e){ if (e.key === "Enter") $("lgBtn").click(); });
-  $("fgEmail").addEventListener("keydown", function(e){ if (e.key === "Enter") $("fgBtn").click(); });
+  /* ════════════ ৯. হোম ════════════ */
+  function dayOfBatch(f){
+    if (!f || !f.batchStartDate) return null;
+    const start = new Date(f.batchStartDate + "T00:00:00");
+    if (isNaN(start.getTime())) return null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = Math.floor((today - start) / 86400000) + 1;
+    return d;
+  }
 
-  /* ─────────── ঢোকার পরের পর্দা ─────────── */
-  function renderFarm(doc){
-    const f = doc.data();
+  function paintHome(){
+    const f = ST.farm || {};
     $("hmFarm").textContent  = f.name || "খামার";
     $("hmPlace").textContent =
-      [f.village, f.upazila, f.district].filter(Boolean).join(", ") +
-      "  ·  কোড " + (f.code || "F01");
+      [f.village, f.upazila, f.district].filter(Boolean).join(", ") + "  ·  কোড " + (f.code || "F01");
 
-    return doc.ref.collection("zones").get().then(function(zs){
-      const box = $("hmZones");
-      if (zs.empty){ box.innerHTML = '<p class="hint">কোনো জোন নেই।</p>'; return; }
-      const rows = [];
-      zs.forEach(function(z){ rows.push(z.data()); });
-      rows.sort(function(a,b){ return String(a.code).localeCompare(String(b.code)); });
-      box.innerHTML = "";
-      rows.forEach(function(z){
-        const n = document.createElement("div");
-        n.className = "zone";
-        const dev = (z.devices || []).length;
-        n.innerHTML =
-          '<span class="dot"></span>' +
-          '<span><span class="nm"></span><br><span class="meta"></span></span>';
-        n.querySelector(".nm").textContent = z.name || z.code;
-        n.querySelector(".meta").textContent = dev + " টা যন্ত্র · যন্ত্র যুক্ত হয়নি";
-        box.appendChild(n);
-      });
+    const d = dayOfBatch(f);
+    $("hmBatch").textContent = (d === null)
+      ? "ব্যাচ শুরুর তারিখ বসানো হয়নি — চাপ দিয়ে বসান"
+      : (f.batch ? f.batch + " · " : "") + "আজ " + bn(d) + " নম্বর দিন"
+        + (f.birds ? " · " + bn(f.birds) + " টা বাচ্চা" : "");
+
+    const box = $("hmZones");
+    box.innerHTML = "";
+    if (!ST.zones.length){ box.innerHTML = '<p class="hint">কোনো জোন নেই।</p>'; return; }
+    ST.zones.forEach(function(z){
+      const n = document.createElement("div");
+      n.className = "zrow";
+      n.innerHTML = '<span class="dot"></span><span class="body">' +
+                    '<span class="nm"></span><span class="meta"></span></span><span class="go">›</span>';
+      const live = (z.devices || []).filter(function(d2){ return d2 && d2.type; }).length;
+      n.querySelector(".nm").textContent = bn(z.name || z.code);
+      n.querySelector(".meta").textContent = z.controlEnabled === false
+        ? "শুধু দেখা · যন্ত্র নেই"
+        : bn(live) + " টা যন্ত্র · যন্ত্র যুক্ত হয়নি";
+      n.addEventListener("click", function(){ openZone(z); });
+      box.appendChild(n);
     });
   }
 
-  function noFarm(){
-    $("hmFarm").textContent  = "কোনো খামার পাওয়া যায়নি";
-    $("hmPlace").textContent = "নিবন্ধন পুরোপুরি শেষ হয়নি বলে মনে হচ্ছে।";
-  }
-
   function loadHome(user){
+    ST.user = user;
     $("hmEmail").textContent = user.email || "";
     $("hmName").textContent  = "…";
     $("hmFarm").textContent  = "খামার আনা হচ্ছে…";
     $("hmPlace").textContent = "";
+    $("hmBatch").textContent = "";
     $("hmZones").innerHTML   = "";
+    clearMsg($("hmMsg"));
 
     db.collection("users").doc(user.uid).get()
       .then(function(d){
         const u = (d.exists && d.data()) || {};
         $("hmName").textContent = u.name || "—";
-
-        // নতুন অ্যাকাউন্টে খামারের আইডি জমা থাকে — সরাসরি আনা যায়
         if (u.primaryFarmId){
-          return db.collection("farms").doc(u.primaryFarmId).get()
-            .then(function(fd){ return fd.exists ? renderFarm(fd) : noFarm(); });
+          return db.collection("farms").doc(u.primaryFarmId).get();
         }
-
-        // পুরনো অ্যাকাউন্ট — আইডি জমা নেই, তাই খুঁজে নিতে হবে
-        return db.collection("farms").where("ownerUid", "==", user.uid).limit(1).get()
-          .then(function(snap){ return snap.empty ? noFarm() : renderFarm(snap.docs[0]); });
+        return db.collection("farms").where("ownerUid","==",user.uid).limit(1).get()
+          .then(function(snap){ return snap.empty ? null : snap.docs[0]; });
+      })
+      .then(function(fd){
+        if (!fd || !fd.exists){
+          $("hmFarm").textContent  = "কোনো খামার পাওয়া যায়নি";
+          $("hmPlace").textContent = "নিবন্ধন পুরোপুরি শেষ হয়নি বলে মনে হচ্ছে।";
+          return;
+        }
+        ST.farmRef = fd.ref; ST.farm = fd.data();
+        return ST.farmRef.collection("zones").get().then(function(zs){
+          ST.zones = [];
+          zs.forEach(function(z){ const d2 = z.data(); d2.__id = z.id; ST.zones.push(d2); });
+          ST.zones.sort(function(a,b){ return String(a.code||a.__id).localeCompare(String(b.code||b.__id)); });
+          paintHome();
+        });
       })
       .catch(function(e){
         $("hmName").textContent  = "—";
@@ -575,9 +627,242 @@
       });
   }
 
-  /* ─────────── শুরু ─────────── */
-  fillDistricts();
-  fillZoneCount();
+  function goHome(){ show("scrHome"); paintHome(); }
+
+  /* ════════════ ১০. খামারের সেটিংস ════════════ */
+  $("hmFarmCard").addEventListener("click", function(){
+    if (!ST.farm) return;
+    const f = ST.farm;
+    $("fmName").value  = f.name || "";
+    $("fmVill").value  = f.village || "";
+    $("fmBatch").value = f.batch || "";
+    $("fmBirds").value = f.birds || "";
+    $("fmDays").value  = f.batchDays || 36;
+    $("fmStart").value = f.batchStartDate || "";
+    fillSelect($("fmDist"), [{v:"",label:"— বেছে নিন —"}].concat(
+      allDistricts().map(function(d){ return {v:d,label:d}; })), f.district || "");
+    paintUpa($("fmDist"), $("fmUpa"), f.upazila || "");
+    paintFmDay();
+    clearMsg($("fmMsg"));
+    show("scrFarm", { back: goHome, title:"খামারের তথ্য", sub: f.name || "" });
+  });
+
+  function paintFmDay(){
+    const d = dayOfBatch({ batchStartDate: $("fmStart").value });
+    $("fmDayNow").textContent = (d === null) ? "" :
+      (d < 1 ? "ব্যাচ শুরু হতে আরও " + bn(1-d) + " দিন" : "আজ " + bn(d) + " নম্বর দিন");
+  }
+  $("fmStart").addEventListener("change", paintFmDay);
+
+  $("fmSave").addEventListener("click", function(){
+    const btn = this, box = $("fmMsg");
+    clearMsg(box);
+    const name = $("fmName").value.trim();
+    if (!name){ msg(box, "খামারের নাম লিখুন।"); return; }
+    if (!$("fmDist").value){ msg(box, "জেলা বেছে নিন।"); return; }
+    if (!$("fmUpa").value){ msg(box, "উপজেলা বেছে নিন।"); return; }
+    const days = parseInt($("fmDays").value,10) || 36;
+    if (days < 1 || days > 120){ msg(box, "দিনের সংখ্যা ১ থেকে ১২০-এর মধ্যে হতে হবে।"); return; }
+
+    const patch = {
+      name: name,
+      district: $("fmDist").value,
+      upazila:  $("fmUpa").value,
+      village:  $("fmVill").value.trim(),
+      batch:    $("fmBatch").value.trim(),
+      birds:    parseInt($("fmBirds").value,10) || 0,
+      batchDays: days,
+      batchStartDate: $("fmStart").value || null,
+      updatedAt: TS()
+    };
+    busy(btn, true, "সেভ হচ্ছে…");
+    ST.farmRef.update(patch)
+      .then(function(){
+        busy(btn,false);
+        Object.keys(patch).forEach(function(k){ if (k !== "updatedAt") ST.farm[k] = patch[k]; });
+        msg(box, "✅ সেভ হয়েছে।", "ok");
+        paintHome();
+      })
+      .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+  });
+
+  /* ════════════ ১১. জোনের ভেতরে ════════════ */
+  let zSlots = [];   // {type, name}
+
+  function openZone(z){
+    ST.zone = z;
+    ST.zoneRef = ST.farmRef.collection("zones").doc(z.__id);
+    $("znName").value  = bn(z.name || z.code || "");
+    $("znControl").value = (z.controlEnabled === false) ? "0" : "1";
+    $("znStrat").value = z.tempStrategy || "SAFE";
+    $("znGrad").value  = (z.gradientAlertC == null) ? 3 : z.gradientAlertC;
+
+    const count = z.relaySlots || Math.max(8, (z.devices||[]).length);
+    fillSelect($("znCount"), [4,6,8,10,12,16].map(function(n){
+      return { v:n, label: bn(n) + " টা স্লট" };
+    }), count);
+
+    zSlots = [];
+    for (let i=1;i<=16;i++){
+      const d = (z.devices || []).find(function(x){ return x && x.slot === i; });
+      zSlots.push({ type: (d && d.type) || "", name: (d && d.name) || "" });
+    }
+    paintSlots();
+    clearMsg($("znMsg"));
+    show("scrZone", { back: goHome, title: bn(z.name || z.code), sub: ST.farm ? ST.farm.name : "" });
+  }
+
+  $("znCount").addEventListener("change", paintSlots);
+  $("znControl").addEventListener("change", function(){
+    $("znDevCard").style.display = (this.value === "0") ? "none" : "";
+  });
+
+  function paintSlots(){
+    const n = parseInt($("znCount").value,10) || 8;
+    $("znDevCard").style.display = ($("znControl").value === "0") ? "none" : "";
+    const over = PINS.length;
+    $("znPinNote").textContent = (n > over)
+      ? bn(over) + " টার বেশি স্লট সরাসরি ESP32-র পিনে হবে না — I2C সম্প্রসারক চিপ লাগবে।"
+      : "প্রতিটা স্লটের পাশে ESP32-র পিন লেখা আছে — তার লাগানোর সময় কাজে লাগবে।";
+
+    const box = $("znSlots");
+    box.innerHTML = "";
+    for (let i=1;i<=n;i++){
+      const s = zSlots[i-1];
+      const row = document.createElement("div");
+      row.className = "slot" + (s.type ? "" : " empty");
+      row.innerHTML =
+        '<div class="num">R<b>' + bn(i) + '</b>' + pinOf(i) + '</div>' +
+        '<div class="fields"><select></select><input type="text" placeholder="নাম"></div>';
+      const sel = row.querySelector("select"), inp = row.querySelector("input");
+      fillSelect(sel, DEV_TYPES.map(function(t){ return {v:t.v,label:t.label}; }), s.type);
+      inp.value = s.name;
+      inp.disabled = !s.type;
+      sel.addEventListener("change", function(){
+        zSlots[i-1].type = sel.value;
+        if (sel.value && !inp.value.trim()) inp.value = typeLabel(sel.value);
+        if (!sel.value) inp.value = "";
+        zSlots[i-1].name = inp.value;
+        paintSlots();
+      });
+      inp.addEventListener("input", function(){ zSlots[i-1].name = inp.value; });
+      box.appendChild(row);
+    }
+  }
+
+  function buildDevices(n){
+    const out = [];
+    let fan = 0, light = 0;
+    for (let i=1;i<=n;i++){
+      const s = zSlots[i-1];
+      if (!s.type) continue;
+      const d = { slot:i, type:s.type, name:(s.name || typeLabel(s.type)), mode:"AUTO" };
+      if (s.type === "FAN")   d.stage = ++fan;     // কোন ফ্যান আগে চলবে
+      if (s.type === "LIGHT") d.group = ++light;   // অর্ধেক আলো করার জন্য
+      out.push(d);
+    }
+    // পর্দার দুইটা স্লট জোড়া লাগানো — একসাথে চললে মোটর পুড়বে
+    const op = out.find(function(d){ return d.type === "CURTAIN_OPEN"; });
+    const cl = out.find(function(d){ return d.type === "CURTAIN_CLOSE"; });
+    if (op && cl){ op.pair = cl.slot; cl.pair = op.slot; }
+    return out;
+  }
+
+  function checkDevices(devs){
+    const op = devs.filter(function(d){ return d.type === "CURTAIN_OPEN"; }).length;
+    const cl = devs.filter(function(d){ return d.type === "CURTAIN_CLOSE"; }).length;
+    if (op > 1 || cl > 1) return "পর্দার প্রতিটা দিক একটাই স্লটে হবে।";
+    if (op !== cl) return "পর্দার জন্য দুইটাই লাগবে — খোলা আর বন্ধ। এক রিলেতে পর্দা আধখোলা রাখা যায় না।";
+    if (!devs.length) return "অন্তত একটা যন্ত্র বসান।";
+    return "";
+  }
+
+  $("znSave").addEventListener("click", function(){
+    const btn = this, box = $("znMsg");
+    clearMsg(box);
+    const name = $("znName").value.trim();
+    if (!name){ msg(box, "জোনের নাম লিখুন।"); return; }
+
+    const control = $("znControl").value === "1";
+    const n = parseInt($("znCount").value,10) || 8;
+    const grad = parseFloat($("znGrad").value);
+    if (isNaN(grad) || grad < 1 || grad > 15){ msg(box, "তফাতের মাত্রা ১ থেকে ১৫ ডিগ্রির মধ্যে দিন।"); return; }
+
+    let devs = [];
+    if (control){
+      devs = buildDevices(n);
+      const bad = checkDevices(devs);
+      if (bad){ msg(box, bad); return; }
+    }
+
+    const patch = {
+      name: name,
+      controlEnabled: control,
+      relaySlots: n,
+      devices: devs,
+      tempStrategy: $("znStrat").value,
+      gradientAlertC: grad,
+      updatedAt: TS()
+    };
+    busy(btn, true, "সেভ হচ্ছে…");
+    ST.zoneRef.update(patch)
+      .then(function(){
+        busy(btn,false);
+        Object.keys(patch).forEach(function(k){ if (k !== "updatedAt") ST.zone[k] = patch[k]; });
+        msg(box, "✅ সেভ হয়েছে।", "ok");
+        paintHome();
+      })
+      .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+  });
+
+  /* ── জোন যোগ ও মোছা ── */
+  $("hmAddZone").addEventListener("click", function(){
+    const btn = this, box = $("hmMsg");
+    clearMsg(box);
+    if (!ST.farmRef){ msg(box, "আগে খামার তৈরি হতে হবে।"); return; }
+    if (ST.zones.length >= 20){ msg(box, "এক খামারে ২০টার বেশি জোন এখন করা যাচ্ছে না।"); return; }
+
+    let next = 1;
+    const used = {};
+    ST.zones.forEach(function(z){ used[z.__id] = 1; });
+    while (used["Z" + (next<10 ? "0"+next : next)]) next++;
+    const zid = "Z" + (next<10 ? "0"+next : next);
+
+    busy(btn, true, "তৈরি হচ্ছে…");
+    ST.farmRef.collection("zones").doc(zid).set({
+      code:zid, name:"জোন " + bn(next), controllerId:null, nodeId:null,
+      controlEnabled:true, tempStrategy:"SAFE", gradientAlertC:3,
+      relaySlots:8, devices:defaultDevices(), points:{},
+      feedTimes:["06:00","10:00","14:00","18:00","22:00"],
+      settings:{}, emergencyRequest:false, createdAt:TS(), updatedAt:TS()
+    })
+    .then(function(){ busy(btn,false); loadHome(ST.user); })
+    .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+  });
+
+  let delArmed = false;
+  $("znDel").addEventListener("click", function(){
+    const btn = this, box = $("znMsg");
+    if (!delArmed){
+      delArmed = true;
+      btn.textContent = "সত্যিই মুছবেন? আবার চাপুন";
+      msg(box, "মুছে ফেললে এই জোনের সব সেটিংস চলে যাবে।", "info");
+      setTimeout(function(){ delArmed = false; btn.textContent = "এই জোনটা মুছে ফেলুন"; }, 5000);
+      return;
+    }
+    delArmed = false;
+    busy(btn, true, "মুছছি…");
+    ST.zoneRef.delete()
+      .then(function(){ busy(btn,false); btn.textContent = "এই জোনটা মুছে ফেলুন"; goHome(); loadHome(ST.user); })
+      .catch(function(e){ busy(btn,false); btn.textContent = "এই জোনটা মুছে ফেলুন"; msg(box, bnError(e)); });
+  });
+
+  /* ════════════ ১২. শুরু ════════════ */
+  wireLocation($("rgDist"), $("rgUpa"));
+  wireLocation($("fmDist"), $("fmUpa"));
+  fillSelect($("rgZones"), (function(){
+    const a = []; for (let i=1;i<=20;i++) a.push({ v:i, label: bn(i) + " টা জোন" }); return a;
+  })(), 3);
 
   auth.onAuthStateChanged(function(user){
     if (user){ show("scrHome"); loadHome(user); }
