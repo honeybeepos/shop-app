@@ -193,6 +193,10 @@
     </div>
   </section>
 
+  <div class="noprint" style="text-align:center;font-size:12px;color:var(--muted);margin:22px 0 10px">
+    Honey Bee Poultry · অ্যাডমিন · সংস্করণ <b>০.২</b>
+  </div>
+
   <!-- ছাপার জন্য -->
   <div id="printArea"></div>
 </div>
@@ -495,14 +499,29 @@
     $("genMonths").innerHTML = h;
   })();
 
+  // অ্যাডমিন নয় — কোথায় ভুল, সেটা দেখিয়ে দাও
+  function notAdmin(user){
+    const box = $("loginMsg");
+    box.className = "msg err";
+    box.innerHTML =
+      "<b>এই অ্যাকাউন্ট সুপার অ্যাডমিন নয়।</b><br><br>" +
+      "Firestore-এ <b>superAdmins</b> সংগ্রহে ঠিক এই নামে একটা নথি থাকতে হবে " +
+      "(ছোট-বড় হাতের অক্ষরও মিলতে হবে):<br>" +
+      "<div style='margin:8px 0;padding:9px;background:#fff;border:1px solid #e5e7eb;" +
+      "border-radius:7px;font-family:ui-monospace,monospace;font-size:13px;" +
+      "word-break:break-all;user-select:all'>" + user.uid + "</div>" +
+      "<span style='font-size:13px'>ভেতরে অন্তত একটা ঘর দিতে হবে, যেমন " +
+      "<b>role</b> = <b>owner</b>। খালি নথি Firestore সেভ করে না।</span>";
+    show("scrLogin");
+  }
+
   auth.onAuthStateChanged(function(user){
     if (!user){ ME = null; $("btnOut").style.display = "none"; show("scrLogin"); return; }
     // সত্যিই সুপার অ্যাডমিন কিনা দেখে নাও
     db.collection("superAdmins").doc(user.uid).get()
       .then(function(d){
         if (!d.exists){
-          msg($("loginMsg"), "এই অ্যাকাউন্ট সুপার অ্যাডমিন নয়।");
-          show("scrLogin");
+          notAdmin(user);
           return auth.signOut();
         }
         ME = { uid:user.uid, email:user.email };
@@ -511,7 +530,8 @@
         return loadAll();
       })
       .catch(function(e){
-        msg($("loginMsg"), bnError(e));
+        if (e && e.code === "permission-denied") notAdmin(user);
+        else msg($("loginMsg"), bnError(e));
         show("scrLogin");
         auth.signOut();
       });
