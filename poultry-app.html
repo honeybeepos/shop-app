@@ -114,6 +114,27 @@
   table.sched tr.today td.d{color:var(--green)}
   table.sched tr.today input{border-color:var(--green);background:var(--green-l)}
 
+  /* ── ড্যাশবোর্ড ── */
+  .zcard{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px;background:#fff}
+  .zcard h3{margin:0 0 2px;font-size:15px}
+  .zcard .when{font-size:11px;color:var(--muted)}
+  .zcard.stale{border-color:#f2dfae;background:#fffdf6}
+  .zcard.off{opacity:.65}
+  .reads{display:grid;grid-template-columns:repeat(auto-fit,minmax(78px,1fr));gap:8px;margin-top:10px}
+  .read{border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center;min-width:0}
+  .read .v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+  .read .k{font-size:11px;color:var(--muted)}
+  .read .src{font-size:10px;color:var(--muted)}
+  .read.warn{border-color:#f0b0a8;background:#fdf3f2}
+  .read.warn .v{color:var(--danger)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .chip.on{background:var(--green-l);border-color:#bfe3ce;color:var(--green);font-weight:600}
+  .devrow{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .devrow:last-child{border-bottom:0}
+  .devrow b{font-weight:600}
+  .devrow span{color:var(--muted);font-size:12px;text-align:right}
+
   .foot{text-align:center;font-size:12px;color:var(--muted);margin:22px 0 10px}
 </style>
 </head>
@@ -220,6 +241,16 @@
       <div class="msg" id="hmMsg"></div>
     </div>
 
+    <div class="card tap" id="hmDashCard">
+      <h2>ড্যাশবোর্ড</h2>
+      <p class="sub" id="hmDashSub" style="margin:0">—</p>
+    </div>
+
+    <div class="card tap" id="hmDevCard">
+      <h2>যন্ত্র</h2>
+      <p class="sub" id="hmDevSub" style="margin:0">—</p>
+    </div>
+
     <div class="card tap" id="hmSchedCard">
       <h2>দিনের সূচি</h2>
       <p class="sub" id="hmSchedSub" style="margin:0">—</p>
@@ -227,6 +258,36 @@
 
     <div class="msg info" style="display:block">
       ⚙️ যন্ত্র যোগ করা, তাপমাত্রা দেখা আর নিয়ন্ত্রণ — পরের ধাপে আসবে।
+    </div>
+  </section>
+
+  <!-- ══════ ড্যাশবোর্ড ══════ -->
+  <section class="screen" id="scrDash">
+    <div class="card">
+      <h2 id="dashTitle">এখনকার অবস্থা</h2>
+      <p class="sub" id="dashSub" style="margin:0">—</p>
+      <div id="dashZones"></div>
+    </div>
+    <div class="msg" id="dashMsg"></div>
+  </section>
+
+  <!-- ══════ যন্ত্র ══════ -->
+  <section class="screen" id="scrDevice">
+    <div class="card">
+      <h2>যন্ত্র যোগ করুন</h2>
+      <p class="sub">যন্ত্রের গায়ে সিরিয়াল নম্বর, আর বাক্সের কাগজে দখল-কোড</p>
+      <label for="dvSerial">সিরিয়াল নম্বর</label>
+      <input id="dvSerial" type="text" autocapitalize="characters" placeholder="HBP-0001-7">
+      <label for="dvCode">দখল-কোড</label>
+      <input id="dvCode" type="text" autocapitalize="characters" placeholder="বাক্সের কাগজে লেখা">
+      <button class="btn" id="dvClaim">যন্ত্রটা আমার নামে নিন</button>
+      <div class="msg" id="dvMsg"></div>
+      <div class="hint">কোড একবারই চলে। ভুল লিখলে কিছুই হবে না — আবার চেষ্টা করতে পারবেন।</div>
+    </div>
+
+    <div class="card">
+      <h2>যুক্ত যন্ত্র</h2>
+      <div id="dvList"></div>
     </div>
   </section>
 
@@ -343,7 +404,7 @@
     <div class="msg" id="znMsg"></div>
   </section>
 
-  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৩</span></div>
+  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৪</span></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -624,6 +685,7 @@
         + (f.birds ? " · " + bn(f.birds) + " টা বাচ্চা" : "");
 
     paintSchedSummary();
+    paintDevSummary();
 
     const box = $("hmZones");
     box.innerHTML = "";
@@ -674,7 +736,7 @@
           ST.zones = [];
           zs.forEach(function(z){ const d2 = z.data(); d2.__id = z.id; ST.zones.push(d2); });
           ST.zones.sort(function(a,b){ return String(a.code||a.__id).localeCompare(String(b.code||b.__id)); });
-          paintHome();
+          return loadCtrls().then(paintHome);
         });
       })
       .catch(function(e){
@@ -1094,7 +1156,270 @@
       .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
   });
 
-  /* ════════════ ১৩. শুরু ════════════ */
+  /* ════════════ ১৩. যন্ত্র যোগ করা ════════════ */
+  let CTRLS = [];   // এই খামারের কন্ট্রোলারগুলো
+
+  function loadCtrls(){
+    if (!ST.farmRef) return Promise.resolve([]);
+    return ST.farmRef.collection("controllers").get().then(function(cs){
+      CTRLS = [];
+      cs.forEach(function(c){ const d = c.data(); d.__id = c.id; CTRLS.push(d); });
+      CTRLS.sort(function(a,b){ return String(a.__id).localeCompare(String(b.__id)); });
+      return CTRLS;
+    }).catch(function(){ CTRLS = []; return CTRLS; });
+  }
+
+  function paintDevSummary(){
+    const n = CTRLS.length;
+    $("hmDevSub").textContent = n
+      ? bn(n) + " টা যন্ত্র যুক্ত আছে"
+      : "কোনো যন্ত্র যুক্ত হয়নি — চাপ দিয়ে যোগ করুন";
+    const linked = ST.zones.filter(function(z){ return z.controllerId; }).length;
+    $("hmDashSub").textContent = n
+      ? bn(linked) + " / " + bn(ST.zones.length) + " জোনে যন্ত্র বসানো"
+      : "যন্ত্র যুক্ত হলে এখানে তাপমাত্রা দেখা যাবে";
+  }
+
+  function paintDevList(){
+    const box = $("dvList");
+    box.innerHTML = "";
+    if (!CTRLS.length){ box.innerHTML = '<p class="hint">এখনো কোনো যন্ত্র যুক্ত হয়নি।</p>'; return; }
+    CTRLS.forEach(function(c){
+      const zs = ST.zones.filter(function(z){ return z.controllerId === c.__id; });
+      const row = document.createElement("div");
+      row.className = "devrow";
+      row.innerHTML = "<span><b></b><br><span class='hint'></span></span><span></span>";
+      row.querySelector("b").textContent = c.serial || c.__id;
+      row.querySelector(".hint").textContent = zs.length
+        ? zs.map(function(z){ return bn(z.name || z.code); }).join(", ")
+        : "কোনো জোনে বসানো হয়নি";
+      row.querySelector("span:last-child").textContent =
+        c.lastSeenAt ? "শেষ দেখা গেছে" : "এখনো সাড়া দেয়নি";
+      box.appendChild(row);
+    });
+  }
+
+  $("hmDevCard").addEventListener("click", function(){
+    if (!ST.farm) return;
+    clearMsg($("dvMsg"));
+    $("dvSerial").value = ""; $("dvCode").value = "";
+    paintDevList();
+    show("scrDevice", { back: goHome, title:"যন্ত্র", sub: ST.farm.name || "" });
+  });
+
+  $("dvClaim").addEventListener("click", function(){
+    const btn = this, box = $("dvMsg");
+    clearMsg(box);
+    const serial = $("dvSerial").value.trim().toUpperCase();
+    const code   = $("dvCode").value.trim().toUpperCase();
+    if (!serial){ msg(box, "সিরিয়াল নম্বর লিখুন।"); return; }
+    if (!code){ msg(box, "দখল-কোড লিখুন।"); return; }
+    if (!navigator.onLine){ msg(box, "যন্ত্র যোগ করতে ইন্টারনেট লাগবে।"); return; }
+
+    // পরের খালি কন্ট্রোলার নম্বর
+    let n = 1;
+    const used = {}; CTRLS.forEach(function(c){ used[c.__id] = 1; });
+    while (used["C" + (n<10 ? "0"+n : n)]) n++;
+    const cid = "C" + (n<10 ? "0"+n : n);
+
+    busy(btn, true, "মিলিয়ে দেখছি…");
+    // কোড ঠিক হলেই কেবল এই লেখাটা হবে — ভুল হলে নিয়ম আটকে দেবে
+    db.collection("devices").doc(serial).update({
+      serial: serial,
+      claimCode: code,
+      status: "CLAIMED",
+      claimedByUid: ST.user.uid,
+      farmId: ST.farmRef.id,
+      controllerId: cid,
+      claimedAt: TS()
+    })
+    .then(function(){
+      // খামারের ভেতরে কন্ট্রোলারের নথি
+      return ST.farmRef.collection("controllers").doc(cid).set({
+        code: (ST.farm.code || "F01") + "-" + cid,
+        serial: serial, model: "", firmwareVersion: null,
+        status: "UNKNOWN", lastSeenAt: null, lastIp: null,
+        rtcOk: null, clockSource: "UNKNOWN",
+        createdAt: TS(), updatedAt: TS()
+      });
+    })
+    .then(function(){
+      // যে জোনগুলোতে এখনো কোনো যন্ত্র নেই, সেগুলোতে বসিয়ে দাও
+      const free = ST.zones.filter(function(z){ return !z.controllerId; });
+      if (!free.length) return null;
+      const batch = db.batch();
+      free.forEach(function(z){
+        batch.update(ST.farmRef.collection("zones").doc(z.__id),
+                     { controllerId: cid, updatedAt: TS() });
+      });
+      return batch.commit();
+    })
+    .then(function(){
+      busy(btn,false);
+      msg(box, "✅ যন্ত্রটা আপনার নামে হয়ে গেছে।", "ok");
+      $("dvSerial").value = ""; $("dvCode").value = "";
+      return loadHome(ST.user);
+    })
+    .catch(function(e){
+      busy(btn,false);
+      if (e && e.code === "permission-denied"){
+        msg(box, "সিরিয়াল বা দখল-কোড মিলছে না। অথবা যন্ত্রটা আগেই কারও নামে নেওয়া হয়েছে।");
+      } else {
+        msg(box, bnError(e));
+      }
+    });
+  });
+
+  /* ════════════ ১৪. ড্যাশবোর্ড ════════════ */
+  let liveSubs = [];   // চলমান সংযোগ — পাতা ছাড়লে বন্ধ করতে হবে
+  let liveData = {};   // controllerId → নথি
+
+  function stopLive(){
+    liveSubs.forEach(function(u){ try { u(); } catch(err){} });
+    liveSubs = [];
+  }
+
+  function fmtAge(ms){
+    if (ms == null) return "";
+    const m = Math.floor(ms/60000);
+    if (m < 1) return "এইমাত্র";
+    if (m < 60) return bn(m) + " মিনিট আগে";
+    const h = Math.floor(m/60);
+    if (h < 24) return bn(h) + " ঘণ্টা আগে";
+    return bn(Math.floor(h/24)) + " দিন আগে";
+  }
+
+  function readBox(label, val, unit, src, warn){
+    const d = document.createElement("div");
+    d.className = "read" + (warn ? " warn" : "");
+    const v = document.createElement("div"); v.className = "v";
+    v.textContent = (val == null) ? "—" : bn(val) + (unit || "");
+    const k = document.createElement("div"); k.className = "k"; k.textContent = label;
+    d.appendChild(v); d.appendChild(k);
+    if (src){ const sd = document.createElement("div"); sd.className = "src"; sd.textContent = src; d.appendChild(sd); }
+    return d;
+  }
+
+  function sensorVal(sen, key){
+    if (!sen || !sen[key]) return { v:null, src:null };
+    const x = sen[key];
+    if (typeof x === "number") return { v:x, src:null };
+    return { v:(x.value == null ? null : x.value), src:(x.source === "CONTROLLER" ? "সাধারণ" : null) };
+  }
+
+  function paintDash(){
+    const box = $("dashZones");
+    box.innerHTML = "";
+    if (!ST.zones.length){ box.innerHTML = '<p class="hint">কোনো জোন নেই।</p>'; return; }
+
+    let anyLinked = false;
+    ST.zones.forEach(function(z){
+      const card = document.createElement("div");
+      card.className = "zcard";
+      const h = document.createElement("h3"); h.textContent = bn(z.name || z.code);
+      card.appendChild(h);
+
+      if (!z.controllerId){
+        card.className += " off";
+        const p = document.createElement("div"); p.className = "when";
+        p.textContent = "যন্ত্র বসানো হয়নি";
+        card.appendChild(p); box.appendChild(card); return;
+      }
+      anyLinked = true;
+
+      const live = liveData[z.controllerId];
+      const zl = (live && live.zones && live.zones[z.__id]) ||
+                 (live && live.zones && live.zones[z.code]) || null;
+
+      const when = document.createElement("div"); when.className = "when";
+      if (!live){
+        when.textContent = "যন্ত্র এখনো কোনো খবর পাঠায়নি";
+        card.className += " off";
+        card.appendChild(when); box.appendChild(card); return;
+      }
+
+      const at = live.at ? new Date(live.at).getTime() : null;
+      const age = at ? (Date.now() - at) : null;
+      const stale = (age != null && age > 15*60000);
+      if (stale) card.className += " stale";
+      when.textContent = (age == null ? "সময় জানা নেই" : "খবর এসেছে " + fmtAge(age))
+                       + (stale ? " · বাসি" : "");
+      card.appendChild(when);
+
+      const sen = zl && zl.sensors;
+      const reads = document.createElement("div"); reads.className = "reads";
+      const t = sensorVal(sen, "temp"), hu = sensorVal(sen, "hum");
+      const nh = sensorVal(sen, "nh3") .v != null ? sensorVal(sen, "nh3")
+                : (live.shared && live.shared.nh3 ? { v: live.shared.nh3.value, src:"সাধারণ" } : { v:null, src:null });
+
+      // আজকের লক্ষ্যের সাথে মিলিয়ে দেখা
+      const day = dayOfBatch(ST.farm || {});
+      const plan = (day && ST.farm && ST.farm.schedule) ? ST.farm.schedule[day-1] : null;
+      const tWarn = (t.v != null && plan && plan.targetTemp != null)
+                    ? Math.abs(t.v - plan.targetTemp) >= 3 : false;
+
+      reads.appendChild(readBox("তাপ", t.v, "°", t.src, tWarn));
+      reads.appendChild(readBox("আর্দ্রতা", hu.v, "%", hu.src, false));
+      reads.appendChild(readBox("অ্যামোনিয়া", nh.v, "", nh.src, (nh.v != null && nh.v > 20)));
+      card.appendChild(reads);
+
+      if (plan && plan.targetTemp != null){
+        const p = document.createElement("div"); p.className = "when";
+        p.style.marginTop = "8px";
+        p.textContent = "আজকের লক্ষ্য " + bn(plan.targetTemp) + "°"
+                      + (tWarn ? " — অনেক তফাত" : "");
+        card.appendChild(p);
+      }
+
+      const devs = zl && zl.devices;
+      if (devs){
+        const chips = document.createElement("div"); chips.className = "chips";
+        (z.devices || []).forEach(function(d){
+          const st = devs[String(d.type || "").toLowerCase()] ||
+                     devs["slot" + d.slot] || devs[d.name] || null;
+          const on = st && (st.state === true || st.state === "ON");
+          const c = document.createElement("span");
+          c.className = "chip" + (on ? " on" : "");
+          c.textContent = bn(d.name || typeLabel(d.type)) + (on ? " · চালু" : " · বন্ধ");
+          chips.appendChild(c);
+        });
+        if (chips.children.length) card.appendChild(chips);
+      }
+      box.appendChild(card);
+    });
+
+    $("dashSub").textContent = anyLinked
+      ? "যন্ত্র থেকে খবর এলেই নিজে থেকে বদলাবে"
+      : "কোনো জোনে যন্ত্র বসানো নেই — আগে যন্ত্র যোগ করুন";
+  }
+
+  function startLive(){
+    stopLive();
+    liveData = {};
+    const ids = {};
+    ST.zones.forEach(function(z){ if (z.controllerId) ids[z.controllerId] = 1; });
+    Object.keys(ids).forEach(function(cid){
+      const ref = ST.farmRef.collection("live").doc(cid);
+      const un = ref.onSnapshot(function(d){
+        liveData[cid] = d.exists ? d.data() : null;
+        paintDash();
+      }, function(e){
+        msg($("dashMsg"), bnError(e));
+      });
+      liveSubs.push(un);
+    });
+    paintDash();
+  }
+
+  $("hmDashCard").addEventListener("click", function(){
+    if (!ST.farm) return;
+    clearMsg($("dashMsg"));
+    show("scrDash", { back: function(){ stopLive(); goHome(); },
+                      title:"ড্যাশবোর্ড", sub: ST.farm.name || "" });
+    startLive();
+  });
+
+  /* ════════════ ১৫. শুরু ════════════ */
   wireLocation($("rgDist"), $("rgUpa"));
   wireLocation($("fmDist"), $("fmUpa"));
   fillSelect($("rgZones"), (function(){
