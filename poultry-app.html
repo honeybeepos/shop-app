@@ -263,6 +263,33 @@
 
   <!-- ══════ ড্যাশবোর্ড ══════ -->
   <section class="screen" id="scrDash">
+    <div class="card" id="dashEmptyCard" style="display:none">
+      <h2>🏠 ঘর এখন খালি</h2>
+      <p class="sub" style="margin:0">কোনো বাচ্চা নেই, তাই যন্ত্র চুপ করে আছে —
+         তাপমাত্রার অ্যালার্মও বন্ধ। নতুন বাচ্চা এলে খামারের তথ্য থেকে
+         "নতুন ব্যাচ শুরু" চাপুন।</p>
+    </div>
+
+    <div class="card" id="dashEmgCard">
+      <h2>🚨 ইমার্জেন্সি তালা</h2>
+      <p class="sub" id="emgSub">সব ফ্যান-হিটার-মিস্ট সাথে সাথে বন্ধ হবে।
+         আলো আর হাতের সুইচ জ্বলতেই থাকবে।</p>
+      <button class="btn danger" id="emgBtn">সব বন্ধ করে দিন</button>
+      <div class="msg" id="emgMsg"></div>
+    </div>
+
+    <div class="card" id="dashDeathCard">
+      <h2>আজ কয়টা মরল</h2>
+      <p class="sub">রোজ লিখে রাখলে ব্যাচ শেষে আসল হিসাবটা পাবেন</p>
+      <div class="row2">
+        <div><label for="dthN">সংখ্যা</label>
+          <input id="dthN" type="number" inputmode="numeric" min="0" placeholder="0"></div>
+        <div><label for="dthSave">&nbsp;</label>
+          <button class="btn ghost" id="dthSave">লিখে রাখুন</button></div>
+      </div>
+      <div class="msg" id="dthMsg"></div>
+    </div>
+
     <div class="card">
       <h2 id="dashTitle">এখনকার অবস্থা</h2>
       <p class="sub" id="dashSub" style="margin:0">—</p>
@@ -362,6 +389,72 @@
 
     <button class="btn" id="fmSave">সেভ করুন</button>
     <div class="msg" id="fmMsg"></div>
+
+    <div class="card">
+      <h2>ঘরের অবস্থা</h2>
+      <p class="sub" id="hsNow">—</p>
+      <button class="btn warn" id="hsClose">🐔 এই ব্যাচ শেষ করুন</button>
+      <button class="btn" id="hsNew">🐣 নতুন ব্যাচ শুরু করুন</button>
+      <button class="btn ghost sm" id="hsList">📚 জমা থাকা ব্যাচ দেখুন</button>
+      <div class="msg" id="hsMsg"></div>
+    </div>
+  </section>
+
+  <!-- ══════ ব্যাচ শেষ ══════ -->
+  <section class="screen" id="scrClose">
+    <div class="card">
+      <h2>এই ব্যাচ শেষ করা</h2>
+      <p class="sub" id="clInfo">—</p>
+      <div class="row2">
+        <div><label for="clSold">কয়টা বিক্রি হলো</label>
+          <input id="clSold" type="number" inputmode="numeric" min="0"></div>
+        <div><label for="clDeaths">মোট কয়টা মরল</label>
+          <input id="clDeaths" type="number" inputmode="numeric" min="0"></div>
+      </div>
+      <div class="row2">
+        <div><label for="clKg">মোট ওজন কেজি <span class="opt">(ঐচ্ছিক)</span></label>
+          <input id="clKg" type="number" inputmode="decimal" min="0" step="0.5"></div>
+        <div><label for="clPrice">মোট দাম টাকা <span class="opt">(ঐচ্ছিক)</span></label>
+          <input id="clPrice" type="number" inputmode="numeric" min="0"></div>
+      </div>
+      <label for="clNote">নোট <span class="opt">(ঐচ্ছিক)</span></label>
+      <input id="clNote" type="text" placeholder="যেমন: গরমে একটু ক্ষতি হয়েছে">
+      <p class="hint">শেষ করলে এই ব্যাচের হিসাবটা জমা থাকবে, আর ঘর "খালি" হয়ে যাবে।
+         যন্ত্র সব বন্ধ করে দেবে। সূচি মুছবে না — পরের ব্যাচে কাজে লাগবে।</p>
+    </div>
+    <button class="btn warn" id="clSave">হ্যাঁ, ব্যাচ শেষ করুন</button>
+    <div class="msg" id="clMsg"></div>
+  </section>
+
+  <!-- ══════ নতুন ব্যাচ ══════ -->
+  <section class="screen" id="scrNew">
+    <div class="card">
+      <h2>নতুন ব্যাচ</h2>
+      <p class="sub">দিন আবার ১ থেকে শুরু হবে</p>
+      <label for="nbName">ব্যাচের নাম</label>
+      <input id="nbName" type="text" placeholder="Batch-002">
+      <div class="row2">
+        <div><label for="nbBirds">কয়টা বাচ্চা</label>
+          <input id="nbBirds" type="number" inputmode="numeric" min="0" placeholder="2000"></div>
+        <div><label for="nbDays">কত দিনের</label>
+          <input id="nbDays" type="number" inputmode="numeric" min="1" max="120" placeholder="36"></div>
+      </div>
+      <label for="nbStart">বাচ্চা ঢোকার তারিখ</label>
+      <input id="nbStart" type="date">
+      <p class="hint" id="nbWarn"></p>
+    </div>
+    <button class="btn" id="nbSave">শুরু করুন</button>
+    <div class="msg" id="nbMsg"></div>
+  </section>
+
+  <!-- ══════ জমা থাকা ব্যাচ ══════ -->
+  <section class="screen" id="scrBatches">
+    <div class="card">
+      <h2>জমা থাকা ব্যাচ</h2>
+      <p class="sub">পুরনো ব্যাচের সাথে মিলিয়ে দেখলেই বোঝা যায় কোথায় ভালো হলো</p>
+      <div id="bhList"></div>
+      <div class="msg" id="bhMsg"></div>
+    </div>
   </section>
 
   <!-- ══════ জোনের ভেতরে ══════ -->
@@ -399,12 +492,30 @@
       <input id="znGrad" type="number" inputmode="decimal" min="1" max="15" step="0.5">
     </div>
 
+    <div class="card" id="znVentCard">
+      <h2>ঘড়ি ধরে বাতাস</h2>
+      <p class="sub">ঠান্ডার দিনেও ঘরে বাতাস বদলানো দরকার — নইলে লিটার ভিজে
+         যায়, অ্যামোনিয়া জমে। বাণিজ্যিক খামার ঘড়ি ধরেই করে।</p>
+      <label for="mvOn">চালু রাখব?</label>
+      <select id="mvOn">
+        <option value="1">হ্যাঁ — ঘড়ি ধরে ফ্যান চলবে</option>
+        <option value="0">না</option>
+      </select>
+      <div class="row2">
+        <div><label for="mvEvery">প্রতি কত মিনিটে</label>
+          <input id="mvEvery" type="number" inputmode="numeric" min="2" max="60"></div>
+        <div><label for="mvRun">কত সেকেন্ড চলবে</label>
+          <input id="mvRun" type="number" inputmode="numeric" min="5" max="600"></div>
+      </div>
+      <div class="hint" id="mvNote"></div>
+    </div>
+
     <button class="btn" id="znSave">সেভ করুন</button>
     <button class="btn danger sm" id="znDel">এই জোনটা মুছে ফেলুন</button>
     <div class="msg" id="znMsg"></div>
   </section>
 
-  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৬</span></div>
+  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৭</span></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -439,6 +550,13 @@
       return "০১২৩৪৫৬৭৮৯".charAt(+d);
     });
   }
+  // মালিকের নিজের লেখা HTML-এ বসানোর আগে নিরাপদ করা
+  function esc(t){
+    return String(t == null ? "" : t)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+
   function msg(el, text, kind){ el.className = "msg " + (kind || "err"); el.textContent = text; }
   function clearMsg(el){ el.className = "msg"; el.textContent = ""; }
   function busy(btn, on, label){
@@ -623,6 +741,7 @@
             code:zid, name:"জোন " + bn(i), controllerId:null, nodeId:null,
             controlEnabled:true, tempStrategy:"SAFE", gradientAlertC:3,
             relaySlots:8, devices:defaultDevices(), points:{},
+      minVent:{ enabled:true, everyMin:5, runSec:30 },
             feedTimes:["06:00","10:00","14:00","18:00","22:00"],
             settings:{}, emergencyRequest:false, createdAt:TS(), updatedAt:TS()
           });
@@ -695,6 +814,18 @@
     return "আজ " + bn(d) + " নম্বর দিন";
   }
 
+  // ঘর খালি মানে বাচ্চা নেই — যন্ত্র চুপ, অ্যালার্মও চুপ
+  function isEmpty(f){ return (f || {}).houseState === "EMPTY"; }
+
+  // যন্ত্রের লগইন ইমেইল সিরিয়াল থেকেই হিসাব হয়
+  function devEmail(serial){ return String(serial||"").toLowerCase() + "@dev.honeybee.farm"; }
+
+  function todayKey(){
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0")
+                           + "-" + String(d.getDate()).padStart(2,"0");
+  }
+
   function paintHome(){
     const f = ST.farm || {};
     $("hmFarm").textContent  = f.name || "খামার";
@@ -702,10 +833,15 @@
       [f.village, f.upazila, f.district].filter(Boolean).join(", ") + "  ·  কোড " + (f.code || "F01");
 
     const d = dayOfBatch(f);
-    $("hmBatch").textContent = (d === null)
-      ? "ব্যাচ শুরুর তারিখ বসানো হয়নি — চাপ দিয়ে বসান"
-      : (f.batch ? f.batch + " · " : "") + dayText(f)
-        + (f.birds ? " · " + bn(f.birds) + " টা বাচ্চা" : "");
+    if (isEmpty(f)){
+      $("hmBatch").textContent = "🏠 ঘর খালি — নতুন বাচ্চা এলে চাপ দিয়ে ব্যাচ শুরু করুন";
+    } else {
+      $("hmBatch").textContent = (d === null)
+        ? "ব্যাচ শুরুর তারিখ বসানো হয়নি — চাপ দিয়ে বসান"
+        : (f.batch ? f.batch + " · " : "") + dayText(f)
+          + (f.birds ? " · " + bn(f.birds) + " টা বাচ্চা" : "");
+    }
+    if (f.emergencyStop) $("hmBatch").textContent += "  ·  🚨 ইমার্জেন্সি তালা লাগানো";
 
     paintSchedSummary();
     paintDevSummary();
@@ -787,7 +923,8 @@
       allDistricts().map(function(d){ return {v:d,label:d}; })), f.district || "");
     paintUpa($("fmDist"), $("fmUpa"), f.upazila || "");
     paintFmDay();
-    clearMsg($("fmMsg"));
+    paintHouse();
+    clearMsg($("fmMsg")); clearMsg($("hsMsg"));
     show("scrFarm", { back: goHome, title:"খামারের তথ্য", sub: f.name || "" });
   });
 
@@ -842,6 +979,12 @@
     $("znStrat").value = z.tempStrategy || "SAFE";
     $("znGrad").value  = (z.gradientAlertC == null) ? 3 : z.gradientAlertC;
 
+    const mv = z.minVent || {};
+    $("mvOn").value    = (mv.enabled === false) ? "0" : "1";
+    $("mvEvery").value = mv.everyMin || 5;
+    $("mvRun").value   = mv.runSec   || 30;
+    paintMv();
+
     const count = z.relaySlots || Math.max(8, (z.devices||[]).length);
     fillSelect($("znCount"), [4,6,8,10,12,16].map(function(n){
       return { v:n, label: bn(n) + " টা স্লট" };
@@ -864,8 +1007,25 @@
 
   $("znCount").addEventListener("change", paintSlots);
   $("znControl").addEventListener("change", function(){
-    $("znDevCard").style.display = (this.value === "0") ? "none" : "";
+    const hide = (this.value === "0");
+    $("znDevCard").style.display  = hide ? "none" : "";
+    $("znVentCard").style.display = hide ? "none" : "";
   });
+
+  // "প্রতি ৫ মিনিটে ৩০ সেকেন্ড" মানে দিনে কত — মালিক নিজের চোখে দেখুক
+  function paintMv(){
+    const on = $("mvOn").value === "1";
+    const e = parseInt($("mvEvery").value,10) || 5;
+    const r = parseInt($("mvRun").value,10) || 30;
+    if (!on){ $("mvNote").textContent = "বন্ধ — শুধু গরম হলে বা আর্দ্রতা বাড়লে ফ্যান চলবে।"; return; }
+    const perDay = Math.round(1440 / e);
+    const mins = Math.round(perDay * r / 60);
+    $("mvNote").textContent = "দিনে " + bn(perDay) + " বার, মোট প্রায় "
+      + bn(mins) + " মিনিট ফ্যান চলবে। গরমের দিনে এমনিতেই ফ্যান চলে, তখন এটা বাড়তি কিছু করবে না।";
+  }
+  $("mvOn").addEventListener("change", paintMv);
+  $("mvEvery").addEventListener("input", paintMv);
+  $("mvRun").addEventListener("input", paintMv);
 
   function paintSlots(){
     const n = parseInt($("znCount").value,10) || 8;
@@ -972,6 +1132,11 @@
       devices: devs,
       tempStrategy: $("znStrat").value,
       gradientAlertC: grad,
+      minVent: {
+        enabled:  $("mvOn").value === "1",
+        everyMin: Math.min(60, Math.max(2,  parseInt($("mvEvery").value,10) || 5)),
+        runSec:   Math.min(600, Math.max(5, parseInt($("mvRun").value,10)   || 30))
+      },
       updatedAt: TS()
     };
     busy(btn, true, "সেভ হচ্ছে…");
@@ -1294,6 +1459,14 @@
       claimedAt: TS()
     })
     .then(function(){
+      // যন্ত্রটা যে ইমেইল দিয়ে ঢোকে, সেটা খামারের নথিতে লিখে রাখা।
+      // নিরাপত্তার নিয়ম এই তালিকা দেখেই যন্ত্রকে চেনে — সিরিয়াল থেকেই
+      // ইমেইলটা হিসাব করা যায়, আলাদা করে পড়তে হয় না।
+      const patch = {};
+      patch["deviceBy." + cid] = devEmail(serial);
+      return ST.farmRef.update(patch);
+    })
+    .then(function(){
       // খামারের ভেতরে কন্ট্রোলারের নথি
       return ST.farmRef.collection("controllers").doc(cid).set({
         code: (ST.farm.code || "F01") + "-" + cid,
@@ -1368,6 +1541,13 @@
   }
 
   function paintDash(){
+    const f = ST.farm || {};
+    const empty = isEmpty(f);
+    $("dashEmptyCard").style.display = empty ? "" : "none";
+    $("dashEmgCard").style.display   = empty ? "none" : "";
+    $("dashDeathCard").style.display = empty ? "none" : "";
+    paintEmg();
+
     const box = $("dashZones");
     box.innerHTML = "";
     if (!ST.zones.length){ box.innerHTML = '<p class="hint">কোনো জোন নেই।</p>'; return; }
@@ -1413,7 +1593,7 @@
                 : (live.shared && live.shared.nh3 ? { v: live.shared.nh3.value, src:"সাধারণ" } : { v:null, src:null });
 
       // আজকের লক্ষ্যের সাথে মিলিয়ে দেখা
-      const pday = planDay(ST.farm || {});
+      const pday = isEmpty(ST.farm) ? null : planDay(ST.farm || {});
       const plan = (pday && ST.farm && ST.farm.schedule) ? ST.farm.schedule[pday-1] : null;
       const tWarn = (t.v != null && plan && plan.targetTemp != null)
                     ? Math.abs(t.v - plan.targetTemp) >= 3 : false;
@@ -1486,7 +1666,301 @@
     startLive();
   });
 
-  /* ════════════ ১৫. শুরু ════════════ */
+  /* ════════════ ১৫. ইমার্জেন্সি তালা ════════════ */
+  // যন্ত্রের বুদ্ধি এটা দেখেই সব জলবায়ুর যন্ত্র বন্ধ করে রাখে।
+  // আলো আর "শুধু হাতে চলে" সুইচে হাত দেয় না — অন্ধকারে মানুষ ঢুকবে কীভাবে।
+  function paintEmg(){
+    const on = !!(ST.farm && ST.farm.emergencyStop);
+    $("emgBtn").textContent = on ? "তালা খুলে দিন" : "সব বন্ধ করে দিন";
+    $("emgBtn").className = "btn " + (on ? "warn" : "danger");
+    $("emgSub").textContent = on
+      ? "🚨 তালা লাগানো আছে — ফ্যান, হিটার, মিস্ট সব বন্ধ। আলো জ্বলছে।"
+      : "সব ফ্যান-হিটার-মিস্ট সাথে সাথে বন্ধ হবে। আলো আর হাতের সুইচ জ্বলতেই থাকবে।";
+  }
+
+  let emgArmed = false;
+  $("emgBtn").addEventListener("click", function(){
+    const btn = this, box = $("emgMsg");
+    clearMsg(box);
+    if (!ST.farmRef) return;
+    const on = !!(ST.farm && ST.farm.emergencyStop);
+
+    // বন্ধ করা সাথে সাথে — বিপদের সময় দুইবার চাপার সময় নেই।
+    // কিন্তু খোলার সময় একবার জিজ্ঞেস করি, কারণ তখন যন্ত্র আবার চালু হবে।
+    if (on && !emgArmed){
+      emgArmed = true;
+      btn.textContent = "নিশ্চিত? আবার চাপুন";
+      msg(box, "খুললে যন্ত্র আবার নিজে নিজে চলতে শুরু করবে।", "info");
+      setTimeout(function(){ emgArmed = false; paintEmg(); }, 6000);
+      return;
+    }
+    emgArmed = false;
+    busy(btn, true, "পাঠাচ্ছি…");
+    ST.farmRef.update({
+      emergencyStop: !on,
+      emergencyAt: TS(),
+      emergencyBy: ST.user.uid,
+      updatedAt: TS()
+    })
+    .then(function(){
+      ST.farm.emergencyStop = !on;
+      return ST.farmRef.collection("logs").add({
+        kind: !on ? "EMERGENCY_ON" : "EMERGENCY_OFF",
+        byUid: ST.user.uid, at: TS()
+      }).catch(function(){ /* লগ না হলেও কাজ আটকাবে না */ });
+    })
+    .then(function(){
+      busy(btn,false); paintEmg();
+      msg(box, !on ? "🚨 তালা লাগানো হয়েছে। যন্ত্র নেট পেলেই বন্ধ করবে।"
+                   : "✅ তালা খুলে দেওয়া হয়েছে।", "ok");
+    })
+    .catch(function(e){ busy(btn,false); paintEmg(); msg(box, bnError(e)); });
+  });
+
+  /* ════════════ ১৬. আজ কয়টা মরল ════════════ */
+  $("dthSave").addEventListener("click", function(){
+    const btn = this, box = $("dthMsg");
+    clearMsg(box);
+    const n = parseInt($("dthN").value,10);
+    if (isNaN(n) || n < 0){ msg(box, "সংখ্যাটা লিখুন — কিছু না মরলে ০ দিন।"); return; }
+    if (!ST.farmRef) return;
+    const key = todayKey();
+    busy(btn, true, "লিখছি…");
+    ST.farmRef.collection("daily").doc(key).set({
+      date: key, deaths: n, updatedAt: TS()
+    }, { merge: true })
+    .then(function(){ busy(btn,false); msg(box, "✅ আজকের হিসাব লেখা হয়েছে।", "ok"); })
+    .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+  });
+
+  /* ════════════ ১৭. ঘরের অবস্থা — ব্যাচ শেষ, নতুন ব্যাচ ════════════ */
+  function paintHouse(){
+    const f = ST.farm || {};
+    const empty = isEmpty(f);
+    $("hsNow").textContent = empty
+      ? "🏠 ঘর খালি" + (f.emptySince ? " — " + f.emptySince + " থেকে" : "")
+      : "🐔 বাচ্চা আছে" + (dayText(f) ? " · " + dayText(f) : "");
+    $("hsClose").style.display = empty ? "none" : "";
+    $("hsNew").style.display   = empty ? "" : "none";
+  }
+
+  function farmBack(){ show("scrFarm", { back: goHome, title:"খামারের তথ্য",
+                                         sub: (ST.farm && ST.farm.name) || "" }); paintHouse(); }
+
+  // ── ব্যাচ শেষ ──
+  $("hsClose").addEventListener("click", function(){
+    const f = ST.farm || {};
+    clearMsg($("clMsg"));
+    const d = dayOfBatch(f);
+    $("clInfo").textContent = (f.batch || "এই ব্যাচ")
+      + (d ? " · " + bn(d) + " দিন হলো" : "")
+      + (f.birds ? " · শুরুতে " + bn(f.birds) + " টা" : "");
+    $("clSold").value = ""; $("clKg").value = ""; $("clPrice").value = ""; $("clNote").value = "";
+
+    // রোজকার হিসাব যোগ করে মৃত্যুর সংখ্যাটা আগে থেকেই বসিয়ে দিই
+    $("clDeaths").value = "";
+    ST.farmRef.collection("daily").get().then(function(snap){
+      let t = 0;
+      snap.forEach(function(x){ t += (Number(x.data().deaths) || 0); });
+      if (t > 0) $("clDeaths").value = t;
+    }).catch(function(){});
+
+    show("scrClose", { back: farmBack, title:"ব্যাচ শেষ", sub: f.name || "" });
+  });
+
+  $("clSave").addEventListener("click", function(){
+    const btn = this, box = $("clMsg");
+    clearMsg(box);
+    const f = ST.farm || {};
+    const sold   = parseInt($("clSold").value,10);
+    const deaths = parseInt($("clDeaths").value,10);
+    if (isNaN(sold) || sold < 0){ msg(box, "কয়টা বিক্রি হলো লিখুন।"); return; }
+    if (isNaN(deaths) || deaths < 0){ msg(box, "মোট কয়টা মরল লিখুন — না মরলে ০।"); return; }
+    if (f.birds && (sold + deaths) > f.birds * 1.5){
+      msg(box, "সংখ্যাটা শুরুর চেয়ে অনেক বেশি হয়ে যাচ্ছে — মিলিয়ে দেখুন।"); return;
+    }
+
+    const start = f.batchStartDate || "";
+    const id = (String(f.batch || "B").replace(/[^A-Za-z0-9-]/g, "_") + "-" + (start || todayKey()))
+               .slice(0, 100);
+    const days = dayOfBatch(f);
+
+    busy(btn, true, "জমা করছি…");
+    // ⚠️ আগে ব্যাচটা জমা হবে, তারপরেই ঘর খালি হবে। উল্টো করলে জমা
+    //    করতে গিয়ে ভুল হলে হিসাবটা হারিয়ে যেত।
+    ST.farmRef.collection("batches").doc(id).set({
+      batchNo: String(f.batch || "—"),
+      startDate: start || null,
+      endDate: todayKey(),
+      plannedDays: f.batchDays || 36,
+      actualDays: days || null,
+      birdsIn: f.birds || 0,
+      birdsSold: sold,
+      deaths: deaths,
+      soldWeightKg: (function(){ const v = parseFloat($("clKg").value); return isNaN(v) ? null : v; })(),
+      soldPrice:    (function(){ const v = parseInt($("clPrice").value,10); return isNaN(v) ? null : v; })(),
+      note: $("clNote").value.trim(),
+      zoneCount: ST.zones.length,
+      schedule: (f.schedule || null),      // তুলনার জন্য সূচিটাও থাকল
+      closedByUid: ST.user.uid,
+      closedAt: TS()
+    })
+    .then(function(){
+      return ST.farmRef.update({
+        houseState: "EMPTY",
+        emptySince: todayKey(),
+        lastBatchId: id,
+        emergencyStop: false,
+        updatedAt: TS()
+      });
+    })
+    .then(function(){
+      ST.farm.houseState = "EMPTY";
+      ST.farm.emptySince = todayKey();
+      ST.farm.lastBatchId = id;
+      ST.farm.emergencyStop = false;
+      busy(btn,false);
+      msg(box, "✅ ব্যাচটা জমা হয়ে গেছে। ঘর এখন খালি — যন্ত্র সব বন্ধ করে দেবে।", "ok");
+      setTimeout(function(){ farmBack(); paintHome(); }, 1200);
+    })
+    .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+  });
+
+  // ── নতুন ব্যাচ ──
+  $("hsNew").addEventListener("click", function(){
+    const f = ST.farm || {};
+    clearMsg($("nbMsg"));
+    // পুরনো নামটা থেকে পরের নম্বর আন্দাজ করি: Batch-001 → Batch-002
+    let sug = "Batch-001";
+    const m = String(f.batch || "").match(/^(.*?)(\d+)$/);
+    if (m){
+      const w = m[2].length;
+      sug = m[1] + String(parseInt(m[2],10) + 1).padStart(w, "0");
+    }
+    $("nbName").value  = sug;
+    $("nbBirds").value = f.birds || "";
+    $("nbDays").value  = f.batchDays || 36;
+    $("nbStart").value = todayKey();
+    paintNbWarn();
+    show("scrNew", { back: farmBack, title:"নতুন ব্যাচ", sub: f.name || "" });
+  });
+
+  function paintNbWarn(){
+    const d = $("nbStart").value;
+    $("nbWarn").textContent = "দিনের সূচি আগের মতোই থাকবে — বদলাতে চাইলে পরে "
+      + "সূচির পাতা থেকে বদলাবেন। রোজকার মৃত্যুর হিসাব নতুন করে শুরু হবে।"
+      + (d ? "  আজ থেকে ধরলে " + d + " হবে ১ নম্বর দিন।" : "");
+  }
+  $("nbStart").addEventListener("change", paintNbWarn);
+
+  $("nbSave").addEventListener("click", function(){
+    const btn = this, box = $("nbMsg");
+    clearMsg(box);
+    const name  = $("nbName").value.trim();
+    const birds = parseInt($("nbBirds").value,10) || 0;
+    const days  = parseInt($("nbDays").value,10) || 36;
+    const start = $("nbStart").value;
+    if (!name){ msg(box, "ব্যাচের একটা নাম দিন।"); return; }
+    if (!start){ msg(box, "বাচ্চা ঢোকার তারিখ দিন।"); return; }
+    if (days < 1 || days > 120){ msg(box, "দিনের সংখ্যা ১ থেকে ১২০-এর মধ্যে হতে হবে।"); return; }
+
+    busy(btn, true, "শুরু করছি…");
+    ST.farmRef.update({
+      batch: name, birds: birds, batchDays: days, batchStartDate: start,
+      houseState: "ACTIVE", emptySince: null, emergencyStop: false,
+      updatedAt: TS()
+    })
+    .then(function(){
+      ST.farm.batch = name; ST.farm.birds = birds; ST.farm.batchDays = days;
+      ST.farm.batchStartDate = start; ST.farm.houseState = "ACTIVE";
+      ST.farm.emptySince = null; ST.farm.emergencyStop = false;
+      busy(btn,false);
+      msg(box, "✅ নতুন ব্যাচ শুরু হয়েছে।", "ok");
+      setTimeout(function(){ farmBack(); paintHome(); }, 1000);
+    })
+    .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+  });
+
+  /* ════════════ ১৮. জমা থাকা ব্যাচ ════════════ */
+  let bhArmed = {};
+  $("hsList").addEventListener("click", function(){
+    clearMsg($("bhMsg"));
+    $("bhList").innerHTML = '<p class="hint">আনা হচ্ছে…</p>';
+    show("scrBatches", { back: farmBack, title:"জমা থাকা ব্যাচ",
+                         sub: (ST.farm && ST.farm.name) || "" });
+    loadBatches();
+  });
+
+  function loadBatches(){
+    ST.farmRef.collection("batches").get()
+      .then(function(snap){
+        const rows = [];
+        snap.forEach(function(d){ const x = d.data(); x.__id = d.id; rows.push(x); });
+        rows.sort(function(a,b){ return String(b.endDate||"").localeCompare(String(a.endDate||"")); });
+        paintBatches(rows);
+      })
+      .catch(function(e){ $("bhList").innerHTML = ""; msg($("bhMsg"), bnError(e)); });
+  }
+
+  function paintBatches(rows){
+    const box = $("bhList");
+    box.innerHTML = "";
+    if (!rows.length){
+      box.innerHTML = '<p class="hint">এখনো কোনো ব্যাচ জমা হয়নি। '
+                    + 'প্রথম ব্যাচ শেষ করলে এখানে দেখতে পাবেন।</p>';
+      return;
+    }
+    rows.forEach(function(r){
+      const live = (Number(r.birdsIn) || 0);
+      const pct  = live ? Math.round((Number(r.deaths)||0) * 1000 / live) / 10 : null;
+      const kg   = (r.soldWeightKg && r.birdsSold)
+                   ? Math.round(r.soldWeightKg / r.birdsSold * 100) / 100 : null;
+
+      const c = document.createElement("div");
+      c.className = "zcard";
+      let h = "<h3>" + esc(r.batchNo || r.__id) + "</h3>";
+      h += '<div class="when">' + bn(r.startDate || "?") + " → " + bn(r.endDate || "?")
+         + (r.actualDays ? " · " + bn(r.actualDays) + " দিন" : "") + "</div>";
+      h += '<div class="reads">';
+      h += '<div class="read"><div class="v">' + bn(live) + '</div><div class="k">শুরুতে</div></div>';
+      h += '<div class="read"><div class="v">' + bn(r.birdsSold||0) + '</div><div class="k">বিক্রি</div></div>';
+      h += '<div class="read' + (pct != null && pct > 5 ? " warn" : "") + '"><div class="v">'
+         + bn(r.deaths||0) + '</div><div class="k">মরেছে'
+         + (pct != null ? " " + bn(pct) + "%" : "") + "</div></div>";
+      h += "</div>";
+      if (kg)        h += '<div class="when" style="margin-top:8px">গড় ওজন ' + bn(kg) + " কেজি</div>";
+      if (r.soldPrice) h += '<div class="when">মোট দাম ' + bn(r.soldPrice) + " টাকা</div>";
+      if (r.note)    h += '<div class="when">' + esc(r.note) + "</div>";
+      h += '<button class="btn danger sm" data-del="' + r.__id + '" style="margin-top:10px">মুছে ফেলুন</button>';
+      c.innerHTML = h;
+      box.appendChild(c);
+    });
+
+    const bs = box.querySelectorAll("[data-del]");
+    for (let i=0;i<bs.length;i++){
+      bs[i].addEventListener("click", function(){ delBatch(this, this.getAttribute("data-del")); });
+    }
+  }
+
+  // মালিকের জিনিস, মালিক মুছবেন — কিন্তু কী হারাচ্ছেন সেটা একবার দেখিয়ে
+  function delBatch(btn, id){
+    const box = $("bhMsg");
+    if (!bhArmed[id]){
+      bhArmed[id] = true;
+      btn.textContent = "সত্যিই মুছবেন? আবার চাপুন";
+      msg(box, "মুছে ফেললে এই ব্যাচের হিসাব আর ফিরবে না — পরের ব্যাচের সাথে "
+             + "তুলনা করা যাবে না, কোন মাসে ভালো হয়েছিল বোঝা যাবে না।", "info");
+      setTimeout(function(){ bhArmed[id] = false; btn.textContent = "মুছে ফেলুন"; clearMsg(box); }, 6000);
+      return;
+    }
+    bhArmed[id] = false;
+    busy(btn, true, "মুছছি…");
+    ST.farmRef.collection("batches").doc(id).delete()
+      .then(function(){ busy(btn,false); clearMsg(box); loadBatches(); })
+      .catch(function(e){ busy(btn,false); btn.textContent = "মুছে ফেলুন"; msg(box, bnError(e)); });
+  }
+
+  /* ════════════ ১৯. শুরু ════════════ */
   wireLocation($("rgDist"), $("rgUpa"));
   wireLocation($("fmDist"), $("fmUpa"));
   fillSelect($("rgZones"), (function(){

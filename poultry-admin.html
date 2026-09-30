@@ -194,7 +194,7 @@
   </section>
 
   <div class="noprint" style="text-align:center;font-size:12px;color:var(--muted);margin:22px 0 10px">
-    Honey Bee Poultry · অ্যাডমিন · সংস্করণ <b>০.২</b>
+    Honey Bee Poultry · অ্যাডমিন · সংস্করণ <b>০.৩</b>
   </div>
 
   <!-- ছাপার জন্য -->
@@ -265,6 +265,49 @@
     return out;
   }
 
+  /* ─── যন্ত্রের লগইন অ্যাকাউন্ট ───
+     Firebase-এ একটা অ্যাকাউন্ট বানালে সেটা সাথে সাথে লগইন হয়ে যায় —
+     মানে অ্যাডমিন নিজেই বের হয়ে যেত। তাই একই প্রজেক্টের জন্য একটা
+     "দ্বিতীয় অ্যাপ" খুলে রাখা হয়েছে; নতুন অ্যাকাউন্ট ওখানে লগইন হয়,
+     এখানকার অ্যাডমিন অটুট থাকে।
+     custom claim লাগছে না, তাই Cloud Function বা Blaze প্ল্যানও লাগছে না। */
+  const app2  = firebase.initializeApp(firebaseConfig, "devmaker");
+  const auth2 = app2.auth();
+
+  const DEV_DOMAIN = "@dev.honeybee.farm";
+  function devEmail(serial){ return serial.toLowerCase() + DEV_DOMAIN; }
+
+  // যন্ত্রের গোপন শব্দ — মানুষকে টাইপ করতে হয় না, তাই লম্বা ও কড়া
+  const PASS_ALPHA = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  function makePass(){
+    const buf = new Uint32Array(20);
+    (window.crypto || window.msCrypto).getRandomValues(buf);
+    let out = "";
+    for (let i=0;i<20;i++) out += PASS_ALPHA.charAt(buf[i] % PASS_ALPHA.length);
+    return out;
+  }
+
+  // একটা যন্ত্রের অ্যাকাউন্ট বানায়। আগে থেকে থাকলে জানিয়ে দেয়।
+  function makeDeviceAccount(serial){
+    const em = devEmail(serial), pw = makePass();
+    return auth2.createUserWithEmailAndPassword(em, pw)
+      .then(function(cred){
+        const u = cred.user.uid;
+        return auth2.signOut().then(function(){
+          return { email: em, pass: pw, uid: u, fresh: true };
+        });
+      })
+      .catch(function(e){
+        return auth2.signOut().catch(function(){}).then(function(){
+          if (e && e.code === "auth/email-already-in-use"){
+            // সিরিয়ালটা আগেই বানানো — গোপন শব্দ deviceAuth-এ আছে
+            return { email: em, pass: null, uid: null, fresh: false };
+          }
+          throw e;
+        });
+      });
+  }
+
   /* ─── অবস্থা ─── */
   let ME = null;
   let DEVICES = [], USERS = [], FARMS = [];
@@ -323,12 +366,14 @@
     });
     const t = $("devTable");
     if (!rows.length){ t.innerHTML = "<tbody><tr><td>কিছু পাওয়া যায়নি।</td></tr></tbody>"; return; }
-    let h = "<thead><tr><th>সিরিয়াল</th><th>অবস্থা</th><th>দখল-কোড</th><th>কার নামে</th><th></th></tr></thead><tbody>";
+    let h = "<thead><tr><th>সিরিয়াল</th><th>অবস্থা</th><th>দখল-কোড</th><th>কার নামে</th><th>ফ্ল্যাশ</th><th></th></tr></thead><tbody>";
     rows.forEach(function(d){
       h += "<tr><td class='mono'>" + d.__id + "</td>" +
            "<td>" + statusPill(d.status) + "</td>" +
            "<td class='mono'>" + (d.claimCode || "—") + "</td>" +
            "<td>" + ownerOf(d) + "</td>" +
+           "<td><button class='btn ghost sm' data-key='" + d.__id + "'>🔑 দেখুন</button>" +
+               "<div class='mono' id='k_" + d.__id + "' style='font-size:11px;word-break:break-all'></div></td>" +
            "<td>" + ((d.status === "CLAIMED")
               ? "<button class='btn warn sm' data-rel='" + d.__id + "'>ছাড়িয়ে দিন</button>" : "") +
            "</td></tr>";
@@ -339,6 +384,25 @@
     for (let i=0;i<bs.length;i++){
       bs[i].addEventListener("click", function(){ release(this, this.getAttribute("data-rel")); });
     }
+    const ks = t.querySelectorAll("[data-key]");
+    for (let i=0;i<ks.length;i++){
+      ks[i].addEventListener("click", function(){ showKey(this, this.getAttribute("data-key")); });
+    }
+  }
+
+  // বোর্ড বদলে নতুন করে ফ্ল্যাশ করতে হলে এখান থেকেই দেখে নেওয়া যায়।
+  // এই ঘরটা নিয়মে সুপার অ্যাডমিন ছাড়া কেউ পড়তে পারে না।
+  function showKey(btn, serial){
+    const out = $("k_" + serial);
+    if (!out) return;
+    if (out.textContent){ out.textContent = ""; return; }   // আবার চাপলে লুকিয়ে যাবে
+    busy(btn, true, "…");
+    db.collection("deviceAuth").doc(serial).get().then(function(sn){
+      busy(btn, false);
+      if (!sn.exists){ out.textContent = "নেই — পুরনো সিরিয়াল, লগইন অ্যাকাউন্ট বানানো হয়নি"; return; }
+      const d = sn.data();
+      out.innerHTML = "<b>ইমেইল:</b> " + d.email + "<br><b>গোপন শব্দ:</b> " + d.password;
+    }).catch(function(e){ busy(btn,false); out.textContent = bnError(e); });
   }
 
   const armed = {};
@@ -399,55 +463,98 @@
   $("btnGen").addEventListener("click", function(){
     const btn = this, box = $("genMsg");
     clearMsg(box);
-    const count  = parseInt($("genCount").value,10) || 1;
+    const count  = Math.max(1, Math.min(25, parseInt($("genCount").value,10) || 1));
     const model  = $("genModel").value.trim() || "HB-ESP32-GW-V1";
     const months = parseInt($("genMonths").value,10) || 12;
     busy(btn, true, "তৈরি হচ্ছে…");
 
+    // একটা একটা করে — মাঝপথে থামলেও যেটা হয়েছে সেটা পুরোপুরি হয়েছে
     nextSeq().then(function(start){
       const exp = new Date(); exp.setMonth(exp.getMonth() + months);
       const expTs = firebase.firestore.Timestamp.fromDate(exp);
       const made = [];
-      const batch = db.batch();
-      for (let i=0;i<count;i++){
+
+      function step(i){
+        if (i >= count) return Promise.resolve();
         const seq = start + i;
         const serial = makeSerial(seq);
         const code = makeCode();
-        made.push({ serial:serial, code:code });
-        batch.set(db.collection("devices").doc(serial), {
-          serial: serial, seq: seq, model: model, role: "GATEWAY",
-          status: "STOCK", claimCode: code, claimCodeExpiresAt: expTs,
-          claimedByUid: null, farmId: null, controllerId: null,
-          firmwareVersion: null, lastSeenAt: null, lastIp: null,
-          createdBy: ME.uid, createdAt: TS()
+        msg(box, "⏳ " + bn(i+1) + "/" + bn(count) + " — " + serial, "warn");
+
+        return makeDeviceAccount(serial).then(function(acc){
+          const batch = db.batch();
+          batch.set(db.collection("devices").doc(serial), {
+            serial: serial, seq: seq, model: model, role: "GATEWAY",
+            status: "STOCK", claimCode: code, claimCodeExpiresAt: expTs,
+            claimedByUid: null, farmId: null, controllerId: null,
+            authEmail: acc.email, authUid: acc.uid,
+            firmwareVersion: null, lastSeenAt: null, lastIp: null,
+            createdBy: ME.uid, createdAt: TS()
+          });
+          // গোপন শব্দ শুধু এখানে — নিয়মে এই ঘরটা সুপার অ্যাডমিন ছাড়া কেউ দেখে না
+          if (acc.pass){
+            batch.set(db.collection("deviceAuth").doc(serial), {
+              serial: serial, email: acc.email, password: acc.pass,
+              createdBy: ME.uid, createdAt: TS()
+            });
+          }
+          return batch.commit().then(function(){
+            made.push({ serial:serial, code:code, email:acc.email,
+                        pass: acc.pass, fresh: acc.fresh });
+            return step(i+1);
+          });
         });
       }
-      return batch.commit().then(function(){
-        return db.collection("adminLogs").add({
-          action: "CREATE_DEVICES", count: count,
-          from: made[0].serial, to: made[made.length-1].serial,
-          byUid: ME.uid, byEmail: ME.email, at: TS()
-        }).catch(function(){ /* লগ না হলেও কাজ আটকাবে না */ });
-      }).then(function(){ return made; });
+
+      return step(0).then(function(){ return made; });
+    })
+    .then(function(made){
+      if (!made.length) throw new Error("কিছুই তৈরি হয়নি");
+      return db.collection("adminLogs").add({
+        action: "CREATE_DEVICES", count: made.length,
+        from: made[0].serial, to: made[made.length-1].serial,
+        byUid: ME.uid, byEmail: ME.email, at: TS()
+      }).catch(function(){ /* লগ না হলেও কাজ আটকাবে না */ })
+        .then(function(){ return made; });
     })
     .then(function(made){
       busy(btn,false);
-      msg(box, "✅ " + bn(made.length) + " টা তৈরি হয়েছে।", "ok");
+      const old = made.filter(function(m){ return !m.fresh; }).length;
+      msg(box, "✅ " + bn(made.length) + " টা তৈরি হয়েছে।"
+             + (old ? " (" + bn(old) + " টার লগইন আগেই ছিল — গোপন শব্দ যন্ত্রের তালিকায় দেখুন)" : ""), "ok");
       paintGenOut(made);
       return loadAll();
     })
-    .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+    .catch(function(e){
+      busy(btn,false);
+      msg(box, bnError(e) + " যেগুলো হয়ে গেছে সেগুলো ঠিক আছে — আবার চাপলে পরের নম্বর থেকে শুরু হবে।");
+      loadAll();
+    });
   });
 
   function paintGenOut(made){
-    let h = "<thead><tr><th>সিরিয়াল (যন্ত্রের গায়ে)</th><th>দখল-কোড (আলাদা কাগজে)</th></tr></thead><tbody>";
+    let h = "<thead><tr><th>সিরিয়াল (যন্ত্রের গায়ে)</th><th>দখল-কোড (বাক্সের কাগজে)</th></tr></thead><tbody>";
     made.forEach(function(m){
       h += "<tr><td class='mono'>" + m.serial + "</td><td class='mono'>" + m.code + "</td></tr>";
     });
     h += "</tbody>";
     $("genOut").innerHTML = h;
     $("genOutCard").style.display = "";
-    $("printArea").innerHTML = "<h3>Honey Bee Smart Poultry — সিরিয়াল ও দখল-কোড</h3><table>" + h + "</table>";
+
+    // ⚠️ ফ্ল্যাশ করার কাগজ — এটা গ্রাহকের কাছে যাবে না
+    let f = "<thead><tr><th>সিরিয়াল</th><th>যন্ত্রের ইমেইল</th><th>গোপন শব্দ</th></tr></thead><tbody>";
+    made.forEach(function(m){
+      f += "<tr><td class='mono'>" + m.serial + "</td><td class='mono'>" + m.email
+         + "</td><td class='mono'>" + (m.pass || "— আগেই ছিল —") + "</td></tr>";
+    });
+    f += "</tbody>";
+
+    $("printArea").innerHTML =
+        "<h3>Honey Bee Smart Poultry — সিরিয়াল ও দখল-কোড</h3><table>" + h + "</table>"
+      + "<h3 style='margin-top:22px'>⚠️ শুধু ফ্ল্যাশ করার জন্য — গ্রাহককে দেবেন না</h3>"
+      + "<p style='font-size:12px'>এই তিনটা ঘর ফার্মওয়্যারে বসবে। কাগজটা আলাদা রাখুন বা কেটে ফেলুন। "
+      + "হারালে সুপার অ্যাডমিন প্যানেল থেকে আবার দেখা যাবে।</p>"
+      + "<table>" + f + "</table>";
   }
 
   $("btnPrint").addEventListener("click", function(){ window.print(); });
