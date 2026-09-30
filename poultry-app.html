@@ -103,6 +103,17 @@
   .slot select,.slot input{font-size:14px;padding:9px 10px}
   .slot.empty{opacity:.55}
 
+  /* ── সূচির তালিকা ── */
+  .tblWrap{overflow-x:auto;margin-top:8px;-webkit-overflow-scrolling:touch}
+  table.sched{border-collapse:collapse;width:100%;min-width:272px}
+  table.sched th{font-size:11px;color:var(--muted);font-weight:600;text-align:center;
+                 padding:6px 3px;position:sticky;top:0;background:var(--card);z-index:1}
+  table.sched td{padding:3px 2px;text-align:center}
+  table.sched td.d{font-size:13px;font-weight:600;width:40px;font-variant-numeric:tabular-nums;color:var(--muted)}
+  table.sched input{padding:7px 3px;font-size:13px;text-align:center;border-radius:7px}
+  table.sched tr.today td.d{color:var(--green)}
+  table.sched tr.today input{border-color:var(--green);background:var(--green-l)}
+
   .foot{text-align:center;font-size:12px;color:var(--muted);margin:22px 0 10px}
 </style>
 </head>
@@ -209,9 +220,53 @@
       <div class="msg" id="hmMsg"></div>
     </div>
 
+    <div class="card tap" id="hmSchedCard">
+      <h2>দিনের সূচি</h2>
+      <p class="sub" id="hmSchedSub" style="margin:0">—</p>
+    </div>
+
     <div class="msg info" style="display:block">
       ⚙️ যন্ত্র যোগ করা, তাপমাত্রা দেখা আর নিয়ন্ত্রণ — পরের ধাপে আসবে।
     </div>
+  </section>
+
+  <!-- ══════ দিনের সূচি ══════ -->
+  <section class="screen" id="scrSched">
+    <div class="card">
+      <h2>আজকের লক্ষ্য</h2>
+      <p class="sub" id="schToday" style="margin:0">—</p>
+    </div>
+
+    <div class="card">
+      <h2>একসাথে কয়েক দিন বসান</h2>
+      <p class="sub">সপ্তাহ ধরে বসালে দ্রুত হয়। যে ঘর খালি রাখবেন, সেটা বদলাবে না।</p>
+      <div class="row2">
+        <div><label for="sfFrom">কোন দিন থেকে</label><input id="sfFrom" type="number" inputmode="numeric" min="1"></div>
+        <div><label for="sfTo">কোন দিন পর্যন্ত</label><input id="sfTo" type="number" inputmode="numeric" min="1"></div>
+      </div>
+      <div class="row2">
+        <div><label for="sfTemp">তাপ °C</label><input id="sfTemp" type="number" inputmode="decimal" step="0.5" placeholder="খালি = বদলাবে না"></div>
+        <div><label for="sfHum">আর্দ্রতা %</label><input id="sfHum" type="number" inputmode="numeric" placeholder="খালি"></div>
+      </div>
+      <div class="row2">
+        <div><label for="sfLight">আলো ঘণ্টা</label><input id="sfLight" type="number" inputmode="numeric" placeholder="খালি"></div>
+        <div><label for="sfClean">পরিষ্কার (বার)</label><input id="sfClean" type="number" inputmode="numeric" placeholder="খালি"></div>
+      </div>
+      <button class="btn ghost sm" id="schFill">এই দিনগুলোতে বসান</button>
+      <button class="btn ghost sm" id="schStd">সাধারণ সূচি বসিয়ে দিন</button>
+      <div class="hint">সাধারণ সূচি একটা <b>শুরুর খসড়া</b> — ব্রুডিংয়ে গরম, শেষে ঠান্ডা।
+        আপনার বাচ্চার জাত অনুযায়ী সরবরাহকারীর দেওয়া কাগজের সাথে মিলিয়ে নেবেন।</div>
+      <div class="msg" id="schFillMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2>দিন ধরে ধরে</h2>
+      <p class="sub">সবুজ সারিটা আজকের দিন</p>
+      <div class="tblWrap"><table class="sched" id="schTable"></table></div>
+    </div>
+
+    <button class="btn" id="schSave">সেভ করুন</button>
+    <div class="msg" id="schMsg"></div>
   </section>
 
   <!-- ══════ খামারের সেটিংস ══════ -->
@@ -288,7 +343,7 @@
     <div class="msg" id="znMsg"></div>
   </section>
 
-  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.২</span></div>
+  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৩</span></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -567,6 +622,8 @@
       ? "ব্যাচ শুরুর তারিখ বসানো হয়নি — চাপ দিয়ে বসান"
       : (f.batch ? f.batch + " · " : "") + "আজ " + bn(d) + " নম্বর দিন"
         + (f.birds ? " · " + bn(f.birds) + " টা বাচ্চা" : "");
+
+    paintSchedSummary();
 
     const box = $("hmZones");
     box.innerHTML = "";
@@ -857,7 +914,187 @@
       .catch(function(e){ busy(btn,false); btn.textContent = "এই জোনটা মুছে ফেলুন"; msg(box, bnError(e)); });
   });
 
-  /* ════════════ ১২. শুরু ════════════ */
+  /* ════════════ ১২. দিনের সূচি ════════════ */
+  let SCHED = [];
+
+  function num(v){
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  }
+
+  function loadSched(){
+    const days = (ST.farm && ST.farm.batchDays) || 36;
+    const old  = (ST.farm && ST.farm.schedule) || [];
+    SCHED = [];
+    for (let d=1; d<=days; d++){
+      let o = null;
+      for (let i=0;i<old.length;i++){ if (old[i] && Number(old[i].day) === d){ o = old[i]; break; } }
+      o = o || {};
+      SCHED.push({
+        day: d,
+        targetTemp:     num(o.targetTemp),
+        humidityTarget: num(o.humidityTarget),
+        lightHours:     num(o.lightHours),
+        clean:          num(o.clean)
+      });
+    }
+  }
+
+  // শুরুর খসড়া — ব্রুডিংয়ে গরম, শেষ দিকে ঠান্ডা।
+  // এটা সাধারণভাবে প্রচলিত মাত্রা, কোনো নির্দিষ্ট জাতের সরকারি সুপারিশ নয়।
+  function standardCurve(days){
+    const out = [];
+    const span = Math.max(1, days - 1);
+    for (let d=1; d<=days; d++){
+      let t = 33 - (d - 1) * (33 - 21) / span;
+      t = Math.round(t * 2) / 2;
+      out.push({
+        day: d,
+        targetTemp: t,
+        humidityTarget: (d <= 7) ? 65 : 60,
+        lightHours: (d <= 7) ? 23 : (d <= 14 ? 20 : 18),
+        clean: 2
+      });
+    }
+    return out;
+  }
+
+  function filledDays(){
+    let n = 0;
+    SCHED.forEach(function(r){ if (r.targetTemp !== null) n++; });
+    return n;
+  }
+
+  function paintSchedSummary(){
+    const f = ST.farm || {};
+    const total = (f.batchDays || 36);
+    const arr = f.schedule || [];
+    let done = 0;
+    arr.forEach(function(r){ if (r && r.targetTemp !== null && r.targetTemp !== undefined) done++; });
+    $("hmSchedSub").textContent = done
+      ? bn(done) + " / " + bn(total) + " দিনের লক্ষ্য বসানো আছে"
+      : "কোনো দিনের লক্ষ্য বসানো হয়নি — চাপ দিয়ে বসান";
+  }
+
+  function paintSchedToday(){
+    const f = ST.farm || {};
+    const d = dayOfBatch(f);
+    if (d === null){ $("schToday").textContent = "ব্যাচ শুরুর তারিখ বসানো নেই, তাই আজকের দিন জানা যাচ্ছে না।"; return; }
+    if (d < 1){ $("schToday").textContent = "ব্যাচ শুরু হতে আরও " + bn(1-d) + " দিন।"; return; }
+    if (d > SCHED.length){ $("schToday").textContent = "ব্যাচের " + bn(SCHED.length) + " দিন পার হয়ে গেছে (আজ " + bn(d) + " নম্বর দিন)।"; return; }
+    const r = SCHED[d-1];
+    const bits = [];
+    if (r.targetTemp !== null)     bits.push("তাপ " + bn(r.targetTemp) + "°");
+    if (r.humidityTarget !== null) bits.push("আর্দ্রতা " + bn(r.humidityTarget) + "%");
+    if (r.lightHours !== null)     bits.push("আলো " + bn(r.lightHours) + " ঘণ্টা");
+    $("schToday").textContent = "আজ " + bn(d) + " নম্বর দিন — " +
+      (bits.length ? bits.join(" · ") : "এই দিনের লক্ষ্য এখনো বসানো হয়নি");
+  }
+
+  function paintSched(){
+    const today = dayOfBatch(ST.farm || {});
+    const t = $("schTable");
+    t.innerHTML =
+      "<thead><tr><th>দিন</th><th>তাপ °C</th><th>আর্দ্রতা %</th><th>আলো ঘ.</th><th>পরিষ্কার</th></tr></thead>";
+    const tb = document.createElement("tbody");
+    const cols = ["targetTemp","humidityTarget","lightHours","clean"];
+    const steps = ["0.5","1","1","1"];
+
+    SCHED.forEach(function(r, idx){
+      const tr = document.createElement("tr");
+      if (today === r.day) tr.className = "today";
+      const td0 = document.createElement("td");
+      td0.className = "d"; td0.textContent = bn(r.day);
+      tr.appendChild(td0);
+      cols.forEach(function(c, ci){
+        const td = document.createElement("td");
+        const inp = document.createElement("input");
+        inp.type = "number"; inp.step = steps[ci]; inp.inputMode = (ci === 0 ? "decimal" : "numeric");
+        inp.value = (r[c] === null) ? "" : r[c];
+        inp.addEventListener("input", function(){
+          SCHED[idx][c] = num(inp.value);
+          if (c === "targetTemp") paintSchedToday();
+        });
+        td.appendChild(inp); tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    paintSchedToday();
+  }
+
+  $("hmSchedCard").addEventListener("click", function(){
+    if (!ST.farm) return;
+    loadSched();
+    paintSched();
+    $("sfFrom").value = ""; $("sfTo").value = "";
+    $("sfTemp").value = ""; $("sfHum").value = ""; $("sfLight").value = ""; $("sfClean").value = "";
+    clearMsg($("schMsg")); clearMsg($("schFillMsg"));
+    show("scrSched", { back: goHome, title:"দিনের সূচি", sub: ST.farm.name || "" });
+  });
+
+  $("schFill").addEventListener("click", function(){
+    const box = $("schFillMsg");
+    clearMsg(box);
+    const from = parseInt($("sfFrom").value,10), to = parseInt($("sfTo").value,10);
+    if (isNaN(from) || isNaN(to)){ msg(box, "কোন দিন থেকে কোন দিন, দুইটাই লিখুন।"); return; }
+    if (from < 1 || to > SCHED.length || from > to){
+      msg(box, "দিন ১ থেকে " + bn(SCHED.length) + "-এর মধ্যে হতে হবে, আর শুরুটা আগে।"); return;
+    }
+    const vals = {
+      targetTemp:     num($("sfTemp").value),
+      humidityTarget: num($("sfHum").value),
+      lightHours:     num($("sfLight").value),
+      clean:          num($("sfClean").value)
+    };
+    let any = false;
+    for (const k in vals) if (vals[k] !== null) any = true;
+    if (!any){ msg(box, "অন্তত একটা ঘরে মান লিখুন।"); return; }
+
+    const bad = checkVals(vals);
+    if (bad){ msg(box, bad); return; }
+
+    for (let d=from; d<=to; d++){
+      for (const k in vals) if (vals[k] !== null) SCHED[d-1][k] = vals[k];
+    }
+    paintSched();
+    msg(box, "✅ " + bn(from) + " থেকে " + bn(to) + " নম্বর দিনে বসানো হয়েছে। এখন নিচে সেভ করুন।", "ok");
+  });
+
+  $("schStd").addEventListener("click", function(){
+    SCHED = standardCurve(SCHED.length || 36);
+    paintSched();
+    msg($("schFillMsg"), "✅ খসড়া বসানো হয়েছে। দেখে নিয়ে দরকারমতো বদলান, তারপর সেভ করুন।", "ok");
+  });
+
+  function checkVals(v){
+    if (v.targetTemp !== null && (v.targetTemp < 10 || v.targetTemp > 45)) return "তাপমাত্রা ১০ থেকে ৪৫ ডিগ্রির মধ্যে দিন।";
+    if (v.humidityTarget !== null && (v.humidityTarget < 20 || v.humidityTarget > 95)) return "আর্দ্রতা ২০ থেকে ৯৫ শতাংশের মধ্যে দিন।";
+    if (v.lightHours !== null && (v.lightHours < 0 || v.lightHours > 24)) return "আলো ০ থেকে ২৪ ঘণ্টার মধ্যে দিন।";
+    if (v.clean !== null && (v.clean < 0 || v.clean > 10)) return "পরিষ্কারের সংখ্যা ০ থেকে ১০-এর মধ্যে দিন।";
+    return "";
+  }
+
+  $("schSave").addEventListener("click", function(){
+    const btn = this, box = $("schMsg");
+    clearMsg(box);
+    for (let i=0;i<SCHED.length;i++){
+      const bad = checkVals(SCHED[i]);
+      if (bad){ msg(box, bn(SCHED[i].day) + " নম্বর দিনে সমস্যা — " + bad); return; }
+    }
+    busy(btn, true, "সেভ হচ্ছে…");
+    ST.farmRef.update({ schedule: SCHED, updatedAt: TS() })
+      .then(function(){
+        busy(btn,false);
+        ST.farm.schedule = SCHED;
+        msg(box, "✅ সেভ হয়েছে — " + bn(filledDays()) + " দিনের লক্ষ্য বসানো আছে।", "ok");
+        paintSchedSummary();
+      })
+      .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+  });
+
+  /* ════════════ ১৩. শুরু ════════════ */
   wireLocation($("rgDist"), $("rgUpa"));
   wireLocation($("fmDist"), $("fmUpa"));
   fillSelect($("rgZones"), (function(){
