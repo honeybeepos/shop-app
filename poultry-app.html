@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Honey Bee Smart Poultry</title>
+<meta name="theme-color" content="#0f7b3d">
+<style>
+  :root{
+    --green:#0f7b3d; --green-d:#0a5c2d; --amber:#f0a500; --amber-d:#c98500;
+    --bg:#f4f6f5; --card:#fff; --ink:#15211b; --muted:#5d6b63;
+    --line:#dde4e0; --danger:#c0392b; --ok:#0f7b3d;
+    --shadow:0 2px 10px rgba(15,40,25,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Noto Sans Bengali","Hind Siliguri",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.65;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:460px;margin:0 auto;padding:16px}
+  @media(min-width:900px){ .wrap{max-width:560px;padding:32px 16px} }
+
+  .brand{display:flex;align-items:center;gap:10px;justify-content:center;margin:18px 0 6px}
+  .brand .bee{font-size:30px;line-height:1}
+  .brand h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.2px}
+  .brand small{display:block;font-size:12px;color:var(--muted);font-weight:400}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+        padding:18px;box-shadow:var(--shadow);margin-top:14px}
+  .card h2{font-size:17px;margin:0 0 4px}
+  .card p.sub{margin:0 0 14px;color:var(--muted);font-size:13px}
+
+  label{display:block;font-size:13px;font-weight:600;margin:12px 0 5px}
+  label .opt{font-weight:400;color:var(--muted)}
+  input,select{
+    width:100%;padding:11px 12px;font:inherit;font-size:15px;
+    border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);
+  }
+  input:focus,select:focus{outline:2px solid var(--green);outline-offset:1px;border-color:var(--green)}
+  input[disabled],select[disabled]{background:#f0f2f1;color:var(--muted)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:360px){ .row2{grid-template-columns:1fr} }
+
+  .btn{
+    width:100%;padding:13px;font:inherit;font-size:16px;font-weight:700;
+    border:0;border-radius:10px;background:var(--green);color:#fff;cursor:pointer;
+    margin-top:18px;
+  }
+  .btn:active{background:var(--green-d)}
+  .btn[disabled]{opacity:.55;cursor:default}
+  .btn.alt{background:var(--amber);color:#2a1d00}
+  .btn.alt:active{background:var(--amber-d)}
+  .btn.ghost{background:transparent;color:var(--green);border:1px solid var(--line);font-weight:600}
+
+  .linkrow{text-align:center;margin-top:14px;font-size:14px}
+  .linkrow a{color:var(--green);font-weight:600;text-decoration:none;cursor:pointer}
+
+  .msg{margin-top:14px;padding:11px 12px;border-radius:9px;font-size:14px;display:none}
+  .msg.err{display:block;background:#fdecea;color:var(--danger);border:1px solid #f5c6c0}
+  .msg.ok{display:block;background:#e8f5ee;color:var(--ok);border:1px solid #bfe3ce}
+  .msg.info{display:block;background:#fff6e0;color:#7a5600;border:1px solid #f2dfae}
+
+  .hint{font-size:12px;color:var(--muted);margin-top:5px}
+
+  .net{position:fixed;left:0;right:0;top:0;padding:7px 12px;text-align:center;
+       font-size:13px;font-weight:600;background:#7a5600;color:#fff;display:none;z-index:50}
+  .net.show{display:block}
+  body.offline .wrap{padding-top:44px}
+
+  .screen{display:none}
+  .screen.on{display:block}
+
+  .userbar{display:flex;align-items:center;justify-content:space-between;gap:10px;
+           background:var(--card);border:1px solid var(--line);border-radius:12px;
+           padding:12px 14px;box-shadow:var(--shadow)}
+  .userbar b{display:block;font-size:15px}
+  .userbar span{font-size:12px;color:var(--muted)}
+  .userbar button{padding:8px 12px;font:inherit;font-size:13px;font-weight:600;
+                  border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer}
+
+  .zone{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .zone:last-child{border-bottom:0}
+  .zone .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+  .zone .nm{font-weight:600}
+  .zone .meta{font-size:12px;color:var(--muted)}
+
+  .spin{width:22px;height:22px;border:3px solid var(--line);border-top-color:var(--green);
+        border-radius:50%;animation:sp .8s linear infinite;margin:26px auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  .foot{text-align:center;font-size:12px;color:var(--muted);margin:22px 0 10px}
+</style>
+</head>
+<body>
+
+<div class="net" id="netBar">📴 ইন্টারনেট নেই — সংযোগ ফিরলে নিজে থেকেই চলবে</div>
+
+<div class="wrap">
+
+  <div class="brand">
+    <div class="bee">🐝</div>
+    <div>
+      <h1>Honey Bee Smart Poultry</h1>
+      <small>স্মার্ট পোলট্রি খামার ব্যবস্থাপনা</small>
+    </div>
+  </div>
+
+  <!-- ══════════ লোডিং ══════════ -->
+  <section class="screen on" id="scrLoad">
+    <div class="spin"></div>
+    <p style="text-align:center;color:var(--muted);font-size:14px">অপেক্ষা করুন…</p>
+  </section>
+
+  <!-- ══════════ লগইন ══════════ -->
+  <section class="screen" id="scrLogin">
+    <div class="card">
+      <h2>লগইন করুন</h2>
+      <p class="sub">আপনার ইমেইল আর পাসওয়ার্ড দিন</p>
+
+      <label for="lgEmail">ইমেইল</label>
+      <input id="lgEmail" type="email" inputmode="email" autocomplete="username" placeholder="apnar@email.com">
+
+      <label for="lgPass">পাসওয়ার্ড</label>
+      <input id="lgPass" type="password" autocomplete="current-password" placeholder="••••••">
+
+      <button class="btn" id="lgBtn">লগইন</button>
+      <div class="msg" id="lgMsg"></div>
+
+      <div class="linkrow"><a id="toForgot">পাসওয়ার্ড ভুলে গেছেন?</a></div>
+      <div class="linkrow">অ্যাকাউন্ট নেই? <a id="toReg">নতুন নিবন্ধন করুন</a></div>
+    </div>
+  </section>
+
+  <!-- ══════════ পাসওয়ার্ড ভুলে গেলে ══════════ -->
+  <section class="screen" id="scrForgot">
+    <div class="card">
+      <h2>পাসওয়ার্ড ঠিক করুন</h2>
+      <p class="sub">ইমেইল দিন — নতুন পাসওয়ার্ড বসানোর লিংক পাঠানো হবে</p>
+
+      <label for="fgEmail">ইমেইল</label>
+      <input id="fgEmail" type="email" inputmode="email" placeholder="apnar@email.com">
+
+      <button class="btn" id="fgBtn">লিংক পাঠান</button>
+      <div class="msg" id="fgMsg"></div>
+
+      <div class="linkrow"><a class="backLogin">← লগইনে ফিরে যান</a></div>
+    </div>
+  </section>
+
+  <!-- ══════════ নিবন্ধন ══════════ -->
+  <section class="screen" id="scrReg">
+    <div class="card">
+      <h2>নতুন নিবন্ধন</h2>
+      <p class="sub">একবারই লাগবে। পরে শুধু ইমেইল-পাসওয়ার্ড দিয়ে ঢুকবেন।</p>
+
+      <label for="rgName">আপনার নাম</label>
+      <input id="rgName" type="text" autocomplete="name" placeholder="যেমন: ফরিদ হোসেন">
+
+      <label for="rgPhone">ফোন নম্বর</label>
+      <input id="rgPhone" type="tel" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX">
+
+      <label for="rgEmail">ইমেইল</label>
+      <input id="rgEmail" type="email" inputmode="email" autocomplete="email" placeholder="apnar@email.com">
+
+      <div class="row2">
+        <div>
+          <label for="rgPass">পাসওয়ার্ড</label>
+          <input id="rgPass" type="password" autocomplete="new-password" placeholder="৬ অক্ষরের বেশি">
+        </div>
+        <div>
+          <label for="rgPass2">আবার লিখুন</label>
+          <input id="rgPass2" type="password" autocomplete="new-password" placeholder="একই পাসওয়ার্ড">
+        </div>
+      </div>
+
+      <label for="rgFarm">খামারের নাম</label>
+      <input id="rgFarm" type="text" placeholder="যেমন: ফরিদ পোলট্রি">
+
+      <label for="rgDist">জেলা</label>
+      <select id="rgDist"><option value="">— বেছে নিন —</option></select>
+
+      <label for="rgUpa">উপজেলা / থানা</label>
+      <select id="rgUpa" disabled><option value="">— আগে জেলা বেছে নিন —</option></select>
+
+      <label for="rgVill">গ্রাম / এলাকা <span class="opt">(ঐচ্ছিক)</span></label>
+      <input id="rgVill" type="text" placeholder="যেমন: বরকামতা">
+
+      <label for="rgZones">কয়টা জোন (ঘর/ভাগ)</label>
+      <select id="rgZones"></select>
+      <div class="hint">এক ঘরের ভেতরেও কয়েকটা জোন হতে পারে। পরে বাড়ানো-কমানো যাবে।</div>
+
+      <button class="btn" id="rgBtn">নিবন্ধন করুন</button>
+      <div class="msg" id="rgMsg"></div>
+
+      <div class="linkrow">অ্যাকাউন্ট আছে? <a class="backLogin">লগইন করুন</a></div>
+    </div>
+  </section>
+
+  <!-- ══════════ ঢোকার পর ══════════ -->
+  <section class="screen" id="scrHome">
+    <div class="userbar">
+      <div>
+        <b id="hmName">—</b>
+        <span id="hmEmail">—</span>
+      </div>
+      <button id="hmOut">বের হন</button>
+    </div>
+
+    <div class="card">
+      <h2 id="hmFarm">—</h2>
+      <p class="sub" id="hmPlace">—</p>
+      <div id="hmZones"></div>
+    </div>
+
+    <div class="msg info" style="display:block">
+      ⚙️ এখন পর্যন্ত শুধু লগইন আর খামার তৈরি হয়েছে। যন্ত্র যোগ করা, তাপমাত্রা
+      দেখা আর নিয়ন্ত্রণ — এগুলো পরের ধাপে আসবে।
+    </div>
+  </section>
+
+  <div class="foot">Honey Bee Smart Poultry · সংস্করণ ০.১</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="bd-locations.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ─────────── Firebase ─────────── */
+  const firebaseConfig = {
+    apiKey: "AIzaSyDXNlXwNMapFQs5ez2GHohe19Ud04ip_PU",
+    authDomain: "honeybee-poultry.firebaseapp.com",
+    projectId: "honeybee-poultry",
+    storageBucket: "honeybee-poultry.firebasestorage.app",
+    messagingSenderId: "845877967187",
+    appId: "1:845877967187:web:4c87e884f40dc2138449a6"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db   = firebase.firestore();
+  const TS   = () => firebase.firestore.FieldValue.serverTimestamp();
+
+  // অফলাইনে পড়া যাবে — ফায়ারবেসে বারবার যেতে হবে না
+  db.enablePersistence({ synchronizeTabs: true }).catch(function(){ /* একাধিক ট্যাব বা পুরনো ব্রাউজার — সমস্যা নেই */ });
+
+  /* ─────────── ছোট সাহায্যকারী ─────────── */
+  const $ = function(id){ return document.getElementById(id); };
+
+  function show(id){
+    const list = document.querySelectorAll(".screen");
+    for (let i=0;i<list.length;i++) list[i].classList.remove("on");
+    $(id).classList.add("on");
+    window.scrollTo(0,0);
+  }
+  function msg(el, text, kind){
+    el.className = "msg " + (kind || "err");
+    el.textContent = text;
+  }
+  function clearMsg(el){ el.className = "msg"; el.textContent = ""; }
+  function busy(btn, on, label){
+    btn.disabled = !!on;
+    if (on){ btn.dataset.old = btn.textContent; btn.textContent = label || "অপেক্ষা করুন…"; }
+    else if (btn.dataset.old){ btn.textContent = btn.dataset.old; }
+  }
+
+  /* ─────────── ফায়ারবেসের ভুল → বাংলা ─────────── */
+  function bnError(e){
+    const c = (e && e.code) || "";
+    switch(c){
+      case "auth/invalid-email":          return "ইমেইলটা ঠিক নেই — আবার দেখুন।";
+      case "auth/email-already-in-use":   return "এই ইমেইল দিয়ে আগেই অ্যাকাউন্ট আছে। লগইন করুন।";
+      case "auth/weak-password":          return "পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে।";
+      case "auth/user-not-found":
+      case "auth/wrong-password":
+      case "auth/invalid-credential":     return "ইমেইল বা পাসওয়ার্ড ভুল।";
+      case "auth/user-disabled":          return "এই অ্যাকাউন্ট বন্ধ করা আছে।";
+      case "auth/too-many-requests":      return "অনেকবার চেষ্টা হয়েছে। কিছুক্ষণ পরে আবার করুন।";
+      case "auth/network-request-failed": return "ইন্টারনেট পাওয়া যাচ্ছে না।";
+      case "permission-denied":           return "অনুমতি নেই। নিয়ম (rules) ঠিকমতো বসেছে কিনা দেখুন।";
+      case "unavailable":                 return "ইন্টারনেট পাওয়া যাচ্ছে না।";
+      default:
+        return "কিছু একটা ভুল হয়েছে" + (c ? " (" + c + ")" : "") + "। আবার চেষ্টা করুন।";
+    }
+  }
+
+  /* ─────────── নেট আছে কিনা ─────────── */
+  function netPaint(){
+    const off = !navigator.onLine;
+    $("netBar").classList.toggle("show", off);
+    document.body.classList.toggle("offline", off);
+  }
+  window.addEventListener("online", netPaint);
+  window.addEventListener("offline", netPaint);
+  netPaint();
+
+  /* ─────────── জেলা-উপজেলা ─────────── */
+  function fillDistricts(){
+    const sel = $("rgDist");
+    const names = [];
+    for (const div in BD_LOCATIONS){
+      for (const dist in BD_LOCATIONS[div]) names.push(dist);
+    }
+    names.sort(function(a,b){ return a.localeCompare(b, "bn"); });
+    for (let i=0;i<names.length;i++){
+      const o = document.createElement("option");
+      o.value = names[i]; o.textContent = names[i];
+      sel.appendChild(o);
+    }
+  }
+  function upazilasOf(dist){
+    for (const div in BD_LOCATIONS){
+      if (BD_LOCATIONS[div][dist]) return BD_LOCATIONS[div][dist];
+    }
+    return [];
+  }
+  $("rgDist").addEventListener("change", function(){
+    const sel = $("rgUpa");
+    sel.innerHTML = "";
+    const list = upazilasOf(this.value);
+    if (!list.length){
+      sel.disabled = true;
+      sel.innerHTML = '<option value="">— আগে জেলা বেছে নিন —</option>';
+      return;
+    }
+    sel.disabled = false;
+    const head = document.createElement("option");
+    head.value = ""; head.textContent = "— বেছে নিন —";
+    sel.appendChild(head);
+    for (let i=0;i<list.length;i++){
+      const o = document.createElement("option");
+      o.value = list[i]; o.textContent = list[i];
+      sel.appendChild(o);
+    }
+  });
+
+  function fillZoneCount(){
+    const sel = $("rgZones");
+    for (let i=1;i<=20;i++){
+      const o = document.createElement("option");
+      o.value = String(i);
+      o.textContent = i + " টা জোন";
+      if (i === 3) o.selected = true;
+      sel.appendChild(o);
+    }
+  }
+
+  /* ─────────── জোনের যন্ত্রের তালিকা (৮ রিলে) ─────────── */
+  function defaultDevices(){
+    return [
+      { slot:1, type:"HEATER",        name:"হিটার",      mode:"AUTO" },
+      { slot:2, type:"FAN",           name:"ফ্যান ১",    stage:1, mode:"AUTO" },
+      { slot:3, type:"MIST",          name:"মিস্ট",      mode:"AUTO" },
+      { slot:4, type:"LIGHT",         name:"আলো ১",      group:1, mode:"AUTO" },
+      { slot:5, type:"WATER",         name:"পানির পাম্প", mode:"AUTO" },
+      { slot:6, type:"FEEDER",        name:"খাবার",      mode:"AUTO" },
+      { slot:7, type:"CURTAIN_OPEN",  name:"পর্দা খোলা", pair:8,  mode:"AUTO" },
+      { slot:8, type:"CURTAIN_CLOSE", name:"পর্দা বন্ধ", pair:7,  mode:"AUTO" }
+    ];
+  }
+
+  /* ─────────── যাচাই ─────────── */
+  function validReg(v){
+    if (!v.name)                      return "আপনার নাম লিখুন।";
+    if (!/^01[3-9]\d{8}$/.test(v.phone)) return "ফোন নম্বর ১১ সংখ্যার হতে হবে, 01 দিয়ে শুরু।";
+    if (!v.email)                     return "ইমেইল লিখুন।";
+    if (v.pass.length < 6)            return "পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে।";
+    if (v.pass !== v.pass2)           return "দুইটা পাসওয়ার্ড এক হয়নি।";
+    if (!v.farm)                      return "খামারের নাম লিখুন।";
+    if (!v.dist)                      return "জেলা বেছে নিন।";
+    if (!v.upa)                       return "উপজেলা বেছে নিন।";
+    return "";
+  }
+
+  /* ─────────── নিবন্ধন ─────────── */
+  $("rgBtn").addEventListener("click", function(){
+    const btn = this, box = $("rgMsg");
+    clearMsg(box);
+
+    const v = {
+      name:  $("rgName").value.trim(),
+      phone: $("rgPhone").value.trim(),
+      email: $("rgEmail").value.trim(),
+      pass:  $("rgPass").value,
+      pass2: $("rgPass2").value,
+      farm:  $("rgFarm").value.trim(),
+      dist:  $("rgDist").value,
+      upa:   $("rgUpa").value,
+      vill:  $("rgVill").value.trim(),
+      zones: parseInt($("rgZones").value, 10) || 3
+    };
+
+    const bad = validReg(v);
+    if (bad){ msg(box, bad); return; }
+    if (!navigator.onLine){ msg(box, "নিবন্ধন করতে ইন্টারনেট লাগবে।"); return; }
+
+    busy(btn, true, "তৈরি হচ্ছে…");
+
+    auth.createUserWithEmailAndPassword(v.email, v.pass)
+      .then(function(cred){
+        const uid = cred.user.uid;
+
+        // ১) ব্যবহারকারীর নথি
+        return db.collection("users").doc(uid).set({
+          email: v.email, name: v.name, phone: v.phone,
+          district: v.dist, upazila: v.upa, village: v.vill,
+          createdAt: TS(), updatedAt: TS()
+        }).then(function(){ return uid; });
+      })
+      .then(function(uid){
+        // ২) খামার — জোন লেখার আগে এটা তৈরি হতেই হবে,
+        //    কারণ নিয়ম খামারের নথি দেখে অনুমতি দেয়
+        const farmRef = db.collection("farms").doc();
+        return farmRef.set({
+          code: "F01",
+          name: v.farm,
+          ownerUid: uid,
+          memberUids: [],
+          district: v.dist, upazila: v.upa, village: v.vill,
+          zoneCount: v.zones,
+          batch: "", birds: 0, batchStartDate: null, batchDays: 36,
+          createdAt: TS(), updatedAt: TS()
+        }).then(function(){ return farmRef; });
+      })
+      .then(function(farmRef){
+        // ৩) এখন জোনগুলো — খামার তৈরি হয়ে গেছে, তাই অনুমতি মিলবে
+        const batch = db.batch();
+        for (let i=1; i<=v.zones; i++){
+          const zid = "Z" + (i < 10 ? "0" + i : i);
+          batch.set(farmRef.collection("zones").doc(zid), {
+            code: zid,
+            name: "জোন " + i,
+            controllerId: null,
+            nodeId: null,
+            controlEnabled: true,
+            tempStrategy: "SAFE",
+            gradientAlertC: 3,
+            devices: defaultDevices(),
+            points: {},
+            feedTimes: ["06:00","10:00","14:00","18:00","22:00"],
+            settings: {},
+            emergencyRequest: false,
+            createdAt: TS(), updatedAt: TS()
+          });
+        }
+        return batch.commit();
+      })
+      .then(function(){
+        busy(btn, false);
+        msg(box, "✅ হয়ে গেছে! আপনার খামার তৈরি।", "ok");
+        // onAuthStateChanged নিজেই হোম স্ক্রিনে নিয়ে যাবে
+      })
+      .catch(function(e){
+        busy(btn, false);
+        msg(box, bnError(e));
+        // অ্যাকাউন্ট তৈরি হয়ে গিয়ে পরের ধাপ আটকালে, লগইন থাকা অবস্থাতেই
+        // আবার চেষ্টা করা যাবে — তাই এখানে অ্যাকাউন্ট মোছা হচ্ছে না
+      });
+  });
+
+  /* ─────────── লগইন ─────────── */
+  $("lgBtn").addEventListener("click", function(){
+    const btn = this, box = $("lgMsg");
+    clearMsg(box);
+
+    const em = $("lgEmail").value.trim();
+    const pw = $("lgPass").value;
+    if (!em || !pw){ msg(box, "ইমেইল আর পাসওয়ার্ড দুইটাই দিন।"); return; }
+    if (!navigator.onLine){ msg(box, "লগইন করতে ইন্টারনেট লাগবে।"); return; }
+
+    busy(btn, true, "ঢুকছি…");
+    auth.signInWithEmailAndPassword(em, pw)
+      .then(function(){ busy(btn, false); })
+      .catch(function(e){ busy(btn, false); msg(box, bnError(e)); });
+  });
+
+  /* ─────────── পাসওয়ার্ড ভুলে গেলে ─────────── */
+  $("fgBtn").addEventListener("click", function(){
+    const btn = this, box = $("fgMsg");
+    clearMsg(box);
+    const em = $("fgEmail").value.trim();
+    if (!em){ msg(box, "ইমেইল লিখুন।"); return; }
+
+    busy(btn, true, "পাঠাচ্ছি…");
+    auth.sendPasswordResetEmail(em)
+      .then(function(){
+        busy(btn, false);
+        msg(box, "ইমেইলে লিংক পাঠানো হয়েছে। ইনবক্স আর স্প্যাম — দুই জায়গাতেই দেখুন।", "ok");
+      })
+      .catch(function(e){ busy(btn, false); msg(box, bnError(e)); });
+  });
+
+  /* ─────────── পাতা বদল ─────────── */
+  $("toReg").addEventListener("click", function(){ clearMsg($("rgMsg")); show("scrReg"); });
+  $("toForgot").addEventListener("click", function(){
+    clearMsg($("fgMsg"));
+    $("fgEmail").value = $("lgEmail").value.trim();
+    show("scrForgot");
+  });
+  const backs = document.querySelectorAll(".backLogin");
+  for (let i=0;i<backs.length;i++){
+    backs[i].addEventListener("click", function(){ clearMsg($("lgMsg")); show("scrLogin"); });
+  }
+  $("hmOut").addEventListener("click", function(){ auth.signOut(); });
+
+  // Enter চাপলেই কাজ হবে
+  $("lgPass").addEventListener("keydown", function(e){ if (e.key === "Enter") $("lgBtn").click(); });
+  $("fgEmail").addEventListener("keydown", function(e){ if (e.key === "Enter") $("fgBtn").click(); });
+
+  /* ─────────── ঢোকার পরের পর্দা ─────────── */
+  function loadHome(user){
+    $("hmEmail").textContent = user.email || "";
+    $("hmName").textContent  = "…";
+    $("hmFarm").textContent  = "খামার আনা হচ্ছে…";
+    $("hmPlace").textContent = "";
+    $("hmZones").innerHTML   = "";
+
+    db.collection("users").doc(user.uid).get()
+      .then(function(d){
+        $("hmName").textContent = (d.exists && d.data().name) ? d.data().name : "—";
+      })
+      .catch(function(){ $("hmName").textContent = "—"; });
+
+    db.collection("farms").where("ownerUid", "==", user.uid).limit(1).get()
+      .then(function(snap){
+        if (snap.empty){
+          $("hmFarm").textContent = "কোনো খামার পাওয়া যায়নি";
+          $("hmPlace").textContent = "নিবন্ধন পুরোপুরি শেষ হয়নি বলে মনে হচ্ছে।";
+          return;
+        }
+        const doc = snap.docs[0], f = doc.data();
+        $("hmFarm").textContent  = f.name || "খামার";
+        $("hmPlace").textContent =
+          [f.village, f.upazila, f.district].filter(Boolean).join(", ") +
+          "  ·  কোড " + (f.code || "F01");
+
+        return doc.ref.collection("zones").get().then(function(zs){
+          const box = $("hmZones");
+          if (zs.empty){ box.innerHTML = '<p class="hint">কোনো জোন নেই।</p>'; return; }
+          const rows = [];
+          zs.forEach(function(z){ rows.push(z.data()); });
+          rows.sort(function(a,b){ return String(a.code).localeCompare(String(b.code)); });
+          box.innerHTML = "";
+          rows.forEach(function(z){
+            const n = document.createElement("div");
+            n.className = "zone";
+            const dev = (z.devices || []).length;
+            n.innerHTML =
+              '<span class="dot"></span>' +
+              '<span><span class="nm"></span><br><span class="meta"></span></span>';
+            n.querySelector(".nm").textContent = z.name || z.code;
+            n.querySelector(".meta").textContent =
+              dev + " টা যন্ত্র · যন্ত্র যুক্ত হয়নি";
+            box.appendChild(n);
+          });
+        });
+      })
+      .catch(function(e){
+        $("hmFarm").textContent = "খামার আনা গেল না";
+        $("hmPlace").textContent = bnError(e);
+      });
+  }
+
+  /* ─────────── শুরু ─────────── */
+  fillDistricts();
+  fillZoneCount();
+
+  auth.onAuthStateChanged(function(user){
+    if (user){ show("scrHome"); loadHome(user); }
+    else     { show("scrLogin"); }
+  });
+
+})();
+</script>
+</body>
+</html>
