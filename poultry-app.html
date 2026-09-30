@@ -404,7 +404,7 @@
     <div class="msg" id="znMsg"></div>
   </section>
 
-  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৪</span></div>
+  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৬</span></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -541,8 +541,12 @@
     { v:"WATER",         label:"পানির পাম্প" },
     { v:"FEEDER",        label:"খাবার" },
     { v:"CURTAIN_OPEN",  label:"পর্দা খোলা" },
-    { v:"CURTAIN_CLOSE", label:"পর্দা বন্ধ" }
+    { v:"CURTAIN_CLOSE", label:"পর্দা বন্ধ" },
+    { v:"SWITCH",        label:"সুইচ (যা খুশি)" }
   ];
+  // এই যন্ত্রগুলোর সাথে তাপমাত্রার সম্পর্ক নেই — যন্ত্রের বুদ্ধি
+  // কোনোদিন এগুলোয় হাত দেবে না
+  function alwaysManual(t){ return t === "SWITCH"; }
   function typeLabel(v){
     for (let i=0;i<DEV_TYPES.length;i++) if (DEV_TYPES[i].v === v) return DEV_TYPES[i].label;
     return v || "খালি";
@@ -554,14 +558,14 @@
 
   function defaultDevices(){
     return [
-      { slot:1, type:"HEATER",        name:"হিটার",       mode:"AUTO" },
-      { slot:2, type:"FAN",           name:"ফ্যান ১",     mode:"AUTO" },
-      { slot:3, type:"MIST",          name:"মিস্ট",        mode:"AUTO" },
-      { slot:4, type:"LIGHT",         name:"আলো ১",       mode:"AUTO" },
-      { slot:5, type:"WATER",         name:"পানির পাম্প", mode:"AUTO" },
-      { slot:6, type:"FEEDER",        name:"খাবার",       mode:"AUTO" },
-      { slot:7, type:"CURTAIN_OPEN",  name:"পর্দা খোলা",  mode:"AUTO" },
-      { slot:8, type:"CURTAIN_CLOSE", name:"পর্দা বন্ধ",  mode:"AUTO" }
+      { slot:1, type:"HEATER",        name:"হিটার",       auto:true, mode:"AUTO" },
+      { slot:2, type:"FAN",           name:"ফ্যান ১",     auto:true, mode:"AUTO" },
+      { slot:3, type:"MIST",          name:"মিস্ট",        auto:true, mode:"AUTO" },
+      { slot:4, type:"LIGHT",         name:"আলো ১",       auto:true, mode:"AUTO" },
+      { slot:5, type:"WATER",         name:"পানির পাম্প", auto:true, mode:"AUTO" },
+      { slot:6, type:"FEEDER",        name:"খাবার",       auto:true, mode:"AUTO" },
+      { slot:7, type:"CURTAIN_OPEN",  name:"পর্দা খোলা",  auto:true, mode:"AUTO" },
+      { slot:8, type:"CURTAIN_CLOSE", name:"পর্দা বন্ধ",  auto:true, mode:"AUTO" }
     ];
   }
 
@@ -672,6 +676,25 @@
     return d;
   }
 
+  // সূচিতে খোঁজার জন্য দিন — ব্যাচের শেষ দিনের পরে আর এগোয় না।
+  // ৪০ দিনেও মাল না বিকোলে ৩৬ দিনের লক্ষ্যই ধরে রাখে।
+  // ⚠️ কখনো ঘুরে ১-এ ফেরে না — ৪০ দিনের মুরগিকে ৩৩° দিলে মরে যাবে।
+  function planDay(f){
+    const d = dayOfBatch(f);
+    if (d === null) return null;
+    const last = (f && f.batchDays) || 36;
+    return Math.min(last, Math.max(1, d));
+  }
+
+  // "আজ ৪০ নম্বর দিন · ৩৬ দিনের লক্ষ্য ধরে রাখা"
+  function dayText(f){
+    const d = dayOfBatch(f), pd = planDay(f);
+    if (d === null) return "";
+    if (d < 1) return "ব্যাচ শুরু হতে আরও " + bn(1-d) + " দিন";
+    if (d > pd) return "আজ " + bn(d) + " নম্বর দিন · " + bn(pd) + " দিনের লক্ষ্য ধরে রাখা";
+    return "আজ " + bn(d) + " নম্বর দিন";
+  }
+
   function paintHome(){
     const f = ST.farm || {};
     $("hmFarm").textContent  = f.name || "খামার";
@@ -681,7 +704,7 @@
     const d = dayOfBatch(f);
     $("hmBatch").textContent = (d === null)
       ? "ব্যাচ শুরুর তারিখ বসানো হয়নি — চাপ দিয়ে বসান"
-      : (f.batch ? f.batch + " · " : "") + "আজ " + bn(d) + " নম্বর দিন"
+      : (f.batch ? f.batch + " · " : "") + dayText(f)
         + (f.birds ? " · " + bn(f.birds) + " টা বাচ্চা" : "");
 
     paintSchedSummary();
@@ -695,11 +718,13 @@
       n.className = "zrow";
       n.innerHTML = '<span class="dot"></span><span class="body">' +
                     '<span class="nm"></span><span class="meta"></span></span><span class="go">›</span>';
-      const live = (z.devices || []).filter(function(d2){ return d2 && d2.type; }).length;
+      const alldev = (z.devices || []).filter(function(d2){ return d2 && d2.type; });
+      const live = alldev.length;
+      const hand = alldev.filter(function(d2){ return d2.auto === false; }).length;
       n.querySelector(".nm").textContent = bn(z.name || z.code);
       n.querySelector(".meta").textContent = z.controlEnabled === false
         ? "শুধু দেখা · যন্ত্র নেই"
-        : bn(live) + " টা যন্ত্র · যন্ত্র যুক্ত হয়নি";
+        : bn(live) + " টা যন্ত্র" + (hand ? " (" + bn(hand) + " টা হাতে)" : "") + " · যন্ত্র যুক্ত হয়নি";
       n.addEventListener("click", function(){ openZone(z); });
       box.appendChild(n);
     });
@@ -767,11 +792,12 @@
   });
 
   function paintFmDay(){
-    const d = dayOfBatch({ batchStartDate: $("fmStart").value });
-    $("fmDayNow").textContent = (d === null) ? "" :
-      (d < 1 ? "ব্যাচ শুরু হতে আরও " + bn(1-d) + " দিন" : "আজ " + bn(d) + " নম্বর দিন");
+    const days = parseInt($("fmDays").value,10) || 36;
+    const f = { batchStartDate: $("fmStart").value, batchDays: days };
+    $("fmDayNow").textContent = dayText(f);
   }
   $("fmStart").addEventListener("change", paintFmDay);
+  $("fmDays").addEventListener("input", paintFmDay);
 
   $("fmSave").addEventListener("click", function(){
     const btn = this, box = $("fmMsg");
@@ -824,7 +850,12 @@
     zSlots = [];
     for (let i=1;i<=16;i++){
       const d = (z.devices || []).find(function(x){ return x && x.slot === i; });
-      zSlots.push({ type: (d && d.type) || "", name: (d && d.name) || "" });
+      zSlots.push({
+        type: (d && d.type) || "",
+        name: (d && d.name) || "",
+        // পুরনো নথিতে ঘরটা নেই — তখন সুইচ ছাড়া সবই নিজে চলে ধরা হবে
+        auto: d ? (d.auto !== undefined ? !!d.auto : !alwaysManual(d.type)) : true
+      });
     }
     paintSlots();
     clearMsg($("znMsg"));
@@ -852,19 +883,33 @@
       row.className = "slot" + (s.type ? "" : " empty");
       row.innerHTML =
         '<div class="num">R<b>' + bn(i) + '</b>' + pinOf(i) + '</div>' +
-        '<div class="fields"><select></select><input type="text" placeholder="নাম"></div>';
-      const sel = row.querySelector("select"), inp = row.querySelector("input");
+        '<div class="fields"><select class="ty"></select>' +
+        '<input type="text" placeholder="নাম">' +
+        '<select class="au"></select></div>';
+      const sel = row.querySelector("select.ty"),
+            inp = row.querySelector("input"),
+            au  = row.querySelector("select.au");
       fillSelect(sel, DEV_TYPES.map(function(t){ return {v:t.v,label:t.label}; }), s.type);
       inp.value = s.name;
       inp.disabled = !s.type;
+      fillSelect(au, [
+        { v:"1", label:"নিজে নিজে চলবে" },
+        { v:"0", label:"শুধু হাতে — ফোনের সুইচ" }
+      ], s.auto ? "1" : "0");
+      au.style.display = s.type ? "" : "none";
+      au.disabled = alwaysManual(s.type);   // সুইচ সবসময় হাতেই
+
       sel.addEventListener("change", function(){
         zSlots[i-1].type = sel.value;
         if (sel.value && !inp.value.trim()) inp.value = typeLabel(sel.value);
         if (!sel.value) inp.value = "";
         zSlots[i-1].name = inp.value;
+        if (alwaysManual(sel.value)) zSlots[i-1].auto = false;
+        else if (sel.value) zSlots[i-1].auto = true;
         paintSlots();
       });
       inp.addEventListener("input", function(){ zSlots[i-1].name = inp.value; });
+      au.addEventListener("change", function(){ zSlots[i-1].auto = (au.value === "1"); });
       box.appendChild(row);
     }
   }
@@ -875,9 +920,12 @@
     for (let i=1;i<=n;i++){
       const s = zSlots[i-1];
       if (!s.type) continue;
-      const d = { slot:i, type:s.type, name:(s.name || typeLabel(s.type)), mode:"AUTO" };
-      if (s.type === "FAN")   d.stage = ++fan;     // কোন ফ্যান আগে চলবে
-      if (s.type === "LIGHT") d.group = ++light;   // অর্ধেক আলো করার জন্য
+      const isAuto = alwaysManual(s.type) ? false : !!s.auto;
+      const d = { slot:i, type:s.type, name:(s.name || typeLabel(s.type)),
+                  auto: isAuto, mode: isAuto ? "AUTO" : "MANUAL" };
+      // ধাপ আর দল শুধু নিজে-চলা যন্ত্রের জন্য
+      if (isAuto && s.type === "FAN")   d.stage = ++fan;
+      if (isAuto && s.type === "LIGHT") d.group = ++light;
       out.push(d);
     }
     // পর্দার দুইটা স্লট জোড়া লাগানো — একসাথে চললে মোটর পুড়বে
@@ -888,6 +936,9 @@
   }
 
   function checkDevices(devs){
+    const autoCount = devs.filter(function(d){ return d.auto; }).length;
+    if (!autoCount && devs.length)
+      return "অন্তত একটা যন্ত্র নিজে নিজে চলার মতো রাখুন, নইলে জোনটা কিছুই নিয়ন্ত্রণ করবে না।";
     const op = devs.filter(function(d){ return d.type === "CURTAIN_OPEN"; }).length;
     const cl = devs.filter(function(d){ return d.type === "CURTAIN_CLOSE"; }).length;
     if (op > 1 || cl > 1) return "পর্দার প্রতিটা দিক একটাই স্লটে হবে।";
@@ -1044,8 +1095,17 @@
     const d = dayOfBatch(f);
     if (d === null){ $("schToday").textContent = "ব্যাচ শুরুর তারিখ বসানো নেই, তাই আজকের দিন জানা যাচ্ছে না।"; return; }
     if (d < 1){ $("schToday").textContent = "ব্যাচ শুরু হতে আরও " + bn(1-d) + " দিন।"; return; }
-    if (d > SCHED.length){ $("schToday").textContent = "ব্যাচের " + bn(SCHED.length) + " দিন পার হয়ে গেছে (আজ " + bn(d) + " নম্বর দিন)।"; return; }
-    const r = SCHED[d-1];
+    const pd = Math.min(SCHED.length, d);
+    const r = SCHED[pd-1];
+    if (d > SCHED.length){
+      const bits2 = [];
+      if (r.targetTemp !== null) bits2.push("তাপ " + bn(r.targetTemp) + "°");
+      if (r.humidityTarget !== null) bits2.push("আর্দ্রতা " + bn(r.humidityTarget) + "%");
+      $("schToday").textContent = "আজ " + bn(d) + " নম্বর দিন — সূচি শেষ, তাই "
+        + bn(SCHED.length) + " দিনের লক্ষ্যই ধরে রাখা হচ্ছে"
+        + (bits2.length ? " (" + bits2.join(" · ") + ")" : "");
+      return;
+    }
     const bits = [];
     if (r.targetTemp !== null)     bits.push("তাপ " + bn(r.targetTemp) + "°");
     if (r.humidityTarget !== null) bits.push("আর্দ্রতা " + bn(r.humidityTarget) + "%");
@@ -1055,7 +1115,7 @@
   }
 
   function paintSched(){
-    const today = dayOfBatch(ST.farm || {});
+    const today = planDay(ST.farm || {});
     const t = $("schTable");
     t.innerHTML =
       "<thead><tr><th>দিন</th><th>তাপ °C</th><th>আর্দ্রতা %</th><th>আলো ঘ.</th><th>পরিষ্কার</th></tr></thead>";
@@ -1353,8 +1413,8 @@
                 : (live.shared && live.shared.nh3 ? { v: live.shared.nh3.value, src:"সাধারণ" } : { v:null, src:null });
 
       // আজকের লক্ষ্যের সাথে মিলিয়ে দেখা
-      const day = dayOfBatch(ST.farm || {});
-      const plan = (day && ST.farm && ST.farm.schedule) ? ST.farm.schedule[day-1] : null;
+      const pday = planDay(ST.farm || {});
+      const plan = (pday && ST.farm && ST.farm.schedule) ? ST.farm.schedule[pday-1] : null;
       const tWarn = (t.v != null && plan && plan.targetTemp != null)
                     ? Math.abs(t.v - plan.targetTemp) >= 3 : false;
 
@@ -1374,6 +1434,7 @@
       const devs = zl && zl.devices;
       if (devs){
         const chips = document.createElement("div"); chips.className = "chips";
+        const hands = document.createElement("div"); hands.className = "chips";
         (z.devices || []).forEach(function(d){
           const st = devs[String(d.type || "").toLowerCase()] ||
                      devs["slot" + d.slot] || devs[d.name] || null;
@@ -1381,9 +1442,15 @@
           const c = document.createElement("span");
           c.className = "chip" + (on ? " on" : "");
           c.textContent = bn(d.name || typeLabel(d.type)) + (on ? " · চালু" : " · বন্ধ");
-          chips.appendChild(c);
+          (d.auto === false ? hands : chips).appendChild(c);
         });
         if (chips.children.length) card.appendChild(chips);
+        if (hands.children.length){
+          const lb = document.createElement("div");
+          lb.className = "when"; lb.style.marginTop = "8px";
+          lb.textContent = "হাতে চালানো —";
+          card.appendChild(lb); card.appendChild(hands);
+        }
       }
       box.appendChild(card);
     });
