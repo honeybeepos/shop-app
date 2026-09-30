@@ -402,18 +402,9 @@
 
     auth.createUserWithEmailAndPassword(v.email, v.pass)
       .then(function(cred){
+        // ১) খামার সবার আগে — জোন লেখার আগে এটা তৈরি হতেই হবে, কারণ নিয়ম
+        //    খামারের নথি দেখে অনুমতি দেয়। আর এর আইডিটা পরের ধাপে লাগবে।
         const uid = cred.user.uid;
-
-        // ১) ব্যবহারকারীর নথি
-        return db.collection("users").doc(uid).set({
-          email: v.email, name: v.name, phone: v.phone,
-          district: v.dist, upazila: v.upa, village: v.vill,
-          createdAt: TS(), updatedAt: TS()
-        }).then(function(){ return uid; });
-      })
-      .then(function(uid){
-        // ২) খামার — জোন লেখার আগে এটা তৈরি হতেই হবে,
-        //    কারণ নিয়ম খামারের নথি দেখে অনুমতি দেয়
         const farmRef = db.collection("farms").doc();
         return farmRef.set({
           code: "F01",
@@ -424,7 +415,17 @@
           zoneCount: v.zones,
           batch: "", birds: 0, batchStartDate: null, batchDays: 36,
           createdAt: TS(), updatedAt: TS()
-        }).then(function(){ return farmRef; });
+        }).then(function(){ return { uid: uid, farmRef: farmRef }; });
+      })
+      .then(function(o){
+        // ২) ব্যবহারকারীর নথি — সাথে খামারের আইডি, যাতে পরে তালিকা না খুঁজে
+        //    সরাসরি ওই খামারটাই আনা যায় (একটা পড়া বাঁচে, নিয়মও সহজ থাকে)
+        return db.collection("users").doc(o.uid).set({
+          email: v.email, name: v.name, phone: v.phone,
+          district: v.dist, upazila: v.upa, village: v.vill,
+          primaryFarmId: o.farmRef.id,
+          createdAt: TS(), updatedAt: TS()
+        }).then(function(){ return o.farmRef; });
       })
       .then(function(farmRef){
         // ৩) এখন জোনগুলো — খামার তৈরি হয়ে গেছে, তাই অনুমতি মিলবে
@@ -512,6 +513,39 @@
   $("fgEmail").addEventListener("keydown", function(e){ if (e.key === "Enter") $("fgBtn").click(); });
 
   /* ─────────── ঢোকার পরের পর্দা ─────────── */
+  function renderFarm(doc){
+    const f = doc.data();
+    $("hmFarm").textContent  = f.name || "খামার";
+    $("hmPlace").textContent =
+      [f.village, f.upazila, f.district].filter(Boolean).join(", ") +
+      "  ·  কোড " + (f.code || "F01");
+
+    return doc.ref.collection("zones").get().then(function(zs){
+      const box = $("hmZones");
+      if (zs.empty){ box.innerHTML = '<p class="hint">কোনো জোন নেই।</p>'; return; }
+      const rows = [];
+      zs.forEach(function(z){ rows.push(z.data()); });
+      rows.sort(function(a,b){ return String(a.code).localeCompare(String(b.code)); });
+      box.innerHTML = "";
+      rows.forEach(function(z){
+        const n = document.createElement("div");
+        n.className = "zone";
+        const dev = (z.devices || []).length;
+        n.innerHTML =
+          '<span class="dot"></span>' +
+          '<span><span class="nm"></span><br><span class="meta"></span></span>';
+        n.querySelector(".nm").textContent = z.name || z.code;
+        n.querySelector(".meta").textContent = dev + " টা যন্ত্র · যন্ত্র যুক্ত হয়নি";
+        box.appendChild(n);
+      });
+    });
+  }
+
+  function noFarm(){
+    $("hmFarm").textContent  = "কোনো খামার পাওয়া যায়নি";
+    $("hmPlace").textContent = "নিবন্ধন পুরোপুরি শেষ হয়নি বলে মনে হচ্ছে।";
+  }
+
   function loadHome(user){
     $("hmEmail").textContent = user.email || "";
     $("hmName").textContent  = "…";
@@ -521,46 +555,22 @@
 
     db.collection("users").doc(user.uid).get()
       .then(function(d){
-        $("hmName").textContent = (d.exists && d.data().name) ? d.data().name : "—";
-      })
-      .catch(function(){ $("hmName").textContent = "—"; });
+        const u = (d.exists && d.data()) || {};
+        $("hmName").textContent = u.name || "—";
 
-    db.collection("farms").where("ownerUid", "==", user.uid).limit(1).get()
-      .then(function(snap){
-        if (snap.empty){
-          $("hmFarm").textContent = "কোনো খামার পাওয়া যায়নি";
-          $("hmPlace").textContent = "নিবন্ধন পুরোপুরি শেষ হয়নি বলে মনে হচ্ছে।";
-          return;
+        // নতুন অ্যাকাউন্টে খামারের আইডি জমা থাকে — সরাসরি আনা যায়
+        if (u.primaryFarmId){
+          return db.collection("farms").doc(u.primaryFarmId).get()
+            .then(function(fd){ return fd.exists ? renderFarm(fd) : noFarm(); });
         }
-        const doc = snap.docs[0], f = doc.data();
-        $("hmFarm").textContent  = f.name || "খামার";
-        $("hmPlace").textContent =
-          [f.village, f.upazila, f.district].filter(Boolean).join(", ") +
-          "  ·  কোড " + (f.code || "F01");
 
-        return doc.ref.collection("zones").get().then(function(zs){
-          const box = $("hmZones");
-          if (zs.empty){ box.innerHTML = '<p class="hint">কোনো জোন নেই।</p>'; return; }
-          const rows = [];
-          zs.forEach(function(z){ rows.push(z.data()); });
-          rows.sort(function(a,b){ return String(a.code).localeCompare(String(b.code)); });
-          box.innerHTML = "";
-          rows.forEach(function(z){
-            const n = document.createElement("div");
-            n.className = "zone";
-            const dev = (z.devices || []).length;
-            n.innerHTML =
-              '<span class="dot"></span>' +
-              '<span><span class="nm"></span><br><span class="meta"></span></span>';
-            n.querySelector(".nm").textContent = z.name || z.code;
-            n.querySelector(".meta").textContent =
-              dev + " টা যন্ত্র · যন্ত্র যুক্ত হয়নি";
-            box.appendChild(n);
-          });
-        });
+        // পুরনো অ্যাকাউন্ট — আইডি জমা নেই, তাই খুঁজে নিতে হবে
+        return db.collection("farms").where("ownerUid", "==", user.uid).limit(1).get()
+          .then(function(snap){ return snap.empty ? noFarm() : renderFarm(snap.docs[0]); });
       })
       .catch(function(e){
-        $("hmFarm").textContent = "খামার আনা গেল না";
+        $("hmName").textContent  = "—";
+        $("hmFarm").textContent  = "খামার আনা গেল না";
         $("hmPlace").textContent = bnError(e);
       });
   }
