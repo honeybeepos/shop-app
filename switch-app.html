@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Honey Bee Smart Switch</title>
+<style>
+:root{
+  --bg:#0b1220; --panel:#121c2e; --panel2:#17243a; --text:#f5f7fb;
+  --muted:#91a0b8; --yellow:#ffc928; --green:#22c55e; --red:#ef4444;
+  --blue:#38bdf8; --border:#26354d;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(145deg,#07101d,#111d31);color:var(--text);
+     font-family:Arial,"Noto Sans Bengali",sans-serif;min-height:100vh}
+button,input,select{font:inherit}
+.app{max-width:1100px;margin:auto;min-height:100vh;padding-bottom:85px}
+header{position:sticky;top:0;z-index:10;background:rgba(8,15,27,.94);backdrop-filter:blur(15px);
+       border-bottom:1px solid var(--border);padding:16px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:46px;height:46px;border-radius:14px;background:#ffc928;display:grid;place-items:center;font-size:27px}
+h1{font-size:20px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:3px}
+main{padding:18px}
+.page{display:none}.page.active{display:block}
+.hero{background:linear-gradient(135deg,#17253b,#101a2c);border:1px solid var(--border);
+      border-radius:22px;padding:18px;margin-bottom:16px}
+.hero h2{margin:0 0 6px;font-size:24px}.hero p{margin:0;color:var(--muted);font-size:13px}
+.toolbar{display:flex;gap:9px;overflow:auto;margin-bottom:15px;padding-bottom:4px}
+.filter{border:1px solid var(--border);background:var(--panel);color:var(--muted);
+        border-radius:12px;padding:10px 14px;white-space:nowrap;cursor:pointer}
+.filter.active{background:#4b3a08;color:#ffd84a;border-color:#8d7111}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:14px}
+.switch-card{position:relative}
+.switch-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.icon{font-size:28px}
+.name{font-weight:700;font-size:15px;margin-top:4px}
+.chno{font-size:11px;color:var(--muted);margin-top:3px}
+.status{font-size:12px;margin-top:10px;color:var(--muted)}
+.status.on{color:#5ee58a}.status.off{color:#8e9ab0}
+.row{display:flex;gap:7px;margin-top:12px}
+.btn{border:0;border-radius:11px;padding:11px 8px;flex:1;font-weight:700;cursor:pointer;
+     background:var(--yellow);color:#201900}
+.btn[disabled]{opacity:.55;cursor:default}
+.onbtn{background:#163c28;color:#63ed8e}.offbtn{background:#3d1e24;color:#ff8790}
+.ghost{background:#202f46;color:#b8c7df}
+.onbtn.sel{background:#22c55e;color:#04210f}
+.offbtn.sel{background:#ef4444;color:#2a0206}
+.modes{display:flex;gap:6px;margin-top:10px}
+.mode{flex:1;border:1px solid var(--border);background:#0e1726;color:var(--muted);
+      border-radius:10px;padding:8px 4px;font-size:12px;cursor:pointer}
+.mode.active{background:#4b3a08;color:#ffd84a;border-color:#8d7111;font-weight:700}
+.schedule-box{display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.schedule-box.open{display:block}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+input[type=time],input[type=text],input[type=email],input[type=password],input[type=tel],select{
+  width:100%;background:#0b1423;border:1px solid var(--border);color:#fff;
+  padding:11px;border-radius:10px}
+.sensor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.sensor{padding:18px}.sensor .big{font-size:32px;font-weight:800;margin:10px 0 4px}
+.sensor .unit{font-size:14px;color:var(--muted)}
+.dot{font-size:12px}.dot.ok{color:#4ade80}.dot.no{color:#f59e0b}
+.info{color:var(--muted);font-size:13px;line-height:1.7}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px;
+      padding:15px 0;border-bottom:1px solid var(--border)}
+.item:last-child{border-bottom:0}
+.badge{display:inline-block;padding:5px 10px;border-radius:99px;font-size:12px;white-space:nowrap}
+.badge.ok{background:#183a29;color:#66e993}
+.badge.no{background:#3b2025;color:#ff8992}
+.badge.warn{background:#3d3312;color:#ffd84a}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:20;background:rgba(10,17,29,.97);
+    border-top:1px solid var(--border);display:flex;justify-content:center}
+.navin{max-width:700px;width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
+.navbtn{background:none;border:0;color:var(--muted);padding:12px 4px 10px;cursor:pointer}
+.navbtn.active{color:#ffd22e}.navicon{font-size:20px;display:block}
+.navlabel{font-size:11px;margin-top:3px}
+.msg{margin-top:12px;padding:11px 12px;border-radius:10px;font-size:14px;display:none;
+     line-height:1.6;white-space:pre-line}
+.msg.err{display:block;background:#3b2025;color:#ff9aa2;border:1px solid #5d2a31}
+.msg.ok{display:block;background:#15301f;color:#7fe6a4;border:1px solid #26543a}
+.msg.info{display:block;background:#2a2510;color:#ffd84a;border:1px solid #5b4c15}
+.linkrow{margin-top:14px;font-size:14px;color:var(--muted);text-align:center}
+.linkrow a{color:var(--yellow);text-decoration:underline;cursor:pointer}
+.hint{color:var(--muted);font-size:12px;line-height:1.6;margin-top:8px}
+.auth{max-width:440px;margin:40px auto;padding:0 16px}
+.stale{border-color:#8d7111}
+@media(max-width:650px){
+  .grid{grid-template-columns:1fr}
+  .sensor-grid{grid-template-columns:1fr}
+  .hero h2{font-size:21px}
+  main{padding:13px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ লগইন / নিবন্ধন ══════════ -->
+<div id="authWrap" class="auth" style="display:none">
+  <div class="brand" style="justify-content:center;margin-bottom:22px">
+    <div class="logo">🐝</div>
+    <div><h1>Honey Bee Smart Switch</h1><div class="sub">১৬ চ্যানেল কন্ট্রোলার</div></div>
+  </div>
+
+  <section class="page" id="scrLogin">
+    <div class="card">
+      <h2 style="margin-top:0">লগইন করুন</h2>
+      <p class="sub">আপনার ইমেইল আর পাসওয়ার্ড দিন</p>
+      <label for="lgEmail">ইমেইল</label>
+      <input id="lgEmail" type="email" inputmode="email" autocomplete="username" placeholder="apnar@email.com">
+      <label for="lgPass">পাসওয়ার্ড</label>
+      <input id="lgPass" type="password" autocomplete="current-password" placeholder="••••••">
+      <button class="btn" id="lgBtn" style="margin-top:16px">লগইন</button>
+      <div class="msg" id="lgMsg"></div>
+      <div class="linkrow"><a id="toForgot">পাসওয়ার্ড ভুলে গেছেন?</a></div>
+      <div class="linkrow">অ্যাকাউন্ট নেই? <a id="toReg">নতুন নিবন্ধন করুন</a></div>
+    </div>
+  </section>
+
+  <section class="page" id="scrForgot">
+    <div class="card">
+      <h2 style="margin-top:0">পাসওয়ার্ড ঠিক করুন</h2>
+      <p class="sub">ইমেইল দিন — নতুন পাসওয়ার্ড বসানোর লিংক পাঠানো হবে</p>
+      <label for="fgEmail">ইমেইল</label>
+      <input id="fgEmail" type="email" inputmode="email" placeholder="apnar@email.com">
+      <button class="btn" id="fgBtn" style="margin-top:16px">লিংক পাঠান</button>
+      <div class="msg" id="fgMsg"></div>
+      <div class="linkrow"><a class="backLogin">← লগইনে ফিরে যান</a></div>
+    </div>
+  </section>
+
+  <section class="page" id="scrReg">
+    <div class="card">
+      <h2 style="margin-top:0">নতুন নিবন্ধন</h2>
+      <p class="sub">একবারই লাগবে। পরে শুধু ইমেইল-পাসওয়ার্ড দিয়ে ঢুকবেন।</p>
+      <label for="rgName">আপনার নাম</label>
+      <input id="rgName" type="text" autocomplete="name" placeholder="যেমন: ফরিদ হোসেন">
+      <label for="rgPhone">ফোন নম্বর</label>
+      <input id="rgPhone" type="tel" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX">
+      <label for="rgEmail">ইমেইল</label>
+      <input id="rgEmail" type="email" inputmode="email" autocomplete="email" placeholder="apnar@email.com">
+      <label for="rgPass">পাসওয়ার্ড</label>
+      <input id="rgPass" type="password" autocomplete="new-password" placeholder="৬ অক্ষরের বেশি">
+      <label for="rgPass2">পাসওয়ার্ড আবার লিখুন</label>
+      <input id="rgPass2" type="password" autocomplete="new-password" placeholder="একই পাসওয়ার্ড">
+      <label for="rgPlace">জায়গার নাম</label>
+      <input id="rgPlace" type="text" placeholder="যেমন: আমার বাড়ি, ফরিদ স্টোর">
+      <button class="btn" id="rgBtn" style="margin-top:16px">নিবন্ধন করুন</button>
+      <div class="msg" id="rgMsg"></div>
+      <div class="linkrow">অ্যাকাউন্ট আছে? <a class="backLogin">লগইন করুন</a></div>
+    </div>
+  </section>
+</div>
+
+<!-- ══════════ মূল অ্যাপ ══════════ -->
+<div class="app" id="appWrap" style="display:none">
+<header>
+  <div class="brand">
+    <div class="logo">🐝</div>
+    <div><h1>Honey Bee Smart Switch</h1>
+         <div class="sub" id="hdSub">১৬ চ্যানেল কন্ট্রোলার</div></div>
+  </div>
+</header>
+
+<main>
+<!-- ───── সুইচ ───── -->
+<section id="switches" class="page active">
+  <div class="hero">
+    <h2>সুইচ</h2>
+    <p id="swHint">প্রতিটা লাইন আলাদা চালু-বন্ধ। সময় বা আলো অনুযায়ী নিজে থেকেও চলবে।</p>
+    <div class="row" style="margin-top:14px">
+      <button class="btn onbtn" id="allOn">⚡ সব চালু</button>
+      <button class="btn offbtn" id="allOff">⛔ সব বন্ধ</button>
+    </div>
+  </div>
+  <div class="msg" id="swMsg"></div>
+  <div class="toolbar" id="filters"></div>
+  <div class="grid" id="switchGrid"></div>
+</section>
+
+<!-- ───── পরিবেশ ───── -->
+<section id="environment" class="page">
+  <div class="hero"><h2>🌡 পরিবেশ</h2>
+    <p>যন্ত্র যা মাপছে। এগুলো দেখার জন্য — সুইচ নিজে থেকে চালায় না।</p></div>
+  <div class="sensor-grid" id="sensorGrid"></div>
+  <p class="info" id="envNote"></p>
+</section>
+
+<!-- ───── সেটিংস ───── -->
+<section id="settings" class="page">
+  <div class="hero"><h2>⚙️ সেটিংস</h2><p id="stSub">—</p></div>
+
+  <div class="card">
+    <div class="item">
+      <div><b id="stName">—</b><div class="sub" id="stEmail">—</div></div>
+      <button class="btn ghost" id="stOut" style="flex:0 0 auto;padding:9px 14px">বের হন</button>
+    </div>
+    <div class="item">
+      <div><b>ইন্টারনেট</b><div class="sub">ক্লাউডের সাথে যোগ</div></div>
+      <span class="badge" id="stNet">—</span>
+    </div>
+    <div class="item">
+      <div><b>যন্ত্রের খবর</b><div class="sub" id="stSeenSub">—</div></div>
+      <span class="badge" id="stSeen">—</span>
+    </div>
+    <div class="item">
+      <div><b>যন্ত্রের ঘড়ি</b><div class="sub">সময়সূচি এটার উপর চলে</div></div>
+      <span class="badge" id="stClock">—</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:15px">
+    <h2 style="margin:0 0 4px;font-size:18px">যুক্ত যন্ত্র</h2>
+    <p class="sub" style="margin:0">নামের উপর চাপ দিলে নাম বদলাতে পারবেন</p>
+    <div id="devList" style="margin-top:12px"></div>
+    <button class="btn" id="addDevBtn" style="margin-top:14px">+ নতুন যন্ত্র যোগ করুন</button>
+  </div>
+
+  <div class="card" id="addDevCard" style="margin-top:15px;display:none">
+    <h2 style="margin:0 0 4px;font-size:18px">যন্ত্র যোগ করুন</h2>
+    <p class="sub" style="margin:0">যন্ত্রের গায়ে সিরিয়াল নম্বর, বাক্সের কাগজে দখল-কোড</p>
+    <label for="dvSerial">সিরিয়াল নম্বর</label>
+    <input id="dvSerial" type="text" autocapitalize="characters" placeholder="HBS-0001-7">
+    <label for="dvCode">দখল-কোড</label>
+    <input id="dvCode" type="text" autocapitalize="characters" placeholder="বাক্সের কাগজে লেখা">
+    <label for="dvName">যন্ত্রের নাম</label>
+    <input id="dvName" type="text" maxlength="30" placeholder="যেমন: নিচতলার বোর্ড">
+    <div class="hint">খালি রাখলে নিজে থেকে নাম বসে যাবে।</div>
+    <button class="btn" id="dvClaim" style="margin-top:14px">যন্ত্রটা আমার নামে নিন</button>
+    <div class="msg" id="dvMsg"></div>
+    <div class="hint">কোড একবারই চলে। ভুল লিখলে কিছুই হবে না — আবার চেষ্টা করতে পারবেন।</div>
+  </div>
+</section>
+</main>
+
+<nav><div class="navin">
+  <button class="navbtn active" data-pg="switches"><span class="navicon">🎛️</span><span class="navlabel">সুইচ</span></button>
+  <button class="navbtn" data-pg="environment"><span class="navicon">🌡️</span><span class="navlabel">পরিবেশ</span></button>
+  <button class="navbtn" data-pg="settings"><span class="navicon">⚙️</span><span class="navlabel">সেটিংস</span></button>
+</div></nav>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ════════════ ১. Firebase ════════════
+   পোলট্রির সাথে **একই প্রজেক্ট, একই অ্যাকাউন্ট**। তাই গ্রাহককে
+   দুইবার নিবন্ধন করতে হয় না, আর নিরাপত্তার নিয়মেও হাত দিতে হয় না। */
+const firebaseConfig = {
+  apiKey: "AIzaSyDXNlXwNMapFQs5ez2GHohe19Ud04ip_PU",
+  authDomain: "honeybee-poultry.firebaseapp.com",
+  projectId: "honeybee-poultry",
+  storageBucket: "honeybee-poultry.firebasestorage.app",
+  messagingSenderId: "845877967187",
+  appId: "1:845877967187:web:4c87e884f40dc2138449a6"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+const TS   = function(){ return firebase.firestore.FieldValue.serverTimestamp(); };
+db.enablePersistence({ synchronizeTabs: true }).catch(function(){});
+
+/* ════════════ ২. ছোট সাহায্যকারী ════════════ */
+const $ = function(id){ return document.getElementById(id); };
+const BN = ["০","১","২","৩","৪","৫","৬","৭","৮","৯"];
+function bn(n){ return String(n).replace(/[0-9]/g, function(d){ return BN[+d]; }); }
+function msg(el, text, kind){ el.className = "msg " + (kind || "err"); el.textContent = text; }
+function clearMsg(el){ el.className = "msg"; el.textContent = ""; }
+function busy(btn, on, label){
+  btn.disabled = !!on;
+  if (on){ btn.dataset.old = btn.textContent; btn.textContent = label || "অপেক্ষা করুন…"; }
+  else if (btn.dataset.old){ btn.textContent = btn.dataset.old; }
+}
+function bnError(e){
+  const c = (e && e.code) || "";
+  if (c === "auth/invalid-email")        return "ইমেইলটা ঠিক নেই।";
+  if (c === "auth/email-already-in-use") return "এই ইমেইলে আগেই অ্যাকাউন্ট আছে। লগইন করুন।";
+  if (c === "auth/weak-password")        return "পাসওয়ার্ড অন্তত ৬ অক্ষরের দিন।";
+  if (c === "auth/wrong-password" || c === "auth/invalid-credential"
+      || c === "auth/user-not-found")    return "ইমেইল বা পাসওয়ার্ড মিলছে না।";
+  if (c === "auth/too-many-requests")    return "অনেকবার চেষ্টা হয়েছে। একটু পরে আবার দেখুন।";
+  if (c === "auth/network-request-failed"
+      || c === "unavailable")            return "ইন্টারনেট পাওয়া যাচ্ছে না।";
+  if (c === "permission-denied")         return "অনুমতি নেই।";
+  return "কিছু একটা হয়নি। আবার চেষ্টা করুন।";
+}
+// যন্ত্রের নিজস্ব ইমেইল — সিরিয়াল থেকেই হিসাব করা যায়
+function devEmail(serial){ return String(serial).toLowerCase() + "@dev.honeybee.farm"; }
+
+function fmtAge(ms){
+  if (ms == null) return "";
+  const m = Math.floor(ms / 60000);
+  if (m < 1)  return "এইমাত্র";
+  if (m < 60) return bn(m) + " মিনিট আগে";
+  const h = Math.floor(m / 60);
+  if (h < 24) return bn(h) + " ঘণ্টা আগে";
+  return bn(Math.floor(h / 24)) + " দিন আগে";
+}
+
+/* ════════════ ৩. চ্যানেলের ধরন ════════════
+   ⚠️ GPIO নম্বর অ্যাপে **রাখা হয়নি** — ইচ্ছে করেই। গ্রাহকের কাছে
+      ওটার কোনো মানে নেই, আর রাখলে অ্যাপটা একটা নির্দিষ্ট তারের
+      নকশার সাথে আটকে যেত। যন্ত্র ভেতরে কোন পিন ব্যবহার করছে সেটা
+      ফার্মওয়্যারের ব্যাপার — অ্যাপ শুধু "চ্যানেল ১…১৬" চেনে।      */
+const TYPES = {
+  LIGHT:   { icon:"💡",  bn:"বাতি"    },
+  FAN:     { icon:"🌀",  bn:"ফ্যান"    },
+  EXHAUST: { icon:"🌬️", bn:"এগজস্ট"  },
+  LOAD:    { icon:"🔌",  bn:"অন্যান্য" }
+};
+const TYPE_ORDER = ["LIGHT","FAN","EXHAUST","LOAD"];
+const MODES = { HAND:"হাতে", TIME:"সময়", LDR:"আলো" };
+const NCH = 16;
+
+// নতুন যন্ত্রের শুরুর সাজ — মালিক পরে নিজের মতো বদলে নেবেন
+function defaultChannels(){
+  const out = [];
+  for (let i = 1; i <= NCH; i++){
+    let type = "LOAD";
+    if (i <= 7)       type = "LIGHT";
+    else if (i <= 12) type = "FAN";
+    else if (i >= 15) type = "EXHAUST";
+    out.push({
+      slot: i,
+      name: TYPES[type].bn + " " + bn(i),
+      type: type,
+      mode: "HAND",          // শুরুতে সব হাতে — নিজে থেকে কিছু করবে না
+      onTime: "18:00",
+      offTime: "06:00"
+    });
+  }
+  return out;
+}
+
+/* ════════════ ৪. অবস্থা ════════════ */
+const ST = { user:null, placeRef:null, place:null };
+let DEVS = [];           // controllers
+let CUR  = null;         // এখন যে যন্ত্র দেখানো হচ্ছে
+let LIVE = {};           // controllerId → live নথি
+let SUBS = [];
+let FILTER = "ALL";
+const PENDING = {};      // "cid:slot" → true
+
+function stopLive(){ SUBS.forEach(function(u){ try{ u(); }catch(e){} }); SUBS = []; }
+
+/* ════════════ ৫. পাতা বদল ════════════ */
+function showPage(id){
+  document.querySelectorAll(".app .page").forEach(function(p){ p.classList.remove("active"); });
+  $(id).classList.add("active");
+  document.querySelectorAll(".navbtn").forEach(function(b){
+    b.classList.toggle("active", b.dataset.pg === id);
+  });
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll(".navbtn").forEach(function(b){
+  b.addEventListener("click", function(){ showPage(b.dataset.pg); });
+});
+
+function showAuth(id){
+  $("authWrap").style.display = "";
+  $("appWrap").style.display  = "none";
+  document.querySelectorAll("#authWrap .page").forEach(function(p){ p.classList.remove("active"); });
+  $(id).classList.add("active");
+  window.scrollTo(0, 0);
+}
+
+/* ════════════ ৬. লগইন / নিবন্ধন ════════════ */
+$("toForgot").addEventListener("click", function(){ showAuth("scrForgot"); });
+$("toReg").addEventListener("click",   function(){ showAuth("scrReg"); });
+document.querySelectorAll(".backLogin").forEach(function(a){
+  a.addEventListener("click", function(){ showAuth("scrLogin"); });
+});
+
+$("lgBtn").addEventListener("click", function(){
+  const btn = this, box = $("lgMsg");
+  clearMsg(box);
+  const em = $("lgEmail").value.trim(), pw = $("lgPass").value;
+  if (!em || !pw){ msg(box, "ইমেইল আর পাসওয়ার্ড দুইটাই দিন।"); return; }
+  if (!navigator.onLine){ msg(box, "লগইন করতে ইন্টারনেট লাগবে।"); return; }
+  busy(btn, true, "ঢুকছি…");
+  auth.signInWithEmailAndPassword(em, pw)
+    .then(function(){ busy(btn, false); })
+    .catch(function(e){ busy(btn, false); msg(box, bnError(e)); });
+});
+
+$("fgBtn").addEventListener("click", function(){
+  const btn = this, box = $("fgMsg");
+  clearMsg(box);
+  const em = $("fgEmail").value.trim();
+  if (!em){ msg(box, "ইমেইল লিখুন।"); return; }
+  busy(btn, true, "পাঠাচ্ছি…");
+  auth.sendPasswordResetEmail(em)
+    .then(function(){ busy(btn,false);
+      msg(box, "ইমেইলে লিংক পাঠানো হয়েছে। ইনবক্স আর স্প্যাম — দুই জায়গাতেই দেখুন।", "ok"); })
+    .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+});
+
+function validReg(v){
+  if (!v.name)  return "আপনার নাম লিখুন।";
+  if (!/^01[3-9]\d{8}$/.test(v.phone)) return "ফোন নম্বরটা ১১ সংখ্যার, 01 দিয়ে শুরু হবে।";
+  if (!v.email) return "ইমেইল লিখুন।";
+  if (v.pass.length < 6) return "পাসওয়ার্ড অন্তত ৬ অক্ষরের দিন।";
+  if (v.pass !== v.pass2) return "দুইবারের পাসওয়ার্ড এক হয়নি।";
+  if (!v.place) return "জায়গার নাম লিখুন।";
+  return null;
+}
+
+$("rgBtn").addEventListener("click", function(){
+  const btn = this, box = $("rgMsg");
+  clearMsg(box);
+  const v = {
+    name:$("rgName").value.trim(), phone:$("rgPhone").value.trim(),
+    email:$("rgEmail").value.trim(), pass:$("rgPass").value,
+    pass2:$("rgPass2").value, place:$("rgPlace").value.trim()
+  };
+  const bad = validReg(v);
+  if (bad){ msg(box, bad); return; }
+  if (!navigator.onLine){ msg(box, "নিবন্ধন করতে ইন্টারনেট লাগবে।"); return; }
+
+  busy(btn, true, "তৈরি হচ্ছে…");
+  auth.createUserWithEmailAndPassword(v.email, v.pass)
+    .then(function(cred){
+      // ⚠️ জায়গার নথি সবার আগে — ভেতরের সব নথির অনুমতি এটা দেখেই আসে
+      const uid = cred.user.uid;
+      const ref = db.collection("farms").doc();
+      return ref.set({
+        code:"P01", name:v.place, ownerUid:uid, memberUids:[],
+        kind:"PLACE",                 // খামার নয়, সাধারণ জায়গা
+        district:"", upazila:"", village:"",
+        houseState:"ACTIVE", emergencyStop:false, deviceBy:{},
+        createdAt:TS(), updatedAt:TS()
+      }).then(function(){ return { uid:uid, ref:ref }; });
+    })
+    .then(function(o){
+      return db.collection("users").doc(o.uid).set({
+        email:v.email, name:v.name, phone:v.phone,
+        primaryFarmId:o.ref.id, createdAt:TS(), updatedAt:TS()
+      });
+    })
+    .then(function(){ busy(btn,false); msg(box, "✅ হয়ে গেছে!", "ok"); })
+    .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
+});
+
+$("stOut").addEventListener("click", function(){
+  stopLive();
+  auth.signOut();
+});
+
+/* ════════════ ৭. তথ্য আনা ════════════ */
+function loadAll(user){
+  ST.user = user;
+  $("stName").textContent  = "…";
+  $("stEmail").textContent = user.email || "";
+
+  db.collection("users").doc(user.uid).get()
+    .then(function(d){
+      const u = (d.exists && d.data()) || {};
+      $("stName").textContent = u.name || "—";
+      if (u.primaryFarmId) return db.collection("farms").doc(u.primaryFarmId).get();
+      return db.collection("farms").where("ownerUid","==",user.uid).limit(1).get()
+               .then(function(s){ return s.empty ? null : s.docs[0]; });
+    })
+    .then(function(fd){
+      if (!fd || !fd.exists){
+        $("stSub").textContent = "জায়গা পাওয়া যায়নি — নিবন্ধন পুরোপুরি শেষ হয়নি।";
+        paintAll();
+        return;
+      }
+      ST.placeRef = fd.ref; ST.place = fd.data();
+      $("stSub").textContent = ST.place.name || "জায়গা";
+      $("hdSub").textContent = ST.place.name || "১৬ চ্যানেল কন্ট্রোলার";
+      return loadDevs();
+    })
+    .catch(function(e){ msg($("swMsg"), bnError(e)); });
+}
+
+function loadDevs(){
+  return ST.placeRef.collection("controllers").get().then(function(snap){
+    DEVS = [];
+    snap.forEach(function(d){
+      const o = d.data(); o.__id = d.id; o.__ref = d.ref;
+      DEVS.push(o);
+    });
+    DEVS.sort(function(a,b){ return a.__id < b.__id ? -1 : 1; });
+    if (!CUR || !DEVS.some(function(d){ return d.__id === CUR; }))
+      CUR = DEVS.length ? DEVS[0].__id : null;
+    subscribeLive();
+    paintAll();
+  });
+}
+
+function subscribeLive(){
+  stopLive();
+  LIVE = {};
+  DEVS.forEach(function(d){
+    const u = ST.placeRef.collection("live").doc(d.__id).onSnapshot(
+      function(s){ LIVE[d.__id] = s.exists ? s.data() : null; paintAll(); },
+      function(){ LIVE[d.__id] = null; paintAll(); }
+    );
+    SUBS.push(u);
+  });
+}
+
+function curDev(){
+  for (let i = 0; i < DEVS.length; i++) if (DEVS[i].__id === CUR) return DEVS[i];
+  return null;
+}
+
+/* যন্ত্রের খবর কত পুরনো। ১৫ মিনিটের বেশি হলে "বাসি" ধরা হয় —
+   ⚠️ যন্ত্র ৫ মিনিট পরপর খবর পাঠায়, তাই ১৫ মিনিট মানে তিনবার মিস। */
+function liveAge(cid){
+  const l = LIVE[cid];
+  if (!l || !l.at) return null;
+  const t = (typeof l.at === "string") ? Date.parse(l.at)
+          : (l.at.toDate ? l.at.toDate().getTime() : null);
+  if (!t || isNaN(t)) return null;
+  return Date.now() - t;
+}
+function isStale(cid){
+  const a = liveAge(cid);
+  return a == null || a > 15 * 60 * 1000;
+}
+
+/* চ্যানেলটা এখন চালু কিনা — **যন্ত্র যা বলছে সেটাই**, অ্যাপের ধারণা নয়।
+   ⚠️ এখানে নিজেদের একটা হিসাব রাখলে অ্যাপ মিথ্যা বলত: গ্রাহক ON চাপলেন,
+      অ্যাপ সবুজ দেখাল, অথচ যন্ত্রে বিদ্যুৎ নেই। */
+function chOn(cid, slot){
+  const l = LIVE[cid];
+  if (!l || !l.outputs) return null;            // জানা নেই
+  const v = l.outputs[String(slot)];
+  if (v === undefined || v === null) return null;
+  return !!(v === true || v === "ON" || v === 1);
+}
+
+/* ════════════ ৮. সুইচের পাতা ════════════ */
+function paintFilters(){
+  const el = $("filters"); el.innerHTML = "";
+  const list = [["ALL","সব"]].concat(TYPE_ORDER.map(function(t){ return [t, TYPES[t].bn]; }));
+  list.forEach(function(p){
+    const b = document.createElement("button");
+    b.className = "filter" + (FILTER === p[0] ? " active" : "");
+    b.textContent = p[1];
+    b.addEventListener("click", function(){ FILTER = p[0]; paintSwitches(); });
+    el.appendChild(b);
+  });
+}
+
+function paintSwitches(){
+  paintFilters();
+  const grid = $("switchGrid"); grid.innerHTML = "";
+  const d = curDev();
+
+  if (!d){
+    $("swHint").textContent = "এখনো কোনো যন্ত্র যুক্ত হয়নি।";
+    $("allOn").disabled = $("allOff").disabled = true;
+    const c = document.createElement("div");
+    c.className = "card"; c.style.gridColumn = "1 / -1";
+    c.innerHTML = "<b>যন্ত্র যোগ করুন</b>"
+      + "<p class='hint'>সেটিংস পাতায় গিয়ে সিরিয়াল নম্বর আর দখল-কোড বসান।</p>";
+    grid.appendChild(c);
+    return;
+  }
+
+  $("allOn").disabled = $("allOff").disabled = false;
+  const stale = isStale(d.__id);
+  $("swHint").textContent = stale
+    ? "⚠️ যন্ত্রের খবর আসছে না — নিচের অবস্থা পুরনো হতে পারে।"
+    : "প্রতিটা লাইন আলাদা চালু-বন্ধ। সময় বা আলো অনুযায়ী নিজে থেকেও চলবে।";
+
+  const chans = d.outputs || [];
+  chans.filter(function(c){ return FILTER === "ALL" || c.type === FILTER; })
+       .forEach(function(c){ grid.appendChild(cardFor(d, c, stale)); });
+
+  if (!grid.children.length){
+    const c = document.createElement("div");
+    c.className = "card"; c.style.gridColumn = "1 / -1";
+    c.innerHTML = "<p class='hint' style='margin:0'>এই ধরনের কোনো চ্যানেল নেই।</p>";
+    grid.appendChild(c);
+  }
+}
+
+function cardFor(d, c, stale){
+  const on   = chOn(d.__id, c.slot);
+  const key  = d.__id + ":" + c.slot;
+  const wait = !!PENDING[key];
+  const t    = TYPES[c.type] || TYPES.LOAD;
+
+  const card = document.createElement("div");
+  card.className = "card switch-card" + (stale ? " stale" : "");
+
+  const head = document.createElement("div");
+  head.className = "switch-head";
+  const left = document.createElement("div");
+  left.innerHTML = "<div class='icon'>" + t.icon + "</div>";
+  const nm = document.createElement("div");
+  nm.className = "name"; nm.textContent = c.name || (t.bn + " " + bn(c.slot));
+  const no = document.createElement("div");
+  no.className = "chno"; no.textContent = "চ্যানেল " + bn(c.slot);
+  left.appendChild(nm); left.appendChild(no);
+  const bdg = document.createElement("span");
+  bdg.className = "badge " + (on === null ? "warn" : (on ? "ok" : "no"));
+  bdg.textContent = on === null ? "?" : (on ? "চালু" : "বন্ধ");
+  head.appendChild(left); head.appendChild(bdg);
+  card.appendChild(head);
+
+  const st = document.createElement("div");
+  st.className = "status " + (on ? "on" : "off");
+  st.textContent = wait ? "● পাঠানো হচ্ছে…"
+                 : on === null ? "● যন্ত্র এখনো জানায়নি"
+                 : on ? "● চালু আছে" : "● বন্ধ আছে";
+  card.appendChild(st);
+
+  const row = document.createElement("div");
+  row.className = "row";
+  const bOn  = document.createElement("button");
+  bOn.className = "btn onbtn" + (on === true ? " sel" : "");
+  bOn.textContent = "চালু"; bOn.disabled = wait;
+  bOn.addEventListener("click", function(){ sendCmd(d, c, "ON"); });
+  const bOff = document.createElement("button");
+  bOff.className = "btn offbtn" + (on === false ? " sel" : "");
+  bOff.textContent = "বন্ধ"; bOff.disabled = wait;
+  bOff.addEventListener("click", function(){ sendCmd(d, c, "OFF"); });
+  const bMore = document.createElement("button");
+  bMore.className = "btn ghost"; bMore.textContent = "⚙";
+  bMore.style.flex = "0 0 48px";
+  bMore.addEventListener("click", function(){
+    const b = $("box-" + d.__id + "-" + c.slot);
+    b.classList.toggle("open");
+  });
+  row.appendChild(bOn); row.appendChild(bOff); row.appendChild(bMore);
+  card.appendChild(row);
+
+  /* ───── কীভাবে চলবে ─────
+     ⚠️ আগের নকশায় "LDR LOCKED / ALLOW" ছিল — গ্রাহক বুঝত না, আর
+        দিনে হাতে জ্বালালে LDR আবার নিভিয়ে দিত। এখন একটা চ্যানেলের
+        একটাই অবস্থা, আর সেটা পর্দায় লেখা থাকে।                     */
+  const modes = document.createElement("div");
+  modes.className = "modes";
+  Object.keys(MODES).forEach(function(m){
+    const b = document.createElement("button");
+    b.className = "mode" + ((c.mode || "HAND") === m ? " active" : "");
+    b.textContent = MODES[m];
+    b.addEventListener("click", function(){ setMode(d, c, m); });
+    modes.appendChild(b);
+  });
+  card.appendChild(modes);
+
+  const box = document.createElement("div");
+  box.className = "schedule-box"; box.id = "box-" + d.__id + "-" + c.slot;
+
+  const lblN = document.createElement("label"); lblN.textContent = "এই লাইনের নাম";
+  const inN  = document.createElement("input");
+  inN.type = "text"; inN.maxLength = 30; inN.value = c.name || "";
+  box.appendChild(lblN); box.appendChild(inN);
+
+  const lblT = document.createElement("label"); lblT.textContent = "ধরন";
+  const selT = document.createElement("select");
+  TYPE_ORDER.forEach(function(k){
+    const o = document.createElement("option");
+    o.value = k; o.textContent = TYPES[k].icon + " " + TYPES[k].bn;
+    if (c.type === k) o.selected = true;
+    selT.appendChild(o);
+  });
+  box.appendChild(lblT); box.appendChild(selT);
+
+  const wrapTime = document.createElement("div");
+  wrapTime.style.display = (c.mode === "TIME") ? "" : "none";
+  const l1 = document.createElement("label"); l1.textContent = "চালু হবে";
+  const t1 = document.createElement("input"); t1.type = "time"; t1.value = c.onTime || "18:00";
+  const l2 = document.createElement("label"); l2.textContent = "বন্ধ হবে";
+  const t2 = document.createElement("input"); t2.type = "time"; t2.value = c.offTime || "06:00";
+  wrapTime.appendChild(l1); wrapTime.appendChild(t1);
+  wrapTime.appendChild(l2); wrapTime.appendChild(t2);
+  box.appendChild(wrapTime);
+
+  const note = document.createElement("div");
+  note.className = "hint";
+  note.textContent = modeNote(c.mode || "HAND");
+  box.appendChild(note);
+
+  const save = document.createElement("button");
+  save.className = "btn"; save.textContent = "সংরক্ষণ করুন";
+  save.style.marginTop = "14px";
+  save.addEventListener("click", function(){
+    saveChannel(d, c, {
+      name: inN.value.trim() || c.name,
+      type: selT.value,
+      onTime: t1.value || "18:00",
+      offTime: t2.value || "06:00"
+    }, save);
+  });
+  box.appendChild(save);
+
+  const smsg = document.createElement("div");
+  smsg.className = "msg"; smsg.id = "msg-" + d.__id + "-" + c.slot;
+  box.appendChild(smsg);
+
+  card.appendChild(box);
+  return card;
+}
+
+function modeNote(m){
+  if (m === "TIME") return "ঠিক করা সময়ে নিজে থেকে চালু-বন্ধ হবে। "
+                         + "হাতে চাপ দিলে সেটা পরের নির্ধারিত সময় পর্যন্ত টিকবে।";
+  if (m === "LDR")  return "সন্ধ্যা হলে নিজে থেকে চালু, ভোর হলে বন্ধ। "
+                         + "হাতে চাপ দিলে সেটা পরের সন্ধ্যা বা ভোর পর্যন্ত টিকবে।";
+  return "শুধু হাতে — অ্যাপ থেকে চাপ না দিলে নিজে থেকে কিছু হবে না।";
+}
+
+/* ════════════ ৯. আদেশ পাঠানো ════════════
+   ⚠️ অ্যাপ সরাসরি অবস্থা লেখে না। আদেশ জমা দেয়, যন্ত্র সেটা পড়ে
+      কাজ করে, তারপর নিজের অবস্থা জানায়। নইলে যন্ত্রে বিদ্যুৎ না
+      থাকলেও অ্যাপ সবুজ দেখাত — আর গ্রাহক ভাবতেন কাজ হয়েছে।      */
+function sendCmd(d, c, action){
+  const box = $("swMsg");
+  clearMsg(box);
+  if (!navigator.onLine){ msg(box, "আদেশ পাঠাতে ইন্টারনেট লাগবে।"); return; }
+
+  const key = d.__id + ":" + c.slot;
+  if (PENDING[key]) return;
+  PENDING[key] = true; paintSwitches();
+
+  // পুরনো আদেশ ২৪ ঘণ্টায় বাতিল — যন্ত্র বহুদিন বন্ধ থাকলে
+  // চালু হয়েই যেন বাসি আদেশ মেনে না বসে
+  const exp = new Date(Date.now() + 24*3600*1000);
+  ST.placeRef.collection("commands").add({
+    controllerId: d.__id,
+    slot: c.slot, name: c.name, type: c.type,
+    action: action,
+    status: "PENDING",
+    requestedBy: ST.user.uid,
+    createdAt: TS(),
+    expiresAt: firebase.firestore.Timestamp.fromDate(exp)
+  })
+  .then(function(){
+    msg(box, "✅ " + c.name + " " + (action === "ON" ? "চালু" : "বন্ধ")
+           + " করতে বলা হয়েছে। যন্ত্র নেট পেলেই করবে।", "ok");
+  })
+  .catch(function(e){ msg(box, bnError(e)); })
+  .then(function(){
+    // ⚠️ সাথে সাথে নয় — যন্ত্রের উত্তর আসতে কয়েক সেকেন্ড লাগে।
+    //    আগেই খুলে দিলে গ্রাহক দুইবার চাপতেন।
+    setTimeout(function(){ delete PENDING[key]; paintSwitches(); }, 6000);
+  });
+}
+
+$("allOn").addEventListener("click",  function(){ sendAll("ON"); });
+$("allOff").addEventListener("click", function(){ sendAll("OFF"); });
+
+function sendAll(action){
+  const d = curDev(), box = $("swMsg");
+  clearMsg(box);
+  if (!d) return;
+  if (!navigator.onLine){ msg(box, "আদেশ পাঠাতে ইন্টারনেট লাগবে।"); return; }
+
+  const exp = new Date(Date.now() + 24*3600*1000);
+  const bt  = db.batch();
+  (d.outputs || []).forEach(function(c){
+    bt.set(ST.placeRef.collection("commands").doc(), {
+      controllerId: d.__id,
+      slot: c.slot, name: c.name, type: c.type,
+      action: action, status: "PENDING",
+      requestedBy: ST.user.uid, createdAt: TS(),
+      expiresAt: firebase.firestore.Timestamp.fromDate(exp)
+    });
+  });
+  bt.commit()
+    .then(function(){
+      msg(box, "✅ সব লাইন " + (action === "ON" ? "চালু" : "বন্ধ")
+             + " করতে বলা হয়েছে।\nযন্ত্র একটা একটা করে বদলাবে — "
+             + "সবগুলো হতে কয়েক সেকেন্ড লাগবে।", "ok");
+    })
+    .catch(function(e){ msg(box, bnError(e)); });
+}
+
+/* ════════════ ১০. চ্যানেলের সেটিংস ════════════ */
+function setMode(d, c, m){
+  const outs = (d.outputs || []).map(function(x){
+    return (x.slot === c.slot) ? Object.assign({}, x, { mode:m }) : x;
+  });
+  d.outputs = outs;
+  paintSwitches();
+  const b = $("box-" + d.__id + "-" + c.slot);
+  if (b) b.classList.add("open");                 // খোলা রাখি, যাতে সময় বসাতে পারেন
+  d.__ref.update({ outputs: outs, updatedAt: TS() })
+    .catch(function(e){ msg($("swMsg"), bnError(e)); });
+}
+
+function saveChannel(d, c, patch, btn){
+  const box = $("msg-" + d.__id + "-" + c.slot);
+  clearMsg(box);
+  const outs = (d.outputs || []).map(function(x){
+    return (x.slot === c.slot) ? Object.assign({}, x, patch) : x;
+  });
+  busy(btn, true, "সংরক্ষণ হচ্ছে…");
+  d.__ref.update({ outputs: outs, updatedAt: TS() })
+    .then(function(){
+      d.outputs = outs;
+      busy(btn, false);
+      msg(box, "✅ সংরক্ষণ হয়েছে।", "ok");
+      setTimeout(paintSwitches, 700);
+    })
+    .catch(function(e){ busy(btn, false); msg(box, bnError(e)); });
+}
+
+/* ════════════ ১১. পরিবেশের পাতা ════════════ */
+function paintEnv(){
+  const g = $("sensorGrid"); g.innerHTML = "";
+  const d = curDev();
+  const l = d ? LIVE[d.__id] : null;
+  const s = (l && l.sensors) || {};
+
+  function val(o){
+    if (!o) return null;
+    if (typeof o === "number") return o;
+    return (o.value === undefined || o.value === null) ? null : o.value;
+  }
+  const rows = [
+    ["🌡️ তাপমাত্রা", val(s.temp), "°C", 1],
+    ["💧 আর্দ্রতা",   val(s.hum),  "%",  0],
+    ["🧪 অ্যামোনিয়া", val(s.nh3),  " ppm", 0]
+  ];
+  let any = false;
+  rows.forEach(function(r){
+    if (r[1] == null && r[0].indexOf("অ্যামোনিয়া") >= 0) return;  // সেন্সর নেই — দেখাবই না
+    const c = document.createElement("div");
+    c.className = "card sensor";
+    const have = r[1] != null;
+    if (have) any = true;
+    c.innerHTML = "<div>" + r[0] + "</div>"
+      + "<div class='big'>" + (have ? bn(Number(r[1]).toFixed(r[3])) : "—") + "</div>"
+      + "<div class='unit'>" + r[2] + "</div>"
+      + "<div class='dot " + (have ? "ok" : "no") + "'>● "
+      + (have ? "পাওয়া যাচ্ছে" : "সেন্সর নেই") + "</div>";
+    g.appendChild(c);
+  });
+
+  const n = $("envNote");
+  if (!d)            n.textContent = "যন্ত্র যুক্ত হলে এখানে খবর আসবে।";
+  else if (!any)     n.textContent = "এই যন্ত্রে কোনো সেন্সর বসানো নেই, "
+                                   + "অথবা এখনো খবর আসেনি।";
+  else if (isStale(d.__id)) n.textContent = "⚠️ খবরটা পুরনো — " + fmtAge(liveAge(d.__id))
+                                   + " আসা। যন্ত্রের নেট আছে কিনা দেখুন।";
+  else               n.textContent = "শেষ খবর " + fmtAge(liveAge(d.__id))
+                                   + "। সেন্সরগুলো শুধু দেখার জন্য — "
+                                   + "সুইচ এগুলো দেখে নিজে থেকে চলে না।";
+}
+
+/* ════════════ ১২. সেটিংসের পাতা ════════════ */
+function paintSettings(){
+  const d = curDev();
+  const l = d ? LIVE[d.__id] : null;
+
+  const on = navigator.onLine;
+  $("stNet").className   = "badge " + (on ? "ok" : "no");
+  $("stNet").textContent = on ? "আছে" : "নেই";
+
+  if (!d){
+    $("stSeen").className = "badge no";  $("stSeen").textContent = "যন্ত্র নেই";
+    $("stSeenSub").textContent = "এখনো কোনো যন্ত্র যুক্ত হয়নি";
+    $("stClock").className = "badge no"; $("stClock").textContent = "—";
+  } else {
+    const age = liveAge(d.__id);
+    const stale = isStale(d.__id);
+    $("stSeen").className   = "badge " + (age == null ? "no" : (stale ? "warn" : "ok"));
+    $("stSeen").textContent = age == null ? "আসেনি" : (stale ? "পুরনো" : "আসছে");
+    $("stSeenSub").textContent = age == null ? "যন্ত্র এখনো সাড়া দেয়নি"
+                                             : "শেষ খবর " + fmtAge(age);
+    // ⚠️ ঘড়ি ঠিক না থাকলে সময়সূচি চলবে না — এটা লুকানো যাবে না
+    const okClock = l && (l.rtcOk === true || l.clockSource === "RTC" || l.clockSource === "NTP");
+    $("stClock").className   = "badge " + (l ? (okClock ? "ok" : "no") : "no");
+    $("stClock").textContent = !l ? "—" : (okClock ? "ঠিক আছে" : "ঠিক নেই");
+  }
+
+  const box = $("devList"); box.innerHTML = "";
+  if (!DEVS.length){
+    box.innerHTML = "<p class='hint' style='margin:0'>এখনো কোনো যন্ত্র যুক্ত হয়নি।</p>";
+    return;
+  }
+  DEVS.forEach(function(x){
+    const row = document.createElement("div");
+    row.className = "item";
+    const age = liveAge(x.__id);
+    row.innerHTML = "<div><b>" + (x.name || x.__id) + "</b>"
+      + "<div class='sub'>" + (x.serial || "—") + "</div></div>";
+    const b = document.createElement("span");
+    b.className = "badge " + (age == null ? "no" : (isStale(x.__id) ? "warn" : "ok"));
+    b.textContent = age == null ? "সাড়া দেয়নি" : fmtAge(age);
+    row.appendChild(b);
+    row.style.cursor = "pointer";
+    row.addEventListener("click", function(){ renameDev(x); });
+    box.appendChild(row);
+  });
+}
+
+function renameDev(x){
+  const nm = window.prompt("যন্ত্রের নাম", x.name || "");
+  if (nm === null) return;
+  const v = nm.trim();
+  if (!v) return;
+  x.__ref.update({ name:v, updatedAt:TS() })
+    .then(function(){ x.name = v; paintAll(); })
+    .catch(function(e){ msg($("dvMsg"), bnError(e)); });
+}
+
+/* ════════════ ১৩. যন্ত্র যোগ ════════════ */
+$("addDevBtn").addEventListener("click", function(){
+  const c = $("addDevCard");
+  const open = c.style.display === "";
+  c.style.display = open ? "none" : "";
+  if (!open){
+    clearMsg($("dvMsg"));
+    $("dvSerial").value = ""; $("dvCode").value = ""; $("dvName").value = "";
+    setTimeout(function(){ try{ $("dvSerial").focus(); }catch(e){} }, 200);
+  }
+});
+
+$("dvClaim").addEventListener("click", function(){
+  const btn = this, box = $("dvMsg");
+  clearMsg(box);
+  if (!ST.placeRef){ msg(box, "আগে জায়গা তৈরি হতে হবে।"); return; }
+  const serial = $("dvSerial").value.trim().toUpperCase();
+  const code   = $("dvCode").value.trim().toUpperCase();
+  if (!serial){ msg(box, "সিরিয়াল নম্বর লিখুন।"); return; }
+  if (!code){ msg(box, "দখল-কোড লিখুন।"); return; }
+  if (!navigator.onLine){ msg(box, "যন্ত্র যোগ করতে ইন্টারনেট লাগবে।"); return; }
+
+  // পরের খালি নম্বর
+  let n = 1;
+  const used = {}; DEVS.forEach(function(d){ used[d.__id] = 1; });
+  while (used["C" + (n < 10 ? "0" + n : n)]) n++;
+  const cid = "C" + (n < 10 ? "0" + n : n);
+
+  busy(btn, true, "মিলিয়ে দেখছি…");
+
+  /* ⚠️ তিনটা লেখা একসাথেই — একটা হয়ে আরেকটা বাদ গেলে যন্ত্র নিজের
+     জায়গা জেনে ফেলত, কিন্তু জায়গার তালিকায় তার নাম উঠত না। তখন
+     নিয়ম তাকে চিনত না, আর যন্ত্র জেনে ফেলেছে বলে আর জিজ্ঞেসও করত
+     না — চিরকাল আটকে থাকত। batch হলো সব-নয়তো-কিছুই-না।          */
+  const bt = db.batch();
+
+  bt.update(db.collection("devices").doc(serial), {
+    serial: serial, claimCode: code, status: "CLAIMED",
+    claimedByUid: ST.user.uid, farmId: ST.placeRef.id,
+    controllerId: cid, claimedAt: TS()
+  });
+
+  const patch = {};
+  patch["deviceBy." + cid] = devEmail(serial);
+  bt.update(ST.placeRef, patch);
+
+  const typed = $("dvName").value.trim();
+  bt.set(ST.placeRef.collection("controllers").doc(cid), {
+    name: typed || ("বোর্ড " + bn(DEVS.length + 1)),
+    code: (ST.place && ST.place.code ? ST.place.code : "P01") + "-" + cid,
+    serial: serial, model: "SWITCH16", deviceType: "SWITCH",
+    outputs: defaultChannels(),
+    firmwareVersion: null, status: "UNKNOWN", lastSeenAt: null, lastIp: null,
+    rtcOk: null, clockSource: "UNKNOWN",
+    createdAt: TS(), updatedAt: TS()
+  });
+
+  bt.commit()
+    .then(function(){
+      busy(btn, false);
+      // ⚠️ "চালু হয়ে গেছে" লেখা যাবে না — যন্ত্র পরের আধ মিনিটে নিজের
+      //    পরিচয় জেনে নেবে। নইলে গ্রাহক তখনই তাকিয়ে ভাববেন কাজ হয়নি।
+      msg(box, "✅ যন্ত্রটা আপনার নামে হয়ে গেছে।\n"
+             + "যন্ত্রের পর্দায় আধ মিনিটের মধ্যে দখলের খবর দেখাবে। "
+             + "যন্ত্রে ওয়াইফাই না থাকলে আগে ওয়াইফাই দিন।", "ok");
+      $("dvSerial").value = ""; $("dvCode").value = ""; $("dvName").value = "";
+      CUR = cid;
+      return loadDevs();
+    })
+    .catch(function(e){
+      busy(btn, false);
+      if (e && e.code === "permission-denied")
+        msg(box, "সিরিয়াল বা দখল-কোড মিলছে না। অথবা যন্ত্রটা আগেই কারও নামে নেওয়া হয়েছে।");
+      else msg(box, bnError(e));
+    });
+});
+
+/* ════════════ ১৪. সব আঁকা ════════════ */
+function paintAll(){ paintSwitches(); paintEnv(); paintSettings(); }
+
+window.addEventListener("online",  paintAll);
+window.addEventListener("offline", paintAll);
+
+auth.onAuthStateChanged(function(user){
+  if (user){
+    $("authWrap").style.display = "none";
+    $("appWrap").style.display  = "";
+    showPage("switches");
+    loadAll(user);
+  } else {
+    stopLive();
+    DEVS = []; LIVE = {}; CUR = null;
+    ST.user = ST.place = ST.placeRef = null;
+    showAuth("scrLogin");
+  }
+});
+
+})();
+</script>
+</body>
+</html>
