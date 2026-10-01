@@ -74,6 +74,9 @@
   .linkrow{text-align:center;margin-top:14px;font-size:14px}
   .linkrow a{color:var(--green);font-weight:600;text-decoration:none;cursor:pointer}
 
+  /* হোমের একদম নিচের বোতাম — কার্ড নয়, বোতাম, যাতে "এটা চাপা যায়" বোঝা যায় */
+  .addDev{margin-top:4px}
+  @media(min-width:700px){ #scrHome.on > .addDev{grid-column:1 / -1} }
   .msg{margin-top:14px;padding:11px 12px;border-radius:9px;font-size:14px;display:none;white-space:pre-line}
   .msg.err{display:block;background:#fdecea;color:var(--danger);border:1px solid #f5c6c0}
   .msg.ok{display:block;background:var(--green-l);color:var(--green);border:1px solid #bfe3ce}
@@ -292,6 +295,10 @@
       <p class="sub" id="hmSchedSub" style="margin:0">—</p>
     </div>
 
+    <!-- একদম নিচে, সবকিছুর পরে। নতুন যন্ত্র বানিয়ে যোগ করার কাজটা
+         রোজকার নয় — তাই উপরে না রেখে নিচে, কিন্তু স্পষ্ট বড় বোতামে। -->
+    <button class="btn addDev" id="hmAddDev">+ নতুন যন্ত্র যোগ করুন</button>
+
   </section>
 
   <!-- ══════ ড্যাশবোর্ড ══════ -->
@@ -340,6 +347,11 @@
       <input id="dvSerial" type="text" autocapitalize="characters" placeholder="HBP-0001-7">
       <label for="dvCode">দখল-কোড</label>
       <input id="dvCode" type="text" autocapitalize="characters" placeholder="বাক্সের কাগজে লেখা">
+      <label for="dvName">ঘরের নাম</label>
+      <input id="dvName" type="text" maxlength="30" placeholder="যেমন: উত্তরের ঘর">
+      <div class="hint" style="margin:-4px 0 12px">
+        এই যন্ত্র যে ঘরটা চালাবে তার নাম। খালি রাখলে নিজে থেকে নাম বসে যাবে।
+      </div>
       <button class="btn" id="dvClaim">যন্ত্রটা আমার নামে নিন</button>
       <div class="msg" id="dvMsg"></div>
       <div class="hint">কোড একবারই চলে। ভুল লিখলে কিছুই হবে না — আবার চেষ্টা করতে পারবেন।</div>
@@ -558,7 +570,7 @@
     <div class="msg" id="hsMsg2"></div>
   </section>
 
-  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৯</span></div>
+  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">১.০</span></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -900,6 +912,10 @@
     paintSchedSummary();
     paintDevSummary();
 
+    // ⚠️ খামার তৈরি না হলে যন্ত্র যোগ করা যায় না — তখন বোতামটা
+    //    লুকানোই ভালো। দেখিয়ে রেখে চাপলে কিছু না হওয়াটা বিভ্রান্তিকর।
+    $("hmAddDev").style.display = ST.farm ? "" : "none";
+
     const box = $("hmHouses");
     box.innerHTML = "";
     if (!CTRLS.length){
@@ -937,6 +953,11 @@
     $("hmBatch").textContent = "";
     $("hmHouses").innerHTML  = "";
     clearMsg($("hmMsg"));
+    // ⚠️ খামার আসার আগে লুকানো থাকে। খামার না পাওয়া গেলে paintHome()
+    //    ডাকাই হয় না — তাই এখানে লুকিয়ে রাখা ছাড়া উপায় নেই, নইলে
+    //    "খামার পাওয়া যায়নি" পর্দাতেও বোতামটা বসে থাকত, আর চাপলে
+    //    কিছুই হতো না।
+    $("hmAddDev").style.display = "none";
 
     db.collection("users").doc(user.uid).get()
       .then(function(d){
@@ -1432,13 +1453,21 @@
     });
   }
 
-  $("hmDevCard").addEventListener("click", function(){
+  function openDevice(focus){
     if (!ST.farm) return;
     clearMsg($("dvMsg"));
-    $("dvSerial").value = ""; $("dvCode").value = "";
+    $("dvSerial").value = ""; $("dvCode").value = ""; $("dvName").value = "";
     paintDevList();
     show("scrDevice", { back: goHome, title:"যন্ত্র", sub: ST.farm.name || "" });
-  });
+    // ⚠️ focus() সাথে সাথে দিলে পর্দা বদলানোর সময় ফোনে কিবোর্ড
+    //    উঠে গিয়ে পাতাটা লাফিয়ে ওঠে। তাই একটু পরে।
+    if (focus) setTimeout(function(){ try { $("dvSerial").focus(); } catch(e){} }, 250);
+  }
+
+  $("hmDevCard").addEventListener("click", function(){ openDevice(false); });
+
+  // একদম নিচের বোতাম — একই পাতা, কিন্তু সরাসরি লেখার জন্য তৈরি
+  $("hmAddDev").addEventListener("click", function(){ openDevice(true); });
 
   $("dvClaim").addEventListener("click", function(){
     const btn = this, box = $("dvMsg");
@@ -1488,7 +1517,9 @@
 
     // ৩. খামারের ভেতরে ঘরের নথি — ১ হিটার · ৫ ফ্যান · ৫ আলো বসানো থাকে,
     //    মালিক পরে নিজের মতো বদলে নেবেন
-    const h = defaultHouse("ঘর " + bn(CTRLS.length + 1));
+    // খামারি নিজে নাম দিলে সেটাই, নইলে নিজে থেকে "ঘর ২", "ঘর ৩"…
+    const typed = $("dvName").value.trim();
+    const h = defaultHouse(typed || ("ঘর " + bn(CTRLS.length + 1)));
     h.code = (ST.farm.code || "F01") + "-" + cid;
     h.serial = serial; h.model = ""; h.firmwareVersion = null;
     h.status = "UNKNOWN"; h.lastSeenAt = null; h.lastIp = null;
@@ -1504,7 +1535,7 @@
       msg(box, "✅ যন্ত্রটা আপনার নামে হয়ে গেছে।\n"
              + "যন্ত্রের পর্দায় আধ মিনিটের মধ্যে “Dokhol: HOYECHE” দেখাবে। "
              + "যন্ত্রে ওয়াইফাই না থাকলে আগে ওয়াইফাই দিন।", "ok");
-      $("dvSerial").value = ""; $("dvCode").value = "";
+      $("dvSerial").value = ""; $("dvCode").value = ""; $("dvName").value = "";
       return loadHome(ST.user);
     })
     .catch(function(e){
