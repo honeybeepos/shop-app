@@ -74,7 +74,7 @@
   .linkrow{text-align:center;margin-top:14px;font-size:14px}
   .linkrow a{color:var(--green);font-weight:600;text-decoration:none;cursor:pointer}
 
-  .msg{margin-top:14px;padding:11px 12px;border-radius:9px;font-size:14px;display:none}
+  .msg{margin-top:14px;padding:11px 12px;border-radius:9px;font-size:14px;display:none;white-space:pre-line}
   .msg.err{display:block;background:#fdecea;color:var(--danger);border:1px solid #f5c6c0}
   .msg.ok{display:block;background:var(--green-l);color:var(--green);border:1px solid #bfe3ce}
   .msg.info{display:block;background:#fff6e0;color:#7a5600;border:1px solid #f2dfae}
@@ -558,7 +558,7 @@
     <div class="msg" id="hsMsg2"></div>
   </section>
 
-  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৮</span></div>
+  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৯</span></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -699,10 +699,13 @@
   // ESP32-তে নিরাপদে আউটপুট দেওয়া যায় এমন পিন। স্ট্র্যাপিং পিন
   // (০·২·৫·১২·১৫) বাদ, ৩৪–৩৯ শুধু ইনপুট, আর ২১·২২ I2C-তে
   // (ডিসপ্লে + ঘড়ি) — তাই সেগুলোও বাদ।
-  // ⚠️ সাইরেনের পিনটা এই তালিকায় রাখা যাবে না।
-  //    আগে GPIO32 দুই জায়গাতেই ছিল — ১২টা আউটপুট বসালে ১২ নম্বর রিলে
-  //    আর সাইরেন একই তারে পড়ত, অথচ অ্যাপ সবুজ টিক দেখাত।
-  const PINS = [4, 13, 14, 16, 17, 18, 19, 23, 25, 26, 27, 33];
+  // ⚠️ এই তালিকাটা ফার্মওয়্যারের hb_config.h-এর সাথে হুবহু মিলতে হবে।
+  //    দুই জায়গায় দুই কথা থাকলে অ্যাপ এক পিন দেখাবে, যন্ত্র আরেকটা
+  //    নাড়াবে — আর ইলেকট্রিশিয়ান ভুল তারে রিলে লাগাবেন।
+  //
+  //    সাইরেন GPIO32-এ, আর পাঁচটা বোতাম 33·34·35·36·39-এ। ওগুলো
+  //    এখানে থাকতে পারবে না।
+  const PINS = [4, 13, 14, 16, 17, 18, 19, 23, 25, 26, 27];
   const PIN_SIREN = 32;
 
   const MAX_FAN = 8, MAX_LIGHT = 8;
@@ -1453,8 +1456,20 @@
     const cid = "C" + (n<10 ? "0"+n : n);
 
     busy(btn, true, "মিলিয়ে দেখছি…");
-    // কোড ঠিক হলেই কেবল এই লেখাটা হবে — ভুল হলে নিয়ম আটকে দেবে
-    db.collection("devices").doc(serial).update({
+
+    /* ⚠️ তিনটা লেখা **একসাথেই** হতে হবে — একটা হয়ে আরেকটা বাদ গেলে
+       যন্ত্রটা চিরকাল আটকে থাকত।
+
+       আগে একটার পর একটা লিখতাম। মাঝপথে নেট গেলে যা হতো:
+         • `devices/` লেখা হয়ে গেছে — যন্ত্র নিজের খামার জেনে ফেলেছে
+         • কিন্তু খামারের `deviceBy` তালিকায় তার নাম ওঠেনি
+         • ফলে নিয়ম তাকে চিনত না, সব অনুরোধ আটকে দিত
+         • আর যন্ত্র জেনে ফেলেছে বলে আর কখনো জিজ্ঞেসও করত না
+       batch হলো সব-নয়তো-কিছুই-না। মাঝপথ নেই।                      */
+    const bt = db.batch();
+
+    // ১. যন্ত্রের নথি — কোড ঠিক হলেই কেবল এটা হবে, ভুল হলে নিয়ম আটকে দেবে
+    bt.update(db.collection("devices").doc(serial), {
       serial: serial,
       claimCode: code,
       status: "CLAIMED",
@@ -1462,29 +1477,33 @@
       farmId: ST.farmRef.id,
       controllerId: cid,
       claimedAt: TS()
-    })
-    .then(function(){
-      // যন্ত্রটা যে ইমেইল দিয়ে ঢোকে, সেটা খামারের নথিতে লিখে রাখা।
-      // নিরাপত্তার নিয়ম এই তালিকা দেখেই যন্ত্রকে চেনে — সিরিয়াল থেকেই
-      // ইমেইলটা হিসাব করা যায়, আলাদা করে পড়তে হয় না।
-      const patch = {};
-      patch["deviceBy." + cid] = devEmail(serial);
-      return ST.farmRef.update(patch);
-    })
-    .then(function(){
-      // খামারের ভেতরে ঘরের নথি — ১ হিটার · ৫ ফ্যান · ৫ আলো বসানো থাকে,
-      // মালিক পরে নিজের মতো বদলে নেবেন
-      const h = defaultHouse("ঘর " + bn(CTRLS.length + 1));
-      h.code = (ST.farm.code || "F01") + "-" + cid;
-      h.serial = serial; h.model = ""; h.firmwareVersion = null;
-      h.status = "UNKNOWN"; h.lastSeenAt = null; h.lastIp = null;
-      h.rtcOk = null; h.clockSource = "UNKNOWN";
-      h.createdAt = TS(); h.updatedAt = TS();
-      return ST.farmRef.collection("controllers").doc(cid).set(h);
-    })
+    });
+
+    // ২. যন্ত্রটা যে ইমেইল দিয়ে ঢোকে, সেটা খামারের নথিতে লিখে রাখা।
+    //    নিরাপত্তার নিয়ম এই তালিকা দেখেই যন্ত্রকে চেনে — সিরিয়াল থেকেই
+    //    ইমেইলটা হিসাব করা যায়, আলাদা করে পড়তে হয় না।
+    const patch = {};
+    patch["deviceBy." + cid] = devEmail(serial);
+    bt.update(ST.farmRef, patch);
+
+    // ৩. খামারের ভেতরে ঘরের নথি — ১ হিটার · ৫ ফ্যান · ৫ আলো বসানো থাকে,
+    //    মালিক পরে নিজের মতো বদলে নেবেন
+    const h = defaultHouse("ঘর " + bn(CTRLS.length + 1));
+    h.code = (ST.farm.code || "F01") + "-" + cid;
+    h.serial = serial; h.model = ""; h.firmwareVersion = null;
+    h.status = "UNKNOWN"; h.lastSeenAt = null; h.lastIp = null;
+    h.rtcOk = null; h.clockSource = "UNKNOWN";
+    h.createdAt = TS(); h.updatedAt = TS();
+    bt.set(ST.farmRef.collection("controllers").doc(cid), h);
+
+    bt.commit()
     .then(function(){
       busy(btn,false);
-      msg(box, "✅ যন্ত্রটা আপনার নামে হয়ে গেছে।", "ok");
+      // ⚠️ "চালু হয়ে গেছে" লেখা যাবে না — যন্ত্র পরের ৩০ সেকেন্ডে নিজের
+      //    পরিচয় জেনে নেবে। নইলে গ্রাহক তখনই পর্দায় তাকিয়ে ভাববেন কাজ হয়নি।
+      msg(box, "✅ যন্ত্রটা আপনার নামে হয়ে গেছে।\n"
+             + "যন্ত্রের পর্দায় আধ মিনিটের মধ্যে “Dokhol: HOYECHE” দেখাবে। "
+             + "যন্ত্রে ওয়াইফাই না থাকলে আগে ওয়াইফাই দিন।", "ok");
       $("dvSerial").value = ""; $("dvCode").value = "";
       return loadHome(ST.user);
     })
