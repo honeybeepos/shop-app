@@ -20,8 +20,6 @@
     background:var(--bg); color:var(--ink); line-height:1.65; -webkit-text-size-adjust:100%;
   }
   .wrap{max-width:460px;margin:0 auto;padding:16px}
-  @media(min-width:900px){ .wrap{max-width:600px;padding:28px 16px} }
-
   /* ── উপরের বার ── */
   .top{display:flex;align-items:center;gap:10px;margin:10px 0 4px;min-height:44px}
   .top .bee{font-size:26px;line-height:1;flex:none}
@@ -47,6 +45,22 @@
   input:focus,select:focus{outline:2px solid var(--green);outline-offset:1px;border-color:var(--green)}
   input[disabled],select[disabled]{background:#f0f2f1;color:var(--muted)}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  /* ── বড় পর্দা: কম্পিউটারে কার্ডগুলো পাশাপাশি ──
+       ঘরের কার্ডগুলোকে পুরো চওড়া দিতে হবে, নইলে ভেতরের সুইচগুলো
+       একটার নিচে একটা হয়ে লম্বা হয়ে যায় আর ডান দিক ফাঁকা পড়ে থাকে। */
+  @media(min-width:900px){
+    .wrap{max-width:1080px;padding:28px 20px}
+    #scrHome.on, #scrDash.on{display:grid;grid-template-columns:1fr 1fr;
+                             gap:16px;align-items:start}
+    #scrHome.on > .card, #scrDash.on > .card{margin-top:0}
+    #scrHome .who, #dashMainCard, #dashEmptyCard,
+    #scrHome .card:nth-of-type(2){grid-column:1 / -1}
+    #dashZones{display:grid;gap:12px;
+               grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+    #dashZones .zcard{margin-top:0}
+    .msg{grid-column:1 / -1}
+  }
+
   @media(max-width:360px){ .row2{grid-template-columns:1fr} }
 
   .btn{width:100%;padding:13px;font:inherit;font-size:16px;font-weight:700;border:0;
@@ -82,7 +96,7 @@
   .userbar button{flex:none;padding:8px 12px;font:inherit;font-size:13px;font-weight:600;
                   border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer}
 
-  /* ── জোনের সারি ── */
+  /* ── ঘরের সারি ── */
   .zrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
   .zrow:last-child{border-bottom:0}
   .zrow:active{background:var(--green-l)}
@@ -114,6 +128,29 @@
   table.sched tr.today td.d{color:var(--green)}
   table.sched tr.today input{border-color:var(--green);background:var(--green-l)}
 
+  /* ── ঘরের ফর্ম: নামের সারি ও পিনের তালিকা ── */
+  .namerows{display:grid;gap:6px;margin:6px 0 2px}
+  .namerow{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:center}
+  .namerow .nn{font-size:12px;color:var(--muted);text-align:right;
+               font-variant-numeric:tabular-nums}
+  .namerow input{font-size:14px;padding:9px 10px}
+  .pinbox{margin-top:14px;padding:10px;border:1px solid var(--line);
+          border-radius:10px;background:#fafafa;font-size:12px}
+  .pinbox b{display:block;margin-bottom:6px;font-size:12px;color:var(--muted)}
+  .pinbox table{border-collapse:collapse;width:100%}
+  .pinbox td{padding:3px 6px 3px 0;border-bottom:1px solid var(--line)}
+  .pinbox td:first-child{width:38px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .pinbox td:nth-child(2){width:76px;color:var(--muted)}
+  .pinbox tr:last-child td{border-bottom:0}
+  .pinbox .ok2{margin-top:8px;color:var(--green)}
+  .pinbox .warn2{margin-top:8px;color:#9a6b00}
+
+  /* ── "নিজে চলবে" বড় সুইচ ── */
+  .autobtn{width:100%;margin-top:12px;padding:11px 12px;border-radius:10px;
+           border:1px solid var(--line);background:#fff;font-size:14px;
+           font-weight:600;font-family:inherit;cursor:pointer;text-align:center}
+  .autobtn.on{border-color:var(--green);background:var(--green-l);color:var(--green)}
+
   /* ── ড্যাশবোর্ড ── */
   .zcard{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px;background:#fff}
   .zcard h3{margin:0 0 2px;font-size:15px}
@@ -129,6 +166,9 @@
   .read.warn .v{color:var(--danger)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
   .chip{font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .chip{cursor:pointer;font-family:inherit;border-width:1px;border-style:solid}
+  .chip.lock{opacity:.72;cursor:default}
+  .chip.pend{opacity:.6;font-style:italic}
   .chip.on{background:var(--green-l);border-color:#bfe3ce;color:var(--green);font-weight:600}
   .devrow{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
   .devrow:last-child{border-bottom:0}
@@ -211,9 +251,6 @@
       <select id="rgUpa" disabled><option value="">— আগে জেলা বেছে নিন —</option></select>
       <label for="rgVill">গ্রাম / এলাকা <span class="opt">(ঐচ্ছিক)</span></label>
       <input id="rgVill" type="text" placeholder="যেমন: বরকামতা">
-      <label for="rgZones">কয়টা জোন (ঘর/ভাগ)</label>
-      <select id="rgZones"></select>
-      <div class="hint">এক ঘরের ভেতরেও কয়েকটা জোন হতে পারে। পরে বাড়ানো-কমানো যাবে।</div>
       <button class="btn" id="rgBtn">নিবন্ধন করুন</button>
       <div class="msg" id="rgMsg"></div>
       <div class="linkrow">অ্যাকাউন্ট আছে? <a class="backLogin">লগইন করুন</a></div>
@@ -234,10 +271,9 @@
     </div>
 
     <div class="card">
-      <h2>জোন</h2>
+      <h2>ঘর</h2>
       <p class="sub">নামের উপর চাপ দিলে ভেতরে যাবেন</p>
-      <div id="hmZones"></div>
-      <button class="btn ghost sm" id="hmAddZone">➕ নতুন জোন</button>
+      <div id="hmHouses"></div>
       <div class="msg" id="hmMsg"></div>
     </div>
 
@@ -256,9 +292,6 @@
       <p class="sub" id="hmSchedSub" style="margin:0">—</p>
     </div>
 
-    <div class="msg info" style="display:block">
-      ⚙️ যন্ত্র যোগ করা, তাপমাত্রা দেখা আর নিয়ন্ত্রণ — পরের ধাপে আসবে।
-    </div>
   </section>
 
   <!-- ══════ ড্যাশবোর্ড ══════ -->
@@ -290,7 +323,7 @@
       <div class="msg" id="dthMsg"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="dashMainCard">
       <h2 id="dashTitle">এখনকার অবস্থা</h2>
       <p class="sub" id="dashSub" style="margin:0">—</p>
       <div id="dashZones"></div>
@@ -457,42 +490,52 @@
     </div>
   </section>
 
-  <!-- ══════ জোনের ভেতরে ══════ -->
-  <section class="screen" id="scrZone">
+  <!-- ══════ ঘরের ভেতরে ══════ -->
+  <section class="screen" id="scrHouse">
     <div class="card">
-      <h2>জোনের তথ্য</h2>
-      <label for="znName">জোনের নাম</label>
-      <input id="znName" type="text">
-      <label for="znControl">এই জোনে যন্ত্র চালানো হবে?</label>
-      <select id="znControl">
-        <option value="1">হ্যাঁ — ফ্যান, হিটার সব চলবে</option>
-        <option value="0">না — শুধু তাপমাত্রা দেখা হবে</option>
-      </select>
-      <div class="hint">"না" দিলে এই জোনে কোনো রিলে নেই ধরা হবে।</div>
-    </div>
-
-    <div class="card" id="znDevCard">
-      <h2>রিলের স্লট</h2>
-      <p class="sub">কোন তারে কী লাগানো — ফ্যান বা আলো যতগুলো দরকার বসান</p>
-      <label for="znCount">রিলে বোর্ডে কয়টা স্লট</label>
-      <select id="znCount"></select>
-      <div class="hint" id="znPinNote"></div>
-      <div id="znSlots" style="margin-top:8px"></div>
+      <h2>ঘরের তথ্য</h2>
+      <label for="hsName">এই ঘরের নাম</label>
+      <input id="hsName" type="text" placeholder="যেমন: সামনের শেড">
+      <p class="hint" id="hsSerial"></p>
     </div>
 
     <div class="card">
-      <h2>তাপমাত্রার নিয়ম</h2>
-      <label for="znStrat">কোন থার্মোমিটার দেখে চলবে</label>
-      <select id="znStrat">
-        <option value="SAFE">নিরাপদ — গরম করার সময় সবচেয়ে ঠান্ডা, ঠান্ডা করার সময় সবচেয়ে গরম</option>
-        <option value="AVG">সবগুলোর গড়</option>
-        <option value="PRIMARY">শুধু প্রধান বিন্দুটা</option>
+      <h2>যন্ত্র নিজে চলবে?</h2>
+      <select id="hsAuto">
+        <option value="1">হ্যাঁ — সেন্সর দেখে হিটার-ফ্যান নিজে চলবে</option>
+        <option value="0">না — সব আমি হাতে চালাব</option>
       </select>
-      <label for="znGrad">ঘরের দুই মাথায় কত ডিগ্রি তফাত হলে সতর্ক করবে</label>
-      <input id="znGrad" type="number" inputmode="decimal" min="1" max="15" step="0.5">
+      <div class="hint" id="hsAutoNote"></div>
     </div>
 
-    <div class="card" id="znVentCard">
+    <div class="card">
+      <h2>এই ঘরে কী কী আছে</h2>
+
+      <label for="hsHeater">হিটার</label>
+      <select id="hsHeater">
+        <option value="1">আছে</option>
+        <option value="0">নেই</option>
+      </select>
+
+      <label for="hsFans">কয়টা ফ্যান</label>
+      <select id="hsFans"></select>
+      <div id="hsFanRows" class="namerows"></div>
+
+      <label for="hsLights">কয়টা আলো</label>
+      <select id="hsLights"></select>
+      <div id="hsLightRows" class="namerows"></div>
+      <div class="hint">আলো সবসময় হাতে চলবে — তাপমাত্রা দেখে নিজে জ্বলবে বা নিভবে না।</div>
+
+      <label for="hsMist">ফগার / মিস্ট <span class="opt">(থাকলে)</span></label>
+      <select id="hsMist">
+        <option value="0">নেই</option>
+        <option value="1">আছে</option>
+      </select>
+
+      <div class="pinbox" id="hsPins"></div>
+    </div>
+
+    <div class="card">
       <h2>ঘড়ি ধরে বাতাস</h2>
       <p class="sub">ঠান্ডার দিনেও ঘরে বাতাস বদলানো দরকার — নইলে লিটার ভিজে
          যায়, অ্যামোনিয়া জমে। বাণিজ্যিক খামার ঘড়ি ধরেই করে।</p>
@@ -510,12 +553,12 @@
       <div class="hint" id="mvNote"></div>
     </div>
 
-    <button class="btn" id="znSave">সেভ করুন</button>
-    <button class="btn danger sm" id="znDel">এই জোনটা মুছে ফেলুন</button>
-    <div class="msg" id="znMsg"></div>
+    <button class="btn" id="hsSave">সেভ করুন</button>
+    <button class="btn danger sm" id="hsDel">এই ঘরটা মুছে ফেলুন</button>
+    <div class="msg" id="hsMsg2"></div>
   </section>
 
-  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৭</span></div>
+  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">০.৮</span></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -604,7 +647,7 @@
   netPaint();
 
   /* ════════════ ৫. পর্দা বদল ════════════ */
-  const ST = { user:null, farmRef:null, farm:null, zones:[], zoneRef:null, zone:null };
+  const ST = { user:null, farmRef:null, farm:null, houseRef:null, house:null };
   let backTo = null;
 
   function show(id, opts){
@@ -649,42 +692,64 @@
       list.map(function(u){ return {v:u,label:u}; })), current);
   }
 
-  /* ════════════ ৭. যন্ত্রের ধরন ও পিন ════════════ */
-  const DEV_TYPES = [
-    { v:"",              label:"— খালি —" },
-    { v:"HEATER",        label:"হিটার" },
-    { v:"FAN",           label:"ফ্যান" },
-    { v:"MIST",          label:"মিস্ট" },
-    { v:"LIGHT",         label:"আলো" },
-    { v:"WATER",         label:"পানির পাম্প" },
-    { v:"FEEDER",        label:"খাবার" },
-    { v:"CURTAIN_OPEN",  label:"পর্দা খোলা" },
-    { v:"CURTAIN_CLOSE", label:"পর্দা বন্ধ" },
-    { v:"SWITCH",        label:"সুইচ (যা খুশি)" }
-  ];
-  // এই যন্ত্রগুলোর সাথে তাপমাত্রার সম্পর্ক নেই — যন্ত্রের বুদ্ধি
-  // কোনোদিন এগুলোয় হাত দেবে না
-  function alwaysManual(t){ return t === "SWITCH"; }
-  function typeLabel(v){
-    for (let i=0;i<DEV_TYPES.length;i++) if (DEV_TYPES[i].v === v) return DEV_TYPES[i].label;
-    return v || "খালি";
-  }
-  // ESP32-র নিরাপদ আউটপুট পিন। strapping (0,2,5,12,15), শুধু-ইনপুট (34-39)
-  // আর বাজারের পিন (4) বাদ দেওয়া হয়েছে।
-  const PINS = [25,26,27,14,18,13,19,23,16,17,21,22];
-  function pinOf(slot){ return (slot <= PINS.length) ? ("GPIO" + PINS[slot-1]) : "সম্প্রসারক"; }
+  /* ════════════ ৭. আউটপুট ও পিন ════════════ */
+  // ক১১-এর যন্ত্র: ১ হিটার · ৫ ফ্যান · ৫ আলো = ১১ আউটপুট।
+  // সংখ্যাগুলো বদলানো যায় — ছোট খামারে কম, বড়টায় বেশি।
+  //
+  // ESP32-তে নিরাপদে আউটপুট দেওয়া যায় এমন পিন। স্ট্র্যাপিং পিন
+  // (০·২·৫·১২·১৫) বাদ, ৩৪–৩৯ শুধু ইনপুট, আর ২১·২২ I2C-তে
+  // (ডিসপ্লে + ঘড়ি) — তাই সেগুলোও বাদ।
+  // ⚠️ সাইরেনের পিনটা এই তালিকায় রাখা যাবে না।
+  //    আগে GPIO32 দুই জায়গাতেই ছিল — ১২টা আউটপুট বসালে ১২ নম্বর রিলে
+  //    আর সাইরেন একই তারে পড়ত, অথচ অ্যাপ সবুজ টিক দেখাত।
+  const PINS = [4, 13, 14, 16, 17, 18, 19, 23, 25, 26, 27, 33];
+  const PIN_SIREN = 32;
 
-  function defaultDevices(){
-    return [
-      { slot:1, type:"HEATER",        name:"হিটার",       auto:true, mode:"AUTO" },
-      { slot:2, type:"FAN",           name:"ফ্যান ১",     auto:true, mode:"AUTO" },
-      { slot:3, type:"MIST",          name:"মিস্ট",        auto:true, mode:"AUTO" },
-      { slot:4, type:"LIGHT",         name:"আলো ১",       auto:true, mode:"AUTO" },
-      { slot:5, type:"WATER",         name:"পানির পাম্প", auto:true, mode:"AUTO" },
-      { slot:6, type:"FEEDER",        name:"খাবার",       auto:true, mode:"AUTO" },
-      { slot:7, type:"CURTAIN_OPEN",  name:"পর্দা খোলা",  auto:true, mode:"AUTO" },
-      { slot:8, type:"CURTAIN_CLOSE", name:"পর্দা বন্ধ",  auto:true, mode:"AUTO" }
-    ];
+  const MAX_FAN = 8, MAX_LIGHT = 8;
+
+  function pinOf(slot){
+    return (slot <= PINS.length) ? ("GPIO" + PINS[slot-1]) : "—";
+  }
+
+  // একটা ঘরের আউটপুটের তালিকা বানায়।
+  // ক্রম পাকা: হিটার → ফ্যান → মিস্ট → আলো।  ক্রম বদলালে তার খুলে
+  // আবার লাগাতে হবে, তাই এটা ইচ্ছে করেই বাঁধা।
+  function buildOutputs(o){
+    const out = [];
+    let slot = 0;
+    if (o.heater) out.push({ slot: ++slot, type:"HEATER", name: o.heaterName || "হিটার",
+                             auto: true });
+    for (let i = 0; i < o.fans; i++)
+      out.push({ slot: ++slot, type:"FAN", name: (o.fanNames[i] || ("ফ্যান " + bn(i+1))),
+                 auto: true, stage: i + 1 });
+    if (o.mist) out.push({ slot: ++slot, type:"MIST", name: o.mistName || "ফগার", auto: true });
+    for (let i = 0; i < o.lights; i++)
+      out.push({ slot: ++slot, type:"LIGHT", name: (o.lightNames[i] || ("আলো " + bn(i+1))),
+                 auto: false });     // আলো সবসময় হাতে (ক১১)
+    return out;
+  }
+
+  function typeLabel(t){
+    if (t === "HEATER") return "হিটার";
+    if (t === "FAN")    return "ফ্যান";
+    if (t === "MIST")   return "ফগার";
+    if (t === "LIGHT")  return "আলো";
+    return "যন্ত্র";
+  }
+  function isHandOnly(d){ return !d || d.auto === false || d.type === "LIGHT"; }
+
+  // নতুন যন্ত্র দখল করলে এই ঘরটাই তৈরি হয়
+  function defaultHouse(name){
+    return {
+      name: name || "ঘর ১",
+      autoMode: true,
+      heater: true, fans: 5, lights: 5, mist: false,
+      outputs: buildOutputs({ heater:true, fans:5, lights:5, mist:false,
+                              fanNames:[], lightNames:[] }),
+      tempStrategy: "SAFE",
+      gradientAlertC: 3,
+      minVent: { enabled:true, everyMin:5, runSec:30 }
+    };
   }
 
   /* ════════════ ৮. নিবন্ধন ও লগইন ════════════ */
@@ -707,7 +772,7 @@
       name:$("rgName").value.trim(), phone:$("rgPhone").value.trim(),
       email:$("rgEmail").value.trim(), pass:$("rgPass").value, pass2:$("rgPass2").value,
       farm:$("rgFarm").value.trim(), dist:$("rgDist").value, upa:$("rgUpa").value,
-      vill:$("rgVill").value.trim(), zones:parseInt($("rgZones").value,10)||3
+      vill:$("rgVill").value.trim()
     };
     const bad = validReg(v);
     if (bad){ msg(box, bad); return; }
@@ -716,13 +781,14 @@
     busy(btn, true, "তৈরি হচ্ছে…");
     auth.createUserWithEmailAndPassword(v.email, v.pass)
       .then(function(cred){
-        // খামার সবার আগে — জোনের অনুমতি খামারের নথি দেখেই আসে
+        // খামার সবার আগে — ভেতরের সব নথির অনুমতি খামারের নথি দেখেই আসে
         const uid = cred.user.uid;
         const farmRef = db.collection("farms").doc();
         return farmRef.set({
           code:"F01", name:v.farm, ownerUid:uid, memberUids:[],
-          district:v.dist, upazila:v.upa, village:v.vill, zoneCount:v.zones,
+          district:v.dist, upazila:v.upa, village:v.vill,
           batch:"", birds:0, batchStartDate:null, batchDays:36,
+          houseState:"ACTIVE", emergencyStop:false, deviceBy:{},
           createdAt:TS(), updatedAt:TS()
         }).then(function(){ return { uid:uid, farmRef:farmRef }; });
       })
@@ -731,22 +797,7 @@
           email:v.email, name:v.name, phone:v.phone,
           district:v.dist, upazila:v.upa, village:v.vill,
           primaryFarmId:o.farmRef.id, createdAt:TS(), updatedAt:TS()
-        }).then(function(){ return o.farmRef; });
-      })
-      .then(function(farmRef){
-        const batch = db.batch();
-        for (let i=1; i<=v.zones; i++){
-          const zid = "Z" + (i < 10 ? "0" + i : i);
-          batch.set(farmRef.collection("zones").doc(zid), {
-            code:zid, name:"জোন " + bn(i), controllerId:null, nodeId:null,
-            controlEnabled:true, tempStrategy:"SAFE", gradientAlertC:3,
-            relaySlots:8, devices:defaultDevices(), points:{},
-      minVent:{ enabled:true, everyMin:5, runSec:30 },
-            feedTimes:["06:00","10:00","14:00","18:00","22:00"],
-            settings:{}, emergencyRequest:false, createdAt:TS(), updatedAt:TS()
-          });
-        }
-        return batch.commit();
+        });
       })
       .then(function(){ busy(btn,false); msg(box, "✅ হয়ে গেছে! আপনার খামার তৈরি।", "ok"); })
       .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
@@ -846,22 +897,30 @@
     paintSchedSummary();
     paintDevSummary();
 
-    const box = $("hmZones");
+    const box = $("hmHouses");
     box.innerHTML = "";
-    if (!ST.zones.length){ box.innerHTML = '<p class="hint">কোনো জোন নেই।</p>'; return; }
-    ST.zones.forEach(function(z){
+    if (!CTRLS.length){
+      box.innerHTML = '<p class="hint">এখনো কোনো ঘর নেই। নিচে "যন্ত্র যোগ করুন" '
+                    + 'চেপে বাক্সের সিরিয়াল দিলে ঘরটা নিজে থেকেই তৈরি হয়ে যাবে।</p>';
+      return;
+    }
+    CTRLS.forEach(function(c){
       const n = document.createElement("div");
       n.className = "zrow";
       n.innerHTML = '<span class="dot"></span><span class="body">' +
                     '<span class="nm"></span><span class="meta"></span></span><span class="go">›</span>';
-      const alldev = (z.devices || []).filter(function(d2){ return d2 && d2.type; });
-      const live = alldev.length;
-      const hand = alldev.filter(function(d2){ return d2.auto === false; }).length;
-      n.querySelector(".nm").textContent = bn(z.name || z.code);
-      n.querySelector(".meta").textContent = z.controlEnabled === false
-        ? "শুধু দেখা · যন্ত্র নেই"
-        : bn(live) + " টা যন্ত্র" + (hand ? " (" + bn(hand) + " টা হাতে)" : "") + " · যন্ত্র যুক্ত হয়নি";
-      n.addEventListener("click", function(){ openZone(z); });
+      const outs = c.outputs || [];
+      const fans   = outs.filter(function(d){ return d.type === "FAN"; }).length;
+      const lights = outs.filter(function(d){ return d.type === "LIGHT"; }).length;
+      const bits = [];
+      if (c.heater !== false) bits.push("হিটার");
+      if (fans)   bits.push(bn(fans) + " ফ্যান");
+      if (lights) bits.push(bn(lights) + " আলো");
+      n.querySelector(".nm").textContent = c.name || c.__id;
+      n.querySelector(".meta").textContent =
+        (bits.length ? bits.join(" · ") : "কিছু বসানো হয়নি")
+        + (c.autoMode === false ? "  ·  সব হাতে" : "");
+      n.addEventListener("click", function(){ openHouse(c); });
       box.appendChild(n);
     });
   }
@@ -873,7 +932,7 @@
     $("hmFarm").textContent  = "খামার আনা হচ্ছে…";
     $("hmPlace").textContent = "";
     $("hmBatch").textContent = "";
-    $("hmZones").innerHTML   = "";
+    $("hmHouses").innerHTML  = "";
     clearMsg($("hmMsg"));
 
     db.collection("users").doc(user.uid).get()
@@ -893,12 +952,7 @@
           return;
         }
         ST.farmRef = fd.ref; ST.farm = fd.data();
-        return ST.farmRef.collection("zones").get().then(function(zs){
-          ST.zones = [];
-          zs.forEach(function(z){ const d2 = z.data(); d2.__id = z.id; ST.zones.push(d2); });
-          ST.zones.sort(function(a,b){ return String(a.code||a.__id).localeCompare(String(b.code||b.__id)); });
-          return loadCtrls().then(paintHome);
-        });
+        return loadCtrls().then(paintHome);
       })
       .catch(function(e){
         $("hmName").textContent  = "—";
@@ -968,48 +1022,102 @@
       .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
   });
 
-  /* ════════════ ১১. জোনের ভেতরে ════════════ */
-  let zSlots = [];   // {type, name}
+  /* ════════════ ১১. ঘরের ভেতরে ════════════ */
+  let hNames = { fan: [], light: [] };
 
-  function openZone(z){
-    ST.zone = z;
-    ST.zoneRef = ST.farmRef.collection("zones").doc(z.__id);
-    $("znName").value  = bn(z.name || z.code || "");
-    $("znControl").value = (z.controlEnabled === false) ? "0" : "1";
-    $("znStrat").value = z.tempStrategy || "SAFE";
-    $("znGrad").value  = (z.gradientAlertC == null) ? 3 : z.gradientAlertC;
+  function openHouse(c){
+    ST.house = c;
+    ST.houseRef = ST.farmRef.collection("controllers").doc(c.__id);
 
-    const mv = z.minVent || {};
+    $("hsName").value   = c.name || c.__id;
+    $("hsSerial").textContent = c.serial
+      ? ("যন্ত্রের সিরিয়াল " + c.serial) : "এখনো কোনো যন্ত্র বসানো হয়নি";
+    $("hsAuto").value   = (c.autoMode === false) ? "0" : "1";
+    $("hsHeater").value = (c.heater === false) ? "0" : "1";
+    $("hsMist").value   = c.mist ? "1" : "0";
+
+    fillSelect($("hsFans"),  countOpts(0, MAX_FAN,  "টা ফ্যান"), (c.fans   == null) ? 5 : c.fans);
+    fillSelect($("hsLights"),countOpts(0, MAX_LIGHT,"টা আলো"),   (c.lights == null) ? 5 : c.lights);
+
+    // পুরনো নামগুলো ফিরিয়ে আনা
+    hNames = { fan: [], light: [] };
+    (c.outputs || []).forEach(function(d){
+      if (d.type === "FAN")   hNames.fan.push(d.name);
+      if (d.type === "LIGHT") hNames.light.push(d.name);
+    });
+
+    const mv = c.minVent || {};
     $("mvOn").value    = (mv.enabled === false) ? "0" : "1";
     $("mvEvery").value = mv.everyMin || 5;
     $("mvRun").value   = mv.runSec   || 30;
-    paintMv();
 
-    const count = z.relaySlots || Math.max(8, (z.devices||[]).length);
-    fillSelect($("znCount"), [4,6,8,10,12,16].map(function(n){
-      return { v:n, label: bn(n) + " টা স্লট" };
-    }), count);
-
-    zSlots = [];
-    for (let i=1;i<=16;i++){
-      const d = (z.devices || []).find(function(x){ return x && x.slot === i; });
-      zSlots.push({
-        type: (d && d.type) || "",
-        name: (d && d.name) || "",
-        // পুরনো নথিতে ঘরটা নেই — তখন সুইচ ছাড়া সবই নিজে চলে ধরা হবে
-        auto: d ? (d.auto !== undefined ? !!d.auto : !alwaysManual(d.type)) : true
-      });
-    }
-    paintSlots();
-    clearMsg($("znMsg"));
-    show("scrZone", { back: goHome, title: bn(z.name || z.code), sub: ST.farm ? ST.farm.name : "" });
+    paintHouseForm();
+    clearMsg($("hsMsg2"));
+    show("scrHouse", { back: goHome, title: c.name || "ঘর",
+                       sub: ST.farm ? ST.farm.name : "" });
   }
 
-  $("znCount").addEventListener("change", paintSlots);
-  $("znControl").addEventListener("change", function(){
-    const hide = (this.value === "0");
-    $("znDevCard").style.display  = hide ? "none" : "";
-    $("znVentCard").style.display = hide ? "none" : "";
+  function countOpts(lo, hi, suffix){
+    const a = [];
+    for (let i = lo; i <= hi; i++) a.push({ v:i, label: (i ? bn(i) : "কোনোটা নেই") + (i ? " " + suffix : "") });
+    return a;
+  }
+
+  // নামের ঘরগুলো — টাইপ বাছার দরকার নেই, কোন ভাগে আছে তাতেই বোঝা যায়
+  function nameRows(boxId, n, kind, labelBase){
+    const box = $(boxId);
+    box.innerHTML = "";
+    for (let i = 0; i < n; i++){
+      const row = document.createElement("div");
+      row.className = "namerow";
+      row.innerHTML = '<span class="nn"></span><input type="text">';
+      row.querySelector(".nn").textContent = bn(i + 1);
+      const inp = row.querySelector("input");
+      inp.placeholder = labelBase + " " + bn(i + 1);
+      inp.value = hNames[kind][i] || "";
+      inp.addEventListener("input", function(){ hNames[kind][i] = inp.value; });
+      box.appendChild(row);
+    }
+  }
+
+  function paintHouseForm(){
+    const heater = $("hsHeater").value === "1";
+    const mist   = $("hsMist").value === "1";
+    const fans   = parseInt($("hsFans").value,10)   || 0;
+    const lights = parseInt($("hsLights").value,10) || 0;
+
+    nameRows("hsFanRows",   fans,   "fan",   "ফ্যান");
+    nameRows("hsLightRows", lights, "light", "আলো");
+
+    const auto = $("hsAuto").value === "1";
+    $("hsAutoNote").textContent = auto
+      ? "গরম হলে ফ্যান চালু হবে, ঠান্ডা হলে হিটার। আলো আপনার হাতেই থাকবে।"
+      : "যন্ত্র কিছুতেই হাত দেবে না — শুধু দেখাবে, আর বিপদ হলে অ্যালার্ম দেবে। "
+      + "তবে খুব গরম বা খুব ঠান্ডা হলে রক্ষার কাজটা তবুও করবে।";
+
+    // পিনের তালিকা — ইলেকট্রিশিয়ানের জন্য
+    const outs = buildOutputs({ heater:heater, fans:fans, mist:mist, lights:lights,
+                                fanNames:hNames.fan, lightNames:hNames.light });
+    const total = outs.length;
+    let h = "<b>তার লাগানোর তালিকা</b><table>";
+    outs.forEach(function(d){
+      h += "<tr><td>R" + bn(d.slot) + "</td><td>" + pinOf(d.slot)
+         + "</td><td>" + esc(d.name) + "</td></tr>";
+    });
+    h += "<tr><td>—</td><td>GPIO" + PIN_SIREN + "</td><td>সাইরেন</td></tr>";
+    h += "</table>";
+    if (total > PINS.length)
+      h += '<div class="warn2">⚠️ ' + bn(total) + " টা আউটপুট — ESP32-র নিরাপদ পিনে "
+         + bn(PINS.length) + " টার বেশি সরাসরি হবে না। সম্প্রসারক চিপ লাগবে।</div>";
+    else
+      h += '<div class="ok2">✅ ' + bn(total) + " টা আউটপুট — সবই সরাসরি ESP32-র পিনে বসে যাবে।</div>";
+    $("hsPins").innerHTML = h;
+
+    paintMv();
+  }
+
+  ["hsHeater","hsMist","hsFans","hsLights","hsAuto"].forEach(function(id){
+    $(id).addEventListener("change", paintHouseForm);
   });
 
   // "প্রতি ৫ মিনিটে ৩০ সেকেন্ড" মানে দিনে কত — মালিক নিজের চোখে দেখুক
@@ -1017,7 +1125,7 @@
     const on = $("mvOn").value === "1";
     const e = parseInt($("mvEvery").value,10) || 5;
     const r = parseInt($("mvRun").value,10) || 30;
-    if (!on){ $("mvNote").textContent = "বন্ধ — শুধু গরম হলে বা আর্দ্রতা বাড়লে ফ্যান চলবে।"; return; }
+    if (!on){ $("mvNote").textContent = "বন্ধ — শুধু গরম হলে ফ্যান চলবে।"; return; }
     const perDay = Math.round(1440 / e);
     const mins = Math.round(perDay * r / 60);
     $("mvNote").textContent = "দিনে " + bn(perDay) + " বার, মোট প্রায় "
@@ -1027,111 +1135,33 @@
   $("mvEvery").addEventListener("input", paintMv);
   $("mvRun").addEventListener("input", paintMv);
 
-  function paintSlots(){
-    const n = parseInt($("znCount").value,10) || 8;
-    $("znDevCard").style.display = ($("znControl").value === "0") ? "none" : "";
-    const over = PINS.length;
-    $("znPinNote").textContent = (n > over)
-      ? bn(over) + " টার বেশি স্লট সরাসরি ESP32-র পিনে হবে না — I2C সম্প্রসারক চিপ লাগবে।"
-      : "প্রতিটা স্লটের পাশে ESP32-র পিন লেখা আছে — তার লাগানোর সময় কাজে লাগবে।";
-
-    const box = $("znSlots");
-    box.innerHTML = "";
-    for (let i=1;i<=n;i++){
-      const s = zSlots[i-1];
-      const row = document.createElement("div");
-      row.className = "slot" + (s.type ? "" : " empty");
-      row.innerHTML =
-        '<div class="num">R<b>' + bn(i) + '</b>' + pinOf(i) + '</div>' +
-        '<div class="fields"><select class="ty"></select>' +
-        '<input type="text" placeholder="নাম">' +
-        '<select class="au"></select></div>';
-      const sel = row.querySelector("select.ty"),
-            inp = row.querySelector("input"),
-            au  = row.querySelector("select.au");
-      fillSelect(sel, DEV_TYPES.map(function(t){ return {v:t.v,label:t.label}; }), s.type);
-      inp.value = s.name;
-      inp.disabled = !s.type;
-      fillSelect(au, [
-        { v:"1", label:"নিজে নিজে চলবে" },
-        { v:"0", label:"শুধু হাতে — ফোনের সুইচ" }
-      ], s.auto ? "1" : "0");
-      au.style.display = s.type ? "" : "none";
-      au.disabled = alwaysManual(s.type);   // সুইচ সবসময় হাতেই
-
-      sel.addEventListener("change", function(){
-        zSlots[i-1].type = sel.value;
-        if (sel.value && !inp.value.trim()) inp.value = typeLabel(sel.value);
-        if (!sel.value) inp.value = "";
-        zSlots[i-1].name = inp.value;
-        if (alwaysManual(sel.value)) zSlots[i-1].auto = false;
-        else if (sel.value) zSlots[i-1].auto = true;
-        paintSlots();
-      });
-      inp.addEventListener("input", function(){ zSlots[i-1].name = inp.value; });
-      au.addEventListener("change", function(){ zSlots[i-1].auto = (au.value === "1"); });
-      box.appendChild(row);
-    }
-  }
-
-  function buildDevices(n){
-    const out = [];
-    let fan = 0, light = 0;
-    for (let i=1;i<=n;i++){
-      const s = zSlots[i-1];
-      if (!s.type) continue;
-      const isAuto = alwaysManual(s.type) ? false : !!s.auto;
-      const d = { slot:i, type:s.type, name:(s.name || typeLabel(s.type)),
-                  auto: isAuto, mode: isAuto ? "AUTO" : "MANUAL" };
-      // ধাপ আর দল শুধু নিজে-চলা যন্ত্রের জন্য
-      if (isAuto && s.type === "FAN")   d.stage = ++fan;
-      if (isAuto && s.type === "LIGHT") d.group = ++light;
-      out.push(d);
-    }
-    // পর্দার দুইটা স্লট জোড়া লাগানো — একসাথে চললে মোটর পুড়বে
-    const op = out.find(function(d){ return d.type === "CURTAIN_OPEN"; });
-    const cl = out.find(function(d){ return d.type === "CURTAIN_CLOSE"; });
-    if (op && cl){ op.pair = cl.slot; cl.pair = op.slot; }
-    return out;
-  }
-
-  function checkDevices(devs){
-    const autoCount = devs.filter(function(d){ return d.auto; }).length;
-    if (!autoCount && devs.length)
-      return "অন্তত একটা যন্ত্র নিজে নিজে চলার মতো রাখুন, নইলে জোনটা কিছুই নিয়ন্ত্রণ করবে না।";
-    const op = devs.filter(function(d){ return d.type === "CURTAIN_OPEN"; }).length;
-    const cl = devs.filter(function(d){ return d.type === "CURTAIN_CLOSE"; }).length;
-    if (op > 1 || cl > 1) return "পর্দার প্রতিটা দিক একটাই স্লটে হবে।";
-    if (op !== cl) return "পর্দার জন্য দুইটাই লাগবে — খোলা আর বন্ধ। এক রিলেতে পর্দা আধখোলা রাখা যায় না।";
-    if (!devs.length) return "অন্তত একটা যন্ত্র বসান।";
-    return "";
-  }
-
-  $("znSave").addEventListener("click", function(){
-    const btn = this, box = $("znMsg");
+  $("hsSave").addEventListener("click", function(){
+    const btn = this, box = $("hsMsg2");
     clearMsg(box);
-    const name = $("znName").value.trim();
-    if (!name){ msg(box, "জোনের নাম লিখুন।"); return; }
+    const name = $("hsName").value.trim();
+    if (!name){ msg(box, "ঘরের একটা নাম দিন।"); return; }
 
-    const control = $("znControl").value === "1";
-    const n = parseInt($("znCount").value,10) || 8;
-    const grad = parseFloat($("znGrad").value);
-    if (isNaN(grad) || grad < 1 || grad > 15){ msg(box, "তফাতের মাত্রা ১ থেকে ১৫ ডিগ্রির মধ্যে দিন।"); return; }
+    const heater = $("hsHeater").value === "1";
+    const mist   = $("hsMist").value === "1";
+    const fans   = parseInt($("hsFans").value,10)   || 0;
+    const lights = parseInt($("hsLights").value,10) || 0;
+    const auto   = $("hsAuto").value === "1";
 
-    let devs = [];
-    if (control){
-      devs = buildDevices(n);
-      const bad = checkDevices(devs);
-      if (bad){ msg(box, bad); return; }
+    if (!heater && !fans && !lights && !mist){
+      msg(box, "অন্তত একটা যন্ত্র বসান — নইলে এই ঘরে করার কিছু নেই।"); return;
+    }
+    if (auto && !heater && !fans && !mist){
+      msg(box, "নিজে চলার মতো কিছু নেই — শুধু আলো আছে। "
+             + "হয় একটা ফ্যান বা হিটার বসান, নয়তো \"সব আমি হাতে চালাব\" বেছে নিন।");
+      return;
     }
 
+    const outputs = buildOutputs({ heater:heater, fans:fans, mist:mist, lights:lights,
+                                   fanNames:hNames.fan, lightNames:hNames.light });
     const patch = {
-      name: name,
-      controlEnabled: control,
-      relaySlots: n,
-      devices: devs,
-      tempStrategy: $("znStrat").value,
-      gradientAlertC: grad,
+      name: name, autoMode: auto,
+      heater: heater, fans: fans, lights: lights, mist: mist,
+      outputs: outputs,
       minVent: {
         enabled:  $("mvOn").value === "1",
         everyMin: Math.min(60, Math.max(2,  parseInt($("mvEvery").value,10) || 5)),
@@ -1140,56 +1170,35 @@
       updatedAt: TS()
     };
     busy(btn, true, "সেভ হচ্ছে…");
-    ST.zoneRef.update(patch)
+    ST.houseRef.update(patch)
       .then(function(){
         busy(btn,false);
-        Object.keys(patch).forEach(function(k){ if (k !== "updatedAt") ST.zone[k] = patch[k]; });
+        Object.keys(patch).forEach(function(k){ if (k !== "updatedAt") ST.house[k] = patch[k]; });
         msg(box, "✅ সেভ হয়েছে।", "ok");
         paintHome();
       })
       .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
   });
 
-  /* ── জোন যোগ ও মোছা ── */
-  $("hmAddZone").addEventListener("click", function(){
-    const btn = this, box = $("hmMsg");
-    clearMsg(box);
-    if (!ST.farmRef){ msg(box, "আগে খামার তৈরি হতে হবে।"); return; }
-    if (ST.zones.length >= 20){ msg(box, "এক খামারে ২০টার বেশি জোন এখন করা যাচ্ছে না।"); return; }
-
-    let next = 1;
-    const used = {};
-    ST.zones.forEach(function(z){ used[z.__id] = 1; });
-    while (used["Z" + (next<10 ? "0"+next : next)]) next++;
-    const zid = "Z" + (next<10 ? "0"+next : next);
-
-    busy(btn, true, "তৈরি হচ্ছে…");
-    ST.farmRef.collection("zones").doc(zid).set({
-      code:zid, name:"জোন " + bn(next), controllerId:null, nodeId:null,
-      controlEnabled:true, tempStrategy:"SAFE", gradientAlertC:3,
-      relaySlots:8, devices:defaultDevices(), points:{},
-      feedTimes:["06:00","10:00","14:00","18:00","22:00"],
-      settings:{}, emergencyRequest:false, createdAt:TS(), updatedAt:TS()
-    })
-    .then(function(){ busy(btn,false); loadHome(ST.user); })
-    .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
-  });
-
-  let delArmed = false;
-  $("znDel").addEventListener("click", function(){
-    const btn = this, box = $("znMsg");
-    if (!delArmed){
-      delArmed = true;
+  let hDelArmed = false;
+  $("hsDel").addEventListener("click", function(){
+    const btn = this, box = $("hsMsg2");
+    if (!hDelArmed){
+      hDelArmed = true;
       btn.textContent = "সত্যিই মুছবেন? আবার চাপুন";
-      msg(box, "মুছে ফেললে এই জোনের সব সেটিংস চলে যাবে।", "info");
-      setTimeout(function(){ delArmed = false; btn.textContent = "এই জোনটা মুছে ফেলুন"; }, 5000);
+      msg(box, "মুছে ফেললে এই ঘরের সব সেটিংস চলে যাবে। "
+             + "যন্ত্রটা আপনার নামেই থাকবে, আবার বসানো যাবে।", "info");
+      setTimeout(function(){ hDelArmed = false; btn.textContent = "এই ঘরটা মুছে ফেলুন"; }, 5000);
       return;
     }
-    delArmed = false;
+    hDelArmed = false;
     busy(btn, true, "মুছছি…");
-    ST.zoneRef.delete()
-      .then(function(){ busy(btn,false); btn.textContent = "এই জোনটা মুছে ফেলুন"; goHome(); loadHome(ST.user); })
-      .catch(function(e){ busy(btn,false); btn.textContent = "এই জোনটা মুছে ফেলুন"; msg(box, bnError(e)); });
+    ST.houseRef.delete()
+      .then(function(){
+        busy(btn,false); btn.textContent = "এই ঘরটা মুছে ফেলুন";
+        goHome(); loadHome(ST.user);
+      })
+      .catch(function(e){ busy(btn,false); btn.textContent = "এই ঘরটা মুছে ফেলুন"; msg(box, bnError(e)); });
   });
 
   /* ════════════ ১২. দিনের সূচি ════════════ */
@@ -1399,9 +1408,8 @@
     $("hmDevSub").textContent = n
       ? bn(n) + " টা যন্ত্র যুক্ত আছে"
       : "কোনো যন্ত্র যুক্ত হয়নি — চাপ দিয়ে যোগ করুন";
-    const linked = ST.zones.filter(function(z){ return z.controllerId; }).length;
     $("hmDashSub").textContent = n
-      ? bn(linked) + " / " + bn(ST.zones.length) + " জোনে যন্ত্র বসানো"
+      ? bn(n) + " টা ঘরের এখনকার অবস্থা"
       : "যন্ত্র যুক্ত হলে এখানে তাপমাত্রা দেখা যাবে";
   }
 
@@ -1410,14 +1418,11 @@
     box.innerHTML = "";
     if (!CTRLS.length){ box.innerHTML = '<p class="hint">এখনো কোনো যন্ত্র যুক্ত হয়নি।</p>'; return; }
     CTRLS.forEach(function(c){
-      const zs = ST.zones.filter(function(z){ return z.controllerId === c.__id; });
       const row = document.createElement("div");
       row.className = "devrow";
       row.innerHTML = "<span><b></b><br><span class='hint'></span></span><span></span>";
       row.querySelector("b").textContent = c.serial || c.__id;
-      row.querySelector(".hint").textContent = zs.length
-        ? zs.map(function(z){ return bn(z.name || z.code); }).join(", ")
-        : "কোনো জোনে বসানো হয়নি";
+      row.querySelector(".hint").textContent = c.name || "নাম দেওয়া হয়নি";
       row.querySelector("span:last-child").textContent =
         c.lastSeenAt ? "শেষ দেখা গেছে" : "এখনো সাড়া দেয়নি";
       box.appendChild(row);
@@ -1467,25 +1472,15 @@
       return ST.farmRef.update(patch);
     })
     .then(function(){
-      // খামারের ভেতরে কন্ট্রোলারের নথি
-      return ST.farmRef.collection("controllers").doc(cid).set({
-        code: (ST.farm.code || "F01") + "-" + cid,
-        serial: serial, model: "", firmwareVersion: null,
-        status: "UNKNOWN", lastSeenAt: null, lastIp: null,
-        rtcOk: null, clockSource: "UNKNOWN",
-        createdAt: TS(), updatedAt: TS()
-      });
-    })
-    .then(function(){
-      // যে জোনগুলোতে এখনো কোনো যন্ত্র নেই, সেগুলোতে বসিয়ে দাও
-      const free = ST.zones.filter(function(z){ return !z.controllerId; });
-      if (!free.length) return null;
-      const batch = db.batch();
-      free.forEach(function(z){
-        batch.update(ST.farmRef.collection("zones").doc(z.__id),
-                     { controllerId: cid, updatedAt: TS() });
-      });
-      return batch.commit();
+      // খামারের ভেতরে ঘরের নথি — ১ হিটার · ৫ ফ্যান · ৫ আলো বসানো থাকে,
+      // মালিক পরে নিজের মতো বদলে নেবেন
+      const h = defaultHouse("ঘর " + bn(CTRLS.length + 1));
+      h.code = (ST.farm.code || "F01") + "-" + cid;
+      h.serial = serial; h.model = ""; h.firmwareVersion = null;
+      h.status = "UNKNOWN"; h.lastSeenAt = null; h.lastIp = null;
+      h.rtcOk = null; h.clockSource = "UNKNOWN";
+      h.createdAt = TS(); h.updatedAt = TS();
+      return ST.farmRef.collection("controllers").doc(cid).set(h);
     })
     .then(function(){
       busy(btn,false);
@@ -1550,26 +1545,20 @@
 
     const box = $("dashZones");
     box.innerHTML = "";
-    if (!ST.zones.length){ box.innerHTML = '<p class="hint">কোনো জোন নেই।</p>'; return; }
+    if (!CTRLS.length){
+      box.innerHTML = '<p class="hint">কোনো ঘর নেই — আগে যন্ত্র যোগ করুন।</p>';
+      $("dashSub").textContent = "";
+      return;
+    }
 
-    let anyLinked = false;
-    ST.zones.forEach(function(z){
+    CTRLS.forEach(function(c){
       const card = document.createElement("div");
       card.className = "zcard";
-      const h = document.createElement("h3"); h.textContent = bn(z.name || z.code);
+      const live = liveData[c.__id];
+
+      const h = document.createElement("h3");
+      h.textContent = c.name || c.__id;
       card.appendChild(h);
-
-      if (!z.controllerId){
-        card.className += " off";
-        const p = document.createElement("div"); p.className = "when";
-        p.textContent = "যন্ত্র বসানো হয়নি";
-        card.appendChild(p); box.appendChild(card); return;
-      }
-      anyLinked = true;
-
-      const live = liveData[z.controllerId];
-      const zl = (live && live.zones && live.zones[z.__id]) ||
-                 (live && live.zones && live.zones[z.code]) || null;
 
       const when = document.createElement("div"); when.className = "when";
       if (!live){
@@ -1577,7 +1566,6 @@
         card.className += " off";
         card.appendChild(when); box.appendChild(card); return;
       }
-
       const at = live.at ? new Date(live.at).getTime() : null;
       const age = at ? (Date.now() - at) : null;
       const stale = (age != null && age > 15*60000);
@@ -1586,18 +1574,18 @@
                        + (stale ? " · বাসি" : "");
       card.appendChild(when);
 
-      const sen = zl && zl.sensors;
-      const reads = document.createElement("div"); reads.className = "reads";
-      const t = sensorVal(sen, "temp"), hu = sensorVal(sen, "hum");
-      const nh = sensorVal(sen, "nh3") .v != null ? sensorVal(sen, "nh3")
-                : (live.shared && live.shared.nh3 ? { v: live.shared.nh3.value, src:"সাধারণ" } : { v:null, src:null });
+      /* ── সেন্সরের পাঠ ── */
+      const sen = live.sensors;
+      const t  = sensorVal(sen, "temp");
+      const hu = sensorVal(sen, "hum");
+      const nh = sensorVal(sen, "nh3");
 
-      // আজকের লক্ষ্যের সাথে মিলিয়ে দেখা
-      const pday = isEmpty(ST.farm) ? null : planDay(ST.farm || {});
-      const plan = (pday && ST.farm && ST.farm.schedule) ? ST.farm.schedule[pday-1] : null;
+      const pday = empty ? null : planDay(f);
+      const plan = (pday && f.schedule) ? f.schedule[pday-1] : null;
       const tWarn = (t.v != null && plan && plan.targetTemp != null)
                     ? Math.abs(t.v - plan.targetTemp) >= 3 : false;
 
+      const reads = document.createElement("div"); reads.className = "reads";
       reads.appendChild(readBox("তাপ", t.v, "°", t.src, tWarn));
       reads.appendChild(readBox("আর্দ্রতা", hu.v, "%", hu.src, false));
       reads.appendChild(readBox("অ্যামোনিয়া", nh.v, "", nh.src, (nh.v != null && nh.v > 20)));
@@ -1607,48 +1595,129 @@
         const p = document.createElement("div"); p.className = "when";
         p.style.marginTop = "8px";
         p.textContent = "আজকের লক্ষ্য " + bn(plan.targetTemp) + "°"
+                      + (plan.lightHours != null ? "  ·  আলো থাকা উচিত " + bn(plan.lightHours) + " ঘণ্টা" : "")
                       + (tWarn ? " — অনেক তফাত" : "");
         card.appendChild(p);
       }
 
-      const devs = zl && zl.devices;
-      if (devs){
-        const chips = document.createElement("div"); chips.className = "chips";
-        const hands = document.createElement("div"); hands.className = "chips";
-        (z.devices || []).forEach(function(d){
-          const st = devs[String(d.type || "").toLowerCase()] ||
-                     devs["slot" + d.slot] || devs[d.name] || null;
-          const on = st && (st.state === true || st.state === "ON");
-          const c = document.createElement("span");
-          c.className = "chip" + (on ? " on" : "");
-          c.textContent = bn(d.name || typeLabel(d.type)) + (on ? " · চালু" : " · বন্ধ");
-          (d.auto === false ? hands : chips).appendChild(c);
-        });
-        if (chips.children.length) card.appendChild(chips);
-        if (hands.children.length){
-          const lb = document.createElement("div");
-          lb.className = "when"; lb.style.marginTop = "8px";
-          lb.textContent = "হাতে চালানো —";
-          card.appendChild(lb); card.appendChild(hands);
-        }
-      }
+      /* ── নিজে চলবে কি না — বড় সুইচ ── */
+      const autoOn = (c.autoMode !== false);
+      const ab = document.createElement("button");
+      ab.className = "autobtn" + (autoOn ? " on" : "");
+      ab.textContent = autoOn ? "⚙️ যন্ত্র নিজে চালাচ্ছে — হাতে নিন"
+                              : "✋ সব হাতে চলছে — যন্ত্রকে ছেড়ে দিন";
+      ab.addEventListener("click", function(){ toggleAuto(c, ab); });
+      card.appendChild(ab);
+
+      /* ── সুইচগুলো ── */
+      const outs = (c.outputs || []).slice().sort(function(a,b){ return a.slot - b.slot; });
+      const climate = outs.filter(function(d){ return d.type !== "LIGHT"; });
+      const lights  = outs.filter(function(d){ return d.type === "LIGHT"; });
+
+      if (climate.length) card.appendChild(chipRow(c, climate, autoOn, "হিটার ও ফ্যান"));
+      if (lights.length)  card.appendChild(chipRow(c, lights,  autoOn, "আলো — সবসময় আপনার হাতে"));
+
       box.appendChild(card);
     });
 
-    $("dashSub").textContent = anyLinked
-      ? "যন্ত্র থেকে খবর এলেই নিজে থেকে বদলাবে"
-      : "কোনো জোনে যন্ত্র বসানো নেই — আগে যন্ত্র যোগ করুন";
+    $("dashSub").textContent = "চাপ দিলেই চালু-বন্ধ হবে";
+  }
+
+  // এক সারি সুইচ
+  function chipRow(c, outs, autoOn, label){
+    const wrap = document.createElement("div");
+    const lb = document.createElement("div");
+    lb.className = "when"; lb.style.marginTop = "10px"; lb.textContent = label;
+    wrap.appendChild(lb);
+
+    const row = document.createElement("div"); row.className = "chips";
+    const live = liveData[c.__id] || {};
+    const st = live.outputs || {};
+    outs.forEach(function(d){
+      const cur = st["slot" + d.slot] || st[String(d.slot)] || null;
+      const on = cur && (cur.state === true || cur.state === "ON");
+      const key = c.__id + ":" + d.slot;
+      const pend = PENDING[key];
+
+      const b = document.createElement("button");
+      b.className = "chip" + (on ? " on" : "") + (pend ? " pend" : "");
+      // যন্ত্র নিজে চালালে নিজে-চলা যন্ত্রে হাত দেওয়া যাবে না — মিথ্যা বলব না
+      const locked = autoOn && !isHandOnly(d);
+      if (locked) b.className += " lock";
+      b.textContent = (locked ? "⚙️ " : "") + d.name
+                    + (pend ? " · পাঠানো হচ্ছে…" : (on ? " · চালু" : " · বন্ধ"));
+      b.addEventListener("click", function(){ tapOutput(c, d, on, locked); });
+      row.appendChild(b);
+    });
+    wrap.appendChild(row);
+    return wrap;
+  }
+
+  /* ── ফোন থেকে আদেশ পাঠানো ── */
+  // আদেশ কখনো সরাসরি অবস্থা লেখে না — একটা "চাওয়া" লিখে রাখে,
+  // যন্ত্র সেটা দেখে কাজ করে আর নিজের ঘরে ফল লেখে। (ক১-এর নিয়ম)
+  let PENDING = {};
+
+  function tapOutput(c, d, isOn, locked){
+    const box = $("dashMsg");
+    clearMsg(box);
+    if (locked){
+      msg(box, d.name + " এখন যন্ত্র নিজে চালাচ্ছে। হাতে নিতে উপরের "
+             + "\"হাতে নিন\" বোতামটা চাপুন।", "info");
+      return;
+    }
+    if (!navigator.onLine){ msg(box, "আদেশ পাঠাতে ইন্টারনেট লাগবে।"); return; }
+
+    const key = c.__id + ":" + d.slot;
+    if (PENDING[key]) return;
+    PENDING[key] = true; paintDash();
+
+    const exp = new Date(Date.now() + 24*3600*1000);   // পুরনো আদেশ ২৪ ঘণ্টায় বাতিল
+    ST.farmRef.collection("commands").add({
+      controllerId: c.__id,
+      slot: d.slot, name: d.name, type: d.type,
+      action: isOn ? "OFF" : "ON",
+      status: "PENDING",
+      requestedBy: ST.user.uid,
+      createdAt: TS(),
+      expiresAt: firebase.firestore.Timestamp.fromDate(exp)
+    })
+    .then(function(){
+      msg(box, "✅ " + d.name + " " + (isOn ? "বন্ধ" : "চালু")
+             + " করতে বলা হয়েছে। যন্ত্র নেট পেলেই করবে।", "ok");
+      // যন্ত্র সত্যিই করল কিনা সেটা live থেকেই জানা যাবে
+      setTimeout(function(){ delete PENDING[key]; paintDash(); }, 20000);
+    })
+    .catch(function(e){
+      delete PENDING[key]; paintDash(); msg(box, bnError(e));
+    });
+  }
+
+  function toggleAuto(c, btn){
+    const box = $("dashMsg");
+    clearMsg(box);
+    const want = (c.autoMode === false);     // এখন বন্ধ থাকলে চালু করব
+    busy(btn, true, "পাঠাচ্ছি…");
+    ST.farmRef.collection("controllers").doc(c.__id)
+      .update({ autoMode: want, updatedAt: TS() })
+      .then(function(){
+        busy(btn,false);
+        c.autoMode = want;
+        msg(box, want ? "⚙️ যন্ত্র আবার নিজে চালাবে।"
+                      : "✋ এখন সব আপনার হাতে। খুব গরম বা খুব ঠান্ডা হলে "
+                        + "রক্ষার কাজটা তবুও যন্ত্র করবে।", "ok");
+        paintDash();
+      })
+      .catch(function(e){ busy(btn,false); msg(box, bnError(e)); });
   }
 
   function startLive(){
     stopLive();
     liveData = {};
-    const ids = {};
-    ST.zones.forEach(function(z){ if (z.controllerId) ids[z.controllerId] = 1; });
-    Object.keys(ids).forEach(function(cid){
-      const ref = ST.farmRef.collection("live").doc(cid);
+    CTRLS.forEach(function(c){
+      const ref = ST.farmRef.collection("live").doc(c.__id);
       const un = ref.onSnapshot(function(d){
-        liveData[cid] = d.exists ? d.data() : null;
+        liveData[c.__id] = d.exists ? d.data() : null;
         paintDash();
       }, function(e){
         msg($("dashMsg"), bnError(e));
@@ -1800,7 +1869,7 @@
       soldWeightKg: (function(){ const v = parseFloat($("clKg").value); return isNaN(v) ? null : v; })(),
       soldPrice:    (function(){ const v = parseInt($("clPrice").value,10); return isNaN(v) ? null : v; })(),
       note: $("clNote").value.trim(),
-      zoneCount: ST.zones.length,
+      houseCount: CTRLS.length,
       schedule: (f.schedule || null),      // তুলনার জন্য সূচিটাও থাকল
       closedByUid: ST.user.uid,
       closedAt: TS()
@@ -1963,9 +2032,6 @@
   /* ════════════ ১৯. শুরু ════════════ */
   wireLocation($("rgDist"), $("rgUpa"));
   wireLocation($("fmDist"), $("fmUpa"));
-  fillSelect($("rgZones"), (function(){
-    const a = []; for (let i=1;i<=20;i++) a.push({ v:i, label: bn(i) + " টা জোন" }); return a;
-  })(), 3);
 
   auth.onAuthStateChanged(function(user){
     if (user){ show("scrHome"); loadHome(user); }
