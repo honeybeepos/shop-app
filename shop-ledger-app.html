@@ -55,6 +55,14 @@
     color:#fff8e8;
     padding:12px 18px 14px;
     position:relative;
+    /* ⚠️ overflow:hidden থাকছে — সরালে ভেতরের সাজসজ্জার স্তরটা
+       (header::after) পাতার বাইরে বেরিয়ে যায় আর আড়াআড়ি স্ক্রল
+       তৈরি করে। একবার সরিয়ে দেখেছিলাম, ঠিক সেটাই হয়েছিল।
+
+       আগে এটা বিপজ্জনক ছিল: সারিটা নিচে নামতে পারত না, তাই জায়গা
+       না কুলালে দোকান খোলা/বন্ধের সুইচটা চুপচাপ কেটে যেত। এখন
+       সারিতে flex-wrap দেওয়া আছে — কুলালে নিচের লাইনে নামে, কিছুই
+       বাইরে যায় না। তাই আইকনগুলোও বড় রাখা যায়। */
     overflow:hidden;
     border-bottom:2px solid rgba(255,209,102,0.25);
     box-shadow:0 4px 24px rgba(0,0,0,0.35);
@@ -732,18 +740,18 @@
   @media (max-width: 420px){
     header#posHeader{ gap:9px !important; }
     header{ padding-left:12px; padding-right:12px; }
-    #logoWrap #shopLogo, #logoWrap #logoPlaceholder{ width:46px !important; height:46px !important; font-size:19px !important; }
+    #logoWrap #shopLogo, #logoWrap #logoPlaceholder{ width:48px !important; height:48px !important; font-size:20px !important; }
     #headerPrintShortcut, #headerNoteShortcut, #headerQrShortcut{
-      width:42px !important; height:42px !important; font-size:18px !important;
+      width:48px !important; height:48px !important; font-size:24px !important;
     }
     #headerShopOpenToggle{ width:74px !important; }
   }
   @media (max-width: 350px){
     header#posHeader{ gap:7px !important; }
     header{ padding-left:9px; padding-right:9px; }
-    #logoWrap #shopLogo, #logoWrap #logoPlaceholder{ width:40px !important; height:40px !important; font-size:17px !important; }
+    #logoWrap #shopLogo, #logoWrap #logoPlaceholder{ width:44px !important; height:44px !important; font-size:18px !important; }
     #headerPrintShortcut, #headerNoteShortcut, #headerQrShortcut{
-      width:37px !important; height:37px !important; font-size:16px !important;
+      width:44px !important; height:44px !important; font-size:22px !important;
     }
     #headerShopOpenToggle{ width:64px !important; height:28px !important; }
     #headerShopOpenKnob{ width:20px !important; height:20px !important; }
@@ -1131,7 +1139,7 @@ window.hbLoadLib = function(name){
   </div>
 </div>
 
-<header id="posHeader" style="display:flex; align-items:center; gap:12px;">
+<header id="posHeader" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; row-gap:10px;">
   <div id="logoWrap" style="cursor:pointer; flex-shrink:0;">
     <img id="shopLogo" src="" style="display:none; width:52px;height:52px;border-radius:12px;object-fit:cover;border:2px solid rgba(255,255,255,.4);" />
     <div id="logoPlaceholder" style="width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:22px;">➕</div>
@@ -1139,13 +1147,13 @@ window.hbLoadLib = function(name){
   <input type="file" id="logoInput" accept="image/*" style="display:none;">
   <!-- 🖨️🏷️ প্রিন্ট আর QR ড্যাশবোর্ডে সরাসরি যাওয়ার শর্টকাট — লোগোর পাশে খালি
        জায়গায় (আগে নিচের ট্যাব-বারে ছিল, এখন সেখান থেকে সরিয়ে এখানে আনা হলো) -->
-  <div id="headerPrintShortcut" title="🖨️ প্রিন্ট" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🖨️</div>
+  <div id="headerPrintShortcut" title="🖨️ প্রিন্ট" style="cursor:pointer; flex-shrink:0; width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:26px;">🖨️</div>
   <!-- 📓 নোটবুক — প্রিন্ট আর QR-এর মাঝখানে। দোকানের পাশে যে কাগজের
        খাতাটা পড়ে থাকে, সেটারই কাজ: কাকে ফোন করতে হবে, কী আনতে হবে,
        কার কাছে কী কথা আছে — যা মনে রাখা দরকার কিন্তু হিসাবের ঘরে
        বসে না। চাপ দিলে পুরো পর্দা জুড়ে খোলে। -->
-  <div id="headerNoteShortcut" title="📓 নোটবুক" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px; position:relative;">📓<span id="headerNoteCount" style="display:none; position:absolute; top:-5px; right:-5px; background:#2fbf71; color:#fff; font-size:10px; font-weight:800; min-width:17px; height:17px; border-radius:9px; line-height:17px; text-align:center; padding:0 3px;">0</span></div>
-  <div id="headerQrShortcut" title="🏷️ QR (ওজন স্টিকার)" style="cursor:pointer; flex-shrink:0; width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:20px;">🏷️</div>
+  <div id="headerNoteShortcut" title="📓 নোটবুক" style="cursor:pointer; flex-shrink:0; width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:26px; position:relative;">📓<span id="headerNoteCount" style="display:none; position:absolute; top:-5px; right:-5px; background:#2fbf71; color:#fff; font-size:10px; font-weight:800; min-width:17px; height:17px; border-radius:9px; line-height:17px; text-align:center; padding:0 3px;">0</span></div>
+  <div id="headerQrShortcut" title="🏷️ QR (ওজন স্টিকার)" style="cursor:pointer; flex-shrink:0; width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-size:26px;">🏷️</div>
   <!-- 🟢🔴 দোকান খোলা/বন্ধ সুইচ — শপকিপার এখান থেকে টগল করলে shops/{shopId}.isShopOpen
        আপডেট হয়, Bazar-এ কাস্টমাররা তখন দোকান বন্ধ থাকলে দেখতে/বুঝতে পারবেন -->
   <div id="headerShopOpenWrap" title="দোকান খোলা/বন্ধ করুন" style="cursor:pointer; flex-shrink:0;">
