@@ -6215,17 +6215,51 @@ let hbGsCameFrom = null;
    মোছার আগে একবার জিজ্ঞেস করা হয়: প্রথম চাপে বাটনটা "নিশ্চিত?" হয়ে
    যায়, দ্বিতীয় চাপে মোছে। ভুল করে আঙুল লেগে নোট হারানোর ভয় থাকে না,
    অথচ আলাদা পপ-আপও লাগে না। */
-const HB_NB_KEY = 'hb-notebook';
+/* ⚠️ আগে সব নোট `hb-notebook` নামে এক জায়গায় জমত। ব্রাউজারের জমা
+   রাখার ঘর **ডোমেইন ধরে** ভাগ হয়, অ্যাপ বা মানুষ ধরে নয় — তাই
+   দোকানের খাতার লেখা বাজারের অ্যাপেও দেখা যেত, আর একই ফোনে যেই
+   খুলুক সেই পড়তে পারত। নোট ব্যক্তিগত জিনিস, এটা হওয়া উচিত নয়।
+
+   এখন নাম হয় `hb-notebook:shop:<যার খাতা>` — দোকানের জন্য আলাদা,
+   বাজারের জন্য আলাদা, আর প্রতিটা মানুষের জন্য আলাদা।            */
+const HB_NB_LEGACY_KEY = 'hb-notebook';
+
+function hbNbKey(){
+  try{
+    const se = (typeof getSession === 'function') ? getSession() : null;
+    if(se && se.uid) return 'hb-notebook:shop:' + se.uid;
+  }catch(e){}
+  return null;              // কে জানি না — তখন কোনো খাতাই নেই
+}
+
+/* পুরনো নোটগুলো হারাবে না। যিনি প্রথম লগইন করা অবস্থায় খাতা খুলবেন,
+   সেগুলো তাঁর নামে চলে যাবে — তারপর পুরনো নামটা মুছে দেওয়া হয়, যাতে
+   বাজারের অ্যাপ বা অন্য কেউ ওখান থেকে আর কিছু পড়তে না পারে। */
+function hbNbMigrate(){
+  const k = hbNbKey();
+  if(!k) return;
+  try{
+    const old = localStorage.getItem(HB_NB_LEGACY_KEY);
+    if(!old) return;
+    if(!localStorage.getItem(k)) localStorage.setItem(k, old);
+    localStorage.removeItem(HB_NB_LEGACY_KEY);
+  }catch(e){}
+}
 let hbNbEditingId = null;
 let hbNbConfirmId = null;      // এখন কোন নোটের মোছা "নিশ্চিত?" অবস্থায় আছে
 let hbNbOpenIds = {};          // কোন কোন নোট এখন খোলা আছে
 
 function hbNbLoad(){
-  try{ const a = JSON.parse(localStorage.getItem(HB_NB_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+  const k = hbNbKey();
+  if(!k) return [];                 // লগইন ছাড়া কিছুই দেখা যাবে না
+  hbNbMigrate();
+  try{ const a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; }
   catch(e){ return []; }
 }
 function hbNbSave(list){
-  try{ localStorage.setItem(HB_NB_KEY, JSON.stringify(list)); }catch(e){}
+  const k = hbNbKey();
+  if(!k) return;                    // লগইন ছাড়া লেখাও যাবে না
+  try{ localStorage.setItem(k, JSON.stringify(list)); }catch(e){}
   hbNbUpdateCount();
 }
 

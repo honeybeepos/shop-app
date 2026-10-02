@@ -1234,6 +1234,18 @@
       }
       #screenNotebook .nbCard.pin{ border-color:rgba(255,209,102,0.6); background:rgba(255,209,102,0.09); }
       #screenNotebook .nbCard.locked{ border-color:rgba(255,209,102,0.55); }
+      #screenNotebook .nbHead{ display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; -webkit-user-select:none; }
+      #screenNotebook .nbArrow{ flex-shrink:0; font-size:15px; color:rgba(255,209,102,0.7); transition:transform .2s ease; }
+      #screenNotebook .nbCard.open .nbArrow{ transform:rotate(180deg); }
+      #screenNotebook .nbName{ flex:1; min-width:0; }
+      #screenNotebook .nbNameTx{
+        font-size:15px; font-weight:800; color:#ffd166; line-height:1.45;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      }
+      #screenNotebook .nbNameTx mark{ background:#22d3ee; color:#06282e; border-radius:3px; padding:0 3px; }
+      #screenNotebook .nbNameSub{ font-size:11px; color:rgba(255,248,232,0.45); margin-top:3px; }
+      #screenNotebook .nbNoteBody{ display:none; margin-top:11px; padding-top:10px; border-top:1px dashed rgba(255,209,102,0.18); }
+      #screenNotebook .nbCard.open .nbNoteBody{ display:block; }
       #screenNotebook .nbTitle{ font-size:15px; font-weight:800; color:#ffd166; margin-bottom:7px; line-height:1.45; }
       #screenNotebook .nbText{ color:#fff8e8; font-size:14.5px; line-height:1.65; }
       #screenNotebook .nbLine{ padding:3px 0; line-height:1.7; }
@@ -3316,6 +3328,13 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
     }else if(svc === "smartwatch"){
       showScreen("screenSmartWatch");
     }else if(svc === "notebook"){
+      /* ⚠️ নোট ব্যক্তিগত জিনিস — লগইন ছাড়া খোলা যাবে না। আগে যে কেউ
+         ফোনটা হাতে নিয়ে খাতাটা পড়তে পারত, কারণ সব এক জায়গায় জমত
+         আর কোনো পাহারা ছিল না। */
+      if(!nbLoggedIn()){
+        alert("নোটবুক আপনার ব্যক্তিগত খাতা — দেখতে আগে ☰ Menu থেকে Google দিয়ে লগইন করুন।");
+        return;
+      }
       nbRender();
       showScreen("screenNotebook");
     }else if(svc === "house"){
@@ -3347,17 +3366,47 @@ document.getElementById("backToHomeFromSmartCalculator") && document.getElementB
 
    ক্যালকুলেটরের মতোই — এই অ্যাপ থেকে নোটের কোনো লেখা নিজে থেকে
    কোথাও পাঠানো হয় না, ফোনেই থাকে। */
-const NB_KEY = 'hb-notebook';
+/* ⚠️ আগে এখানে `hb-notebook` লেখা ছিল — ঠিক যেটা দোকানের অ্যাপও
+   ব্যবহার করত। দুইটা অ্যাপ একই ডোমেইনে থাকায় ব্রাউজারের জমা রাখার
+   ঘরটাও এক, তাই **দোকানের ব্যক্তিগত নোট গ্রাহকের অ্যাপে দেখা যেত**।
+   আর কেউ লগইন না করলেও খাতাটা খোলা পড়ে থাকত।
+
+   এখন খাতা হয় `hb-notebook:bazar:<যার খাতা>` — দোকানের খাতার সাথে
+   কোনো সম্পর্ক নেই, আর একজনের লেখা আরেকজন কোনোভাবেই দেখতে পান না। */
+function nbKey(){
+  /* ⚠️ currentUser দেখলে চলবে না — পাতা খুললেই সবাইকে নীরবে অ্যানোনিমাস
+     লগইন করানো হয়, তাই ওটা সবসময়ই থাকে। currentCustomer শুধু
+     সত্যিকারের লগইনেই বসে।
+
+     ⚠️ try দিয়ে ঘেরা, কারণ নেট খারাপ হলে বা Firebase-এর স্ক্রিপ্ট
+     লোড না হলে উপরের কোড মাঝপথে থেমে যায় — তখন currentCustomer
+     ঘোষণাই হয় না, আর সরাসরি ছুঁলে ফাংশনটা ভেঙে পড়ে। পাহারার কাজ
+     ভেঙে পড়া নয়; সন্দেহ হলে **খাতা নেই** বলাই নিরাপদ।          */
+  try{
+    return (currentCustomer && currentCustomer.uid)
+         ? 'hb-notebook:bazar:' + currentCustomer.uid : null;
+  }catch(e){ return null; }
+}
+function nbLoggedIn(){ return !!nbKey(); }
 let nbEditingId = null;
 let nbConfirmId = null;
+let nbOpenIds = {};        // কোন কোন নোট এখন খোলা
 
 function nbToast(msg){
   const b = $('nbToastBar'); if(!b) return;
   b.textContent = msg; b.style.display = 'block';
   clearTimeout(b.__t); b.__t = setTimeout(function(){ b.style.display = 'none'; }, 2400);
 }
-function nbLoad(){ try{ const a = JSON.parse(localStorage.getItem(NB_KEY) || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
-function nbSave(list){ try{ localStorage.setItem(NB_KEY, JSON.stringify(list)); }catch(e){} }
+function nbLoad(){
+  const k = nbKey();
+  if(!k) return [];                 // লগইন ছাড়া কিছুই নেই
+  try{ const a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; }
+}
+function nbSave(list){
+  const k = nbKey();
+  if(!k) return;                    // লগইন ছাড়া লেখাও যাবে না
+  try{ localStorage.setItem(k, JSON.stringify(list)); }catch(e){}
+}
 
 /* বাংলা/আরবি অঙ্ক সাধারণ অঙ্ক বানানো, বড়-ছোট হাতের অক্ষর এক করা —
    দোকানের অ্যাপে যে নিয়মে মেলানো হয়, এখানেও ঠিক সেই নিয়ম */
@@ -3695,6 +3744,38 @@ function nbRender(){
     lkBtn.addEventListener('click', function(){ nbToggleLock(n.id); });
     meta2.appendChild(prBtn); meta2.appendChild(shBtn); meta2.appendChild(lkBtn);
     card.appendChild(meta2);
+
+    /* ভাঁজ করা — শুধু নামটা দেখা যায়, চাপ দিলে ভেতরটা খোলে।
+       দোকানের অ্যাপে ঠিক একই আচরণ। */
+    const body = document.createElement('div');
+    body.className = 'nbNoteBody';
+    while(card.firstChild) body.appendChild(card.firstChild);
+    const titleEl = body.querySelector('.nbTitle');
+    if(titleEl) titleEl.remove();
+
+    const head = document.createElement('div'); head.className = 'nbHead';
+    const arrow = document.createElement('span'); arrow.className = 'nbArrow'; arrow.textContent = '▾';
+    const nameWrap = document.createElement('div'); nameWrap.className = 'nbName';
+    const nameTx = document.createElement('div'); nameTx.className = 'nbNameTx';
+    const firstLine = String(n.text || '').split('\n').find(function(l){ return l.trim(); }) || '(খালি নোট)';
+    const shownName = (n.title && n.title.trim()) ? n.title.trim() : firstLine.trim();
+    nameTx.appendChild(nbMark(shownName, q));
+    const sub = document.createElement('div'); sub.className = 'nbNameSub';
+    const nLines = String(n.text || '').split('\n').filter(function(l){ return l.trim(); }).length;
+    sub.textContent = (n.pinned ? '📌 ' : '') + (n.locked ? '🔒 ' : '') +
+                      nLines + ' লাইন · ' + nbWhen(n.updatedAt || n.createdAt);
+    nameWrap.appendChild(nameTx); nameWrap.appendChild(sub);
+    head.appendChild(arrow); head.appendChild(nameWrap);
+    card.appendChild(head); card.appendChild(body);
+
+    const openNow = !!nbOpenIds[n.id] || (q && hits.length > 0);
+    card.classList.toggle('open', !!openNow);
+    head.addEventListener('click', function(){
+      const nowOpen = !card.classList.contains('open');
+      card.classList.toggle('open', nowOpen);
+      if(nowOpen) nbOpenIds[n.id] = true; else delete nbOpenIds[n.id];
+    });
+
     box.appendChild(card);
   });
   nbZoomApply(nbZoomGet());
