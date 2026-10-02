@@ -77,6 +77,21 @@
   /* হোমের একদম নিচের বোতাম — কার্ড নয়, বোতাম, যাতে "এটা চাপা যায়" বোঝা যায় */
   .addDev{margin-top:4px}
   @media(min-width:700px){ #scrHome.on > .addDev{grid-column:1 / -1} }
+  /* বিপদের কার্ড — লাল, যাতে চোখ এড়াতে না পারে */
+  .alertCard{border-color:#f0b6b0;background:#fff7f6}
+  .alertCard.warnOnly{border-color:#f2dfae;background:#fffaf0}
+  .alertCard h2{color:var(--danger)}
+  .alertCard.warnOnly h2{color:#7a5600}
+  .alertRow{display:flex;gap:10px;align-items:flex-start;padding:10px 0;
+            border-top:1px solid #f0e2e0}
+  .alertRow:first-of-type{border-top:0}
+  .alertDot{flex:0 0 auto;font-size:17px;line-height:1.4}
+  .alertTxt{flex:1;min-width:0}
+  .alertTxt b{display:block;font-size:15px}
+  .alertTxt .when{color:var(--muted);font-size:12px;margin-top:2px}
+  .alertAck{flex:0 0 auto;border:1px solid var(--line);background:#fff;
+            border-radius:8px;padding:7px 11px;font-size:13px;cursor:pointer}
+  #scrHome.on > .alertCard{grid-column:1 / -1}
   .msg{margin-top:14px;padding:11px 12px;border-radius:9px;font-size:14px;display:none;white-space:pre-line}
   .msg.err{display:block;background:#fdecea;color:var(--danger);border:1px solid #f5c6c0}
   .msg.ok{display:block;background:var(--green-l);color:var(--green);border:1px solid #bfe3ce}
@@ -266,6 +281,10 @@
       <div><b id="hmName">—</b><span id="hmEmail">—</span></div>
       <button id="hmOut">বের হন</button>
     </div>
+
+    <!-- ⚠️ সবার উপরে, খামারের নামেরও আগে। বিপদের খবর নিচে থাকলে
+         খামারি স্ক্রল না করলে দেখতেনই না। -->
+    <div class="card alertCard" id="hmAlerts" style="display:none"></div>
 
     <div class="card tap" id="hmFarmCard">
       <h2 id="hmFarm">—</h2>
@@ -570,7 +589,7 @@
     <div class="msg" id="hsMsg2"></div>
   </section>
 
-  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">১.০</span></div>
+  <div class="foot">Honey Bee Smart Poultry · সংস্করণ <span id="verTag">১.১</span></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -892,6 +911,122 @@
                            + "-" + String(d.getDate()).padStart(2,"0");
   }
 
+  /* ════════ সতর্কবার্তা ════════
+     ⚠️ যন্ত্র বিপদ দেখলে `alerts` ঘরে লেখে, আর ঠিক হলে clearedAt
+        বসায়। অ্যাপ শুধু **খোলা** বার্তাগুলো দেখায়। */
+  let ALERTS = [];
+  let alertSub = null;
+
+  const ALERT_TEXT = {
+    CRIT_HIGH:    ["ঘর অনেক গরম",            "ফ্যান চলছে কিনা, বিদ্যুৎ আছে কিনা দেখুন"],
+    CRIT_LOW:     ["ঘর অনেক ঠান্ডা",          "হিটার চলছে কিনা দেখুন"],
+    SENSOR_BLIND: ["সেন্সরের খবর আসছে না",     "সেন্সর বাক্সের ব্যাটারি বা তার দেখুন"],
+    NH3:          ["অ্যামোনিয়ার গন্ধ বেশি",    "লিটার বদলান, বাতাস চলাচল বাড়ান"],
+    GRADIENT:     ["ঘরের দুই মাথায় তফাত বেশি", "পর্দা বা ফ্যানের দিক দেখুন"],
+    CLOCK:        ["যন্ত্রের ঘড়ি ঠিক নেই",     "RTC ব্যাটারি বদলাতে হতে পারে"],
+    NO_DAY:       ["ব্যাচের দিন জানা নেই",     "ব্যাচ শুরুর তারিখ বসান"],
+    EMERGENCY:    ["ইমার্জেন্সি তালা লাগানো",   "হিটার-ফ্যান সব বন্ধ আছে"]
+  };
+
+  function subscribeAlerts(){
+    if (alertSub){ try { alertSub(); } catch(e){} alertSub = null; }
+    if (!ST.farmRef) return;
+    /* শুধু খোলা বার্তা — clearedAt এখনো বসেনি।
+       ⚠️ orderBy দিইনি ইচ্ছে করে: where + orderBy একসাথে দিলে
+          Firestore আলাদা index চায়, আর সেটা না বানানো থাকলে
+          অ্যাপ চুপচাপ কিছুই দেখাত না। সাজানোটা এখানেই করি।    */
+    alertSub = ST.farmRef.collection("alerts")
+      .where("clearedAt", "==", null).limit(20)
+      .onSnapshot(function(snap){
+        ALERTS = [];
+        snap.forEach(function(d){
+          const a = d.data(); a.__id = d.id; a.__ref = d.ref;
+          /* ⚠️ where()-এর উপর একা ভরসা নয়। যন্ত্রের পুরনো সংস্করণ
+             clearedAt না-ও লিখতে পারে, আর তখন বন্ধ হয়ে যাওয়া বিপদও
+             তালিকায় এসে পড়ত — খামারি ঠিক হয়ে যাওয়া জিনিস নিয়ে
+             দৌড়াদৌড়ি করতেন। তাই এখানেও মিলিয়ে নিই।            */
+          if (!a.clearedAt && !a.acknowledgedAt) ALERTS.push(a);
+        });
+        ALERTS.sort(function(x, y){
+          const rank = { CRIT:0, WARN:1, INFO:2 };
+          const dx = (rank[x.severity] == null ? 3 : rank[x.severity]);
+          const dy = (rank[y.severity] == null ? 3 : rank[y.severity]);
+          if (dx !== dy) return dx - dy;
+          return msOf(y.startedAt) - msOf(x.startedAt);
+        });
+        paintAlerts();
+      }, function(){ ALERTS = []; paintAlerts(); });
+  }
+
+  function msOf(t){
+    if (!t) return 0;
+    if (typeof t === "string") return Date.parse(t) || 0;
+    if (t.toDate) { try { return t.toDate().getTime(); } catch(e){ return 0; } }
+    return 0;
+  }
+
+  function paintAlerts(){
+    const box = $("hmAlerts");
+    if (!ALERTS.length){ box.style.display = "none"; box.innerHTML = ""; return; }
+
+    const worst = ALERTS[0].severity;
+    box.className = "card alertCard" + (worst === "CRIT" ? "" : " warnOnly");
+    box.style.display = "";
+    box.innerHTML = "";
+
+    const h = document.createElement("h2");
+    h.textContent = (worst === "CRIT" ? "⚠️ " : "") + "সতর্কবার্তা ("
+                  + bn(ALERTS.length) + ")";
+    box.appendChild(h);
+
+    ALERTS.forEach(function(a){
+      const t = ALERT_TEXT[a.code] || [a.code, ""];
+      const row = document.createElement("div");
+      row.className = "alertRow";
+
+      const dot = document.createElement("div");
+      dot.className = "alertDot";
+      dot.textContent = a.severity === "CRIT" ? "🔴" : (a.severity === "WARN" ? "🟡" : "🔵");
+
+      const txt = document.createElement("div");
+      txt.className = "alertTxt";
+      const b = document.createElement("b"); b.textContent = t[0];
+      const p = document.createElement("div");
+      p.className = "hint"; p.style.margin = "2px 0 0";
+      p.textContent = t[1];
+      const w = document.createElement("div");
+      w.className = "when";
+      const ms = msOf(a.startedAt);
+      let when = ms ? fmtAge(Date.now() - ms) + " থেকে" : "";
+      if (a.value != null && (a.code === "CRIT_HIGH" || a.code === "CRIT_LOW"))
+        when += (when ? " · " : "") + bn(Number(a.value).toFixed(1)) + "°";
+      w.textContent = when;
+      txt.appendChild(b); txt.appendChild(p); if (when) txt.appendChild(w);
+
+      const ack = document.createElement("button");
+      ack.className = "alertAck"; ack.textContent = "দেখেছি";
+      ack.addEventListener("click", function(){ ackAlert(a, ack); });
+
+      row.appendChild(dot); row.appendChild(txt); row.appendChild(ack);
+      box.appendChild(row);
+    });
+
+    const note = document.createElement("div");
+    note.className = "hint";
+    note.style.marginTop = "10px";
+    /* ⚠️ সৎ থাকা দরকার: অ্যাপ খোলা না থাকলে ফোনে কোনো শব্দ হবে না।
+       খামারিকে এটা জানিয়ে রাখা ভালো, নইলে তিনি ভরসা করে বসে থাকবেন। */
+    note.textContent = "যন্ত্রের গায়ের বাজারও বাজছে। অ্যাপ বন্ধ থাকলে "
+                     + "ফোনে শব্দ হবে না — দিনে দুইবার দেখে নেবেন।";
+    box.appendChild(note);
+  }
+
+  function ackAlert(a, btn){
+    btn.disabled = true; btn.textContent = "…";
+    a.__ref.update({ acknowledgedBy: ST.user.uid, acknowledgedAt: TS() })
+      .catch(function(){ btn.disabled = false; btn.textContent = "দেখেছি"; });
+  }
+
   function paintHome(){
     const f = ST.farm || {};
     $("hmFarm").textContent  = f.name || "খামার";
@@ -976,6 +1111,7 @@
           return;
         }
         ST.farmRef = fd.ref; ST.farm = fd.data();
+        subscribeAlerts();
         return loadCtrls().then(paintHome);
       })
       .catch(function(e){
@@ -1552,6 +1688,11 @@
   let liveSubs = [];   // চলমান সংযোগ — পাতা ছাড়লে বন্ধ করতে হবে
   let liveData = {};   // controllerId → নথি
 
+  function stopAlerts(){
+    if (alertSub){ try { alertSub(); } catch(e){} alertSub = null; }
+    ALERTS = []; paintAlerts();
+  }
+
   function stopLive(){
     liveSubs.forEach(function(u){ try { u(); } catch(err){} });
     liveSubs = [];
@@ -2085,7 +2226,13 @@
 
   auth.onAuthStateChanged(function(user){
     if (user){ show("scrHome"); loadHome(user); }
-    else     { show("scrLogin"); }
+    else {
+      // ⚠️ বের হওয়ার সময় চলমান সংযোগ বন্ধ না করলে পুরনো খামারের
+      //    খবর আসতে থাকত, আর নিয়ম আটকে দিলে ভুলের বন্যা হতো
+      stopAlerts(); stopLive();
+      ST.farm = ST.farmRef = ST.user = null;
+      show("scrLogin");
+    }
   });
 
 })();
