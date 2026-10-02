@@ -3137,6 +3137,30 @@ window.hbLoadLib = function(name){
     #program-notebook .nbDupWarn .no{ background:rgba(255,255,255,0.14); color:#fff8e8; }
 
     /* নোটের নাম কার্ডের উপরে */
+    /* ভাঁজ করা নোট — শুধু নাম দেখা যায়, চাপ দিলে ভেতরটা খোলে */
+    /* ⚠️ নাম `nbCardHead`, `nbHead` নয়। পর্দার উপরের বারটাও
+       `.nbHead` — একই নাম রাখায় নোটের মাথা ওই বারের কালো পটভূমি,
+       ১৬px প্যাডিং আর নিচের দাগ পেয়ে বসেছিল। */
+    #program-notebook .nbCardHead{
+      display:flex; align-items:center; gap:10px; cursor:pointer;
+      user-select:none; -webkit-user-select:none;
+      padding:2px 0;
+    }
+    #program-notebook .nbArrow{
+      flex-shrink:0; font-size:15px; color:rgba(255,209,102,0.7);
+      transition:transform .2s ease;
+    }
+    #program-notebook .nbCard.open .nbArrow{ transform:rotate(180deg); }
+    #program-notebook .nbName{ flex:1; min-width:0; }
+    #program-notebook .nbNameTx{
+      font-size:15px; font-weight:800; color:#ffd166; line-height:1.45;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    #program-notebook .nbNameTx mark{ background:#22d3ee; color:#06282e; border-radius:3px; padding:0 3px; }
+    #program-notebook .nbNameSub{ font-size:11px; color:rgba(255,248,232,0.45); margin-top:3px; }
+    #program-notebook .nbNoteBody{ display:none; margin-top:11px; padding-top:10px; border-top:1px dashed rgba(255,209,102,0.18); }
+    #program-notebook .nbCard.open .nbNoteBody{ display:block; }
+
     #program-notebook .nbTitle{
       font-size:15px; font-weight:800; color:#ffd166; margin-bottom:7px; line-height:1.45;
     }
@@ -6186,6 +6210,7 @@ let hbGsCameFrom = null;
 const HB_NB_KEY = 'hb-notebook';
 let hbNbEditingId = null;
 let hbNbConfirmId = null;      // এখন কোন নোটের মোছা "নিশ্চিত?" অবস্থায় আছে
+let hbNbOpenIds = {};          // কোন কোন নোট এখন খোলা আছে
 
 function hbNbLoad(){
   try{ const a = JSON.parse(localStorage.getItem(HB_NB_KEY) || '[]'); return Array.isArray(a) ? a : []; }
@@ -6366,6 +6391,59 @@ function hbNbRender(){
     meta2.appendChild(lkBtn);
 
     card.appendChild(meta2);
+
+    /* ---- এখন কার্ডটাকে ভাঁজ করা হয় ----
+       এতক্ষণ সব কিছু বানানো হয়েছে; এবার নামটাকে মাথা বানিয়ে বাকি
+       সবটুকু তার নিচে গুটিয়ে দেওয়া হয়। খাতায় দশটা নোট থাকলে আগে
+       দশটার পুরো লেখা একসাথে পর্দায় নামত — একটা লম্বা নোটই গোটা
+       পর্দা খেয়ে ফেলত। এখন শুধু নামগুলো থাকে, যেটা দরকার সেটাতে
+       চাপ দিলে খোলে।
+
+       ভেতরের কিছু নতুন করে বানানো হয়নি — যা বানানো ছিল তাকেই
+       সরিয়ে একটা মোড়কে ঢোকানো হলো, তাই সব বোতাম আগের মতোই কাজ করে। */
+    const body = document.createElement('div');
+    body.className = 'nbNoteBody';
+    while(card.firstChild) body.appendChild(card.firstChild);   // নাম সহ সব
+
+    // নাম আলাদা করে মাথায় তুলে আনা
+    const titleEl = body.querySelector('.nbTitle');
+    if(titleEl) titleEl.remove();
+
+    const head = document.createElement('div');
+    head.className = 'nbCardHead';
+
+    const arrow = document.createElement('span');
+    arrow.className = 'nbArrow';
+    arrow.textContent = '▾';
+
+    const nameWrap = document.createElement('div');
+    nameWrap.className = 'nbName';
+    const nameTx = document.createElement('div');
+    nameTx.className = 'nbNameTx';
+    // নাম না দিলে প্রথম লাইনটাই নাম হিসেবে দেখাই — মাথা কখনো খালি থাকে না
+    const firstLine = String(n.text || '').split('\n').find(function(l){ return l.trim(); }) || '(খালি নোট)';
+    const shownName = (n.title && n.title.trim()) ? n.title.trim() : firstLine.trim();
+    nameTx.appendChild(hbNbMark(shownName, q));
+    const sub = document.createElement('div');
+    sub.className = 'nbNameSub';
+    const nLines = String(n.text || '').split('\n').filter(function(l){ return l.trim(); }).length;
+    sub.textContent = (n.pinned ? '📌 ' : '') + (n.locked ? '🔒 ' : '') +
+                      nLines + ' লাইন · ' + hbNbWhen(n.updatedAt || n.createdAt);
+    nameWrap.appendChild(nameTx); nameWrap.appendChild(sub);
+
+    head.appendChild(arrow); head.appendChild(nameWrap);
+    card.appendChild(head); card.appendChild(body);
+
+    /* খোঁজার সময় যেগুলোতে মিল আছে সেগুলো নিজে থেকেই খুলে যায় — নাহলে
+       খুঁজে পেয়েও আবার হাতে খুলতে হতো */
+    const openNow = !!hbNbOpenIds[n.id] || (q && hits.length > 0);
+    card.classList.toggle('open', !!openNow);
+    head.addEventListener('click', function(){
+      const nowOpen = !card.classList.contains('open');
+      card.classList.toggle('open', nowOpen);
+      if(nowOpen) hbNbOpenIds[n.id] = true; else delete hbNbOpenIds[n.id];
+    });
+
     box.appendChild(card);
   });
   hbNbZoomApply(hbNbZoomGet());     // নতুন করে আঁকা হলো, মাপটা আবার বসাই
