@@ -138,10 +138,15 @@
             <select id="genCount"></select>
           </div>
           <div>
-            <label for="genModel">মডেল</label>
-            <input id="genModel" type="text" value="HB-ESP32-GW-V1">
+            <label for="genType">কোন যন্ত্র</label>
+            <select id="genType">
+              <option value="POULTRY">পোলট্রি কন্ট্রোলার (HBP)</option>
+              <option value="SWITCH">স্মার্ট সুইচ ১৬ চ্যানেল (HBS)</option>
+            </select>
           </div>
         </div>
+        <label for="genModel">মডেল</label>
+        <input id="genModel" type="text" value="HB-ESP32-GW-V1">
         <label for="genMonths">দখল-কোডের মেয়াদ (মাস)</label>
         <select id="genMonths"></select>
         <button class="btn" id="btnGen">তৈরি করুন</button>
@@ -248,9 +253,18 @@
     }
     return (10 - (sum % 10)) % 10;
   }
-  function makeSerial(seq){
+  /* ⚠️ ক্রমিক নম্বর দুই পণ্যে **ভাগাভাগি** করা হয় — HBP-0042 আর
+     HBS-0043। এক নম্বর দুইবার ব্যবহার হয় না, তাই কোনোদিন দুইটা
+     যন্ত্রের ইমেইল এক হবে না।                                   */
+  const TYPES = {
+    POULTRY: { pre:"HBP", role:"GATEWAY",  model:"HB-ESP32-GW-V1" },
+    SWITCH:  { pre:"HBS", role:"SWITCH16", model:"HB-ESP32-SW16-V1" }
+  };
+  function typeInfo(){ return TYPES[$("genType").value] || TYPES.POULTRY; }
+
+  function makeSerial(seq, prefix){
     const n = String(seq).padStart(4, "0");
-    return "HBP-" + n + "-" + luhn(n);
+    return (prefix || "HBP") + "-" + n + "-" + luhn(n);
   }
   // বিভ্রান্তিকর অক্ষর বাদ: O/0, I/1/L
   const ALPHA = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -460,11 +474,18 @@
       });
   }
 
+  $("genType").addEventListener("change", function(){
+    // ⚠️ মডেলের নামটা নিজে থেকে বদলে দিই — নইলে সুইচ বানাতে গিয়ে
+    //    "HB-ESP32-GW-V1" লেখা থেকে যেত, আর পরে চেনা যেত না
+    $("genModel").value = typeInfo().model;
+  });
+
   $("btnGen").addEventListener("click", function(){
     const btn = this, box = $("genMsg");
     clearMsg(box);
     const count  = Math.max(1, Math.min(25, parseInt($("genCount").value,10) || 1));
-    const model  = $("genModel").value.trim() || "HB-ESP32-GW-V1";
+    const ti     = typeInfo();
+    const model  = $("genModel").value.trim() || ti.model;
     const months = parseInt($("genMonths").value,10) || 12;
     busy(btn, true, "তৈরি হচ্ছে…");
 
@@ -477,14 +498,15 @@
       function step(i){
         if (i >= count) return Promise.resolve();
         const seq = start + i;
-        const serial = makeSerial(seq);
+        const serial = makeSerial(seq, ti.pre);
         const code = makeCode();
         msg(box, "⏳ " + bn(i+1) + "/" + bn(count) + " — " + serial, "warn");
 
         return makeDeviceAccount(serial).then(function(acc){
           const batch = db.batch();
           batch.set(db.collection("devices").doc(serial), {
-            serial: serial, seq: seq, model: model, role: "GATEWAY",
+            serial: serial, seq: seq, model: model, role: ti.role,
+            deviceType: $("genType").value,
             status: "STOCK", claimCode: code, claimCodeExpiresAt: expTs,
             claimedByUid: null, farmId: null, controllerId: null,
             authEmail: acc.email, authUid: acc.uid,
