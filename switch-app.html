@@ -9,13 +9,14 @@
   --bg:#0b1220; --panel:#121c2e; --panel2:#17243a; --text:#f5f7fb;
   --muted:#91a0b8; --yellow:#ffc928; --green:#22c55e; --red:#ef4444;
   --blue:#38bdf8; --border:#26354d;
+  color-scheme: dark;        /* ইনপুট, স্ক্রলবার — সবই কালো সাজে চলবে */
 }
 *{box-sizing:border-box}
 body{margin:0;background:linear-gradient(145deg,#07101d,#111d31);color:var(--text);
      font-family:Arial,"Noto Sans Bengali",sans-serif;min-height:100vh}
 button,input,select{font:inherit}
 .app{max-width:1100px;margin:auto;min-height:100vh;padding-bottom:85px}
-header{position:sticky;top:0;z-index:10;background:rgba(8,15,27,.94);backdrop-filter:blur(15px);
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:10;background:rgba(8,15,27,.94);backdrop-filter:blur(15px);
        border-bottom:1px solid var(--border);padding:16px}
 .brand{display:flex;align-items:center;gap:12px}
 .logo{width:46px;height:46px;border-radius:14px;background:#ffc928;display:grid;place-items:center;font-size:27px}
@@ -69,7 +70,8 @@ input[type=time],input[type=text],input[type=email],input[type=password],input[t
 .badge.no{background:#3b2025;color:#ff8992}
 .badge.warn{background:#3d3312;color:#ffd84a}
 nav{position:fixed;bottom:0;left:0;right:0;z-index:20;background:rgba(10,17,29,.97);
-    border-top:1px solid var(--border);display:flex;justify-content:center}
+    border-top:1px solid var(--border);display:flex;justify-content:center;
+    padding-bottom:env(safe-area-inset-bottom,0px)}
 .navin{max-width:700px;width:100%;display:grid;grid-template-columns:repeat(3,1fr)}
 .navbtn{background:none;border:0;color:var(--muted);padding:12px 4px 10px;cursor:pointer}
 .navbtn.active{color:#ffd22e}.navicon{font-size:20px;display:block}
@@ -230,6 +232,9 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:20;background:rgba(10,17,29,.
     <div class="hint">কোড একবারই চলে। ভুল লিখলে কিছুই হবে না — আবার চেষ্টা করতে পারবেন।</div>
   </div>
 </section>
+  <p class="info" style="text-align:center;margin:22px 0 0">
+    Honey Bee Smart Switch · সংস্করণ <span id="verTag">১.০</span>
+  </p>
 </main>
 
 <nav><div class="navin">
@@ -239,9 +244,9 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:20;background:rgba(10,17,29,.
 </div></nav>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-firestore-compat.js"></script>
 <script>
 (function(){
 "use strict";
@@ -891,19 +896,44 @@ function paintSettings(){
     b.textContent = age == null ? "সাড়া দেয়নি" : fmtAge(age);
     row.appendChild(b);
     row.style.cursor = "pointer";
-    row.addEventListener("click", function(){ renameDev(x); });
+    row.addEventListener("click", function(){ renameDev(x, row); });
     box.appendChild(row);
   });
 }
 
-function renameDev(x){
-  const nm = window.prompt("যন্ত্রের নাম", x.name || "");
-  if (nm === null) return;
-  const v = nm.trim();
-  if (!v) return;
-  x.__ref.update({ name:v, updatedAt:TS() })
-    .then(function(){ x.name = v; paintAll(); })
-    .catch(function(e){ msg($("dvMsg"), bnError(e)); });
+/* ⚠️ window.prompt() ব্যবহার করা যাবে না — অনেক ব্রাউজারে আর অ্যাপের
+   ভেতরে ওটা দেখানোই হয় না, তখন বোতাম চেপে কিছুই হয় না আর গ্রাহক
+   ভাবেন অ্যাপ নষ্ট। নাম বদলানোর ঘরটা পাতার ভেতরেই থাকবে।         */
+function renameDev(x, row){
+  if (row.dataset.editing === "1"){ row.dataset.editing = ""; paintSettings(); return; }
+  row.dataset.editing = "1";
+  row.innerHTML = "";
+  row.style.display = "block";
+
+  const lbl = document.createElement("label");
+  lbl.textContent = "যন্ত্রের নাম";
+  const inp = document.createElement("input");
+  inp.type = "text"; inp.maxLength = 30; inp.value = x.name || "";
+  const rw  = document.createElement("div"); rw.className = "row";
+  const ok  = document.createElement("button");
+  ok.className = "btn"; ok.textContent = "সংরক্ষণ";
+  const no  = document.createElement("button");
+  no.className = "btn ghost"; no.textContent = "বাতিল";
+  const em  = document.createElement("div"); em.className = "msg";
+
+  no.addEventListener("click", function(){ row.dataset.editing = ""; paintSettings(); });
+  ok.addEventListener("click", function(){
+    const v = inp.value.trim();
+    if (!v){ msg(em, "নাম খালি রাখা যাবে না।"); return; }
+    busy(ok, true, "সংরক্ষণ হচ্ছে…");
+    x.__ref.update({ name:v, updatedAt:TS() })
+      .then(function(){ x.name = v; row.dataset.editing = ""; paintAll(); })
+      .catch(function(e){ busy(ok, false); msg(em, bnError(e)); });
+  });
+
+  rw.appendChild(ok); rw.appendChild(no);
+  row.appendChild(lbl); row.appendChild(inp); row.appendChild(rw); row.appendChild(em);
+  setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 50);
 }
 
 /* ════════════ ১৩. যন্ত্র যোগ ════════════ */
