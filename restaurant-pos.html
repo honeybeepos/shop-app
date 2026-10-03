@@ -992,14 +992,29 @@ function saveRestaurantTables(){
 }
 function renderTables(){
   const grid=document.getElementById('tableGrid'); if(!grid)return;
-  grid.innerHTML=tableList().map(t=>`<div class="table free">
+  grid.innerHTML=tableList().map((t,i)=>`<div class="table free" data-table-name="${encodeURIComponent(t)}">
     <b>${t}</b><div class="status">🟢 Free</div>
-    <button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR(${JSON.stringify(t)})">▣ QR / Code</button>
+    <button type="button" class="btn table-action" data-table-action="qr" data-table-index="${i}" style="margin-top:8px;width:100%;touch-action:manipulation">▣ QR / Code</button>
     <div style="display:flex;gap:6px;margin-top:6px">
-      <button class="btn" style="flex:1" onclick="renameRestaurantTable(${JSON.stringify(t)})">✎ Rename</button>
-      <button class="btn danger" style="flex:1" onclick="deleteRestaurantTable(${JSON.stringify(t)})">🗑 Delete</button>
+      <button type="button" class="btn table-action" data-table-action="rename" data-table-index="${i}" style="flex:1;touch-action:manipulation">✎ Rename</button>
+      <button type="button" class="btn danger table-action" data-table-action="delete" data-table-index="${i}" style="flex:1;touch-action:manipulation">🗑 Delete</button>
     </div>
   </div>`).join('') || '<div style="padding:20px;color:var(--muted)">কোনো Table নেই। ＋ Add Table চাপুন।</div>';
+}
+if(!window.__hbTableActionsBound){
+  window.__hbTableActionsBound=true;
+  document.addEventListener('click',function(e){
+    const btn=e.target.closest && e.target.closest('.table-action');
+    if(!btn)return;
+    e.preventDefault(); e.stopPropagation();
+    const i=Number(btn.getAttribute('data-table-index'));
+    const t=tableList()[i];
+    if(!t)return;
+    const action=btn.getAttribute('data-table-action');
+    if(action==='qr') openTableQR(t);
+    else if(action==='rename') renameRestaurantTable(t);
+    else if(action==='delete') deleteRestaurantTable(t);
+  },true);
 }
 async function addRestaurantTable(){
   const suggested=nextTableName();
@@ -1077,6 +1092,15 @@ function openAllTableQR(){
   html+='setTimeout(()=>window.print(),700);<\/script></body></html>';
   w.document.write(html); w.document.close();
 }
+
+window.addRestaurantTable=addRestaurantTable;
+window.renameRestaurantTable=renameRestaurantTable;
+window.deleteRestaurantTable=deleteRestaurantTable;
+window.openTableQR=openTableQR;
+window.closeTableQR=closeTableQR;
+window.copyTableCode=copyTableCode;
+window.printTableQR=printTableQR;
+window.openAllTableQR=openAllTableQR;
 
 function showPage(id){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
