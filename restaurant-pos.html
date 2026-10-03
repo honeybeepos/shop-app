@@ -582,11 +582,11 @@ function renderAdminMenu(){
 function renderCustomerPreview(){
   const list=products.filter(f=>f.published&&f.available);
   document.getElementById("customerPreview").innerHTML=list.map(f=>`
-    <article class="product">
+    <article class="product" onclick="addToCart(${JSON.stringify(String(f.id))})" style="cursor:pointer">
       <img src="${f.img}" alt="${f.name}">
       <div class="product-body"><div class="product-name">${f.name}</div>
       <div style="font-size:12px;color:var(--muted);min-height:30px">${f.description||""}</div>
-      <div class="product-meta"><span class="price">${money(f.price)}</span><button class="add" onclick="addToCart(${JSON.stringify(String(f.id))})">＋</button></div></div>
+      <div class="product-meta"><span class="price">${money(f.price)}</span><button class="add" onclick="event.stopPropagation();addToCart(${JSON.stringify(String(f.id))})">＋</button></div></div>
     </article>`).join("") || `<div style="color:var(--muted)">No published food yet.</div>`;
 }
 
@@ -599,13 +599,13 @@ function renderCustomerPage(){
     (customerCategory==="All"||f.cat===customerCategory)&&
     f.name.toLowerCase().includes(q));
   document.getElementById("customerPageProducts").innerHTML=list.map(f=>`
-    <article class="product">
+    <article class="product" onclick="addToCart(${JSON.stringify(String(f.id))})" style="cursor:pointer">
       <img src="${f.img}" alt="${f.name}" loading="lazy">
       <div class="product-body">
         <div class="product-name">${f.name}</div>
         <div style="font-size:12px;color:var(--muted);min-height:32px">${f.description||""}</div>
         <div class="product-meta"><span class="price">${money(f.price)}</span>
-        <button class="add" onclick="addToCart(${JSON.stringify(String(f.id))})">＋</button></div>
+        <button class="add" onclick="event.stopPropagation();addToCart(${JSON.stringify(String(f.id))})">＋</button></div>
       </div>
     </article>`).join("") || `<div style="color:var(--muted);padding:20px">কোনো published food নেই।</div>`;
 }
@@ -619,14 +619,14 @@ function renderProducts(){
   const q=(document.getElementById("search")?.value||"").toLowerCase();
   const list=products.filter(p=>(category==="All"||p.cat===category)&&p.name.toLowerCase().includes(q));
   document.getElementById("products").innerHTML=list.map(p=>`
-    <article class="product">
+    <article class="product" onclick="addToCart(${JSON.stringify(String(p.id))})" style="cursor:pointer">
       <img src="${p.img}" alt="${p.name}" loading="lazy">
       <div class="product-body"><div class="product-name">${p.name}</div>
-      <div class="product-meta"><span class="price">${money(p.price)}</span><button class="add" onclick="addToCart(${JSON.stringify(String(p.id))})">＋</button></div></div>
+      <div class="product-meta"><span class="price">${money(p.price)}</span><button class="add" onclick="event.stopPropagation();addToCart(${JSON.stringify(String(p.id))})">＋</button></div></div>
     </article>`).join("");
 }
 function addToCart(id){
-  const p=products.find(x=>String(x.id)===String(id)); if(!p||!p.available)return;
+  const p=products.find(x=>String(x.id)===String(id)); if(!p || p.available===false)return;
   if((p.variants?.length||0)+(p.addons?.length||0)>0){
     openItemChooser(p); return;
   }
@@ -651,7 +651,7 @@ function confirmItemChoice(id){
   document.getElementById("chooser").remove();renderCart();
 }
 function changeQty(id,d){
-  const x=cart.find(i=>String(i.id)===String(id)); if(!x)return; x.qty+=d; if(x.qty<=0)cart=cart.filter(i=>i.id!==id); renderCart();
+  const x=cart.find(i=>String(i.id)===String(id)); if(!x)return; x.qty+=d; if(x.qty<=0)cart=cart.filter(i=>String(i.id)!==String(id)); renderCart();
 }
 function renderCart(){
   const el=document.getElementById("cartItems");
