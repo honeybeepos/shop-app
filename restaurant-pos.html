@@ -379,6 +379,12 @@ button{cursor:pointer;border:0}
         </div>
         <p style="color:var(--muted)">Kitchen printer: KOT only. Cash printer: final customer receipt. Kitchen-এর কোনো login নেই।</p>
       </div>
+
+      <div class="panel" style="border:1px solid #fecaca;background:#fffafa">
+        <h2>Account</h2>
+        <p style="color:var(--muted);margin:0 0 12px">এই Restaurant POS অ্যাকাউন্ট থেকে বের হতে নিচের Logout চাপুন।</p>
+        <button class="btn danger" onclick="logoutRestaurant()">↪ Logout</button>
+      </div>
     </section>
   </main>
 </div>
@@ -427,6 +433,17 @@ async function saveOneFood(f){
   await foodsRef().doc(String(id)).set(rest, { merge:true });
 }
 async function deleteOneFood(id){ await foodsRef().doc(String(id)).delete(); }
+
+async function logoutRestaurant(){
+  if(!confirm("আপনি কি Restaurant POS থেকে Logout করতে চান?")) return;
+  try{
+    await auth.signOut();
+    window.location.href="login.html";
+  }catch(e){
+    toastRP("Logout করা যায়নি — আবার চেষ্টা করুন।", true);
+    console.error("Restaurant logout:", e);
+  }
+}
 
 function toastRP(msg, bad){
   let t = document.getElementById("rpToast");
