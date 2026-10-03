@@ -215,19 +215,14 @@ button{cursor:pointer;border:0}
       <div class="panel">
         <div class="toolbar" style="align-items:center">
           <div style="flex:1"><h2 style="margin:0">Tables & QR</h2><div style="color:var(--muted);font-size:13px;margin-top:4px">প্রতিটি Table-এর QR scan করলে Customer Menu খুলবে। Camera কাজ না করলে নিচের Table Code লিখেও ঢোকা যাবে।</div></div>
-          <button class="btn primary" onclick="openAllTableQR()">🖨️ QR Cards</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="addRestaurantTable()">＋ Add Table</button>
+            <button class="btn primary" onclick="openAllTableQR()">🖨️ QR Cards</button>
+          </div>
         </div>
-        <div class="tables" id="tableGrid">
-          <div class="table free"><b>T01</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T01')">▣ QR / Code</button></div>
-          <div class="table free"><b>T02</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T02')">▣ QR / Code</button></div>
-          <div class="table free"><b>T03</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T03')">▣ QR / Code</button></div>
-          <div class="table free"><b>T04</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T04')">▣ QR / Code</button></div>
-          <div class="table free"><b>T05</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T05')">▣ QR / Code</button></div>
-          <div class="table free"><b>T06</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T06')">▣ QR / Code</button></div>
-          <div class="table free"><b>T07</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T07')">▣ QR / Code</button></div>
-          <div class="table free"><b>T08</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T08')">▣ QR / Code</button></div>
-        </div>
-      </div>
+        <div class="tables" id="tableGrid"></div>
+        <div style="margin-top:12px;color:var(--muted);font-size:12px">💡 যতগুলো Table দরকার Add Table দিয়ে যোগ করুন। Table-এর নাম পরিবর্তন বা মুছতেও পারবেন।</div>
+        <div id="tableAddHelp" style="display:none"></div>      </div>
     </section>
 
     <div id="paymentModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.62);z-index:90;padding:16px;overflow:auto">
@@ -965,8 +960,60 @@ function markReady(){
   o.status="READY";o.kitchenStatus="READY";saveOrders(orders);renderOrderHistory();
   alert(`Order #${no} ready — Kitchen থেকে মুখে “${no} ready” বলা হবে।`);
 }
-const HB_TABLES = ['T01','T02','T03','T04','T05','T06','T07','T08'];
+let restaurantTables = ['T01','T02','T03','T04','T05','T06','T07','T08'];
 let currentQRTable=null;
+function tableList(){ return Array.isArray(restaurantTables) ? restaurantTables : []; }
+function nextTableName(){
+  let n=tableList().length+1;
+  while(tableList().includes('T'+String(n).padStart(2,'0'))) n++;
+  return 'T'+String(n).padStart(2,'0');
+}
+function saveRestaurantTables(){
+  return db.collection('restaurants').doc(RP.uid).set({tables:tableList()},{merge:true});
+}
+function renderTables(){
+  const grid=document.getElementById('tableGrid'); if(!grid)return;
+  grid.innerHTML=tableList().map(t=>`<div class="table free">
+    <b>${t}</b><div class="status">🟢 Free</div>
+    <button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR(${JSON.stringify(t)})">▣ QR / Code</button>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button class="btn" style="flex:1" onclick="renameRestaurantTable(${JSON.stringify(t)})">✎ Rename</button>
+      <button class="btn danger" style="flex:1" onclick="deleteRestaurantTable(${JSON.stringify(t)})">🗑 Delete</button>
+    </div>
+  </div>`).join('') || '<div style="padding:20px;color:var(--muted)">কোনো Table নেই। ＋ Add Table চাপুন।</div>';
+}
+async function addRestaurantTable(){
+  const suggested=nextTableName();
+  const name=prompt('নতুন Table-এর নাম দিন:',suggested);
+  if(name===null)return;
+  const t=name.trim();
+  if(!t)return alert('Table-এর নাম দিন।');
+  if(t.length>30)return alert('Table-এর নাম 30 অক্ষরের মধ্যে দিন।');
+  if(tableList().some(x=>x.toLowerCase()===t.toLowerCase()))return alert('এই Table নামটি আগে থেকেই আছে।');
+  restaurantTables.push(t);
+  try{ await saveRestaurantTables(); renderTables(); toastRP(t+' যোগ হয়েছে।'); }
+  catch(e){ restaurantTables=restaurantTables.filter(x=>x!==t); alert('Table সংরক্ষণ হয়নি। আবার চেষ্টা করুন।'); }
+}
+async function renameRestaurantTable(oldName){
+  const name=prompt('নতুন Table-এর নাম দিন:',oldName);
+  if(name===null)return;
+  const t=name.trim();
+  if(!t || t===oldName)return;
+  if(t.length>30)return alert('Table-এর নাম 30 অক্ষরের মধ্যে দিন।');
+  if(tableList().some(x=>x.toLowerCase()===t.toLowerCase()))return alert('এই Table নামটি আগে থেকেই আছে।');
+  const i=restaurantTables.indexOf(oldName); if(i<0)return;
+  restaurantTables[i]=t;
+  try{ await saveRestaurantTables(); renderTables(); toastRP(oldName+' → '+t); }
+  catch(e){ restaurantTables[i]=oldName; alert('Table নাম সংরক্ষণ হয়নি।'); }
+}
+async function deleteRestaurantTable(t){
+  if(tableList().length<=1)return alert('কমপক্ষে ১টি Table রাখতে হবে।');
+  if(!confirm(t+' Delete করবেন?'))return;
+  const old=[...restaurantTables];
+  restaurantTables=restaurantTables.filter(x=>x!==t);
+  try{ await saveRestaurantTables(); renderTables(); toastRP(t+' মুছে ফেলা হয়েছে।'); }
+  catch(e){ restaurantTables=old; renderTables(); alert('Table মুছে ফেলা যায়নি।'); }
+}
 function makeTableCode(table){
   const raw=(RP.uid||'restaurant')+'|'+table;
   let h=2166136261;
@@ -1000,10 +1047,16 @@ function printTableQR(){
   w.document.close();
 }
 function openAllTableQR(){
+  const tables=tableList();
   const w=window.open('','_blank','width=700,height=900'); if(!w)return;
-  const cards=HB_TABLES.map(t=>{const c=makeTableCode(t),u=customerTableUrl(t,c);return '<div class="card"><h2>Table '+t+'</h2><div id="q'+t+'"></div><b>'+c+'</b><p>Scan QR or enter the Table Code</p></div>'}).join('');
-  w.document.write('<html><head><title>Restaurant Table QR Cards</title><style>body{font-family:Arial;display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px}.card{text-align:center;border:1px solid #ddd;padding:15px;break-inside:avoid}.card div{display:flex;justify-content:center}</style></head><body>'+cards+'<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><script>'+HB_TABLES.map(t=>'new QRCode(document.getElementById("q'+t+'"),{text:'+JSON.stringify(customerTableUrl(t,makeTableCode(t)))+',width:180,height:180});').join('')+'setTimeout(()=>window.print(),700);<\/script></body></html>');
-  w.document.close();
+  const cards=tables.map(t=>{const c=makeTableCode(t),u=customerTableUrl(t,c),id='q'+Math.random().toString(36).slice(2);return '<div class="card"><h2>Table '+t+'</h2><div id="'+id+'"></div><b>'+c+'</b><p>Scan QR or enter the Table Code</p></div>';}).join('');
+  const scripts=tables.map(t=>{const c=makeTableCode(t),u=customerTableUrl(t,c),id='q'+tables.indexOf(t);return '';}).join('');
+  let html='<html><head><title>Restaurant Table QR Cards</title><style>body{font-family:Arial;display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px}.card{text-align:center;border:1px solid #ddd;padding:15px;break-inside:avoid}.card div{display:flex;justify-content:center}</style></head><body>';
+  tables.forEach((t,i)=>{const c=makeTableCode(t),u=customerTableUrl(t,c);html+='<div class="card"><h2>Table '+t+'</h2><div id="qr'+i+'"></div><b>'+c+'</b><p>Scan QR or enter the Table Code</p></div>';});
+  html+='<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><script>';
+  tables.forEach((t,i)=>{html+='new QRCode(document.getElementById("qr'+i+'"),{text:'+JSON.stringify(customerTableUrl(t,makeTableCode(t)))+',width:180,height:180});';});
+  html+='setTimeout(()=>window.print(),700);<\/script></body></html>';
+  w.document.write(html); w.document.close();
 }
 
 function showPage(id){
@@ -1015,6 +1068,7 @@ function showPage(id){
   if(id==="menu"){renderAdminMenu();renderCustomerPreview();}
   if(id==="customer"){renderCustomerPage();}
   if(id==="orders"){renderOrderHistory();}
+  if(id==="tables"){renderTables();}
 }
 document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
 
@@ -1061,6 +1115,8 @@ auth.onAuthStateChanged(async function(user){
     RP.uid = user.uid;
     RP.name = d.name || "রেস্টুরেন্ট";
     RP.cur = d.currency || "SAR";
+    restaurantTables = Array.isArray(d.tables) && d.tables.length ? d.tables.map(String) : ['T01','T02','T03','T04','T05','T06','T07','T08'];
+    renderTables();
     const printNameEl=document.getElementById("printShopName");
     const savedPrintName=d.printHeader || localStorage.getItem("hbPrintShopName") || RP.name;
     if(printNameEl) printNameEl.value=savedPrintName;
