@@ -174,7 +174,7 @@
     <input type="text" id="rsAddress" placeholder="যেমনঃ থানা রোড, বাস স্ট্যান্ডের পাশে">
 
     <button class="btn" id="restaurantSignupBtn">✅ নিবন্ধন করুন</button>
-    <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:10px;">নিবন্ধনের পর আপনার রেস্টুরেন্ট Honey Bee Bazar-এ দেখা যাবে। খাবারের তালিকা বসানোর অ্যাপটা শীঘ্রই আসছে।</p>
+    <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:10px;">নিবন্ধনের পর সরাসরি আপনার Restaurant POS খুলে যাবে — সেখানে খাবারের তালিকা বসাবেন। Publish করলে Honey Bee Bazar-এ গ্রাহক দেখতে পাবেন।</p>
     <div class="msg" id="restaurantMsg"></div>
   </div>
 
@@ -576,7 +576,7 @@ document.getElementById("restaurantSignupBtn").addEventListener("click", async (
       createdAt: fbNow()
     });
 
-    showMsg("restaurantMsg","✅ নিবন্ধন সম্পন্ন হয়েছে! আপনার রেস্টুরেন্ট এখন Honey Bee Bazar-এ দেখা যাবে।", true);
+    showMsg("restaurantMsg","✅ নিবন্ধন সম্পন্ন হয়েছে! আপনার Restaurant POS খোলা হচ্ছে…", true);
     await afterLoginRoute(uid);
   }catch(e){
     console.error(e);
@@ -641,10 +641,8 @@ async function afterLoginRoute(uid){
       await auth.signOut();
       return;
     }
-    showMsg("loginMsg", "✅ আপনার রেস্টুরেন্ট নিবন্ধিত আছে — Honey Bee Bazar-এ দেখা যাচ্ছে।\n"
-      + "খাবারের তালিকা বসানোর অ্যাপটা শীঘ্রই আসছে। তৈরি হলে এই মোবাইল নম্বর "
-      + "আর পাসওয়ার্ড দিয়েই ঢুকতে পারবেন।", true);
-    await auth.signOut();
+    saveSession({ uid, role: "restaurant", name: doc.data().name || "" });
+    window.location.href = "restaurant-pos.html";
     return;
   }
 

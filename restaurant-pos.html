@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Restaurant POS — Honey Bee</title>
+<style>
+:root{
+  --bg:#f6f7fb; --card:#fff; --text:#172033; --muted:#6b7280;
+  --primary:#f59e0b; --primary2:#ea580c; --green:#16a34a;
+  --red:#dc2626; --blue:#2563eb; --border:#e5e7eb;
+  --shadow:0 8px 24px rgba(15,23,42,.08); --radius:18px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit}
+button{cursor:pointer;border:0}
+.app{min-height:100vh;display:flex}
+.sidebar{width:240px;background:#111827;color:#fff;padding:18px;position:fixed;inset:0 auto 0 0;z-index:20}
+.brand{font-size:21px;font-weight:800;padding:8px 10px 22px}
+.brand small{display:block;color:#9ca3af;font-size:11px;font-weight:500;margin-top:4px}
+.nav{display:grid;gap:7px}
+.nav button{background:transparent;color:#d1d5db;text-align:left;padding:12px 13px;border-radius:12px}
+.nav button.active,.nav button:hover{background:#263244;color:#fff}
+.main{margin-left:240px;width:calc(100% - 240px);padding:22px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px}
+.topbar h1{margin:0;font-size:25px}
+.top-actions{display:flex;gap:8px}
+.btn{padding:11px 15px;border-radius:12px;background:#fff;border:1px solid var(--border)}
+.btn.primary{background:var(--primary);color:#111827;border-color:var(--primary)}
+.btn.green{background:var(--green);color:#fff}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.danger{background:#fee2e2;color:#991b1b}
+.page{display:none}.page.active{display:block}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.stat{background:var(--card);padding:18px;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.stat .label{font-size:13px;color:var(--muted)}.stat .num{font-size:28px;font-weight:800;margin-top:7px}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+.order-layout{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:18px}
+.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}
+.search{flex:1;min-width:180px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:#fff}
+.chips{display:flex;gap:7px;overflow:auto;padding-bottom:4px;margin-bottom:14px}
+.chip{white-space:nowrap;padding:9px 13px;border-radius:999px;background:#f3f4f6;color:#4b5563}
+.chip.active{background:#111827;color:#fff}
+.products{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+#adminProducts .btn{padding:8px 10px;font-size:13px}
+.product{overflow:hidden;border:1px solid var(--border);border-radius:16px;background:#fff;transition:.15s}
+.product:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.product img{width:100%;aspect-ratio:1.25;object-fit:cover;display:block}
+.product-body{padding:12px}.product-name{font-weight:750}.product-meta{display:flex;justify-content:space-between;align-items:center;margin-top:7px}
+.price{font-weight:800}.add{width:34px;height:34px;border-radius:10px;background:#fff7ed;color:#c2410c;font-size:21px}
+.cart{position:sticky;top:18px;height:max-content}
+.cart h2{font-size:18px;margin:0 0 10px}
+.order-id{font-weight:800;background:#111827;color:#fff;padding:10px 12px;border-radius:12px;margin-bottom:12px}
+.cart-items{display:grid;gap:9px;max-height:360px;overflow:auto}
+.cart-item{border:1px solid var(--border);border-radius:12px;padding:10px}
+.item-row{display:flex;justify-content:space-between;gap:8px}
+.qty{display:flex;align-items:center;gap:7px;margin-top:7px}.qty button{width:27px;height:27px;border-radius:8px;background:#f3f4f6}
+.total{border-top:1px solid var(--border);margin-top:12px;padding-top:12px;display:grid;gap:7px}
+.total-row{display:flex;justify-content:space-between}.grand{font-size:20px;font-weight:850}
+.full{width:100%;margin-top:12px}
+.tables{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.table{padding:18px;border-radius:16px;background:#fff;border:1px solid var(--border);min-height:110px}
+.table.free{border-left:5px solid var(--green)}.table.ordered{border-left:5px solid var(--primary)}.table.occupied{border-left:5px solid var(--red)}.table.ready{border-left:5px solid var(--blue)}
+.table b{font-size:20px}.status{font-size:12px;color:var(--muted);margin-top:6px}
+.orders{display:grid;gap:10px}.order-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;border:1px solid var(--border);border-radius:14px;background:#fff}
+.badge{padding:6px 9px;border-radius:999px;font-size:12px;font-weight:700}.badge.ready{background:#dbeafe;color:#1d4ed8}.badge.prep{background:#ffedd5;color:#c2410c}.badge.paid{background:#dcfce7;color:#15803d}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:6px}.field label{font-size:13px;color:var(--muted)}.field input,.field select,.field textarea{padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:#fff}
+@media(max-width:1050px){.cards{grid-template-columns:repeat(2,1fr)}.products{grid-template-columns:repeat(2,1fr)}.order-layout{grid-template-columns:1fr}.cart{position:static}.tables{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){
+ .sidebar{width:100%;height:66px;bottom:0;top:auto;left:0;padding:6px 8px}.brand{display:none}.nav{display:flex;justify-content:space-around}.nav button{font-size:11px;text-align:center;padding:8px 7px}.nav button span{display:block;font-size:18px}.nav button strong{font-weight:600}.main{margin-left:0;width:100%;padding:14px 12px 84px}.topbar h1{font-size:20px}.top-actions .btn{padding:9px 11px}.cards{grid-template-columns:repeat(2,1fr);gap:9px}.stat{padding:13px}.stat .num{font-size:23px}.products{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.product-body{padding:9px}.product-name{font-size:14px}.price{font-size:14px}.add{width:31px;height:31px}.tables{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}
+}
+
+/* Enhanced food/product tap feedback */
+.food-card{
+  position:relative;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  transform:translateZ(0);
+  transition:transform .14s ease, box-shadow .18s ease, filter .18s ease;
+}
+.food-card::after{
+  content:"";
+  position:absolute;
+  width:18px;height:18px;
+  left:var(--tap-x,50%);top:var(--tap-y,50%);
+  border-radius:50%;
+  background:rgba(255,255,255,.42);
+  transform:translate(-50%,-50%) scale(0);
+  opacity:0;
+  pointer-events:none;
+}
+.food-card.is-tapping{
+  transform:scale(.965);
+  filter:brightness(1.06);
+}
+.food-card.is-tapping::after{
+  animation:foodRipple .42s ease-out;
+}
+.food-card.is-selected{
+  box-shadow:0 0 0 2px rgba(255,183,3,.72), 0 10px 28px rgba(0,0,0,.16);
+}
+@keyframes foodRipple{
+  0%{transform:translate(-50%,-50%) scale(0);opacity:.55}
+  100%{transform:translate(-50%,-50%) scale(18);opacity:0}
+}
+@media (prefers-reduced-motion:reduce){
+  .food-card,.food-card.is-tapping{transition:none;transform:none}
+  .food-card.is-tapping::after{animation:none}
+}
+
+</style>
+
+<style>
+#foodPublishTimes{display:grid}
+#foodPublishTimes input{width:100%;box-sizing:border-box}
+.publish-schedule-badge{font-size:11px;opacity:.78;margin-top:5px}
+</style>
+<style>
+  /* লগইন না হওয়া পর্যন্ত পুরো অ্যাপ ঢেকে রাখে */
+  #rpGate{position:fixed;inset:0;z-index:9999;background:#f6f7fb;display:flex;
+    align-items:center;justify-content:center;flex-direction:column;gap:12px;
+    font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;padding:24px;text-align:center}
+  #rpGate b{font-size:17px;color:#172033}
+  #rpGate span{font-size:13.5px;color:#6b7280;line-height:1.7;max-width:420px}
+  #rpGate a{margin-top:6px;padding:11px 18px;border-radius:12px;background:#f59e0b;
+    color:#111827;text-decoration:none;font-weight:700}
+</style>
+</head>
+<body>
+
+<!-- ⚠️ রেস্টুরেন্টের মেনু আর অর্ডার ব্যক্তিগত জিনিস। লগইন ছাড়া যেন
+     কেউ খুলে বসতে না পারে, তাই পুরো অ্যাপ ঢেকে রাখা হয় — লগইন
+     নিশ্চিত হলে তবেই সরে। -->
+<div id="rpGate"><b>🍯 Honey Bee Restaurant</b><span>যাচাই করা হচ্ছে, একটু অপেক্ষা করুন…</span></div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">🍯 Honey Bee Restaurant<small>Restaurant POS</small></div>
+    <div class="nav">
+      <button class="active" data-page="dashboard"><span>🏠</span><strong>Dashboard</strong></button>
+      <button data-page="order"><span>🛒</span><strong>New Order</strong></button>
+      <button data-page="orders"><span>📋</span><strong>Orders</strong></button>
+      <button data-page="tables"><span>🪑</span><strong>Tables</strong></button>
+      <button data-page="menu"><span>🍔</span><strong>Menu</strong></button>
+      <button data-page="customer"><span>📱</span><strong>Customer</strong></button>
+      <button data-page="settings"><span>⚙️</span><strong>Settings</strong></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 id="pageTitle">Dashboard</h1>
+      <div class="top-actions">
+        <button class="btn" onclick="newOrder()">＋ New Order</button>
+      </div>
+    </div>
+
+    <section class="page active" id="dashboard">
+      <div class="cards">
+        <div class="stat"><div class="label">New Orders</div><div class="num">12</div></div>
+        <div class="stat"><div class="label">Preparing</div><div class="num">7</div></div>
+        <div class="stat"><div class="label">Ready</div><div class="num">4</div></div>
+        <div class="stat"><div class="label">Today Sales</div><div class="num">SAR 4,850</div></div>
+      </div>
+      <div class="panel">
+        <h2>Recent Orders</h2>
+        <div class="orders">
+          <div class="order-row"><div><b>#1025</b> · Table T08<br><small>Chicken Burger ×2, Fries ×1</small></div><span class="badge ready">READY</span></div>
+          <div class="order-row"><div><b>#1024</b> · Table T03<br><small>Pizza ×1, Coke ×2</small></div><span class="badge prep">PREPARING</span></div>
+          <div class="order-row"><div><b>#1023</b> · Takeaway<br><small>Beef Burger ×1</small></div><span class="badge paid">PAID</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="order">
+      <div class="order-layout">
+        <div class="panel">
+          <div class="toolbar">
+            <input class="search" id="search" placeholder="🔎 Search food..." oninput="renderProducts()">
+            <select class="btn" id="orderType"><option>Dine-in</option><option>Takeaway</option><option>Delivery</option><option>Online</option></select>
+            <select class="btn" id="orderSource"><option>Cashier</option><option>Waiter</option><option>Customer QR</option><option>Customer Home</option></select>
+          </div>
+          <div class="chips" id="chips"></div>
+          <div class="products" id="products"></div>
+        </div>
+        <aside class="panel cart">
+          <h2>Current Order</h2>
+          <div class="order-id">ORDER #<span id="orderNo">1025</span></div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Table <b id="tableLabel">T08</b></div>
+          <div class="cart-items" id="cartItems"></div>
+          <div class="total">
+            <div class="total-row"><span>Subtotal</span><b id="subtotal">SAR 0</b></div>
+            <div class="total-row"><span>Tax</span><b id="tax">SAR 0</b></div>
+            <div class="total-row grand"><span>Total</span><b id="grand">SAR 0</b></div>
+          </div>
+          <button class="btn green full" onclick="sendOrder()">🖨️ Send Order to Kitchen</button>
+          <button class="btn primary full" onclick="payPrint()">💳 Pay & Print Receipt</button><button class="btn blue full" onclick="markReady()">🔔 Mark Order Ready</button>
+        </aside>
+      </div>
+    </section>
+
+    <section class="page" id="orders">
+      <div class="panel">
+        <h2>Orders</h2>
+        <div class="orders">
+          <div class="order-row"><div><b>#1025</b><br>Table T08 · SAR 60</div><span class="badge ready">READY</span></div>
+          <div class="order-row"><div><b>#1024</b><br>Table T03 · SAR 95</div><span class="badge prep">PREPARING</span></div>
+          <div class="order-row"><div><b>#1023</b><br>Takeaway · SAR 42</div><span class="badge paid">PAID</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="tables">
+      <div class="panel">
+        <h2>Tables</h2>
+        <div class="tables">
+          <div class="table free"><b>T01</b><div class="status">🟢 Free</div></div>
+          <div class="table occupied"><b>T02</b><div class="status">🔴 Occupied</div></div>
+          <div class="table ordered"><b>T03</b><div class="status">🟠 Ordered</div></div>
+          <div class="table ready"><b>T04</b><div class="status">🔵 Ready</div></div>
+          <div class="table free"><b>T05</b><div class="status">🟢 Free</div></div>
+          <div class="table occupied"><b>T06</b><div class="status">🔴 Occupied</div></div>
+          <div class="table free"><b>T07</b><div class="status">🟢 Free</div></div>
+          <div class="table ordered"><b>T08</b><div class="status">🟠 Order #1025</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="menu">
+      <div class="panel">
+        <div class="toolbar">
+          <div style="flex:1">
+            <h2 style="margin:0">Food Menu</h2>
+            <div style="color:var(--muted);font-size:13px;margin-top:4px">একবার Food তৈরি করুন — POS ও Customer Menu-তে একই item ব্যবহার হবে।</div>
+          </div>
+          <button class="btn primary" onclick="openFoodEditor()">＋ Add Food</button>
+        </div>
+
+        <div class="toolbar">
+          <input class="search" id="menuSearch" placeholder="🔎 Search food..." oninput="renderAdminMenu()">
+          <button class="btn" onclick="showPublishedOnly()">🟢 Published</button>
+          <button class="btn" onclick="showAllFoods()">All</button>
+        </div>
+
+        <div class="products" id="adminProducts"></div>
+      </div>
+
+      <div class="panel" style="margin-top:18px">
+        <h3 style="margin-top:0">📱 Customer Menu Preview</h3>
+        <div style="color:var(--muted);font-size:13px;margin-bottom:12px">শুধু Published + Available খাবার customer QR/Home menu-তে দেখা যাবে।</div>
+        <div class="products" id="customerPreview"></div>
+      </div>
+    </section>
+
+    <div id="foodModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:50;padding:16px;overflow:auto">
+      <div class="panel" style="max-width:760px;margin:30px auto">
+        <div class="topbar" style="margin-bottom:12px">
+          <h2 id="foodModalTitle">Add Food</h2>
+          <button class="btn" onclick="closeFoodEditor()">✕</button>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Food Name</label>
+            <input id="foodName" placeholder="e.g. Chicken Burger">
+          </div>
+          <div class="field">
+            <label>Category</label>
+            <input id="foodCategory" placeholder="e.g. Burger">
+          </div>
+          <div class="field">
+            <label>Price (SAR)</label>
+            <input id="foodPrice" type="number" min="0" step=".01" placeholder="15">
+          </div>
+          <div class="field">
+            
+<div class="form-row" style="margin-top:10px">
+  <label style="display:flex;align-items:center;gap:8px">
+    <input type="checkbox" id="foodTimedPublish" style="width:auto">
+    <span>Timed Publish</span>
+  </label>
+</div>
+<div class="form-row" id="foodPublishTimes" style="display:none;margin-top:8px;grid-template-columns:1fr 1fr;gap:10px">
+  <div><label>Publish From</label><input type="datetime-local" id="foodPublishStart"></div>
+  <div><label>Publish Until</label><input type="datetime-local" id="foodPublishEnd"></div>
+</div>
+<label>Availability</label>
+            <select id="foodAvailable">
+              <option value="true">Available</option>
+              <option value="false">Unavailable</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:12px">
+          <label>Food Photo</label>
+          <input id="foodImage" type="file" accept="image/*" onchange="previewFoodImage(event)">
+          <div id="imagePreview" style="margin-top:8px"></div>
+        </div>
+
+        <div class="field" style="margin-top:12px">
+          <label>Description</label>
+          <textarea id="foodDescription" rows="3" placeholder="Short customer-facing description"></textarea>
+        </div>
+
+        <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:16px">
+          <div class="toolbar">
+            <div style="flex:1"><b>Variants</b><div style="font-size:12px;color:var(--muted)">Size/portion যেমন Regular, Large</div></div>
+            <button class="btn" onclick="addVariantRow()">＋ Add Variant</button>
+          </div>
+          <div id="variantRows"></div>
+        </div>
+
+        <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:16px">
+          <div class="toolbar">
+            <div style="flex:1"><b>Add-ons</b><div style="font-size:12px;color:var(--muted)">Extra Cheese, Egg, Sauce ইত্যাদি</div></div>
+            <button class="btn" onclick="addAddonRow()">＋ Add Add-on</button>
+          </div>
+          <div id="addonRows"></div>
+        </div>
+
+        <div style="display:flex;gap:9px;justify-content:flex-end;margin-top:20px">
+          <button class="btn" onclick="closeFoodEditor()">Cancel</button>
+          <button class="btn green" onclick="saveFood()">Save Food</button>
+        </div>
+      </div>
+    </div>
+
+
+    <section class="page" id="customer">
+      <div class="panel" style="background:#111827;color:#fff">
+        <div class="toolbar" style="align-items:center">
+          <div style="flex:1">
+            <h2 style="margin:0">📱 Customer Menu</h2>
+            <div style="color:#cbd5e1;font-size:13px;margin-top:4px">QR / Home customer একই published menu ব্যবহার করবে।</div>
+          </div>
+          <span class="badge paid">LIVE MENU</span>
+        </div>
+      </div>
+      <div style="height:14px"></div>
+      <div class="panel">
+        <div class="toolbar">
+          <input class="search" id="customerSearch" placeholder="🔎 Search food..." oninput="renderCustomerPage()">
+          <div class="chips" id="customerCats" style="margin:0"></div>
+        </div>
+        <div class="products" id="customerPageProducts"></div>
+      </div>
+    </section>
+
+    <section class="page" id="settings">
+      <div class="panel">
+        <h2>Printer Settings</h2>
+        <div class="form-grid">
+          <div class="field"><label>Kitchen Printer IP</label><input placeholder="192.168.1.101" value="192.168.1.101"></div>
+          <div class="field"><label>Kitchen Port</label><input value="9100"></div>
+          <div class="field"><label>Cash Printer IP</label><input placeholder="192.168.1.102" value="192.168.1.102"></div>
+          <div class="field"><label>Cash Printer Port</label><input value="9100"></div>
+        </div>
+        <p style="color:var(--muted)">Kitchen printer: KOT only. Cash printer: final customer receipt. Kitchen-এর কোনো login নেই।</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-init.js"></script>
+<script>
+const defaultProducts=[
+ {id:1,name:"Chicken Burger",cat:"Burger",price:15,available:true,published:true,description:"Grilled chicken burger",img:"https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=700&q=80",variants:[{name:"Regular",price:0},{name:"Large",price:5}],addons:[{name:"Extra Cheese",price:2},{name:"Extra Chicken",price:4}]},
+ {id:2,name:"Beef Burger",cat:"Burger",price:18,available:true,published:true,description:"Classic beef burger",img:"https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=700&q=80",variants:[],addons:[]},
+ {id:3,name:"Pizza",cat:"Pizza",price:30,available:true,published:true,description:"Fresh oven pizza",img:"https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=700&q=80",variants:[{name:"Regular",price:0},{name:"Large",price:8}],addons:[{name:"Extra Cheese",price:3}]},
+ {id:4,name:"French Fries",cat:"Sides",price:10,available:true,published:true,description:"Crispy fries",img:"https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=700&q=80",variants:[],addons:[]},
+ {id:5,name:"Fried Chicken",cat:"Chicken",price:25,available:true,published:true,description:"Crispy fried chicken",img:"https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=700&q=80",variants:[],addons:[]},
+ {id:6,name:"Coke",cat:"Drinks",price:5,available:true,published:true,description:"Cold soft drink",img:"https://images.unsplash.com/photo-1629203849820-fdd70d49c38e?auto=format&fit=crop&w=700&q=80",variants:[],addons:[]},
+ {id:7,name:"Water",cat:"Drinks",price:3,available:true,published:true,description:"Bottled water",img:"https://images.unsplash.com/photo-1548839140-29a749e1cf4d?auto=format&fit=crop&w=700&q=80",variants:[],addons:[]},
+ {id:8,name:"Nuggets",cat:"Chicken",price:20,available:true,published:true,description:"Chicken nuggets",img:"https://images.unsplash.com/photo-1562967916-eb82221dfb92?auto=format&fit=crop&w=700&q=80",variants:[],addons:[]}
+];
+/* ════════ কে চালাচ্ছে ════════
+   ⚠️ আগে মেনু শুধু ব্রাউজারে (localStorage) জমত। তাতে তিনটা সমস্যা:
+      ফোন বদলালে মেনু হারাত, দুই ডিভাইসে দুই রকম মেনু থাকত, আর
+      Honey Bee Bazar-এর গ্রাহক কিছুই দেখতে পেতেন না।
+      এখন মেনু ক্লাউডে — রেস্টুরেন্টের নিজের ঘরে।                   */
+let RP = { uid:null, name:"", cur:"SAR" };
+let products = [];
+
+function foodsRef(){ return db.collection("restaurants").doc(RP.uid).collection("foods"); }
+
+async function loadProducts(){
+  try{
+    const qs = await foodsRef().get();
+    products = qs.docs.map(d => ({ ...d.data(), id: d.id }));
+  }catch(e){
+    console.warn("menu load:", e && e.code);
+    products = [];
+    toastRP("মেনু আনা যায়নি — ইন্টারনেট দেখুন।", true);
+  }
+}
+
+/* ⚠️ এক-একটা খাবার আলাদা নথিতে, পুরো তালিকা একসাথে নয়। একসাথে
+   রাখলে দুইজন একসাথে বদলালে একজনের কাজ মুছে যেত, আর ছবির কারণে
+   নথিটা Firestore-এর ১ MB সীমা ছাড়িয়ে যেত।                      */
+async function saveOneFood(f){
+  const { id, ...rest } = f;
+  await foodsRef().doc(String(id)).set(rest, { merge:true });
+}
+async function deleteOneFood(id){ await foodsRef().doc(String(id)).delete(); }
+
+function toastRP(msg, bad){
+  let t = document.getElementById("rpToast");
+  if(!t){
+    t = document.createElement("div"); t.id = "rpToast";
+    t.style.cssText = "position:fixed;left:50%;bottom:92px;transform:translateX(-50%);"
+      + "z-index:9000;padding:12px 16px;border-radius:12px;font-size:14px;max-width:88vw;"
+      + "box-shadow:0 8px 24px rgba(15,23,42,.18)";
+    document.body.appendChild(t);
+  }
+  t.style.background = bad ? "#fee2e2" : "#dcfce7";
+  t.style.color = bad ? "#991b1b" : "#15803d";
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(t.__h); t.__h = setTimeout(function(){ t.style.display = "none"; }, 2600);
+}
+async function compressImage(file,maxW=900,quality=.78){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=reject;
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const scale=Math.min(1,maxW/img.width);
+        const c=document.createElement("canvas");
+        c.width=Math.max(1,Math.round(img.width*scale));
+        c.height=Math.max(1,Math.round(img.height*scale));
+        const ctx=c.getContext("2d");
+        ctx.drawImage(img,0,0,c.width,c.height);
+        resolve(c.toDataURL("image/jpeg",quality));
+      };
+      img.onerror=reject; img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+let category="All", cart=[];
+// রেস্টুরেন্টের নিজের মুদ্রা — নিবন্ধনের দেশ অনুযায়ী বসে
+const money=n=>RP.cur+" "+Number(n||0).toFixed(2);
+
+
+let editingFoodId=null, currentImageData=null, menuFilter="all";
+
+function openFoodEditor(id=null){
+  editingFoodId=id; currentImageData=null;
+  document.getElementById("foodModal").style.display="block";
+  document.getElementById("foodModalTitle").textContent=id?"Edit Food":"Add Food";
+  document.getElementById("variantRows").innerHTML="";
+  document.getElementById("addonRows").innerHTML="";
+  document.getElementById("imagePreview").innerHTML="";
+  if(id){
+    const f=products.find(x=>x.id===id);
+    if(!f)return;
+    foodName.value=f.name; foodCategory.value=f.cat; foodPrice.value=f.price;
+    foodAvailable.value=String(f.available); foodDescription.value=f.description||"";
+    currentImageData=f.img||null;
+    if(f.img) imagePreview.innerHTML=`<img src="${f.img}" style="width:100px;height:80px;object-fit:cover;border-radius:10px">`;
+    (f.variants||[]).forEach(v=>addVariantRow(v.name,v.price));
+    (f.addons||[]).forEach(a=>addAddonRow(a.name,a.price));
+  }else{
+    foodName.value="";foodCategory.value="";foodPrice.value="";foodAvailable.value="true";foodDescription.value="";
+  }
+}
+function closeFoodEditor(){document.getElementById("foodModal").style.display="none";}
+async function previewFoodImage(e){
+  const file=e.target.files?.[0]; if(!file)return;
+  if(!file.type.startsWith("image/")) return alert("শুধু image file দিন।");
+  try{
+    currentImageData=await compressImage(file);
+    imagePreview.innerHTML=`<img src="${currentImageData}" style="width:120px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">Compressed automatically</div>`;
+  }catch(err){alert("ছবি পড়া যায়নি। আবার চেষ্টা করুন।");}
+}
+function addVariantRow(name="",price=0){
+  const row=document.createElement("div");row.className="toolbar";row.dataset.row="variant";
+  row.innerHTML=`<input class="search v-name" placeholder="Variant name" value="${name}">
+  <input class="search v-price" type="number" min="0" step=".01" placeholder="Extra price" value="${price}">
+  <button class="btn danger" onclick="this.parentElement.remove()">Remove</button>`;
+  document.getElementById("variantRows").appendChild(row);
+}
+function addAddonRow(name="",price=0){
+  const row=document.createElement("div");row.className="toolbar";row.dataset.row="addon";
+  row.innerHTML=`<input class="search a-name" placeholder="Add-on name" value="${name}">
+  <input class="search a-price" type="number" min="0" step=".01" placeholder="Extra price" value="${price}">
+  <button class="btn danger" onclick="this.parentElement.remove()">Remove</button>`;
+  document.getElementById("addonRows").appendChild(row);
+}
+function readRows(container, nameCls, priceCls){
+  return [...document.querySelectorAll(`#${container} .toolbar`)].map(r=>({
+    name:r.querySelector(nameCls)?.value.trim(),price:Number(r.querySelector(priceCls)?.value||0)
+  })).filter(x=>x.name);
+}
+function saveFood(){
+  const name=foodName.value.trim(),cat=foodCategory.value.trim(),price=Number(foodPrice.value);
+  if(!name||!cat||!Number.isFinite(price))return alert("Food name, category এবং price দিন।");
+  const f={
+    id:editingFoodId||Date.now(),name,cat,price,
+    available:foodAvailable.value==="true",published:editingFoodId?(products.find(x=>x.id===editingFoodId)?.published??false):false,
+    description:foodDescription.value.trim(),
+    img:currentImageData||"https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=700&q=80",
+    variants:readRows("variantRows",".v-name",".v-price"),
+    addons:readRows("addonRows",".a-name",".a-price")
+  };
+  const i=products.findIndex(x=>x.id===f.id);
+  if(i>=0)products[i]=f;else products.unshift(f);
+  closeFoodEditor();renderProducts();renderAdminMenu();renderCustomerPreview();
+  /* ⚠️ পর্দায় আগে দেখাই, ক্লাউডে পরে — নইলে নেট ধীর হলে মনে হতো
+     কিছুই হয়নি। কিন্তু ক্লাউডে ব্যর্থ হলে সেটাও স্পষ্ট বলতে হবে,
+     নইলে মালিক ভাবতেন সংরক্ষণ হয়ে গেছে।                        */
+  saveOneFood(f)
+    .then(function(){ toastRP(name + " সংরক্ষিত হয়েছে। Publish করলে গ্রাহক দেখবেন।"); })
+    .catch(function(e){ toastRP("সংরক্ষণ হয়নি — " + (e.code||"আবার চেষ্টা করুন"), true); });
+}
+function togglePublish(id){
+  const f=products.find(x=>x.id===id);if(!f)return;
+  f.published=!f.published;renderAdminMenu();renderCustomerPreview();
+  saveOneFood(f).catch(function(e){ toastRP("বদলটা ক্লাউডে যায়নি।", true); });
+}
+function toggleAvailability(id){
+  const f=products.find(x=>x.id===id);if(!f)return;
+  f.available=!f.available;renderAdminMenu();renderCustomerPreview();renderProducts();
+  saveOneFood(f).catch(function(e){ toastRP("বদলটা ক্লাউডে যায়নি।", true); });
+}
+function deleteFood(id){
+  const f=products.find(x=>x.id===id);if(!f)return;
+  if(!confirm(`Delete ${f.name}?`))return;
+  products=products.filter(x=>x.id!==id);renderAdminMenu();renderCustomerPreview();renderProducts();
+  deleteOneFood(id).catch(function(e){ toastRP("মুছতে পারেনি — আবার চেষ্টা করুন।", true); });
+}
+function showPublishedOnly(){menuFilter="published";renderAdminMenu()}
+function showAllFoods(){menuFilter="all";renderAdminMenu()}
+function renderAdminMenu(){
+  const q=(document.getElementById("menuSearch")?.value||"").toLowerCase();
+  const list=products.filter(f=>(menuFilter==="all"||f.published)&&f.name.toLowerCase().includes(q));
+  document.getElementById("adminProducts").innerHTML=list.map(f=>`
+    <article class="product">
+      <img src="${f.img}" alt="${f.name}">
+      <div class="product-body">
+        <div class="product-name">${f.name}</div>
+        <div style="font-size:12px;color:var(--muted)">${f.cat} · ${money(f.price)}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px">
+          <span class="badge ${f.published?'paid':'prep'}">${f.published?'PUBLISHED':'DRAFT'}</span>
+          <span class="badge ${f.available?'paid':'prep'}">${f.available?'AVAILABLE':'OFF'}</span>
+        </div>
+        <div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
+          <button class="btn" onclick="openFoodEditor(${f.id})">Edit</button>
+          <button class="btn" onclick="togglePublish(${f.id})">${f.published?'Unpublish':'Publish'}</button>
+          <button class="btn" onclick="toggleAvailability(${f.id})">${f.available?'Set Off':'Set Available'}</button>
+          <button class="btn danger" onclick="deleteFood(${f.id})">Delete</button>
+        </div>
+      </div>
+    </article>`).join("") || `<div style="color:var(--muted)">No food found.</div>`;
+}
+function renderCustomerPreview(){
+  const list=products.filter(f=>f.published&&f.available);
+  document.getElementById("customerPreview").innerHTML=list.map(f=>`
+    <article class="product">
+      <img src="${f.img}" alt="${f.name}">
+      <div class="product-body"><div class="product-name">${f.name}</div>
+      <div style="font-size:12px;color:var(--muted);min-height:30px">${f.description||""}</div>
+      <div class="product-meta"><span class="price">${money(f.price)}</span><button class="add" onclick="addToCart(${f.id})">＋</button></div></div>
+    </article>`).join("") || `<div style="color:var(--muted)">No published food yet.</div>`;
+}
+
+let customerCategory="All";
+function renderCustomerPage(){
+  const q=(document.getElementById("customerSearch")?.value||"").toLowerCase();
+  const cats=["All",...new Set(products.filter(f=>f.published&&f.available).map(f=>f.cat))];
+  document.getElementById("customerCats").innerHTML=cats.map(c=>`<button class="chip ${c===customerCategory?'active':''}" onclick="customerCategory='${c}';renderCustomerPage()">${c}</button>`).join("");
+  const list=products.filter(f=>f.published&&f.available&&
+    (customerCategory==="All"||f.cat===customerCategory)&&
+    f.name.toLowerCase().includes(q));
+  document.getElementById("customerPageProducts").innerHTML=list.map(f=>`
+    <article class="product">
+      <img src="${f.img}" alt="${f.name}" loading="lazy">
+      <div class="product-body">
+        <div class="product-name">${f.name}</div>
+        <div style="font-size:12px;color:var(--muted);min-height:32px">${f.description||""}</div>
+        <div class="product-meta"><span class="price">${money(f.price)}</span>
+        <button class="add" onclick="addToCart(${f.id})">＋</button></div>
+      </div>
+    </article>`).join("") || `<div style="color:var(--muted);padding:20px">কোনো published food নেই।</div>`;
+}
+function init(){
+  const cats=["All",...new Set(products.map(p=>p.cat))];
+  document.getElementById("chips").innerHTML=cats.map(c=>`<button class="chip ${c===category?'active':''}" onclick="setCategory('${c}')">${c}</button>`).join("");
+  renderProducts(); renderCart(); renderAdminMenu(); renderCustomerPreview(); renderOrderHistory();
+}
+function setCategory(c){category=c;init()}
+function renderProducts(){
+  const q=(document.getElementById("search")?.value||"").toLowerCase();
+  const list=products.filter(p=>(category==="All"||p.cat===category)&&p.name.toLowerCase().includes(q));
+  document.getElementById("products").innerHTML=list.map(p=>`
+    <article class="product">
+      <img src="${p.img}" alt="${p.name}" loading="lazy">
+      <div class="product-body"><div class="product-name">${p.name}</div>
+      <div class="product-meta"><span class="price">${money(p.price)}</span><button class="add" onclick="addToCart(${p.id})">＋</button></div></div>
+    </article>`).join("");
+}
+function addToCart(id){
+  const p=products.find(x=>x.id===id); if(!p||!p.available)return;
+  if((p.variants?.length||0)+(p.addons?.length||0)>0){
+    openItemChooser(p); return;
+  }
+  const found=cart.find(x=>x.id===id);
+  found?found.qty++:cart.push({...p,qty:1,selection:null}); renderCart();
+}
+function openItemChooser(p){
+  const variant=(p.variants||[]).map((v,i)=>`<label style="display:flex;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:9px;margin-top:6px"><span><input type="radio" name="variantPick" value="${i}" ${i===0?'checked':''}> ${v.name}</span><b>${v.price?`+${money(v.price)}`:""}</b></label>`).join("");
+  const addons=(p.addons||[]).map((a,i)=>`<label style="display:flex;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:9px;margin-top:6px"><span><input type="checkbox" name="addonPick" value="${i}"> ${a.name}</span><b>+${money(a.price)}</b></label>`).join("");
+  const html=`<div id="chooser" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:60;padding:16px;overflow:auto"><div class="panel" style="max-width:500px;margin:40px auto"><img src="${p.img}" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px"><h2>${p.name}</h2><div style="color:var(--muted)">Base ${money(p.price)}</div><h3>Variant</h3>${variant||"<div style='color:var(--muted)'>No variants</div>"}<h3>Add-ons</h3>${addons||"<div style='color:var(--muted)'>No add-ons</div>"}<div style="display:flex;gap:8px;margin-top:18px"><button class="btn" onclick="document.getElementById('chooser').remove()">Cancel</button><button class="btn primary" onclick="confirmItemChoice(${p.id})">Add to Cart</button></div></div></div>`;
+  document.body.insertAdjacentHTML("beforeend",html);
+}
+function confirmItemChoice(id){
+  const p=products.find(x=>x.id===id), vi=document.querySelector('input[name="variantPick"]:checked');
+  const variant=vi?(p.variants||[])[Number(vi.value)]:null;
+  const addons=[...document.querySelectorAll('input[name="addonPick"]:checked')].map(x=>p.addons[Number(x.value)]);
+  const extra=(variant?.price||0)+addons.reduce((s,a)=>s+a.price,0);
+  const key=id+"|"+(variant?.name||"")+"|"+addons.map(a=>a.name).join(",");
+  const found=cart.find(x=>x.selectionKey===key);
+  if(found)found.qty++;
+  else cart.push({...p,price:p.price+extra,qty:1,selectionKey:key,selection:{variant:variant?.name||"",addons:addons.map(a=>a.name)}});
+  document.getElementById("chooser").remove();renderCart();
+}
+function changeQty(id,d){
+  const x=cart.find(i=>i.id===id); if(!x)return; x.qty+=d; if(x.qty<=0)cart=cart.filter(i=>i.id!==id); renderCart();
+}
+function renderCart(){
+  const el=document.getElementById("cartItems");
+  el.innerHTML=cart.length?cart.map(x=>`
+    <div class="cart-item"><div class="item-row"><b>${x.name}</b><b>${money(x.price*x.qty)}</b></div>${x.selection?.variant||x.selection?.addons?.length?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${x.selection.variant||""}${x.selection?.addons?.length?` · ${x.selection.addons.join(", ")}`:""}</div>`:""}
+    <div class="qty"><button onclick="changeQty(${x.id},-1)">−</button><span>${x.qty}</span><button onclick="changeQty(${x.id},1)">＋</button></div></div>`).join(""):`<div style="color:var(--muted);padding:20px 4px;text-align:center">No food selected yet.</div>`;
+  const sub=cart.reduce((s,x)=>s+x.price*x.qty,0), tax=sub*.15, total=sub+tax;
+  document.getElementById("subtotal").textContent=money(sub);document.getElementById("tax").textContent=money(tax);document.getElementById("grand").textContent=money(total);
+}
+
+function nextOrderNumber(){
+  const n=Number(localStorage.getItem("hbNextOrderNo")||1025);
+  localStorage.setItem("hbNextOrderNo",String(n+1)); return n;
+}
+function getOrders(){return JSON.parse(localStorage.getItem("hbOrders")||"[]");}
+function saveOrders(a){localStorage.setItem("hbOrders",JSON.stringify(a));}
+function currentOrderPayload(){
+  const no=Number(document.getElementById("orderNo").textContent);
+  const source=document.getElementById("orderSource")?.value||"Cashier";
+  const type=document.getElementById("orderType")?.value||"Dine-in";
+  const sub=cart.reduce((s,x)=>s+x.price*x.qty,0),tax=sub*.15;
+  return {orderNo:no,source,type,table:document.getElementById("tableLabel").textContent,
+    items:cart.map(x=>({id:x.id,name:x.name,qty:x.qty,unitPrice:x.price,selection:x.selection||null})),
+    subtotal:sub,tax,total:sub+tax,status:"NEW",kitchenStatus:"NOT_SENT",paymentStatus:"UNPAID",createdAt:new Date().toISOString()};
+}
+function ensureCurrentOrder(){
+  const orders=getOrders(),no=Number(document.getElementById("orderNo").textContent);
+  let o=orders.find(x=>x.orderNo===no);
+  if(!o){o=currentOrderPayload();orders.unshift(o);saveOrders(orders);} return o;
+}
+function makeKOT(o){
+  return ["==============================","          KITCHEN KOT",`             #${o.orderNo}`,`${o.table||""}`,
+  "==============================",...o.items.map(i=>`${i.name} x${i.qty}${i.selection?.variant?` [${i.selection.variant}]`:""}${i.selection?.addons?.length?` + ${i.selection.addons.join(", ")}`:""}`),
+  "=============================="].join("\n");
+}
+function makeReceipt(o){
+  return ["==============================","       RESTAURANT RECEIPT",`          ORDER #${o.orderNo}`,"==============================",
+  ...o.items.map(i=>`${i.name} x${i.qty}    ${money(i.unitPrice*i.qty)}`),"------------------------------",
+  `Subtotal              ${money(o.subtotal)}`,`Tax                   ${money(o.tax)}`,`TOTAL                 ${money(o.total)}`,
+  "------------------------------",`PAYMENT: ${o.paymentStatus}`,"=============================="].join("\n");
+}
+function printPreview(title,text){
+  const w=window.open("","_blank","width=420,height=700"); if(!w)return alert("Popup blocked. Browser-এ popup allow করুন।");
+  w.document.write(`<html><head><title>${title}</title><style>body{font-family:monospace;padding:20px;white-space:pre-wrap}button{padding:12px 18px;margin-bottom:15px}</style></head><body><button onclick="print()">PRINT</button><pre>${text.replaceAll("&","&amp;").replaceAll("<","&lt;")}</pre></body></html>`);
+  w.document.close();
+}
+function renderOrderHistory(){
+  const el=document.querySelector("#orders .orders");if(!el)return;const orders=getOrders();
+  el.innerHTML=orders.length?orders.slice(0,30).map(o=>`<div class="order-row"><div><b>#${o.orderNo}</b> · ${o.type}<br><small>${o.source} · ${o.items.reduce((s,i)=>s+i.qty,0)} items · ${money(o.total)}</small></div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${o.status==="READY"?"ready":o.paymentStatus==="PAID"?"paid":"prep"}">${o.status}</span><button class="btn" onclick="viewOrder(${o.orderNo})">View</button></div></div>`).join(""):`<div style="color:var(--muted)">No orders yet.</div>`;
+}
+function viewOrder(no){
+  const o=getOrders().find(x=>x.orderNo===no);if(!o)return;
+  alert(`Order #${o.orderNo}\n${o.type} · ${o.source}\n${o.items.map(i=>`${i.name} ×${i.qty}`).join("\n")}\n\nTotal: ${money(o.total)}\nStatus: ${o.status}`);
+}
+function newOrder(){
+  showPage("order");cart=[];document.getElementById("orderNo").textContent=nextOrderNumber();document.getElementById("tableLabel").textContent="T08";renderCart();
+}
+function sendOrder(){
+  if(!cart.length)return alert("প্রথমে খাবার নির্বাচন করুন।");
+  const o=ensureCurrentOrder();o.status="PREPARING";o.kitchenStatus="PRINTED";
+  const orders=getOrders().filter(x=>x.orderNo!==o.orderNo);orders.unshift(o);saveOrders(orders);renderOrderHistory();
+  printPreview(`KOT #${o.orderNo}`,makeKOT(o));
+}
+function payPrint(){
+  if(!cart.length)return alert("প্রথমে খাবার নির্বাচন করুন।");
+  const o=ensureCurrentOrder();o.paymentStatus="PAID";o.status="PAID";
+  const orders=getOrders().filter(x=>x.orderNo!==o.orderNo);orders.unshift(o);saveOrders(orders);renderOrderHistory();
+  printPreview(`Receipt #${o.orderNo}`,makeReceipt(o));
+}
+function markReady(){
+  const no=Number(document.getElementById("orderNo").textContent),orders=getOrders(),o=orders.find(x=>x.orderNo===no);
+  if(!o)return alert("Order আগে Kitchen-এ পাঠান।");
+  o.status="READY";o.kitchenStatus="READY";saveOrders(orders);renderOrderHistory();
+  alert(`Order #${no} ready — Kitchen থেকে মুখে “${no} ready” বলা হবে।`);
+}
+function showPage(id){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===id));
+  const titles={dashboard:"Dashboard",order:"New Order",orders:"Orders",tables:"Tables",menu:"Food Menu",customer:"Customer Menu",settings:"Settings"};
+  document.getElementById("pageTitle").textContent=titles[id]||"Restaurant POS";
+  if(id==="menu"){renderAdminMenu();renderCustomerPreview();}
+  if(id==="customer"){renderCustomerPage();}
+  if(id==="orders"){renderOrderHistory();}
+}
+document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
+
+/* ════════ লগইন ════════
+   রেস্টুরেন্ট login.html থেকে নিবন্ধন করে (role "restaurant")। এখানে
+   শুধু যাচাই করা হয় — নিবন্ধন এখানে হয় না।
+
+   ⚠️ auth.currentUser দেখে সিদ্ধান্ত নেওয়া যাবে না: পাতা খোলার
+      মুহূর্তে ওটা এখনো null থাকে, তখন সবাইকে বের করে দিত।
+      onAuthStateChanged-এর জন্য অপেক্ষা করতেই হবে।              */
+function rpGateMsg(title, detail, link){
+  const g = document.getElementById("rpGate");
+  g.innerHTML = "<b>" + title + "</b><span>" + detail + "</span>"
+    + (link ? '<a href="login.html">লগইন পাতায় যান</a>' : "");
+  g.style.display = "flex";
+}
+
+auth.onAuthStateChanged(async function(user){
+  if(!user || user.isAnonymous){
+    rpGateMsg("🍯 Honey Bee Restaurant",
+      "এই পাতাটা রেস্টুরেন্টের নিজের — মেনু আর অর্ডার এখানে থাকে। "
+      + "দেখতে হলে আগে লগইন করুন।", true);
+    return;
+  }
+  try{
+    const rdoc = await db.collection("restaurants").doc(user.uid).get();
+    if(!rdoc.exists){
+      /* ⚠️ দোকানদার বা ড্রাইভার ভুল করে এই ঠিকানায় এলে তাঁকে সৎভাবে
+         বলা হয় — ফাঁকা POS দেখিয়ে বিভ্রান্ত করা হয় না। */
+      rpGateMsg("এই অ্যাকাউন্টটা রেস্টুরেন্টের নয়",
+        "আপনার অ্যাকাউন্টে কোনো রেস্টুরেন্ট নিবন্ধিত নেই। "
+        + "রেস্টুরেন্ট নিবন্ধন করতে লগইন পাতার “🍽️ নতুন রেস্টুরেন্ট নিবন্ধন” দেখুন।", true);
+      await auth.signOut();
+      return;
+    }
+    const d = rdoc.data();
+    if(d.status === "blocked"){
+      rpGateMsg("অ্যাকাউন্টটি বন্ধ করা আছে",
+        "Honey Bee-র সাথে যোগাযোগ করুন।", false);
+      await auth.signOut();
+      return;
+    }
+
+    RP.uid = user.uid;
+    RP.name = d.name || "রেস্টুরেন্ট";
+    RP.cur = d.currency || "SAR";
+
+    // নাম আর এলাকা উপরে বসাই — কোন রেস্টুরেন্টে আছি, স্পষ্ট থাকুক
+    const brand = document.querySelector(".brand");
+    if(brand) brand.innerHTML = "🍯 " + RP.name
+      + "<small>" + (d.area || "Restaurant POS") + "</small>";
+
+    await loadProducts();
+    document.getElementById("rpGate").style.display = "none";
+    init();
+  }catch(e){
+    console.error(e);
+    rpGateMsg("খোলা যাচ্ছে না",
+      "ইন্টারনেট দেখুন, তারপর পাতাটা আবার খুলুন।", false);
+  }
+});
+
+/* Enhanced product click/tap effect */
+if (!window.__hbFoodTapEffect) {
+  window.__hbFoodTapEffect = true;
+  document.addEventListener('pointerdown', function(e){
+    const card = e.target.closest('.food-card');
+    if(!card) return;
+    const r = card.getBoundingClientRect();
+    card.style.setProperty('--tap-x', ((e.clientX-r.left)/r.width*100)+'%');
+    card.style.setProperty('--tap-y', ((e.clientY-r.top)/r.height*100)+'%');
+    card.classList.remove('is-tapping');
+    void card.offsetWidth;
+    card.classList.add('is-tapping');
+    clearTimeout(card.__hbTapTimer);
+    card.__hbTapTimer = setTimeout(()=>card.classList.remove('is-tapping'), 180);
+  }, {passive:true});
+}
+
+
+/* Timed product publishing */
+function isFoodCurrentlyPublished(f){
+  if(!f || !f.published) return false;
+  if(!f.publishStart && !f.publishEnd) return true;
+  const now=Date.now();
+  const start=f.publishStart ? new Date(f.publishStart).getTime() : -Infinity;
+  const end=f.publishEnd ? new Date(f.publishEnd).getTime() : Infinity;
+  return now>=start && now<=end;
+}
+function syncTimedPublishState(){
+  let changed=false;
+  /* ⚠️ এখানে 'hbFoods' লেখা ছিল, অথচ মেনু কখনো ওই নামে জমত না —
+     তাই সময়-নির্ধারিত প্রকাশ কোনোদিন কাজ করেনি, কেউ টেরও পায়নি।
+     এখন মেনু ক্লাউডে, তাই হিসাবটা products থেকেই হয়।          */
+  const foods=products;
+  foods.forEach(f=>{
+    if(f.published && f.publishEnd && Date.now()>new Date(f.publishEnd).getTime()){
+      f.published=false;
+      f.publishExpired=true;
+      changed=true;
+    }
+  });
+  if(changed){
+    foods.filter(f=>f.publishExpired).forEach(function(f){
+      saveOneFood(f).catch(function(){});
+    });
+    renderAdminMenu(); renderCustomerPreview();
+  }
+  return foods;
+}
+setInterval(syncTimedPublishState,30000);
+document.addEventListener('DOMContentLoaded',syncTimedPublishState);
+
+if(!window.__hbTimedPublishUI){
+  window.__hbTimedPublishUI=true;
+  document.addEventListener('change',e=>{
+    if(e.target && e.target.id==='foodTimedPublish'){
+      const box=document.getElementById('foodPublishTimes');
+      if(box) box.style.display=e.target.checked?'grid':'none';
+    }
+  });
+}
+
+</script>
+</body>
+</html>
