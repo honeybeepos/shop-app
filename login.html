@@ -25,7 +25,10 @@
   .box{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 22px;box-shadow:0 3px 0 var(--line);}
   h1{font-size:20px;margin:0 0 4px;color:var(--teal);text-align:center;}
   .sub{font-size:12.5px;color:#8a7f6c;text-align:center;margin:0 0 20px;font-family:'Space Mono',monospace;}
-  .tabs{display:flex;gap:6px;margin-bottom:18px;}
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px;}
+  /* ⚠️ flex-wrap ছাড়া চার নম্বর ট্যাবটা যোগ হওয়ার পর প্রতিটা এত সরু হয়ে
+     যেত যে লেখা পড়া যেত না। এখন কুলালে নিচের লাইনে নামে। */
+  .tabs div{min-width:108px;}
   .tabs div{flex:1;text-align:center;padding:9px 6px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:13.5px;font-weight:700;color:#6b6153;cursor:pointer;}
   .tabs div.active{background:var(--teal);color:#fff;border-color:var(--teal);}
   label{display:block;font-size:12px;color:#6b6153;margin-bottom:4px;font-weight:600;}
@@ -53,6 +56,7 @@
     <div class="tab-sw active" data-p="login">লগইন</div>
     <div class="tab-sw" data-p="signup">নতুন দোকান নিবন্ধন</div>
     <div class="tab-sw" data-p="provider">🚑 ট্রান্সপোর্ট ড্রাইভার নিবন্ধন</div>
+    <div class="tab-sw" data-p="restaurant">🍽️ নতুন রেস্টুরেন্ট নিবন্ধন</div>
   </div>
 
   <div class="panel active" id="panel-login">
@@ -147,6 +151,31 @@
     <button class="btn" id="providerSignupBtn">✅ নিবন্ধন করুন</button>
     <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:10px;">নিবন্ধনের পর আপনার এলাকার Honey Bee Agent আপনাকে যাচাই (verify) করবেন — তারপর আপনি Honey Bee Bazar-এ 🛡️ ব্যাজসহ দেখা যাবেন।</p>
     <div class="msg" id="providerMsg"></div>
+  </div>
+
+  <div class="panel" id="panel-restaurant">
+    <label>রেস্টুরেন্টের নাম</label>
+    <input type="text" id="rsName" placeholder="যেমনঃ ফরিদ বিরিয়ানি হাউস">
+    <label>মালিকের নাম</label>
+    <input type="text" id="rsOwner" placeholder="পূর্ণ নাম">
+    <label>মোবাইল নম্বর (লগইনের জন্য ব্যবহার হবে)</label>
+    <input type="text" id="rsPhone" placeholder="05XXXXXXXX">
+    <label>পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
+    <input type="password" id="rsPass" placeholder="••••••••">
+
+    <label>জেলা</label>
+    <select id="rsDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
+    <label>উপজেলা/থানা</label>
+    <select id="rsUpazila" disabled><option value="">-- আগে জেলা নির্বাচন করুন --</option></select>
+    <label>বাজার/এলাকা</label>
+    <select id="rsMarket" disabled><option value="">-- আগে উপজেলা নির্বাচন করুন --</option></select>
+
+    <label>ঠিকানা (ঐচ্ছিক)</label>
+    <input type="text" id="rsAddress" placeholder="যেমনঃ থানা রোড, বাস স্ট্যান্ডের পাশে">
+
+    <button class="btn" id="restaurantSignupBtn">✅ নিবন্ধন করুন</button>
+    <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:10px;">নিবন্ধনের পর আপনার রেস্টুরেন্ট Honey Bee Bazar-এ দেখা যাবে। খাবারের তালিকা বসানোর অ্যাপটা শীঘ্রই আসছে।</p>
+    <div class="msg" id="restaurantMsg"></div>
   </div>
 
   <!-- 📧 ইমেইল ভেরিফিকেশন গেট — ভুয়া/ভুল ইমেইল দিয়ে দোকান নিবন্ধন ঠেকাতে।
@@ -460,6 +489,104 @@ document.getElementById("providerSignupBtn").addEventListener("click", async ()=
   btn.disabled = false; btn.textContent = "✅ নিবন্ধন করুন";
 });
 
+/* ==================== 🍽️ রেস্টুরেন্ট নিবন্ধন ====================
+   রেস্টুরেন্টের নিজস্ব POS এখনো বানানো হয়নি। কিন্তু নিবন্ধনটা আগে
+   থাকলে বাজারের অ্যাপে তালিকা দেখানো শুরু করা যায়, আর POS তৈরি হলে
+   একই অ্যাকাউন্ট দিয়েই ঢোকা যাবে — আবার নিবন্ধন করতে হবে না।     */
+document.getElementById("rsDistrict").innerHTML += getAllDistricts().map(d=>`<option value="${d}">${d}</option>`).join("");
+
+document.getElementById("rsDistrict").addEventListener("change", (e)=>{
+  const district = e.target.value;
+  const upSel = document.getElementById("rsUpazila");
+  const marketSel = document.getElementById("rsMarket");
+  marketSel.innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; marketSel.disabled = true;
+  if(!district){
+    upSel.innerHTML = '<option value="">-- আগে জেলা নির্বাচন করুন --</option>'; upSel.disabled = true;
+    return;
+  }
+  upSel.disabled = false;
+  upSel.innerHTML = '<option value="">-- উপজেলা/থানা নির্বাচন করুন --</option>' +
+    getUpazilasForDistrict(district).map(u=>`<option value="${u}">${u}</option>`).join("");
+});
+
+document.getElementById("rsUpazila").addEventListener("change", async (e)=>{
+  const district = document.getElementById("rsDistrict").value;
+  const upazila = e.target.value;
+  const marketSel = document.getElementById("rsMarket");
+  if(!upazila){
+    marketSel.innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; marketSel.disabled = true;
+    return;
+  }
+  marketSel.innerHTML = '<option value="">লোড হচ্ছে...</option>'; marketSel.disabled = true;
+  try{
+    const qs = await db.collection("markets").where("district","==",district).where("upazila","==",upazila).get();
+    if(qs.empty){
+      marketSel.innerHTML = '<option value="">এই উপজেলায় এখনো কোনো বাজার নিবন্ধিত হয়নি</option>';
+      marketSel.disabled = true;
+      return;
+    }
+    marketSel.innerHTML = '<option value="">-- বাজার/এলাকা নির্বাচন করুন --</option>' +
+      qs.docs.map(d=> `<option value="${d.id}">${d.data().name || d.id}</option>`).join("");
+    marketSel.disabled = false;
+  }catch(e){
+    marketSel.innerHTML = '<option value="">লোড করা যায়নি</option>';
+  }
+});
+
+document.getElementById("restaurantSignupBtn").addEventListener("click", async ()=>{
+  const name = document.getElementById("rsName").value.trim();
+  const owner = document.getElementById("rsOwner").value.trim();
+  const phone = document.getElementById("rsPhone").value.trim();
+  const pass = document.getElementById("rsPass").value;
+  const district = document.getElementById("rsDistrict").value;
+  const upazila = document.getElementById("rsUpazila").value;
+  const marketId = document.getElementById("rsMarket").value;
+  const address = document.getElementById("rsAddress").value.trim();
+
+  if(!name){ showMsg("restaurantMsg","রেস্টুরেন্টের নাম লিখুন।",false); return; }
+  if(!owner || !phone || pass.length < 6){
+    showMsg("restaurantMsg","মালিকের নাম, মোবাইল নম্বর ও পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর) সঠিকভাবে দিন।",false); return;
+  }
+  if(!marketId){
+    showMsg("restaurantMsg","জেলা, উপজেলা ও বাজার/এলাকা নির্বাচন করুন।",false); return;
+  }
+
+  const btn = document.getElementById("restaurantSignupBtn");
+  btn.disabled = true; btn.textContent = "নিবন্ধন হচ্ছে...";
+  __authFlowInProgress = true;
+  try{
+    const authEmail = phoneToAuthEmail(phone);
+    const cred = await auth.createUserWithEmailAndPassword(authEmail, pass);
+    const uid = cred.user.uid;
+
+    await db.collection("users").doc(uid).set({ role: "restaurant", phone, createdAt: fbNow() });
+    /* ⚠️ ঘরের নামগুলো বাজারের অ্যাপ যা পড়ে ঠিক তাই — name, area,
+       isActive, isOpen। নাম না মিললে নিবন্ধন হতো, কিন্তু তালিকায়
+       কিছুই দেখা যেত না, আর কারণটা ধরা কঠিন হতো।                */
+    await db.collection("restaurants").doc(uid).set({
+      name, ownerName: owner, phone,
+      district, upazila, marketId,
+      area: [upazila, district].filter(Boolean).join(", "),
+      address: address || null,
+      photoURL: null,
+      isActive: true,      // বাজারের তালিকায় দেখা যাবে
+      isOpen: true,        // মালিক পরে খোলা/বন্ধ করতে পারবেন
+      isVerified: false,   // যাচাই পরে — তখন ব্যাজ দেখানো যাবে
+      status: "active",
+      createdAt: fbNow()
+    });
+
+    showMsg("restaurantMsg","✅ নিবন্ধন সম্পন্ন হয়েছে! আপনার রেস্টুরেন্ট এখন Honey Bee Bazar-এ দেখা যাবে।", true);
+    await afterLoginRoute(uid);
+  }catch(e){
+    console.error(e);
+    let friendly = e.message;
+    if(e.code === "auth/email-already-in-use") friendly = "এই মোবাইল নম্বর দিয়ে আগে থেকেই একটা অ্যাকাউন্ট নিবন্ধিত আছে।";
+    showMsg("restaurantMsg","⚠️ নিবন্ধন করা যায়নি: " + friendly, false);
+  }
+  btn.disabled = false; btn.textContent = "✅ নিবন্ধন করুন";
+});
+
 async function afterLoginRoute(uid){
   const superAdmin = await isSuperAdmin(uid);
   if (superAdmin) {
@@ -501,6 +628,23 @@ async function afterLoginRoute(uid){
     }
     saveSession({ uid, role: "rider", name: doc.data().name || "" });
     window.location.href = "shop-ledger-app.html";
+    return;
+  }
+
+  /* 🍽️ রেস্টুরেন্ট — নিজস্ব POS এখনো বানানো হয়নি। তাই সৎভাবে সেটাই
+     বলা হয়, ভাঙা কোনো পাতায় পাঠানো হয় না। অ্যাকাউন্টটা থেকে যায়,
+     POS তৈরি হলে একই মোবাইল-পাসওয়ার্ড দিয়েই ঢোকা যাবে। */
+  if (userDoc.role === "restaurant") {
+    const doc = await db.collection("restaurants").doc(uid).get();
+    if (!doc.exists || doc.data().status === "blocked") {
+      showMsg("loginMsg", "আপনার অ্যাকাউন্টটি ব্লক করা আছে অথবা প্রোফাইল পাওয়া যায়নি।", false);
+      await auth.signOut();
+      return;
+    }
+    showMsg("loginMsg", "✅ আপনার রেস্টুরেন্ট নিবন্ধিত আছে — Honey Bee Bazar-এ দেখা যাচ্ছে।\n"
+      + "খাবারের তালিকা বসানোর অ্যাপটা শীঘ্রই আসছে। তৈরি হলে এই মোবাইল নম্বর "
+      + "আর পাসওয়ার্ড দিয়েই ঢুকতে পারবেন।", true);
+    await auth.signOut();
     return;
   }
 
