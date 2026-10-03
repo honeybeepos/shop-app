@@ -1604,6 +1604,81 @@ exports.adminUpdateShopOwnerEmail = onCall(async (request) => {
   }
 });
 
+// 🔑 সুপার অ্যাডমিন যেকোনো একাউন্টের পাসওয়ার্ড বদলে দেন।
+//
+// কেন এটা দরকার: দোকানদার, রাইডার, ড্রাইভার আর রেস্টুরেন্ট — সবাই মোবাইল
+// নম্বর দিয়ে নিবন্ধন করে। ভেতরে Firebase-এর জন্য একটা বানানো ইমেইল তৈরি হয়
+// (rider_01…@honeybee-riders.app)। ওই ডোমেইনে কোনো চিঠি যায় না, তাই
+// "পাসওয়ার্ড ভুলে গেছেন" লিংক কোনোদিনই কাজ করবে না — অ্যাপ "পাঠানো হয়েছে"
+// বললেও মেইল কোথাও পৌঁছায় না। পাসওয়ার্ড ভুলে গেলে মালিক নিজের ব্যবসার
+// ভেতরে আর ঢুকতেই পারতেন না। এই ফাংশনটা সেই একমাত্র উদ্ধারের পথ।
+//
+// ⚠️ ক্লায়েন্ট (ব্রাউজার) থেকে অন্য কারো পাসওয়ার্ড বদলানো সম্ভব নয় — শুধু
+//    Admin SDK পারে। তাই এটা Cloud Function-ই হতে হবে।
+exports.adminResetPassword = onCall(async (request) => {
+  try {
+    const callerUid = request.auth && request.auth.uid;
+    if (!callerUid) {
+      throw new HttpsError("unauthenticated", "লগইন করা নেই।");
+    }
+
+    const superAdminDoc = await db.collection("superadmins").doc(callerUid).get();
+    if (!superAdminDoc.exists) {
+      throw new HttpsError("permission-denied", "শুধু সুপার অ্যাডমিন এই কাজ করতে পারবেন।");
+    }
+
+    const { targetUid, accountType, newPassword } = request.data || {};
+    const pass = String(newPassword || "");
+
+    if (!targetUid) {
+      throw new HttpsError("invalid-argument", "কার পাসওয়ার্ড বদলাবেন সেটা দিতে হবে।");
+    }
+    if (pass.length < 6) {
+      throw new HttpsError("invalid-argument", "পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে।");
+    }
+
+    // যে ঘরে একাউন্টটা আছে সেখানে সত্যিই ডকুমেন্টটা আছে কিনা মিলিয়ে নেওয়া
+    // হচ্ছে — যাতে ভুল uid দিলে অন্য কারো পাসওয়ার্ড বদলে না যায়।
+    const COLLECTION = {
+      shop: "shops", rider: "riders", restaurant: "restaurants",
+      agent: "agents", transport_driver: "transportDrivers"
+    };
+    const col = COLLECTION[accountType];
+    if (!col) {
+      throw new HttpsError("invalid-argument", "accountType ঠিক নেই।");
+    }
+
+    const snap = await db.collection(col).doc(targetUid).get();
+    if (!snap.exists) {
+      throw new HttpsError("not-found", "এই একাউন্ট খুঁজে পাওয়া যায়নি।");
+    }
+
+    // দোকানের ক্ষেত্রে মালিকের uid আলাদা হতে পারে
+    const authUid = (col === "shops" && snap.data().ownerUid) ? snap.data().ownerUid : targetUid;
+
+    await getAuth().updateUser(authUid, { password: pass });
+
+    // কে, কার, কখন পাসওয়ার্ড বদলেছে — হিসাব রাখা হচ্ছে। পাসওয়ার্ডটা
+    // কোথাও লেখা হয় না, শুধু ঘটনাটা লেখা হয়।
+    await db.collection("adminAudit").add({
+      action: "resetPassword",
+      byUid: callerUid,
+      targetUid: authUid,
+      accountType,
+      at: FieldValue.serverTimestamp()
+    }).catch(() => {});
+
+    return { success: true, targetUid: authUid };
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    console.error("adminResetPassword ব্যর্থ হয়েছে:", err);
+    if (err.code === "auth/user-not-found") {
+      throw new HttpsError("not-found", "Firebase Authentication-এ এই ব্যবহারকারী নেই।");
+    }
+    throw new HttpsError("internal", "পাসওয়ার্ড বদলানো যায়নি — " + (err && err.message ? err.message : String(err)));
+  }
+});
+
 // 📦 "প্রস্তুত হচ্ছে" ট্যাবে একটা কাস্টমারের পুরো রসিদ (একাধিক প্রোডাক্ট/orderRequests
 // ডকুমেন্ট) প্যাকেজিং শেষ হলে দোকানদার একবার এই callable-টা ডাকেন (প্রতিটা
 // প্রোডাক্টের জন্য আলাদা আলাদা না — নাহলে কাস্টমার একই কথায় ৩-৪টা নোটিফিকেশন
