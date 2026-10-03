@@ -675,10 +675,36 @@ function makeReceipt(o){
   `Subtotal              ${money(o.subtotal)}`,`Tax                   ${money(o.tax)}`,`TOTAL                 ${money(o.total)}`,
   "------------------------------",`PAYMENT: ${o.paymentStatus}`,"=============================="].join("\n");
 }
-function printPreview(title,text){
-  const w=window.open("","_blank","width=420,height=700"); if(!w)return alert("Popup blocked. Browser-এ popup allow করুন।");
-  w.document.write(`<html><head><title>${title}</title><style>body{font-family:monospace;padding:20px;white-space:pre-wrap}button{padding:12px 18px;margin-bottom:15px}</style></head><body><button onclick="print()">PRINT</button><pre>${text.replaceAll("&","&amp;").replaceAll("<","&lt;")}</pre></body></html>`);
-  w.document.close();
+/* ════════ Automatic LAN Printing ════════
+   PC-তে চলা Local Print Bridge-এ ESC/POS job পাঠানো হবে।
+   Browser print preview আর ব্যবহার করা হবে না।
+   Bridge endpoint: http://127.0.0.1:9105/print
+*/
+const PRINT_BRIDGE_URL = "http://127.0.0.1:9105/print";
+const PRINTERS = {
+  kitchen: { model:"Xprinter XP-N160I", ip:"192.168.1.101", port:9100 },
+  cash: { model:"Rongta RP326", ip:"192.168.1.102", port:9100 }
+};
+
+async function autoPrint(printerType, text, orderNo){
+  const printer=PRINTERS[printerType];
+  try{
+    const r=await fetch(PRINT_BRIDGE_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        printerType, model:printer.model, ip:printer.ip, port:printer.port,
+        orderNo, text, format:"escpos"
+      })
+    });
+    if(!r.ok) throw new Error("Print Bridge error "+r.status);
+    toastRP((printerType==="kitchen"?"🍳 Kitchen KOT":"🧾 Customer Receipt")+" automatically sent to "+printer.model);
+    return true;
+  }catch(e){
+    console.error("Auto print failed:",e);
+    toastRP("Automatic print হয়নি — PC Print Bridge চালু আছে কিনা দেখুন।",true);
+    return false;
+  }
 }
 function renderOrderHistory(){
   const el=document.querySelector("#orders .orders");if(!el)return;const orders=getOrders();
@@ -695,13 +721,13 @@ function sendOrder(){
   if(!cart.length)return alert("প্রথমে খাবার নির্বাচন করুন।");
   const o=ensureCurrentOrder();o.status="PREPARING";o.kitchenStatus="PRINTED";
   const orders=getOrders().filter(x=>x.orderNo!==o.orderNo);orders.unshift(o);saveOrders(orders);renderOrderHistory();
-  printPreview(`KOT #${o.orderNo}`,makeKOT(o));
+  autoPrint("kitchen",makeKOT(o),o.orderNo);
 }
 function payPrint(){
   if(!cart.length)return alert("প্রথমে খাবার নির্বাচন করুন।");
   const o=ensureCurrentOrder();o.paymentStatus="PAID";o.status="PAID";
   const orders=getOrders().filter(x=>x.orderNo!==o.orderNo);orders.unshift(o);saveOrders(orders);renderOrderHistory();
-  printPreview(`Receipt #${o.orderNo}`,makeReceipt(o));
+  autoPrint("cash",makeReceipt(o),o.orderNo);
 }
 function markReady(){
   const no=Number(document.getElementById("orderNo").textContent),orders=getOrders(),o=orders.find(x=>x.orderNo===no);
