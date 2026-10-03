@@ -230,7 +230,8 @@ button{cursor:pointer;border:0}
         <div class="topbar"><h2 style="margin:0">💵 Cash Counter</h2><button class="btn" onclick="closePaymentCounter()">✕</button></div>
         <div style="margin-top:12px">
           <label>1️⃣ Receipt / Order Number</label>
-          <div style="display:flex;gap:8px;margin-top:6px"><input id="payOrderNo" class="search" inputmode="numeric" placeholder="যেমন 1025"><button class="btn primary" onclick="loadPaymentOrder()">Search</button></div>
+          <div style="color:var(--muted);font-size:13px;margin-top:4px">শুধু <b>Cash Counter / Pay & Print</b> চাপলে Receipt Number চাইবে। Product select, quantity change বা Kitchen-এ Order পাঠানোর সময় এই popup আসবে না।</div>
+          <div style="display:flex;gap:8px;margin-top:8px"><input id="payOrderNo" class="search" inputmode="numeric" placeholder="যেমন 1025" onkeydown="if(event.key==='Enter')loadPaymentOrder()"><button class="btn primary" onclick="loadPaymentOrder()">Search</button></div>
         </div>
         <div id="paymentDetails" style="display:none;margin-top:16px">
           <div class="panel" style="background:var(--bg2);padding:14px">
@@ -916,11 +917,17 @@ async function sendOrder(){
   const orders=getOrders().filter(x=>x.orderNo!==o.orderNo);orders.unshift(o);saveOrders(orders);renderOrderHistory();
   await autoPrint("kitchen",makeKOT(o,newItems),o.orderNo);
 }
-function openPaymentCounter(prefillNo){
+function openPaymentCounter(){
+  paymentOrder=null;
   document.getElementById("paymentModal").style.display="block";
   document.getElementById("paymentDetails").style.display="none";
-  document.getElementById("payOrderNo").value=prefillNo||"";
-  if(prefillNo)loadPaymentOrder();
+  document.getElementById("payOrderNo").value="";
+  document.getElementById("payAmount").value="";
+  document.getElementById("payReceiptNo").textContent="#—";
+  document.getElementById("payTotal").textContent=money(0);
+  document.getElementById("payChange").textContent=money(0);
+  document.getElementById("payDue").textContent=money(0);
+  setTimeout(()=>document.getElementById("payOrderNo")?.focus(),80);
 }
 function closePaymentCounter(){document.getElementById("paymentModal").style.display="none";}
 let paymentOrder=null;
@@ -953,7 +960,7 @@ async function confirmCashPayment(){
   const ok=await autoPrint("cash",makeReceipt(paymentOrder),paymentOrder.orderNo);
   if(ok){alert(`Payment Confirmed\nTotal: ${money(paymentOrder.total)}\nPaid: ${money(paid)}\nReturn: ${money(paymentOrder.change)}`);closePaymentCounter();}
 }
-function payPrint(){openPaymentCounter(Number(document.getElementById("orderNo")?.textContent||0));}
+function payPrint(){openPaymentCounter();}
 function markReady(){
   const no=Number(document.getElementById("orderNo").textContent),orders=getOrders(),o=orders.find(x=>x.orderNo===no);
   if(!o)return alert("Order আগে Kitchen-এ পাঠান।");
