@@ -503,6 +503,8 @@ function openFoodEditor(id=null){
     foodName.value=f.name; foodCategory.value=f.cat; foodPrice.value=f.price;
     foodAvailable.value=String(f.available); foodDescription.value=f.description||"";
     currentImageData=f.img||null;
+    const photoInput=document.getElementById("foodImage");
+    if(photoInput) photoInput.disabled=!!f.img;
     if(f.img) imagePreview.innerHTML=`<div style="display:flex;flex-direction:column;align-items:flex-start;gap:7px">
       <img src="${f.img}" style="width:120px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">
       <button type="button" class="btn danger" onclick="removeFoodImage()">🗑️ Delete Photo</button>
@@ -511,6 +513,8 @@ function openFoodEditor(id=null){
     (f.variants||[]).forEach(v=>addVariantRow(v.name,v.price));
     (f.addons||[]).forEach(a=>addAddonRow(a.name,a.price));
   }else{
+    const photoInput=document.getElementById("foodImage");
+    if(photoInput){ photoInput.disabled=false; photoInput.value=""; }
     foodName.value="";foodCategory.value="";foodPrice.value="";foodAvailable.value="true";foodDescription.value="";
   }
 }
@@ -519,7 +523,7 @@ function removeFoodImage(){
   currentImageData=null;
   imageWasRemoved=true;
   const input=document.getElementById("foodImage");
-  if(input) input.value="";
+  if(input){ input.value=""; input.disabled=false; }
   imagePreview.innerHTML=`<div style="padding:10px;border:1px dashed var(--border);border-radius:10px">
     <div style="font-weight:700">🗑️ Photo deleted</div>
     <div style="font-size:12px;color:var(--muted);margin-top:4px">এখন উপরের Food Photo থেকে নতুন ছবি বেছে নিন।</div>
@@ -531,6 +535,8 @@ async function previewFoodImage(e){
   try{
     currentImageData=await compressImage(file,900,100);
     imageWasRemoved=false;
+    const input=document.getElementById("foodImage");
+    if(input) input.disabled=true;
     const originalKB=formatKB(file.size);
     const compressedKB=formatKB(dataUrlBytes(currentImageData));
     imagePreview.innerHTML=`<img src="${currentImageData}" style="width:120px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">
