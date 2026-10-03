@@ -195,7 +195,7 @@ button{cursor:pointer;border:0}
             <div class="total-row grand"><span>Total</span><b id="grand">SAR 0</b></div>
           </div>
           <button class="btn green full" onclick="sendOrder()">🖨️ Send Order to Kitchen</button>
-          <button class="btn primary full" onclick="payPrint()">💳 Pay & Print Receipt</button><button class="btn blue full" onclick="markReady()">🔔 Mark Order Ready</button>
+          <button class="btn primary full" onclick="openPaymentCounter()">💳 Cash Counter / Pay & Print</button><button class="btn blue full" onclick="markReady()">🔔 Mark Order Ready</button>
         </aside>
       </div>
     </section>
@@ -213,19 +213,53 @@ button{cursor:pointer;border:0}
 
     <section class="page" id="tables">
       <div class="panel">
-        <h2>Tables</h2>
-        <div class="tables">
-          <div class="table free"><b>T01</b><div class="status">🟢 Free</div></div>
-          <div class="table occupied"><b>T02</b><div class="status">🔴 Occupied</div></div>
-          <div class="table ordered"><b>T03</b><div class="status">🟠 Ordered</div></div>
-          <div class="table ready"><b>T04</b><div class="status">🔵 Ready</div></div>
-          <div class="table free"><b>T05</b><div class="status">🟢 Free</div></div>
-          <div class="table occupied"><b>T06</b><div class="status">🔴 Occupied</div></div>
-          <div class="table free"><b>T07</b><div class="status">🟢 Free</div></div>
-          <div class="table ordered"><b>T08</b><div class="status">🟠 Order #1025</div></div>
+        <div class="toolbar" style="align-items:center">
+          <div style="flex:1"><h2 style="margin:0">Tables & QR</h2><div style="color:var(--muted);font-size:13px;margin-top:4px">প্রতিটি Table-এর QR scan করলে Customer Menu খুলবে। Camera কাজ না করলে নিচের Table Code লিখেও ঢোকা যাবে।</div></div>
+          <button class="btn primary" onclick="openAllTableQR()">🖨️ QR Cards</button>
+        </div>
+        <div class="tables" id="tableGrid">
+          <div class="table free"><b>T01</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T01')">▣ QR / Code</button></div>
+          <div class="table free"><b>T02</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T02')">▣ QR / Code</button></div>
+          <div class="table free"><b>T03</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T03')">▣ QR / Code</button></div>
+          <div class="table free"><b>T04</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T04')">▣ QR / Code</button></div>
+          <div class="table free"><b>T05</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T05')">▣ QR / Code</button></div>
+          <div class="table free"><b>T06</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T06')">▣ QR / Code</button></div>
+          <div class="table free"><b>T07</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T07')">▣ QR / Code</button></div>
+          <div class="table free"><b>T08</b><div class="status">🟢 Free</div><button class="btn" style="margin-top:8px;width:100%" onclick="openTableQR('T08')">▣ QR / Code</button></div>
         </div>
       </div>
     </section>
+
+    <div id="paymentModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.62);z-index:90;padding:16px;overflow:auto">
+      <div class="panel" style="max-width:480px;margin:25px auto">
+        <div class="topbar"><h2 style="margin:0">💵 Cash Counter</h2><button class="btn" onclick="closePaymentCounter()">✕</button></div>
+        <div style="margin-top:12px">
+          <label>1️⃣ Receipt / Order Number</label>
+          <div style="display:flex;gap:8px;margin-top:6px"><input id="payOrderNo" class="search" inputmode="numeric" placeholder="যেমন 1025"><button class="btn primary" onclick="loadPaymentOrder()">Search</button></div>
+        </div>
+        <div id="paymentDetails" style="display:none;margin-top:16px">
+          <div class="panel" style="background:var(--bg2);padding:14px">
+            <div class="item-row"><span>Receipt</span><b id="payReceiptNo">#—</b></div>
+            <div class="item-row"><span>Total Bill</span><b id="payTotal">SAR 0</b></div>
+            <div style="margin-top:12px"><label>2️⃣ Customer Paid</label><input id="payAmount" class="search" style="width:100%;margin-top:6px;font-size:20px;font-weight:800" inputmode="decimal" placeholder="0" oninput="calculatePayment()"></div>
+            <div class="item-row" style="margin-top:14px"><span>3️⃣ Return / Change</span><b id="payChange" style="font-size:24px">SAR 0</b></div>
+            <div class="item-row" style="margin-top:6px"><span>Due</span><b id="payDue">SAR 0</b></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1" onclick="closePaymentCounter()">Cancel</button><button class="btn primary" style="flex:2" onclick="confirmCashPayment()">✓ Confirm & Print</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tableQrModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:80;padding:16px;overflow:auto">
+      <div class="panel" style="max-width:430px;margin:25px auto;text-align:center">
+        <div class="topbar"><h2 id="qrTitle">Table QR</h2><button class="btn" onclick="closeTableQR()">✕</button></div>
+        <div id="qrBox" style="display:flex;justify-content:center;margin:14px 0"></div>
+        <div style="font-size:13px;color:var(--muted)">Camera দিয়ে Scan করুন</div>
+        <div style="margin-top:10px;font-size:22px;font-weight:800;letter-spacing:1px" id="qrCodeText"></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">Camera কাজ না করলে এই Code লিখে Customer Menu খুলবে</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:16px"><button class="btn primary" onclick="printTableQR()">🖨️ Print QR</button><button class="btn" onclick="copyTableCode()">Copy Code</button></div>
+      </div>
+    </div>
 
     <section class="page" id="menu">
       <div class="panel">
@@ -407,6 +441,7 @@ button{cursor:pointer;border:0}
   </main>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -805,10 +840,22 @@ function currentOrderPayload(){
     items:cart.map(x=>({id:x.id,name:x.name,qty:x.qty,unitPrice:x.price,selection:x.selection||null})),
     subtotal:sub,tax,total:sub+tax,status:"NEW",kitchenStatus:"NOT_SENT",paymentStatus:"UNPAID",createdAt:new Date().toISOString()};
 }
+function mergeCartIntoOrder(o){
+  const incoming=cart.map(x=>({id:x.id,name:x.name,qty:x.qty,unitPrice:x.price,selection:x.selection||null}));
+  for(const x of incoming){
+    const key=JSON.stringify([String(x.id),x.selection?.variant||"",x.selection?.addons||[]]);
+    const old=o.items.find(i=>JSON.stringify([String(i.id),i.selection?.variant||"",i.selection?.addons||[]])===key);
+    if(old) old.qty=x.qty; else o.items.push(x);
+  }
+  o.subtotal=o.items.reduce((s,x)=>s+x.unitPrice*x.qty,0);
+  o.tax=o.subtotal*.15; o.total=o.subtotal+o.tax;
+  return o;
+}
 function ensureCurrentOrder(){
   const orders=getOrders(),no=Number(document.getElementById("orderNo").textContent);
   let o=orders.find(x=>x.orderNo===no);
-  if(!o){o=currentOrderPayload();orders.unshift(o);saveOrders(orders);} return o;
+  if(!o){o=currentOrderPayload();o.items=[];o.sentItems=[];orders.unshift(o);saveOrders(orders);}
+  mergeCartIntoOrder(o); return o;
 }
 function getPrintShopName(){
   const v=(document.getElementById("printShopName")?.value||localStorage.getItem("hbPrintShopName")||RP.name||"Honey Bee Restaurant").trim();
@@ -821,55 +868,40 @@ async function savePrintShopName(){
   try{
     await db.collection("restaurants").doc(RP.uid).set({printHeader:name},{merge:true});
     localStorage.setItem("hbPrintShopName",name);
-    toastRP("প্রিন্টের নাম সংরক্ষিত হয়েছে: " + name);
-  }catch(e){
-    toastRP("Print Name সংরক্ষণ হয়নি — " + (e.code||"আবার চেষ্টা করুন"),true);
-  }
+    toastRP("প্রিন্টের নাম সংরক্ষণ করা হয়েছে: " + name);
+  }catch(e){ toastRP("Print Name সংরক্ষণ হয়নি — " + (e.code||"আবার চেষ্টা করুন"),true); }
 }
-function makeKOT(o){
+function makeKOT(o,items){
   const shop=getPrintShopName();
-  return ["==============================",`        ${shop}`,"          KITCHEN KOT",`             #${o.orderNo}`,`${o.table||""}`,
-  "==============================",...o.items.map(i=>`${i.name} x${i.qty}${i.selection?.variant?` [${i.selection.variant}]`:""}${i.selection?.addons?.length?` + ${i.selection.addons.join(", ")}`:""}`),
-  "=============================="].join("\n");
+  const list=items||o.items;
+  return ["==============================",`        ${shop}`,"          KITCHEN KOT",`             #${o.orderNo}`,`${o.table||""}`,"==============================",...list.map(i=>`${i.name} x${i.qty}${i.selection?.variant?` [${i.selection.variant}]`:""}${i.selection?.addons?.length?` + ${i.selection.addons.join(", ")}`:""}`),"=============================="].join("\n");
 }
 function makeReceipt(o){
   const shop=getPrintShopName();
-  return ["==============================",`        ${shop}`,"       RESTAURANT RECEIPT",`          ORDER #${o.orderNo}`,"==============================",
-  ...o.items.map(i=>`${i.name} x${i.qty}    ${money(i.unitPrice*i.qty)}`),"------------------------------",
-  `Subtotal              ${money(o.subtotal)}`,`Tax                   ${money(o.tax)}`,`TOTAL                 ${money(o.total)}`,
-  "------------------------------",`PAYMENT: ${o.paymentStatus}`,"=============================="].join("\n");
+  return ["==============================",`        ${shop}`,"       FINAL RECEIPT",`          ORDER #${o.orderNo}`,"==============================",...o.items.map(i=>`${i.name} x${i.qty}    ${money(i.unitPrice*i.qty)}`),"------------------------------",`Subtotal              ${money(o.subtotal)}`,`Tax                   ${money(o.tax)}`,`TOTAL                 ${money(o.total)}`,"------------------------------",`PAID                  ${money(o.paid||0)}`,`CHANGE                ${money(o.change||0)}`,`DUE                   ${money(o.due||0)}`,"------------------------------","PAYMENT: PAID","=============================="].join("\n");
 }
-/* ════════ Automatic LAN Printing ════════
-   PC-তে চলা Local Print Bridge-এ ESC/POS job পাঠানো হবে।
-   Browser print preview আর ব্যবহার করা হবে না।
-   Bridge endpoint: http://127.0.0.1:9105/print
-*/
+/* ════════ Automatic LAN Printing ════════ */
 const PRINT_BRIDGE_URL = "http://127.0.0.1:9105/print";
-const PRINTERS = {
-  kitchen: { model:"Xprinter XP-N160I", ip:"192.168.1.101", port:9100 },
-  cash: { model:"Rongta RP326", ip:"192.168.1.102", port:9100 }
-};
-
-async function autoPrint(printerType, text, orderNo){
+const PRINTERS = { kitchen:{model:"Xprinter XP-N160I",ip:"192.168.1.101",port:9100}, cash:{model:"Rongta RP326",ip:"192.168.1.102",port:9100} };
+async function autoPrint(printerType,text,orderNo){
   const printer=PRINTERS[printerType];
   try{
-    const r=await fetch(PRINT_BRIDGE_URL,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        printerType, model:printer.model, ip:printer.ip, port:printer.port,
-        orderNo, text, format:"escpos"
-      })
-    });
+    const r=await fetch(PRINT_BRIDGE_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({printerType,model:printer.model,ip:printer.ip,port:printer.port,orderNo,text,format:"escpos"})});
     if(!r.ok) throw new Error("Print Bridge error "+r.status);
-    toastRP((printerType==="kitchen"?"🍳 Kitchen KOT":"🧾 Customer Receipt")+" automatically sent to "+printer.model);
-    return true;
-  }catch(e){
-    console.error("Auto print failed:",e);
-    toastRP("Automatic print হয়নি — PC Print Bridge চালু আছে কিনা দেখুন।",true);
-    return false;
-  }
+    toastRP((printerType==="kitchen"?"🍳 Kitchen KOT":"🧾 Customer Receipt")+" automatically sent to "+printer.model); return true;
+  }catch(e){ console.error("Auto print failed:",e); toastRP("Automatic print হয়নি — PC Print Bridge চালু আছে কিনা দেখুন।",true); return false; }
 }
+function getNewKitchenItems(o){
+  const sent=o.sentItems||[]; const out=[];
+  for(const item of o.items){
+    const key=JSON.stringify([String(item.id),item.selection?.variant||"",item.selection?.addons||[]]);
+    const prev=sent.find(i=>JSON.stringify([String(i.id),i.selection?.variant||"",i.selection?.addons||[]])===key);
+    const diff=item.qty-(prev?.qty||0);
+    if(diff>0) out.push({...item,qty:diff});
+  }
+  return out;
+}
+function markSentItems(o){o.sentItems=JSON.parse(JSON.stringify(o.items));}
 function renderOrderHistory(){
   const el=document.querySelector("#orders .orders");if(!el)return;const orders=getOrders();
   el.innerHTML=orders.length?orders.slice(0,30).map(o=>`<div class="order-row"><div><b>#${o.orderNo}</b> · ${o.type}<br><small>${o.source} · ${o.items.reduce((s,i)=>s+i.qty,0)} items · ${money(o.total)}</small></div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${o.status==="READY"?"ready":o.paymentStatus==="PAID"?"paid":"prep"}">${o.status}</span><button class="btn" onclick="viewOrder(${o.orderNo})">View</button></div></div>`).join(""):`<div style="color:var(--muted)">No orders yet.</div>`;
@@ -878,27 +910,102 @@ function viewOrder(no){
   const o=getOrders().find(x=>x.orderNo===no);if(!o)return;
   alert(`Order #${o.orderNo}\n${o.type} · ${o.source}\n${o.items.map(i=>`${i.name} ×${i.qty}`).join("\n")}\n\nTotal: ${money(o.total)}\nStatus: ${o.status}`);
 }
-function newOrder(){
-  showPage("order");cart=[];document.getElementById("orderNo").textContent=nextOrderNumber();document.getElementById("tableLabel").textContent="T08";renderCart();
-}
-function sendOrder(){
+function newOrder(){ showPage("order");cart=[];document.getElementById("orderNo").textContent=nextOrderNumber();document.getElementById("tableLabel").textContent="T08";renderCart(); }
+async function sendOrder(){
   if(!cart.length)return alert("প্রথমে খাবার নির্বাচন করুন।");
-  const o=ensureCurrentOrder();o.status="PREPARING";o.kitchenStatus="PRINTED";
+  const o=ensureCurrentOrder();
+  if(o.paymentStatus==="PAID"||o.status==="CLOSED")return alert("এই Receipt ইতিমধ্যে Closed। নতুন খাবার যোগ করা যাবে না।");
+  const newItems=getNewKitchenItems(o);
+  if(!newItems.length)return alert("নতুন খাবার নেই — আগের খাবার আবার Kitchen-এ যাবে না।");
+  o.status="PREPARING";o.kitchenStatus="PRINTED";markSentItems(o);
   const orders=getOrders().filter(x=>x.orderNo!==o.orderNo);orders.unshift(o);saveOrders(orders);renderOrderHistory();
-  autoPrint("kitchen",makeKOT(o),o.orderNo);
+  await autoPrint("kitchen",makeKOT(o,newItems),o.orderNo);
 }
-function payPrint(){
-  if(!cart.length)return alert("প্রথমে খাবার নির্বাচন করুন।");
-  const o=ensureCurrentOrder();o.paymentStatus="PAID";o.status="PAID";
-  const orders=getOrders().filter(x=>x.orderNo!==o.orderNo);orders.unshift(o);saveOrders(orders);renderOrderHistory();
-  autoPrint("cash",makeReceipt(o),o.orderNo);
+function openPaymentCounter(prefillNo){
+  document.getElementById("paymentModal").style.display="block";
+  document.getElementById("paymentDetails").style.display="none";
+  document.getElementById("payOrderNo").value=prefillNo||"";
+  if(prefillNo)loadPaymentOrder();
 }
+function closePaymentCounter(){document.getElementById("paymentModal").style.display="none";}
+let paymentOrder=null;
+function loadPaymentOrder(){
+  const no=Number(document.getElementById("payOrderNo").value);
+  const o=getOrders().find(x=>Number(x.orderNo)===no);
+  if(!o)return alert("এই Receipt Number পাওয়া যায়নি।");
+  if(o.paymentStatus==="PAID"||o.status==="CLOSED")return alert("এই Receipt ইতিমধ্যে Paid/Closed।");
+  paymentOrder=o;
+  document.getElementById("payReceiptNo").textContent="#"+o.orderNo;
+  document.getElementById("payTotal").textContent=money(o.total);
+  document.getElementById("payAmount").value="";
+  document.getElementById("payChange").textContent=money(0);
+  document.getElementById("payDue").textContent=money(o.total);
+  document.getElementById("paymentDetails").style.display="block";
+}
+function calculatePayment(){
+  if(!paymentOrder)return;
+  const paid=Math.max(0,Number(document.getElementById("payAmount").value)||0);
+  const diff=paid-paymentOrder.total;
+  document.getElementById("payChange").textContent=money(Math.max(0,diff));
+  document.getElementById("payDue").textContent=money(Math.max(0,-diff));
+}
+async function confirmCashPayment(){
+  if(!paymentOrder)return;
+  const paid=Math.max(0,Number(document.getElementById("payAmount").value)||0);
+  if(paid<paymentOrder.total)return alert(`পুরো টাকা দেওয়া হয়নি।\nTotal: ${money(paymentOrder.total)}\nDue: ${money(paymentOrder.total-paid)}`);
+  paymentOrder.paid=paid;paymentOrder.change=paid-paymentOrder.total;paymentOrder.due=0;paymentOrder.paymentStatus="PAID";paymentOrder.status="CLOSED";paymentOrder.closedAt=new Date().toISOString();
+  const orders=getOrders().filter(x=>x.orderNo!==paymentOrder.orderNo);orders.unshift(paymentOrder);saveOrders(orders);renderOrderHistory();
+  const ok=await autoPrint("cash",makeReceipt(paymentOrder),paymentOrder.orderNo);
+  if(ok){alert(`Payment Confirmed\nTotal: ${money(paymentOrder.total)}\nPaid: ${money(paid)}\nReturn: ${money(paymentOrder.change)}`);closePaymentCounter();}
+}
+function payPrint(){openPaymentCounter(Number(document.getElementById("orderNo")?.textContent||0));}
 function markReady(){
   const no=Number(document.getElementById("orderNo").textContent),orders=getOrders(),o=orders.find(x=>x.orderNo===no);
   if(!o)return alert("Order আগে Kitchen-এ পাঠান।");
   o.status="READY";o.kitchenStatus="READY";saveOrders(orders);renderOrderHistory();
   alert(`Order #${no} ready — Kitchen থেকে মুখে “${no} ready” বলা হবে।`);
 }
+const HB_TABLES = ['T01','T02','T03','T04','T05','T06','T07','T08'];
+let currentQRTable=null;
+function makeTableCode(table){
+  const raw=(RP.uid||'restaurant')+'|'+table;
+  let h=2166136261;
+  for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619);}
+  return table+'-'+(Math.abs(h>>>0).toString(36).toUpperCase().padStart(6,'0').slice(0,6));
+}
+function customerTableUrl(table,code){
+  const base=new URL('honey-bee-bazar.html',location.href);
+  base.searchParams.set('restaurant',RP.uid||'');
+  base.searchParams.set('table',table);
+  base.searchParams.set('code',code);
+  return base.toString();
+}
+function openTableQR(table){
+  currentQRTable=table;
+  const code=makeTableCode(table);
+  document.getElementById('qrTitle').textContent='Table '+table+' QR';
+  document.getElementById('qrCodeText').textContent='Table Code: '+code;
+  const box=document.getElementById('qrBox'); box.innerHTML='';
+  if(window.QRCode){ new QRCode(box,{text:customerTableUrl(table,code),width:220,height:220,correctLevel:QRCode.CorrectLevel.M}); }
+  document.getElementById('tableQrModal').style.display='block';
+}
+function closeTableQR(){document.getElementById('tableQrModal').style.display='none';}
+function copyTableCode(){ if(!currentQRTable)return; navigator.clipboard?.writeText(makeTableCode(currentQRTable)).then(()=>toastRP('Table Code copied.')).catch(()=>toastRP('Code: '+makeTableCode(currentQRTable))); }
+function printTableQR(){
+  if(!currentQRTable)return;
+  const code=makeTableCode(currentQRTable), url=customerTableUrl(currentQRTable,code);
+  const w=window.open('','_blank','width=500,height=700');
+  if(!w)return;
+  w.document.write('<html><head><title>Table '+currentQRTable+' QR</title><style>body{font-family:Arial;text-align:center;padding:30px}#q{display:flex;justify-content:center;margin:20px}</style></head><body><h2>Honey Bee Restaurant</h2><h1>Table '+currentQRTable+'</h1><div id="q"></div><h3>Table Code: '+code+'</h3><p>Scan QR or enter the Table Code</p><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><script>new QRCode(document.getElementById("q"),{text:'+JSON.stringify(url)+',width:260,height:260});setTimeout(()=>window.print(),500);<\/script></body></html>');
+  w.document.close();
+}
+function openAllTableQR(){
+  const w=window.open('','_blank','width=700,height=900'); if(!w)return;
+  const cards=HB_TABLES.map(t=>{const c=makeTableCode(t),u=customerTableUrl(t,c);return '<div class="card"><h2>Table '+t+'</h2><div id="q'+t+'"></div><b>'+c+'</b><p>Scan QR or enter the Table Code</p></div>'}).join('');
+  w.document.write('<html><head><title>Restaurant Table QR Cards</title><style>body{font-family:Arial;display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px}.card{text-align:center;border:1px solid #ddd;padding:15px;break-inside:avoid}.card div{display:flex;justify-content:center}</style></head><body>'+cards+'<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><script>'+HB_TABLES.map(t=>'new QRCode(document.getElementById("q'+t+'"),{text:'+JSON.stringify(customerTableUrl(t,makeTableCode(t)))+',width:180,height:180});').join('')+'setTimeout(()=>window.print(),700);<\/script></body></html>');
+  w.document.close();
+}
+
 function showPage(id){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
