@@ -379,6 +379,11 @@ button{cursor:pointer;border:0}
 
       <div class="panel">
         <h2>Printer Settings</h2>
+        <div class="field" style="margin-bottom:14px">
+          <label>Print Shop Name / Header</label>
+          <input id="printShopName" placeholder="যে নাম এখানে লিখবেন, প্রিন্টে সেটাই আসবে" maxlength="60">
+          <div style="font-size:12px;color:var(--muted);margin-top:5px">KOT ও Customer Receipt-এর একদম উপরে এই নামটি প্রিন্ট হবে। ফাঁকা রাখলে Restaurant Profile-এর নাম ব্যবহার হবে।</div>
+        </div>
         <div class="form-grid">
           <div class="field"><label>Kitchen Printer Model</label><input value="Xprinter XP-N160I" readonly></div>
           <div class="field"><label>Kitchen Printer IP</label><input placeholder="192.168.1.101" value="192.168.1.101"></div>
@@ -386,6 +391,9 @@ button{cursor:pointer;border:0}
           <div class="field"><label>Cash Printer Model</label><input value="Rongta RP326" readonly></div>
           <div class="field"><label>Cash Printer IP</label><input placeholder="192.168.1.102" value="192.168.1.102"></div>
           <div class="field"><label>Cash Printer Port</label><input value="9100"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn green" onclick="savePrintShopName()">Save Print Name</button>
         </div>
         <p style="color:var(--muted)">Kitchen printer: KOT only. Cash printer: final customer receipt. Kitchen-এর কোনো login নেই।</p>
       </div>
@@ -802,13 +810,31 @@ function ensureCurrentOrder(){
   let o=orders.find(x=>x.orderNo===no);
   if(!o){o=currentOrderPayload();orders.unshift(o);saveOrders(orders);} return o;
 }
+function getPrintShopName(){
+  const v=(document.getElementById("printShopName")?.value||localStorage.getItem("hbPrintShopName")||RP.name||"Honey Bee Restaurant").trim();
+  return v || RP.name || "Honey Bee Restaurant";
+}
+async function savePrintShopName(){
+  if(!RP.uid)return alert("Restaurant login পাওয়া যায়নি।");
+  const name=(document.getElementById("printShopName")?.value||"").trim();
+  if(!name)return alert("Print Shop Name লিখুন।");
+  try{
+    await db.collection("restaurants").doc(RP.uid).set({printHeader:name},{merge:true});
+    localStorage.setItem("hbPrintShopName",name);
+    toastRP("প্রিন্টের নাম সংরক্ষিত হয়েছে: " + name);
+  }catch(e){
+    toastRP("Print Name সংরক্ষণ হয়নি — " + (e.code||"আবার চেষ্টা করুন"),true);
+  }
+}
 function makeKOT(o){
-  return ["==============================","          KITCHEN KOT",`             #${o.orderNo}`,`${o.table||""}`,
+  const shop=getPrintShopName();
+  return ["==============================",`        ${shop}`,"          KITCHEN KOT",`             #${o.orderNo}`,`${o.table||""}`,
   "==============================",...o.items.map(i=>`${i.name} x${i.qty}${i.selection?.variant?` [${i.selection.variant}]`:""}${i.selection?.addons?.length?` + ${i.selection.addons.join(", ")}`:""}`),
   "=============================="].join("\n");
 }
 function makeReceipt(o){
-  return ["==============================","       RESTAURANT RECEIPT",`          ORDER #${o.orderNo}`,"==============================",
+  const shop=getPrintShopName();
+  return ["==============================",`        ${shop}`,"       RESTAURANT RECEIPT",`          ORDER #${o.orderNo}`,"==============================",
   ...o.items.map(i=>`${i.name} x${i.qty}    ${money(i.unitPrice*i.qty)}`),"------------------------------",
   `Subtotal              ${money(o.subtotal)}`,`Tax                   ${money(o.tax)}`,`TOTAL                 ${money(o.total)}`,
   "------------------------------",`PAYMENT: ${o.paymentStatus}`,"=============================="].join("\n");
@@ -928,6 +954,10 @@ auth.onAuthStateChanged(async function(user){
     RP.uid = user.uid;
     RP.name = d.name || "রেস্টুরেন্ট";
     RP.cur = d.currency || "SAR";
+    const printNameEl=document.getElementById("printShopName");
+    const savedPrintName=d.printHeader || localStorage.getItem("hbPrintShopName") || RP.name;
+    if(printNameEl) printNameEl.value=savedPrintName;
+    if(savedPrintName) localStorage.setItem("hbPrintShopName",savedPrintName);
 
     // Restaurant Profile fields — reload হলেও photo/description/publish state হারাবে না
     restaurantProfileImageData = d.profileImage || null;
