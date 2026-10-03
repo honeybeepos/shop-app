@@ -7,6 +7,12 @@
 <meta name="theme-color" content="#1f4a48">
 <link rel="icon" href="icon-192.png">
 <title>এডমিন প্যানেল — সব দোকান নিয়ন্ত্রণ</title>
+<!-- ⚡ ফন্টের ফাইলগুলো আসে fonts.gstatic.com থেকে। আগে ব্রাউজার CSS-টা পুরো
+     পড়া শেষ না করে ওই সার্ভারের সাথে যোগাযোগই শুরু করত না — ধীর মোবাইল
+     ইন্টারনেটে এতে লেখা দেখাতে বাড়তি সময় লাগত। preconnect দিয়ে দুটো
+     সার্ভারের সাথেই আগেভাগে সংযোগ তৈরি হয়ে থাকে। -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -107,6 +113,13 @@
   </div>
 
   <div class="card">
+    <h2>🍽️ সব রেস্টুরেন্ট (<span id="restoCount">0</span>)</h2>
+    <p style="font-size:11.5px; color:#8a7f6c; margin:0 0 10px;">রেস্টুরেন্টগুলো নিজেরাই নিবন্ধন করে। “Bazar-এ দেখান/লুকান” দিয়ে ঠিক করবেন কারা গ্রাহকের অ্যাপে দেখা যাবে।</p>
+    <input id="restoSearch" placeholder="🔎 নাম, মোবাইল বা এলাকা দিয়ে খুঁজুন" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #e3dccd; border-radius:10px; margin-bottom:10px;">
+    <div id="restoList">লোড হচ্ছে...</div>
+  </div>
+
+  <div class="card">
     <h2>🛵 সব রাইডার (<span id="riderCount">0</span>)</h2>
     <div id="allRidersList">লোড হচ্ছে...</div>
   </div>
@@ -165,6 +178,7 @@ const deleteAccountFn = cloudFunctions.httpsCallable("deleteAccount");
 // login.html-এর "ইমেইল পরিবর্তন" ফর্ম ব্যবহার করতে না পারলে), সুপার-এডমিন
 // থেকে সরাসরি ঠিক করার জন্য — Admin SDK লাগে বলে Cloud Function দিয়ে
 const adminUpdateShopOwnerEmailFn = cloudFunctions.httpsCallable("adminUpdateShopOwnerEmail");
+const adminResetPasswordFn = cloudFunctions.httpsCallable("adminResetPassword");
 
 const FEATURE_LABELS = {
   reports: "রিপোর্ট", extraIncome: "বাড়তি আয়", ops: "সাপ্লায়ার/স্টাফ/খরচ",
@@ -185,6 +199,7 @@ auth.onAuthStateChanged(async (user)=>{
   loadMarkets();
   loadAgents();
   loadAllRiders();
+  startRestaurantsListener();
   startDriversListener();
   startTmReportsListener();
   startAnalyticsListener();
@@ -611,6 +626,138 @@ async function saveFeatures(shopId, shopEl){
   await db.collection("shops").doc(shopId).set({ features, updatedAt: fbNow() }, { merge: true });
   alert("ফিচার সেটিং সেভ হয়েছে।");
 }
+
+/* ==================== 🔑 পাসওয়ার্ড বদলে দেওয়া ====================
+   মোবাইল নম্বরে নিবন্ধন করা একাউন্টের "পাসওয়ার্ড ভুলে গেছেন" লিংক কখনোই
+   কাজ করে না (ভেতরের ইমেইলটা সত্যিকারের নয়, ওখানে চিঠি যায় না)। তাই
+   মালিক আটকে গেলে সুপার অ্যাডমিনের এখান থেকে বদলে দেওয়াই একমাত্র পথ।
+   ব্রাউজার নিজে অন্য কারো পাসওয়ার্ড বদলাতে পারে না — তাই Cloud Function।  */
+async function resetPasswordFor(uid, accountType, label, name){
+  const pass = prompt(`🔑 "${name}" — এর নতুন পাসওয়ার্ড লিখুন (অন্তত ৬ অক্ষর)।\n\nলিখে OK চাপলে পাসওয়ার্ডটা সাথে সাথে বদলে যাবে। এরপর ${label}-কে এই পাসওয়ার্ডটা জানিয়ে দিন।`);
+  if(pass === null) return;
+  if(String(pass).trim().length < 6){
+    alert("পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে — কিছু বদলানো হয়নি।");
+    return;
+  }
+  try{
+    await adminResetPasswordFn({ targetUid: uid, accountType, newPassword: String(pass).trim() });
+    alert(`✅ পাসওয়ার্ড বদলে গেছে।\n\n${label}: ${name}\nনতুন পাসওয়ার্ড: ${String(pass).trim()}\n\nএটা ${label}-কে জানিয়ে দিন। উনি এখন মোবাইল নম্বর আর এই পাসওয়ার্ড দিয়ে লগইন করতে পারবেন।`);
+  }catch(e){
+    const code = (e && e.code) || "";
+    if(code.includes("not-found") || code.includes("internal/not-found")){
+      alert("⚠️ কাজটা হয়নি: adminResetPassword ফাংশনটা এখনো deploy করা হয়নি, বা একাউন্টটা Firebase Authentication-এ নেই।\n\nকম্পিউটার থেকে একবার চালান:\nfirebase deploy --only functions:adminResetPassword");
+    }else if(code.includes("permission-denied")){
+      alert("⚠️ আপনার সুপার-অ্যাডমিন অনুমতি নেই।");
+    }else{
+      alert("⚠️ পাসওয়ার্ড বদলানো যায়নি — " + (e && e.message ? e.message : e));
+    }
+  }
+}
+
+/* ==================== 🍽️ সব রেস্টুরেন্ট (Super Admin ভিউ) ====================
+   ⚠️ লগইনের ইমেইলটা এখানে দেখানো হয় ইচ্ছে করেই। রেস্টুরেন্ট মোবাইল
+      নম্বর দিয়ে নিবন্ধন করে, আর ভেতরে ইমেইল হয়
+      rider_01…@honeybee-riders.app — ওটা সত্যিকারের ঠিকানা নয়, তাই
+      "পাসওয়ার্ড ভুলে গেছেন" লিংক কাজ করে না। পাসওয়ার্ড বদলাতে হলে
+      Firebase Console → Authentication-এ ঠিক এই ইমেইলটা খুঁজতে হয়।
+      আগে ওটা কোথাও দেখা যেত না, তাই মালিক আটকে গেলে উদ্ধারের কোনো
+      পথই ছিল না।                                                   */
+let __restoAll = [];
+
+function restoAuthEmail(phone){
+  const digits = String(phone || "").replace(/[^0-9]/g, "");
+  return digits ? ("rider_" + digits + "@honeybee-riders.app") : "—";
+}
+
+function renderRestaurants(){
+  const q = (document.getElementById("restoSearch")?.value || "").trim().toLowerCase();
+  const list = document.getElementById("restoList");
+  const rows = __restoAll.filter(r =>
+    !q || String(r.name||"").toLowerCase().includes(q)
+       || String(r.phone||"").includes(q)
+       || String(r.area||"").toLowerCase().includes(q));
+
+  if(!rows.length){
+    list.innerHTML = q ? "<p>এই নামে কিছু পাওয়া যায়নি।</p>"
+                       : "<p>এখনো কোনো রেস্টুরেন্ট নিবন্ধিত হয়নি।</p>";
+    return;
+  }
+
+  list.innerHTML = "";
+  rows.forEach(function(r){
+    const div = document.createElement("div");
+    div.className = "shop";
+    const blocked = r.status === "blocked";
+    const hidden  = r.isActive === false;
+    div.innerHTML = `
+      <div class="shop-top">
+        <span class="shop-name">${r.name || "(নামহীন রেস্টুরেন্ট)"}</span>
+        <span class="chip ${blocked ? 'blocked' : 'active'}">${blocked ? 'ব্লকড' : 'সক্রিয়'}</span>
+      </div>
+      <div class="meta">👤 ${r.ownerName || '—'} · 📱 ${r.phone || '—'} · 📍 ${r.area || '—'}</div>
+      <div class="meta">Bazar-এ: ${hidden ? '🙈 লুকানো' : '👁️ দেখা যাচ্ছে'} · দোকান: ${r.isOpen === false ? '🔴 বন্ধ' : '🟢 খোলা'}</div>
+      <div class="meta" style="margin-top:6px; font-size:11px; color:#8a7f6c; word-break:break-all">
+        🔑 লগইন ইমেইল: <b>${restoAuthEmail(r.phone)}</b><br>
+        পাসওয়ার্ড বদলাতে Firebase Console → Authentication-এ এই ইমেইলটা খুঁজুন।
+      </div>
+      <div class="row">
+        <button class="btn unblock" data-resto-act="pass" data-id="${r.id}">🔑 পাসওয়ার্ড বদলান</button>
+        <button class="btn" data-resto-act="copy" data-id="${r.id}">📋 ইমেইল কপি</button>
+        ${hidden
+          ? `<button class="btn unblock" data-resto-act="show" data-id="${r.id}">👁️ Bazar-এ দেখান</button>`
+          : `<button class="btn" style="background:#8a7f6c" data-resto-act="hide" data-id="${r.id}">🙈 Bazar থেকে লুকান</button>`}
+        ${blocked
+          ? `<button class="btn unblock" data-resto-act="unblock" data-id="${r.id}">✅ আনব্লক</button>`
+          : `<button class="btn block" data-resto-act="block" data-id="${r.id}">⛔ ব্লক</button>`}
+      </div>`;
+    list.appendChild(div);
+  });
+
+  function act(name, patch){
+    list.querySelectorAll('[data-resto-act="'+name+'"]').forEach(function(b){
+      b.addEventListener("click", async function(){
+        await db.collection("restaurants").doc(b.dataset.id)
+                .set(Object.assign({ updatedAt: fbNow() }, patch), { merge:true });
+      });
+    });
+  }
+  act("block",   { status:"blocked" });
+  act("unblock", { status:"active"  });
+  act("hide",    { isActive:false   });
+  act("show",    { isActive:true    });
+
+  list.querySelectorAll('[data-resto-act="pass"]').forEach(function(b){
+    b.addEventListener("click", function(){
+      const r = __restoAll.find(x => x.id === b.dataset.id) || {};
+      resetPasswordFor(b.dataset.id, "restaurant", "রেস্টুরেন্ট মালিক", r.name || "এই রেস্টুরেন্ট");
+    });
+  });
+
+  list.querySelectorAll('[data-resto-act="copy"]').forEach(function(b){
+    b.addEventListener("click", async function(){
+      const r = __restoAll.find(x => x.id === b.dataset.id);
+      const em = restoAuthEmail(r && r.phone);
+      try{ await navigator.clipboard.writeText(em); b.textContent = "✅ কপি হয়েছে"; }
+      catch(e){ window.prompt("এই ইমেইলটা কপি করুন:", em); }
+      setTimeout(function(){ b.textContent = "📋 ইমেইল কপি"; }, 1800);
+    });
+  });
+}
+
+function startRestaurantsListener(){
+  db.collection("restaurants").onSnapshot(function(snap){
+    __restoAll = snap.docs.map(function(d){ return Object.assign({ id:d.id }, d.data()); });
+    __restoAll.sort(function(a,b){ return String(a.name||"").localeCompare(String(b.name||""), "bn"); });
+    document.getElementById("restoCount").textContent = snap.size;
+    renderRestaurants();
+  }, function(e){
+    document.getElementById("restoList").innerHTML =
+      "<p>তালিকা আনা যায়নি — নিয়মে <code>restaurants</code> ঘরটা publish করা আছে কিনা দেখুন।</p>";
+    console.warn("restaurants:", e && e.code);
+  });
+}
+document.getElementById("restoSearch") &&
+  document.getElementById("restoSearch").addEventListener("input", renderRestaurants);
 
 /* ==================== 🛵 সব রাইডার (Super Admin ভিউ) ==================== */
 async function loadAllRiders(){
