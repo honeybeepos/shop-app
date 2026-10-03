@@ -162,6 +162,8 @@
     <input type="text" id="rsPhone" placeholder="05XXXXXXXX">
     <label>পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
     <input type="password" id="rsPass" placeholder="••••••••">
+    <label>পাসওয়ার্ড আবার লিখুন</label>
+    <input type="password" id="rsPass2" placeholder="একই পাসওয়ার্ড">
 
     <label>জেলা</label>
     <select id="rsDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
@@ -547,6 +549,12 @@ document.getElementById("restaurantSignupBtn").addEventListener("click", async (
   if(!owner || !phone || pass.length < 6){
     showMsg("restaurantMsg","মালিকের নাম, মোবাইল নম্বর ও পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর) সঠিকভাবে দিন।",false); return;
   }
+  /* ⚠️ মোবাইল দিয়ে নিবন্ধন করলে ইমেইলে পাসওয়ার্ড রিসেট করা যায় না।
+     তাই এখানে একবার টাইপ ভুল হলে মালিক নিজের রেস্টুরেন্টেই আর
+     ঢুকতে পারতেন না। দুইবার মিলিয়ে নেওয়াই একমাত্র রক্ষা।        */
+  if(pass !== document.getElementById("rsPass2").value){
+    showMsg("restaurantMsg","দুইবারের পাসওয়ার্ড এক হয়নি — মিলিয়ে আবার লিখুন।",false); return;
+  }
   if(!marketId){
     showMsg("restaurantMsg","জেলা, উপজেলা ও বাজার/এলাকা নির্বাচন করুন।",false); return;
   }
@@ -727,11 +735,18 @@ document.getElementById("loginBtn").addEventListener("click", async ()=>{
       btn.disabled = false; btn.textContent = "লগইন করুন";
       return;
     }
-    const count = await recordFailedLogin(email);
-    if (count >= MAX_FAILED_ATTEMPTS) {
-      showMsg("loginMsg", "বারবার ভুল পাসওয়ার্ড দেওয়ার কারণে একাউন্ট ব্লক হয়ে গেছে। এডমিনের সাথে যোগাযোগ করুন।", false);
+    const r = await recordFailedLogin(email);
+    /* ⚠️ আগে এখানে লেখা হতো "একাউন্ট ব্লক হয়ে গেছে, এডমিনের সাথে
+       যোগাযোগ করুন" — আর বেরোনোর কোনো পথ বলা হতো না। অথচ গণনাটা
+       কখনো শূন্য হতো না, তাই একবার ৫ ছুঁলে চিরকাল ওই লেখাটাই আসত।
+       এখন গণনা ১৫ মিনিটে নিজে থেকেই শূন্য হয়, আর সেটাই বলা হয়। */
+    if (r.locked) {
+      showMsg("loginMsg",
+        "বারবার ভুল পাসওয়ার্ড হয়েছে। নিরাপত্তার জন্য " + r.waitMin
+        + " মিনিট অপেক্ষা করে আবার চেষ্টা করুন — তারপর নিজে থেকেই খুলে যাবে।\n"
+        + "পাসওয়ার্ড মনে না থাকলে এডমিনের সাথে যোগাযোগ করুন।", false);
     } else {
-      showMsg("loginMsg", `ভুল ইমেইল/মোবাইল অথবা পাসওয়ার্ড (${count}/${MAX_FAILED_ATTEMPTS} বার চেষ্টা)`, false);
+      showMsg("loginMsg", `ভুল ইমেইল/মোবাইল অথবা পাসওয়ার্ড (${r.count}/${MAX_FAILED_ATTEMPTS} বার চেষ্টা)`, false);
     }
     btn.disabled = false; btn.textContent = "লগইন করুন";
     return;
@@ -763,10 +778,24 @@ document.getElementById("loginBtn").addEventListener("click", async ()=>{
 document.getElementById("forgotLink").addEventListener("click", async (e)=>{
   e.preventDefault();
   let email = document.getElementById("loginEmail").value.trim();
+  /* ⚠️ মোবাইল নম্বর দিয়ে নিবন্ধন করা অ্যাকাউন্টের ইমেইল আসলে
+     rider_01…@honeybee-riders.app — ওটা সত্যিকারের ঠিকানা নয়, কোনো
+     চিঠি ওখানে পৌঁছায় না। আগে এখানে চুপচাপ পাঠানোর চেষ্টা হতো আর
+     "পাঠানো হয়েছে" লেখা দেখাত — মানুষ ইনবক্সে বসে অপেক্ষা করতেন।  */
+  if(email && !email.includes("@")){
+    showMsg("loginMsg",
+      "আপনি মোবাইল নম্বর দিয়ে নিবন্ধন করেছেন, তাই ইমেইলে রিসেট লিংক পাঠানো যায় না।\n"
+      + "পাসওয়ার্ড মনে না থাকলে এডমিনের সাথে যোগাযোগ করুন — তিনি নতুন পাসওয়ার্ড বসিয়ে দিতে পারবেন।", false);
+    return;
+  }
   if(!email){
     email = prompt("আপনার ইমেইল লিখুন, পাসওয়ার্ড রিসেট লিংক পাঠানো হবে:");
   }
   if(!email) return;
+  if(!email.includes("@")){
+    showMsg("loginMsg", "এটা ইমেইল ঠিকানা নয়। মোবাইল নম্বর দিয়ে নিবন্ধন করে থাকলে এডমিনের সাথে যোগাযোগ করুন।", false);
+    return;
+  }
   try{
     await auth.sendPasswordResetEmail(email);
     showMsg("loginMsg", "রিসেট লিংক " + email + " এই ইমেইলে পাঠানো হয়েছে। ইনবক্স (ও স্প্যাম ফোল্ডার) চেক করুন।", true);

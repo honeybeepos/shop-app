@@ -70,12 +70,36 @@ function normalizeLoginEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
+/* ⏱️ তালা নিজে থেকেই খুলে যায়।
+   ⚠️ আগে গণনাটা কখনো শূন্য হতো না — একবার ৫ ছুঁলে তারপর প্রতিবার
+      ভুল হলেই "একাউন্ট ব্লক হয়ে গেছে, এডমিনের সাথে যোগাযোগ করুন"
+      দেখাত, আর বেরোনোর কোনো পথ থাকত না। অথচ বেশিরভাগ ক্ষেত্রে
+      কিছুই ব্লক হতো না — শুধু লেখাটাই ভয় দেখাত।
+      এখন শেষ ভুল চেষ্টার ১৫ মিনিট পর গণনা নিজে থেকেই শূন্য হয়ে যায়। */
+const LOGIN_LOCK_MINUTES = 15;
+
+function __attemptAgeMin(data){
+  const t = data && data.lastAttempt;
+  if (!t) return Infinity;                       // পুরনো নথি — মেয়াদ শেষ ধরি
+  const ms = t.toMillis ? t.toMillis() : (t.seconds ? t.seconds * 1000 : 0);
+  if (!ms) return Infinity;
+  return (Date.now() - ms) / 60000;
+}
+
+/* ফেরত দেয় { count, locked, waitMin } — login.html এটা দেখে
+   কত মিনিট অপেক্ষা করতে হবে সেটা বলতে পারে। */
 async function recordFailedLogin(email) {
   const key = normalizeLoginEmail(email);
   const ref = db.collection("loginAttempts").doc(key);
   const snap = await ref.get();
-  const count = (snap.exists ? (snap.data().count || 0) : 0) + 1;
-  await ref.set({ count, lastAttempt: fbNow() }, { merge: true });
+  const prev = snap.exists ? snap.data() : null;
+  const expired = !prev || __attemptAgeMin(prev) >= LOGIN_LOCK_MINUTES;
+  const count = (expired ? 0 : (prev.count || 0)) + 1;
+  /* মেয়াদ ফুরোলে autoLockApplied-ও মুছে দিই, নইলে Cloud Function
+     ভাবত এই একাউন্টে আগেই তালা দেওয়া হয়ে গেছে। */
+  await ref.set({ count, lastAttempt: fbNow(),
+                  autoLockApplied: expired ? false : (prev && prev.autoLockApplied) || false },
+                { merge: true });
   // 🐞 বাগ-ফিক্স: আগে এখানেই ক্লায়েন্ট থেকে সরাসরি shops/{shopId}.status =
   // "blocked" লেখার চেষ্টা হতো — কিন্তু ব্যর্থ-লগইনের মুহূর্তে সাধারণত
   // request.auth == null থাকে (সাইন-ইনই তো ব্যর্থ হয়েছে), আর
@@ -88,7 +112,7 @@ async function recordFailedLogin(email) {
   // নির্বিশেষে নির্ভরযোগ্যভাবে কাজ করবে। এছাড়া userData.shopId
   // undefined হলে (ড্রাইভার/রাইডার একাউন্ট) doc(undefined) কল করে যে
   // ক্র্যাশ হতো, সেটাও এভাবে এড়ানো গেল।
-  return count;
+  return { count: count, locked: count >= MAX_FAILED_ATTEMPTS, waitMin: LOGIN_LOCK_MINUTES };
 }
 
 async function clearFailedLogin(email) {
