@@ -354,7 +354,7 @@ button{cursor:pointer;border:0}
         <div class="field" style="margin-top:12px">
           <label>Profile / Shop Banner Photo</label>
           <input id="restaurantProfileImage" type="file" accept="image/*" onchange="previewRestaurantProfile(event)">
-          <div style="font-size:12px;color:var(--muted);margin-top:5px">যত বড় ছবি দিন, সিস্টেম নিজে resize/compress করে নির্ধারিত KB-এর মধ্যে upload করবে।</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:5px">ছবি একবার upload হলে নিচে থাকবে। Delete Photo চাপলে Firebase থেকে profile photo-ও সরানো হবে এবং নতুন ছবি বেছে নেওয়া যাবে।</div>
           <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
             <label style="font-size:13px;color:var(--muted)">Upload size</label>
             <select id="restaurantProfileSize" class="btn">
@@ -364,7 +364,17 @@ button{cursor:pointer;border:0}
           </div>
           <div id="restaurantProfilePreview" style="margin-top:10px"></div>
         </div>
-        <button class="btn green" style="margin-top:14px" onclick="saveRestaurantProfile()">Save Profile Photo</button>
+        <div class="field" style="margin-top:14px">
+          <label>Restaurant Description</label>
+          <textarea id="restaurantProfileDescription" rows="4" placeholder="রেস্টুরেন্ট সম্পর্কে সংক্ষিপ্ত বর্ণনা লিখুন..." style="width:100%;box-sizing:border-box"></textarea>
+          <div style="font-size:12px;color:var(--muted);margin-top:5px">এই বর্ণনা online Restaurant Profile / Honey Bee Bazar-এ দেখানো যাবে।</div>
+        </div>
+        <label style="display:flex;align-items:center;gap:9px;margin-top:14px;font-weight:700">
+          <input id="restaurantMarketPublished" type="checkbox" style="width:20px;height:20px">
+          🟢 Honey Bee Bazar-এ Publish করুন
+        </label>
+        <div id="restaurantMarketStatus" style="font-size:12px;color:var(--muted);margin-top:6px">Bazar publish বন্ধ আছে।</div>
+        <button class="btn green" style="margin-top:14px" onclick="saveRestaurantProfile()">Save Restaurant Profile</button>
       </div>
 
       <div class="panel">
@@ -919,6 +929,15 @@ auth.onAuthStateChanged(async function(user){
     RP.name = d.name || "রেস্টুরেন্ট";
     RP.cur = d.currency || "SAR";
 
+    // Restaurant Profile fields — reload হলেও photo/description/publish state হারাবে না
+    restaurantProfileImageData = d.profileImage || null;
+    const rpDesc = document.getElementById("restaurantProfileDescription");
+    if(rpDesc) rpDesc.value = d.restaurantDescription || "";
+    const rpPub = document.getElementById("restaurantMarketPublished");
+    if(rpPub) rpPub.checked = d.marketPublished === true;
+    if(document.getElementById("restaurantProfilePreview")) renderRestaurantProfilePhoto(d.profileImage || null);
+    updateRestaurantMarketStatus();
+
     // নাম আর এলাকা উপরে বসাই — কোন রেস্টুরেন্টে আছি, স্পষ্ট থাকুক
     const brand = document.querySelector(".brand");
     if(brand) brand.innerHTML = "🍯 " + RP.name
@@ -999,19 +1018,60 @@ async function previewRestaurantProfile(e){
     const kb=Number(document.getElementById("restaurantProfileSize")?.value||100);
     restaurantProfileImageData=await compressImageToKB(file,kb);
     document.getElementById("restaurantProfilePreview").innerHTML=
-      `<img src="${restaurantProfileImageData}" style="width:180px;height:100px;object-fit:cover;border-radius:12px;border:1px solid var(--border)"><div style="font-size:11px;color:var(--muted);margin-top:4px">Compressed to ≤ ${kb} KB</div>`;
+      `<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+        <div><img src="${restaurantProfileImageData}" style="width:220px;height:120px;object-fit:cover;border-radius:12px;border:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">New photo · Compressed to ≤ ${kb} KB</div></div>
+        <button type="button" class="btn danger" onclick="deleteRestaurantProfilePhoto()">🗑️ Delete Photo</button>
+      </div>`;
   }catch(err){ alert("ছবিটি নির্ধারিত KB-এর মধ্যে compress করা যায়নি। অন্য ছবি চেষ্টা করুন।"); }
+}
+function renderRestaurantProfilePhoto(url){
+  const box=document.getElementById("restaurantProfilePreview");
+  if(!box)return;
+  if(url){
+    box.innerHTML=`<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+      <div><img src="${url}" style="width:220px;height:120px;object-fit:cover;border-radius:12px;border:1px solid var(--border)">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Saved profile photo</div></div>
+      <button type="button" class="btn danger" onclick="deleteRestaurantProfilePhoto()">🗑️ Delete Photo</button>
+    </div>`;
+  }else{
+    box.innerHTML='<div style="font-size:12px;color:var(--muted)">কোনো profile photo নেই।</div>';
+  }
+}
+function updateRestaurantMarketStatus(){
+  const on=!!document.getElementById("restaurantMarketPublished")?.checked;
+  const el=document.getElementById("restaurantMarketStatus");
+  if(el)el.textContent=on?"🟢 Bazar-এ Restaurant Profile publish করা হবে।":"Bazar publish বন্ধ আছে।";
+}
+async function deleteRestaurantProfilePhoto(){
+  if(!RP.uid)return alert("Restaurant login পাওয়া যায়নি।");
+  if(!confirm("Restaurant Profile-এর ছবি Firebase থেকে মুছে ফেলবেন?"))return;
+  try{
+    restaurantProfileImageData=null;
+    await db.collection("restaurants").doc(RP.uid).set({profileImage:firebase.firestore.FieldValue.delete()},{merge:true});
+    const input=document.getElementById("restaurantProfileImage"); if(input)input.value="";
+    renderRestaurantProfilePhoto(null);
+    toastRP("Profile photo মুছে দেওয়া হয়েছে।");
+  }catch(e){
+    toastRP("ছবি মুছে দেওয়া হয়নি — " + (e.code||"আবার চেষ্টা করুন"),true);
+  }
 }
 async function saveRestaurantProfile(){
   if(!RP.uid)return alert("Restaurant login পাওয়া যায়নি।");
-  if(!restaurantProfileImageData)return alert("প্রথমে Profile/Banner ছবি নির্বাচন করুন।");
+  const description=document.getElementById("restaurantProfileDescription")?.value.trim()||"";
+  const marketPublished=!!document.getElementById("restaurantMarketPublished")?.checked;
   try{
-    await db.collection("restaurants").doc(RP.uid).set({profileImage:restaurantProfileImageData},{merge:true});
-    toastRP("Profile photo সংরক্ষিত হয়েছে।");
+    const data={restaurantDescription:description,marketPublished};
+    if(restaurantProfileImageData)data.profileImage=restaurantProfileImageData;
+    await db.collection("restaurants").doc(RP.uid).set(data,{merge:true});
+    if(restaurantProfileImageData)renderRestaurantProfilePhoto(restaurantProfileImageData);
+    updateRestaurantMarketStatus();
+    toastRP(marketPublished?"Restaurant Profile সংরক্ষিত এবং Bazar Publish করা হয়েছে।":"Restaurant Profile সংরক্ষিত হয়েছে।");
   }catch(e){
-    toastRP("Profile photo সংরক্ষণ হয়নি — " + (e.code||"আবার চেষ্টা করুন"),true);
+    toastRP("Profile সংরক্ষণ হয়নি — " + (e.code||"আবার চেষ্টা করুন"),true);
   }
 }
+document.getElementById("restaurantMarketPublished")?.addEventListener("change",updateRestaurantMarketStatus);
 
 /* Timed product publishing */
 function isFoodCurrentlyPublished(f){
