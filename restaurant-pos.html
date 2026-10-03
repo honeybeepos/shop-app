@@ -582,11 +582,11 @@ function renderAdminMenu(){
 function renderCustomerPreview(){
   const list=products.filter(f=>f.published&&f.available);
   document.getElementById("customerPreview").innerHTML=list.map(f=>`
-    <article class="product" onclick="addToCart(${JSON.stringify(String(f.id))})" style="cursor:pointer">
+    <article class="product hb-product-select" data-hb-product-id="${encodeURIComponent(String(f.id))}" style="cursor:pointer">
       <img src="${f.img}" alt="${f.name}">
       <div class="product-body"><div class="product-name">${f.name}</div>
       <div style="font-size:12px;color:var(--muted);min-height:30px">${f.description||""}</div>
-      <div class="product-meta"><span class="price">${money(f.price)}</span><button class="add" onclick="event.stopPropagation();addToCart(${JSON.stringify(String(f.id))})">＋</button></div></div>
+      <div class="product-meta"><span class="price">${money(f.price)}</span><button class="add" type="button">＋</button></div></div>
     </article>`).join("") || `<div style="color:var(--muted)">No published food yet.</div>`;
 }
 
@@ -599,13 +599,13 @@ function renderCustomerPage(){
     (customerCategory==="All"||f.cat===customerCategory)&&
     f.name.toLowerCase().includes(q));
   document.getElementById("customerPageProducts").innerHTML=list.map(f=>`
-    <article class="product" onclick="addToCart(${JSON.stringify(String(f.id))})" style="cursor:pointer">
+    <article class="product hb-product-select" data-hb-product-id="${encodeURIComponent(String(f.id))}" style="cursor:pointer">
       <img src="${f.img}" alt="${f.name}" loading="lazy">
       <div class="product-body">
         <div class="product-name">${f.name}</div>
         <div style="font-size:12px;color:var(--muted);min-height:32px">${f.description||""}</div>
         <div class="product-meta"><span class="price">${money(f.price)}</span>
-        <button class="add" onclick="event.stopPropagation();addToCart(${JSON.stringify(String(f.id))})">＋</button></div>
+        <button class="add" type="button">＋</button></div>
       </div>
     </article>`).join("") || `<div style="color:var(--muted);padding:20px">কোনো published food নেই।</div>`;
 }
@@ -615,18 +615,36 @@ function init(){
   renderProducts(); renderCart(); renderAdminMenu(); renderCustomerPreview(); renderOrderHistory();
 }
 function setCategory(c){category=c;init()}
+
+/* Product selection: delegated click handler.
+   Inline onclick was removed so Firestore string IDs cannot break the tap/click. */
+if(!window.__hbProductSelectHandler){
+  window.__hbProductSelectHandler=true;
+  document.addEventListener("click",function(e){
+    const card=e.target.closest(".hb-product-select[data-hb-product-id]");
+    if(!card)return;
+    const id=decodeURIComponent(card.getAttribute("data-hb-product-id")||"");
+    if(!id)return;
+    addToCart(id);
+  });
+}
 function renderProducts(){
   const q=(document.getElementById("search")?.value||"").toLowerCase();
   const list=products.filter(p=>(category==="All"||p.cat===category)&&p.name.toLowerCase().includes(q));
   document.getElementById("products").innerHTML=list.map(p=>`
-    <article class="product" onclick="addToCart(${JSON.stringify(String(p.id))})" style="cursor:pointer">
+    <article class="product hb-product-select" data-hb-product-id="${encodeURIComponent(String(p.id))}" style="cursor:pointer">
       <img src="${p.img}" alt="${p.name}" loading="lazy">
       <div class="product-body"><div class="product-name">${p.name}</div>
-      <div class="product-meta"><span class="price">${money(p.price)}</span><button class="add" onclick="event.stopPropagation();addToCart(${JSON.stringify(String(p.id))})">＋</button></div></div>
+      <div class="product-meta"><span class="price">${money(p.price)}</span><button class="add" type="button">＋</button></div></div>
     </article>`).join("");
 }
 function addToCart(id){
-  const p=products.find(x=>String(x.id)===String(id)); if(!p || p.available===false)return;
+  const p=products.find(x=>String(x.id)===String(id));
+  if(!p)return;
+  if(p.available===false || String(p.available).toLowerCase()==="false"){
+    toastRP("এই Product এখন Available নয়।",true);
+    return;
+  }
   if((p.variants?.length||0)+(p.addons?.length||0)>0){
     openItemChooser(p); return;
   }
