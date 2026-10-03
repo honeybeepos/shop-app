@@ -477,7 +477,7 @@ function openFoodEditor(id=null){
   document.getElementById("addonRows").innerHTML="";
   document.getElementById("imagePreview").innerHTML="";
   if(id){
-    const f=products.find(x=>x.id===id);
+    const f=products.find(x=>String(x.id)===String(id));
     if(!f)return;
     foodName.value=f.name; foodCategory.value=f.cat; foodPrice.value=f.price;
     foodAvailable.value=String(f.available); foodDescription.value=f.description||"";
@@ -529,7 +529,7 @@ function saveFood(){
     variants:readRows("variantRows",".v-name",".v-price"),
     addons:readRows("addonRows",".a-name",".a-price")
   };
-  const i=products.findIndex(x=>x.id===f.id);
+  const i=products.findIndex(x=>String(x.id)===String(f.id));
   if(i>=0)products[i]=f;else products.unshift(f);
   closeFoodEditor();renderProducts();renderAdminMenu();renderCustomerPreview();
   /* ⚠️ পর্দায় আগে দেখাই, ক্লাউডে পরে — নইলে নেট ধীর হলে মনে হতো
@@ -540,17 +540,17 @@ function saveFood(){
     .catch(function(e){ toastRP("সংরক্ষণ হয়নি — " + (e.code||"আবার চেষ্টা করুন"), true); });
 }
 function togglePublish(id){
-  const f=products.find(x=>x.id===id);if(!f)return;
+  const f=products.find(x=>String(x.id)===String(id));if(!f)return;
   f.published=!f.published;renderAdminMenu();renderCustomerPreview();
   saveOneFood(f).catch(function(e){ toastRP("বদলটা ক্লাউডে যায়নি।", true); });
 }
 function toggleAvailability(id){
-  const f=products.find(x=>x.id===id);if(!f)return;
+  const f=products.find(x=>String(x.id)===String(id));if(!f)return;
   f.available=!f.available;renderAdminMenu();renderCustomerPreview();renderProducts();
   saveOneFood(f).catch(function(e){ toastRP("বদলটা ক্লাউডে যায়নি।", true); });
 }
 function deleteFood(id){
-  const f=products.find(x=>x.id===id);if(!f)return;
+  const f=products.find(x=>String(x.id)===String(id));if(!f)return;
   if(!confirm(`Delete ${f.name}?`))return;
   products=products.filter(x=>x.id!==id);renderAdminMenu();renderCustomerPreview();renderProducts();
   deleteOneFood(id).catch(function(e){ toastRP("মুছতে পারেনি — আবার চেষ্টা করুন।", true); });
@@ -571,10 +571,10 @@ function renderAdminMenu(){
           <span class="badge ${f.available?'paid':'prep'}">${f.available?'AVAILABLE':'OFF'}</span>
         </div>
         <div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
-          <button class="btn" onclick="openFoodEditor(${f.id})">Edit</button>
-          <button class="btn" onclick="togglePublish(${f.id})">${f.published?'Unpublish':'Publish'}</button>
-          <button class="btn" onclick="toggleAvailability(${f.id})">${f.available?'Set Off':'Set Available'}</button>
-          <button class="btn danger" onclick="deleteFood(${f.id})">Delete</button>
+          <button class="btn" onclick="openFoodEditor(${JSON.stringify(String(f.id))})">Edit</button>
+          <button class="btn" onclick="togglePublish(${JSON.stringify(String(f.id))})">${f.published?'Unpublish':'Publish'}</button>
+          <button class="btn" onclick="toggleAvailability(${JSON.stringify(String(f.id))})">${f.available?'Set Off':'Set Available'}</button>
+          <button class="btn danger" onclick="deleteFood(${JSON.stringify(String(f.id))})">Delete</button>
         </div>
       </div>
     </article>`).join("") || `<div style="color:var(--muted)">No food found.</div>`;
@@ -586,7 +586,7 @@ function renderCustomerPreview(){
       <img src="${f.img}" alt="${f.name}">
       <div class="product-body"><div class="product-name">${f.name}</div>
       <div style="font-size:12px;color:var(--muted);min-height:30px">${f.description||""}</div>
-      <div class="product-meta"><span class="price">${money(f.price)}</span><button class="add" onclick="addToCart(${f.id})">＋</button></div></div>
+      <div class="product-meta"><span class="price">${money(f.price)}</span><button class="add" onclick="addToCart(${JSON.stringify(String(f.id))})">＋</button></div></div>
     </article>`).join("") || `<div style="color:var(--muted)">No published food yet.</div>`;
 }
 
@@ -605,7 +605,7 @@ function renderCustomerPage(){
         <div class="product-name">${f.name}</div>
         <div style="font-size:12px;color:var(--muted);min-height:32px">${f.description||""}</div>
         <div class="product-meta"><span class="price">${money(f.price)}</span>
-        <button class="add" onclick="addToCart(${f.id})">＋</button></div>
+        <button class="add" onclick="addToCart(${JSON.stringify(String(f.id))})">＋</button></div>
       </div>
     </article>`).join("") || `<div style="color:var(--muted);padding:20px">কোনো published food নেই।</div>`;
 }
@@ -622,25 +622,25 @@ function renderProducts(){
     <article class="product">
       <img src="${p.img}" alt="${p.name}" loading="lazy">
       <div class="product-body"><div class="product-name">${p.name}</div>
-      <div class="product-meta"><span class="price">${money(p.price)}</span><button class="add" onclick="addToCart(${p.id})">＋</button></div></div>
+      <div class="product-meta"><span class="price">${money(p.price)}</span><button class="add" onclick="addToCart(${JSON.stringify(String(p.id))})">＋</button></div></div>
     </article>`).join("");
 }
 function addToCart(id){
-  const p=products.find(x=>x.id===id); if(!p||!p.available)return;
+  const p=products.find(x=>String(x.id)===String(id)); if(!p||!p.available)return;
   if((p.variants?.length||0)+(p.addons?.length||0)>0){
     openItemChooser(p); return;
   }
-  const found=cart.find(x=>x.id===id);
+  const found=cart.find(x=>String(x.id)===String(id));
   found?found.qty++:cart.push({...p,qty:1,selection:null}); renderCart();
 }
 function openItemChooser(p){
   const variant=(p.variants||[]).map((v,i)=>`<label style="display:flex;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:9px;margin-top:6px"><span><input type="radio" name="variantPick" value="${i}" ${i===0?'checked':''}> ${v.name}</span><b>${v.price?`+${money(v.price)}`:""}</b></label>`).join("");
   const addons=(p.addons||[]).map((a,i)=>`<label style="display:flex;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:9px;margin-top:6px"><span><input type="checkbox" name="addonPick" value="${i}"> ${a.name}</span><b>+${money(a.price)}</b></label>`).join("");
-  const html=`<div id="chooser" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:60;padding:16px;overflow:auto"><div class="panel" style="max-width:500px;margin:40px auto"><img src="${p.img}" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px"><h2>${p.name}</h2><div style="color:var(--muted)">Base ${money(p.price)}</div><h3>Variant</h3>${variant||"<div style='color:var(--muted)'>No variants</div>"}<h3>Add-ons</h3>${addons||"<div style='color:var(--muted)'>No add-ons</div>"}<div style="display:flex;gap:8px;margin-top:18px"><button class="btn" onclick="document.getElementById('chooser').remove()">Cancel</button><button class="btn primary" onclick="confirmItemChoice(${p.id})">Add to Cart</button></div></div></div>`;
+  const html=`<div id="chooser" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:60;padding:16px;overflow:auto"><div class="panel" style="max-width:500px;margin:40px auto"><img src="${p.img}" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px"><h2>${p.name}</h2><div style="color:var(--muted)">Base ${money(p.price)}</div><h3>Variant</h3>${variant||"<div style='color:var(--muted)'>No variants</div>"}<h3>Add-ons</h3>${addons||"<div style='color:var(--muted)'>No add-ons</div>"}<div style="display:flex;gap:8px;margin-top:18px"><button class="btn" onclick="document.getElementById('chooser').remove()">Cancel</button><button class="btn primary" onclick="confirmItemChoice(${JSON.stringify(String(p.id))})">Add to Cart</button></div></div></div>`;
   document.body.insertAdjacentHTML("beforeend",html);
 }
 function confirmItemChoice(id){
-  const p=products.find(x=>x.id===id), vi=document.querySelector('input[name="variantPick"]:checked');
+  const p=products.find(x=>String(x.id)===String(id)), vi=document.querySelector('input[name="variantPick"]:checked');
   const variant=vi?(p.variants||[])[Number(vi.value)]:null;
   const addons=[...document.querySelectorAll('input[name="addonPick"]:checked')].map(x=>p.addons[Number(x.value)]);
   const extra=(variant?.price||0)+addons.reduce((s,a)=>s+a.price,0);
@@ -651,13 +651,13 @@ function confirmItemChoice(id){
   document.getElementById("chooser").remove();renderCart();
 }
 function changeQty(id,d){
-  const x=cart.find(i=>i.id===id); if(!x)return; x.qty+=d; if(x.qty<=0)cart=cart.filter(i=>i.id!==id); renderCart();
+  const x=cart.find(i=>String(i.id)===String(id)); if(!x)return; x.qty+=d; if(x.qty<=0)cart=cart.filter(i=>i.id!==id); renderCart();
 }
 function renderCart(){
   const el=document.getElementById("cartItems");
   el.innerHTML=cart.length?cart.map(x=>`
     <div class="cart-item"><div class="item-row"><b>${x.name}</b><b>${money(x.price*x.qty)}</b></div>${x.selection?.variant||x.selection?.addons?.length?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${x.selection.variant||""}${x.selection?.addons?.length?` · ${x.selection.addons.join(", ")}`:""}</div>`:""}
-    <div class="qty"><button onclick="changeQty(${x.id},-1)">−</button><span>${x.qty}</span><button onclick="changeQty(${x.id},1)">＋</button></div></div>`).join(""):`<div style="color:var(--muted);padding:20px 4px;text-align:center">No food selected yet.</div>`;
+    <div class="qty"><button onclick="changeQty(${JSON.stringify(String(x.id))},-1)">−</button><span>${x.qty}</span><button onclick="changeQty(${JSON.stringify(String(x.id))},1)">＋</button></div></div>`).join(""):`<div style="color:var(--muted);padding:20px 4px;text-align:center">No food selected yet.</div>`;
   const sub=cart.reduce((s,x)=>s+x.price*x.qty,0), tax=sub*.15, total=sub+tax;
   document.getElementById("subtotal").textContent=money(sub);document.getElementById("tax").textContent=money(tax);document.getElementById("grand").textContent=money(total);
 }
