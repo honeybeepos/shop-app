@@ -523,7 +523,7 @@ function saveFood(){
   if(!name||!cat||!Number.isFinite(price))return alert("Food name, category এবং price দিন।");
   const f={
     id:editingFoodId||Date.now(),name,cat,price,
-    available:foodAvailable.value==="true",published:editingFoodId?(products.find(x=>x.id===editingFoodId)?.published??false):false,
+    available:foodAvailable.value==="true",published:editingFoodId?(products.find(x=>String(x.id)===String(editingFoodId))?.published??false):false,
     description:foodDescription.value.trim(),
     img:currentImageData||"https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=700&q=80",
     variants:readRows("variantRows",".v-name",".v-price"),
@@ -552,7 +552,7 @@ function toggleAvailability(id){
 function deleteFood(id){
   const f=products.find(x=>String(x.id)===String(id));if(!f)return;
   if(!confirm(`Delete ${f.name}?`))return;
-  products=products.filter(x=>x.id!==id);renderAdminMenu();renderCustomerPreview();renderProducts();
+  products=products.filter(x=>String(x.id)!==String(id));renderAdminMenu();renderCustomerPreview();renderProducts();
   deleteOneFood(id).catch(function(e){ toastRP("মুছতে পারেনি — আবার চেষ্টা করুন।", true); });
 }
 function showPublishedOnly(){menuFilter="published";renderAdminMenu()}
@@ -571,10 +571,10 @@ function renderAdminMenu(){
           <span class="badge ${f.available?'paid':'prep'}">${f.available?'AVAILABLE':'OFF'}</span>
         </div>
         <div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
-          <button class="btn" onclick="openFoodEditor(${JSON.stringify(String(f.id))})">Edit</button>
-          <button class="btn" onclick="togglePublish(${JSON.stringify(String(f.id))})">${f.published?'Unpublish':'Publish'}</button>
-          <button class="btn" onclick="toggleAvailability(${JSON.stringify(String(f.id))})">${f.available?'Set Off':'Set Available'}</button>
-          <button class="btn danger" onclick="deleteFood(${JSON.stringify(String(f.id))})">Delete</button>
+          <button class="btn hb-food-action" data-food-action="edit" data-food-id="${encodeURIComponent(String(f.id))}" type="button">Edit</button>
+          <button class="btn hb-food-action" data-food-action="publish" data-food-id="${encodeURIComponent(String(f.id))}" type="button">${f.published?'Unpublish':'Publish'}</button>
+          <button class="btn hb-food-action" data-food-action="availability" data-food-id="${encodeURIComponent(String(f.id))}" type="button">${f.available?'Set Off':'Set Available'}</button>
+          <button class="btn danger hb-food-action" data-food-action="delete" data-food-id="${encodeURIComponent(String(f.id))}" type="button">Delete</button>
         </div>
       </div>
     </article>`).join("") || `<div style="color:var(--muted)">No food found.</div>`;
@@ -628,6 +628,33 @@ if(!window.__hbProductSelectHandler){
     addToCart(id);
   });
 }
+
+/* Admin/cart controls: use delegated taps instead of inline onclick.
+   This keeps controls working reliably on mobile browsers and with Firestore string IDs. */
+if(!window.__hbPosControlHandler){
+  window.__hbPosControlHandler=true;
+  document.addEventListener("click",function(e){
+    const foodBtn=e.target.closest(".hb-food-action");
+    if(foodBtn){
+      e.preventDefault(); e.stopPropagation();
+      const id=decodeURIComponent(foodBtn.getAttribute("data-food-id")||"");
+      const action=foodBtn.getAttribute("data-food-action");
+      if(!id)return;
+      if(action==="edit") openFoodEditor(id);
+      else if(action==="publish") togglePublish(id);
+      else if(action==="availability") toggleAvailability(id);
+      else if(action==="delete") deleteFood(id);
+      return;
+    }
+    const qtyBtn=e.target.closest(".hb-qty-action");
+    if(qtyBtn){
+      e.preventDefault(); e.stopPropagation();
+      const id=decodeURIComponent(qtyBtn.getAttribute("data-qty-id")||"");
+      const d=Number(qtyBtn.getAttribute("data-qty-d")||0);
+      if(id && d) changeQty(id,d);
+    }
+  });
+}
 function renderProducts(){
   const q=(document.getElementById("search")?.value||"").toLowerCase();
   const list=products.filter(p=>(category==="All"||p.cat===category)&&p.name.toLowerCase().includes(q));
@@ -675,7 +702,7 @@ function renderCart(){
   const el=document.getElementById("cartItems");
   el.innerHTML=cart.length?cart.map(x=>`
     <div class="cart-item"><div class="item-row"><b>${x.name}</b><b>${money(x.price*x.qty)}</b></div>${x.selection?.variant||x.selection?.addons?.length?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${x.selection.variant||""}${x.selection?.addons?.length?` · ${x.selection.addons.join(", ")}`:""}</div>`:""}
-    <div class="qty"><button onclick="changeQty(${JSON.stringify(String(x.id))},-1)">−</button><span>${x.qty}</span><button onclick="changeQty(${JSON.stringify(String(x.id))},1)">＋</button></div></div>`).join(""):`<div style="color:var(--muted);padding:20px 4px;text-align:center">No food selected yet.</div>`;
+    <div class="qty"><button class="hb-qty-action" data-qty-d="-1" data-qty-id="${encodeURIComponent(String(x.id))}" type="button">−</button><span>${x.qty}</span><button class="hb-qty-action" data-qty-d="1" data-qty-id="${encodeURIComponent(String(x.id))}" type="button">＋</button></div></div>`).join(""):`<div style="color:var(--muted);padding:20px 4px;text-align:center">No food selected yet.</div>`;
   const sub=cart.reduce((s,x)=>s+x.price*x.qty,0), tax=sub*.15, total=sub+tax;
   document.getElementById("subtotal").textContent=money(sub);document.getElementById("tax").textContent=money(tax);document.getElementById("grand").textContent=money(total);
 }
