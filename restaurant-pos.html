@@ -59,16 +59,16 @@ button{cursor:pointer;border:0}
 .total{border-top:1px solid var(--border);margin-top:12px;padding-top:12px;display:grid;gap:7px}
 .total-row{display:flex;justify-content:space-between}.grand{font-size:20px;font-weight:850}
 .full{width:100%;margin-top:12px}
-.tables{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;width:100%;min-width:0}
-.table{padding:14px;border-radius:16px;background:#fff;border:1px solid var(--border);min-height:110px;min-width:0;box-sizing:border-box;overflow:hidden}
+.tables{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.table{padding:18px;border-radius:16px;background:#fff;border:1px solid var(--border);min-height:110px}
 .table.free{border-left:5px solid var(--green)}.table.ordered{border-left:5px solid var(--primary)}.table.occupied{border-left:5px solid var(--red)}.table.ready{border-left:5px solid var(--blue)}
 .table b{font-size:20px}.status{font-size:12px;color:var(--muted);margin-top:6px}
 .orders{display:grid;gap:10px}.order-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;border:1px solid var(--border);border-radius:14px;background:#fff}
 .badge{padding:6px 9px;border-radius:999px;font-size:12px;font-weight:700}.badge.ready{background:#dbeafe;color:#1d4ed8}.badge.prep{background:#ffedd5;color:#c2410c}.badge.paid{background:#dcfce7;color:#15803d}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:6px}.field label{font-size:13px;color:var(--muted)}.field input,.field select,.field textarea{padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:#fff}
-@media(max-width:1050px){.cards{grid-template-columns:repeat(2,1fr)}.products{grid-template-columns:repeat(2,1fr)}.order-layout{grid-template-columns:1fr}.cart{position:static}.tables{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1050px){.cards{grid-template-columns:repeat(2,1fr)}.products{grid-template-columns:repeat(2,1fr)}.order-layout{grid-template-columns:1fr}.cart{position:static}.tables{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:760px){
- .sidebar{width:100%;height:66px;bottom:0;top:auto;left:0;padding:6px 8px}.brand{display:none}.nav{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;width:100%}.nav button{min-width:0;width:100%;font-size:10px;line-height:1.15;text-align:center;padding:6px 1px;border-radius:10px;overflow:hidden}.nav button span{display:block;font-size:18px;line-height:20px}.nav button strong{display:block;font-weight:600;white-space:normal;overflow-wrap:anywhere}.main{margin-left:0;width:100%;padding:14px 12px 84px}.topbar h1{font-size:20px}.top-actions .btn{padding:9px 11px}.cards{grid-template-columns:repeat(2,1fr);gap:9px}.stat{padding:13px}.stat .num{font-size:23px}.products{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.product-body{padding:9px}.product-name{font-size:14px}.price{font-size:14px}.add{width:31px;height:31px}.tables{grid-template-columns:1fr;gap:10px}.table{padding:12px}.table b{font-size:19px}.table .btn{min-width:0;font-size:14px;padding:10px 8px}.form-grid{grid-template-columns:1fr}
+ .sidebar{width:100%;height:66px;bottom:0;top:auto;left:0;padding:6px 8px}.brand{display:none}.nav{display:flex;justify-content:space-around}.nav button{font-size:11px;text-align:center;padding:8px 7px}.nav button span{display:block;font-size:18px}.nav button strong{font-weight:600}.main{margin-left:0;width:100%;padding:14px 12px 84px}.topbar h1{font-size:20px}.top-actions .btn{padding:9px 11px}.cards{grid-template-columns:repeat(2,1fr);gap:9px}.stat{padding:13px}.stat .num{font-size:23px}.products{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.product-body{padding:9px}.product-name{font-size:14px}.price{font-size:14px}.add{width:31px;height:31px}.tables{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}
 }
 
 /* Enhanced food/product tap feedback */
@@ -141,6 +141,7 @@ button{cursor:pointer;border:0}
       <button class="active" data-page="dashboard"><span>🏠</span><strong>Dashboard</strong></button>
       <button data-page="order"><span>🛒</span><strong>New Order</strong></button>
       <button data-page="orders"><span>📋</span><strong>Orders</strong></button>
+      <button data-page="delivery"><span>🛵</span><strong>ডেলিভারি ম্যান</strong></button>
       <button data-page="tables"><span>🪑</span><strong>Tables</strong></button>
       <button data-page="menu"><span>🍔</span><strong>Menu</strong></button>
       <button data-page="customer"><span>📱</span><strong>Customer</strong></button>
@@ -187,7 +188,7 @@ button{cursor:pointer;border:0}
         <aside class="panel cart">
           <h2>Current Order</h2>
           <div class="order-id">ORDER #<span id="orderNo">1025</span></div>
-          <div id="tableInfo" style="display:none">Table <b id="tableLabel">T08</b></div>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Table <b id="tableLabel">T08</b></div>
           <div class="cart-items" id="cartItems"></div>
           <div class="total">
             <div class="total-row"><span>Subtotal</span><b id="subtotal">SAR 0</b></div>
@@ -195,8 +196,27 @@ button{cursor:pointer;border:0}
             <div class="total-row grand"><span>Total</span><b id="grand">SAR 0</b></div>
           </div>
           <button class="btn green full" onclick="sendOrder()">🖨️ Send Order to Kitchen</button>
-          <button class="btn primary full" onclick="openPaymentCounter()">💳 Cash Counter / Pay & Print</button><button class="btn blue full" onclick="markReady()">🔔 Mark Order Ready</button>
+          <button class="btn primary full" onclick="payPrint()">💳 Pay & Print Receipt</button><button class="btn blue full" onclick="markReady()">🔔 Mark Order Ready</button>
         </aside>
+      </div>
+    </section>
+
+    <!-- 🛵 ডেলিভারি ম্যান — নিজের বাজারের যেসব রাইডার এখন ডিউটিতে (online)
+         আছেন, তাঁরা এখান থেকে কত দূরে আছেন সেটা দেখা যায়।
+
+         দূরত্বটা মাপা হয় এই ফোনের GPS থেকে রাইডারের শেষ পাঠানো অবস্থান
+         পর্যন্ত — সোজা সরলরেখায়, রাস্তার হিসাব নয়। তাই "৮০০ মিটার" মানে
+         হেঁটে ৮০০ মিটার নয়, আকাশপথে। এটা স্পষ্ট করে লেখা আছে, নাহলে
+         রাইডার দেরি করলে মনে হতো অ্যাপ মিথ্যা বলেছে।                    -->
+    <section class="page" id="delivery">
+      <div class="panel">
+        <h2>🛵 ডিউটিতে থাকা রাইডার</h2>
+        <div id="dmNote" style="color:#64748b;font-size:13px;margin:6px 0 12px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="btn" id="dmRefresh">🔄 আবার দেখুন</button>
+          <button class="btn" id="dmLocate">📍 আমার অবস্থান নিন</button>
+        </div>
+        <div id="dmList">লোড হচ্ছে...</div>
       </div>
     </section>
 
@@ -213,48 +233,19 @@ button{cursor:pointer;border:0}
 
     <section class="page" id="tables">
       <div class="panel">
-        <div class="toolbar" style="align-items:center">
-          <div style="flex:1"><h2 style="margin:0">Tables & QR</h2><div style="color:var(--muted);font-size:13px;margin-top:4px">প্রতিটি Table-এর QR scan করলে Customer Menu খুলবে। Camera কাজ না করলে নিচের Table Code লিখেও ঢোকা যাবে।</div></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn" onclick="addRestaurantTable()">＋ Add Table</button>
-            <button class="btn primary" onclick="openAllTableQR()">🖨️ QR Cards</button>
-          </div>
+        <h2>Tables</h2>
+        <div class="tables">
+          <div class="table free"><b>T01</b><div class="status">🟢 Free</div></div>
+          <div class="table occupied"><b>T02</b><div class="status">🔴 Occupied</div></div>
+          <div class="table ordered"><b>T03</b><div class="status">🟠 Ordered</div></div>
+          <div class="table ready"><b>T04</b><div class="status">🔵 Ready</div></div>
+          <div class="table free"><b>T05</b><div class="status">🟢 Free</div></div>
+          <div class="table occupied"><b>T06</b><div class="status">🔴 Occupied</div></div>
+          <div class="table free"><b>T07</b><div class="status">🟢 Free</div></div>
+          <div class="table ordered"><b>T08</b><div class="status">🟠 Order #1025</div></div>
         </div>
-        <div class="tables" id="tableGrid"></div>
-        <div style="margin-top:12px;color:var(--muted);font-size:12px">💡 যতগুলো Table দরকার Add Table দিয়ে যোগ করুন। Table-এর নাম পরিবর্তন বা মুছতেও পারবেন।</div>
-        <div id="tableAddHelp" style="display:none"></div>      </div>
+      </div>
     </section>
-
-    <div id="paymentModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.62);z-index:90;padding:16px;overflow:auto">
-      <div class="panel" style="max-width:480px;margin:25px auto">
-        <div class="topbar"><h2 style="margin:0">💵 Cash Counter</h2><button class="btn" onclick="closePaymentCounter()">✕</button></div>
-        <div style="margin-top:12px">
-          <label>1️⃣ Receipt / Order Number</label>
-          <div id="paymentSearchRow" style="display:flex;gap:8px;margin-top:6px"><input id="payOrderNo" class="search" inputmode="numeric" placeholder="যেমন 1025"><button class="btn primary" onclick="loadPaymentOrder()">Search</button></div>
-        </div>
-        <div id="paymentDetails" style="display:none;margin-top:16px">
-          <div class="panel" style="background:var(--bg2);padding:14px">
-            <div class="item-row"><span>Receipt</span><b id="payReceiptNo">#—</b></div>
-            <div class="item-row"><span>Total Bill</span><b id="payTotal">SAR 0</b></div>
-            <div style="margin-top:12px"><label>2️⃣ Customer Paid</label><input id="payAmount" class="search" style="width:100%;margin-top:6px;font-size:20px;font-weight:800" inputmode="decimal" placeholder="0" oninput="calculatePayment()"></div>
-            <div class="item-row" style="margin-top:14px"><span>3️⃣ Return / Change</span><b id="payChange" style="font-size:24px">SAR 0</b></div>
-            <div class="item-row" style="margin-top:6px"><span>Due</span><b id="payDue">SAR 0</b></div>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" style="flex:1" onclick="closePaymentCounter()">Cancel</button><button class="btn primary" style="flex:2" onclick="confirmCashPayment()">✓ Confirm & Print</button></div>
-        </div>
-      </div>
-    </div>
-
-    <div id="tableQrModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:80;padding:16px;overflow:auto">
-      <div class="panel" style="max-width:430px;margin:25px auto;text-align:center">
-        <div class="topbar"><h2 id="qrTitle">Table QR</h2><button class="btn" onclick="closeTableQR()">✕</button></div>
-        <div id="qrBox" style="display:flex;justify-content:center;margin:14px 0"></div>
-        <div style="font-size:13px;color:var(--muted)">Camera দিয়ে Scan করুন</div>
-        <div style="margin-top:10px;font-size:22px;font-weight:800;letter-spacing:1px" id="qrCodeText"></div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px">Camera কাজ না করলে এই Code লিখে Customer Menu খুলবে</div>
-        <div style="display:flex;gap:8px;justify-content:center;margin-top:16px"><button class="btn primary" onclick="printTableQR()">🖨️ Print QR</button><button class="btn" onclick="copyTableCode()">Copy Code</button></div>
-      </div>
-    </div>
 
     <section class="page" id="menu">
       <div class="panel">
@@ -378,65 +369,20 @@ button{cursor:pointer;border:0}
     </section>
 
     <section class="page" id="settings">
-      <div class="panel" style="margin-bottom:18px">
-        <h2>Restaurant Profile</h2>
-        <div class="field" style="margin-top:12px">
-          <label>Profile / Shop Banner Photo</label>
-          <input id="restaurantProfileImage" type="file" accept="image/*" onchange="previewRestaurantProfile(event)">
-          <div style="font-size:12px;color:var(--muted);margin-top:5px">ছবি একবার upload হলে নিচে থাকবে। Delete Photo চাপলে Firebase থেকে profile photo-ও সরানো হবে এবং নতুন ছবি বেছে নেওয়া যাবে।</div>
-          <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
-            <label style="font-size:13px;color:var(--muted)">Upload size</label>
-            <select id="restaurantProfileSize" class="btn">
-              <option value="50">50 KB</option>
-              <option value="100" selected>100 KB</option>
-            </select>
-          </div>
-          <div id="restaurantProfilePreview" style="margin-top:10px"></div>
-        </div>
-        <div class="field" style="margin-top:14px">
-          <label>Restaurant Description</label>
-          <textarea id="restaurantProfileDescription" rows="4" placeholder="রেস্টুরেন্ট সম্পর্কে সংক্ষিপ্ত বর্ণনা লিখুন..." style="width:100%;box-sizing:border-box"></textarea>
-          <div style="font-size:12px;color:var(--muted);margin-top:5px">এই বর্ণনা online Restaurant Profile / Honey Bee Bazar-এ দেখানো যাবে।</div>
-        </div>
-        <label style="display:flex;align-items:center;gap:9px;margin-top:14px;font-weight:700">
-          <input id="restaurantMarketPublished" type="checkbox" style="width:20px;height:20px">
-          🟢 Honey Bee Bazar-এ Publish করুন
-        </label>
-        <div id="restaurantMarketStatus" style="font-size:12px;color:var(--muted);margin-top:6px">Bazar publish বন্ধ আছে।</div>
-        <button class="btn green" style="margin-top:14px" onclick="saveRestaurantProfile()">Save Restaurant Profile</button>
-      </div>
-
       <div class="panel">
         <h2>Printer Settings</h2>
-        <div class="field" style="margin-bottom:14px">
-          <label>Print Shop Name / Header</label>
-          <input id="printShopName" placeholder="যে নাম এখানে লিখবেন, প্রিন্টে সেটাই আসবে" maxlength="60">
-          <div style="font-size:12px;color:var(--muted);margin-top:5px">KOT ও Customer Receipt-এর একদম উপরে এই নামটি প্রিন্ট হবে। ফাঁকা রাখলে Restaurant Profile-এর নাম ব্যবহার হবে।</div>
-        </div>
         <div class="form-grid">
-          <div class="field"><label>Kitchen Printer Model</label><input value="Xprinter XP-N160I" readonly></div>
           <div class="field"><label>Kitchen Printer IP</label><input placeholder="192.168.1.101" value="192.168.1.101"></div>
           <div class="field"><label>Kitchen Port</label><input value="9100"></div>
-          <div class="field"><label>Cash Printer Model</label><input value="Rongta RP326" readonly></div>
           <div class="field"><label>Cash Printer IP</label><input placeholder="192.168.1.102" value="192.168.1.102"></div>
           <div class="field"><label>Cash Printer Port</label><input value="9100"></div>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
-          <button class="btn green" onclick="savePrintShopName()">Save Print Name</button>
-        </div>
         <p style="color:var(--muted)">Kitchen printer: KOT only. Cash printer: final customer receipt. Kitchen-এর কোনো login নেই।</p>
-      </div>
-
-      <div class="panel" style="border:1px solid #fecaca;background:#fffafa">
-        <h2>Account</h2>
-        <p style="color:var(--muted);margin:0 0 12px">এই Restaurant POS অ্যাকাউন্ট থেকে বের হতে নিচের Logout চাপুন।</p>
-        <button class="btn danger" onclick="logoutRestaurant()">↪ Logout</button>
       </div>
     </section>
   </main>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -457,7 +403,7 @@ const defaultProducts=[
       ফোন বদলালে মেনু হারাত, দুই ডিভাইসে দুই রকম মেনু থাকত, আর
       Honey Bee Bazar-এর গ্রাহক কিছুই দেখতে পেতেন না।
       এখন মেনু ক্লাউডে — রেস্টুরেন্টের নিজের ঘরে।                   */
-let RP = { uid:null, name:"", cur:"SAR" };
+let RP = { uid:null, name:"", cur:"SAR", marketId:null };
 let products = [];
 
 function foodsRef(){ return db.collection("restaurants").doc(RP.uid).collection("foods"); }
@@ -482,17 +428,6 @@ async function saveOneFood(f){
 }
 async function deleteOneFood(id){ await foodsRef().doc(String(id)).delete(); }
 
-async function logoutRestaurant(){
-  if(!confirm("আপনি কি Restaurant POS থেকে Logout করতে চান?")) return;
-  try{
-    await auth.signOut();
-    window.location.href="login.html";
-  }catch(e){
-    toastRP("Logout করা যায়নি — আবার চেষ্টা করুন।", true);
-    console.error("Restaurant logout:", e);
-  }
-}
-
 function toastRP(msg, bad){
   let t = document.getElementById("rpToast");
   if(!t){
@@ -507,41 +442,20 @@ function toastRP(msg, bad){
   t.textContent = msg; t.style.display = "block";
   clearTimeout(t.__h); t.__h = setTimeout(function(){ t.style.display = "none"; }, 2600);
 }
-function dataUrlBytes(dataUrl){
-  const b64=(dataUrl.split(",")[1]||"").replace(/=+$/,"" );
-  return Math.floor(b64.length*3/4);
-}
-function formatKB(bytes){ return (Number(bytes||0)/1024).toFixed(1)+" KB"; }
-async function compressImage(file,maxW=900,targetKB=100){
+async function compressImage(file,maxW=900,quality=.78){
   return new Promise((resolve,reject)=>{
     const reader=new FileReader();
     reader.onerror=reject;
     reader.onload=()=>{
       const img=new Image();
       img.onload=()=>{
-        let scale=Math.min(1,maxW/img.width);
-        let width=Math.max(1,Math.round(img.width*scale));
-        let height=Math.max(1,Math.round(img.height*scale));
+        const scale=Math.min(1,maxW/img.width);
         const c=document.createElement("canvas");
+        c.width=Math.max(1,Math.round(img.width*scale));
+        c.height=Math.max(1,Math.round(img.height*scale));
         const ctx=c.getContext("2d");
-        let best="";
-        // Try quality first, then progressively reduce dimensions until <= target.
-        for(let pass=0;pass<8;pass++){
-          c.width=width; c.height=height;
-          ctx.clearRect(0,0,width,height);
-          ctx.drawImage(img,0,0,width,height);
-          for(const q of [.82,.72,.62,.52,.42,.32,.24]){
-            const out=c.toDataURL("image/jpeg",q);
-            best=out;
-            if(dataUrlBytes(out)<=targetKB*1024){
-              resolve(out); return;
-            }
-          }
-          width=Math.max(320,Math.round(width*.82));
-          height=Math.max(320,Math.round(height*.82));
-          if(width===320 && height===320) break;
-        }
-        resolve(best);
+        ctx.drawImage(img,0,0,c.width,c.height);
+        resolve(c.toDataURL("image/jpeg",quality));
       };
       img.onerror=reject; img.src=reader.result;
     };
@@ -553,63 +467,36 @@ let category="All", cart=[];
 const money=n=>RP.cur+" "+Number(n||0).toFixed(2);
 
 
-let editingFoodId=null, currentImageData=null, imageWasRemoved=false, menuFilter="all";
+let editingFoodId=null, currentImageData=null, menuFilter="all";
 
 function openFoodEditor(id=null){
-  editingFoodId=id; currentImageData=null; imageWasRemoved=false;
+  editingFoodId=id; currentImageData=null;
   document.getElementById("foodModal").style.display="block";
   document.getElementById("foodModalTitle").textContent=id?"Edit Food":"Add Food";
   document.getElementById("variantRows").innerHTML="";
   document.getElementById("addonRows").innerHTML="";
   document.getElementById("imagePreview").innerHTML="";
   if(id){
-    const f=products.find(x=>String(x.id)===String(id));
+    const f=products.find(x=>x.id===id);
     if(!f)return;
     foodName.value=f.name; foodCategory.value=f.cat; foodPrice.value=f.price;
     foodAvailable.value=String(f.available); foodDescription.value=f.description||"";
     currentImageData=f.img||null;
-    const photoInput=document.getElementById("foodImage");
-    if(photoInput) photoInput.disabled=!!f.img;
-    if(f.img) imagePreview.innerHTML=`<div style="display:flex;flex-direction:column;align-items:flex-start;gap:7px">
-      <img src="${f.img}" style="width:120px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">
-      <button type="button" class="btn danger" onclick="removeFoodImage()">🗑️ Delete Photo</button>
-      <div style="font-size:12px;color:var(--muted)">Delete করলে নতুন ছবি upload করতে পারবেন।</div>
-    </div>`;
+    if(f.img) imagePreview.innerHTML=`<img src="${f.img}" style="width:100px;height:80px;object-fit:cover;border-radius:10px">`;
     (f.variants||[]).forEach(v=>addVariantRow(v.name,v.price));
     (f.addons||[]).forEach(a=>addAddonRow(a.name,a.price));
   }else{
-    const photoInput=document.getElementById("foodImage");
-    if(photoInput){ photoInput.disabled=false; photoInput.value=""; }
     foodName.value="";foodCategory.value="";foodPrice.value="";foodAvailable.value="true";foodDescription.value="";
   }
 }
 function closeFoodEditor(){document.getElementById("foodModal").style.display="none";}
-function removeFoodImage(){
-  currentImageData=null;
-  imageWasRemoved=true;
-  const input=document.getElementById("foodImage");
-  if(input){ input.value=""; input.disabled=false; }
-  imagePreview.innerHTML=`<div style="padding:10px;border:1px dashed var(--border);border-radius:10px">
-    <div style="font-weight:700">🗑️ Photo deleted</div>
-    <div style="font-size:12px;color:var(--muted);margin-top:4px">এখন উপরের Food Photo থেকে নতুন ছবি বেছে নিন।</div>
-  </div>`;
-}
 async function previewFoodImage(e){
   const file=e.target.files?.[0]; if(!file)return;
   if(!file.type.startsWith("image/")) return alert("শুধু image file দিন।");
   try{
-    currentImageData=await compressImage(file,900,100);
-    imageWasRemoved=false;
-    const input=document.getElementById("foodImage");
-    if(input) input.disabled=true;
-    const originalKB=formatKB(file.size);
-    const compressedKB=formatKB(dataUrlBytes(currentImageData));
+    currentImageData=await compressImage(file);
     imagePreview.innerHTML=`<img src="${currentImageData}" style="width:120px;height:90px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">
-    <div style="font-size:12px;margin-top:7px;line-height:1.6">
-      <b>ছবি প্রস্তুত ✓</b><br>
-      Original: <b>${originalKB}</b><br>
-      Compressed: <b>${compressedKB}</b> <span style="color:var(--muted)">(max 100 KB)</span>
-    </div>`;
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">Compressed automatically</div>`;
   }catch(err){alert("ছবি পড়া যায়নি। আবার চেষ্টা করুন।");}
 }
 function addVariantRow(name="",price=0){
@@ -636,13 +523,13 @@ function saveFood(){
   if(!name||!cat||!Number.isFinite(price))return alert("Food name, category এবং price দিন।");
   const f={
     id:editingFoodId||Date.now(),name,cat,price,
-    available:foodAvailable.value==="true",published:editingFoodId?(products.find(x=>String(x.id)===String(editingFoodId))?.published??false):false,
+    available:foodAvailable.value==="true",published:editingFoodId?(products.find(x=>x.id===editingFoodId)?.published??false):false,
     description:foodDescription.value.trim(),
-    img:imageWasRemoved ? "" : (currentImageData||"https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=700&q=80"),
+    img:currentImageData||"https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=700&q=80",
     variants:readRows("variantRows",".v-name",".v-price"),
     addons:readRows("addonRows",".a-name",".a-price")
   };
-  const i=products.findIndex(x=>String(x.id)===String(f.id));
+  const i=products.findIndex(x=>x.id===f.id);
   if(i>=0)products[i]=f;else products.unshift(f);
   closeFoodEditor();renderProducts();renderAdminMenu();renderCustomerPreview();
   /* ⚠️ পর্দায় আগে দেখাই, ক্লাউডে পরে — নইলে নেট ধীর হলে মনে হতো
@@ -653,19 +540,19 @@ function saveFood(){
     .catch(function(e){ toastRP("সংরক্ষণ হয়নি — " + (e.code||"আবার চেষ্টা করুন"), true); });
 }
 function togglePublish(id){
-  const f=products.find(x=>String(x.id)===String(id));if(!f)return;
+  const f=products.find(x=>x.id===id);if(!f)return;
   f.published=!f.published;renderAdminMenu();renderCustomerPreview();
   saveOneFood(f).catch(function(e){ toastRP("বদলটা ক্লাউডে যায়নি।", true); });
 }
 function toggleAvailability(id){
-  const f=products.find(x=>String(x.id)===String(id));if(!f)return;
+  const f=products.find(x=>x.id===id);if(!f)return;
   f.available=!f.available;renderAdminMenu();renderCustomerPreview();renderProducts();
   saveOneFood(f).catch(function(e){ toastRP("বদলটা ক্লাউডে যায়নি।", true); });
 }
 function deleteFood(id){
-  const f=products.find(x=>String(x.id)===String(id));if(!f)return;
+  const f=products.find(x=>x.id===id);if(!f)return;
   if(!confirm(`Delete ${f.name}?`))return;
-  products=products.filter(x=>String(x.id)!==String(id));renderAdminMenu();renderCustomerPreview();renderProducts();
+  products=products.filter(x=>x.id!==id);renderAdminMenu();renderCustomerPreview();renderProducts();
   deleteOneFood(id).catch(function(e){ toastRP("মুছতে পারেনি — আবার চেষ্টা করুন।", true); });
 }
 function showPublishedOnly(){menuFilter="published";renderAdminMenu()}
@@ -684,10 +571,10 @@ function renderAdminMenu(){
           <span class="badge ${f.available?'paid':'prep'}">${f.available?'AVAILABLE':'OFF'}</span>
         </div>
         <div style="display:flex;gap:5px;margin-top:9px;flex-wrap:wrap">
-          <button class="btn hb-food-action" data-food-action="edit" data-food-id="${encodeURIComponent(String(f.id))}" type="button">Edit</button>
-          <button class="btn hb-food-action" data-food-action="publish" data-food-id="${encodeURIComponent(String(f.id))}" type="button">${f.published?'Unpublish':'Publish'}</button>
-          <button class="btn hb-food-action" data-food-action="availability" data-food-id="${encodeURIComponent(String(f.id))}" type="button">${f.available?'Set Off':'Set Available'}</button>
-          <button class="btn danger hb-food-action" data-food-action="delete" data-food-id="${encodeURIComponent(String(f.id))}" type="button">Delete</button>
+          <button class="btn" onclick="openFoodEditor(${f.id})">Edit</button>
+          <button class="btn" onclick="togglePublish(${f.id})">${f.published?'Unpublish':'Publish'}</button>
+          <button class="btn" onclick="toggleAvailability(${f.id})">${f.available?'Set Off':'Set Available'}</button>
+          <button class="btn danger" onclick="deleteFood(${f.id})">Delete</button>
         </div>
       </div>
     </article>`).join("") || `<div style="color:var(--muted)">No food found.</div>`;
@@ -695,11 +582,11 @@ function renderAdminMenu(){
 function renderCustomerPreview(){
   const list=products.filter(f=>f.published&&f.available);
   document.getElementById("customerPreview").innerHTML=list.map(f=>`
-    <article class="product hb-product-select" data-hb-product-id="${encodeURIComponent(String(f.id))}" style="cursor:pointer">
+    <article class="product">
       <img src="${f.img}" alt="${f.name}">
       <div class="product-body"><div class="product-name">${f.name}</div>
       <div style="font-size:12px;color:var(--muted);min-height:30px">${f.description||""}</div>
-      <div class="product-meta"><span class="price">${money(f.price)}</span><button class="add" type="button">＋</button></div></div>
+      <div class="product-meta"><span class="price">${money(f.price)}</span><button class="add" onclick="addToCart(${f.id})">＋</button></div></div>
     </article>`).join("") || `<div style="color:var(--muted)">No published food yet.</div>`;
 }
 
@@ -712,13 +599,13 @@ function renderCustomerPage(){
     (customerCategory==="All"||f.cat===customerCategory)&&
     f.name.toLowerCase().includes(q));
   document.getElementById("customerPageProducts").innerHTML=list.map(f=>`
-    <article class="product hb-product-select" data-hb-product-id="${encodeURIComponent(String(f.id))}" style="cursor:pointer">
+    <article class="product">
       <img src="${f.img}" alt="${f.name}" loading="lazy">
       <div class="product-body">
         <div class="product-name">${f.name}</div>
         <div style="font-size:12px;color:var(--muted);min-height:32px">${f.description||""}</div>
         <div class="product-meta"><span class="price">${money(f.price)}</span>
-        <button class="add" type="button">＋</button></div>
+        <button class="add" onclick="addToCart(${f.id})">＋</button></div>
       </div>
     </article>`).join("") || `<div style="color:var(--muted);padding:20px">কোনো published food নেই।</div>`;
 }
@@ -728,77 +615,32 @@ function init(){
   renderProducts(); renderCart(); renderAdminMenu(); renderCustomerPreview(); renderOrderHistory();
 }
 function setCategory(c){category=c;init()}
-
-/* Product selection: delegated click handler.
-   Inline onclick was removed so Firestore string IDs cannot break the tap/click. */
-if(!window.__hbProductSelectHandler){
-  window.__hbProductSelectHandler=true;
-  document.addEventListener("click",function(e){
-    const card=e.target.closest(".hb-product-select[data-hb-product-id]");
-    if(!card)return;
-    const id=decodeURIComponent(card.getAttribute("data-hb-product-id")||"");
-    if(!id)return;
-    addToCart(id);
-  });
-}
-
-/* Admin/cart controls: use delegated taps instead of inline onclick.
-   This keeps controls working reliably on mobile browsers and with Firestore string IDs. */
-if(!window.__hbPosControlHandler){
-  window.__hbPosControlHandler=true;
-  document.addEventListener("click",function(e){
-    const foodBtn=e.target.closest(".hb-food-action");
-    if(foodBtn){
-      e.preventDefault(); e.stopPropagation();
-      const id=decodeURIComponent(foodBtn.getAttribute("data-food-id")||"");
-      const action=foodBtn.getAttribute("data-food-action");
-      if(!id)return;
-      if(action==="edit") openFoodEditor(id);
-      else if(action==="publish") togglePublish(id);
-      else if(action==="availability") toggleAvailability(id);
-      else if(action==="delete") deleteFood(id);
-      return;
-    }
-    const qtyBtn=e.target.closest(".hb-qty-action");
-    if(qtyBtn){
-      e.preventDefault(); e.stopPropagation();
-      const id=decodeURIComponent(qtyBtn.getAttribute("data-qty-id")||"");
-      const d=Number(qtyBtn.getAttribute("data-qty-d")||0);
-      if(id && d) changeQty(id,d);
-    }
-  });
-}
 function renderProducts(){
   const q=(document.getElementById("search")?.value||"").toLowerCase();
   const list=products.filter(p=>(category==="All"||p.cat===category)&&p.name.toLowerCase().includes(q));
   document.getElementById("products").innerHTML=list.map(p=>`
-    <article class="product hb-product-select" data-hb-product-id="${encodeURIComponent(String(p.id))}" style="cursor:pointer">
+    <article class="product">
       <img src="${p.img}" alt="${p.name}" loading="lazy">
       <div class="product-body"><div class="product-name">${p.name}</div>
-      <div class="product-meta"><span class="price">${money(p.price)}</span><button class="add" type="button">＋</button></div></div>
+      <div class="product-meta"><span class="price">${money(p.price)}</span><button class="add" onclick="addToCart(${p.id})">＋</button></div></div>
     </article>`).join("");
 }
 function addToCart(id){
-  const p=products.find(x=>String(x.id)===String(id));
-  if(!p)return;
-  if(p.available===false || String(p.available).toLowerCase()==="false"){
-    toastRP("এই Product এখন Available নয়।",true);
-    return;
-  }
+  const p=products.find(x=>x.id===id); if(!p||!p.available)return;
   if((p.variants?.length||0)+(p.addons?.length||0)>0){
     openItemChooser(p); return;
   }
-  const found=cart.find(x=>String(x.id)===String(id));
+  const found=cart.find(x=>x.id===id);
   found?found.qty++:cart.push({...p,qty:1,selection:null}); renderCart();
 }
 function openItemChooser(p){
   const variant=(p.variants||[]).map((v,i)=>`<label style="display:flex;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:9px;margin-top:6px"><span><input type="radio" name="variantPick" value="${i}" ${i===0?'checked':''}> ${v.name}</span><b>${v.price?`+${money(v.price)}`:""}</b></label>`).join("");
   const addons=(p.addons||[]).map((a,i)=>`<label style="display:flex;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:9px;margin-top:6px"><span><input type="checkbox" name="addonPick" value="${i}"> ${a.name}</span><b>+${money(a.price)}</b></label>`).join("");
-  const html=`<div id="chooser" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:60;padding:16px;overflow:auto"><div class="panel" style="max-width:500px;margin:40px auto"><img src="${p.img}" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px"><h2>${p.name}</h2><div style="color:var(--muted)">Base ${money(p.price)}</div><h3>Variant</h3>${variant||"<div style='color:var(--muted)'>No variants</div>"}<h3>Add-ons</h3>${addons||"<div style='color:var(--muted)'>No add-ons</div>"}<div style="display:flex;gap:8px;margin-top:18px"><button class="btn" onclick="document.getElementById('chooser').remove()">Cancel</button><button class="btn primary" onclick="confirmItemChoice(${JSON.stringify(String(p.id))})">Add to Cart</button></div></div></div>`;
+  const html=`<div id="chooser" style="position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:60;padding:16px;overflow:auto"><div class="panel" style="max-width:500px;margin:40px auto"><img src="${p.img}" style="width:100%;max-height:220px;object-fit:cover;border-radius:14px"><h2>${p.name}</h2><div style="color:var(--muted)">Base ${money(p.price)}</div><h3>Variant</h3>${variant||"<div style='color:var(--muted)'>No variants</div>"}<h3>Add-ons</h3>${addons||"<div style='color:var(--muted)'>No add-ons</div>"}<div style="display:flex;gap:8px;margin-top:18px"><button class="btn" onclick="document.getElementById('chooser').remove()">Cancel</button><button class="btn primary" onclick="confirmItemChoice(${p.id})">Add to Cart</button></div></div></div>`;
   document.body.insertAdjacentHTML("beforeend",html);
 }
 function confirmItemChoice(id){
-  const p=products.find(x=>String(x.id)===String(id)), vi=document.querySelector('input[name="variantPick"]:checked');
+  const p=products.find(x=>x.id===id), vi=document.querySelector('input[name="variantPick"]:checked');
   const variant=vi?(p.variants||[])[Number(vi.value)]:null;
   const addons=[...document.querySelectorAll('input[name="addonPick"]:checked')].map(x=>p.addons[Number(x.value)]);
   const extra=(variant?.price||0)+addons.reduce((s,a)=>s+a.price,0);
@@ -809,13 +651,13 @@ function confirmItemChoice(id){
   document.getElementById("chooser").remove();renderCart();
 }
 function changeQty(id,d){
-  const x=cart.find(i=>String(i.id)===String(id)); if(!x)return; x.qty+=d; if(x.qty<=0)cart=cart.filter(i=>String(i.id)!==String(id)); renderCart();
+  const x=cart.find(i=>i.id===id); if(!x)return; x.qty+=d; if(x.qty<=0)cart=cart.filter(i=>i.id!==id); renderCart();
 }
 function renderCart(){
   const el=document.getElementById("cartItems");
   el.innerHTML=cart.length?cart.map(x=>`
     <div class="cart-item"><div class="item-row"><b>${x.name}</b><b>${money(x.price*x.qty)}</b></div>${x.selection?.variant||x.selection?.addons?.length?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${x.selection.variant||""}${x.selection?.addons?.length?` · ${x.selection.addons.join(", ")}`:""}</div>`:""}
-    <div class="qty"><button class="hb-qty-action" data-qty-d="-1" data-qty-id="${encodeURIComponent(String(x.id))}" type="button">−</button><span>${x.qty}</span><button class="hb-qty-action" data-qty-d="1" data-qty-id="${encodeURIComponent(String(x.id))}" type="button">＋</button></div></div>`).join(""):`<div style="color:var(--muted);padding:20px 4px;text-align:center">No food selected yet.</div>`;
+    <div class="qty"><button onclick="changeQty(${x.id},-1)">−</button><span>${x.qty}</span><button onclick="changeQty(${x.id},1)">＋</button></div></div>`).join(""):`<div style="color:var(--muted);padding:20px 4px;text-align:center">No food selected yet.</div>`;
   const sub=cart.reduce((s,x)=>s+x.price*x.qty,0), tax=sub*.15, total=sub+tax;
   document.getElementById("subtotal").textContent=money(sub);document.getElementById("tax").textContent=money(tax);document.getElementById("grand").textContent=money(total);
 }
@@ -835,68 +677,27 @@ function currentOrderPayload(){
     items:cart.map(x=>({id:x.id,name:x.name,qty:x.qty,unitPrice:x.price,selection:x.selection||null})),
     subtotal:sub,tax,total:sub+tax,status:"NEW",kitchenStatus:"NOT_SENT",paymentStatus:"UNPAID",createdAt:new Date().toISOString()};
 }
-function mergeCartIntoOrder(o){
-  const incoming=cart.map(x=>({id:x.id,name:x.name,qty:x.qty,unitPrice:x.price,selection:x.selection||null}));
-  for(const x of incoming){
-    const key=JSON.stringify([String(x.id),x.selection?.variant||"",x.selection?.addons||[]]);
-    const old=o.items.find(i=>JSON.stringify([String(i.id),i.selection?.variant||"",i.selection?.addons||[]])===key);
-    if(old) old.qty=x.qty; else o.items.push(x);
-  }
-  o.subtotal=o.items.reduce((s,x)=>s+x.unitPrice*x.qty,0);
-  o.tax=o.subtotal*.15; o.total=o.subtotal+o.tax;
-  return o;
-}
 function ensureCurrentOrder(){
   const orders=getOrders(),no=Number(document.getElementById("orderNo").textContent);
   let o=orders.find(x=>x.orderNo===no);
-  if(!o){o=currentOrderPayload();o.items=[];o.sentItems=[];orders.unshift(o);saveOrders(orders);}
-  mergeCartIntoOrder(o); return o;
+  if(!o){o=currentOrderPayload();orders.unshift(o);saveOrders(orders);} return o;
 }
-function getPrintShopName(){
-  const v=(document.getElementById("printShopName")?.value||localStorage.getItem("hbPrintShopName")||RP.name||"Honey Bee Restaurant").trim();
-  return v || RP.name || "Honey Bee Restaurant";
-}
-async function savePrintShopName(){
-  if(!RP.uid)return alert("Restaurant login পাওয়া যায়নি।");
-  const name=(document.getElementById("printShopName")?.value||"").trim();
-  if(!name)return alert("Print Shop Name লিখুন।");
-  try{
-    await db.collection("restaurants").doc(RP.uid).set({printHeader:name},{merge:true});
-    localStorage.setItem("hbPrintShopName",name);
-    toastRP("প্রিন্টের নাম সংরক্ষণ করা হয়েছে: " + name);
-  }catch(e){ toastRP("Print Name সংরক্ষণ হয়নি — " + (e.code||"আবার চেষ্টা করুন"),true); }
-}
-function makeKOT(o,items){
-  const shop=getPrintShopName();
-  const list=items||o.items;
-  return ["==============================",`        ${shop}`,"          KITCHEN KOT",`             #${o.orderNo}`,`${o.table||""}`,"==============================",...list.map(i=>`${i.name} x${i.qty}${i.selection?.variant?` [${i.selection.variant}]`:""}${i.selection?.addons?.length?` + ${i.selection.addons.join(", ")}`:""}`),"=============================="].join("\n");
+function makeKOT(o){
+  return ["==============================","          KITCHEN KOT",`             #${o.orderNo}`,`${o.table||""}`,
+  "==============================",...o.items.map(i=>`${i.name} x${i.qty}${i.selection?.variant?` [${i.selection.variant}]`:""}${i.selection?.addons?.length?` + ${i.selection.addons.join(", ")}`:""}`),
+  "=============================="].join("\n");
 }
 function makeReceipt(o){
-  const shop=getPrintShopName();
-  return ["==============================",`        ${shop}`,"       FINAL RECEIPT",`          ORDER #${o.orderNo}`,"==============================",...o.items.map(i=>`${i.name} x${i.qty}    ${money(i.unitPrice*i.qty)}`),"------------------------------",`Subtotal              ${money(o.subtotal)}`,`Tax                   ${money(o.tax)}`,`TOTAL                 ${money(o.total)}`,"------------------------------",`PAID                  ${money(o.paid||0)}`,`CHANGE                ${money(o.change||0)}`,`DUE                   ${money(o.due||0)}`,"------------------------------","PAYMENT: PAID","=============================="].join("\n");
+  return ["==============================","       RESTAURANT RECEIPT",`          ORDER #${o.orderNo}`,"==============================",
+  ...o.items.map(i=>`${i.name} x${i.qty}    ${money(i.unitPrice*i.qty)}`),"------------------------------",
+  `Subtotal              ${money(o.subtotal)}`,`Tax                   ${money(o.tax)}`,`TOTAL                 ${money(o.total)}`,
+  "------------------------------",`PAYMENT: ${o.paymentStatus}`,"=============================="].join("\n");
 }
-/* ════════ Automatic LAN Printing ════════ */
-const PRINT_BRIDGE_URL = "http://127.0.0.1:9105/print";
-const PRINTERS = { kitchen:{model:"Xprinter XP-N160I",ip:"192.168.1.101",port:9100}, cash:{model:"Rongta RP326",ip:"192.168.1.102",port:9100} };
-async function autoPrint(printerType,text,orderNo){
-  const printer=PRINTERS[printerType];
-  try{
-    const r=await fetch(PRINT_BRIDGE_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({printerType,model:printer.model,ip:printer.ip,port:printer.port,orderNo,text,format:"escpos"})});
-    if(!r.ok) throw new Error("Print Bridge error "+r.status);
-    toastRP((printerType==="kitchen"?"🍳 Kitchen KOT":"🧾 Customer Receipt")+" automatically sent to "+printer.model); return true;
-  }catch(e){ console.error("Auto print failed:",e); toastRP("Automatic print হয়নি — PC Print Bridge চালু আছে কিনা দেখুন।",true); return false; }
+function printPreview(title,text){
+  const w=window.open("","_blank","width=420,height=700"); if(!w)return alert("Popup blocked. Browser-এ popup allow করুন।");
+  w.document.write(`<html><head><title>${title}</title><style>body{font-family:monospace;padding:20px;white-space:pre-wrap}button{padding:12px 18px;margin-bottom:15px}</style></head><body><button onclick="print()">PRINT</button><pre>${text.replaceAll("&","&amp;").replaceAll("<","&lt;")}</pre></body></html>`);
+  w.document.close();
 }
-function getNewKitchenItems(o){
-  const sent=o.sentItems||[]; const out=[];
-  for(const item of o.items){
-    const key=JSON.stringify([String(item.id),item.selection?.variant||"",item.selection?.addons||[]]);
-    const prev=sent.find(i=>JSON.stringify([String(i.id),i.selection?.variant||"",i.selection?.addons||[]])===key);
-    const diff=item.qty-(prev?.qty||0);
-    if(diff>0) out.push({...item,qty:diff});
-  }
-  return out;
-}
-function markSentItems(o){o.sentItems=JSON.parse(JSON.stringify(o.items));}
 function renderOrderHistory(){
   const el=document.querySelector("#orders .orders");if(!el)return;const orders=getOrders();
   el.innerHTML=orders.length?orders.slice(0,30).map(o=>`<div class="order-row"><div><b>#${o.orderNo}</b> · ${o.type}<br><small>${o.source} · ${o.items.reduce((s,i)=>s+i.qty,0)} items · ${money(o.total)}</small></div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${o.status==="READY"?"ready":o.paymentStatus==="PAID"?"paid":"prep"}">${o.status}</span><button class="btn" onclick="viewOrder(${o.orderNo})">View</button></div></div>`).join(""):`<div style="color:var(--muted)">No orders yet.</div>`;
@@ -905,240 +706,201 @@ function viewOrder(no){
   const o=getOrders().find(x=>x.orderNo===no);if(!o)return;
   alert(`Order #${o.orderNo}\n${o.type} · ${o.source}\n${o.items.map(i=>`${i.name} ×${i.qty}`).join("\n")}\n\nTotal: ${money(o.total)}\nStatus: ${o.status}`);
 }
-function newOrder(){ showPage("order");cart=[];document.getElementById("orderNo").textContent=nextOrderNumber();document.getElementById("tableLabel").textContent="T08";renderCart(); }
-async function sendOrder(){
+function newOrder(){
+  showPage("order");cart=[];document.getElementById("orderNo").textContent=nextOrderNumber();document.getElementById("tableLabel").textContent="T08";renderCart();
+}
+function sendOrder(){
   if(!cart.length)return alert("প্রথমে খাবার নির্বাচন করুন।");
-  const o=ensureCurrentOrder();
-  if(o.paymentStatus==="PAID"||o.status==="CLOSED")return alert("এই Receipt ইতিমধ্যে Closed। নতুন খাবার যোগ করা যাবে না।");
-  const newItems=getNewKitchenItems(o);
-  if(!newItems.length)return alert("নতুন খাবার নেই — আগের খাবার আবার Kitchen-এ যাবে না।");
-  o.status="PREPARING";o.kitchenStatus="PRINTED";markSentItems(o);
+  const o=ensureCurrentOrder();o.status="PREPARING";o.kitchenStatus="PRINTED";
   const orders=getOrders().filter(x=>x.orderNo!==o.orderNo);orders.unshift(o);saveOrders(orders);renderOrderHistory();
-  await autoPrint("kitchen",makeKOT(o,newItems),o.orderNo);
+  printPreview(`KOT #${o.orderNo}`,makeKOT(o));
 }
-function openPaymentCounter(prefillNo){
-  /* Product selected থাকলে এটি নতুন/চলমান sale — Receipt search দেখাব না।
-     বর্তমান cart-কে order হিসেবে save করে সরাসরি payment screen খুলবে।
-     Product না থাকলে এটি পুরোনো customer receipt-এর payment — তখন
-     Receipt Number + Search দেখাবে। */
-  if(cart && cart.length){
-    const o=ensureCurrentOrder();
-    prefillNo=o.orderNo;
-  }
-
-  document.getElementById("paymentModal").style.display="block";
-  document.getElementById("paymentDetails").style.display="none";
-  document.getElementById("payOrderNo").value=prefillNo||"";
-
-  const label=document.querySelector('#paymentModal label');
-  const searchRow=document.getElementById('paymentSearchRow');
-  if(cart && cart.length){
-    if(label) label.style.display='none';
-    if(searchRow) searchRow.style.display='none';
-    loadPaymentOrder();
-  }else{
-    if(label) label.style.display='block';
-    if(searchRow) searchRow.style.display='flex';
-  }
+function payPrint(){
+  if(!cart.length)return alert("প্রথমে খাবার নির্বাচন করুন।");
+  const o=ensureCurrentOrder();o.paymentStatus="PAID";o.status="PAID";
+  const orders=getOrders().filter(x=>x.orderNo!==o.orderNo);orders.unshift(o);saveOrders(orders);renderOrderHistory();
+  printPreview(`Receipt #${o.orderNo}`,makeReceipt(o));
 }
-function closePaymentCounter(){document.getElementById("paymentModal").style.display="none";}
-let paymentOrder=null;
-function loadPaymentOrder(){
-  const no=Number(document.getElementById("payOrderNo").value);
-  const o=getOrders().find(x=>Number(x.orderNo)===no);
-  if(!o)return alert("এই Receipt Number পাওয়া যায়নি।");
-  if(o.paymentStatus==="PAID"||o.status==="CLOSED")return alert("এই Receipt ইতিমধ্যে Paid/Closed।");
-  paymentOrder=o;
-  document.getElementById("payReceiptNo").textContent="#"+o.orderNo;
-  document.getElementById("payTotal").textContent=money(o.total);
-  document.getElementById("payAmount").value="";
-  document.getElementById("payChange").textContent=money(0);
-  document.getElementById("payDue").textContent=money(o.total);
-  document.getElementById("paymentDetails").style.display="block";
-}
-function calculatePayment(){
-  if(!paymentOrder)return;
-  const paid=Math.max(0,Number(document.getElementById("payAmount").value)||0);
-  const diff=paid-paymentOrder.total;
-  document.getElementById("payChange").textContent=money(Math.max(0,diff));
-  document.getElementById("payDue").textContent=money(Math.max(0,-diff));
-}
-async function confirmCashPayment(){
-  if(!paymentOrder)return;
-  const paid=Math.max(0,Number(document.getElementById("payAmount").value)||0);
-  if(paid<paymentOrder.total)return alert(`পুরো টাকা দেওয়া হয়নি।\nTotal: ${money(paymentOrder.total)}\nDue: ${money(paymentOrder.total-paid)}`);
-
-  // Receipt stays OPEN until this exact confirmation.
-  paymentOrder.paid=paid;
-  paymentOrder.change=paid-paymentOrder.total;
-  paymentOrder.due=0;
-  paymentOrder.paymentStatus="PAID";
-  paymentOrder.status="CLOSED";
-  paymentOrder.closedAt=new Date().toISOString();
-
-  const orders=getOrders().filter(x=>Number(x.orderNo)!==Number(paymentOrder.orderNo));
-  orders.unshift(paymentOrder);
-  saveOrders(orders);
-  renderOrderHistory();
-
-  // Save first, then print the final receipt.
-  const receiptNo=paymentOrder.orderNo;
-  const receiptTotal=paymentOrder.total;
-  const receiptChange=paymentOrder.change;
-  const ok=await autoPrint("cash",makeReceipt(paymentOrder),receiptNo);
-
-  // A CLOSED receipt must never remain active in the cart.
-  cart=[];
-  paymentOrder=null;
-  closePaymentCounter();
-  document.getElementById("orderNo").textContent=nextOrderNumber();
-  document.getElementById("tableLabel").textContent="T08";
-  renderCart();
-
-  alert(`Payment Confirmed\nReceipt #${receiptNo}\nTotal: ${money(receiptTotal)}\nPaid: ${money(paid)}\nReturn: ${money(receiptChange)}${ok?"":"\n\n⚠️ Payment saved, but automatic printer did not respond."}`);
-}
-
-function payPrint(){openPaymentCounter(Number(document.getElementById("orderNo")?.textContent||0));}
 function markReady(){
   const no=Number(document.getElementById("orderNo").textContent),orders=getOrders(),o=orders.find(x=>x.orderNo===no);
   if(!o)return alert("Order আগে Kitchen-এ পাঠান।");
   o.status="READY";o.kitchenStatus="READY";saveOrders(orders);renderOrderHistory();
   alert(`Order #${no} ready — Kitchen থেকে মুখে “${no} ready” বলা হবে।`);
 }
-let restaurantTables = ['T01','T02','T03','T04','T05','T06','T07','T08'];
-let currentQRTable=null;
-function tableList(){ return Array.isArray(restaurantTables) ? restaurantTables : []; }
-function nextTableName(){
-  let n=tableList().length+1;
-  while(tableList().includes('T'+String(n).padStart(2,'0'))) n++;
-  return 'T'+String(n).padStart(2,'0');
-}
-function saveRestaurantTables(){
-  return db.collection('restaurants').doc(RP.uid).set({tables:tableList()},{merge:true});
-}
-function renderTables(){
-  const grid=document.getElementById('tableGrid'); if(!grid)return;
-  grid.innerHTML=tableList().map((t,i)=>`<div class="table free" data-table-name="${encodeURIComponent(t)}">
-    <b>${t}</b><div class="status">🟢 Free</div>
-    <button type="button" class="btn table-action" data-table-action="qr" data-table-index="${i}" style="margin-top:8px;width:100%;touch-action:manipulation">▣ QR / Code</button>
-    <div style="display:flex;gap:6px;margin-top:6px">
-      <button type="button" class="btn table-action" data-table-action="rename" data-table-index="${i}" style="flex:1;touch-action:manipulation">✎ Rename</button>
-      <button type="button" class="btn danger table-action" data-table-action="delete" data-table-index="${i}" style="flex:1;touch-action:manipulation">🗑 Delete</button>
-    </div>
-  </div>`).join('') || '<div style="padding:20px;color:var(--muted)">কোনো Table নেই। ＋ Add Table চাপুন।</div>';
-}
-if(!window.__hbTableActionsBound){
-  window.__hbTableActionsBound=true;
-  document.addEventListener('click',function(e){
-    const btn=e.target.closest && e.target.closest('.table-action');
-    if(!btn)return;
-    e.preventDefault(); e.stopPropagation();
-    const i=Number(btn.getAttribute('data-table-index'));
-    const t=tableList()[i];
-    if(!t)return;
-    const action=btn.getAttribute('data-table-action');
-    if(action==='qr') openTableQR(t);
-    else if(action==='rename') renameRestaurantTable(t);
-    else if(action==='delete') deleteRestaurantTable(t);
-  },true);
-}
-async function addRestaurantTable(){
-  const suggested=nextTableName();
-  const name=prompt('নতুন Table-এর নাম দিন:',suggested);
-  if(name===null)return;
-  const t=name.trim();
-  if(!t)return alert('Table-এর নাম দিন।');
-  if(t.length>30)return alert('Table-এর নাম 30 অক্ষরের মধ্যে দিন।');
-  if(tableList().some(x=>x.toLowerCase()===t.toLowerCase()))return alert('এই Table নামটি আগে থেকেই আছে।');
-  restaurantTables.push(t);
-  try{ await saveRestaurantTables(); renderTables(); toastRP(t+' যোগ হয়েছে।'); }
-  catch(e){ restaurantTables=restaurantTables.filter(x=>x!==t); alert('Table সংরক্ষণ হয়নি। আবার চেষ্টা করুন।'); }
-}
-async function renameRestaurantTable(oldName){
-  const name=prompt('নতুন Table-এর নাম দিন:',oldName);
-  if(name===null)return;
-  const t=name.trim();
-  if(!t || t===oldName)return;
-  if(t.length>30)return alert('Table-এর নাম 30 অক্ষরের মধ্যে দিন।');
-  if(tableList().some(x=>x.toLowerCase()===t.toLowerCase()))return alert('এই Table নামটি আগে থেকেই আছে।');
-  const i=restaurantTables.indexOf(oldName); if(i<0)return;
-  restaurantTables[i]=t;
-  try{ await saveRestaurantTables(); renderTables(); toastRP(oldName+' → '+t); }
-  catch(e){ restaurantTables[i]=oldName; alert('Table নাম সংরক্ষণ হয়নি।'); }
-}
-async function deleteRestaurantTable(t){
-  if(tableList().length<=1)return alert('কমপক্ষে ১টি Table রাখতে হবে।');
-  if(!confirm(t+' Delete করবেন?'))return;
-  const old=[...restaurantTables];
-  restaurantTables=restaurantTables.filter(x=>x!==t);
-  try{ await saveRestaurantTables(); renderTables(); toastRP(t+' মুছে ফেলা হয়েছে।'); }
-  catch(e){ restaurantTables=old; renderTables(); alert('Table মুছে ফেলা যায়নি।'); }
-}
-function makeTableCode(table){
-  const raw=(RP.uid||'restaurant')+'|'+table;
-  let h=2166136261;
-  for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619);}
-  return table+'-'+(Math.abs(h>>>0).toString(36).toUpperCase().padStart(6,'0').slice(0,6));
-}
-function customerTableUrl(table,code){
-  const base=new URL('honey-bee-bazar.html',location.href);
-  base.searchParams.set('restaurant',RP.uid||'');
-  base.searchParams.set('table',table);
-  base.searchParams.set('code',code);
-  return base.toString();
-}
-function openTableQR(table){
-  currentQRTable=table;
-  const code=makeTableCode(table);
-  document.getElementById('qrTitle').textContent='Table '+table+' QR';
-  document.getElementById('qrCodeText').textContent='Table Code: '+code;
-  const box=document.getElementById('qrBox'); box.innerHTML='';
-  if(window.QRCode){ new QRCode(box,{text:customerTableUrl(table,code),width:220,height:220,correctLevel:QRCode.CorrectLevel.M}); }
-  document.getElementById('tableQrModal').style.display='block';
-}
-function closeTableQR(){document.getElementById('tableQrModal').style.display='none';}
-function copyTableCode(){ if(!currentQRTable)return; navigator.clipboard?.writeText(makeTableCode(currentQRTable)).then(()=>toastRP('Table Code copied.')).catch(()=>toastRP('Code: '+makeTableCode(currentQRTable))); }
-function printTableQR(){
-  if(!currentQRTable)return;
-  const code=makeTableCode(currentQRTable), url=customerTableUrl(currentQRTable,code);
-  const w=window.open('','_blank','width=500,height=700');
-  if(!w)return;
-  w.document.write('<html><head><title>Table '+currentQRTable+' QR</title><style>body{font-family:Arial;text-align:center;padding:30px}#q{display:flex;justify-content:center;margin:20px}</style></head><body><h2>Honey Bee Restaurant</h2><h1>Table '+currentQRTable+'</h1><div id="q"></div><h3>Table Code: '+code+'</h3><p>Scan QR or enter the Table Code</p><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><script>new QRCode(document.getElementById("q"),{text:'+JSON.stringify(url)+',width:260,height:260});setTimeout(()=>window.print(),500);<\/script></body></html>');
-  w.document.close();
-}
-function openAllTableQR(){
-  const tables=tableList();
-  const w=window.open('','_blank','width=700,height=900'); if(!w)return;
-  const cards=tables.map(t=>{const c=makeTableCode(t),u=customerTableUrl(t,c),id='q'+Math.random().toString(36).slice(2);return '<div class="card"><h2>Table '+t+'</h2><div id="'+id+'"></div><b>'+c+'</b><p>Scan QR or enter the Table Code</p></div>';}).join('');
-  const scripts=tables.map(t=>{const c=makeTableCode(t),u=customerTableUrl(t,c),id='q'+tables.indexOf(t);return '';}).join('');
-  let html='<html><head><title>Restaurant Table QR Cards</title><style>body{font-family:Arial;display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:20px}.card{text-align:center;border:1px solid #ddd;padding:15px;break-inside:avoid}.card div{display:flex;justify-content:center}</style></head><body>';
-  tables.forEach((t,i)=>{const c=makeTableCode(t),u=customerTableUrl(t,c);html+='<div class="card"><h2>Table '+t+'</h2><div id="qr'+i+'"></div><b>'+c+'</b><p>Scan QR or enter the Table Code</p></div>';});
-  html+='<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script><script>';
-  tables.forEach((t,i)=>{html+='new QRCode(document.getElementById("qr'+i+'"),{text:'+JSON.stringify(customerTableUrl(t,makeTableCode(t)))+',width:180,height:180});';});
-  html+='setTimeout(()=>window.print(),700);<\/script></body></html>';
-  w.document.write(html); w.document.close();
-}
-
-window.addRestaurantTable=addRestaurantTable;
-window.renameRestaurantTable=renameRestaurantTable;
-window.deleteRestaurantTable=deleteRestaurantTable;
-window.openTableQR=openTableQR;
-window.closeTableQR=closeTableQR;
-window.copyTableCode=copyTableCode;
-window.printTableQR=printTableQR;
-window.openAllTableQR=openAllTableQR;
-
 function showPage(id){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===id));
-  const titles={dashboard:"Dashboard",order:"New Order",orders:"Orders",tables:"Tables",menu:"Food Menu",customer:"Customer Menu",settings:"Settings"};
+  const titles={dashboard:"Dashboard",order:"New Order",orders:"Orders",delivery:"ডেলিভারি ম্যান",tables:"Tables",menu:"Food Menu",customer:"Customer Menu",settings:"Settings"};
   document.getElementById("pageTitle").textContent=titles[id]||"Restaurant POS";
   if(id==="menu"){renderAdminMenu();renderCustomerPreview();}
   if(id==="customer"){renderCustomerPage();}
   if(id==="orders"){renderOrderHistory();}
-  if(id==="tables"){renderTables();}
+  if(id==="delivery"){dmOpen();}
 }
+
+/* ════════ 🛵 ডেলিভারি ম্যান ════════
+   রাইডার তার অ্যাপে "অনলাইন" করলে riders/{uid}.online = true হয়, আর
+   GPS চালু থাকলে প্রতি ৭ সেকেন্ডে liveLocation আপডেট হয়। এখানে শুধু
+   পড়া হয় — রেস্টুরেন্ট কিছু বদলাতে পারে না।
+
+   ⚠️ "অনলাইন" মানেই কাছে আছেন নয়। কেউ অনলাইন করে ফোন পকেটে রেখে
+      দিতে পারেন, তখন GPS পুরনো হয়ে যায়। তাই অবস্থান কত আগের সেটাও
+      দেখানো হয় — ২০ মিনিটের পুরনো হলে দূরত্বটা ধূসর করে সতর্ক করা
+      হয়, নাহলে রেস্টুরেন্ট ভুল রাইডারকে ডেকে বসতেন।                */
+let dmRiders = [];
+let dmMyPos = null;        // [lat, lng] — এই ফোনের অবস্থান
+let dmState = "idle";
+let dmErrText = "";
+
+function dmSetNote(t){ const e=document.getElementById("dmNote"); if(e) e.textContent = t; }
+
+/* দুইটা অবস্থানের মধ্যে সরলরেখার দূরত্ব (কিলোমিটারে) — Haversine */
+function dmDistanceKm(a, b){
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b[0]-a[0]) * rad, dLng = (b[1]-a[1]) * rad;
+  const h = Math.sin(dLat/2)*Math.sin(dLat/2)
+          + Math.cos(a[0]*rad)*Math.cos(b[0]*rad)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function dmShowDist(km){
+  if(km < 1) return Math.round(km*1000) + " মিটার";
+  return (Math.round(km*10)/10) + " কিমি";
+}
+function dmAgeMin(ts){
+  if(!ts) return null;
+  const ms = ts.toMillis ? ts.toMillis() : (ts.seconds ? ts.seconds*1000 : 0);
+  if(!ms) return null;
+  return (Date.now() - ms) / 60000;
+}
+function dmShowAge(min){
+  if(min == null) return "সময় জানা নেই";
+  if(min < 1)  return "এইমাত্র";
+  if(min < 60) return Math.round(min) + " মিনিট আগে";
+  const h = Math.floor(min/60);
+  if(h < 24) return h + " ঘণ্টা আগে";
+  return Math.floor(h/24) + " দিন আগে";
+}
+
+function dmGetPosition(){
+  return new Promise(function(resolve){
+    if(!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      function(pos){ resolve([pos.coords.latitude, pos.coords.longitude]); },
+      function(){ resolve(null); },
+      { enableHighAccuracy:true, maximumAge:60000, timeout:12000 });
+  });
+}
+
+async function dmLoad(){
+  if(!RP.marketId){ dmState = "nomarket"; return; }
+  try{
+    const qs = await db.collection("riders")
+                       .where("marketId", "==", RP.marketId)
+                       .where("online", "==", true).limit(60).get();
+    dmRiders = qs.docs.map(function(d){ return Object.assign({ id:d.id }, d.data()); })
+                      .filter(function(r){ return r.status !== "blocked"; });
+    dmState = "ok";
+  }catch(e){
+    console.warn("riders load:", e && e.code);
+    dmState = (e && e.code === "permission-denied") ? "denied"
+            : (e && e.code === "failed-precondition") ? "needindex" : "error";
+    dmErrText = (e && e.message) ? String(e.message) : "";
+  }
+}
+
+function dmRender(){
+  const box = document.getElementById("dmList"); if(!box) return;
+
+  if(dmState === "load"){ box.innerHTML = '<div style="color:#64748b">খোঁজা হচ্ছে...</div>'; return; }
+  if(dmState === "nomarket"){
+    dmSetNote("");
+    box.innerHTML = '<div style="color:#991b1b">এই রেস্টুরেন্টের সাথে কোনো বাজার যুক্ত করা নেই, '
+      + 'তাই কোন এলাকার রাইডার দেখাব সেটা জানা যাচ্ছে না। Honey Bee-র সাথে যোগাযোগ করুন।</div>';
+    return;
+  }
+  if(dmState === "denied"){
+    dmSetNote("");
+    box.innerHTML = '<div style="color:#991b1b">রাইডারের তালিকা দেখার অনুমতি এখনো চালু হয়নি — '
+      + 'নতুন নিয়মটা (firestore.rules) publish করতে হবে।</div>';
+    return;
+  }
+  if(dmState === "needindex"){
+    dmSetNote("");
+    box.innerHTML = '<div style="color:#991b1b">Firestore-এ একটা index বানাতে হবে। '
+      + 'নিচের লেখাটার মধ্যে যে লিংকটা আছে সেটা কম্পিউটারে খুলে "Create index" চাপুন, '
+      + '২-৩ মিনিট পর আবার চেষ্টা করুন।</div>'
+      + '<div style="color:#64748b;font-size:11.5px;margin-top:8px;word-break:break-all">'
+      + (dmErrText || "") + '</div>';
+    return;
+  }
+  if(dmState === "error"){
+    dmSetNote("");
+    box.innerHTML = '<div style="color:#991b1b">তালিকা আনা যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।</div>';
+    return;
+  }
+
+  dmSetNote(dmMyPos
+    ? "দূরত্ব সরলরেখায় মাপা — রাস্তার দূরত্ব এর চেয়ে বেশি হবে।"
+    : "📍 আপনার অবস্থান নেওয়া হয়নি, তাই দূরত্ব দেখানো যাচ্ছে না।");
+
+  if(!dmRiders.length){
+    box.innerHTML = '<div style="color:#64748b">এখন কোনো রাইডার ডিউটিতে নেই।</div>';
+    return;
+  }
+
+  // কাছের জন আগে — অবস্থান না জানলে নামের ক্রমে
+  const rows = dmRiders.map(function(r){
+    const loc = r.liveLocation;
+    const km = (dmMyPos && loc && typeof loc.lat === "number" && typeof loc.lng === "number")
+             ? dmDistanceKm(dmMyPos, [loc.lat, loc.lng]) : null;
+    return { r:r, km:km, age: loc ? dmAgeMin(loc.updatedAt) : null };
+  }).sort(function(a,b){
+    if(a.km == null && b.km == null) return String(a.r.name||"").localeCompare(String(b.r.name||""), "bn");
+    if(a.km == null) return 1;
+    if(b.km == null) return -1;
+    return a.km - b.km;
+  });
+
+  box.innerHTML = rows.map(function(x){
+    const r = x.r;
+    const stale = x.age != null && x.age > 20;
+    const busy = r.currentStatus === "on_trip" || r.currentStatus === "on_waiting";
+    const digits = String(r.phone || "").replace(/[^0-9]/g, "");
+    const dist = x.km == null
+      ? '<span style="color:#94a3b8">দূরত্ব জানা নেই</span>'
+      : '<span style="color:' + (stale ? "#94a3b8" : "#15803d") + ';font-weight:700">'
+        + dmShowDist(x.km) + '</span>';
+    return '<div class="order-row" style="align-items:flex-start">'
+      + '<div style="flex:1;min-width:0">'
+      + '<b>' + (r.name || "রাইডার") + '</b>'
+      + (busy ? ' <span class="badge prep">অর্ডারে আছেন</span>' : ' <span class="badge ready">খালি আছেন</span>')
+      + '<br><span style="color:#64748b;font-size:12.5px">'
+      + dist + ' · অবস্থান ' + dmShowAge(x.age)
+      + (stale ? ' <span style="color:#b45309">(পুরনো)</span>' : '')
+      + '</span>'
+      + (digits ? '<br><a href="tel:' + digits + '" style="color:#2563eb;font-size:13px">📞 ' + r.phone + '</a>' : '')
+      + '</div></div>';
+  }).join("");
+}
+
+async function dmOpen(){
+  dmState = "load"; dmRender();
+  if(!dmMyPos) dmMyPos = await dmGetPosition();
+  await dmLoad();
+  dmRender();
+}
+
+document.getElementById("dmRefresh") &&
+  document.getElementById("dmRefresh").addEventListener("click", dmOpen);
+document.getElementById("dmLocate") &&
+  document.getElementById("dmLocate").addEventListener("click", async function(){
+    dmSetNote("📍 অবস্থান নেওয়া হচ্ছে...");
+    dmMyPos = await dmGetPosition();
+    if(!dmMyPos) toastRP("অবস্থান পাওয়া যায়নি — GPS/লোকেশন অনুমতি দিন।", true);
+    dmRender();
+  });
+
 document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
 
 /* ════════ লগইন ════════
@@ -1184,21 +946,7 @@ auth.onAuthStateChanged(async function(user){
     RP.uid = user.uid;
     RP.name = d.name || "রেস্টুরেন্ট";
     RP.cur = d.currency || "SAR";
-    restaurantTables = Array.isArray(d.tables) && d.tables.length ? d.tables.map(String) : ['T01','T02','T03','T04','T05','T06','T07','T08'];
-    renderTables();
-    const printNameEl=document.getElementById("printShopName");
-    const savedPrintName=d.printHeader || localStorage.getItem("hbPrintShopName") || RP.name;
-    if(printNameEl) printNameEl.value=savedPrintName;
-    if(savedPrintName) localStorage.setItem("hbPrintShopName",savedPrintName);
-
-    // Restaurant Profile fields — reload হলেও photo/description/publish state হারাবে না
-    restaurantProfileImageData = d.profileImage || null;
-    const rpDesc = document.getElementById("restaurantProfileDescription");
-    if(rpDesc) rpDesc.value = d.restaurantDescription || "";
-    const rpPub = document.getElementById("restaurantMarketPublished");
-    if(rpPub) rpPub.checked = d.marketPublished === true;
-    if(document.getElementById("restaurantProfilePreview")) renderRestaurantProfilePhoto(d.profileImage || null);
-    updateRestaurantMarketStatus();
+    RP.marketId = d.marketId || null;   // 🛵 ডেলিভারি ম্যান পাতার জন্য
 
     // নাম আর এলাকা উপরে বসাই — কোন রেস্টুরেন্টে আছি, স্পষ্ট থাকুক
     const brand = document.querySelector(".brand");
@@ -1232,108 +980,6 @@ if (!window.__hbFoodTapEffect) {
   }, {passive:true});
 }
 
-
-/* Restaurant profile image — always compressed to the selected KB limit */
-let restaurantProfileImageData = null;
-async function compressImageToKB(file, targetKB=100){
-  return new Promise((resolve,reject)=>{
-    const reader=new FileReader();
-    reader.onerror=reject;
-    reader.onload=()=>{
-      const img=new Image();
-      img.onerror=reject;
-      img.onload=()=>{
-        const canvas=document.createElement("canvas");
-        const maxW=1400;
-        const scale=Math.min(1,maxW/img.width);
-        canvas.width=Math.max(1,Math.round(img.width*scale));
-        canvas.height=Math.max(1,Math.round(img.height*scale));
-        let ctx=canvas.getContext("2d");
-        ctx.drawImage(img,0,0,canvas.width,canvas.height);
-        let quality=.82, data="";
-        for(let i=0;i<12;i++){
-          data=canvas.toDataURL("image/jpeg",quality);
-          const bytes=Math.ceil((data.length-data.indexOf(",")-1)*3/4);
-          if(bytes<=targetKB*1024) return resolve(data);
-          quality-=.06;
-          if(quality<.28) break;
-        }
-        let w=canvas.width,h=canvas.height;
-        for(let i=0;i<10;i++){
-          w=Math.max(320,Math.round(w*.82)); h=Math.max(180,Math.round(h*.82));
-          canvas.width=w; canvas.height=h;
-          ctx=canvas.getContext("2d"); ctx.drawImage(img,0,0,w,h);
-          data=canvas.toDataURL("image/jpeg",.55);
-          const bytes=Math.ceil((data.length-data.indexOf(",")-1)*3/4);
-          if(bytes<=targetKB*1024) return resolve(data);
-        }
-        reject(new Error("Could not compress image enough"));
-      };
-      img.src=reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-async function previewRestaurantProfile(e){
-  const file=e.target.files?.[0]; if(!file)return;
-  try{
-    const kb=Number(document.getElementById("restaurantProfileSize")?.value||100);
-    restaurantProfileImageData=await compressImageToKB(file,kb);
-    document.getElementById("restaurantProfilePreview").innerHTML=
-      `<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
-        <div><img src="${restaurantProfileImageData}" style="width:220px;height:120px;object-fit:cover;border-radius:12px;border:1px solid var(--border)">
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">New photo · Compressed to ≤ ${kb} KB</div></div>
-        <button type="button" class="btn danger" onclick="deleteRestaurantProfilePhoto()">🗑️ Delete Photo</button>
-      </div>`;
-  }catch(err){ alert("ছবিটি নির্ধারিত KB-এর মধ্যে compress করা যায়নি। অন্য ছবি চেষ্টা করুন।"); }
-}
-function renderRestaurantProfilePhoto(url){
-  const box=document.getElementById("restaurantProfilePreview");
-  if(!box)return;
-  if(url){
-    box.innerHTML=`<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
-      <div><img src="${url}" style="width:220px;height:120px;object-fit:cover;border-radius:12px;border:1px solid var(--border)">
-      <div style="font-size:11px;color:var(--muted);margin-top:4px">Saved profile photo</div></div>
-      <button type="button" class="btn danger" onclick="deleteRestaurantProfilePhoto()">🗑️ Delete Photo</button>
-    </div>`;
-  }else{
-    box.innerHTML='<div style="font-size:12px;color:var(--muted)">কোনো profile photo নেই।</div>';
-  }
-}
-function updateRestaurantMarketStatus(){
-  const on=!!document.getElementById("restaurantMarketPublished")?.checked;
-  const el=document.getElementById("restaurantMarketStatus");
-  if(el)el.textContent=on?"🟢 Bazar-এ Restaurant Profile publish করা হবে।":"Bazar publish বন্ধ আছে।";
-}
-async function deleteRestaurantProfilePhoto(){
-  if(!RP.uid)return alert("Restaurant login পাওয়া যায়নি।");
-  if(!confirm("Restaurant Profile-এর ছবি Firebase থেকে মুছে ফেলবেন?"))return;
-  try{
-    restaurantProfileImageData=null;
-    await db.collection("restaurants").doc(RP.uid).set({profileImage:firebase.firestore.FieldValue.delete()},{merge:true});
-    const input=document.getElementById("restaurantProfileImage"); if(input)input.value="";
-    renderRestaurantProfilePhoto(null);
-    toastRP("Profile photo মুছে দেওয়া হয়েছে।");
-  }catch(e){
-    toastRP("ছবি মুছে দেওয়া হয়নি — " + (e.code||"আবার চেষ্টা করুন"),true);
-  }
-}
-async function saveRestaurantProfile(){
-  if(!RP.uid)return alert("Restaurant login পাওয়া যায়নি।");
-  const description=document.getElementById("restaurantProfileDescription")?.value.trim()||"";
-  const marketPublished=!!document.getElementById("restaurantMarketPublished")?.checked;
-  try{
-    const data={restaurantDescription:description,marketPublished};
-    if(restaurantProfileImageData)data.profileImage=restaurantProfileImageData;
-    await db.collection("restaurants").doc(RP.uid).set(data,{merge:true});
-    if(restaurantProfileImageData)renderRestaurantProfilePhoto(restaurantProfileImageData);
-    updateRestaurantMarketStatus();
-    toastRP(marketPublished?"Restaurant Profile সংরক্ষিত এবং Bazar Publish করা হয়েছে।":"Restaurant Profile সংরক্ষিত হয়েছে।");
-  }catch(e){
-    toastRP("Profile সংরক্ষণ হয়নি — " + (e.code||"আবার চেষ্টা করুন"),true);
-  }
-}
-document.getElementById("restaurantMarketPublished")?.addEventListener("change",updateRestaurantMarketStatus);
 
 /* Timed product publishing */
 function isFoodCurrentlyPublished(f){
