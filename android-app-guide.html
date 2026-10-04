@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="bn"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Honey Bee Bazar — Android অ্যাপ বানানোর ধাপ</title>
+<style>
+  :root{ --bg:#14110b; --card:#1e1a12; --amber:#ffd166; --txt:#fff8e8; --muted:#b5a98f; --green:#4ade80; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--txt); padding:16px 14px 60px;
+        font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif; line-height:1.75; }
+  h1{ font-size:20px; margin:0 0 3px; }
+  .sub{ color:var(--muted); font-size:13px; margin-bottom:18px; }
+  .card{ background:var(--card); border:1px solid rgba(255,209,102,.16);
+         border-radius:14px; padding:15px; margin-bottom:13px; }
+  .n{ display:inline-flex; width:27px; height:27px; border-radius:50%; background:var(--amber);
+      color:#1a1408; font-weight:800; align-items:center; justify-content:center;
+      font-size:14px; margin-left:-2px; margin-bottom:7px; }
+  h2{ font-size:15.5px; margin:0 0 7px; color:var(--amber); }
+  p{ margin:0 0 9px; font-size:14px; }
+  code{ background:rgba(255,255,255,.09); padding:2px 7px; border-radius:5px;
+        font-size:13px; word-break:break-all; }
+  .note{ font-size:12.5px; color:var(--muted); border-right:3px solid var(--amber);
+         padding-right:10px; margin-top:9px; }
+  .warn{ color:#fca5a5; }
+  .good{ color:var(--green); }
+  ol{ margin:6px 0; padding-right:20px; }
+  li{ font-size:14px; margin-bottom:5px; }
+  .files{ font-size:13.5px; }
+  .files div{ padding:5px 0; border-bottom:1px solid rgba(255,255,255,.07); }
+  .files div:last-child{ border:none; }
+</style></head><body>
+
+<h1>📱 Android অ্যাপ বানানোর ধাপ</h1>
+<div class="sub">Honey Bee Bazar · PWABuilder দিয়ে · 04-10-2026</div>
+
+<div class="card">
+  <h2>আগে এই ফাইলগুলো GitHub-এ বসান</h2>
+  <div class="files">
+    <div>✅ <code>bazar-manifest.json</code> — নতুন করে লেখা</div>
+    <div>✅ <code>bazar-icon-maskable-192.png</code> — নতুন</div>
+    <div>✅ <code>bazar-icon-maskable-512.png</code> — নতুন</div>
+    <div>✅ <code>honey-bee-bazar.html</code> — শর্টকাট কাজ করার জন্য</div>
+  </div>
+  <div class="note">এগুলো না বসালে পরের ধাপে অ্যাপের আইকন বা নাম ভুল আসবে।
+    বসানোর পর <code>honeybeebazar.com</code> একবার খুলে দেখে নিন সাইট আগের মতোই চলছে।</div>
+</div>
+
+<div class="card">
+  <span class="n">১</span>
+  <h2>PWABuilder খুলুন</h2>
+  <p>ব্রাউজারে যান <code>pwabuilder.com</code></p>
+  <p>ঘরটায় লিখুন <code>https://honeybeebazar.com</code> আর <b>Start</b> চাপুন।</p>
+  <div class="note">৩০ সেকেন্ডের মতো নেবে। এরপর নম্বর দিয়ে দেখাবে আপনার সাইট কতটা
+    প্রস্তুত। Manifest-এর ঘরটা সবুজ থাকার কথা — ওটাই আমি ঠিক করে দিয়েছি।</div>
+</div>
+
+<div class="card">
+  <span class="n">২</span>
+  <h2>Android বেছে নিন</h2>
+  <p><b>Package For Stores</b> চাপুন, তারপর <b>Android</b> ঘরের <b>Generate Package</b>।</p>
+  <p>একটা বাক্স খুলবে। এখানে দুইটা ঘর খুব জরুরি:</p>
+  <ol>
+    <li><b>Package ID</b> — এটা অ্যাপের স্থায়ী পরিচয়। সুপারিশ:
+        <code>com.honeybeebazar.app</code></li>
+    <li><b>App name</b> — <code>Honey Bee Bazar</code></li>
+  </ol>
+  <p class="warn">⚠️ Package ID একবার Play Store-এ গেলে <b>আর কোনোদিন বদলানো যায় না</b>।
+    ভুল হলে নতুন অ্যাপ খুলতে হয়, পুরনো গ্রাহক হারিয়ে যায়। তাই এখনই ভেবে দিন।</p>
+</div>
+
+<div class="card">
+  <span class="n">৩</span>
+  <h2>ফাইল নামান আর চাবিটা লুকিয়ে রাখুন</h2>
+  <p><b>Download</b> চাপলে একটা zip নামবে। ভেতরে থাকবে:</p>
+  <ol>
+    <li><code>app-release-signed.apk</code> — ফোনে বসিয়ে পরীক্ষা করার জন্য</li>
+    <li><code>app-release-bundle.aab</code> — Play Store-এ এটাই দিতে হয়</li>
+    <li><code>signing.keystore</code> আর <code>signing-key-info.txt</code></li>
+    <li><code>assetlinks.json</code></li>
+  </ol>
+  <p class="warn">🔑 <code>signing.keystore</code> আর তার পাসওয়ার্ড হারালে
+    <b>অ্যাপটা আর কোনোদিন আপডেট করতে পারবেন না</b> — নতুন নামে নতুন অ্যাপ খুলতে হবে।
+    Google Drive আর পেনড্রাইভ, দুই জায়গায় কপি রাখুন।</p>
+</div>
+
+<div class="card">
+  <span class="n">৪</span>
+  <h2>assetlinks.json সাইটে বসান</h2>
+  <p>zip-এর ভেতরের <code>assetlinks.json</code> ফাইলটা GitHub-এ এই জায়গায় রাখুন:</p>
+  <p><code>.well-known/assetlinks.json</code></p>
+  <p>মানে প্রজেক্টে <code>.well-known</code> নামে একটা ফোল্ডার বানিয়ে তার ভেতরে।</p>
+  <div class="note">এটা না করলে অ্যাপ খুললে উপরে ব্রাউজারের ঠিকানার বারটা দেখা যাবে —
+    তখন আর অ্যাপের মতো লাগবে না, ওয়েবসাইটের মতো লাগবে। বসানোর পর
+    <code>honeybeebazar.com/.well-known/assetlinks.json</code> খুলে দেখে নিন লেখা আসে কিনা।</div>
+</div>
+
+<div class="card">
+  <span class="n">৫</span>
+  <h2>আগে ফোনে পরীক্ষা করুন</h2>
+  <p><code>app-release-signed.apk</code> ফাইলটা ফোনে নিয়ে চাপ দিন। "অজানা উৎস" চালু
+    করতে বলবে — করে দিন।</p>
+  <p>খুলে দেখুন: আইকন ঠিক আছে? উপরে ব্রাউজারের বার নেই তো? লগইন, কার্ট, অর্ডার সব চলছে?</p>
+  <div class="note">এই ধাপটা বাদ দেবেন না। Play Store-এ দেওয়ার পর ভুল ধরা পড়লে
+    ঠিক করতে কয়েক দিন লেগে যায়।</div>
+</div>
+
+<div class="card">
+  <span class="n">৬</span>
+  <h2>Play Store-এ দিন</h2>
+  <p><code>play.google.com/console</code> — একবার <b>$25</b> ফি (আজীবনের জন্য)।</p>
+  <p>নতুন অ্যাপ বানিয়ে <code>app-release-bundle.aab</code> ফাইলটা দিন। সাথে লাগবে:</p>
+  <ol>
+    <li>অ্যাপের ছবি — ফোনে স্ক্রিনশট নিয়ে দিলেই হবে (অন্তত ২টা)</li>
+    <li>৫১২×৫১২ আইকন — <code>bazar-icon-512.png</code> দিয়ে দিন</li>
+    <li>১০২৪×৫০০ ব্যানার ছবি</li>
+    <li>Privacy Policy-র একটা লিংক</li>
+    <li>ছোট বিবরণ আর বড় বিবরণ</li>
+  </ol>
+  <div class="note">প্রথমবার Google যাচাই করতে কয়েক দিন থেকে দুই সপ্তাহ নিতে পারে।
+    ধৈর্য রাখবেন, এটা স্বাভাবিক।</div>
+</div>
+
+<div class="card">
+  <h2 class="good">একটা সুবিধার কথা</h2>
+  <p>এই অ্যাপটা আসলে আপনার ওয়েবসাইটটাই ভেতরে চালায়। মানে <b>সাইটে কিছু বদলালে
+    অ্যাপেও সাথে সাথে বদলে যাবে</b> — নতুন করে অ্যাপ বানিয়ে Play Store-এ দিতে হবে না।</p>
+  <p>শুধু আইকন, নাম বা শর্টকাট বদলালে নতুন করে বানাতে হবে।</p>
+</div>
+
+<div class="card">
+  <h2>আটকে গেলে</h2>
+  <p>কোন ধাপে কী লেখা আসছে আমাকে ছবি তুলে পাঠান — দেখে বলে দেব।</p>
+</div>
+
+</body></html>

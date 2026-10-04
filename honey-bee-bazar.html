@@ -10703,6 +10703,26 @@ function hbCloseCart(){
 }
 
 /* ---------- 🚚 Order Tracking — নিজস্ব ফুল-স্ক্রিন ড্যাশবোর্ড, Cart থেকে খোলা হয় ---------- */
+/* 📱 অ্যাপের আইকনে চেপে ধরলে যে ছোট মেনুটা আসে (Android shortcut),
+   সেখান থেকে সরাসরি কার্ট বা অর্ডারে যাওয়া — manifest-এ শর্টকাট দুইটা
+   ঘোষণা করা আছে, তাই এখানে সেটা সত্যিই কাজ করাতে হয়। নাহলে চাপ দিলে
+   শুধু হোম পাতাই খুলত, আর মানুষ ভাবত অ্যাপটা নষ্ট। */
+(function hbHandleShortcut(){
+  let which = null;
+  try{ which = new URLSearchParams(location.search).get("screen"); }catch(e){ return; }
+  if(which !== "cart" && which !== "orders") return;
+
+  const go = function(){
+    // ঠিকানাটা পরিষ্কার করে দেওয়া হচ্ছে, নাহলে পরে রিফ্রেশ করলে
+    // আবার একই পাতায় ফিরে যেত
+    try{ history.replaceState(null, "", location.pathname); }catch(e){}
+    if(which === "cart" && typeof hbOpenCart === "function") hbOpenCart();
+    else if(which === "orders" && typeof hbOpenOrderTracking === "function") hbOpenOrderTracking();
+  };
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", go);
+  else go();
+})();
+
 function hbOpenOrderTracking(){
   $("hbCartScreen").style.display = "none"; // Cart-এর ওপর থেকে খোলা, তাই সেটা লুকানো
   $("hbOrderTrackingScreen").style.display = "block";
