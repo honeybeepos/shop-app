@@ -727,7 +727,36 @@ function markReady(){
   o.status="READY";o.kitchenStatus="READY";saveOrders(orders);renderOrderHistory();
   alert(`Order #${no} ready — Kitchen থেকে মুখে “${no} ready” বলা হবে।`);
 }
+/* 🐞 বাগ-ফিক্স: "Add Food"-এর জানালাটা (foodModal) আর খাবার বাছাইয়ের
+   জানালাটা (chooser) দুইটাই পুরো পর্দা ঢেকে বসে থাকে (position:fixed,
+   inset:0)। আগে এগুলো বন্ধ হতো শুধু ✕ বা Save/Cancel চাপলে।
+
+   ফল: কেউ Add Food খুলে, ছবি বেছে, তারপর ✕ না চেপে নিচের মেনু থেকে
+   অন্য পাতায় চলে গেলে জানালাটা খোলাই থেকে যেত — চোখে প্রায় দেখা যেত
+   না, কিন্তু সব ক্লিক ওটাই খেয়ে নিত। তখন "প্রোডাক্ট সিলেক্ট হচ্ছে না"
+   মনে হতো, যদিও প্রোডাক্টে কোনো সমস্যা ছিল না।
+
+   এখন পাতা বদলালে, ফাঁকা জায়গায় চাপলে, বা Esc চাপলে — তিনভাবেই
+   জানালা বন্ধ হয়।                                                  */
+function rpCloseOverlays(){
+  const fm = document.getElementById("foodModal");
+  if(fm) fm.style.display = "none";
+  const ch = document.getElementById("chooser");
+  if(ch) ch.remove();
+}
+
+// ফাঁকা (কালচে) জায়গায় চাপলে বন্ধ — ভেতরের ফর্মে চাপলে নয়
+document.addEventListener("click", function(e){
+  if(e.target && e.target.id === "foodModal") rpCloseOverlays();
+  if(e.target && e.target.id === "chooser")   rpCloseOverlays();
+});
+// Esc চাপলেও বন্ধ
+document.addEventListener("keydown", function(e){
+  if(e.key === "Escape") rpCloseOverlays();
+});
+
 function showPage(id){
+  rpCloseOverlays();   // খোলা জানালা নিয়ে অন্য পাতায় যাওয়া চলবে না
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===id));
