@@ -209,6 +209,27 @@ button{cursor:pointer;border:0}
           <div class="order-row"><div><b>#1023</b><br>Takeaway · SAR 42</div><span class="badge paid">PAID</span></div>
         </div>
       </div>
+
+      <!-- 🛵 ডেলিভারি ম্যান — Orders পাতার ভেতরেই, কারণ অর্ডার পাঠানোর
+           সময়েই রাইডার দরকার হয়। নিচের মেনুতে আলাদা বোতাম রাখলে ৮টা
+           হয়ে যেত, ছোট ফোনে লেখা ভেঙে যেত।
+
+           দূরত্ব মাপা হয় এই ফোনের GPS থেকে রাইডারের শেষ পাঠানো অবস্থান
+           পর্যন্ত — সরলরেখায়, রাস্তার হিসাব নয়।                      -->
+      <div class="panel" style="margin-top:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <h2 style="margin:0">🛵 ডেলিভারি ম্যান</h2>
+          <button class="btn" id="dmToggle">দেখুন</button>
+        </div>
+        <div id="dmBody" style="display:none;margin-top:12px">
+          <div id="dmNote" style="color:#64748b;font-size:13px;margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <button class="btn" id="dmRefresh">🔄 আবার দেখুন</button>
+            <button class="btn" id="dmLocate">📍 আমার অবস্থান নিন</button>
+          </div>
+          <div id="dmList"></div>
+        </div>
+      </div>
     </section>
 
     <section class="page" id="tables">
@@ -457,7 +478,7 @@ const defaultProducts=[
       ফোন বদলালে মেনু হারাত, দুই ডিভাইসে দুই রকম মেনু থাকত, আর
       Honey Bee Bazar-এর গ্রাহক কিছুই দেখতে পেতেন না।
       এখন মেনু ক্লাউডে — রেস্টুরেন্টের নিজের ঘরে।                   */
-let RP = { uid:null, name:"", cur:"SAR" };
+let RP = { uid:null, name:"", cur:"SAR", marketId:null };
 let products = [];
 
 function foodsRef(){ return db.collection("restaurants").doc(RP.uid).collection("foods"); }
@@ -1096,7 +1117,35 @@ window.copyTableCode=copyTableCode;
 window.printTableQR=printTableQR;
 window.openAllTableQR=openAllTableQR;
 
+/* 🐞 বাগ-ফিক্স: এই পাতার জানালাগুলো (Add Food, Payment, Table QR, খাবার
+   বাছাই) পুরো পর্দা ঢেকে বসে — position:fixed, inset:0। আগে এগুলো বন্ধ
+   হতো শুধু ✕ বা Save/Cancel চাপলে।
+
+   ফল: কেউ Add Food খুলে, ছবি বেছে, তারপর ✕ না চেপে নিচের মেনু থেকে
+   অন্য পাতায় চলে গেলে জানালাটা খোলাই থেকে যেত। প্রায় স্বচ্ছ বলে চোখে
+   ধরা পড়ত না, কিন্তু সব ক্লিক ওটাই খেয়ে নিত — তখন "প্রোডাক্ট সিলেক্ট
+   হচ্ছে না" মনে হতো, যদিও প্রোডাক্টে কোনো সমস্যা ছিল না।
+
+   এখন পাতা বদলালে, ফাঁকা জায়গায় চাপলে, বা Esc চাপলে — তিনভাবেই বন্ধ। */
+const RP_OVERLAYS = ["foodModal", "paymentModal", "tableQrModal"];
+function rpCloseOverlays(){
+  RP_OVERLAYS.forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) el.style.display = "none";
+  });
+  const ch = document.getElementById("chooser");
+  if(ch) ch.remove();
+}
+document.addEventListener("click", function(e){
+  if(!e.target || !e.target.id) return;
+  if(RP_OVERLAYS.indexOf(e.target.id) > -1 || e.target.id === "chooser") rpCloseOverlays();
+});
+document.addEventListener("keydown", function(e){
+  if(e.key === "Escape") rpCloseOverlays();
+});
+
 function showPage(id){
+  rpCloseOverlays();   // খোলা জানালা নিয়ে অন্য পাতায় যাওয়া চলবে না
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===id));
@@ -1107,6 +1156,174 @@ function showPage(id){
   if(id==="orders"){renderOrderHistory();}
   if(id==="tables"){renderTables();}
 }
+
+/* ════════ 🛵 ডেলিভারি ম্যান ════════
+   রাইডার তার অ্যাপে "অনলাইন" করলে riders/{uid}.online = true হয়, আর
+   GPS চালু থাকলে প্রতি ৭ সেকেন্ডে liveLocation আপডেট হয়। এখানে শুধু
+   পড়া হয় — রেস্টুরেন্ট রাইডারের কিছু বদলাতে পারে না।
+
+   ⚠️ "অনলাইন" মানেই কাছে আছেন নয়। কেউ অনলাইন করে ফোন পকেটে রেখে
+      দিতে পারেন, তখন অবস্থান পুরনো হয়ে যায়। তাই কত আগের অবস্থান
+      সেটাও দেখানো হয় — ২০ মিনিটের বেশি পুরনো হলে দূরত্বটা ধূসর করে
+      সতর্ক করা হয়, নাহলে ভুল রাইডারকে ডেকে বসতেন।                  */
+let dmRiders = [], dmMyPos = null, dmState = "idle", dmErrText = "";
+
+function dmSetNote(t){ const e=document.getElementById("dmNote"); if(e) e.textContent = t; }
+
+/* দুইটা অবস্থানের সরলরেখার দূরত্ব, কিলোমিটারে (Haversine) */
+function dmDistanceKm(a, b){
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b[0]-a[0]) * rad, dLng = (b[1]-a[1]) * rad;
+  const h = Math.sin(dLat/2)*Math.sin(dLat/2)
+          + Math.cos(a[0]*rad)*Math.cos(b[0]*rad)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function dmShowDist(km){
+  if(km < 1) return Math.round(km*1000) + " মিটার";
+  return (Math.round(km*10)/10) + " কিমি";
+}
+function dmAgeMin(ts){
+  if(!ts) return null;
+  const ms = ts.toMillis ? ts.toMillis() : (ts.seconds ? ts.seconds*1000 : 0);
+  if(!ms) return null;
+  return (Date.now() - ms) / 60000;
+}
+function dmShowAge(min){
+  if(min == null) return "সময় জানা নেই";
+  if(min < 1)  return "এইমাত্র";
+  if(min < 60) return Math.round(min) + " মিনিট আগে";
+  const h = Math.floor(min/60);
+  if(h < 24) return h + " ঘণ্টা আগে";
+  return Math.floor(h/24) + " দিন আগে";
+}
+function dmGetPosition(){
+  return new Promise(function(resolve){
+    if(!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      function(pos){ resolve([pos.coords.latitude, pos.coords.longitude]); },
+      function(){ resolve(null); },
+      { enableHighAccuracy:true, maximumAge:60000, timeout:12000 });
+  });
+}
+
+async function dmLoad(){
+  if(!RP.marketId){ dmState = "nomarket"; return; }
+  try{
+    const qs = await db.collection("riders")
+                       .where("marketId", "==", RP.marketId)
+                       .where("online", "==", true).limit(60).get();
+    dmRiders = qs.docs.map(function(d){ return Object.assign({ id:d.id }, d.data()); })
+                      .filter(function(r){ return r.status !== "blocked"; });
+    dmState = "ok";
+  }catch(e){
+    console.warn("riders load:", e && e.code);
+    dmState = (e && e.code === "permission-denied") ? "denied"
+            : (e && e.code === "failed-precondition") ? "needindex" : "error";
+    dmErrText = (e && e.message) ? String(e.message) : "";
+  }
+}
+
+function dmRender(){
+  const box = document.getElementById("dmList"); if(!box) return;
+
+  if(dmState === "load"){ box.innerHTML = '<div style="color:#64748b">খোঁজা হচ্ছে...</div>'; return; }
+  if(dmState === "nomarket"){
+    dmSetNote("");
+    box.innerHTML = '<div style="color:#991b1b">এই রেস্টুরেন্টের সাথে কোনো বাজার যুক্ত করা নেই, '
+      + 'তাই কোন এলাকার রাইডার দেখাব সেটা জানা যাচ্ছে না। Honey Bee-র সাথে যোগাযোগ করুন।</div>';
+    return;
+  }
+  if(dmState === "denied"){
+    dmSetNote("");
+    box.innerHTML = '<div style="color:#991b1b">রাইডারের তালিকা দেখার অনুমতি এখনো চালু হয়নি — '
+      + 'নতুন নিয়মটা (firestore.rules) publish করতে হবে।</div>';
+    return;
+  }
+  if(dmState === "needindex"){
+    dmSetNote("");
+    box.innerHTML = '<div style="color:#991b1b">Firestore-এ একটা index বানাতে হবে। নিচের লেখার '
+      + 'মধ্যে যে লিংকটা আছে সেটা কম্পিউটারে খুলে "Create index" চাপুন, ২-৩ মিনিট পর আবার দেখুন।</div>'
+      + '<div style="color:#64748b;font-size:11.5px;margin-top:8px;word-break:break-all">'
+      + (dmErrText || "") + '</div>';
+    return;
+  }
+  if(dmState === "error"){
+    dmSetNote("");
+    box.innerHTML = '<div style="color:#991b1b">তালিকা আনা যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।</div>';
+    return;
+  }
+
+  dmSetNote(dmMyPos
+    ? "দূরত্ব সরলরেখায় মাপা — রাস্তার দূরত্ব এর চেয়ে বেশি হবে।"
+    : "📍 আপনার অবস্থান নেওয়া হয়নি, তাই দূরত্ব দেখানো যাচ্ছে না।");
+
+  if(!dmRiders.length){
+    box.innerHTML = '<div style="color:#64748b">এখন কোনো রাইডার ডিউটিতে নেই।</div>';
+    return;
+  }
+
+  const rows = dmRiders.map(function(r){
+    const loc = r.liveLocation;
+    const km = (dmMyPos && loc && typeof loc.lat === "number" && typeof loc.lng === "number")
+             ? dmDistanceKm(dmMyPos, [loc.lat, loc.lng]) : null;
+    return { r:r, km:km, age: loc ? dmAgeMin(loc.updatedAt) : null };
+  }).sort(function(a,b){
+    if(a.km == null && b.km == null) return String(a.r.name||"").localeCompare(String(b.r.name||""), "bn");
+    if(a.km == null) return 1;
+    if(b.km == null) return -1;
+    return a.km - b.km;
+  });
+
+  box.innerHTML = rows.map(function(x){
+    const r = x.r;
+    const stale = x.age != null && x.age > 20;
+    const busy = r.currentStatus === "on_trip" || r.currentStatus === "on_waiting";
+    const digits = String(r.phone || "").replace(/[^0-9]/g, "");
+    const dist = x.km == null
+      ? '<span style="color:#94a3b8">দূরত্ব জানা নেই</span>'
+      : '<span style="color:' + (stale ? "#94a3b8" : "#15803d") + ';font-weight:700">'
+        + dmShowDist(x.km) + '</span>';
+    return '<div class="order-row" style="align-items:flex-start">'
+      + '<div style="flex:1;min-width:0">'
+      + '<b>' + (r.name || "রাইডার") + '</b> '
+      + (busy ? '<span class="badge prep">অর্ডারে আছেন</span>'
+              : '<span class="badge ready">খালি আছেন</span>')
+      + '<br><span style="color:#64748b;font-size:12.5px">'
+      + dist + ' · অবস্থান ' + dmShowAge(x.age)
+      + (stale ? ' <span style="color:#b45309">(পুরনো)</span>' : '')
+      + '</span>'
+      + (digits ? '<br><a href="tel:' + digits + '" style="color:#2563eb;font-size:13px">📞 ' + r.phone + '</a>' : '')
+      + '</div></div>';
+  }).join("");
+}
+
+async function dmOpen(){
+  dmState = "load"; dmRender();
+  if(!dmMyPos) dmMyPos = await dmGetPosition();
+  await dmLoad();
+  dmRender();
+}
+
+/* "দেখুন" চাপলে খোলে/বন্ধ হয় — প্রথমবার খুললেই তালিকা আনা হয়। আগে থেকে
+   খুলে রাখলে Orders পাতা খোলার সময় প্রতিবারই GPS চাইত, বিরক্তিকর। */
+document.getElementById("dmToggle") &&
+  document.getElementById("dmToggle").addEventListener("click", function(){
+    const body = document.getElementById("dmBody");
+    const open = body.style.display !== "none";
+    body.style.display = open ? "none" : "block";
+    this.textContent = open ? "দেখুন" : "লুকান";
+    if(!open && dmState === "idle") dmOpen();
+  });
+document.getElementById("dmRefresh") &&
+  document.getElementById("dmRefresh").addEventListener("click", dmOpen);
+document.getElementById("dmLocate") &&
+  document.getElementById("dmLocate").addEventListener("click", async function(){
+    dmSetNote("📍 অবস্থান নেওয়া হচ্ছে...");
+    dmMyPos = await dmGetPosition();
+    if(!dmMyPos && typeof toastRP === "function") toastRP("অবস্থান পাওয়া যায়নি — লোকেশন অনুমতি দিন।", true);
+    dmRender();
+  });
+
 document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
 
 /* ════════ লগইন ════════
@@ -1152,6 +1369,7 @@ auth.onAuthStateChanged(async function(user){
     RP.uid = user.uid;
     RP.name = d.name || "রেস্টুরেন্ট";
     RP.cur = d.currency || "SAR";
+    RP.marketId = d.marketId || null;   // 🛵 ডেলিভারি ম্যানের জন্য
     restaurantTables = Array.isArray(d.tables) && d.tables.length ? d.tables.map(String) : ['T01','T02','T03','T04','T05','T06','T07','T08'];
     renderTables();
     const printNameEl=document.getElementById("printShopName");
