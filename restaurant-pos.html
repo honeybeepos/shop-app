@@ -967,11 +967,37 @@ async function confirmCashPayment(){
   if(!paymentOrder)return;
   const paid=Math.max(0,Number(document.getElementById("payAmount").value)||0);
   if(paid<paymentOrder.total)return alert(`পুরো টাকা দেওয়া হয়নি।\nTotal: ${money(paymentOrder.total)}\nDue: ${money(paymentOrder.total-paid)}`);
-  paymentOrder.paid=paid;paymentOrder.change=paid-paymentOrder.total;paymentOrder.due=0;paymentOrder.paymentStatus="PAID";paymentOrder.status="CLOSED";paymentOrder.closedAt=new Date().toISOString();
-  const orders=getOrders().filter(x=>x.orderNo!==paymentOrder.orderNo);orders.unshift(paymentOrder);saveOrders(orders);renderOrderHistory();
-  const ok=await autoPrint("cash",makeReceipt(paymentOrder),paymentOrder.orderNo);
-  if(ok){alert(`Payment Confirmed\nTotal: ${money(paymentOrder.total)}\nPaid: ${money(paid)}\nReturn: ${money(paymentOrder.change)}`);closePaymentCounter();}
+
+  // Receipt stays OPEN until this exact confirmation.
+  paymentOrder.paid=paid;
+  paymentOrder.change=paid-paymentOrder.total;
+  paymentOrder.due=0;
+  paymentOrder.paymentStatus="PAID";
+  paymentOrder.status="CLOSED";
+  paymentOrder.closedAt=new Date().toISOString();
+
+  const orders=getOrders().filter(x=>Number(x.orderNo)!==Number(paymentOrder.orderNo));
+  orders.unshift(paymentOrder);
+  saveOrders(orders);
+  renderOrderHistory();
+
+  // Save first, then print the final receipt.
+  const receiptNo=paymentOrder.orderNo;
+  const receiptTotal=paymentOrder.total;
+  const receiptChange=paymentOrder.change;
+  const ok=await autoPrint("cash",makeReceipt(paymentOrder),receiptNo);
+
+  // A CLOSED receipt must never remain active in the cart.
+  cart=[];
+  paymentOrder=null;
+  closePaymentCounter();
+  document.getElementById("orderNo").textContent=nextOrderNumber();
+  document.getElementById("tableLabel").textContent="T08";
+  renderCart();
+
+  alert(`Payment Confirmed\nReceipt #${receiptNo}\nTotal: ${money(receiptTotal)}\nPaid: ${money(paid)}\nReturn: ${money(receiptChange)}${ok?"":"\n\n⚠️ Payment saved, but automatic printer did not respond."}`);
 }
+
 function payPrint(){openPaymentCounter(Number(document.getElementById("orderNo")?.textContent||0));}
 function markReady(){
   const no=Number(document.getElementById("orderNo").textContent),orders=getOrders(),o=orders.find(x=>x.orderNo===no);
