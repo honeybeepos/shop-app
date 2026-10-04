@@ -91,6 +91,12 @@
   .svcMascot{ width:100%; height:100%; border-radius:6px; object-fit:cover; display:block; border:1px solid rgba(0,0,0,0.25); }
   .serviceCard .lbl{ font-size:11.5px; font-weight:700; color:#fff8e8; }
   .serviceCard.soon{ opacity:0.55; }
+  .coType{ flex:1; padding:11px; border-radius:11px; border:1px solid rgba(255,209,102,0.25);
+           background:transparent; color:var(--muted); font-size:13.5px; font-weight:700; }
+  .coType.active{ background:rgba(255,209,102,0.18); color:#ffd166; }
+  .rmAdd{ flex:0 0 auto; width:34px; height:34px; border-radius:50%; border:none;
+          background:#ffd166; color:#1a1408; font-size:20px; font-weight:800; }
+  #rmCartBar{ position:sticky; bottom:12px; margin-top:14px; display:none; }
   .serviceCard.soon .soonBadge{
     position:absolute; bottom:-6px; left:50%; transform:translateX(-50%);
     background:var(--danger); color:#fff; font-size:8.5px; padding:2px 6px; border-radius:20px; white-space:nowrap;
@@ -1232,6 +1238,28 @@
     <div id="rmHead" style="margin-bottom:14px;"></div>
     <input type="text" class="searchBox" id="rmSearch" placeholder="🔍 খাবারের নাম">
     <div id="rmList" style="margin-top:14px;"></div>
+    <div id="rmCartBar"><button class="bigBtn" id="rmGoCheckout"></button></div>
+  </div>
+
+  <!-- 🛒 অর্ডার নিশ্চিত করার পাতা -->
+  <div id="screenRestaurantCheckout" style="padding:20px 16px;">
+    <button class="backBtn" id="backToMenuFromCheckout">← মেনুতে ফিরে যান</button>
+    <div style="font-size:21px; font-weight:800; color:#fff8e8; margin-bottom:12px;">🛒 অর্ডার নিশ্চিত করুন</div>
+    <div id="coCart" style="margin-bottom:14px;"></div>
+
+    <div class="card" style="padding:14px;">
+      <div style="font-size:13px; color:var(--muted); margin-bottom:8px;">কীভাবে নেবেন?</div>
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <button class="coType active" data-cotype="delivery">🛵 ডেলিভারি</button>
+        <button class="coType" data-cotype="pickup">🏃 নিজে নেব</button>
+      </div>
+      <input class="searchBox" id="coName"  placeholder="আপনার নাম" style="margin-bottom:9px;">
+      <input class="searchBox" id="coPhone" placeholder="মোবাইল নম্বর" inputmode="numeric" style="margin-bottom:9px;">
+      <input class="searchBox" id="coAddr"  placeholder="ঠিকানা (ডেলিভারির জন্য)" style="margin-bottom:9px;">
+      <input class="searchBox" id="coNote"  placeholder="কিছু বলার থাকলে (ঝাল কম, ইত্যাদি)">
+      <div id="coMsg" style="font-size:12.5px; margin-top:10px; min-height:18px;"></div>
+      <button class="bigBtn" id="coSend" style="margin-top:6px;">অর্ডার পাঠান</button>
+    </div>
   </div>
 
   <!-- 📓 নোটবুক — দোকানের অ্যাপের খাতাটাই এখানে। একই ফোনে দুই অ্যাপ
@@ -3220,7 +3248,7 @@ let __nearbyMarketId = null; // 📍 GPS-এ সবচেয়ে কাছে�
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenRestaurant","screenRestaurantMenu","screenNotebook","screenHome","screenSmartWatch","screenSmartWatchMenu","screenPanchang","screenPrayer","screenSmartCalculator","screenCalcBasic","screenCalcScientific","screenCalcWeight","screenCalcBusiness","screenCalcMoney","screenCalcUnit","screenCalcConstruction","screenCalcUtility","screenCalcDatetime","screenCalcKids","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenMarketCategories","screenMarketSubcategories","screenMarketProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders","screenEkadashiSpecial"].forEach(s=> $(s).classList.remove("active"));
+  ["screenRestaurant","screenRestaurantMenu","screenRestaurantCheckout","screenNotebook","screenHome","screenSmartWatch","screenSmartWatchMenu","screenPanchang","screenPrayer","screenSmartCalculator","screenCalcBasic","screenCalcScientific","screenCalcWeight","screenCalcBusiness","screenCalcMoney","screenCalcUnit","screenCalcConstruction","screenCalcUtility","screenCalcDatetime","screenCalcKids","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenMarketCategories","screenMarketSubcategories","screenMarketProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders","screenEkadashiSpecial"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
   if(id === "screenTransportMedia") tmListenFeed(); // 📢 Phase 6 — স্ক্রিন খুললেই লাইভ ফিড লোড হয়
   // ✈️ Smart Flight Tracking — অন্য কোনো স্ক্রিনে গেলে auto-refresh টাইমার
@@ -3496,10 +3524,13 @@ function rmMoney(n){
 }
 
 async function rmOpen(r){
+  // অন্য রেস্টুরেন্টে গেলে আগের কার্ট খালি — দুই দোকানের খাবার এক
+  // অর্ডারে মিশে গেলে কোনো রেস্টুরেন্টই সেটা পাঠাতে পারত না
+  if(!rmCur || rmCur.id !== r.id){ rmCart = []; }
   rmCur = r; rmFoods = []; rmState = "load";
   showScreen("screenRestaurantMenu");
   const se = $("rmSearch"); if(se) se.value = "";
-  rmRenderHead(); rmRender();
+  rmRenderHead(); rmRender(); rmCartBar();
   try{
     const qs = await db.collection("restaurants").doc(r.id)
                        .collection("foods").get();
@@ -3588,12 +3619,161 @@ function rmRender(){
                 : '')
             + extra
             + '</div>'
-            + '<div style="flex:0 0 auto; font-size:14px; font-weight:800; color:#ffd166;">'
+            + '<div style="flex:0 0 auto; text-align:right;">'
+            + '<div style="font-size:14px; font-weight:800; color:#ffd166; margin-bottom:5px;">'
             + rmMoney(f.price) + '</div>'
+            + '<button class="rmAdd" data-add="' + escapeHtml(String(f.id)) + '">+</button>'
+            + '</div>'
             + '</div>';
         }).join("");
   }).join("");
 }
+
+/* ==================== 🛒 অর্ডার ====================
+   গ্রাহক খাবার বেছে অর্ডার পাঠালে সেটা restaurants/{id}/orders-এ
+   জমা হয়, আর রেস্টুরেন্টের POS-এ সাথে সাথে দেখা যায়।
+
+   ⚠️ অর্ডার শুধু বসানো যায়, পরে বদলানো যায় না — নিয়মেও তা-ই।
+      বদলাতে হলে রেস্টুরেন্টে ফোন করতে হবে। এটা ইচ্ছে করেই: রান্না
+      শুরুর পর গ্রাহক চুপচাপ জিনিস বদলে দিলে ঝামেলা হতো।             */
+let rmCart = [];      // [{id,name,price,qty}]
+let coType = "delivery";
+
+function rmCartTotal(){ return rmCart.reduce(function(t,i){ return t + i.price*i.qty; }, 0); }
+function rmCartCount(){ return rmCart.reduce(function(t,i){ return t + i.qty; }, 0); }
+
+function rmCartBar(){
+  const bar = $("rmCartBar"), btn = $("rmGoCheckout");
+  if(!bar || !btn) return;
+  const n = rmCartCount();
+  bar.style.display = n ? "block" : "none";
+  btn.textContent = n + "টা খাবার · " + rmMoney(rmCartTotal()) + " — অর্ডার করুন";
+}
+
+function rmAddToCart(foodId){
+  const f = rmFoods.find(function(x){ return String(x.id) === String(foodId); });
+  if(!f) return;
+  const line = rmCart.find(function(x){ return String(x.id) === String(f.id); });
+  if(line) line.qty += 1;
+  else rmCart.push({ id:f.id, name:f.name||"", price:Number(f.price)||0, qty:1 });
+  rmCartBar();
+}
+
+function coRenderCart(){
+  const box = $("coCart"); if(!box) return;
+  if(!rmCart.length){ box.innerHTML = '<div class="emptyMsg">কিছু বাছাই করা হয়নি।</div>'; return; }
+  box.innerHTML = rmCart.map(function(i, idx){
+    return '<div class="card" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:11px;">'
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-size:14px;font-weight:700;color:#fff8e8;">' + escapeHtml(i.name) + '</div>'
+      + '<div style="font-size:12px;color:var(--muted);">' + rmMoney(i.price) + ' × ' + i.qty + '</div>'
+      + '</div>'
+      + '<button class="rmAdd" data-co="less" data-i="' + idx + '" style="background:rgba(255,255,255,0.12);color:#fff8e8;">−</button>'
+      + '<button class="rmAdd" data-co="more" data-i="' + idx + '">+</button>'
+      + '</div>';
+  }).join("")
+  + '<div style="text-align:right;font-size:15px;font-weight:800;color:#ffd166;margin-top:6px;">'
+  + 'মোট: ' + rmMoney(rmCartTotal()) + '</div>';
+
+  box.querySelectorAll("[data-co]").forEach(function(b){
+    b.addEventListener("click", function(){
+      const i = Number(b.dataset.i);
+      if(b.dataset.co === "more") rmCart[i].qty += 1;
+      else { rmCart[i].qty -= 1; if(rmCart[i].qty <= 0) rmCart.splice(i,1); }
+      coRenderCart(); rmCartBar();
+    });
+  });
+}
+
+function coMsg(t, bad){
+  const e = $("coMsg"); if(!e) return;
+  e.textContent = t || "";
+  e.style.color = bad ? "#fca5a5" : "var(--muted)";
+}
+
+/* ছোট, পড়তে সহজ কোড — রেস্টুরেন্ট মুখে বলতে পারে ("A7K2 রেডি")।
+   বিভ্রান্তিকর অক্ষর (O/0, I/1) বাদ দেওয়া হয়েছে।                 */
+function coMakeCode(){
+  const ch = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for(let i=0;i<4;i++) out += ch[Math.floor(Math.random()*ch.length)];
+  return out;
+}
+
+async function coSend(){
+  if(!rmCart.length){ coMsg("আগে খাবার বাছাই করুন।", true); return; }
+  if(!rmCur){ coMsg("রেস্টুরেন্ট খুঁজে পাওয়া যায়নি।", true); return; }
+
+  const name  = ($("coName").value  || "").trim();
+  const phone = ($("coPhone").value || "").trim();
+  const addr  = ($("coAddr").value  || "").trim();
+  const note  = ($("coNote").value  || "").trim();
+  const digits = phone.replace(/[^0-9]/g, "");
+
+  if(name.length < 2){ coMsg("আপনার নাম লিখুন।", true); return; }
+  if(digits.length < 11){ coMsg("১১ সংখ্যার মোবাইল নম্বর লিখুন — রেস্টুরেন্ট এই নম্বরে ফোন করবে।", true); return; }
+  if(coType === "delivery" && addr.length < 5){
+    coMsg("ডেলিভারির জন্য ঠিকানা লিখুন, নাহলে রাইডার খুঁজে পাবেন না।", true); return;
+  }
+  if(rmCur.isOpen === false){ coMsg("এই রেস্টুরেন্ট এখন বন্ধ — এখন অর্ডার নেওয়া হচ্ছে না।", true); return; }
+
+  const btn = $("coSend");
+  btn.disabled = true; coMsg("পাঠানো হচ্ছে...");
+
+  try{
+    const user = auth.currentUser;
+    if(!user) throw new Error("no-auth");
+    const code = coMakeCode();
+    await db.collection("restaurants").doc(rmCur.id).collection("orders").add({
+      code: code,
+      customerUid: user.uid,
+      customerName: name,
+      customerPhone: phone,
+      items: rmCart.map(function(i){
+        return { id:String(i.id), name:i.name, price:i.price, qty:i.qty };
+      }),
+      total: rmCartTotal(),
+      type: coType,
+      address: coType === "delivery" ? addr : "",
+      note: note,
+      status: "new",
+      createdAt: fbNow(),
+      updatedAt: fbNow()
+    });
+    rmCart = []; rmCartBar(); coRenderCart();
+    $("coMsg").style.color = "#4ade80";
+    $("coMsg").textContent = "✅ অর্ডার পাঠানো হয়েছে! আপনার কোড: " + code
+      + " — রেস্টুরেন্ট ফোন করে নিশ্চিত করবে।";
+  }catch(e){
+    console.warn("order:", e && e.code);
+    coMsg(e && e.code === "permission-denied"
+      ? "অর্ডার পাঠানো যায়নি — এই সুবিধাটা এখনো চালু হয়নি।"
+      : "অর্ডার পাঠানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।", true);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+document.addEventListener("click", function(e){
+  const a = e.target && e.target.closest ? e.target.closest("[data-add]") : null;
+  if(a){ rmAddToCart(a.dataset.add); }
+});
+document.querySelectorAll(".coType").forEach(function(b){
+  b.addEventListener("click", function(){
+    document.querySelectorAll(".coType").forEach(function(x){ x.classList.remove("active"); });
+    b.classList.add("active");
+    coType = b.dataset.cotype;
+    const ad = $("coAddr");
+    if(ad) ad.style.display = (coType === "pickup") ? "none" : "block";
+  });
+});
+$("rmGoCheckout") && $("rmGoCheckout").addEventListener("click", function(){
+  coRenderCart(); coMsg(""); showScreen("screenRestaurantCheckout");
+});
+$("backToMenuFromCheckout") && $("backToMenuFromCheckout").addEventListener("click", function(){
+  showScreen("screenRestaurantMenu"); rmCartBar();
+});
+$("coSend") && $("coSend").addEventListener("click", coSend);
 
 document.getElementById("rmSearch") &&
   document.getElementById("rmSearch").addEventListener("input", rmRender);

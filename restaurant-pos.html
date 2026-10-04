@@ -210,6 +210,24 @@ button{cursor:pointer;border:0}
         </div>
       </div>
 
+      <!-- 🌐 অনলাইন অর্ডার — Honey Bee Bazar থেকে গ্রাহকের পাঠানো অর্ডার।
+           এটা ভাঁজ করা থাকে না, কারণ নতুন অর্ডার চোখে না পড়লে গ্রাহক
+           বসে থাকেন। উপরে সংখ্যাটা লাল হয়ে জানান দেয় কয়টা নতুন অর্ডার
+           অপেক্ষা করছে।
+
+           উপরের "Orders" তালিকাটা দোকানের নিজের (টেবিল/কাউন্টারের)
+           অর্ডার, ওটা এই ফোনেই থাকে। এটা আলাদা — এগুলো বাইরে থেকে আসে। -->
+      <div class="panel" style="margin-top:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <h2 style="margin:0">🌐 অনলাইন অর্ডার <span id="ooBadge"></span></h2>
+          <button class="btn" id="ooShowDone">সম্পন্নগুলোও দেখুন</button>
+        </div>
+        <div style="color:#64748b;font-size:12.5px;margin-top:4px">
+          Honey Bee Bazar থেকে গ্রাহকের পাঠানো অর্ডার এখানে আসে।
+        </div>
+        <div id="ooList" style="margin-top:12px">লোড হচ্ছে...</div>
+      </div>
+
       <!-- 🛵 ডেলিভারি ম্যান — Orders পাতার ভেতরেই, কারণ অর্ডার পাঠানোর
            সময়েই রাইডার দরকার হয়। নিচের মেনুতে আলাদা বোতাম রাখলে ৮টা
            হয়ে যেত, ছোট ফোনে লেখা ভেঙে যেত।
@@ -1157,6 +1175,157 @@ function showPage(id){
   if(id==="tables"){renderTables();}
 }
 
+/* ════════ 🌐 অনলাইন অর্ডার ════════
+   গ্রাহক Bazar-এ খাবার বেছে অর্ডার পাঠালে সেটা
+   restaurants/{uid}/orders-এ জমা হয়। এখানে লাইভ শোনা হয় — পাতা
+   রিফ্রেশ না করেই নতুন অর্ডার চলে আসে।
+
+   অবস্থার ধাপ: new → accepted → preparing → ready → completed
+   (যেকোনো সময় rejected)। গ্রাহক শুধু "new" বসাতে পারেন; অবস্থা
+   বদলানো একমাত্র রেস্টুরেন্টের কাজ — নিয়মেও সেটা আটকানো আছে।     */
+const OO_LIVE = ["new", "accepted", "preparing", "ready"];
+let ooAll = [], ooUnsub = null, ooShowDone = false, ooSeenNew = 0;
+
+function ooMoney(n){ return RP.cur + " " + Number(n||0).toFixed(2); }
+function ooTime(ts){
+  if(!ts) return "";
+  const ms = ts.toMillis ? ts.toMillis() : (ts.seconds ? ts.seconds*1000 : 0);
+  if(!ms) return "";
+  const d = new Date(ms), mins = (Date.now()-ms)/60000;
+  if(mins < 1)  return "এইমাত্র";
+  if(mins < 60) return Math.round(mins) + " মিনিট আগে";
+  return d.getHours().toString().padStart(2,"0") + ":" + d.getMinutes().toString().padStart(2,"0");
+}
+const OO_LABEL = { new:"নতুন", accepted:"গৃহীত", preparing:"রান্না হচ্ছে",
+                   ready:"তৈরি", completed:"সম্পন্ন", rejected:"বাতিল" };
+const OO_CHIP  = { new:"prep", accepted:"prep", preparing:"prep",
+                   ready:"ready", completed:"paid", rejected:"prep" };
+
+function ooStart(){
+  if(ooUnsub) ooUnsub();
+  ooUnsub = db.collection("restaurants").doc(RP.uid).collection("orders")
+    .limit(100)
+    .onSnapshot(function(qs){
+      ooAll = qs.docs.map(function(d){ return Object.assign({ id:d.id }, d.data()); });
+      ooAll.sort(function(a,b){
+        const ta = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+        const tb = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+        return tb - ta;
+      });
+      ooRender();
+      ooAlertIfNew();
+    }, function(e){
+      console.warn("online orders:", e && e.code);
+      const box = document.getElementById("ooList");
+      if(box) box.innerHTML = (e && e.code === "permission-denied")
+        ? '<div style="color:#991b1b">অনলাইন অর্ডার দেখার অনুমতি এখনো চালু হয়নি — নতুন firestore.rules publish করতে হবে।</div>'
+        : '<div style="color:#991b1b">অর্ডার আনা যায়নি — ইন্টারনেট দেখুন।</div>';
+    });
+}
+
+/* নতুন অর্ডার এলে জানান দেওয়া — অনেক সময় ফোন পাশে রাখা থাকে, তাই
+   শুধু তালিকায় যোগ হওয়াটা যথেষ্ট নয়। */
+function ooAlertIfNew(){
+  const n = ooAll.filter(function(o){ return o.status === "new"; }).length;
+  if(n > ooSeenNew){
+    if(typeof toastRP === "function") toastRP("🔔 নতুন অনলাইন অর্ডার এসেছে!");
+    try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
+  }
+  ooSeenNew = n;
+}
+
+async function ooSetStatus(id, status, extra){
+  try{
+    await db.collection("restaurants").doc(RP.uid).collection("orders").doc(id)
+            .set(Object.assign({ status:status, updatedAt: fbNow() }, extra||{}), { merge:true });
+  }catch(e){
+    if(typeof toastRP === "function") toastRP("বদলানো যায়নি — " + (e.code||"আবার চেষ্টা করুন"), true);
+  }
+}
+
+function ooRender(){
+  const box = document.getElementById("ooList"); if(!box) return;
+  const badge = document.getElementById("ooBadge");
+
+  const nNew = ooAll.filter(function(o){ return o.status === "new"; }).length;
+  if(badge) badge.innerHTML = nNew
+    ? '<span style="background:#dc2626;color:#fff;border-radius:999px;padding:2px 9px;font-size:13px">'
+      + nNew + ' নতুন</span>'
+    : '';
+
+  const list = ooShowDone ? ooAll
+             : ooAll.filter(function(o){ return OO_LIVE.indexOf(o.status) > -1; });
+
+  if(!list.length){
+    box.innerHTML = '<div style="color:#64748b">'
+      + (ooShowDone ? 'এখনো কোনো অনলাইন অর্ডার আসেনি।' : 'এখন কোনো চলমান অর্ডার নেই।')
+      + '</div>';
+    return;
+  }
+
+  box.innerHTML = list.map(function(o){
+    const items = Array.isArray(o.items) ? o.items : [];
+    const lines = items.map(function(i){
+      return '<div style="font-size:13px">• ' + (i.name||"") + ' ×' + (i.qty||1)
+           + (i.variant ? ' <span style="color:#64748b">(' + i.variant + ')</span>' : '')
+           + ' — ' + ooMoney((i.price||0) * (i.qty||1)) + '</div>';
+    }).join("");
+    const digits = String(o.customerPhone||"").replace(/[^0-9]/g,"");
+
+    let btns = "";
+    if(o.status === "new"){
+      btns = '<button class="btn primary" data-oo="accept" data-id="'+o.id+'">✅ গ্রহণ করুন</button>'
+           + '<button class="btn" data-oo="reject" data-id="'+o.id+'">❌ বাতিল</button>';
+    }else if(o.status === "accepted"){
+      btns = '<button class="btn primary" data-oo="preparing" data-id="'+o.id+'">👨‍🍳 রান্না শুরু</button>';
+    }else if(o.status === "preparing"){
+      btns = '<button class="btn primary" data-oo="ready" data-id="'+o.id+'">🔔 তৈরি হয়েছে</button>';
+    }else if(o.status === "ready"){
+      btns = '<button class="btn primary" data-oo="completed" data-id="'+o.id+'">✅ সম্পন্ন</button>';
+    }
+
+    return '<div class="order-row" style="align-items:flex-start;flex-direction:column;gap:8px">'
+      + '<div style="display:flex;justify-content:space-between;width:100%;gap:8px;flex-wrap:wrap">'
+      + '<div><b>#' + (o.code || o.id.slice(0,5)) + '</b> '
+      + '<span class="badge ' + (OO_CHIP[o.status]||"prep") + '">' + (OO_LABEL[o.status]||o.status) + '</span>'
+      + '<br><span style="color:#64748b;font-size:12.5px">'
+      + (o.type === "pickup" ? "🏃 নিজে নেবেন" : "🛵 ডেলিভারি")
+      + ' · ' + ooTime(o.createdAt) + '</span></div>'
+      + '<div style="font-weight:800">' + ooMoney(o.total) + '</div>'
+      + '</div>'
+      + '<div style="width:100%">' + lines + '</div>'
+      + '<div style="color:#64748b;font-size:12.5px;width:100%">'
+      + '👤 ' + (o.customerName || "গ্রাহক")
+      + (digits ? ' · <a href="tel:'+digits+'" style="color:#2563eb">📞 '+o.customerPhone+'</a>' : '')
+      + (o.type !== "pickup" && o.address ? '<br>📍 ' + o.address : '')
+      + (o.note ? '<br>📝 ' + o.note : '')
+      + (o.rejectReason ? '<br><span style="color:#991b1b">বাতিলের কারণ: '+o.rejectReason+'</span>' : '')
+      + '</div>'
+      + (btns ? '<div style="display:flex;gap:8px;flex-wrap:wrap;width:100%">' + btns + '</div>' : '')
+      + '</div>';
+  }).join("");
+
+  box.querySelectorAll("[data-oo]").forEach(function(b){
+    b.addEventListener("click", function(){
+      const act = b.dataset.oo, id = b.dataset.id;
+      if(act === "reject"){
+        const why = prompt("বাতিলের কারণ লিখুন (গ্রাহক দেখতে পাবেন):", "এখন এই খাবার নেই");
+        if(why === null) return;
+        ooSetStatus(id, "rejected", { rejectReason: String(why).trim() || "রেস্টুরেন্ট বাতিল করেছে" });
+        return;
+      }
+      ooSetStatus(id, act === "accept" ? "accepted" : act);
+    });
+  });
+}
+
+document.getElementById("ooShowDone") &&
+  document.getElementById("ooShowDone").addEventListener("click", function(){
+    ooShowDone = !ooShowDone;
+    this.textContent = ooShowDone ? "শুধু চলমান দেখুন" : "সম্পন্নগুলোও দেখুন";
+    ooRender();
+  });
+
 /* ════════ 🛵 ডেলিভারি ম্যান ════════
    রাইডার তার অ্যাপে "অনলাইন" করলে riders/{uid}.online = true হয়, আর
    GPS চালু থাকলে প্রতি ৭ সেকেন্ডে liveLocation আপডেট হয়। এখানে শুধু
@@ -1391,6 +1560,7 @@ auth.onAuthStateChanged(async function(user){
     if(brand) brand.innerHTML = "🍯 " + RP.name
       + "<small>" + (d.area || "Restaurant POS") + "</small>";
 
+    ooStart();          // 🌐 অনলাইন অর্ডার লাইভ শোনা শুরু
     await loadProducts();
     document.getElementById("rpGate").style.display = "none";
     init();
