@@ -91,8 +91,6 @@
   .svcMascot{ width:100%; height:100%; border-radius:6px; object-fit:cover; display:block; border:1px solid rgba(0,0,0,0.25); }
   .serviceCard .lbl{ font-size:11.5px; font-weight:700; color:#fff8e8; }
   .serviceCard.soon{ opacity:0.55; }
-  .rmAdd{ flex:0 0 auto; width:34px; height:34px; border-radius:50%; border:none;
-          background:#ffd166; color:#1a1408; font-size:20px; font-weight:800; }
   .bigBtn{ display:block; width:100%; padding:14px; border:none; border-radius:13px;
            background:#ffd166; color:#1a1408; font-size:15.5px; font-weight:800; cursor:pointer; }
   .bigBtn:disabled{ opacity:0.6; cursor:default; }
@@ -3537,13 +3535,42 @@ function rmRenderHead(){
         : '');
 }
 
+/* বাজারের পণ্যের কার্ড যে চেহারায় দেখায় (pCard / mfCard), খাবারও ঠিক
+   সেই চেহারায় দেখানো হয় — একই গ্রিড, একই ছবি-ফ্রেম, একই 🛒 বোতাম আর
+   একই অ্যানিমেশন। আলাদা নকশা বানালে এক অ্যাপের ভেতরেই দুই রকম দেখাত। */
+function rmFoodCardHTML(f, idx){
+  const safeName = escapeHtml(f.name||'').replace(/'/g,"");
+  const safeShop = escapeHtml((rmCur && rmCur.name)||'').replace(/'/g,"");
+  const closed   = rmCur && rmCur.isOpen === false;
+  const price    = Number(f.price) || 0;
+  return `
+    <div class="pCard mfCard" style="animation-delay:${Math.min(idx,12)*0.08}s;">
+      <div class="mfHookChain"><span class="mfHookRing"></span><span class="mfHookRing mfHookRingBottom"></span></div>
+      <div class="pCardImgWrap">
+        <span class="pCardImgInner">${f.img
+          ? `<img src="${escapeHtml(f.img)}" alt="" onerror="this.parentElement.textContent='🍽️'">`
+          : '🍽️'}</span>
+        <div class="pCardBadges">
+          ${closed ? '<span class="pCardOfferBadge" style="background:#6b7280;">🔴 এখন বন্ধ</span>' : ''}
+        </div>
+        <button class="mfCartBtn" ${closed ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''}
+          onclick="event.stopPropagation(); mfAddToCartAnimated(this,'${escapeHtml(String(f.id))}','${safeName}',${price},'${rmCur ? rmCur.id : ''}','${safeShop}')">🛒</button>
+      </div>
+      <div class="pCardBody">
+        <div class="pCardName">${escapeHtml(f.name || "খাবার")}</div>
+        <span class="mfShopTag">🍽️ ${escapeHtml((rmCur && rmCur.name) || "রেস্টুরেন্ট")}</span>
+        ${f.cat ? `<div class="mfCardArea">${escapeHtml(f.cat)}</div>` : ""}
+        <div class="pCardPriceRow">
+          <span class="pCardPrice">${rmMoney(price)}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
 function rmRender(){
   const box = $("rmList"); if(!box) return;
 
-  if(rmState === "load"){
-    box.innerHTML = '<div class="loadingMsg">মেনু আনা হচ্ছে...</div>';
-    return;
-  }
+  if(rmState === "load"){ box.innerHTML = '<div class="loadingMsg">মেনু আনা হচ্ছে...</div>'; return; }
   if(rmState === "error"){
     box.innerHTML = '<div class="emptyMsg">মেনু আনা যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।</div>';
     return;
@@ -3557,64 +3584,25 @@ function rmRender(){
 
   if(!list.length){
     box.innerHTML = q
-      ? '<div class="emptyMsg">এই নামে কোনো খাবার পাওয়া যায়নি।</div>'
-      : '<div class="emptyMsg">এই রেস্টুরেন্ট এখনো কোনো খাবার দেখায়নি।</div>';
+      ? '<div class="mfEmpty">😕 এই নামে কোনো খাবার পাওয়া যায়নি।</div>'
+      : '<div class="mfEmpty">এই রেস্টুরেন্ট এখনো কোনো খাবার দেখায়নি।</div>';
     return;
   }
 
-  // ক্যাটাগরি অনুযায়ী সাজানো — POS-এ যেভাবে ভাগ করা, এখানেও সেভাবেই
+  // ক্যাটাগরি অনুযায়ী ভাগ — POS-এ যেভাবে সাজানো, এখানেও সেভাবেই
   const cats = [];
   list.forEach(function(f){
     const c = f.cat || "অন্যান্য";
     if(cats.indexOf(c) === -1) cats.push(c);
   });
 
+  let n = 0;
   box.innerHTML = cats.map(function(c){
     const items = list.filter(function(f){ return (f.cat || "অন্যান্য") === c; });
-    return '<div style="font-size:14px; font-weight:800; color:#ffd166; margin:16px 0 8px;">'
-      + escapeHtml(c) + '</div>'
-      + items.map(function(f){
-          const variants = Array.isArray(f.variants) ? f.variants : [];
-          const extra = variants.length
-            ? '<div style="font-size:11px; color:var(--muted); margin-top:3px;">'
-              + escapeHtml(variants.map(function(v){ return v.name; }).join(" · ")) + '</div>'
-            : '';
-          return '<div class="card" style="display:flex; gap:12px; align-items:center; margin-bottom:10px;">'
-            + '<div style="flex:0 0 auto; width:62px; height:62px; border-radius:13px; overflow:hidden; '
-            + 'background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:28px;">'
-            + (f.img ? '<img src="' + escapeHtml(f.img) + '" alt="" style="width:100%;height:100%;object-fit:cover;">' : '🍽️')
-            + '</div>'
-            + '<div style="flex:1; min-width:0;">'
-            + '<div style="font-size:14.5px; font-weight:800; color:#fff8e8;">'
-            + escapeHtml(f.name || "") + '</div>'
-            + (f.description
-                ? '<div style="font-size:11.5px; color:var(--muted); margin-top:2px; overflow:hidden; '
-                  + 'text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(f.description) + '</div>'
-                : '')
-            + extra
-            + '</div>'
-            + '<div style="flex:0 0 auto; text-align:right;">'
-            + '<div style="font-size:14px; font-weight:800; color:#ffd166; margin-bottom:5px;">'
-            + rmMoney(f.price) + '</div>'
-            + '<button class="rmAdd" data-add="' + escapeHtml(String(f.id)) + '">+</button>'
-            + '</div>'
-            + '</div>';
-        }).join("");
+    return '<div class="mfSectionHead"><span>' + escapeHtml(c) + '</span></div>'
+         + '<div class="pGrid">' + items.map(function(f){ return rmFoodCardHTML(f, n++); }).join("") + '</div>';
   }).join("");
 }
-
-/* খাবারের "+" — বাজারের নিজস্ব কার্টেই যায় (hbCart), আলাদা কোনো
-   কার্ট নয়। ফলে দোকানের প্রোডাক্টের মতোই Cart পাতা, ঠিকানা, GPS,
-   চেকআউট আর "আমার অর্ডারসমূহ" ট্র্যাকিং — সবই আগের মতো কাজ করে।
-   রেস্টুরেন্টটা এখানে একটা "দোকান" হিসেবেই যায় (shopId = রেস্টুরেন্টের id)। */
-document.addEventListener("click", function(e){
-  const btn = e.target && e.target.closest ? e.target.closest("[data-add]") : null;
-  if(!btn || !rmCur) return;
-  const f = rmFoods.find(function(x){ return String(x.id) === String(btn.dataset.add); });
-  if(!f) return;
-  addToCart(String(f.id), f.name || "খাবার", Number(f.price) || 0,
-            { shopId: rmCur.id, shopName: rmCur.name || "রেস্টুরেন্ট" });
-});
 
 document.getElementById("rmSearch") &&
   document.getElementById("rmSearch").addEventListener("input", rmRender);
