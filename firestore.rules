@@ -13,6 +13,11 @@ service cloud.firestore {
     function myShopId() { return myUserData().shopId; }
     function myRole() { return myUserData().role; }
     function isAgent() { return isSignedIn() && myRole() == 'agent'; }
+    // 🍽️ রেস্টুরেন্ট কোন বাজারের — "ডেলিভারি ম্যান" পাতায় নিজের বাজারের
+    //    অনলাইন রাইডার দেখানোর জন্য দরকার।
+    function myRestaurantMarketId() {
+      return get(/databases/$(database)/documents/restaurants/$(request.auth.uid)).data.marketId;
+    }
     function myAgentMarketId() {
       return get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.marketId;
     }
@@ -163,6 +168,54 @@ service cloud.firestore {
       }
     }
 
+    /* 🍽️ রেস্টুরেন্ট — নিজস্ব POS দিয়ে নিবন্ধন করে, Bazar-এ দেখা যায়।
+       ⚠️ এই ব্লকটা না থাকলে Firestore ডিফল্টে সব আটকে দিত — নিবন্ধন
+          লিখতেই পারত না, আর Bazar-এর তালিকাও চিরকাল খালি থাকত। */
+    match /restaurants/{restaurantId} {
+      // গ্রাহক (লগইন ছাড়াও) তালিকা দেখতে পারেন — Bazar-এর জন্য দরকার
+      allow read: if true;
+
+      // নিজের নথি নিজেই বানায়; অন্য কারও নথিতে হাত দিতে পারে না
+      allow create: if isSignedIn() && request.auth.uid == restaurantId;
+      allow update: if isSignedIn()
+                    && (isSuperAdmin() || request.auth.uid == restaurantId);
+      allow delete: if isSuperAdmin();
+
+      /* খাবারের তালিকা। গ্রাহক পড়তে পারেন (Bazar-এ মেনু দেখাতে হয়),
+         কিন্তু লিখতে পারেন শুধু ওই রেস্টুরেন্ট নিজে। */
+      match /foods/{foodId} {
+        allow read: if true;
+        allow write: if isSignedIn() && request.auth.uid == restaurantId;
+      }
+
+      /* অর্ডার — গ্রাহক Bazar থেকে অর্ডার বসায়, রেস্টুরেন্ট সেটা দেখে ও
+         অবস্থা বদলায়।
+
+         ⚠️ গ্রাহককে create দেওয়া হয়েছে, update নয়। নাহলে গ্রাহক নিজের
+            অর্ডারকে "ready" বা "completed" বানিয়ে দিতে পারত, কিংবা দাম
+            বদলে দিতে পারত। অবস্থা বদলানো একমাত্র রেস্টুরেন্টের কাজ।     */
+      match /orders/{orderId} {
+        // রেস্টুরেন্ট নিজের সব অর্ডার দেখে; গ্রাহক শুধু নিজেরটা
+        allow read: if isSignedIn()
+                    && (isSuperAdmin() || request.auth.uid == restaurantId
+                        || resource.data.customerUid == request.auth.uid);
+
+        // নতুন অর্ডার — নিজের নামেই বসাতে হবে, আর সবসময় "new" অবস্থায়।
+        // খালি অর্ডার বা অস্বাভাবিক বড় অর্ডার আটকানো হচ্ছে।
+        allow create: if isSignedIn()
+                      && request.resource.data.customerUid == request.auth.uid
+                      && request.resource.data.status == 'new'
+                      && request.resource.data.total is number
+                      && request.resource.data.total >= 0
+                      && request.resource.data.items.size() > 0
+                      && request.resource.data.items.size() <= 50;
+
+        allow update: if isSignedIn()
+                      && (isSuperAdmin() || request.auth.uid == restaurantId);
+        allow delete: if isSuperAdmin();
+      }
+    }
+
     match /markets/{marketId} {
       allow read: if true;
       allow write: if isSuperAdmin();
@@ -182,9 +235,13 @@ service cloud.firestore {
       // agent/নিজে-রাইডার — দোকানদার এর কোনোটাই না), তাই ড্রপডাউন চিরকাল খালি
       // দেখাত ("কোনো রাইডার অনলাইনে নেই") এমনকি রাইডার অনলাইন থাকলেও। এখন
       // নিজের দোকানের marketId-র সাথে মিলে যাওয়া রাইডারও পড়তে পারবে।
+      // 🍽️ রেস্টুরেন্টও নিজের বাজারের রাইডার পড়তে পারবে — নাহলে POS-এর
+      //    "ডেলিভারি ম্যান" পাতাটা চিরকাল খালি দেখাত, ঠিক আগে দোকানের
+      //    ড্রপডাউন যেমন খালি দেখাত।
       allow read: if isSignedIn() &&
         (isSuperAdmin() || resource.data.assignedAgentId == request.auth.uid || request.auth.uid == riderId ||
-         (myShopId() != null && get(/databases/$(database)/documents/shops/$(myShopId())).data.marketId == resource.data.marketId));
+         (myShopId() != null && get(/databases/$(database)/documents/shops/$(myShopId())).data.marketId == resource.data.marketId) ||
+         (myRole() == 'restaurant' && myRestaurantMarketId() == resource.data.marketId));
       allow create: if isSignedIn() && request.resource.data.assignedAgentId == request.auth.uid;
       allow update: if isSignedIn() &&
         (isSuperAdmin() || resource.data.assignedAgentId == request.auth.uid || request.auth.uid == riderId);
