@@ -984,12 +984,29 @@ document.getElementById("verifySignOutLink").addEventListener("click", async (e)
 //  ১) লগইন/সাইনআপ বাটন নিজে থেকে রুট করছে এমন সময় এটা কিছু করবে না, এবং
 //  ২) localStorage-এর session সত্যিই এই মুহূর্তের auth user-এরই কিনা, সেটা মিলিয়ে দেখা —
 //  নাহলে ডিভাইসে থেকে যাওয়া কোনো পুরনো/অন্য ইউজারের session দিয়ে ভুল শপে ঢুকিয়ে দিতে পারত)
+/* 🐞 বাগ-ফিক্স: আগে এখানে শুধু superadmin আলাদা করা হতো, আর বাকি
+   সবাইকে — রেস্টুরেন্ট মালিক সহ — shop-ledger-app.html (দোকানদারের POS)
+   এ পাঠিয়ে দেওয়া হতো।
+
+   ফল: রেস্টুরেন্ট মালিক প্রথমবার লগইন করলে ঠিকমতো নিজের POS-এ যেতেন
+   (afterLoginRoute ঠিকই ছিল), কিন্তু অ্যাপ বন্ধ করে আবার খুললেই এই
+   অটো-রিডাইরেক্ট চালু হয়ে তাঁকে দোকানদারের POS-এ ফেলে দিত। ওখানে
+   session.shopId নেই, তাই পাতাটা ভাঙা অবস্থায় খুলতো।
+
+   এখন লগইনের পর যেভাবে রুট হয়, ফিরে আসার সময়ও ঠিক সেভাবেই হবে। */
+function routeByRole(role){
+  if (role === "superadmin") return "admin.html";
+  if (role === "restaurant") return "restaurant-pos.html";
+  // রাইডার আর ট্রান্সপোর্ট ড্রাইভার ইচ্ছে করেই POS-এ যায় — ওই অ্যাপ
+  // নিজে থেকেই তাদের Rider Mode / Driver Mode দেখায়।
+  return "shop-ledger-app.html";
+}
+
 auth.onAuthStateChanged(async (user)=>{
   if (__authFlowInProgress) return;
   const session = getSession();
   if (user && session && session.uid === user.uid) {
-    if (session.role === "superadmin") window.location.href = "admin.html";
-    else window.location.href = "shop-ledger-app.html";
+    window.location.href = routeByRole(session.role);
   }
 });
 </script>
