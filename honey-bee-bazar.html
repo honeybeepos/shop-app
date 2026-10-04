@@ -1223,6 +1223,17 @@
     <div id="rstList" style="margin-top:14px;"></div>
   </div>
 
+  <!-- 🍽️ একটা রেস্টুরেন্টের মেনু — restaurants/{id}/foods থেকে পড়া হয়।
+       রেস্টুরেন্ট POS-এ যেগুলো Publish করেছে আর "আছে" দেখিয়েছে, শুধু
+       সেগুলোই এখানে আসে। Draft বা শেষ হয়ে যাওয়া খাবার গ্রাহক দেখবেন না। -->
+  <div id="screenRestaurantMenu" style="padding:20px 16px;">
+    <button class="backBtn" id="backToRestaurantList">← রেস্টুরেন্টের তালিকায়</button>
+
+    <div id="rmHead" style="margin-bottom:14px;"></div>
+    <input type="text" class="searchBox" id="rmSearch" placeholder="🔍 খাবারের নাম">
+    <div id="rmList" style="margin-top:14px;"></div>
+  </div>
+
   <!-- 📓 নোটবুক — দোকানের অ্যাপের খাতাটাই এখানে। একই ফোনে দুই অ্যাপ
        একই জায়গায় (localStorage) লেখে, তাই যেখানেই লিখুন দুই জায়গাতেই
        দেখা যায়। ক্যালকুলেটরের মতোই এর কোনো লেখা এই অ্যাপ থেকে
@@ -3209,7 +3220,7 @@ let __nearbyMarketId = null; // 📍 GPS-এ সবচেয়ে কাছে�
 let __hbNavigatingViaPopstate = false;
 
 function showScreen(id){
-  ["screenNotebook","screenHome","screenSmartWatch","screenSmartWatchMenu","screenPanchang","screenPrayer","screenSmartCalculator","screenCalcBasic","screenCalcScientific","screenCalcWeight","screenCalcBusiness","screenCalcMoney","screenCalcUnit","screenCalcConstruction","screenCalcUtility","screenCalcDatetime","screenCalcKids","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenMarketCategories","screenMarketSubcategories","screenMarketProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders","screenEkadashiSpecial"].forEach(s=> $(s).classList.remove("active"));
+  ["screenRestaurant","screenRestaurantMenu","screenNotebook","screenHome","screenSmartWatch","screenSmartWatchMenu","screenPanchang","screenPrayer","screenSmartCalculator","screenCalcBasic","screenCalcScientific","screenCalcWeight","screenCalcBusiness","screenCalcMoney","screenCalcUnit","screenCalcConstruction","screenCalcUtility","screenCalcDatetime","screenCalcKids","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenMarketCategories","screenMarketSubcategories","screenMarketProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders","screenEkadashiSpecial"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
   if(id === "screenTransportMedia") tmListenFeed(); // 📢 Phase 6 — স্ক্রিন খুললেই লাইভ ফিড লোড হয়
   // ✈️ Smart Flight Tracking — অন্য কোনো স্ক্রিনে গেলে auto-refresh টাইমার
@@ -3430,7 +3441,9 @@ function rstRender(){
       : '<div class="card" style="text-align:center; padding:26px 18px;">'
         + '<div style="font-size:40px; margin-bottom:8px;">🍽️</div>'
         + '<div style="font-size:15px; font-weight:800; color:#fff8e8; margin-bottom:6px;">'
-        + 'এখনো কোনো রেস্টুরেন্ট যুক্ত হয়নি</div>'
+        + 'এখনো কোনো রেস্টুরেন্ট নেই</div>'
+        + '<div style="font-size:12.5px; color:var(--muted); margin-bottom:10px;">'
+        + 'আপনার এলাকায় এখনো কেউ যুক্ত হয়নি</div>'
         + '<div style="font-size:12.5px; color:var(--muted); line-height:1.7;">'
         + 'রেস্টুরেন্টগুলো নিজেদের অ্যাপ দিয়ে নিবন্ধন করলে এখানে '
         + 'আপনার কাছেরগুলো দেখা যাবে — খাবারের ছবি, দাম আর অর্ডার সহ।</div>'
@@ -3460,9 +3473,134 @@ function rstRender(){
       + '<div style="font-size:11.5px; margin-top:4px; color:' + (open ? '#4ade80' : '#f59e0b') + ';">● '
       + (open ? 'এখন খোলা' : 'এখন বন্ধ') + '</div>'
       + '</div>';
+    card.addEventListener("click", function(){ rmOpen(r); });
     box.appendChild(card);
   });
 }
+
+/* ==================== 🍽️ একটা রেস্টুরেন্টের মেনু ====================
+   রেস্টুরেন্ট তার POS-এ খাবার যোগ করে, তারপর Publish চাপে। Publish না
+   করা খাবার এখানে আসে না — এটা ইচ্ছে করেই, যাতে অসম্পূর্ণ বা দাম বসানো
+   হয়নি এমন খাবার গ্রাহকের চোখে না পড়ে।
+
+   ⚠️ অর্ডার করার ব্যবস্থা এখনো বানানো হয়নি। তাই মেনু দেখিয়ে ফোন করার
+      বোতাম দেওয়া হচ্ছে — "অর্ডার করুন" লিখে এমন বোতাম দিলে গ্রাহক চাপ
+      দিয়ে কিছুই হতো না, সেটা না থাকার চেয়েও খারাপ।                   */
+let rmCur = null;      // এখন যে রেস্টুরেন্টটা খোলা
+let rmFoods = [];
+let rmState = "load";  // load | ok | error
+
+function rmMoney(n){
+  const v = Number(n || 0);
+  return "৳ " + (Math.round(v * 100) / 100).toLocaleString("bn-BD");
+}
+
+async function rmOpen(r){
+  rmCur = r; rmFoods = []; rmState = "load";
+  showScreen("screenRestaurantMenu");
+  const se = $("rmSearch"); if(se) se.value = "";
+  rmRenderHead(); rmRender();
+  try{
+    const qs = await db.collection("restaurants").doc(r.id)
+                       .collection("foods").get();
+    rmFoods = qs.docs.map(function(d){ return Object.assign({ id:d.id }, d.data()); })
+                     .filter(function(f){ return f.published === true && f.available !== false; });
+    rmState = "ok";
+  }catch(e){
+    console.warn("menu load:", e && e.code);
+    rmState = "error";
+  }
+  rmRender();
+}
+
+function rmRenderHead(){
+  const box = $("rmHead"); if(!box || !rmCur) return;
+  const r = rmCur;
+  const open = r.isOpen !== false;
+  const digits = String(r.phone || "").replace(/[^0-9]/g, "");
+  box.innerHTML =
+    '<div style="font-size:22px; font-weight:800; color:#fff8e8;">'
+    + escapeHtml(r.name || "রেস্টুরেন্ট") + '</div>'
+    + '<div style="font-size:13px; color:var(--muted); margin-top:3px;">'
+    + escapeHtml(r.area || "") + '</div>'
+    + '<div style="font-size:12px; margin-top:5px; color:' + (open ? '#4ade80' : '#f59e0b') + ';">● '
+    + (open ? 'এখন খোলা' : 'এখন বন্ধ') + '</div>'
+    + (digits
+        ? '<a href="tel:' + digits + '" style="display:inline-block; margin-top:10px; padding:9px 16px; '
+          + 'border-radius:11px; background:rgba(255,209,102,0.16); color:#ffd166; font-size:13.5px; '
+          + 'font-weight:700; text-decoration:none;">📞 ফোন করে অর্ডার করুন</a>'
+        : '');
+}
+
+function rmRender(){
+  const box = $("rmList"); if(!box) return;
+
+  if(rmState === "load"){
+    box.innerHTML = '<div class="loadingMsg">মেনু আনা হচ্ছে...</div>';
+    return;
+  }
+  if(rmState === "error"){
+    box.innerHTML = '<div class="emptyMsg">মেনু আনা যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।</div>';
+    return;
+  }
+
+  const q = ($("rmSearch") && $("rmSearch").value || "").trim().toLowerCase();
+  const list = rmFoods.filter(function(f){
+    return !q || String(f.name || "").toLowerCase().includes(q)
+              || String(f.cat  || "").toLowerCase().includes(q);
+  });
+
+  if(!list.length){
+    box.innerHTML = q
+      ? '<div class="emptyMsg">এই নামে কোনো খাবার পাওয়া যায়নি।</div>'
+      : '<div class="emptyMsg">এই রেস্টুরেন্ট এখনো কোনো খাবার দেখায়নি।</div>';
+    return;
+  }
+
+  // ক্যাটাগরি অনুযায়ী সাজানো — POS-এ যেভাবে ভাগ করা, এখানেও সেভাবেই
+  const cats = [];
+  list.forEach(function(f){
+    const c = f.cat || "অন্যান্য";
+    if(cats.indexOf(c) === -1) cats.push(c);
+  });
+
+  box.innerHTML = cats.map(function(c){
+    const items = list.filter(function(f){ return (f.cat || "অন্যান্য") === c; });
+    return '<div style="font-size:14px; font-weight:800; color:#ffd166; margin:16px 0 8px;">'
+      + escapeHtml(c) + '</div>'
+      + items.map(function(f){
+          const variants = Array.isArray(f.variants) ? f.variants : [];
+          const extra = variants.length
+            ? '<div style="font-size:11px; color:var(--muted); margin-top:3px;">'
+              + escapeHtml(variants.map(function(v){ return v.name; }).join(" · ")) + '</div>'
+            : '';
+          return '<div class="card" style="display:flex; gap:12px; align-items:center; margin-bottom:10px;">'
+            + '<div style="flex:0 0 auto; width:62px; height:62px; border-radius:13px; overflow:hidden; '
+            + 'background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:28px;">'
+            + (f.img ? '<img src="' + escapeHtml(f.img) + '" alt="" style="width:100%;height:100%;object-fit:cover;">' : '🍽️')
+            + '</div>'
+            + '<div style="flex:1; min-width:0;">'
+            + '<div style="font-size:14.5px; font-weight:800; color:#fff8e8;">'
+            + escapeHtml(f.name || "") + '</div>'
+            + (f.description
+                ? '<div style="font-size:11.5px; color:var(--muted); margin-top:2px; overflow:hidden; '
+                  + 'text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(f.description) + '</div>'
+                : '')
+            + extra
+            + '</div>'
+            + '<div style="flex:0 0 auto; font-size:14px; font-weight:800; color:#ffd166;">'
+            + rmMoney(f.price) + '</div>'
+            + '</div>';
+        }).join("");
+  }).join("");
+}
+
+document.getElementById("rmSearch") &&
+  document.getElementById("rmSearch").addEventListener("input", rmRender);
+document.getElementById("backToRestaurantList") &&
+  document.getElementById("backToRestaurantList").addEventListener("click", function(){
+    rstRender(); showScreen("screenRestaurant");
+  });
 
 document.getElementById("backToHomeFromRestaurant") &&
   document.getElementById("backToHomeFromRestaurant").addEventListener("click", ()=> showScreen("screenHome"));
