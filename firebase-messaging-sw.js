@@ -62,7 +62,12 @@ self.addEventListener("notificationclick", (event) => {
   // 📢 Honey Bee Transport Media Phase 7 — যাত্রী-মুখী পুশ (নতুন ভাড়া
   // অফার, ট্রিপ কনফার্ম) Bazar অ্যাপে যাবে; ড্রাইভার-মুখী পুশ (ট্রিপ
   // কনফার্ম, পোস্টে মন্তব্য) Rider/Driver Mode-এ (shop-ledger-app.html)
-  const passengerFacingTypes = ["messenger-message", "trip-offer", "trip-confirmed", "trip-chat-passenger", "flight-update", "panchang-reminder"];
+  // 🐞 বাগ-ফিক্স: অর্ডারের খবরগুলো (গ্রহণ করা হয়েছে, প্যাকেজিং শেষ,
+  //    পথে আছে, পৌঁছে গেছে) যায় গ্রাহকের কাছে, কিন্তু এই তালিকায়
+  //    ছিল না — তাই গ্রাহক নোটিফিকেশনে চাপ দিলে দোকানদারের POS খুলত,
+  //    যেখানে তাঁর কিছুই নেই। এখন বাজারেই খুলবে।
+  const passengerFacingTypes = ["messenger-message", "trip-offer", "trip-confirmed", "trip-chat-passenger", "flight-update", "panchang-reminder",
+                                "order-accepted", "order-packaging-done", "order-status"];
   // 🍽️ রেস্টুরেন্টের নতুন অর্ডারের পুশ রেস্টুরেন্টের নিজের POS-এ খুলবে —
   //    নাহলে দোকানের POS খুলত, যেখানে রেস্টুরেন্ট মালিকের কিছুই নেই
   const restaurantFacingTypes = ["restaurant-order"];
