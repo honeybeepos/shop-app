@@ -255,6 +255,68 @@ async function sendFcmToCustomer(customerUid, title, body, data) {
    ⚠️ sendFcmToRider()-এর থেকে ইচ্ছাকৃতভাবে সম্পূর্ণ আলাদা ফাংশন — যাতে
    এই নতুন কোডের কোনো বাগ কখনো বিদ্যমান Rider-নোটিফিকেশন সিস্টেমকে
    প্রভাবিত করতে না পারে। */
+/* 🔔 অর্ডারের খবর গ্রাহকের ফোনে পাঠানো।
+   ⚠️ নামটা sendFcmToCustomer নয় ইচ্ছে করেই — ওই নামে আগে থেকেই একটা
+      ফাংশন আছে (ফ্লাইট/ট্রিপ/পঞ্জিকার খবর পাঠায়, ৭ জায়গায় ব্যবহার
+      হয়)। একই নাম দিলে সেটা চুপচাপ ঢাকা পড়ে যেত আর ওগুলোর
+      নোটিফিকেশন ভুল অ্যাপে খুলত।
+   ⚠️ টোকেন দুই জায়গায় জমা হয় — Honey Messenger-এ লগইন করলে
+      messengerUsers/{uid}-এ, আর সাধারণভাবে অ্যাপ খুললে customers/{uid}-এ।
+      আগে শুধু প্রথমটা দেখা হতো, তাই যে গ্রাহক কখনো Messenger খোলেননি
+      তাঁর কাছে অর্ডারের কোনো খবরই যেত না — অথচ কোথাও কোনো এরর দেখাত
+      না, তাই ধরাও পড়ত না। এখন দুই জায়গাতেই খোঁজা হয়।               */
+async function sendOrderPushToCustomer(uid, title, body, data) {
+  if (!uid) return false;
+  const places = [
+    { col: "messengerUsers" },
+    { col: "customers" },
+  ];
+  for (const place of places) {
+    let token = null;
+    try {
+      const snap = await db.collection(place.col).doc(uid).get();
+      token = snap.exists ? snap.data().fcmToken : null;
+    } catch (e) { continue; }
+    if (!token) continue;
+    try {
+      await getMessaging().send({
+        token,
+        notification: { title, body },
+        data: Object.assign({ type: "order-status" }, data || {}),
+        webpush: { fcmOptions: { link: BAZAR_APP_URL } },
+      });
+      console.log(JSON.stringify({ event: "CUSTOMER_FCM_SENT", uid, from: place.col }));
+      return true;
+    } catch (e) {
+      if (e && (e.code === "messaging/registration-token-not-registered" ||
+                e.code === "messaging/invalid-registration-token")) {
+        await db.collection(place.col).doc(uid)
+                .update({ fcmToken: FieldValue.delete() }).catch(() => {});
+        continue;   // পরের জায়গায় চেষ্টা
+      }
+      console.warn(JSON.stringify({ event: "CUSTOMER_FCM_FAILED", uid, error: String(e && e.message || e) }));
+      return false;
+    }
+  }
+  return false;
+}
+
+/* বিক্রেতার নাম — রেস্টুরেন্ট না দোকান, দুইটাই দেখা হয়। আগে শুধু
+   shops/ দেখা হতো, তাই রেস্টুরেন্টের অর্ডারে গ্রাহক "দোকান" লেখা
+   দেখতেন, নিজের চেনা রেস্টুরেন্টের নাম নয়। */
+async function sellerDisplayName(shopId) {
+  if (!shopId) return "দোকান";
+  try {
+    const r = await db.collection("restaurants").doc(shopId).get();
+    if (r.exists) return r.data().name || "রেস্টুরেন্ট";
+  } catch (e) {}
+  try {
+    const sh = await db.collection("shops").doc(shopId).get();
+    if (sh.exists) return sh.data().name || sh.data().shopName || "দোকান";
+  } catch (e) {}
+  return "দোকান";
+}
+
 async function sendFcmToMessengerUser(uid, title, body, data) {
   try {
     const userDoc = await db.collection("messengerUsers").doc(uid).get();
@@ -556,16 +618,18 @@ exports.onOrderConfirmed = onDocumentUpdated(
     // ইতিমধ্যেই আছে (Honey Messenger লগইনের সময় সেভ হয়), তাই সেটাই পুনর্ব্যবহার।
     if (after.customerUid) {
       try {
-        const shopSnap = await db.collection("shops").doc(after.shopId).get();
-        const shopName = shopSnap.exists ? (shopSnap.data().name || shopSnap.data().shopName || "দোকান") : "দোকান";
+        const shopName = await sellerDisplayName(after.shopId);
         const body = isSelfDelivery
           ? `${shopName} আপনার "${after.productName || "প্রোডাক্ট"}" অর্ডারটি গ্রহণ করেছে — রাইডার ছাড়াই (নিজে/অন্য মাধ্যমে) পাঠানো হবে।`
           : `${shopName} আপনার "${after.productName || "প্রোডাক্ট"}" অর্ডারটি গ্রহণ করেছে — এখন প্রস্তুত করা হচ্ছে।`;
-        await sendFcmToMessengerUser(
+        // 🏷️ এক রসিদে তিনটা খাবার থাকলে তিনটা ডকুমেন্টই বদলায়। একই
+        //    গ্রাহক+অবস্থার জন্য একটাই পরিচয় দেওয়া হচ্ছে, যাতে ফোনে
+        //    তিনবার না বেজে একটাই নোটিফিকেশন দেখায়।
+        await sendOrderPushToCustomer(
           after.customerUid,
           "✅ অর্ডার গ্রহণ করা হয়েছে",
           body,
-          { type: "order-accepted", orderId }
+          { type: "order-accepted", orderId: `${after.customerUid}-preparing` }
         );
       } catch (e) {
         console.warn(JSON.stringify({ event: "CUSTOMER_ACCEPT_NOTIFY_FAILED", orderId, error: String(e && e.message || e) }));
@@ -1603,6 +1667,48 @@ exports.adminUpdateShopOwnerEmail = onCall(async (request) => {
     throw new HttpsError("internal", "ইমেইল পরিবর্তন করা যায়নি — " + (err && err.message ? err.message : String(err)));
   }
 });
+
+// 🔔 অর্ডারের অবস্থা বদলালে গ্রাহককে জানানো — "পথে আছে", "পৌঁছে গেছে",
+// "বাতিল"। আগে শুধু "গ্রহণ করা হয়েছে" পর্যন্ত খবর যেত, তারপর গ্রাহক
+// অন্ধকারে থাকতেন — অ্যাপ খুলে নিজে না দেখলে জানার উপায় ছিল না।
+//
+// "preparing" এখানে ইচ্ছে করেই বাদ — ওটা onOrderConfirmed আগে থেকেই
+// পাঠায়। দুই জায়গা থেকে পাঠালে গ্রাহক একই কথা দুইবার পেতেন।
+const OO_CUSTOMER_MSG = {
+  shipped:   { title: "🛵 আপনার অর্ডার পথে আছে", verb: "পাঠিয়ে দিয়েছে — শীঘ্রই পৌঁছে যাবে।" },
+  delivered: { title: "🎉 অর্ডার পৌঁছে গেছে",    verb: "আপনার অর্ডার পৌঁছে দিয়েছে। ধন্যবাদ!" },
+  cancelled: { title: "❌ অর্ডার বাতিল হয়েছে",   verb: "দুঃখিত, অর্ডারটি নিতে পারেনি।" },
+};
+
+exports.notifyCustomerOrderStatus = onDocumentUpdated(
+  "orderRequests/{orderId}",
+  async (event) => {
+    try {
+      const before = event.data.before.data();
+      const after = event.data.after.data();
+      if (!before || !after) return;
+      if (before.status === after.status) return;
+
+      const msg = OO_CUSTOMER_MSG[after.status];
+      if (!msg) return;                 // অন্য অবস্থায় কিছু পাঠানোর নেই
+      if (!after.customerUid) return;   // কে অর্ডার করেছে জানা নেই
+
+      const seller = await sellerDisplayName(after.shopId);
+      await sendOrderPushToCustomer(
+        after.customerUid,
+        msg.title,
+        `${seller} ${msg.verb}`,
+        {
+          type: "order-status",
+          // একই গ্রাহক + একই অবস্থা = একটাই নোটিফিকেশন
+          orderId: `${after.customerUid}-${after.status}`,
+        }
+      );
+    } catch (err) {
+      console.error("notifyCustomerOrderStatus ব্যর্থ:", err);
+    }
+  }
+);
 
 // 🍽️🔔 রেস্টুরেন্টে নতুন অনলাইন অর্ডার এলে ফোনে পুশ নোটিফিকেশন।
 //
