@@ -63,7 +63,12 @@ self.addEventListener("notificationclick", (event) => {
   // অফার, ট্রিপ কনফার্ম) Bazar অ্যাপে যাবে; ড্রাইভার-মুখী পুশ (ট্রিপ
   // কনফার্ম, পোস্টে মন্তব্য) Rider/Driver Mode-এ (shop-ledger-app.html)
   const passengerFacingTypes = ["messenger-message", "trip-offer", "trip-confirmed", "trip-chat-passenger", "flight-update", "panchang-reminder"];
-  const targetFile = passengerFacingTypes.includes(type) ? "honey-bee-bazar.html" : "shop-ledger-app.html";
+  // 🍽️ রেস্টুরেন্টের নতুন অর্ডারের পুশ রেস্টুরেন্টের নিজের POS-এ খুলবে —
+  //    নাহলে দোকানের POS খুলত, যেখানে রেস্টুরেন্ট মালিকের কিছুই নেই
+  const restaurantFacingTypes = ["restaurant-order"];
+  const targetFile = restaurantFacingTypes.includes(type) ? "restaurant-pos.html"
+                   : passengerFacingTypes.includes(type) ? "honey-bee-bazar.html"
+                   : "shop-ledger-app.html";
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {

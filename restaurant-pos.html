@@ -220,7 +220,11 @@ button{cursor:pointer;border:0}
       <div class="panel" style="margin-top:14px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
           <h2 style="margin:0">🌐 অনলাইন অর্ডার <span id="ooBadge"></span></h2>
-          <button class="btn" id="ooShowDone">সম্পন্নগুলোও দেখুন</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn" id="ooBell" title="নতুন অর্ডারের শব্দ"
+                    style="font-size:19px;padding:8px 13px;line-height:1">🔔</button>
+            <button class="btn" id="ooShowDone">সম্পন্নগুলোও দেখুন</button>
+          </div>
         </div>
         <div style="color:#64748b;font-size:12.5px;margin-top:4px">
           Honey Bee Bazar থেকে গ্রাহকের পাঠানো অর্ডার এখানে আসে।
@@ -479,6 +483,7 @@ button{cursor:pointer;border:0}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="firebase-init.js"></script>
 <script>
 const defaultProducts=[
@@ -1175,6 +1180,129 @@ function showPage(id){
   if(id==="tables"){renderTables();}
 }
 
+/* ════════ 🔔 নতুন অর্ডারের ঘণ্টা ════════
+   রান্নাঘরে ফোন পাশে পড়ে থাকে, কেউ পর্দার দিকে তাকিয়ে থাকেন না। তাই
+   নতুন অর্ডার এলে শব্দ হওয়াটা সবচেয়ে জরুরি অংশ — তালিকায় যোগ হওয়াটা
+   নয়।
+
+   ⚠️ ব্রাউজার কোনো পাতাকে নিজে থেকে শব্দ করতে দেয় না যতক্ষণ না
+      ব্যবহারকারী একবার অন্তত কোথাও চাপ দিয়েছেন। তাই প্রথম চাপেই
+      অডিও "খুলে" রাখা হয়, নাহলে প্রথম অর্ডারটার শব্দ চুপচাপ হারিয়ে
+      যেত আর কেউ বুঝতেও পারত না।                                    */
+const OO_BELL_KEY = "hb-resto-bell";
+let __ooAudioCtx = null;
+
+function ooBellOn(){
+  try{ return localStorage.getItem(OO_BELL_KEY) !== "off"; }catch(e){ return true; }
+}
+function ooBellSet(on){
+  try{ localStorage.setItem(OO_BELL_KEY, on ? "on" : "off"); }catch(e){}
+  ooBellUi();
+}
+function ooBellUi(){
+  const b = document.getElementById("ooBell");
+  if(!b) return;
+  const on = ooBellOn();
+  b.textContent = on ? "🔔" : "🔕";
+  b.title = on ? "শব্দ চালু — বন্ধ করতে চাপুন" : "শব্দ বন্ধ — চালু করতে চাপুন";
+  b.style.opacity = on ? "1" : "0.5";
+}
+
+/* প্রথম ছোঁয়াতেই অডিও খুলে রাখা */
+function ooUnlockAudio(){
+  try{
+    if(!__ooAudioCtx) __ooAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(__ooAudioCtx.state === "suspended") __ooAudioCtx.resume();
+  }catch(e){}
+}
+["click","touchstart","keydown"].forEach(function(ev){
+  document.addEventListener(ev, ooUnlockAudio, { once:true, passive:true });
+});
+
+/* রেস্টুরেন্টের টোন — কাউন্টারের ঘণ্টার মতো দুইবার "টিং-টিং"।
+   অনেকক্ষণ বাজে না, কিন্তু রান্নাঘরের শব্দ ছাপিয়ে কানে লাগে। */
+function ooPlayChime(force){
+  if(!force && !ooBellOn()){
+    try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
+    return;
+  }
+  try{ if(navigator.vibrate) navigator.vibrate([200,100,200,100,300]); }catch(e){}
+  try{
+    if(!__ooAudioCtx) __ooAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = __ooAudioCtx;
+    if(ctx.state === "suspended"){
+      // বন্ধ থাকলে খুলে নিয়ে তারপর বাজানো — নাহলে কোনো শব্দই হতো না
+      ctx.resume().then(function(){ ooRingBell(ctx); }).catch(function(){});
+      return;
+    }
+    ooRingBell(ctx);
+  }catch(e){ console.warn("chime:", e); }
+}
+
+function ooRingBell(ctx){
+  const now = ctx.currentTime;
+  // দুইটা টোকা, প্রতিটায় মূল সুর + তার উপরের সুর — ধাতব ঘণ্টার মতো শোনায়
+  [0, 0.42].forEach(function(start){
+    [[988, 0.30], [1319, 0.13]].forEach(function(pair){
+      const freq = pair[0], vol = pair[1];
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + start);
+      // ঘণ্টার মতো করে শুরুতে জোরে, তারপর আস্তে আস্তে মিলিয়ে যাওয়া
+      gain.gain.setValueAtTime(0.0001, now + start);
+      gain.gain.exponentialRampToValueAtTime(vol, now + start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + start + 0.95);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now + start);
+      osc.stop(now + start + 1.0);
+    });
+  });
+}
+
+document.getElementById("ooBell") &&
+  document.getElementById("ooBell").addEventListener("click", function(){
+    ooUnlockAudio();
+    const next = !ooBellOn();
+    ooBellSet(next);
+    // চালু করলে একবার বাজিয়ে শোনানো — কেমন শব্দ হবে জেনে রাখা ভালো
+    if(next) ooPlayChime(true);
+    if(typeof toastRP === "function"){
+      toastRP(next ? "🔔 নতুন অর্ডারে শব্দ হবে" : "🔕 শব্দ বন্ধ — শুধু কাঁপবে");
+    }
+  });
+ooBellUi();
+
+/* ════════ 📲 পুশ নোটিফিকেশন ════════
+   অ্যাপ বন্ধ থাকলেও যেন অর্ডার জানা যায়। টোকেনটা restaurants/{uid}-এ
+   জমা থাকে, আর Cloud Function নতুন অর্ডার এলে ওখানেই পাঠায়।
+
+   ⚠️ এটা কাজ করার শর্ত: HTTPS সাইট, ব্যবহারকারীর অনুমতি, আর
+      firebase-messaging-sw.js ফাইলটা সাইটের গোড়ায় থাকা। কোনোটা না
+      থাকলে চুপচাপ বাদ যায় — পাতার বাকি কিছু ভাঙে না।                */
+const OO_VAPID = "BCEdpLGNUIBG2IW9lTVGcaM7qbFrbaEnGg9N1CYGNCojCVUIruqqcWP4cdX3YietIJ1kWe1ZUulbCQpvSQXAIKg";
+
+async function ooSetupPush(){
+  if(!("Notification" in window) || !("serviceWorker" in navigator)) return;
+  if(!firebase.messaging || !firebase.messaging.isSupported) return;
+  try{
+    if(!(await firebase.messaging.isSupported())) return;
+    const perm = await Notification.requestPermission();
+    if(perm !== "granted") return;
+
+    const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({ vapidKey: OO_VAPID, serviceWorkerRegistration: reg });
+    if(token){
+      await db.collection("restaurants").doc(RP.uid)
+              .set({ fcmToken: token, fcmUpdatedAt: fbNow() }, { merge:true });
+    }
+    // অ্যাপ খোলা থাকলে ব্যাকগ্রাউন্ড হ্যান্ডলার চলে না — তাই এখানে শব্দ
+    messaging.onMessage(function(){ ooPlayChime(); });
+  }catch(e){
+    console.warn("push setup:", e && (e.code || e.message));
+  }
+}
+
 /* ════════ 🌐 অনলাইন অর্ডার ════════
    গ্রাহক Honey Bee Bazar-এ কার্টে খাবার দিয়ে অর্ডার করলে সেটা
    orderRequests ঘরে জমা হয় — দোকানের প্রোডাক্ট যেভাবে যায়, ঠিক
@@ -1258,7 +1386,7 @@ function ooAlertIfNew(){
   const n = ooAll.filter(function(o){ return (o.status||"pending") === "pending"; }).length;
   if(n > ooSeenNew){
     if(typeof toastRP === "function") toastRP("🔔 নতুন অনলাইন অর্ডার এসেছে!");
-    try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
+    ooPlayChime();
   }
   ooSeenNew = n;
 }
@@ -1586,6 +1714,7 @@ auth.onAuthStateChanged(async function(user){
       + "<small>" + (d.area || "Restaurant POS") + "</small>";
 
     ooStart();          // 🌐 অনলাইন অর্ডার লাইভ শোনা শুরু
+    ooSetupPush();      // 📲 বন্ধ থাকলেও যেন জানা যায়
     await loadProducts();
     document.getElementById("rpGate").style.display = "none";
     init();
