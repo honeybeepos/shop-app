@@ -1604,6 +1604,67 @@ exports.adminUpdateShopOwnerEmail = onCall(async (request) => {
   }
 });
 
+// 🍽️🔔 রেস্টুরেন্টে নতুন অনলাইন অর্ডার এলে ফোনে পুশ নোটিফিকেশন।
+//
+// কেন দরকার: রান্নাঘরে কেউ পর্দার দিকে তাকিয়ে থাকেন না। POS খোলা
+// থাকলে পাতাটা নিজেই ঘণ্টা বাজায়, কিন্তু অ্যাপ বন্ধ থাকলে অর্ডার
+// চুপচাপ পড়ে থাকত আর গ্রাহক বসে থাকতেন।
+//
+// ⚠️ বাজারের চেকআউট প্রতিটা খাবারের জন্য আলাদা ডকুমেন্ট বানায়। তিনটা
+//    খাবার অর্ডার করলে এই ফাংশনটা তিনবার চলত, ফোনে তিনটা নোটিফিকেশন
+//    যেত। তাই একই গ্রাহকের অর্ডারে একটাই tag ব্যবহার করা হচ্ছে —
+//    ফোন তখন আগেরটা বদলে দেয়, তিনবার বাজে না।
+exports.notifyRestaurantNewOrder = onDocumentCreated(
+  "orderRequests/{orderId}",
+  async (event) => {
+    try {
+      const o = event.data && event.data.data();
+      if (!o || !o.shopId) return;
+
+      // shopId-তে রেস্টুরেন্টের uid বসে। দোকানের অর্ডার হলে এখানে
+      // কিছুই পাওয়া যাবে না, তাই চুপচাপ ফিরে যাওয়া।
+      const rSnap = await db.collection("restaurants").doc(o.shopId).get();
+      if (!rSnap.exists) return;
+
+      const r = rSnap.data();
+      const token = r.fcmToken;
+      if (!token) return;   // এখনো কেউ অনুমতি দেয়নি
+
+      const item = o.productName || "খাবার";
+      const qty = Number(o.qty) || 1;
+
+      await getMessaging().send({
+        token,
+        notification: {
+          title: "🔔 নতুন অর্ডার এসেছে!",
+          body: `${item} ×${qty} — ${o.customerName || "গ্রাহক"}`,
+        },
+        data: {
+          type: "restaurant-order",
+          // একই গ্রাহকের সব খাবারে এক tag, যাতে একটাই নোটিফিকেশন দেখায়
+          orderId: String(o.customerUid || event.params.orderId),
+          shopId: String(o.shopId),
+        },
+        webpush: {
+          fcmOptions: { link: "/restaurant-pos.html" },
+        },
+      });
+    } catch (err) {
+      // টোকেন মরে গেলে মুছে দেওয়া — নাহলে প্রতিবার একই ভুল হতো
+      if (err && (err.code === "messaging/registration-token-not-registered" ||
+                  err.code === "messaging/invalid-registration-token")) {
+        const o = event.data && event.data.data();
+        if (o && o.shopId) {
+          await db.collection("restaurants").doc(o.shopId)
+                  .update({ fcmToken: FieldValue.delete() }).catch(() => {});
+        }
+        return;
+      }
+      console.error("notifyRestaurantNewOrder ব্যর্থ:", err);
+    }
+  }
+);
+
 // 🔑 সুপার অ্যাডমিন যেকোনো একাউন্টের পাসওয়ার্ড বদলে দেন।
 //
 // কেন এটা দরকার: দোকানদার, রাইডার, ড্রাইভার আর রেস্টুরেন্ট — সবাই মোবাইল
