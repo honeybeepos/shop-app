@@ -1668,6 +1668,36 @@ exports.adminUpdateShopOwnerEmail = onCall(async (request) => {
   }
 });
 
+// ⏱️ গ্রাহকের "ভেবে দেখার" ১ মিনিট শেষ হলে অর্ডারটা বিক্রেতার কাছে
+// ছেড়ে দেওয়া — status "holding" থেকে "pending"।
+//
+// কেন সার্ভারে, গ্রাহকের ফোনে নয়: ফোনে টাইমার চালালে গ্রাহক অ্যাপ বন্ধ
+// করে দিলে, নেট চলে গেলে, বা ফোন ঘুমিয়ে পড়লে অর্ডারটা চিরকাল আটকে
+// থাকত — দোকান কোনোদিন জানতই না। সার্ভারে থাকলে গ্রাহক যা-ই করুন,
+// এক মিনিট পরে অর্ডার ঠিকই পৌঁছে যায়।
+//
+// প্রতি মিনিটে একবার চলে, তাই অপেক্ষা ৬০ থেকে ১২০ সেকেন্ড হতে পারে।
+// গ্রাহককে "প্রায় ১ মিনিট" বলাই সৎ, "ঠিক ৬০ সেকেন্ড" নয়।
+exports.releaseHeldOrders = onSchedule("every 1 minutes", async () => {
+  const now = new Date();
+  const snap = await db.collection("orderRequests")
+    .where("status", "==", "holding")
+    .where("releaseAt", "<=", now)
+    .limit(200)
+    .get();
+
+  if (snap.empty) return;
+
+  // একসাথে লেখা — একটা ছেড়ে আরেকটা বাদ পড়লে এক রসিদের অর্ধেক
+  // দোকানে যেত, বাকি অর্ধেক আটকে থাকত
+  const batch = db.batch();
+  snap.docs.forEach((d) => {
+    batch.set(d.ref, { status: "pending", releasedAt: FieldValue.serverTimestamp() }, { merge: true });
+  });
+  await batch.commit();
+  console.log(JSON.stringify({ event: "HELD_ORDERS_RELEASED", count: snap.size }));
+});
+
 // 🔔 অর্ডারের অবস্থা বদলালে গ্রাহককে জানানো — "পথে আছে", "পৌঁছে গেছে",
 // "বাতিল"। আগে শুধু "গ্রহণ করা হয়েছে" পর্যন্ত খবর যেত, তারপর গ্রাহক
 // অন্ধকারে থাকতেন — অ্যাপ খুলে নিজে না দেখলে জানার উপায় ছিল না।
@@ -1720,48 +1750,49 @@ exports.notifyCustomerOrderStatus = onDocumentUpdated(
 //    খাবার অর্ডার করলে এই ফাংশনটা তিনবার চলত, ফোনে তিনটা নোটিফিকেশন
 //    যেত। তাই একই গ্রাহকের অর্ডারে একটাই tag ব্যবহার করা হচ্ছে —
 //    ফোন তখন আগেরটা বদলে দেয়, তিনবার বাজে না।
-exports.notifyRestaurantNewOrder = onDocumentCreated(
+exports.notifyRestaurantNewOrder = onDocumentWritten(
   "orderRequests/{orderId}",
   async (event) => {
     try {
-      const o = event.data && event.data.data();
-      if (!o || !o.shopId) return;
+      const before = event.data.before.exists ? event.data.before.data() : null;
+      const after = event.data.after.exists ? event.data.after.data() : null;
+      if (!after || !after.shopId) return;
 
-      // shopId-তে রেস্টুরেন্টের uid বসে। দোকানের অর্ডার হলে এখানে
-      // কিছুই পাওয়া যাবে না, তাই চুপচাপ ফিরে যাওয়া।
-      const rSnap = await db.collection("restaurants").doc(o.shopId).get();
-      if (!rSnap.exists) return;
+      // ⏱️ অর্ডার প্রথমে "holding" অবস্থায় বসে — গ্রাহকের ভেবে দেখার
+      //    ১ মিনিট। রেস্টুরেন্ট জানবে তখনই, যখন সেটা সত্যিই "pending"
+      //    হয়। আগে তৈরি হওয়ামাত্রই জানানো হতো — তাহলে গ্রাহক বাতিল
+      //    করলেও রেস্টুরেন্টের ফোন বেজে যেত, রাঁধুনি রান্না শুরু করে দিতেন।
+      if (after.status !== "pending") return;
+      if (before && before.status === "pending") return;   // আগেই জানানো হয়েছে
 
-      const r = rSnap.data();
-      const token = r.fcmToken;
-      if (!token) return;   // এখনো কেউ অনুমতি দেয়নি
+      const rSnap = await db.collection("restaurants").doc(after.shopId).get();
+      if (!rSnap.exists) return;   // দোকানের অর্ডার — এটা এই ফাংশনের কাজ নয়
 
-      const item = o.productName || "খাবার";
-      const qty = Number(o.qty) || 1;
+      const token = rSnap.data().fcmToken;
+      if (!token) return;
+
+      const item = after.productName || "খাবার";
+      const qty = Number(after.qty) || 1;
 
       await getMessaging().send({
         token,
         notification: {
           title: "🔔 নতুন অর্ডার এসেছে!",
-          body: `${item} ×${qty} — ${o.customerName || "গ্রাহক"}`,
+          body: `${item} ×${qty} — ${after.customerName || "গ্রাহক"}`,
         },
         data: {
           type: "restaurant-order",
-          // একই গ্রাহকের সব খাবারে এক tag, যাতে একটাই নোটিফিকেশন দেখায়
-          orderId: String(o.customerUid || event.params.orderId),
-          shopId: String(o.shopId),
+          orderId: String(after.customerUid || event.params.orderId),
+          shopId: String(after.shopId),
         },
-        webpush: {
-          fcmOptions: { link: "/restaurant-pos.html" },
-        },
+        webpush: { fcmOptions: { link: "/restaurant-pos.html" } },
       });
     } catch (err) {
-      // টোকেন মরে গেলে মুছে দেওয়া — নাহলে প্রতিবার একই ভুল হতো
       if (err && (err.code === "messaging/registration-token-not-registered" ||
                   err.code === "messaging/invalid-registration-token")) {
-        const o = event.data && event.data.data();
-        if (o && o.shopId) {
-          await db.collection("restaurants").doc(o.shopId)
+        const a = event.data.after.exists ? event.data.after.data() : null;
+        if (a && a.shopId) {
+          await db.collection("restaurants").doc(a.shopId)
                   .update({ fcmToken: FieldValue.delete() }).catch(() => {});
         }
         return;
