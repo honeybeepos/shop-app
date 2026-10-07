@@ -17868,6 +17868,27 @@ function ordCardListRowHtml_invoice(b){
    খোলার সময় একবার সাম্প্রতিক ১০০০টা রেকর্ড fetch করে ক্লায়েন্ট-সাইডে যোগফল করা
    হয় — নাহলে সময়ের সাথে সাথে একটা কালেকশন যত বড় হবে, লিস্টেনারও তত ভারী হয়ে
    যেত (ঠিক আগের ক্র্যাশ-কারণের মতোই একটা ফাঁদ, তাই সচেতনভাবে এড়ানো হয়েছে)। */
+/* ⚠️ আগে এখানে শুধু "লোড করতে সমস্যা হয়েছে" লেখা দেখাতো, আর আসল
+   কারণটা যেত console-এ — যেটা ফোনে খোলার উপায় নেই। তাই দোকানদার
+   বুঝতেই পারতেন না কোনটা করতে হবে — index বানানো, নিয়ম publish করা,
+   নাকি শুধু ইন্টারনেট দেখা। এখন কারণটা পর্দাতেই লেখা থাকে। */
+function ordLoadErrorHtml(e){
+  const code = (e && e.code) ? String(e.code) : '';
+  if(code.indexOf('failed-precondition') > -1){
+    return '<div class="glassEmpty" style="text-align:left; line-height:1.7;">'
+      + '⚠️ Firestore-এ <b>index</b> বানানো হয়নি।<br>'
+      + '<span style="font-size:11.5px; opacity:.85;">কম্পিউটার থেকে একবার চালান:<br>'
+      + '<code>firebase deploy --only firestore:indexes</code><br>'
+      + '২-৩ মিনিট পর আবার দেখুন।</span></div>';
+  }
+  if(code.indexOf('permission-denied') > -1){
+    return '<div class="glassEmpty" style="text-align:left; line-height:1.7;">'
+      + '⚠️ দেখার অনুমতি নেই।<br>'
+      + '<span style="font-size:11.5px; opacity:.85;">নতুন <code>firestore.rules</code> publish করতে হবে।</span></div>';
+  }
+  return '<div class="glassEmpty">লোড করতে সমস্যা হয়েছে — ইন্টারনেট দেখে আবার চেষ্টা করুন।</div>';
+}
+
 let __ordVisitsCache = [];
 let __ordProductViewsCache = [];
 
@@ -17956,7 +17977,7 @@ async function ordRenderCardListRows(status){
       const uniqueVisitors = new Set(visits.map(v=>v.visitorId)).size;
       countEl.textContent = uniqueVisitors;
       rowsEl.innerHTML = visits.length ? visits.map(ordCardListRowHtml_visit).join('') : '<div class="glassEmpty">এখনো কোনো ভিজিট রেকর্ড হয়নি</div>';
-    }catch(e){ console.error('ordRenderCardListRows (visitors) failed:', e); rowsEl.innerHTML = '<div class="glassEmpty">লোড করতে সমস্যা হয়েছে</div>'; }
+    }catch(e){ console.error('ordRenderCardListRows (visitors) failed:', e); rowsEl.innerHTML = ordLoadErrorHtml(e); }
     return;
   }
   if(status === 'productviews'){
@@ -17967,7 +17988,7 @@ async function ordRenderCardListRows(status){
       __ordProductViewsCache = agg;
       countEl.textContent = agg.length;
       rowsEl.innerHTML = agg.length ? agg.map((pv,i)=>ordCardListRowHtml_productView(pv, i+1)).join('') : '<div class="glassEmpty">এখনো কোনো প্রোডাক্ট-ভিউ রেকর্ড হয়নি</div>';
-    }catch(e){ console.error('ordRenderCardListRows (productviews) failed:', e); rowsEl.innerHTML = '<div class="glassEmpty">লোড করতে সমস্যা হয়েছে</div>'; }
+    }catch(e){ console.error('ordRenderCardListRows (productviews) failed:', e); rowsEl.innerHTML = ordLoadErrorHtml(e); }
     return;
   }
   const cfg = ORD_STATUS_CARD_CONFIG[status];
