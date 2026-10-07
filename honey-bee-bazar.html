@@ -2920,6 +2920,7 @@
   <div style="display:flex; align-items:center; margin:16px 4px 8px;">
     <div style="font-weight:800; font-size:14px;">📦 আমার অর্ডারসমূহ</div>
     <span id="hbCartOrdersFilterClear" style="display:none; margin-left:auto; font-size:11px; color:var(--amber); cursor:pointer;">সব দেখুন ✕</span>
+    <span id="hbOrdersClearDone" style="display:none; margin-left:auto; font-size:11.5px; color:#f87171; cursor:pointer; padding:4px 9px; border:1px solid rgba(248,113,113,0.4); border-radius:8px;">🧹 শেষ হওয়াগুলো মুছে ফেলুন</span>
   </div>
   <div id="hbCartOrdersList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
 </div>
@@ -10629,13 +10630,19 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
       deliveryAddress, deliveryPhone,
       deliveryLat: __hbDeliveryGpsCoords ? __hbDeliveryGpsCoords.lat : null,
       deliveryLng: __hbDeliveryGpsCoords ? __hbDeliveryGpsCoords.lng : null,
-      qty: it.qty, status: "pending", createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      // ⏱️ অর্ডার সাথে সাথে দোকানে যায় না — ১ মিনিট "holding" অবস্থায়
+      //    থাকে, যাতে গ্রাহক ভুল বুঝলে বাতিল করতে পারেন বা আরও কিছু
+      //    যোগ করতে পারেন। সার্ভারের একটা কাজ ১ মিনিট পরে এটাকে
+      //    "pending" করে দেয়, তখনই দোকান/রেস্টুরেন্ট দেখতে পায়।
+      qty: it.qty, status: "holding",
+      releaseAt: firebase.firestore.Timestamp.fromMillis(Date.now() + HB_HOLD_MS),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
     })));
     hbCartSet([]);
     hbCartRenderItems();
     $("hbCartAddressInput").value = ""; $("hbCartPhoneInput").value = "";
     __hbDeliveryGpsCoords = null; $("hbCartGpsStatus").style.display = "none";
-    alert("✅ আপনার অর্ডার(গুলো) পাঠানো হয়েছে — দোকান(গুলো) শীঘ্রই যোগাযোগ করবে।");
+    alert("✅ অর্ডার নেওয়া হয়েছে!\n\n⏱️ প্রায় ১ মিনিট সময় আছে — এর মধ্যে চাইলে বাতিল করতে পারবেন বা আরও কিছু যোগ করতে পারবেন। তারপর দোকানে চলে যাবে।");
     // 📦 অর্ডার যেন কখনো "হারিয়ে" না যায় — কনফার্মের সাথে সাথেই সরাসরি
     // Order Tracking-এ নিয়ে যাওয়া হচ্ছে, যাতে "আমার অর্ডারসমূহ"-তে
     // 🕐 পেন্ডিং হিসেবে অর্ডারটা তখনই চোখে পড়ে (আগের কোনো ফিল্টার সাফ করে দিয়ে)
@@ -10742,10 +10749,18 @@ $("hbOrderTrackingBackBtn").addEventListener("click", hbCloseOrderTracking);
 
 /* ---------- 📦🚚 আমার অর্ডারসমূহ + এনিমেটেড ট্র্যাকার ---------- */
 const HB_STATUS_LABEL = {
+  holding: "⏱️ অপেক্ষায়",
   pending: "🕐 পেন্ডিং", preparing: "📦 প্রস্তুত হচ্ছে", shipped: "🚚 পথে আছে",
   delivered: "✅ ডেলিভার্ড", cancelled: "❌ বাতিল"
 };
+/* ⏱️ অর্ডার দেওয়ার পর ভেবে দেখার সময়। সার্ভারের কাজটা প্রতি মিনিটে
+   একবার চলে, তাই আসল অপেক্ষা ৬০-১২০ সেকেন্ড হতে পারে — গ্রাহককে
+   "প্রায় ১ মিনিট" বলা হচ্ছে, কারণ "ঠিক ৬০ সেকেন্ড" বললে ঘড়ি ধরে বসে
+   থাকলে ঠকতেন। */
+const HB_HOLD_MS = 60 * 1000;
+
 const HB_STATUS_STEPS = [
+  { key:"holding", icon:"⏱️", label:"অপেক্ষায়", timeField:"createdAt", color:"#fbbf24" },
   { key:"pending", icon:"🛒", label:"অর্ডার দেওয়া হয়েছে", timeField:"createdAt", color:"#a78bfa" },
   { key:"preparing", icon:"📦", label:"প্রস্তুত হচ্ছে", timeField:"preparingAt", color:"#818cf8" },
   { key:"shipped", icon:"🚚", label:"পথে আছে", timeField:"shippedAt", color:"#38bdf8" },
@@ -10813,7 +10828,39 @@ function hbTrackMiniRender(){
 
 function hbOrdersRender(){
   const listEl = $("hbCartOrdersList");
-  let orders = __hbOrdersData;
+  // 🧹 গ্রাহক যেগুলো নিজের তালিকা থেকে সরিয়েছেন সেগুলো আর দেখানো হয় না
+  //    (দোকান/রেস্টুরেন্টের হিসাবে ঠিকই থেকে যায়)
+  let orders = __hbOrdersData.filter(function(o){ return o.hiddenForCustomer !== true; });
+
+  /* 🧹 শেষ হয়ে যাওয়া অর্ডার একসাথে মুছে ফেলার বোতাম — একেকটা ✕ চাপা
+     বিরক্তিকর, বিশেষ করে যাঁদের অনেক বাতিল অর্ডার জমেছে। চলতি অর্ডার
+     কখনো মুছবে না — তাহলে কেউ ভুল চেপে চলতি অর্ডারের খবর হারিয়ে ফেলতেন। */
+  const __doneOrders = orders.filter(function(o){
+    const st = o.status || "pending";
+    return st === "delivered" || st === "cancelled";
+  });
+  const __clearBtn = $("hbOrdersClearDone");
+  if(__clearBtn){
+    __clearBtn.style.display = (__doneOrders.length >= 2 && !__hbOrdersFilter) ? "inline-block" : "none";
+    __clearBtn.textContent = "🧹 শেষ হওয়া " + __doneOrders.length + "টা মুছে ফেলুন";
+    __clearBtn.onclick = async function(){
+      if(!confirm(__doneOrders.length + "টা শেষ হওয়া অর্ডার তালিকা থেকে মুছে ফেলবেন?\n\nচলতি অর্ডারগুলো ঠিকই থাকবে।")) return;
+      __clearBtn.style.pointerEvents = "none";
+      __clearBtn.textContent = "মুছে ফেলা হচ্ছে...";
+      try{
+        // একসাথে লেখা — একটা একটা করে পাঠালে মাঝপথে নেট গেলে
+        // অর্ধেক মুছে অর্ধেক থেকে যেত
+        const batch = db.batch();
+        __doneOrders.forEach(function(o){
+          batch.set(db.collection("orderRequests").doc(o.id), { hiddenForCustomer: true }, { merge:true });
+        });
+        await batch.commit();
+      }catch(err){
+        alert("মুছতে পারেনি — ইন্টারনেট দেখে আবার চেষ্টা করুন।");
+      }
+      __clearBtn.style.pointerEvents = "";
+    };
+  }
   if(__hbOrdersFilter) orders = orders.filter(o=> (o.status||"pending") === __hbOrdersFilter);
 
   if(orders.length === 0){
@@ -10830,9 +10877,48 @@ function hbOrdersRender(){
           <div style="font-size:11px; color:var(--muted);">পরিমাণ: ${o.qty||1} · ${time}</div>
         </div>
         <span style="font-size:11px; font-weight:800; flex-shrink:0;">${HB_STATUS_LABEL[status]||status}</span>
-        <span style="color:var(--muted); font-size:14px;">›</span>
+        ${status === "holding"
+          ? `<button class="hbOrderCancel" data-oid="${o.id}" style="flex-shrink:0; padding:6px 11px; border-radius:9px; border:1px solid #f87171; background:transparent; color:#f87171; font-size:11.5px; font-weight:700; font-family:inherit; cursor:pointer;">বাতিল</button>`
+          : (status === "delivered" || status === "cancelled")
+            ? `<button class="hbOrderHide" data-oid="${o.id}" title="তালিকা থেকে সরান" style="flex-shrink:0; padding:6px 10px; border-radius:9px; border:1px solid var(--border); background:transparent; color:var(--muted); font-size:13px; font-family:inherit; cursor:pointer;">✕</button>`
+            : `<span style="color:var(--muted); font-size:14px;">›</span>`}
       </div>`;
   }).join("");
+
+  /* ⏱️ অপেক্ষায় থাকা অর্ডার বাতিল — দোকান এখনো দেখেইনি, তাই
+     পুরোপুরি মুছে ফেলা হয় — যেন কখনো অর্ডারই হয়নি। */
+  listEl.querySelectorAll(".hbOrderCancel").forEach(function(btn){
+    btn.addEventListener("click", async function(e){
+      e.stopPropagation();
+      if(!confirm("এই অর্ডারটি বাতিল করবেন?")) return;
+      btn.disabled = true; btn.textContent = "...";
+      try{
+        await db.collection("orderRequests").doc(btn.dataset.oid).delete();
+      }catch(err){
+        btn.disabled = false; btn.textContent = "বাতিল";
+        alert(err && err.code === "permission-denied"
+          ? "সময় শেষ — অর্ডারটি দোকানে পৌঁছে গেছে। বাতিল করতে দোকানে ফোন করুন।"
+          : "বাতিল করা যায়নি — আবার চেষ্টা করুন।");
+      }
+    });
+  });
+
+  /* 🧹 শেষ হয়ে যাওয়া অর্ডার সরানো — মোছা হয় না, শুধু নিজের তালিকা
+     থেকে লুকানো। একটাই নথি দুই পক্ষ দেখে — মুছে ফেললে দোকানের
+     বিক্রির হিসাবও হারিয়ে যেত। */
+  listEl.querySelectorAll(".hbOrderHide").forEach(function(btn){
+    btn.addEventListener("click", async function(e){
+      e.stopPropagation();
+      btn.disabled = true;
+      try{
+        await db.collection("orderRequests").doc(btn.dataset.oid)
+                .update({ hiddenForCustomer: true });
+      }catch(err){
+        btn.disabled = false;
+        alert("সরানো যায়নি — আবার চেষ্টা করুন।");
+      }
+    });
+  });
 
   listEl.querySelectorAll(".hbOrderCard").forEach(card=>{
     card.addEventListener("click", ()=>{

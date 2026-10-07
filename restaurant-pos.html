@@ -1343,7 +1343,10 @@ function ooStart(){
     .where("shopId", "==", RP.uid)
     .limit(200)
     .onSnapshot(function(qs){
-      ooAll = qs.docs.map(function(d){ return Object.assign({ id:d.id }, d.data()); });
+      // 🧹 রেস্টুরেন্ট যেগুলো নিজের তালিকা থেকে সরিয়েছে সেগুলো আর দেখায় না
+      //    (গ্রাহকের তালিকায় আগের মতোই থাকে)
+      ooAll = qs.docs.map(function(d){ return Object.assign({ id:d.id }, d.data()); })
+                     .filter(function(o){ return o.hiddenForSeller !== true; });
       ooRender();
       ooAlertIfNew();
     }, function(e){
@@ -1406,6 +1409,20 @@ async function ooSetStatus(ids, status, extra){
   }
 }
 
+/* এক রসিদের সব নথি একসাথে লুকানো — একটা লুকিয়ে আরেকটা রেখে দিলে
+   অর্ধেক রসিদ ঝুলে থাকত */
+async function ooHide(ids){
+  try{
+    const batch = db.batch();
+    ids.forEach(function(id){
+      batch.set(db.collection("orderRequests").doc(id), { hiddenForSeller: true }, { merge:true });
+    });
+    await batch.commit();
+  }catch(e){
+    if(typeof toastRP === "function") toastRP("সরানো যায়নি — " + (e.code||"আবার চেষ্টা করুন"), true);
+  }
+}
+
 function ooRender(){
   const box = document.getElementById("ooList"); if(!box) return;
   const badge = document.getElementById("ooBadge");
@@ -1442,6 +1459,9 @@ function ooRender(){
       btns = '<button class="btn primary" data-oo="shipped" data-k="'+g.key+'">🛵 পাঠানো হয়েছে</button>';
     }else if(g.status === "shipped"){
       btns = '<button class="btn primary" data-oo="delivered" data-k="'+g.key+'">✅ পৌঁছে গেছে</button>';
+    }else if(g.status === "delivered" || g.status === "cancelled"){
+      // শেষ হয়ে গেছে — তালিকা পরিষ্কার করার সুযোগ
+      btns = '<button class="btn" data-oo="hide" data-k="'+g.key+'">🧹 তালিকা থেকে সরান</button>';
     }
 
     return '<div class="order-row" style="align-items:flex-start;flex-direction:column;gap:8px">'
@@ -1465,6 +1485,12 @@ function ooRender(){
     b.addEventListener("click", function(){
       const g = list.find(function(x){ return x.key === b.dataset.k; });
       if(!g) return;
+      if(b.dataset.oo === "hide"){
+        // অর্ডারটা মোছা হয় না — শুধু এই তালিকা থেকে সরে, যাতে
+        // বিক্রির হিসাব আর গ্রাহকের দেখা দুইটাই অক্ষত থাকে
+        ooHide(g.ids);
+        return;
+      }
       if(b.dataset.oo === "cancelled"
          && !confirm("এই অর্ডারটা বাতিল করবেন? গ্রাহক তাঁর অ্যাপে দেখতে পাবেন।")) return;
       ooSetStatus(g.ids, b.dataset.oo);
