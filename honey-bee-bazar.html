@@ -10687,6 +10687,8 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
 
   const btn = $("hbCartCheckoutBtn");
   btn.disabled = true; btn.textContent = "অর্ডার হচ্ছে...";
+  // এই রসিদের সব পণ্যের জন্য একটাই নম্বর
+  const __orderCode = hbMakeOrderCode();
   try{
     await Promise.all(items.map(it=> db.collection("orderRequests").add({
       shopId: it.shopId, productId: it.productId, productName: it.productName,
@@ -10705,6 +10707,7 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
       //    থাকে, যাতে গ্রাহক ভুল বুঝলে বাতিল করতে পারেন বা আরও কিছু
       //    যোগ করতে পারেন। সার্ভারের একটা কাজ ১ মিনিট পরে এটাকে
       //    "pending" করে দেয়, তখনই দোকান/রেস্টুরেন্ট দেখতে পায়।
+      orderCode: __orderCode,
       qty: it.qty, status: "holding",
       releaseAt: firebase.firestore.Timestamp.fromMillis(Date.now() + HB_HOLD_MS),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -10713,7 +10716,7 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
     hbCartRenderItems();
     $("hbCartAddressInput").value = ""; $("hbCartPhoneInput").value = "";
     __hbDeliveryGpsCoords = null; $("hbCartGpsStatus").style.display = "none";
-    alert("✅ অর্ডার নেওয়া হয়েছে!\n\n⏱️ প্রায় ১ মিনিট সময় আছে — এর মধ্যে চাইলে বাতিল করতে পারবেন বা আরও কিছু যোগ করতে পারবেন। তারপর দোকানে চলে যাবে।");
+    alert("✅ অর্ডার নেওয়া হয়েছে!\n\n🧾 অর্ডার নম্বর: " + __orderCode + "\n\n⏱️ প্রায় ১ মিনিট সময় আছে — এর মধ্যে চাইলে বাতিল করতে পারবেন বা আরও কিছু যোগ করতে পারবেন। তারপর দোকানে চলে যাবে।");
     // 📦 অর্ডার যেন কখনো "হারিয়ে" না যায় — কনফার্মের সাথে সাথেই সরাসরি
     // Order Tracking-এ নিয়ে যাওয়া হচ্ছে, যাতে "আমার অর্ডারসমূহ"-তে
     // 🕐 পেন্ডিং হিসেবে অর্ডারটা তখনই চোখে পড়ে (আগের কোনো ফিল্টার সাফ করে দিয়ে)
@@ -10828,12 +10831,28 @@ const HB_STATUS_LABEL = {
    একবার চলে, তাই আসল অপেক্ষা ৬০-১২০ সেকেন্ড হতে পারে — গ্রাহককে
    "প্রায় ১ মিনিট" বলা হচ্ছে, কারণ "ঠিক ৬০ সেকেন্ড" বললে ঘড়ি ধরে বসে
    থাকলে ঠকতেন। */
+/* 🧾 অর্ডার নম্বর। আগে শুধু Firestore-এর ২০ অক্ষরের এলোমেলো
+   আইডি ছিল — কেউ মুখে বলতে পারত না। গ্রাহক ফোন করে "আমার
+   অর্ডারটা" বলতেন, দোকানদার খুঁজে পেতেন না।
+
+   এক রসিদের সব পণ্য একই কোড পায়। বিভ্রান্তিকর অক্ষর (O/0, I/1)
+   বাদ — ফোনে বলার সময় যেন ভুল না হয়।                               */
+function hbMakeOrderCode(){
+  const ch = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for(let i=0;i<4;i++) out += ch[Math.floor(Math.random()*ch.length)];
+  return out;
+}
+
 const HB_HOLD_MS = 60 * 1000;
 
 const HB_STATUS_STEPS = [
   { key:"holding", icon:"⏱️", label:"অপেক্ষায়", timeField:"createdAt", color:"#fbbf24" },
   { key:"pending", icon:"🛒", label:"অর্ডার দেওয়া হয়েছে", timeField:"createdAt", color:"#a78bfa" },
   { key:"preparing", icon:"📦", label:"প্রস্তুত হচ্ছে", timeField:"preparingAt", color:"#818cf8" },
+  // রাইডার অর্ডার নিলেই status "shipped" হয়, কিন্তু তখনো সে দোকানেই
+  // যাননি। pickedUp দেখে আসল কথাটা লেখা হয় — নাহলে গ্রাহক "পথে
+  // আছে" দেখে দরজায় অপেক্ষা করতেন, অথচ রাঁধাই শুরু হয়নি।
   { key:"shipped", icon:"🚚", label:"পথে আছে", timeField:"shippedAt", color:"#38bdf8" },
   { key:"delivered", icon:"🎉", label:"ডেলিভার্ড হয়েছে", timeField:"deliveredAt", color:"#34d399" }
 ];
@@ -10859,6 +10878,19 @@ function hbOrdersListen(){
       __hbOrdersUnsub = null;
       $("hbCartOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার লোড করা যায়নি — নেটওয়ার্ক চেক করুন। <span style="color:var(--amber); text-decoration:underline; cursor:pointer;" onclick="hbOrdersListen()">আবার চেষ্টা করুন</span></div>';
     });
+}
+
+/* 🛵 "পথে আছে" লেখাটা আগে মিথ্যা বলত। রাইডার অর্ডারটা
+   গ্রহণ করলেই status "shipped" হয় — কিন্তু তখনো সে দোকানেই
+   যায়নি। গ্রাহক দরজায় অপেক্ষা করতেন, আর মাল তখনও
+   দোকানেই। pickedUp দেখে এখন আসল কথাটা লেখা হয়।
+   পুরনো অর্ডারে pickedUp ফিল্ডটাই নেই — সেগুলো আগের মতোই
+   "পথে আছে" দেখাবে (=== false মিলবে না), তাই কিছু ভাঙেনি।      */
+function hbStepLabel(step, order){
+  if(step.key === "shipped" && order && order.pickedUp === false){
+    return "🏪 রাইডার দোকানে যাচ্ছেন";
+  }
+  return step.label;
 }
 
 function hbTrackMiniRender(){
@@ -10887,7 +10919,7 @@ function hbTrackMiniRender(){
     <div class="card" style="padding:14px; cursor:pointer;" id="hbTrackMiniClickable">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
         <div style="font-weight:800; font-size:13.5px;">📦 ${escapeHtml(latest.productName||"অর্ডার")}</div>
-        <span style="font-size:11px; font-weight:800; color:var(--amber);">${HB_STATUS_STEPS[stepIndex] ? HB_STATUS_STEPS[stepIndex].label : ""}</span>
+        <span style="font-size:11px; font-weight:800; color:var(--amber);">${HB_STATUS_STEPS[stepIndex] ? hbStepLabel(HB_STATUS_STEPS[stepIndex], latest) : ""}</span>
       </div>
       <div style="display:flex; align-items:center; gap:2px;">${dots}</div>
       ${miniNote ? `<div style="text-align:center; margin-top:8px; font-size:11px; color:var(--amber); font-weight:700;">${miniNote}</div>` : ""}
@@ -10947,10 +10979,12 @@ function hbOrdersRender(){
       <div class="hbOrderCard" data-oid="${o.id}" style="display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px; background:var(--card); border:1px solid var(--border); border-radius:12px; cursor:pointer;">
         <div style="flex:1; min-width:0;">
           <div style="font-weight:700; font-size:13px;">${escapeHtml(o.productName||"প্রোডাক্ট")}</div>
-          <div style="font-size:11px; color:var(--muted);">পরিমাণ: ${o.qty||1} · ${time}</div>
+          <div style="font-size:11px; color:var(--muted);">${o.orderCode ? '🧾 <b style="color:var(--amber);">' + escapeHtml(o.orderCode) + '</b> · ' : ''}পরিমাণ: ${o.qty||1} · ${time}</div>
         </div>
         <span style="font-size:11px; font-weight:800; flex-shrink:0;">${HB_STATUS_LABEL[status]||status}</span>
-        ${status === "holding"
+        ${status === "shipped"
+          ? `<button class="hbOrderGot" data-oid="${o.id}" style="flex-shrink:0; padding:6px 11px; border-radius:9px; border:1px solid #4ade80; background:transparent; color:#4ade80; font-size:11.5px; font-weight:700; font-family:inherit; cursor:pointer;">✅ পেয়েছি</button>`
+          : status === "holding"
           ? `<button class="hbOrderCancel" data-oid="${o.id}" style="flex-shrink:0; padding:6px 11px; border-radius:9px; border:1px solid #f87171; background:transparent; color:#f87171; font-size:11.5px; font-weight:700; font-family:inherit; cursor:pointer;">বাতিল</button>`
           : (status === "delivered" || status === "cancelled")
             ? `<button class="hbOrderHide" data-oid="${o.id}" title="তালিকা থেকে সরান" style="flex-shrink:0; padding:6px 10px; border-radius:9px; border:1px solid var(--border); background:transparent; color:var(--muted); font-size:13px; font-family:inherit; cursor:pointer;">✕</button>`
@@ -10979,6 +11013,28 @@ function hbOrdersRender(){
   /* 🧹 শেষ হয়ে যাওয়া অর্ডার সরানো — মোছা হয় না, শুধু নিজের তালিকা
      থেকে লুকানো। একটাই নথি দুই পক্ষ দেখে — মুছে ফেললে দোকানের
      বিক্রির হিসাবও হারিয়ে যেত। */
+  /* ✅ গ্রাহক নিজেই "পেয়েছি" চাপতে পারেন। আগে শুধু রাইডার
+     পারতেন — রাইডার ভুলে গেলে অর্ডার চিরকাল "পথে আছে"-তে থেকে
+     যেত, আর দোকানের হিসাবেও বিক্রিটা উঠত না। */
+  listEl.querySelectorAll(".hbOrderGot").forEach(function(btn){
+    btn.addEventListener("click", async function(e){
+      e.stopPropagation();
+      if(!confirm("অর্ডারটা বুঝে পেয়েছেন?")) return;
+      btn.disabled = true; btn.textContent = "...";
+      try{
+        await db.collection("orderRequests").doc(btn.dataset.oid).update({
+          status: "delivered",
+          deliveredAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }catch(err){
+        btn.disabled = false; btn.textContent = "✅ পেয়েছি";
+        alert(err && err.code === "permission-denied"
+          ? "এখন এটা করা যাচ্ছে না — নতুন নিয়ম publish করতে হবে।"
+          : "হয়নি — আবার চেষ্টা করুন।");
+      }
+    });
+  });
+
   listEl.querySelectorAll(".hbOrderHide").forEach(function(btn){
     btn.addEventListener("click", async function(e){
       e.stopPropagation();
@@ -11092,7 +11148,7 @@ function hbOpenTracker(order){
             <div class="hStepperDot ${state}" style="${dotBg}">${state === "done" ? "✓" : s.icon}</div>
             ${!isLast ? `<div class="hStepperLine ${rightLineDone ? "done" : ""}" style="${rightLineBg}"></div>` : ""}
           </div>
-          <div class="hStepperLabel ${state}">${s.label}</div>
+          <div class="hStepperLabel ${state}">${hbStepLabel(s, order)}</div>
           ${stepTime ? `<div class="hStepperTime">${stepTime}</div>` : (state==="active" ? `<div class="hStepperLiveBadge">Live</div>` : `<div class="hStepperTime">--:--</div>`)}
         </div>`;
     }).join("") + `</div>`;

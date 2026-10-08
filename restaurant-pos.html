@@ -1366,6 +1366,8 @@ function ooGroup(rows){
               + "|" + (o.status || "pending");
     if(!map[key]){
       map[key] = { key:key, ids:[], items:[], total:0, status:o.status||"pending",
+                   // 🧾 গ্রাহক ফোনে যে নম্বরটা বলবেন
+                   orderCode:o.orderCode || null,
                    customerName:o.customerName, deliveryPhone:o.deliveryPhone,
                    deliveryAddress:o.deliveryAddress, createdAt:o.createdAt };
       keys.push(key);
@@ -1467,6 +1469,7 @@ function ooRender(){
     return '<div class="order-row" style="align-items:flex-start;flex-direction:column;gap:8px">'
       + '<div style="display:flex;justify-content:space-between;width:100%;gap:8px;flex-wrap:wrap">'
       + '<div><b>' + (g.customerName || "গ্রাহক") + '</b> '
+      + (g.orderCode ? '<span style="background:rgba(255,193,7,0.18);color:#b45309;border-radius:7px;padding:1px 7px;font-size:12px;font-weight:800">🧾 ' + g.orderCode + '</span> ' : '')
       + '<span class="badge ' + (OO_CHIP[g.status]||"prep") + '">' + (OO_LABEL[g.status]||g.status) + '</span>'
       + '<br><span style="color:#64748b;font-size:12.5px">' + g.items.length + ' রকম · '
       + ooTime(g.createdAt) + '</span></div>'

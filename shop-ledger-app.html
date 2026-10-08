@@ -6995,6 +6995,9 @@ document.getElementById('backFromReport').addEventListener('click', ()=> switchP
    লোকেশন-ট্র্যাকিং কোড লাগেনি, বিদ্যমান Rider Mode-ই পুনর্ব্যবহার হচ্ছে। */
 let __ordCurrentStatus = "pending";
 let __ordUnsub = null;
+// 🏪 রাইডারকে দোকানের ঠিকানা/ফোন দেওয়ার জন্য — রাইডার বাছাইয়ের
+// সময় এই ডকুমেন্টটা এমনিতেই পড়া হয়, নতুন করে পড়তে হচ্ছে না
+let __ordShopProfile = null;
 let __ordShopMarketId = null;
 const ordFunctionsInstance = firebase.functions(); // 📦 "প্যাকেজিং শেষ" নোটিফিকেশন কল করার জন্য
 
@@ -7110,6 +7113,17 @@ document.getElementById('ordBellModalOverlay').addEventListener('click', (ev)=>{
   if(ev.target.id === 'ordBellModalOverlay') document.getElementById('ordBellModalOverlay').classList.remove('show');
 });
 
+/* 📞 দোকানের ফোন। shops ঘরে আলাদা ফোন ফিল্ড নেই — দোকানদার
+   নিজের বিবরণে যে নম্বরটা লেখেন সেটাই বের করা হয়।
+   functions/index.js-এর extractShopPhone()-এর হুবহু একই নিয়ম, যাতে
+   অটো আর ম্যানুয়াল দুই পথে রাইডার একই নম্বর দেখেন।            */
+function ordExtractShopPhone(text){
+  const m = String(text || '').match(/(\+?\d[\d\s-]{8,}\d)/);
+  if(!m) return null;
+  const digits = m[1].replace(/[^0-9]/g, '');
+  return digits.length >= 10 ? digits : null;
+}
+
 function ordListen(){
   const session = (typeof getSession === 'function') ? getSession() : null;
   if(!session || !session.shopId) return;
@@ -7128,6 +7142,20 @@ function ordListen(){
       const orders = qs.docs.map(d=> ({ id:d.id, ...d.data() }))
         .filter(o=> o.hiddenForSeller !== true)
         .sort((a,b)=> (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
+
+      /* 💰 আগে বিক্রির হিসাব তখনই উঠত যখন দোকানদার নিজে
+         "ডেলিভার্ড" চাপতেন। রাইডার বা গ্রাহক নিজে চাপলে বিক্রিটা
+         হিসাবে কখনোই ওঠত না — দোকানের খাতায় টাকা কম দেখাত।
+         এখন "ডেলিভার্ড" ট্যাব খুললেই বাকিস্টা ধরা পড়ে।
+         ordRecordDeliveredSale() নিজেই ডুপ্লিকেট আটকায় (onlineOrderId
+         দিয়ে), তাই দুইবার যোগ হওয়ার ভয় নেই।                              */
+      if(__ordCurrentStatus === 'delivered'){
+        orders.forEach(o=>{
+          if(Array.isArray(retailEntries) && retailEntries.some(e=> e.onlineOrderId === o.id)) return;
+          ordRecordDeliveredSale(o.id);
+        });
+      }
+
       ordRender(orders);
     }, (err)=>{
       console.warn('order list error:', err);
@@ -7153,6 +7181,8 @@ function ordGroupByCustomer(orders){
     if(!map[key]){
       map[key] = {
         key, customerUid: o.customerUid || null, customerName: o.customerName,
+        // 🧾 গ্রাহক ফোনে যে নম্বরটা বলবেন — এক রসিদের সব পণ্যে একই
+        orderCode: o.orderCode || null,
         deliveryPhone: o.deliveryPhone, deliveryAddress: o.deliveryAddress,
         deliveryLat: o.deliveryLat, deliveryLng: o.deliveryLng, items: []
       };
@@ -7166,7 +7196,7 @@ function ordGroupByCustomer(orders){
 function ordGroupHeadHtml(g, titlePrefix){
   return `
     <div class="ordGroupHead">
-      <div class="ordGroupCustomer">${titlePrefix} ${escapeAttr(g.customerName||'কাস্টমার')}</div>
+      <div class="ordGroupCustomer">${titlePrefix} ${escapeAttr(g.customerName||'কাস্টমার')}${g.orderCode ? ` <span style="background:rgba(255,193,7,0.16); color:#FFC107; padding:1px 7px; border-radius:7px; font-size:11.5px; font-weight:800;">🧾 ${escapeAttr(g.orderCode)}</span>` : ''}</div>
       <div class="ordGroupMeta">${g.deliveryAddress ? '📍 ' + escapeAttr(g.deliveryAddress) : ''}${g.deliveryPhone ? ' · 📞 ' + escapeAttr(g.deliveryPhone) : ''}${g.deliveryLat!=null ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${g.deliveryLat},${g.deliveryLng}" target="_blank" style="color:#0ea5e9;">🗺️ ম্যাপে দেখুন</a>` : ''}</div>
     </div>`;
 }
@@ -7318,6 +7348,7 @@ async function ordPopulateRiderSelects(listEl){
       const rSnap = await db.collection('riders').where('marketId','==',marketId).where('online','==',true).get();
       riders = rSnap.docs.map(d=> ({ id:d.id, ...d.data() }));
       const shopDoc = await db.collection('shops').doc(session.shopId).get();
+      __ordShopProfile = shopDoc.exists ? shopDoc.data() : null;
       const shopLoc = shopDoc.exists ? shopDoc.data().storeLocation : null;
       if(shopLoc){
         riders.forEach(r=>{
@@ -7351,6 +7382,12 @@ async function ordPopulateRiderSelects(listEl){
       const orderId = btn.dataset.oid;
       const assignData = {
         status: 'shipped', assignedRiderId: riderId, assignedRiderName: rider ? rider.name : null,
+        // 🛵 ম্যানুয়ালি বাছলেও রাইডার আগে দোকানে এসে মাল তুলবেন
+        pickedUp: false,
+        pickupName: (__ordShopProfile && (__ordShopProfile.name || __ordShopProfile.shopName)) || null,
+        pickupPhone: ordExtractShopPhone(__ordShopProfile && __ordShopProfile.logoDescription),
+        pickupLat: (__ordShopProfile && __ordShopProfile.storeLocation) ? __ordShopProfile.storeLocation.lat : null,
+        pickupLng: (__ordShopProfile && __ordShopProfile.storeLocation) ? __ordShopProfile.storeLocation.lng : null,
         riderAssignedAt: firebase.firestore.FieldValue.serverTimestamp(),
         shippedAt: firebase.firestore.FieldValue.serverTimestamp(),
         dispatchState: 'assigned' // ম্যানুয়ালি এসাইন করলেও dispatchState সমন্বিত থাকে
@@ -21433,15 +21470,56 @@ function rmStartBazarDeliveryListener(riderUid){
             const mins = Math.max(1, Math.round((km / 22) * 60));
             distBadge = `<div style="font-size:11.5px; color:#FFC107; margin-top:4px; font-weight:700;">📏 আপনার থেকে ${distTxt} দূরে (আনুমানিক ${mins} মিনিট)</div>`;
           }
+          /* 🛵 দুই ধাপ: আগে দোকানে যাওযা, তারপর গ্রাহকের কাছে।
+             আগে দুইটা গুলিয়ে একই সাথে দেখানো হতো, আর দোকানে যাওয়ার
+             কোনো তথ্যই ছিল না — না ঠিকানা, না ফোন, না ম্যাপ। */
+          // ফিল্ডটা নেই মানে এই অর্ডারটা এই পরিবর্তনের আগেই পথে নেমেছে —
+          // তাকে জোর করে আবার "মাল তুলুন" ধাপে ফেরানো হবে না
+          const picked = o.pickedUp !== false;
+          const codeTag = o.orderCode
+            ? `<span style="background:rgba(255,209,102,0.16); color:#FFC107; padding:2px 8px; border-radius:7px; font-size:11.5px; font-weight:800;">🧾 ${escapeAttr(o.orderCode)}</span>` : '';
+
+          if(!picked){
+            // ধাপ ১ — দোকানে যান, মাল তুলুন
+            return `
+            <div style="background:#212121; border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(255,193,7,0.35);">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                <div style="font-weight:800; font-size:13px; color:#FFC107;">🏪 আগে দোকান থেকে মাল তুলুন</div>
+                ${codeTag}
+              </div>
+              <div style="font-size:12.5px; color:#fff; margin-top:6px;">${escapeAttr(o.pickupName || o.shopName || 'দোকান')}</div>
+              ${o.pickupLat!=null ? `<a href="https://www.google.com/maps/search/?api=1&query=${o.pickupLat},${o.pickupLng}" target="_blank" style="display:inline-block; font-size:12px; color:#0ea5e9; margin-top:4px; text-decoration:none;">🗺️ দোকানের পথ দেখুন</a>` : ''}
+              ${o.pickupPhone
+                ? `<a href="tel:${escapeAttr(o.pickupPhone)}" style="display:inline-block; font-size:12px; color:#FFC107; margin-top:4px; margin-left:10px; text-decoration:none;">📞 দোকানে কল</a>`
+                : `<div style="font-size:11px; color:#a8a8a8; margin-top:4px;">দোকানের নম্বর দেওয়া নেই</div>`}
+              <div style="font-size:11.5px; color:#a8a8a8; margin-top:8px;">পণ্য: ${escapeAttr(o.productName||'প্রোডাক্ট')} · ${o.qty||1}টা</div>
+              <button class="rmPickedUpBtn" data-oid="${o.id}" style="width:100%; margin-top:10px; padding:10px; border:none; border-radius:9px; background:#FFC107; color:#241605; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">🛵 মাল তুলেছি — রওনা দিচ্ছি</button>
+            </div>`;
+          }
+
           return `
           <div style="background:#212121; border-radius:12px; padding:12px; margin-bottom:10px;">
-            <div style="font-weight:800; font-size:13px;">${escapeAttr(o.productName||'প্রোডাক্ট')}</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+              <div style="font-weight:800; font-size:13px;">${escapeAttr(o.productName||'প্রোডাক্ট')}</div>
+              ${codeTag}
+            </div>
             <div style="font-size:11.5px; color:#a8a8a8; margin-top:3px;">👤 ${escapeAttr(o.customerName||'কাস্টমার')} · পরিমাণ: ${o.qty||1}</div>
             ${o.deliveryAddress ? `<div style="font-size:12px; color:#fff; margin-top:6px;">📍 ${escapeAttr(o.deliveryAddress)}</div>${o.deliveryLat!=null ? `<a href="https://www.google.com/maps/search/?api=1&query=${o.deliveryLat},${o.deliveryLng}" target="_blank" style="display:inline-block; font-size:12px; color:#0ea5e9; margin-top:4px; text-decoration:none;">🗺️ ম্যাপে দেখুন (নেভিগেশন)</a>` : ''}${distBadge}` : '<div style="font-size:11px; color:#f87171; margin-top:6px;">⚠️ কাস্টমার কোনো ঠিকানা দেননি</div>'}
             ${o.deliveryPhone ? `<a href="tel:${escapeAttr(o.deliveryPhone)}" style="display:inline-block; font-size:12px; color:#FFC107; margin-top:4px; text-decoration:none;">📞 ${escapeAttr(o.deliveryPhone)}</a>` : ''}
             <button class="rmBazarDeliveredBtn" data-oid="${o.id}" style="width:100%; margin-top:10px; padding:10px; border:none; border-radius:9px; background:#2fbf71; color:#0a2416; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;"><span class="rmHoldFill"></span><span class="rmHoldLabel">✅ ৩ সেকেন্ড চেপে ধরুন — ডেলিভারি সম্পন্ন</span></button>
           </div>`;
         }).join("");
+        listEl.querySelectorAll(".rmPickedUpBtn").forEach(btn=>{
+          btn.addEventListener("click", async ()=>{
+            btn.disabled = true;
+            try{
+              await db.collection("orderRequests").doc(btn.dataset.oid).update({
+                pickedUp: true,
+                pickedUpAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+            }catch(e){ btn.disabled = false; alert("হয়নি — আবার চেষ্টা করুন।"); }
+          });
+        });
         listEl.querySelectorAll(".rmBazarDeliveredBtn").forEach(btn=>{
           rmSetupHoldToConfirm(btn, 3000, async ()=>{
             await db.collection("orderRequests").doc(btn.dataset.oid).update({
