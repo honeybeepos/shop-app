@@ -3460,6 +3460,11 @@ window.hbLoadLib = function(name){
     }
     .ordPackagingDoneBtn{ width:100%; margin-top:10px; padding:10px; border-radius:9px; border:1px solid rgba(96,165,250,0.4); background:rgba(96,165,250,0.12); color:#93c5fd; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; }
     .ordPackagingDoneBtn.done{ border-color:rgba(34,197,94,0.4); background:rgba(34,197,94,0.12); color:#86efac; cursor:default; }
+    .ordSelfShipBtn{ width:100%; margin-top:8px; padding:11px; border-radius:9px; border:none;
+      background:#22c55e; color:#08130d; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; }
+    .ordGroupCancelBtn{ width:100%; margin-top:8px; padding:9px; border-radius:9px;
+      border:1px solid rgba(248,113,113,0.45); background:transparent; color:#fca5a5;
+      font-weight:700; font-size:12px; cursor:pointer; font-family:inherit; }
     .ordSelfDeliveryTag{ display:inline-block; font-size:10.5px; font-weight:800; color:#0d1b1e; background:#a78bfa; padding:3px 9px; border-radius:20px; margin-top:8px; }
 
     /* ✅ গ্রহণ-করার পপ-আপ (গ্রুপ-অ্যাকসেপ্ট) — বাকি স্টাইল উপরে গ্লোবাল হওয়ায় এখানে
@@ -7265,6 +7270,21 @@ function ordBuildPreparingGroupHtml(g, allProducts){
   const selfDeliveryTag = g.items.some(o=> o.selfDelivery === true)
     ? `<div class="ordSelfDeliveryTag">🤝 নিজে/অন্য মাধ্যমে পাঠানো হবে (রাইডার লাগবে না)</div>` : '';
 
+  /* 🐞 বাগ-ফিক্স: "নিজে/অন্য মাধ্যমে পাঠাবো" বেছে নিলে কোনো
+     রাইডার থাকত না। অর্ডারের অবস্থা বদলানোর কাজটা রাইডারই করত, তাই
+     নিজে পাঠালে অর্ডারটা "প্রস্তুত হচ্ছে"-তেই চিরকাল আটকে থাকত —
+     গ্রাহক তাঁর অ্যাপে কখনো "পথে আছে" বা "পৌঁছে গেছে" দেখতেন না,
+     আর বিক্রিটাও হিসাবে উঠত না।                                            */
+  const isSelfDelivery = g.items.some(o=> o.selfDelivery === true);
+  const selfShipBtn = (isSelfDelivery && allPackaged)
+    ? `<button class="ordSelfShipBtn" data-gkey="${escapeAttr(g.key)}">🛵 পাঠিয়ে দিয়েছি — পথে আছে</button>`
+    : '';
+
+  /* ❌ পুরো রসিদ একসাথে বাতিল — আগে শুধু একেকটা প্রোডাক্টের পাশে
+     ছোট ✕ ছিল। পাঁচটা প্রোডাক্টের অর্ডার বাতিল করতে পাঁচবার চাপতে হতো। */
+  const groupCancelBtn =
+    `<button class="ordGroupCancelBtn" data-gkey="${escapeAttr(g.key)}">❌ পুরো রসিদ বাতিল করুন</button>`;
+
   return `
     <div class="ordGroupCard ordReceiptCard">
       ${ordGroupHeadHtml(g, '🧾 রসিদ —')}
@@ -7272,6 +7292,8 @@ function ordBuildPreparingGroupHtml(g, allProducts){
       ${selfDeliveryTag}
       ${dispatchHtml}
       ${packagingBtn}
+      ${selfShipBtn}
+      ${groupCancelBtn}
     </div>`;
 }
 
@@ -7447,6 +7469,27 @@ function ordPrintReceipt(g){
 
 // 📦 "প্রস্তুত হচ্ছে" রসিদে প্যাকেজিং শেষ হলে — পুরো রসিদের সব প্রোডাক্ট একসাথে
 // আপডেট + কাস্টমারকে ঠিক একটাই নোটিফিকেশন (প্রতিটা প্রোডাক্টের জন্য আলাদা না)
+/* এক রসিদের সব প্রোডাক্টের অবস্থা একসাথে বদলানো। একটা বদলে
+   আরেকটা বাদ পড়লে গ্রাহক আধা-বদলানো অর্ডার দেখতেন, তাই batch। */
+async function ordUpdateGroupStatus(gkey, groups, newStatus){
+  const g = groups.find(x=> x.key === gkey);
+  if(!g || !g.items.length) return;
+  const timeFieldMap = { preparing:'preparingAt', shipped:'shippedAt', delivered:'deliveredAt', cancelled:'cancelledAt' };
+  try{
+    const batch = db.batch();
+    g.items.forEach(o=>{
+      const upd = { status: newStatus };
+      if(timeFieldMap[newStatus]) upd[timeFieldMap[newStatus]] = firebase.firestore.FieldValue.serverTimestamp();
+      batch.update(db.collection('orderRequests').doc(o.id), upd);
+    });
+    await batch.commit();
+    // বিক্রির হিসাবে তোলা — রাইডারের পথে যেভাবে হয়, হুবহু সেভাবেই
+    if(newStatus === 'delivered'){
+      for(const o of g.items){ await ordRecordDeliveredSale(o.id); }
+    }
+  }catch(e){ alert('আপডেট করা যায়নি: ' + e.message); }
+}
+
 async function ordMarkPackagingDone(gkey, groups){
   const g = groups.find(x=> x.key === gkey);
   if(!g) return;
@@ -7497,6 +7540,18 @@ async function ordRenderGrouped(orders){
     });
     listEl.querySelectorAll('.ordPackagingDoneBtn:not(.done)').forEach(btn=>{
       btn.addEventListener('click', ()=> ordMarkPackagingDone(btn.dataset.gkey, groups));
+    });
+    listEl.querySelectorAll('.ordSelfShipBtn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if(!confirm('অর্ডারটা পাঠিয়ে দিয়েছেন? গ্রাহক "পথে আছে" দেখতে পাবেন।')) return;
+        ordUpdateGroupStatus(btn.dataset.gkey, groups, 'shipped');
+      });
+    });
+    listEl.querySelectorAll('.ordGroupCancelBtn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if(!confirm('এই রসিদের সব প্রোডাক্ট বাতিল হয়ে যাবে। গ্রাহক তাঁর অ্যাপে দেখতে পাবেন। নিশ্চিত?')) return;
+        ordUpdateGroupStatus(btn.dataset.gkey, groups, 'cancelled');
+      });
     });
     await ordPopulateRiderSelects(listEl);
     listEl.querySelectorAll('.ordDeliveredBtn').forEach(btn=>{
