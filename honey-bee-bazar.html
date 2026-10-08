@@ -319,6 +319,13 @@
   .mfSectionHead{ display:flex; align-items:center; justify-content:space-between; margin:6px 0 10px; }
   .mfSectionHead span:first-child{ font-size:14px; font-weight:800; }
   .mfSeeAll{ font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; }
+  /* 🇧🇩 "সব বাজার একসাথে" — .mfSeeAll-এর ধূসর লেখাটা এই বাদামি পটভূমিতে
+     প্রায় দেখাই যেত না, অথচ এটা চেপে দেখার মতো জিনিস। তাই সোনালি চিপ,
+     আর আঙুলে চাপার মতো যথেষ্ট বড় (৬px+১২px প্যাডিং)। */
+  .mfBdBtn{ font-size:11.5px; font-weight:800; color:var(--gold); cursor:pointer;
+            background:rgba(255,183,3,0.13); border:1px solid rgba(255,183,3,0.42);
+            padding:6px 12px; border-radius:999px; white-space:nowrap; flex-shrink:0; }
+  .mfBdBtn:active{ background:rgba(255,183,3,0.26); }
 
   .mfHRow{ display:flex; gap:12px; overflow-x:auto; padding-bottom:6px; margin-bottom:6px; -webkit-overflow-scrolling:touch; }
   .mfHRow::-webkit-scrollbar{ display:none; }
@@ -1867,7 +1874,7 @@
       <div id="mfFeaturedRow" class="mfHRow"></div>
     </div>
 
-    <div class="mfSectionHead"><span>🛍️ সব পণ্য</span></div>
+    <div class="mfSectionHead"><span id="mfAllProductsTitle">🛍️ সব পণ্য</span><span class="mfBdBtn" id="mfAllBdBtn">🇧🇩 সব বাজার একসাথে</span></div>
     <div id="marketFeedGrid" class="pGrid"><div class="loadingMsg">প্রোডাক্ট লোড হচ্ছে...</div></div>
   </div>
 
@@ -1969,6 +1976,14 @@
       <div id="currentShopName" style="font-size:14px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
     </div>
     <div id="productsList" class="pGrid"><div class="loadingMsg">স্টক লোড হচ্ছে...</div></div>
+
+    <!-- 🛍️ দোকানের নিজের পণ্য শেষ হলেই পাতাটা থেমে যেত — গ্রাহক পেছনে
+         গিয়ে আরেকটা দোকানে ঢুকতেন। এখন নিচে এই বাজারের বাকি পণ্য আসতে
+         থাকে, তাই স্ক্রল করতে করতেই কেনাকাটা চলে। -->
+    <div id="shopMoreFromMarket" style="display:none;">
+      <div class="mfSectionHead" style="margin-top:24px;"><span>🛍️ এই বাজারের অন্য পণ্য</span></div>
+      <div id="shopMoreGrid" class="pGrid"></div>
+    </div>
   </div>
 
   <!-- ==================== 🗂️ মার্কেট-ওয়াইড ক্যাটাগরি (নিচের ন্যাভের "ক্যাটাগরি" ট্যাব) ====================
@@ -8846,8 +8861,63 @@ function mfSortList(list){
   return out;
 }
 
+/* ═══════ 🇧🇩 সারা বাংলাদেশের পণ্য একসাথে ═══════
+   বাজার-ভিত্তিক ফিডটা শুধু নিজের বাজারের দোকান দেখায় (shops where
+   marketId == এই বাজার)। "সব বাজার একসাথে" চাপলে সেই শর্তটা বাদ দিয়ে
+   দেশের সব সক্রিয় দোকানের পণ্য আনা হয়।
+
+   ⚠️ খরচের কথাটা সৎভাবে: প্রতিটা দোকানের publicStock আলাদা করে পড়তে
+      হয় (Firestore-এ সাব-কালেকশন একসাথে পড়ার জন্য collectionGroup
+      লাগত, যেটার জন্য নিয়ম ও ইনডেক্স দুটোই বদলাতে হতো)। দোকান যত,
+      কুয়েরিও তত। এখন দোকান অল্প, তাই দ্রুতই হয় — কয়েকশ দোকান হলে
+      এটা ধীর হয়ে যাবে, তখন collectionGroup-এ নিতে হবে।
+
+   একবার এনে ধরে রাখা হয়, তাই বারবার চাপলে আর নতুন করে পড়া হয় না। */
+let __mfBdMode = false;
+let __mfBdProducts = null;
+let __mfBdLoading = false;
+
+async function mfLoadAllBdProducts(){
+  if(__mfBdProducts || __mfBdLoading) return;
+  __mfBdLoading = true;
+  try{
+    const shopsSnap = await db.collection("shops").where("status", "==", "active").get();
+    const shops = shopsSnap.docs.map(d=> ({ id:d.id, ...d.data() }));
+    const perShop = await Promise.all(shops.map(async (shop)=>{
+      try{
+        const qs = await db.collection("shops").doc(shop.id).collection("publicStock").get();
+        const cur = shop.currencySymbol
+          || (shop.currencyCode && typeof window.hbGetCurrencySymbol === 'function' ? window.hbGetCurrencySymbol(shop.currencyCode) : null)
+          || '৳';
+        return qs.docs.map(d=> ({
+          ...d.data(), id: d.id,
+          __shopId: shop.id,
+          __shopName: shop.name || shop.shopName || "দোকান",
+          __shopCategory: shop.category || "",
+          __shopArea: shop.upazila || shop.district || "",
+          __shopIsOpen: shop.isShopOpen !== false,
+          __marketId: shop.marketId || null,
+          __cur: cur
+        }));
+      }catch(e){ console.warn("সব বাজার: দোকানের স্টক পড়া যায়নি", shop.id, e); return []; }
+    }));
+    const all = perShop.flat();
+    // নিজের বাজারের পণ্য আগে — গ্রাহক কাছেরটাই আগে দেখবেন, দূরেরটা পরে
+    const mine = all.filter(p=> p.__marketId === currentMarketId);
+    const rest = all.filter(p=> p.__marketId !== currentMarketId);
+    __mfBdProducts = mine.concat(rest);
+  }catch(e){
+    console.error("সব বাজারের পণ্য লোড ব্যর্থ:", e);
+    throw e;
+  }finally{
+    __mfBdLoading = false;
+  }
+}
+
 function mfGetFilteredSortedList(){
-  let list = marketFeedProducts.slice();
+  // 🇧🇩 মোড চালু থাকলে দেশের সব পণ্য, নাহলে আগের মতোই এই বাজারের
+  const source = (__mfBdMode && __mfBdProducts) ? __mfBdProducts : marketFeedProducts;
+  let list = source.slice();
   if(mfShopTypeFilter) list = list.filter(p=> p.__shopCategory === mfShopTypeFilter);
   if(mfQuickFilter === "offer") list = list.filter(p=> hbGetOfferMeta(p).hasOffer);
   else if(mfQuickFilter === "highlight") list = list.filter(p=> hbGetOfferMeta(p).highlight);
@@ -8976,6 +9046,63 @@ function mfCardHTML(p, idx){
         ${stockLabel ? `<div class="pCardStock ${outOfStock?'out':'low'}">${stockLabel}</div>` : ""}
       </div>
     </div>`;
+}
+
+/* 🇧🇩 বাটনটা একটা সুইচ — একবার চাপলে সারা দেশ, আবার চাপলে নিজের বাজার।
+   আলাদা স্ক্রিন বানাইনি, কারণ ফিল্টার/সাজানো/কার্ট সবই এই পাতায় আগে
+   থেকেই কাজ করে — নতুন স্ক্রিনে সেগুলো আবার লিখতে হতো। */
+async function mfSetBdMode(on){
+  const btn = $("mfAllBdBtn"), title = $("mfAllProductsTitle"), grid = $("marketFeedGrid");
+  if(!btn) return;
+  if(on){
+    if(!__mfBdProducts){
+      btn.textContent = "লোড হচ্ছে...";
+      if(grid) grid.innerHTML = '<div class="loadingMsg">সারা বাংলাদেশের পণ্য আনা হচ্ছে...</div>';
+      try{
+        await mfLoadAllBdProducts();
+      }catch(e){
+        btn.textContent = "🇧🇩 সব বাজার একসাথে";
+        if(grid) grid.innerHTML = '<div class="mfEmpty">সব বাজারের পণ্য আনা যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।</div>';
+        return;
+      }
+    }
+    __mfBdMode = true;
+    if(title) title.textContent = "🇧🇩 সারা বাংলাদেশের পণ্য";
+    btn.textContent = "🏪 শুধু এই বাজার";
+  }else{
+    __mfBdMode = false;
+    if(title) title.textContent = "🛍️ সব পণ্য";
+    btn.textContent = "🇧🇩 সব বাজার একসাথে";
+  }
+  renderMarketFeed();
+}
+$("mfAllBdBtn") && $("mfAllBdBtn").addEventListener("click", ()=> mfSetBdMode(!__mfBdMode));
+
+/* 🛍️ দোকানের পাতার নিচের অংশ — এই বাজারের বাকি পণ্য।
+   নিজের দোকানের পণ্য বাদ দেওয়া হয়, নাহলে উপরে-নিচে একই জিনিস দুইবার
+   দেখাত। ফিডের কার্ডই (mfCardHTML) ব্যবহার করা হচ্ছে, তাই দেখতে
+   বাজারের পাতার মতোই — আলাদা ডিজাইন বানাইনি।                      */
+let __hbMoreFromMarketFor = null;
+async function hbRenderMoreFromMarket(shopId){
+  const wrap = $("shopMoreFromMarket"), grid = $("shopMoreGrid");
+  if(!wrap || !grid || !shopId) return;
+  if(__hbMoreFromMarketFor === shopId && grid.children.length) return; // আগেই আঁকা হয়েছে
+  __hbMoreFromMarketFor = shopId;
+  wrap.style.display = "none";
+  grid.innerHTML = "";
+  try{
+    // ফিডের পণ্য এখনো আনা না হলে (গ্রাহক সোজা বাজার → দোকান-এ এসেছেন) এখন আনা হয়
+    if(!marketFeedProducts || marketFeedProducts.length === 0){
+      if(typeof loadMarketFeedProducts === "function") await loadMarketFeedProducts();
+    }
+    if(__hbMoreFromMarketFor !== shopId) return; // এর মধ্যে অন্য দোকানে চলে গেছেন
+    const others = (marketFeedProducts || []).filter(p=> p.__shopId !== shopId);
+    if(others.length === 0) return;
+    grid.innerHTML = others.map((p,i)=> mfCardHTML(p,i)).join("");
+    wrap.style.display = "block";
+  }catch(e){
+    console.warn("বাজারের বাকি পণ্য দেখানো যায়নি:", e);
+  }
 }
 
 function renderMarketFeed(){
@@ -10418,6 +10545,8 @@ function hbGetOfferMeta(p){
 
 function renderProducts(products){
   __hbCurrentProductsList = products;
+  // দোকানের পণ্য আঁকার পরেই নিচের "এই বাজারের অন্য পণ্য" অংশটা তৈরি হয়
+  if(typeof hbRenderMoreFromMarket === "function") hbRenderMoreFromMarket(currentShopId);
   const favs = (currentCustomer && currentCustomer.favoriteProducts) || [];
   $("productsList").innerHTML = products.map(p=>{
     const qty = Number(p.stockQty);
