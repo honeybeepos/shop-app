@@ -1926,6 +1926,9 @@
       <div style="font-size:16px; font-weight:800; color:var(--amber);" id="currentMarketName">—</div>
     </div>
     <input type="text" class="searchBox" id="shopSearch" placeholder="🔍 দোকান খুঁজুন...">
+    <!-- দোকান ধরে ধরে না দেখে গোটা বাজারের সব পণ্য একসাথে দেখার পথও
+         খোলা রাখা হলো — আগে এটাই একমাত্র পথ ছিল, হঠাৎ কেড়ে নেওয়া ঠিক নয় -->
+    <button class="bigBtn" id="goMarketFeedFromShops" style="margin-bottom:12px;">🛍️ এই বাজারের সব পণ্য একসাথে দেখুন</button>
     <div id="shopsList"><div class="loadingMsg">দোকানের তালিকা লোড হচ্ছে...</div></div>
   </div>
 
@@ -8607,7 +8610,15 @@ $("marketSearch").addEventListener("input", ()=>{
   updateNearbyMarketShopsSection();
 });
 
-window.selectMarket = function(marketId){
+/* 🐞 বাগ-ফিক্স: বাজারে চাপ দিলে সোজা প্রোডাক্টের ফিডে চলে যেত — মাঝখানে
+   দোকানের তালিকাটা বাদ পড়ত। ফলে গ্রাহক বুঝতেই পারতেন না কোন বাজারে কতগুলো
+   দোকান আছে, আর দোকান ধরে ধরে দেখার কোনো উপায়ই ছিল না।
+
+   এখন বাজার → দোকান → প্রোডাক্ট — যেভাবে সত্যিকারের বাজারে হয়।
+
+   ⚠️ goToFavoriteMarket() ইচ্ছে করেই সোজা ফিডে যায় ("পছন্দের বাজারে যান"
+      কার্ডের কাজই তাই) — তাই সেটা goToFeed=true পাঠায়।            */
+window.selectMarket = function(marketId, goToFeed){
   currentMarketId = marketId;
   const market = allMarkets.find(m=> m.id === marketId);
   const marketName = market ? (market.name || marketId) : marketId;
@@ -8615,7 +8626,8 @@ window.selectMarket = function(marketId){
   $("mfMarketName").textContent = marketName;
   try{ localStorage.setItem("hb-last-market-id", marketId); }catch(e){}
   mfResetFilters();
-  showScreen("screenMarketFeed");
+  const se = $("shopSearch"); if(se) se.value = "";
+  showScreen(goToFeed ? "screenMarketFeed" : "screenShops");
   loadShops(marketId);
 };
 
@@ -8646,7 +8658,7 @@ async function goToFavoriteMarket(){
     });
   }
   if(!target) target = allMarkets[0];
-  selectMarket(target.id);
+  selectMarket(target.id, true);   // এই কার্ডের কাজই দোকানের ধাপ বাদ দেওয়া
 }
 
 $("backToMarkets").addEventListener("click", ()=> showScreen("screenHome"));
@@ -9923,6 +9935,13 @@ $("backToSubcategories") && $("backToSubcategories").addEventListener("click", (
 /* ---------- ধাপ ৩: প্রোডাক্ট/স্টক ---------- */
 let currentCatId = null, currentSubId = null, currentSubSubId = null;
 let currentSubName = null; // 🗂️ ব্রেডক্রাম্বে ব্যবহারের জন্য — সাব-সাব-ক্যাটাগরি বাছার সময় দরকার হয়
+
+$("goMarketFeedFromShops") && $("goMarketFeedFromShops").addEventListener("click", function(){
+  if(!currentMarketId) return;
+  mfResetFilters();
+  showScreen("screenMarketFeed");
+  if(typeof loadMarketFeedProducts === "function") loadMarketFeedProducts();
+});
 
 window.selectShop = function(shopId){
   currentShopId = shopId;
