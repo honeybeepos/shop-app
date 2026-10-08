@@ -3465,6 +3465,11 @@ window.hbLoadLib = function(name){
     .ordGroupCancelBtn{ width:100%; margin-top:8px; padding:9px; border-radius:9px;
       border:1px solid rgba(248,113,113,0.45); background:transparent; color:#fca5a5;
       font-weight:700; font-size:12px; cursor:pointer; font-family:inherit; }
+    .ordHideBtn{ margin-top:8px; padding:7px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.18);
+      background:transparent; color:#9aa0a6; font-size:11.5px; cursor:pointer; font-family:inherit; }
+    .ordClearAllBtn{ width:100%; margin-bottom:12px; padding:11px; border-radius:10px;
+      border:1px solid rgba(248,113,113,0.4); background:rgba(248,113,113,0.08); color:#fca5a5;
+      font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; }
     .ordSelfDeliveryTag{ display:inline-block; font-size:10.5px; font-weight:800; color:#0d1b1e; background:#a78bfa; padding:3px 9px; border-radius:20px; margin-top:8px; }
 
     /* ✅ গ্রহণ-করার পপ-আপ (গ্রুপ-অ্যাকসেপ্ট) — বাকি স্টাইল উপরে গ্লোবাল হওয়ায় এখানে
@@ -7117,7 +7122,11 @@ function ordListen(){
   __ordUnsub = db.collection('orderRequests')
     .where('shopId','==',session.shopId).where('status','==',__ordCurrentStatus)
     .onSnapshot((qs)=>{
+      // 🧹 দোকানদার যেগুলো নিজের তালিকা থেকে সরিয়েছেন সেগুলো আর দেখানো
+      //    হয় না। গ্রাহকের তালিকায় আগের মতোই থাকে — একজন মুছলে
+      //    আরেকজনেরটা হারায় না।
       const orders = qs.docs.map(d=> ({ id:d.id, ...d.data() }))
+        .filter(o=> o.hiddenForSeller !== true)
         .sort((a,b)=> (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
       ordRender(orders);
     }, (err)=>{
@@ -7592,12 +7601,46 @@ async function ordRenderFlat(orders){
         <div style="font-size:12px; color:#c9c3f0;">কাস্টমার: ${escapeAttr(o.customerName||'—')} · পরিমাণ: ${o.qty||1}${o.variantColor ? ` · 🎨 ${escapeAttr(o.variantColor)} / 📏 ${escapeAttr(o.variantSize)}` : ''}</div>
         ${o.deliveryAddress ? `<div style="font-size:11.5px; color:#8ec9a8; margin-top:3px;">📍 ${escapeAttr(o.deliveryAddress)}${o.deliveryPhone ? ' · 📞 ' + escapeAttr(o.deliveryPhone) : ''}${o.deliveryLat!=null ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${o.deliveryLat},${o.deliveryLng}" target="_blank" style="color:#0ea5e9;">🗺️ ম্যাপে দেখুন</a>` : ''}</div>` : ''}
         ${actionHtml}
+        ${(__ordCurrentStatus === 'delivered' || __ordCurrentStatus === 'cancelled')
+          ? `<button class="ordHideBtn" data-oid="${o.id}">🧹 তালিকা থেকে সরান</button>` : ''}
       </div>`;
   }).join('');
+
+  /* 🧹 শেষ হয়ে যাওয়া অর্ডার একসাথে সরানো — বাজারের অ্যাপে যেভাবে আছে।
+     দুইয়ের কম হলে দেখানো হয় না — একটার জন্য ✕ চাপলেই হয়। */
+  if((__ordCurrentStatus === 'delivered' || __ordCurrentStatus === 'cancelled') && orders.length >= 2){
+    const bar = document.createElement('button');
+    bar.className = 'ordClearAllBtn';
+    bar.textContent = '🧹 ' + orders.length + 'টাই তালিকা থেকে সরান';
+    bar.addEventListener('click', ()=>{
+      if(!confirm(orders.length + 'টা অর্ডার এই তালিকা থেকে সরে যাবে।\n\nবিক্রির হিসাব আর গ্রাহকের তালিকায় ঠিকই থাকবে। নিশ্চিত?')) return;
+      ordHideOrders(orders.map(o=> o.id));
+    });
+    listEl.insertBefore(bar, listEl.firstChild);
+  }
 
   listEl.querySelectorAll('.ordDeliveredBtn').forEach(btn=>{
     btn.addEventListener('click', ()=> ordUpdateStatus(btn.dataset.oid, 'delivered'));
   });
+  listEl.querySelectorAll('.ordHideBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=> ordHideOrders([btn.dataset.oid]));
+  });
+}
+
+/* অর্ডার মোছা হয় না — শুধু দোকানের তালিকা থেকে লুকানো হয়।
+   একটাই নথি দোকান আর গ্রাহক দুইজনেই দেখেন — সত্যি মুছে ফেললে
+   বিক্রির হিসাব আর গ্রাহকের অর্ডার-ইতিহাস দুইটাই হারাত। */
+async function ordHideOrders(ids){
+  if(!ids || !ids.length) return;
+  try{
+    const batch = db.batch();
+    ids.forEach(id=>{
+      batch.set(db.collection('orderRequests').doc(id),
+        { hiddenForSeller: true, hiddenAt: firebase.firestore.FieldValue.serverTimestamp() },
+        { merge:true });
+    });
+    await batch.commit();
+  }catch(e){ alert('সরানো যায়নি: ' + e.message); }
 }
 
 async function ordRender(orders){

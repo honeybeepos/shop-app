@@ -10923,7 +10923,9 @@ function hbOrdersRender(){
         // অর্ধেক মুছে অর্ধেক থেকে যেত
         const batch = db.batch();
         __doneOrders.forEach(function(o){
-          batch.set(db.collection("orderRequests").doc(o.id), { hiddenForCustomer: true }, { merge:true });
+          batch.set(db.collection("orderRequests").doc(o.id),
+            { hiddenForCustomer: true, hiddenAt: firebase.firestore.FieldValue.serverTimestamp() },
+            { merge:true });
         });
         await batch.commit();
       }catch(err){
@@ -10983,7 +10985,8 @@ function hbOrdersRender(){
       btn.disabled = true;
       try{
         await db.collection("orderRequests").doc(btn.dataset.oid)
-                .update({ hiddenForCustomer: true });
+                .update({ hiddenForCustomer: true,
+                          hiddenAt: firebase.firestore.FieldValue.serverTimestamp() });
       }catch(err){
         btn.disabled = false;
         alert("সরানো যায়নি — আবার চেষ্টা করুন।");
