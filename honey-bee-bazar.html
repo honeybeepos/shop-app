@@ -1938,6 +1938,9 @@
       <button class="backBtn" id="backToShopsFromCat" style="margin-bottom:0; flex-shrink:0;">← দোকানের তালিকায় ফিরে যান</button>
       <div id="currentShopNameCat" style="font-size:14px; font-weight:800; color:var(--amber); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
     </div>
+    <!-- 🏪 দোকানের পরিচয় — বিবরণ, লাইক/কমেন্ট/শেয়ার, কল/WhatsApp।
+         আগে এগুলো দোকানের তালিকায় ছিল, তাতে তালিকাটা বিশাল হয়ে যেত -->
+    <div id="shopHeaderCard" style="margin-bottom:14px;"></div>
     <div class="serviceCardGrid" id="categoriesGrid"></div>
   </div>
 
@@ -9686,6 +9689,42 @@ function hbPhoneToWaLink(localPhone, text){
   const digits = '880' + localPhone.replace(/^0/, '');
   return `https://wa.me/${digits}${text ? '?text=' + encodeURIComponent(text) : ''}`;
 }
+/* 🏪 দোকানের ছোট কার্ড — পণ্যের কার্ড (pCard) যে চেহারায় দেখায়,
+   হুবহু সেই চেহারায়।
+
+   আগে এখানে Facebook-পোস্টের মতো বড় কার্ড দেখাতো — বড় ছবি, পুরো
+   বিবরণ, লাইক/কমেন্ট/শেয়ার, কল/WhatsApp — একটা কার্ডেই পুরো পর্দা
+   ভরে যেত। দশটা দোকান থাকলে গ্রাহককে দশবার স্ক্রল করতে হতো।
+
+   বিবরণ, লাইক, কল — কিছুই বাদ যায়নি। সব এখন দোকানের নিজের
+   পাতায়, যেখানে সেগুলোর জায়গা।                                            */
+function hbShopTileHTML(s, onClickExpr, idx){
+  const closed = s.isShopOpen === false;
+  const likes = s.logoLikeCount || 0;
+  const cat = s.category || "";
+  return `
+    <div class="pCard mfCard" style="animation-delay:${Math.min(idx||0,12)*0.08}s;" onclick="${onClickExpr}">
+      <div class="mfHookChain"><span class="mfHookRing"></span><span class="mfHookRing mfHookRingBottom"></span></div>
+      <div class="pCardImgWrap">
+        <span class="pCardImgInner">${s.logoUrl
+          ? `<img src="${escapeHtml(s.logoUrl)}" alt="" onerror="this.parentElement.textContent='🏪'">`
+          : '🏪'}</span>
+        <div class="pCardBadges">
+          ${closed ? '<span class="pCardOfferBadge" style="background:#6b7280;">🔴 বন্ধ</span>' : ''}
+          ${s.isVerified ? '<span class="pCardHighlightBadge">🛡️</span>' : ''}
+        </div>
+      </div>
+      <div class="pCardBody">
+        <div class="pCardName">${escapeHtml(s.name || s.shopName || "দোকান")}</div>
+        ${cat ? `<span class="mfShopTag">🏷️ ${escapeHtml(cat)}</span>` : ''}
+        <div class="pCardPriceRow">
+          <span style="font-size:11.5px; color:${closed ? '#f59e0b' : '#4ade80'};">● ${closed ? 'এখন বন্ধ' : 'এখন খোলা'}</span>
+          ${likes ? `<span style="font-size:11.5px; color:var(--muted);">❤️ ${likes}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
 function hbShopCardHTML(s, onClickExpr){
   const favs = (currentCustomer && currentCustomer.favoriteShops) || [];
   const isFav = favs.includes(s.id);
@@ -9751,7 +9790,9 @@ function renderShops(list){
     return;
   }
   $("shopsList").className = "shopFeed";
-  $("shopsList").innerHTML = list.map(s => hbShopCardHTML(s, `selectShop('${s.id}')`)).join("");
+  $("shopsList").innerHTML = '<div class="pGrid">'
+    + list.map((s,i) => hbShopTileHTML(s, `selectShop('${s.id}')`, i)).join("")
+    + '</div>';
 }
 
 // 📍 "কাছের বাজার" পেজেই দেখানো ঐ বাজারের দোকানের তালিকা (আলাদা ট্যাপ ছাড়াই)
@@ -9764,7 +9805,9 @@ function renderNearbyMarketShops(marketId, list){
     return;
   }
   container.className = "shopFeed";
-  container.innerHTML = list.map(s => hbShopCardHTML(s, `selectNearbyMarketShop('${marketId}','${s.id}')`)).join("");
+  container.innerHTML = '<div class="pGrid">'
+    + list.map((s,i) => hbShopTileHTML(s, `selectNearbyMarketShop('${marketId}','${s.id}')`, i)).join("")
+    + '</div>';
 }
 
 // 📍 "কাছের বাজার" পেজে দেখানো দোকান তালিকা থেকে সরাসরি কোনো দোকানে ঢোকা —
@@ -9943,6 +9986,14 @@ $("goMarketFeedFromShops") && $("goMarketFeedFromShops").addEventListener("click
   if(typeof loadMarketFeedProducts === "function") loadMarketFeedProducts();
 });
 
+/* দোকানের পাতায় পুরো পরিচয়-কার্ডটা বসানো — তালিকায় যেটা আগে
+   দেখাতো, সেটাই। কোনো ফিচার মুছে ফেলা হয়নি, শুধু জায়গা বদলেছে। */
+function hbFillShopHeader(shop){
+  const box = $("shopHeaderCard");
+  if(!box) return;
+  box.innerHTML = shop ? hbShopCardHTML(shop, "") : "";
+}
+
 window.selectShop = function(shopId){
   currentShopId = shopId;
   if(typeof hbLogShopVisit === 'function') hbLogShopVisit(shopId);
@@ -9950,6 +10001,7 @@ window.selectShop = function(shopId){
   const shopName = shop ? (shop.name || shop.shopName || shopId) : shopId;
   currentShopIsOpen = shop ? shop.isShopOpen !== false : true;
   $("currentShopNameCat").textContent = currentShopIsOpen ? shopName : (shopName + " 🔴 (বন্ধ)");
+  hbFillShopHeader(shop);
   // 🌍 এই দোকানের মুদ্রা-চিহ্ন — সাইনআপে country/currency সেট করা থাকলে সেটাই দেখানো হবে
   HB_CUR = (shop && shop.currencySymbol)
     || (shop && shop.currencyCode && typeof window.hbGetCurrencySymbol === 'function' ? window.hbGetCurrencySymbol(shop.currencyCode) : null)
