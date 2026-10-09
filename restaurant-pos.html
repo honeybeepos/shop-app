@@ -446,6 +446,16 @@ button{cursor:pointer;border:0}
           🟢 Honey Bee Bazar-এ Publish করুন
         </label>
         <div id="restaurantMarketStatus" style="font-size:12px;color:var(--muted);margin-top:6px">Bazar publish বন্ধ আছে।</div>
+
+        <!-- 📍 রাইডার যেন রেস্টুরেন্ট খুঁজে পান। এতদিন restaurants ঘরে
+             কোনো অবস্থানই ছিল না, তাই মাল তুলতে আসা রাইডার কোনো ম্যাপ
+             লিংক পেতেন না, আর কাছের রাইডার বাছাইও করা যেত না। -->
+        <div class="field" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line,rgba(255,255,255,0.12))">
+          <label>📍 রেস্টুরেন্টের অবস্থান (রাইডারের জন্য)</label>
+          <div id="rstLocStatus" style="font-size:12px;color:var(--muted);margin:4px 0 8px">দেখা হচ্ছে...</div>
+          <button class="btn" type="button" id="rstSetLocBtn">📍 এখন যেখানে আছি সেটাই সেভ করুন</button>
+          <div style="font-size:12px;color:var(--muted);margin-top:5px">রেস্টুরেন্টে দাঁড়িয়ে একবার চাপুন। এই অবস্থান দেখেই রাইডার মাল তুলতে আসবেন।</div>
+        </div>
         <button class="btn green" style="margin-top:14px" onclick="saveRestaurantProfile()">Save Restaurant Profile</button>
       </div>
 
@@ -1465,6 +1475,11 @@ function ooRender(){
       // শেষ হয়ে গেছে — তালিকা পরিষ্কার করার সুযোগ
       btns = '<button class="btn" data-oo="hide" data-k="'+g.key+'">🧹 তালিকা থেকে সরান</button>';
     }
+    // 🖨️ প্যাকেটে লাগানোর স্লিপ — রাইডার এসে নম্বর বলে পার্সেল
+    //    চাইবেন, মিলিয়ে দেওয়ার একমাত্র উপায় এটাই।
+    if(g.status === "pending" || g.status === "preparing" || g.status === "shipped"){
+      btns += '<button class="btn" data-ooslip="1" data-k="'+g.key+'">🖨️ স্লিপ</button>';
+    }
 
     return '<div class="order-row" style="align-items:flex-start;flex-direction:column;gap:8px">'
       + '<div style="display:flex;justify-content:space-between;width:100%;gap:8px;flex-wrap:wrap">'
@@ -1484,6 +1499,13 @@ function ooRender(){
       + '</div>';
   }).join("");
 
+  box.querySelectorAll("[data-ooslip]").forEach(function(b){
+    b.addEventListener("click", function(){
+      const g = list.find(function(x){ return x.key === b.dataset.k; });
+      if(g) ooPrintSlip(g);
+    });
+  });
+
   box.querySelectorAll("[data-oo]").forEach(function(b){
     b.addEventListener("click", function(){
       const g = list.find(function(x){ return x.key === b.dataset.k; });
@@ -1499,6 +1521,51 @@ function ooRender(){
       ooSetStatus(g.ids, b.dataset.oo);
     });
   });
+}
+
+/* 🖨️ প্যাকেটের স্লিপ। দোকানের POS-এ যেটা আছে হুবহু তার মতো —
+   একই জিনিস দুই রকম দেখালে রাইডার গুলিয়ে ফেলতেন।
+
+   নতুন উইন্ডোতে ছাপা হয় (window.print() নয়) — নাহলে পুরো POS
+   পাতাটাই ছাপার চেষ্টা হতো। নতুন উইন্ডো পপ-আপ ব্লকে আটকালে
+   সেটাও বলা হয়, চুপচাপ কিছু না হয়ে থাকে না।                            */
+function ooEsc(t){
+  return String(t == null ? "" : t)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function ooPrintSlip(g){
+  if(!g) return;
+  const w = window.open("", "_blank", "width=380,height=620");
+  if(!w){ alert("ব্রাউজার নতুন উইন্ডো আটকে দিয়েছে — পপ-আপ অনুমতি দিয়ে আবার চেষ্টা করুন।"); return; }
+  const rows = g.items.map(function(i){
+    return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #999">'
+         + '<span>' + ooEsc(i.productName || "খাবার") + ' × ' + (i.qty || 1) + '</span></div>';
+  }).join("");
+  const codeBox = g.orderCode
+    ? '<div style="border:3px solid #000;border-radius:6px;padding:8px 4px;margin:8px 0;text-align:center">'
+      + '<div style="font-size:10px;letter-spacing:1px">অর্ডার নম্বর</div>'
+      + '<div style="font-size:34px;font-weight:800;letter-spacing:6px;line-height:1.15">' + ooEsc(g.orderCode) + '</div></div>'
+    : '';
+  const foot = g.orderCode
+    ? '<div style="border-top:1px dashed #000;margin-top:10px;padding-top:6px;text-align:center;font-size:10px">'
+      + '🛵 রাইডার এই নম্বর বলে পার্সেল চাইবেন — মিলিয়ে দিন</div>'
+    : '';
+  w.document.write(
+    '<html><head><meta charset="utf-8"><title>স্লিপ</title></head>'
+    + '<body style="margin:0"><div style="width:280px;margin:0 auto;padding:10px;'
+    + 'font-family:monospace;font-size:12px;color:#000">'
+    + '<div style="text-align:center;font-weight:800;margin-bottom:6px">🧾 ' + ooEsc(getPrintShopName()) + '</div>'
+    + codeBox
+    + '<div>গ্রাহক: ' + ooEsc(g.customerName || "—") + '</div>'
+    + (g.deliveryPhone ? '<div>ফোন: ' + ooEsc(g.deliveryPhone) + '</div>' : '')
+    + (g.deliveryAddress ? '<div>ঠিকানা: ' + ooEsc(g.deliveryAddress) + '</div>' : '')
+    + '<div>সময়: ' + ooEsc(new Date().toLocaleString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})) + '</div>'
+    + '<div style="border-top:1px dashed #000;margin:8px 0"></div>' + rows
+    + '<div style="text-align:center;margin-top:10px;font-size:11px">মোট: ' + ooMoney(g.total) + '</div>'
+    + foot + '</div>'
+    + '<scr' + 'ipt>setTimeout(function(){window.print();},350);<\/scr' + 'ipt>'
+    + '</body></html>');
+  w.document.close();
 }
 
 document.getElementById("ooShowDone") &&
@@ -1721,6 +1788,7 @@ auth.onAuthStateChanged(async function(user){
     RP.name = d.name || "রেস্টুরেন্ট";
     RP.cur = d.currency || "SAR";
     RP.marketId = d.marketId || null;   // 🛵 ডেলিভারি ম্যানের জন্য
+    rstShowLocStatus(d.storeLocation);  // 📍 অবস্থান সেভ আছে কিনা সাথে সাথেই বোঝা যাবে
     restaurantTables = Array.isArray(d.tables) && d.tables.length ? d.tables.map(String) : ['T01','T02','T03','T04','T05','T06','T07','T08'];
     renderTables();
     const printNameEl=document.getElementById("printShopName");
@@ -1857,6 +1925,44 @@ async function deleteRestaurantProfilePhoto(){
     toastRP("ছবি মুছে দেওয়া হয়নি — " + (e.code||"আবার চেষ্টা করুন"),true);
   }
 }
+/* 📍 রেস্টুরেন্টের GPS অবস্থান। দোকানের POS-এ যেটা আগে থেকেই
+   আছে (hbSetStoreLocationBtn), হুবহু সেই কাজ — একই ফিল্ডের নাম
+   (storeLocation) ব্যবহার করা হচ্ছে, যাতে সার্ভারে দোকান আর
+   রেস্টুরেন্টের জন্য আলাদা কোড লিখতে না হয়।                        */
+function rstShowLocStatus(loc){
+  const el = document.getElementById("rstLocStatus");
+  if(!el) return;
+  if(loc && loc.lat != null){
+    el.innerHTML = '✅ সেভ আছে — <a href="https://www.google.com/maps/search/?api=1&query='
+      + loc.lat + ',' + loc.lng + '" target="_blank" style="color:#0ea5e9">ম্যাপে দেখুন</a>';
+  }else{
+    el.textContent = "⚠️ এখনো সেভ করা হয়নি — রাইডার ম্যাপে পথ দেখতে পাবেন না।";
+  }
+}
+document.getElementById("rstSetLocBtn")?.addEventListener("click", function(){
+  const btn = this;
+  if(!navigator.geolocation){ alert("এই ফোনে লোকেশন সাপোর্ট নেই।"); return; }
+  if(!RP.uid){ alert("আগে লগইন করুন।"); return; }
+  const orig = btn.textContent;
+  btn.textContent = "📍 অবস্থান খোঁজা হচ্ছে...";
+  btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(async function(pos){
+    btn.textContent = orig; btn.disabled = false;
+    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+    if(!confirm("এখন যেখানে আছেন, সেটাই রেস্টুরেন্টের অবস্থান হিসেবে সেভ করবেন?")) return;
+    try{
+      await db.collection("restaurants").doc(RP.uid).set({
+        storeLocation: { lat: lat, lng: lng, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }
+      }, { merge: true });
+      rstShowLocStatus({ lat: lat, lng: lng });
+      toastRP("✅ অবস্থান সেভ হয়েছে।");
+    }catch(e){ toastRP("সেভ হয়নি — " + (e.code || "আবার চেষ্টা করুন"), true); }
+  }, function(){
+    btn.textContent = orig; btn.disabled = false;
+    alert("লোকেশন পাওয়া যায়নি — ফোনের লোকেশন অনুমতি দেখুন।");
+  }, { enableHighAccuracy: true, timeout: 15000 });
+});
+
 async function saveRestaurantProfile(){
   if(!RP.uid)return alert("Restaurant login পাওয়া যায়নি।");
   const description=document.getElementById("restaurantProfileDescription")?.value.trim()||"";

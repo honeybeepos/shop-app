@@ -3458,7 +3458,13 @@ window.hbLoadLib = function(name){
       0%,100%{ box-shadow:0 0 0 0 rgba(245,158,11,0.0); }
       50%{ box-shadow:0 0 0 5px rgba(245,158,11,0.25); }
     }
-    .ordPackagingDoneBtn{ width:100%; margin-top:10px; padding:10px; border-radius:9px; border:1px solid rgba(96,165,250,0.4); background:rgba(96,165,250,0.12); color:#93c5fd; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; }
+    .ordSlipPrintBtn{
+    width:100%; margin-top:10px; padding:11px; border-radius:10px; cursor:pointer;
+    background:transparent; border:1px solid rgba(255,193,7,0.45); color:#FFC107;
+    font-weight:800; font-size:12.5px; font-family:inherit;
+  }
+  .ordSlipPrintBtn:active{ background:rgba(255,193,7,0.14); }
+  .ordPackagingDoneBtn{ width:100%; margin-top:10px; padding:10px; border-radius:9px; border:1px solid rgba(96,165,250,0.4); background:rgba(96,165,250,0.12); color:#93c5fd; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; }
     .ordPackagingDoneBtn.done{ border-color:rgba(34,197,94,0.4); background:rgba(34,197,94,0.12); color:#86efac; cursor:default; }
     .ordSelfShipBtn{ width:100%; margin-top:8px; padding:11px; border-radius:9px; border:none;
       background:#22c55e; color:#08130d; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit; }
@@ -7330,6 +7336,9 @@ function ordBuildPreparingGroupHtml(g, allProducts){
       <div class="ordGroupItems">${itemsHtml}</div>
       ${selfDeliveryTag}
       ${dispatchHtml}
+      <!-- 🖨️ আগে শুধু অর্ডার গ্রহণের পপ-আপে ছাপা যেত। কিন্তু স্লিপটা
+           লাগে প্যাক করার সময়, তখন পপ-আপটা আর থাকে না। -->
+      <button class="ordSlipPrintBtn" data-gkey="${escapeAttr(g.key)}">🖨️ প্যাকেটের স্লিপ ছাপুন</button>
       ${packagingBtn}
       ${selfShipBtn}
       ${groupCancelBtn}
@@ -7499,6 +7508,13 @@ function ordPrintReceipt(g){
   document.getElementById('ordReceiptPrintArea').innerHTML = `
     <div style="width:280px; margin:0 auto; padding:10px; font-family:'Space Mono',monospace; font-size:12px; color:#000;">
       <div style="text-align:center; font-weight:800; margin-bottom:6px;">🧾 অর্ডার রসিদ</div>
+      ${g.orderCode ? `
+      <!-- 🛵 রাইডার এসে এই নম্বরটাই বলবেন। তাই এটা সবচেয়ে বড়
+           করে, বাক্সে ঘেরা — প্যাকেটে লাগানোর পর এক নজরেই যেন পড়া যায়। -->
+      <div style="border:3px solid #000; border-radius:6px; padding:8px 4px; margin:8px 0; text-align:center;">
+        <div style="font-size:10px; letter-spacing:1px;">অর্ডার নম্বর</div>
+        <div style="font-size:34px; font-weight:800; letter-spacing:6px; line-height:1.15;">${escapeAttr(g.orderCode)}</div>
+      </div>` : ''}
       <div>কাস্টমার: ${escapeAttr(g.customerName||'—')}</div>
       ${g.deliveryPhone ? `<div>ফোন: ${escapeAttr(g.deliveryPhone)}</div>` : ''}
       ${g.deliveryAddress ? `<div>ঠিকানা: ${escapeAttr(g.deliveryAddress)}</div>` : ''}
@@ -7506,6 +7522,10 @@ function ordPrintReceipt(g){
       <div style="border-top:1px dashed #000; margin:8px 0;"></div>
       ${rows}
       <div style="text-align:center; margin-top:10px; font-size:11px;">মোট আইটেম: ${g.items.length}টা</div>
+      ${g.orderCode ? `
+      <div style="border-top:1px dashed #000; margin-top:10px; padding-top:6px; text-align:center; font-size:10px;">
+        🛵 রাইডার এই নম্বর বলে পার্সেল চাইবেন — মিলিয়ে দিন
+      </div>` : ''}
     </div>`;
   const area = document.getElementById('ordReceiptPrintArea');
   area.classList.add('printing');
@@ -7583,6 +7603,12 @@ async function ordRenderGrouped(orders){
     listEl.innerHTML = groups.map(g=> ordBuildPreparingGroupHtml(g, __ordAllProducts)).join('');
     listEl.querySelectorAll('.ordItemRemoveBtn').forEach(btn=>{
       btn.addEventListener('click', ()=>{ if(confirm('এই প্রোডাক্টটা বাতিল করবেন?')) ordUpdateStatus(btn.dataset.oid, 'cancelled'); });
+    });
+    listEl.querySelectorAll('.ordSlipPrintBtn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const g = groups.find(x=> x.key === btn.dataset.gkey);
+        if(g) ordPrintReceipt(g);
+      });
     });
     listEl.querySelectorAll('.ordPackagingDoneBtn:not(.done)').forEach(btn=>{
       btn.addEventListener('click', ()=> ordMarkPackagingDone(btn.dataset.gkey, groups));
@@ -21477,6 +21503,10 @@ function rmStartBazarDeliveryListener(riderUid){
           // ফিল্ডটা নেই মানে এই অর্ডারটা এই পরিবর্তনের আগেই পথে নেমেছে —
           // তাকে জোর করে আবার "মাল তুলুন" ধাপে ফেরানো হবে না
           const picked = o.pickedUp !== false;
+          // 🍽️ দোকান না রেস্টুরেন্ট — রাইডার যেন ঠিক জায়গায় যান। আগে
+          //    সবকিছুকে "দোকান" বলা হতো, রেস্টুরেন্টেও।
+          const pLbl = o.pickupIsRestaurant ? "রেস্টুরেন্ট" : "দোকান";
+          const pIcon = o.pickupIsRestaurant ? "🍽️" : "🏪";
           const codeTag = o.orderCode
             ? `<span style="background:rgba(255,209,102,0.16); color:#FFC107; padding:2px 8px; border-radius:7px; font-size:11.5px; font-weight:800;">🧾 ${escapeAttr(o.orderCode)}</span>` : '';
 
@@ -21485,14 +21515,14 @@ function rmStartBazarDeliveryListener(riderUid){
             return `
             <div style="background:#212121; border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(255,193,7,0.35);">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-                <div style="font-weight:800; font-size:13px; color:#FFC107;">🏪 আগে দোকান থেকে মাল তুলুন</div>
+                <div style="font-weight:800; font-size:13px; color:#FFC107;">${pIcon} আগে ${pLbl} থেকে মাল তুলুন</div>
                 ${codeTag}
               </div>
-              <div style="font-size:12.5px; color:#fff; margin-top:6px;">${escapeAttr(o.pickupName || o.shopName || 'দোকান')}</div>
-              ${o.pickupLat!=null ? `<a href="https://www.google.com/maps/search/?api=1&query=${o.pickupLat},${o.pickupLng}" target="_blank" style="display:inline-block; font-size:12px; color:#0ea5e9; margin-top:4px; text-decoration:none;">🗺️ দোকানের পথ দেখুন</a>` : ''}
+              <div style="font-size:12.5px; color:#fff; margin-top:6px;">${escapeAttr(o.pickupName || o.shopName || pLbl)}</div>
+              ${o.pickupLat!=null ? `<a href="https://www.google.com/maps/search/?api=1&query=${o.pickupLat},${o.pickupLng}" target="_blank" style="display:inline-block; font-size:12px; color:#0ea5e9; margin-top:4px; text-decoration:none;">🗺️ ${pLbl}ের পথ দেখুন</a>` : ''}
               ${o.pickupPhone
-                ? `<a href="tel:${escapeAttr(o.pickupPhone)}" style="display:inline-block; font-size:12px; color:#FFC107; margin-top:4px; margin-left:10px; text-decoration:none;">📞 দোকানে কল</a>`
-                : `<div style="font-size:11px; color:#a8a8a8; margin-top:4px;">দোকানের নম্বর দেওয়া নেই</div>`}
+                ? `<a href="tel:${escapeAttr(o.pickupPhone)}" style="display:inline-block; font-size:12px; color:#FFC107; margin-top:4px; margin-left:10px; text-decoration:none;">📞 ${pLbl}ে কল</a>`
+                : `<div style="font-size:11px; color:#a8a8a8; margin-top:4px;">${pLbl}ের নম্বর দেওয়া নেই</div>`}
               <div style="font-size:11.5px; color:#a8a8a8; margin-top:8px;">পণ্য: ${escapeAttr(o.productName||'প্রোডাক্ট')} · ${o.qty||1}টা</div>
               <button class="rmPickedUpBtn" data-oid="${o.id}" style="width:100%; margin-top:10px; padding:10px; border:none; border-radius:9px; background:#FFC107; color:#241605; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">🛵 মাল তুলেছি — রওনা দিচ্ছি</button>
             </div>`;
