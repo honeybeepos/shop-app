@@ -2,204 +2,412 @@
 <html lang="bn">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>🐝 Honey Bee — ডেলিভারি ম্যান অ্যাপ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>🐝 Honey Bee Rider</title>
 <meta name="theme-color" content="#1a1206">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="rider-manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
     --bg1:#1a1206; --bg2:#3d2405; --gold:#ffb703; --amber:#ffd166;
-    --card:#241705; --border:rgba(255,209,102,0.25); --danger:#e2543d; --ok:#2fbf71;
+    --card:#241705; --card2:#2d1d08; --border:rgba(255,209,102,0.22);
+    --txt:#fff8e8; --muted:rgba(255,248,232,0.58);
+    --ok:#2fbf71; --danger:#e2543d; --blue:#38bdf8;
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{ height:100%; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; margin:0; }
   body{
-    margin:0; min-height:100vh;
+    min-height:100vh; color:var(--txt);
+    font-family:'Noto Sans Bengali',system-ui,sans-serif;
     background:
-      radial-gradient(circle at 20% 0%, rgba(255,183,3,0.18), transparent 45%),
-      radial-gradient(circle at 90% 100%, rgba(255,209,102,0.12), transparent 40%),
-      linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 100%);
-    color:#fff8e8;
-    font-family:'Noto Sans Bengali','Space Mono',sans-serif;
-    display:flex; flex-direction:column;
+      radial-gradient(circle at 18% 0%, rgba(255,183,3,0.16), transparent 42%),
+      radial-gradient(circle at 92% 100%, rgba(255,209,102,0.10), transparent 38%),
+      linear-gradient(165deg, var(--bg1) 0%, var(--bg2) 100%);
+    background-attachment:fixed;
   }
-  .wrap{ max-width:460px; margin:0 auto; width:100%; padding:22px 20px 40px; flex:1; display:flex; flex-direction:column; }
-
-  header{ text-align:center; margin-bottom:18px; }
-  header .hex{ font-size:44px; filter:drop-shadow(0 0 14px rgba(255,183,3,0.55)); }
-  header h1{ margin:8px 0 2px; font-size:19px; font-weight:800; letter-spacing:0.3px; }
-  header p{ margin:0; font-size:11.5px; color:var(--amber); letter-spacing:1.5px; text-transform:uppercase; opacity:0.85; }
+  .wrap{ max-width:480px; margin:0 auto; padding:18px 16px 96px; }
 
   .card{
-    background:var(--card); border:1px solid var(--border); border-radius:16px; padding:20px;
-    margin-bottom:16px; box-shadow:0 10px 24px rgba(0,0,0,0.35);
+    background:var(--card); border:1px solid var(--border); border-radius:16px;
+    padding:16px; margin-bottom:14px;
   }
-  .card h2{ margin:0 0 10px; font-size:14.5px; color:var(--amber); }
-  .card p.desc{ margin:0 0 14px; font-size:12.5px; color:rgba(255,248,232,0.65); line-height:1.6; }
-
-  label{ display:block; font-size:12px; color:rgba(255,248,232,0.7); margin-bottom:6px; font-weight:600; }
-  input{
-    width:100%; padding:12px 12px; border-radius:10px; border:1px solid var(--border);
-    background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:14px;
-  }
-  input:focus{ outline:2px solid var(--gold); outline-offset:1px; }
-  input::placeholder{ color:rgba(255,248,232,0.35); }
+  .cardTitle{ font-size:13.5px; font-weight:800; color:var(--amber); margin:0 0 10px; }
+  .muted{ color:var(--muted); font-size:12.5px; line-height:1.65; }
 
   .btn{
-    width:100%; padding:13px; border:none; border-radius:11px; font-size:15px; font-weight:800;
-    cursor:pointer; font-family:inherit; margin-top:12px;
-    background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1);
+    width:100%; padding:13px; border:none; border-radius:12px; font-size:14.5px;
+    font-weight:800; font-family:inherit; cursor:pointer; margin-top:10px;
+    background:linear-gradient(135deg, var(--amber), var(--gold)); color:#241605;
   }
   .btn:active{ transform:translateY(1px); }
-  .btn.secondary{ background:transparent; color:var(--amber); border:1px solid var(--border); }
+  .btn.ghost{ background:transparent; color:var(--amber); border:1px solid var(--border); }
+  .btn.ok{ background:var(--ok); color:#06220f; }
   .btn.danger{ background:var(--danger); color:#fff; }
+  .btn:disabled{ opacity:.5; cursor:default; }
 
-  /* ---------- সংযোগ স্ক্রিন ---------- */
-  #setupScreen{ display:none; }
-
-  /* ---------- মূল স্ট্যাটাস স্ক্রিন ---------- */
-  #mainScreen{ display:none; flex:1; flex-direction:column; }
-  .statusRow{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
-  .statusDot{ width:10px; height:10px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok); flex-shrink:0; }
-  .statusDot.off{ background:var(--danger); box-shadow:0 0 8px var(--danger); }
-  .shopNameLbl{ font-size:15px; font-weight:800; }
-  .statusSub{ font-size:11.5px; color:rgba(255,248,232,0.55); margin-top:2px; }
-
-  .idleHive{
-    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    text-align:center; padding:20px 0;
+  /* ───── লগইন ───── */
+  #loginScreen{ display:none; min-height:100vh; align-items:center; justify-content:center; padding:24px 18px; }
+  #loginScreen .inner{ width:100%; max-width:380px; text-align:center; }
+  .brandHex{
+    width:104px; height:104px; margin:0 auto 16px; border-radius:30px;
+    display:flex; align-items:center; justify-content:center; font-size:50px;
+    background:radial-gradient(circle at 34% 28%, rgba(255,209,102,0.32), rgba(255,183,3,0.07));
+    border:1px solid var(--border); animation:float 3.4s ease-in-out infinite;
   }
-  .idleHive .hexBig{
-    width:120px; height:120px; display:flex; align-items:center; justify-content:center;
-    font-size:52px; border-radius:30px;
-    background:radial-gradient(circle at 35% 30%, rgba(255,209,102,0.35), rgba(255,183,3,0.08));
-    border:1px solid var(--border);
-    animation:idleFloat 3.2s ease-in-out infinite;
-    margin-bottom:18px;
-  }
-  @keyframes idleFloat{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-8px); } }
-  .idleHive h3{ margin:0 0 6px; font-size:16px; }
-  .idleHive p{ margin:0; font-size:12.5px; color:rgba(255,248,232,0.55); max-width:260px; }
+  @keyframes float{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
+  #loginScreen h1{ margin:0 0 6px; font-size:21px; font-weight:800; }
+  #loginScreen .tag{ margin:0 0 22px; font-size:12px; color:var(--amber); letter-spacing:2px; text-transform:uppercase; opacity:.85; }
+  .linkTxt{ font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer; display:inline-block; margin-top:16px; }
 
-  .lastCallCard{ font-size:12px; color:rgba(255,248,232,0.6); text-align:center; }
-  .lastCallCard b{ color:var(--amber); }
-
-  .footerLink{ text-align:center; margin-top:auto; padding-top:14px; }
-  .footerLink span{ font-size:11.5px; color:rgba(255,248,232,0.45); cursor:pointer; text-decoration:underline; }
-
-  /* ---------- রিং হচ্ছে — ফুলস্ক্রিন অ্যালার্ট ---------- */
-  #ringOverlay{
-    display:none; position:fixed; inset:0; z-index:999; flex-direction:column; align-items:center; justify-content:center;
-    background:radial-gradient(circle at 50% 30%, rgba(226,84,61,0.35), transparent 55%),
-      linear-gradient(160deg,#2b0e07,#1a1206);
-    text-align:center; padding:30px;
+  /* ───── হেডার ───── */
+  #appScreen{ display:none; }
+  .topBar{ display:flex; align-items:center; gap:11px; margin-bottom:14px; }
+  .avatar{
+    width:44px; height:44px; border-radius:14px; flex-shrink:0;
+    background:linear-gradient(135deg, var(--amber), var(--gold)); color:#241605;
+    display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:800;
   }
-  .ringPulse{
-    width:150px; height:150px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-size:60px; background:radial-gradient(circle, rgba(226,84,61,0.5), rgba(226,84,61,0.05));
-    animation:ringPulse 1s ease-in-out infinite; margin-bottom:24px;
+  .topName{ font-size:15px; font-weight:800; line-height:1.25; }
+  .topSub{ font-size:11.5px; color:var(--muted); }
+  .bellBtn{
+    margin-left:auto; position:relative; width:42px; height:42px; border-radius:13px; flex-shrink:0;
+    background:var(--card); border:1px solid var(--border); color:var(--txt);
+    font-size:18px; cursor:pointer;
   }
-  @keyframes ringPulse{ 0%,100%{ transform:scale(1); box-shadow:0 0 0 0 rgba(226,84,61,0.5); } 50%{ transform:scale(1.08); box-shadow:0 0 0 22px rgba(226,84,61,0); } }
-  #ringOverlay h2{ margin:0 0 8px; font-size:22px; }
-  #ringOverlay p{ margin:0 0 26px; font-size:13px; color:rgba(255,248,232,0.65); }
-  #acceptRingBtn{ background:var(--ok); color:#fff; max-width:280px; }
-  #snoozeRingBtn{ max-width:280px; margin-top:10px; }
+  .bellDot{
+    position:absolute; top:-5px; right:-5px; min-width:19px; height:19px; padding:0 5px;
+    border-radius:10px; background:var(--danger); color:#fff; font-size:11px; font-weight:800;
+    display:none; align-items:center; justify-content:center;
+  }
+
+  /* ───── অনলাইন টগল ───── */
+  .dutyCard{ display:flex; align-items:center; gap:14px; }
+  .dutyTxt{ flex:1; min-width:0; }
+  .dutyTitle{ font-size:15px; font-weight:800; }
+  .dutySub{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .switch{
+    width:60px; height:33px; border-radius:20px; background:#4a3a1c; position:relative;
+    cursor:pointer; transition:background .22s; flex-shrink:0; border:1px solid var(--border);
+  }
+  .switch.on{ background:var(--ok); border-color:var(--ok); }
+  .knob{
+    width:25px; height:25px; border-radius:50%; background:#fff; position:absolute;
+    top:3px; left:3px; transition:left .22s; box-shadow:0 2px 6px rgba(0,0,0,.35);
+  }
+  .switch.on .knob{ left:31px; }
+
+  /* ───── মোড ট্যাব ───── */
+  .modeTabs{ display:flex; gap:8px; margin-bottom:13px; }
+  .modeTab{
+    flex:1; padding:11px 6px; border-radius:12px; font-size:13px; font-weight:800;
+    font-family:inherit; cursor:pointer; background:var(--card);
+    border:1px solid var(--border); color:var(--muted);
+  }
+  .modeTab.active{ background:linear-gradient(135deg, var(--amber), var(--gold)); color:#241605; border-color:transparent; }
+
+  /* ───── যাত্রী রাডার ───── */
+  #radarMap{ width:100%; height:300px; border-radius:14px; overflow:hidden; background:#12100a; }
+  .radarHint{ font-size:12.5px; color:var(--amber); font-weight:700; margin-bottom:9px; }
+  .radarBadge{
+    background:#e2543d; color:#fff; font-weight:800; font-size:11px; padding:4px 10px;
+    border-radius:20px; border:2px solid #fff; white-space:nowrap;
+  }
+  .popBtn{
+    width:100%; margin-top:5px; padding:8px; border:none; border-radius:9px;
+    background:#2fbf71; color:#06220f; font-weight:800; font-size:11.5px;
+    font-family:inherit; cursor:pointer; position:relative; overflow:hidden;
+  }
+  .popBtn.holding{ background:#1d8c50; }
+
+  /* ───── স্ট্যাটস ───── */
+  .statGrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+  .stat{ background:var(--card2); border:1px solid var(--border); border-radius:13px; padding:12px 8px; text-align:center; }
+  .statNum{ font-size:21px; font-weight:800; color:var(--amber); line-height:1.1; }
+  .statLbl{ font-size:10.5px; color:var(--muted); margin-top:3px; }
+  .earnBox{
+    margin-top:10px; background:linear-gradient(135deg, rgba(47,191,113,0.16), rgba(47,191,113,0.05));
+    border:1px solid rgba(47,191,113,0.35); border-radius:13px; padding:13px; text-align:center;
+  }
+  .earnNum{ font-size:25px; font-weight:800; color:var(--ok); }
+  .earnLbl{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+
+  /* ───── অর্ডার কার্ড ───── */
+  .jobCard{ background:var(--card); border:1px solid var(--border); border-radius:16px; padding:15px; margin-bottom:13px; }
+  .jobCard.pickup{ border-color:rgba(255,183,3,0.5); background:linear-gradient(170deg, rgba(255,183,3,0.09), var(--card) 55%); }
+  .jobHead{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:9px; }
+  .jobStage{ font-size:13px; font-weight:800; }
+  .codeChip{
+    background:rgba(255,183,3,0.17); color:var(--gold); border:1px solid rgba(255,183,3,0.4);
+    padding:2px 9px; border-radius:999px; font-size:12px; font-weight:800; letter-spacing:1px;
+  }
+  .jobPlace{ font-size:15px; font-weight:800; margin-bottom:3px; }
+  .jobLine{ font-size:12.5px; color:var(--muted); margin-top:4px; line-height:1.6; }
+  .actRow{ display:flex; gap:8px; margin-top:11px; }
+  .actBtn{
+    flex:1; padding:11px 8px; border-radius:11px; text-align:center; text-decoration:none;
+    font-size:12.5px; font-weight:800; font-family:inherit; cursor:pointer; border:1px solid var(--border);
+    background:var(--card2); color:var(--txt); display:block;
+  }
+  .actBtn.call{ color:var(--ok); border-color:rgba(47,191,113,0.45); }
+  .actBtn.map{ color:var(--blue); border-color:rgba(56,189,248,0.45); }
+  .bigAct{
+    width:100%; margin-top:11px; padding:14px; border:none; border-radius:12px;
+    font-size:14px; font-weight:800; font-family:inherit; cursor:pointer;
+    position:relative; overflow:hidden;
+  }
+  .bigAct.pick{ background:linear-gradient(135deg, var(--amber), var(--gold)); color:#241605; }
+  .bigAct.done{ background:var(--ok); color:#06220f; }
+  .holdFill{
+    position:absolute; left:0; top:0; bottom:0; width:0;
+    background:rgba(255,255,255,0.3); z-index:0;
+  }
+  .holdLabel{ position:relative; z-index:1; }
+  .bigAct.holding{ transform:scale(.975); }
+  .bigAct.holding .holdFill{ width:100%; transition:width 3s linear; }
+  .bigAct.heldDone{ background:#16a34a !important; color:#fff; }
+  .bigAct:disabled{ cursor:default; }
+
+  .emptyBox{ text-align:center; padding:34px 16px; }
+  .emptyBox .bigHex{
+    width:110px; height:110px; margin:0 auto 16px; border-radius:28px;
+    display:flex; align-items:center; justify-content:center; font-size:46px;
+    background:radial-gradient(circle at 34% 28%, rgba(255,209,102,0.28), rgba(255,183,3,0.05));
+    border:1px solid var(--border); animation:float 3.4s ease-in-out infinite;
+  }
+  .emptyBox h3{ margin:0 0 7px; font-size:16px; }
+  .emptyBox p{ margin:0 auto; font-size:12.5px; color:var(--muted); max-width:270px; line-height:1.7; }
+
+  /* ───── অফার ওভারলে ───── */
+  #offerOverlay{
+    display:none; position:fixed; inset:0; z-index:900; padding:26px 20px;
+    flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    background:radial-gradient(circle at 50% 26%, rgba(255,183,3,0.26), transparent 56%), linear-gradient(165deg,#2b1a07,#140e04);
+  }
+  .ring{
+    width:132px; height:132px; border-radius:50%; margin-bottom:18px;
+    display:flex; align-items:center; justify-content:center; font-size:54px;
+    background:radial-gradient(circle, rgba(255,183,3,0.45), rgba(255,183,3,0.04));
+    animation:pulse 1.05s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{transform:scale(1); box-shadow:0 0 0 0 rgba(255,183,3,.45)} 50%{transform:scale(1.07); box-shadow:0 0 0 24px rgba(255,183,3,0)} }
+  .timerBig{ font-size:34px; font-weight:800; color:var(--amber); letter-spacing:2px; margin-bottom:4px; }
+  .offerBox{ width:100%; max-width:340px; background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:16px; padding:15px; margin:14px 0 4px; text-align:left; }
+  .offerRow{ display:flex; gap:9px; font-size:13px; margin-bottom:8px; line-height:1.5; }
+  .offerRow:last-child{ margin-bottom:0; }
+  .offerRow .k{ flex-shrink:0; }
+  .offerBtns{ width:100%; max-width:340px; }
+
+  /* ───── শীট ───── */
+  .sheet{ display:none; position:fixed; inset:0; z-index:950; background:rgba(0,0,0,.62); align-items:flex-end; }
+  .sheetBox{
+    width:100%; max-height:84vh; overflow-y:auto; background:var(--bg1);
+    border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:18px 16px 28px;
+  }
+  .sheetHead{ display:flex; align-items:center; margin-bottom:12px; }
+  .sheetHead .t{ font-size:15px; font-weight:800; color:var(--amber); }
+  .sheetHead .x{ margin-left:auto; font-size:20px; color:var(--muted); cursor:pointer; }
+  .listRow{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:11px 13px; margin-bottom:9px; font-size:12.5px; line-height:1.65; }
+
+  /* ───── নিচের ন্যাভ ───── */
+  .bottomNav{
+    position:fixed; bottom:0; left:0; right:0; z-index:500;
+    max-width:480px; margin:0 auto; display:flex;
+    background:rgba(26,18,6,0.97); border-top:1px solid var(--border);
+    padding:7px 4px calc(7px + env(safe-area-inset-bottom));
+    backdrop-filter:blur(8px);
+  }
+  .navItem{
+    flex:1; text-align:center; padding:6px 2px; cursor:pointer;
+    color:var(--muted); font-size:10.5px; font-weight:700; border:none; background:none; font-family:inherit;
+  }
+  .navItem .ic{ display:block; font-size:19px; margin-bottom:2px; }
+  .navItem.active{ color:var(--amber); }
+
+  .toast{
+    position:fixed; left:50%; transform:translateX(-50%); bottom:84px; z-index:980;
+    background:#2d1d08; border:1px solid var(--border); color:var(--txt);
+    padding:11px 17px; border-radius:12px; font-size:12.5px; font-weight:700;
+    max-width:300px; text-align:center; display:none;
+  }
 </style>
-<!-- Leaflet.js (OpenStreetMap) — ফ্রি, কোনো API key লাগে না -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
-<div class="wrap">
 
-  <header>
-    <div class="hex">🐝</div>
-    <h1>Honey Bee — ডেলিভারি অ্যাপ</h1>
-    <p>Delivery Man Companion</p>
-  </header>
+<!-- ══════════ লগইন ══════════ -->
+<div id="loginScreen">
+  <div class="inner">
+    <div class="brandHex">🛵</div>
+    <h1>Honey Bee Rider</h1>
+    <p class="tag">Delivery Partner</p>
 
-  <!-- ================= কানেক্ট / সেটআপ স্ক্রিন ================= -->
-  <div id="setupScreen" class="card">
-    <h2>🔗 দোকানের সাথে কানেক্ট করুন</h2>
-    <p class="desc">দোকানের Honey Bee Network স্ক্রিনে "🔗 ডেলিভারি অ্যাপ কানেক্ট কোড দেখুন" থেকে কোডটা নিয়ে এখানে বসান। একবার কানেক্ট করলে এই ফোনে আর করা লাগবে না।</p>
-    <label for="shopCodeInput">শপ কোড</label>
-    <input type="text" id="shopCodeInput" placeholder="যেমনঃ Ab12Cd34Ef...">
-    <button class="btn" id="connectBtn">✅ কানেক্ট করুন</button>
-    <p id="connectError" style="display:none; color:var(--danger); font-size:12.5px; margin:10px 0 0;">কোডটা সঠিক না, আবার চেষ্টা করুন।</p>
+    <div class="card" style="text-align:left;">
+      <div class="cardTitle">🔐 রাইডার লগইন</div>
+      <p class="muted">যে Google অ্যাকাউন্ট দিয়ে এজেন্ট আপনাকে রাইডার হিসেবে নিবন্ধন করেছেন, সেটা দিয়েই ঢুকুন। একবার ঢুকলে এই ফোনে আর লাগবে না।</p>
+      <button class="btn" id="googleLoginBtn">🔓 Google দিয়ে ঢুকুন</button>
+      <div id="loginErr" style="display:none; color:var(--danger); font-size:12.5px; margin-top:11px; line-height:1.6;"></div>
+    </div>
+
+    <span class="linkTxt" id="legacyLink">পুরনো শপ-কোড দিয়ে কানেক্ট করব</span>
   </div>
+</div>
 
-  <!-- ================= মূল স্ট্যাটাস স্ক্রিন ================= -->
-  <div id="mainScreen">
-    <div class="card">
-      <div class="statusRow">
-        <div class="statusDot" id="connDot"></div>
-        <div>
-          <div class="shopNameLbl" id="shopNameLbl">—</div>
-          <div class="statusSub" id="connStatusSub">সংযোগ পরীক্ষা হচ্ছে...</div>
+<!-- ══════════ মূল অ্যাপ ══════════ -->
+<div id="appScreen">
+  <div class="wrap">
+
+    <div class="topBar">
+      <div class="avatar" id="avatarEl">🛵</div>
+      <div style="min-width:0;">
+        <div class="topName" id="riderNameEl">—</div>
+        <div class="topSub" id="riderSubEl">—</div>
+      </div>
+      <button class="bellBtn" id="bellBtn">🔔<span class="bellDot" id="bellDot">0</span></button>
+    </div>
+
+    <!-- 📦 / 🛺 মোড — একসাথে দুইটা করা যায় না।
+         সার্ভারের riderEligibilityQuery() transportModeOn == false দেখে
+         ডেলিভারি অফার পাঠায়, তাই যাত্রী-মোডে থাকলে ডেলিভারি আসবে না। -->
+    <div class="modeTabs">
+      <button class="modeTab active" id="modeDelivery">📦 ডেলিভারি</button>
+      <button class="modeTab" id="modePassenger">🛺 যাত্রী</button>
+    </div>
+
+    <!-- ডিউটি -->
+    <div class="card dutyCard">
+      <div class="dutyTxt">
+        <div class="dutyTitle" id="dutyTitle">অফলাইন</div>
+        <div class="dutySub" id="dutySub">অনলাইন হলেই নতুন অর্ডার আসবে</div>
+      </div>
+      <div class="switch" id="dutySwitch"><div class="knob"></div></div>
+    </div>
+
+    <!-- পাতা: হোম -->
+    <div id="pageHome">
+      <div id="jobsArea"></div>
+
+      <div class="card">
+        <div class="cardTitle">📊 আজকের হিসাব</div>
+        <div class="statGrid">
+          <div class="stat"><div class="statNum" id="statTotal">0</div><div class="statLbl">মোট</div></div>
+          <div class="stat"><div class="statNum" id="statTransit">0</div><div class="statLbl">চলছে</div></div>
+          <div class="stat"><div class="statNum" id="statDone">0</div><div class="statLbl">সম্পন্ন</div></div>
+        </div>
+        <div class="earnBox">
+          <div class="earnNum" id="earnNum">৳ ০</div>
+          <div class="earnLbl" id="earnLbl">আজকের আয়</div>
         </div>
       </div>
     </div>
 
-    <div class="idleHive">
-      <div class="hexBig">🐝</div>
-      <h3>সব ঠিক আছে</h3>
-      <p>দোকান থেকে "ডেলিভারি ম্যান কে ডাকুন" বাটনে চাপ দিলেই এই অ্যাপ ভাইব্রেট করে ও শব্দ করে জানিয়ে দেবে। অ্যাপটা চালু/সামনে রাখুন যাতে মিস না হয়।</p>
-    </div>
-
-    <div class="lastCallCard" id="lastCallInfo"></div>
-
-    <div class="card" id="activeCallCard" style="display:none;">
-      <h2>📦 বর্তমান অর্ডার</h2>
-      <div id="activeCallMapEl" style="width:100%; height:200px; border-radius:12px; overflow:hidden; background:#111; margin-bottom:12px; display:none;"></div>
-      <p class="desc" id="activeCallStatusTxt" style="margin-bottom:10px;"></p>
-      <div id="stageButtonsRow" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
-        <button class="btn secondary stageBtn" data-stage="picked_up" style="flex:1; min-width:100px; font-size:12px; padding:9px;">🛵 পিকআপ করলাম</button>
-        <button class="btn secondary stageBtn" data-stage="on_the_way" style="flex:1; min-width:100px; font-size:12px; padding:9px;">🚴 পথে আছি</button>
-        <button class="btn secondary stageBtn" data-stage="delivered" style="flex:1; min-width:100px; font-size:12px; padding:9px;">✅ ডেলিভারি সম্পন্ন</button>
+    <!-- পাতা: যাত্রী রাডার -->
+    <div id="pagePassenger" style="display:none;">
+      <div class="card">
+        <div class="cardTitle">🛺 কাছের অপেক্ষমাণ যাত্রী</div>
+        <div class="radarHint" id="radarHint">মানচিত্র তৈরি হচ্ছে...</div>
+        <div id="radarMap"></div>
+        <p class="muted" style="margin-top:10px;">২ কিমির মধ্যে যাঁরা গাড়ি খুঁজছেন তাঁদের পিন দেখা যাচ্ছে। পিনে চেপে "Pick Up" ধরে রাখুন। নীল পিনগুলো কাছের দোকান — যাত্রী বেশি পাওয়ার জায়গা।</p>
       </div>
-      <a id="navigateLinkBtn" href="#" target="_blank" style="display:none; text-align:center; text-decoration:none;">
-        <button class="btn" style="background:#3b82f6; color:#fff;">🧭 কাস্টমারের কাছে নেভিগেট করুন</button>
-      </a>
     </div>
 
-    <div class="card" id="pushCard">
-      <h2>🔔 ব্যাকগ্রাউন্ড নোটিফিকেশন</h2>
-      <p class="desc" id="pushDesc">অ্যাপ বন্ধ থাকলে বা স্ক্রিন লক থাকলেও দোকানের কল যেন মিস না হয় — এটা চালু করুন। একবার চালু করলে আর করা লাগবে না।</p>
-      <button class="btn" id="enablePushBtn">🔔 নোটিফিকেশন চালু করুন</button>
+    <!-- পাতা: হিস্টরি -->
+    <div id="pageHistory" style="display:none;">
+      <div class="card">
+        <div class="cardTitle">🧾 ডেলিভারি হিস্টরি</div>
+        <div id="historyList"><p class="muted">লোড হচ্ছে...</p></div>
+      </div>
     </div>
 
-    <div class="card" id="gpsCard">
-      <h2>📍 লাইভ লোকেশন শেয়ারিং</h2>
-      <p class="desc" id="gpsDesc">এটা চালু থাকলে দোকান ও এজেন্ট আপনার লাইভ অবস্থান ম্যাপে দেখতে পারবে — কাস্টমারের কাছে পৌঁছাতে সুবিধা হবে।</p>
-      <button class="btn" id="toggleGpsBtn">📍 লোকেশন শেয়ারিং চালু করুন</button>
+    <!-- পাতা: প্রোফাইল -->
+    <div id="pageProfile" style="display:none;">
+      <div class="card">
+        <div class="cardTitle">👤 আমার তথ্য</div>
+        <div id="profileBox" class="muted"></div>
+      </div>
+      <div class="card">
+        <div class="cardTitle">🔔 ব্যাকগ্রাউন্ড নোটিফিকেশন</div>
+        <p class="muted" id="pushDesc">অ্যাপ বন্ধ থাকলে বা স্ক্রিন লক থাকলেও অর্ডার যেন মিস না হয়।</p>
+        <button class="btn ghost" id="enablePushBtn">🔔 চালু করুন</button>
+      </div>
+      <div class="card">
+        <div class="cardTitle">🔧 অন্যান্য</div>
+        <button class="btn ghost" id="testRingBtn">🔔 টেস্ট রিং</button>
+        <button class="btn danger" id="logoutBtn">🚪 লগআউট</button>
+      </div>
     </div>
 
-    <button class="btn secondary" id="testRingBtn">🔔 টেস্ট রিং (নিজে টেস্ট করুন)</button>
-
-    <div class="footerLink">
-      <span id="disconnectBtn">🔁 অন্য দোকানের কোড দিয়ে আবার কানেক্ট করুন</span>
-    </div>
   </div>
 
+  <div class="bottomNav">
+    <button class="navItem active" data-page="Home"><span class="ic">🏠</span>হোম</button>
+    <button class="navItem" data-page="History"><span class="ic">🧾</span>হিস্টরি</button>
+    <button class="navItem" data-page="Profile"><span class="ic">👤</span>প্রোফাইল</button>
+  </div>
 </div>
 
-<!-- ================= কল আসলে ফুলস্ক্রিন রিং ================= -->
-<div id="ringOverlay">
-  <div class="ringPulse">🔔</div>
-  <h2>দোকান থেকে ডাকছে!</h2>
-  <p id="ringSubText">নতুন ডেলিভারি অর্ডার আছে — দোকানে যোগাযোগ করুন।</p>
-  <button class="btn" id="acceptRingBtn">✅ বুঝেছি, রিং বন্ধ করুন</button>
+<!-- ══════════ নতুন অর্ডারের অফার ══════════ -->
+<div id="offerOverlay">
+  <div class="ring">📦</div>
+  <div class="timerBig" id="offerTimer">৬০</div>
+  <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">সেকেন্ডের মধ্যে সাড়া দিন</div>
+  <div class="offerBox">
+    <div class="offerRow"><span class="k" id="offerPickupIcon">🏪</span><span id="offerPickup">—</span></div>
+    <div class="offerRow"><span class="k">🧾</span><span id="offerCode">—</span></div>
+    <div class="offerRow"><span class="k">📍</span><span id="offerDrop">—</span></div>
+    <div class="offerRow"><span class="k">📏</span><span id="offerDist">—</span></div>
+    <div class="offerRow"><span class="k">💰</span><span id="offerIncome">—</span></div>
+  </div>
+  <div class="offerBtns">
+    <button class="btn ok" id="offerAcceptBtn">✅ অর্ডারটা নিচ্ছি</button>
+    <button class="btn ghost" id="offerSkipBtn">পরেরটা দেখি</button>
+  </div>
 </div>
+
+<!-- ══════════ নোটিফিকেশন শীট ══════════ -->
+<div class="sheet" id="notifSheet">
+  <div class="sheetBox">
+    <div class="sheetHead"><span class="t">🔔 নোটিফিকেশন</span><span class="x" id="notifClose">✕</span></div>
+    <div id="notifList"><p class="muted">এখনো কিছু নেই।</p></div>
+  </div>
+</div>
+
+<!-- ══════════ পুরনো শপ-কোড (ঐচ্ছিক) ══════════ -->
+<div class="sheet" id="legacySheet">
+  <div class="sheetBox">
+    <div class="sheetHead"><span class="t">🔗 পুরনো শপ-কোড</span><span class="x" id="legacyClose">✕</span></div>
+    <p class="muted">যেসব দোকান এখনো রাইডার-সিস্টেমে যুক্ত হয়নি, তারা "ডেলিভারি ম্যান কে ডাকুন" দিয়ে ডাকে। সেই পুরনো ব্যবস্থাটা এখানেই আছে — কিন্তু এতে বাজারের অর্ডার আসে না, শুধু ডাক আসে।</p>
+    <input id="legacyCode" placeholder="শপ কোড" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:var(--txt); font-family:inherit; font-size:14px; margin-top:8px;">
+    <button class="btn ghost" id="legacyConnectBtn">কানেক্ট করুন</button>
+    <div id="legacyStatus" class="muted" style="margin-top:10px;"></div>
+  </div>
+</div>
+
+<div class="toast" id="toastEl"></div>
 
 <script>
-/* ============================================================
-   Firebase — মূল দোকান অ্যাপের মতো একই প্রজেক্টের সাথে কানেক্ট,
-   কিন্তু এই অ্যাপ শুধু deliveryCalls সাব-কালেকশন পড়ে/লেখে —
-   কোনো লগইন লাগে না, শুধু "শপ কোড" (shopId) লাগবে।
-   ============================================================ */
+/* ════════════════════════════════════════════════════════════
+   🐝 Honey Bee Rider — ডেলিভারি রাইডারের অ্যাপ
+
+   ⚠️ আগের সংস্করণটা শপ-কোড দিয়ে কানেক্ট হতো আর
+   shops/{id}/deliveryCalls ঘরে লিখত। বাজার, দোকানের POS আর
+   রেস্টুরেন্টের POS — তিনটার একটাও ওই ঘর পড়ে না, তাই রাইডার
+   "পথে আছি" চাপলেও গ্রাহকের ট্র্যাকারে কিছুই বদলাত না।
+
+   এখন এই অ্যাপ POS-এর Rider Mode-এর মতো একই ঘরেই কাজ করে:
+     · deliveryOffers  → নতুন অর্ডারের ডাক
+     · orderRequests   → অর্ডারের আসল অবস্থা (বাজার+POS+রেস্টুরেন্ট
+                          তিনটাই এই ঘরটাই পড়ে)
+     · riders/{uid}    → অনলাইন অবস্থা ও লাইভ GPS
+
+   ফিল্ডের নামগুলো হুবহু POS-এর মতোই রাখা হয়েছে, যাতে একজন
+   রাইডার দুই জায়গার যেটাই ব্যবহার করুন, ফল একই হয়।
+   ════════════════════════════════════════════════════════════ */
+
 const firebaseConfig = {
   apiKey: "AIzaSyD6qmuWkNUrskMIBHq8Z_AQ0N_WT1DL8Is",
   authDomain: "honeybee-984dd.firebaseapp.com",
@@ -210,382 +418,861 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
+const fbNow = () => firebase.firestore.FieldValue.serverTimestamp();
+const $ = (id) => document.getElementById(id);
 
-/* ---------- FCM (ব্যাকগ্রাউন্ড পুশ নোটিফিকেশন) ----------
-   VAPID_KEY: Firebase Console → Project Settings → Cloud Messaging →
-   "Web configuration" → "Generate key pair" থেকে পাওয়া কী এখানে বসান। */
-const VAPID_KEY = "PASTE-YOUR-VAPID-PUBLIC-KEY-HERE";
+/* 🔢 বাংলা সংখ্যা — রাইডার যেন নিজের ভাষায় সংখ্যা দেখেন */
+const BN_DIGITS = ["০","১","২","৩","৪","৫","৬","৭","৮","৯"];
+function bn(n){ return String(n).replace(/[0-9]/g, d => BN_DIGITS[+d]); }
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+let RIDER = null;
+let isOnline = false;
+let gpsWatchId = null;
+let offersUnsub = null, jobsUnsub = null;
+let currentOfferId = null, offerTimer = null;
+let firstJobsLoad = true;
+
+/* ───── টোস্ট ───── */
+let toastTimer = null;
+function toast(msg){
+  const el = $("toastEl");
+  el.textContent = msg;
+  el.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.style.display = "none", 3200);
+}
+
+/* ════════ 🔔 শব্দ ও ভাইব্রেশন ════════
+   মোবাইল ব্রাউজার ব্যবহারকারীর প্রথম ট্যাপের আগে শব্দ করতে দেয় না,
+   তাই প্রথম ট্যাপেই AudioContext খুলে রাখা হয়। নাহলে অর্ডার এলে
+   রাইডার শুধু কাঁপুনি পেতেন, শব্দ না। */
+let audioCtx = null;
+function unlockAudio(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === "suspended") audioCtx.resume();
+  }catch(e){}
+}
+document.body.addEventListener("pointerdown", unlockAudio, { once:true });
+
+function beep(){
+  try{
+    unlockAudio();
+    if(!audioCtx) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, t);
+    osc.frequency.setValueAtTime(660, t + 0.18);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.32, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    osc.connect(g); g.connect(audioCtx.destination);
+    osc.start(t); osc.stop(t + 0.42);
+  }catch(e){}
+}
+let alertRepeat = null;
+function startAlert(){
+  beep();
+  if(navigator.vibrate) navigator.vibrate([420,180,420,180,420]);
+  clearInterval(alertRepeat);
+  alertRepeat = setInterval(()=>{
+    beep();
+    if(navigator.vibrate) navigator.vibrate([420,180,420]);
+  }, 1700);
+}
+function stopAlert(){
+  clearInterval(alertRepeat); alertRepeat = null;
+  if(navigator.vibrate) navigator.vibrate(0);
+}
+
+/* ════════ 🔔 নোটিফিকেশন তালিকা (এই সেশনের) ════════ */
+let notifs = [], unread = 0;
+function addNotif(msg){
+  notifs.unshift({ msg, at:new Date() });
+  if(notifs.length > 40) notifs.pop();
+  unread++;
+  const dot = $("bellDot");
+  dot.textContent = bn(unread);
+  dot.style.display = "flex";
+}
+$("bellBtn").addEventListener("click", ()=>{
+  unread = 0; $("bellDot").style.display = "none";
+  $("notifList").innerHTML = notifs.length
+    ? notifs.map(n => `<div class="listRow">${esc(n.msg)}<div style="color:var(--muted); font-size:11px; margin-top:3px;">${bn(n.at.toLocaleTimeString('bn-BD',{hour:'2-digit',minute:'2-digit'}))}</div></div>`).join("")
+    : '<p class="muted">এখনো কিছু নেই।</p>';
+  $("notifSheet").style.display = "flex";
+});
+$("notifClose").addEventListener("click", ()=> $("notifSheet").style.display = "none");
+
+/* ════════ 🔐 লগইন ════════ */
+$("googleLoginBtn").addEventListener("click", async ()=>{
+  const btn = $("googleLoginBtn");
+  btn.disabled = true; btn.textContent = "ঢোকা হচ্ছে...";
+  try{
+    await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+  }catch(e){
+    showLoginErr(e.code === "auth/popup-blocked"
+      ? "ব্রাউজার পপ-আপ আটকে দিয়েছে — পপ-আপ অনুমতি দিয়ে আবার চেষ্টা করুন।"
+      : "ঢোকা যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।");
+  }finally{
+    btn.disabled = false; btn.textContent = "🔓 Google দিয়ে ঢুকুন";
+  }
+});
+function showLoginErr(msg){
+  const el = $("loginErr");
+  el.textContent = msg; el.style.display = "block";
+}
+
+auth.onAuthStateChanged(async (user)=>{
+  if(!user){
+    $("loginScreen").style.display = "flex";
+    $("appScreen").style.display = "none";
+    return;
+  }
+  try{
+    /* এজেন্ট যাকে রাইডার বানিয়েছেন শুধু তিনিই ঢুকতে পারবেন।
+       POS-এর initRiderMode()-এ ঠিক এই দুইটা পরীক্ষাই আছে। */
+    const u = await db.collection("users").doc(user.uid).get();
+    if(!u.exists || u.data().role !== "rider"){
+      showLoginErr("এই অ্যাকাউন্টটা রাইডার হিসেবে নিবন্ধিত নয়। এজেন্টের সাথে কথা বলুন।");
+      $("loginScreen").style.display = "flex"; $("appScreen").style.display = "none";
+      await auth.signOut(); return;
+    }
+    const r = await db.collection("riders").doc(user.uid).get();
+    if(!r.exists){
+      showLoginErr("রাইডার প্রোফাইল পাওয়া যায়নি। এজেন্টের সাথে কথা বলুন।");
+      $("loginScreen").style.display = "flex"; $("appScreen").style.display = "none";
+      await auth.signOut(); return;
+    }
+    RIDER = { uid:user.uid, ...r.data() };
+    if(RIDER.status === "blocked"){
+      showLoginErr("আপনার অ্যাকাউন্ট এখন ব্লক করা আছে — এজেন্টের সাথে যোগাযোগ করুন।");
+      $("loginScreen").style.display = "flex"; $("appScreen").style.display = "none";
+      await auth.signOut(); return;
+    }
+    startApp();
+  }catch(e){
+    console.error(e);
+    showLoginErr("তথ্য আনা যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।");
+  }
+});
+
+$("logoutBtn").addEventListener("click", async ()=>{
+  if(!confirm("লগআউট করবেন? অনলাইন থাকলে অফলাইন হয়ে যাবেন।")) return;
+  if(isOnline) await setDuty(false);
+  if(offersUnsub) offersUnsub();
+  if(jobsUnsub) jobsUnsub();
+  await auth.signOut();
+  location.reload();
+});
+
+/* ════════ অ্যাপ চালু ════════ */
+function startApp(){
+  $("loginScreen").style.display = "none";
+  $("appScreen").style.display = "block";
+
+  const nm = RIDER.name || "রাইডার";
+  $("riderNameEl").textContent = nm;
+  $("riderSubEl").textContent = (RIDER.vehicleType || "🛵") + " · " + (RIDER.zone || RIDER.phone || "");
+  $("avatarEl").textContent = nm.trim().charAt(0) || "🛵";
+
+  $("profileBox").innerHTML =
+    `👤 ${esc(RIDER.name || "—")}<br>📱 ${esc(RIDER.phone || "—")}<br>` +
+    `🏍️ ${esc(RIDER.vehicleType || "—")}<br>📍 জোন: ${esc(RIDER.zone || "—")}`;
+
+  isOnline = RIDER.online === true;
+  refreshDutyUi();
+  if(isOnline) startGps();
+
+  listenForOffers();
+  listenForJobs();
+  loadTodayStats();
+  refreshPushUi();
+}
+
+/* ════════ 🟢 ডিউটি অন/অফ ════════ */
+function refreshDutyUi(){
+  $("dutySwitch").classList.toggle("on", isOnline);
+  $("dutyTitle").textContent = isOnline ? "🟢 ডিউটিতে আছি" : "অফলাইন";
+  $("dutySub").textContent = isOnline
+    ? "নতুন অর্ডার এলেই বেজে উঠবে"
+    : "অনলাইন হলেই নতুন অর্ডার আসবে";
+}
+async function setDuty(on){
+  isOnline = on;
+  refreshDutyUi();
+  /* currentStatus না বসালে সার্ভারের অটো-ডিসপ্যাচ এই রাইডারকে
+     এলিজিবল হিসেবেই খুঁজে পায় না (riderEligibilityQuery দ্রষ্টব্য)।
+     তবে রাইডার সক্রিয় কোনো ট্রিপে থাকলে সেই অবস্থাটা নষ্ট করা হয় না। */
+  const inTrip = (RIDER.currentStatus === "on_waiting" || RIDER.currentStatus === "on_trip") && RIDER.activeTripId;
+  const payload = { online: on };
+  if(!inTrip){
+    payload.currentStatus = on ? "available" : "offline";
+    RIDER.currentStatus = payload.currentStatus;
+  }
+  try{ await db.collection("riders").doc(RIDER.uid).update(payload); }
+  catch(e){ console.warn("duty update failed:", e); toast("অবস্থা সেভ হয়নি — আবার চাপুন"); }
+  if(on) startGps(); else stopGps();
+}
+$("dutySwitch").addEventListener("click", ()=>{ unlockAudio(); setDuty(!isOnline); });
+
+/* ════════ 📍 লাইভ GPS ════════
+   প্রতি ফিক্সে না লিখে ৭ সেকেন্ডে একবার লেখা হয় — নাহলে Firestore-এ
+   অকারণে হাজারবার লেখা পড়ত আর রাইডারের ডেটা খরচ হতো। */
+let lastGpsWrite = 0;
+function startGps(){
+  if(!navigator.geolocation){ toast("এই ফোনে GPS সাপোর্ট নেই"); return; }
+  if(gpsWatchId != null) return;
+  gpsWatchId = navigator.geolocation.watchPosition((pos)=>{
+    // অবস্থানটা সবসময় মনে রাখা হয় (রাডারের দূরত্ব হিসাবে লাগে),
+    // কিন্তু Firestore-এ লেখা হয় ৭ সেকেন্ডে একবার
+    const first = !myLatLng;
+    myLatLng = [pos.coords.latitude, pos.coords.longitude];
+    if(first && tmOn){ loadShopPins(); }
+    const now = Date.now();
+    if(now - lastGpsWrite < 7000) return;
+    lastGpsWrite = now;
+    db.collection("riders").doc(RIDER.uid).update({
+      liveLocation: { lat:pos.coords.latitude, lng:pos.coords.longitude, updatedAt: fbNow() }
+    }).catch(()=>{});
+  }, ()=>{
+    toast("GPS পাওয়া যাচ্ছে না — লোকেশন অনুমতি দিন");
+  }, { enableHighAccuracy:true, maximumAge:5000, timeout:15000 });
+}
+function stopGps(){
+  if(gpsWatchId != null){ navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId = null; }
+}
+
+/* ════════ 📦 নতুন অর্ডারের ডাক (deliveryOffers) ════════ */
+function listenForOffers(){
+  if(offersUnsub) offersUnsub();
+  offersUnsub = db.collection("deliveryOffers")
+    .where("riderId", "==", RIDER.uid)
+    .where("status", "==", "pending")
+    .onSnapshot((qs)=>{
+      if(qs.empty) return;
+      const d = qs.docs[0];
+      if(d.id === currentOfferId) return;
+      showOffer(d.id, d.data());
+    }, (e)=> console.warn("offers listener:", e));
+}
+
+function showOffer(offerId, o){
+  currentOfferId = offerId;
+  startAlert();
+  addNotif("📦 নতুন অর্ডার — " + (o.pickupName || "দোকান"));
+
+  // আইকনটা লেখার সাথে জুড়লে পাশের স্থির আইকনটার সাথে দুইটা পাশাপাশি পড়ত
+  $("offerPickupIcon").textContent = o.pickupIsRestaurant ? "🍽️" : "🏪";
+  $("offerPickup").textContent = o.pickupName || (o.pickupIsRestaurant ? "রেস্টুরেন্ট" : "দোকান");
+  $("offerCode").textContent = o.orderCode ? ("অর্ডার নম্বর " + o.orderCode) : "নম্বর পরে দেখা যাবে";
+  $("offerDrop").textContent = o.dropAddress || "কাস্টমারের ঠিকানা";
+  $("offerDist").textContent = o.distanceKm != null ? bn(o.distanceKm.toFixed(1)) + " কিমি দূরে" : "দূরত্ব জানা যায়নি";
+  const inc = o.riderIncome != null ? o.riderIncome : o.estimatedCharge;
+  $("offerIncome").textContent = inc != null ? "৳ " + bn(Math.round(inc)) : "ভাড়া পরে জানানো হবে";
+  $("offerOverlay").style.display = "flex";
+
+  let left = 60;
+  $("offerTimer").textContent = bn(left);
+  clearInterval(offerTimer);
+  offerTimer = setInterval(()=>{
+    left--;
+    $("offerTimer").textContent = bn(Math.max(0, left));
+    if(left <= 0) respondToOffer(offerId, "expired");
+  }, 1000);
+}
+
+async function respondToOffer(offerId, status){
+  clearInterval(offerTimer); offerTimer = null;
+  stopAlert();
+  $("offerOverlay").style.display = "none";
+  currentOfferId = null;
+  try{
+    await db.collection("deliveryOffers").doc(offerId).update({ status, respondedAt: fbNow() });
+    if(status === "accepted") toast("✅ অর্ডারটা আপনার — নিচে দেখুন");
+  }catch(e){ console.warn("offer respond failed:", e); toast("সাড়া পাঠানো যায়নি"); }
+}
+$("offerAcceptBtn").addEventListener("click", ()=> currentOfferId && respondToOffer(currentOfferId, "accepted"));
+$("offerSkipBtn").addEventListener("click", ()=> currentOfferId && respondToOffer(currentOfferId, "skipped"));
+
+/* ════════ 🛵 আমার চলতি ডেলিভারি (orderRequests) ════════
+   এই ঘরটাই বাজার, দোকানের POS আর রেস্টুরেন্টের POS — তিনটাই পড়ে।
+   তাই এখানে লেখা মানে তিন জায়গাতেই সাথে সাথে দেখা যায়। */
+function listenForJobs(){
+  if(jobsUnsub) jobsUnsub();
+  firstJobsLoad = true;
+  jobsUnsub = db.collection("orderRequests")
+    .where("assignedRiderId", "==", RIDER.uid)
+    .where("status", "==", "shipped")
+    .onSnapshot((qs)=>{
+      const jobs = qs.docs.map(d=> ({ id:d.id, ...d.data() }))
+        .sort((a,b)=> (b.shippedAt ? b.shippedAt.toMillis() : 0) - (a.shippedAt ? a.shippedAt.toMillis() : 0));
+      renderJobs(jobs);
+
+      // পেজ খোলার মুহূর্তে পুরনো অর্ডার দেখে বাজা ঠিক না — শুধু নতুন এলেই
+      if(!firstJobsLoad){
+        qs.docChanges().forEach(c=>{
+          if(c.type === "added"){ beep(); toast("🚚 নতুন ডেলিভারি এসেছে"); addNotif("🚚 নতুন ডেলিভারি এসাইন হয়েছে"); }
+        });
+      }
+      firstJobsLoad = false;
+      loadTodayStats();
+    }, (e)=>{
+      console.warn("jobs listener:", e);
+      $("jobsArea").innerHTML = '<div class="card"><p class="muted">চলতি অর্ডার আনা যায়নি — ইন্টারনেট দেখুন।</p></div>';
+    });
+}
+
+function renderJobs(jobs){
+  const area = $("jobsArea");
+  if(jobs.length === 0){
+    area.innerHTML = `
+      <div class="emptyBox">
+        <div class="bigHex">🐝</div>
+        <h3>${isOnline ? "অর্ডারের অপেক্ষায়" : "এখন অফলাইন"}</h3>
+        <p>${isOnline
+          ? "নতুন অর্ডার এলেই ফোন বেজে উঠবে আর কেঁপে উঠবে। অ্যাপটা খোলা রাখুন।"
+          : "উপরের সুইচটা চালু করলেই অর্ডার আসা শুরু হবে।"}</p>
+      </div>`;
+    return;
+  }
+  area.innerHTML = jobs.map(jobCardHTML).join("");
+  wireJobButtons();
+}
+
+function jobCardHTML(o){
+  /* দুই ধাপ: আগে দোকান/রেস্টুরেন্ট থেকে মাল তোলা, তারপর গ্রাহকের কাছে।
+     pickedUp ফিল্ডটা না থাকলে (এই সংস্করণের আগের অর্ডার) আগের মতোই
+     সরাসরি গ্রাহকের ধাপ দেখানো হয় — চলতি ডেলিভারি ভাঙে না। */
+  const picked = o.pickedUp !== false;
+  const isRst = o.pickupIsRestaurant === true;
+  const pLbl = isRst ? "রেস্টুরেন্ট" : "দোকান";
+  const pIcon = isRst ? "🍽️" : "🏪";
+  const code = o.orderCode ? `<span class="codeChip">🧾 ${esc(o.orderCode)}</span>` : "";
+  const item = `${esc(o.productName || "পণ্য")} × ${bn(o.qty || 1)}`;
+
+  if(!picked){
+    const phone = o.pickupPhone
+      ? `<a class="actBtn call" href="tel:${esc(o.pickupPhone)}">📞 ${pLbl}ে কল</a>`
+      : `<div class="actBtn" style="color:var(--muted);">নম্বর দেওয়া নেই</div>`;
+    const map = (o.pickupLat != null)
+      ? `<a class="actBtn map" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${o.pickupLat},${o.pickupLng}">🧭 পথ দেখাও</a>`
+      : `<div class="actBtn" style="color:var(--muted);">অবস্থান নেই</div>`;
+    return `
+      <div class="jobCard pickup">
+        <div class="jobHead">
+          <span class="jobStage" style="color:var(--gold);">${pIcon} ধাপ ১ — ${pLbl} থেকে মাল তুলুন</span>
+          ${code}
+        </div>
+        <div class="jobPlace">${esc(o.pickupName || pLbl)}</div>
+        <div class="jobLine">📦 ${item}</div>
+        <div class="actRow">${map}${phone}</div>
+        <button class="bigAct pick pickBtn" data-oid="${o.id}">🛵 মাল তুলেছি — রওনা দিচ্ছি</button>
+      </div>`;
+  }
+
+  const phone = o.deliveryPhone
+    ? `<a class="actBtn call" href="tel:${esc(o.deliveryPhone)}">📞 গ্রাহককে কল</a>`
+    : `<div class="actBtn" style="color:var(--muted);">নম্বর নেই</div>`;
+  const map = (o.deliveryLat != null)
+    ? `<a class="actBtn map" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${o.deliveryLat},${o.deliveryLng}">🧭 পথ দেখাও</a>`
+    : `<div class="actBtn" style="color:var(--muted);">অবস্থান নেই</div>`;
+  return `
+    <div class="jobCard">
+      <div class="jobHead">
+        <span class="jobStage" style="color:var(--blue);">🚴 ধাপ ২ — গ্রাহকের কাছে</span>
+        ${code}
+      </div>
+      <div class="jobPlace">${esc(o.customerName || "গ্রাহক")}</div>
+      <div class="jobLine">📦 ${item}</div>
+      ${o.deliveryAddress ? `<div class="jobLine">📍 ${esc(o.deliveryAddress)}</div>` : ""}
+      <div class="actRow">${map}${phone}</div>
+      <button class="bigAct done doneBtn" data-oid="${o.id}">
+        <span class="holdFill"></span>
+        <span class="holdLabel">✅ ৩ সেকেন্ড চেপে ধরুন — ডেলিভারি সম্পন্ন</span>
+      </button>
+    </div>`;
+}
+
+function wireJobButtons(){
+  // 🛵 মাল তোলা — এক চাপেই, কারণ ভুল হলে ক্ষতি নেই
+  document.querySelectorAll(".pickBtn").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      btn.disabled = true;
+      try{
+        await db.collection("orderRequests").doc(btn.dataset.oid).update({
+          pickedUp: true, pickedUpAt: fbNow()
+        });
+        toast("🛵 রওনা দিন — গ্রাহক এখন 'পথে আছে' দেখছেন");
+      }catch(e){ btn.disabled = false; toast("হয়নি — আবার চাপুন"); }
+    });
+  });
+  /* ✅ ডেলিভারি সম্পন্ন — ৩ সেকেন্ড চেপে ধরতে হয়। পকেটে বা ব্যাগে
+     ভুল চাপে অর্ডার "সম্পন্ন" হয়ে গেলে ফেরার পথ নেই, তাই এই বাধা। */
+  document.querySelectorAll(".doneBtn").forEach(btn=> setupHold(btn, 3000, async ()=>{
+    await db.collection("orderRequests").doc(btn.dataset.oid).update({
+      status: "delivered", deliveredAt: fbNow()
+    });
+    toast("✅ ডেলিভারি সম্পন্ন");
+    addNotif("✅ একটা ডেলিভারি সম্পন্ন হয়েছে");
+  }));
+}
+
+function setupHold(btn, holdMs, onConfirm){
+  const label = btn.querySelector(".holdLabel");
+  const original = label ? label.textContent : "";
+  let timer = null, done = false;
+  function start(e){
+    if(done || btn.disabled) return;
+    e.preventDefault();
+    btn.classList.add("holding");
+    if(label) label.textContent = "🕐 ধরে থাকুন...";
+    timer = setTimeout(async ()=>{
+      done = true;
+      btn.classList.remove("holding"); btn.classList.add("heldDone");
+      if(label) label.textContent = "✅ সম্পন্ন!";
+      btn.disabled = true;
+      try{ await onConfirm(); }
+      catch(err){
+        done = false; btn.disabled = false;
+        btn.classList.remove("heldDone");
+        if(label) label.textContent = original;
+        // চালক নিজে বাতিল করলে সেটা ভুল নয় — অকারণে এরর দেখানো হয় না
+        if(!(err && err.__cancelled)) toast("আপডেট করা যায়নি — আবার চেষ্টা করুন");
+      }
+    }, holdMs);
+  }
+  function cancel(){
+    if(done) return;
+    clearTimeout(timer);
+    btn.classList.remove("holding");
+    if(label) label.textContent = original;
+  }
+  btn.addEventListener("pointerdown", start);
+  btn.addEventListener("pointerup", cancel);
+  btn.addEventListener("pointerleave", cancel);
+  btn.addEventListener("pointercancel", cancel);
+}
+
+/* ════════ 📊 আজকের হিসাব ════════
+   POS-এর rmLoadTodayStats()-এর হুবহু একই হিসাব, যাতে রাইডার দুই
+   জায়গায় দুই রকম সংখ্যা দেখে বিভ্রান্ত না হন। */
+async function loadTodayStats(){
+  try{
+    const start = new Date(); start.setHours(0,0,0,0);
+    const qs = await db.collection("deliveryOffers")
+      .where("riderId", "==", RIDER.uid)
+      .where("createdAt", ">=", start)
+      .get();
+    let total = 0, transit = 0, done = 0, income = 0;
+    qs.forEach(d=>{
+      const o = d.data();
+      if(o.status === "accepted" || o.status === "delivered"){
+        total++;
+        if(o.status === "delivered"){ done++; income += Number(o.riderIncome || 0); }
+        else transit++;
+      }
+    });
+    $("statTotal").textContent = bn(total);
+    $("statTransit").textContent = bn(transit);
+    $("statDone").textContent = bn(done);
+    $("earnNum").textContent = "৳ " + bn(income.toFixed(0));
+    $("earnLbl").textContent = "আজকের আয়";
+  }catch(e){
+    /* হিসাব আনতে না পারলে চুপচাপ ০ দেখানো হয় না — রাইডার ভাবতেন
+       আজ কিছুই কামাননি। তার চেয়ে বলা ভালো যে আনা যায়নি। */
+    console.warn("stats failed:", e);
+    ["statTotal","statTransit","statDone"].forEach(id=> $(id).textContent = "—");
+    $("earnNum").textContent = "—";
+    $("earnLbl") && ($("earnLbl").textContent = e && e.code === "failed-precondition"
+      ? "হিসাব আনা যায়নি — index তৈরি হচ্ছে"
+      : "হিসাব আনা যায়নি");
+  }
+}
+
+/* ════════ 🧾 হিস্টরি ════════ */
+async function loadHistory(){
+  const box = $("historyList");
+  box.innerHTML = '<p class="muted">লোড হচ্ছে...</p>';
+  try{
+    const qs = await db.collection("orderRequests")
+      .where("assignedRiderId", "==", RIDER.uid)
+      .where("status", "==", "delivered")
+      .get();
+    const rows = qs.docs.map(d=> ({ id:d.id, ...d.data() }))
+      .sort((a,b)=> (b.deliveredAt ? b.deliveredAt.toMillis() : 0) - (a.deliveredAt ? a.deliveredAt.toMillis() : 0))
+      .slice(0, 50);
+    if(rows.length === 0){
+      box.innerHTML = '<p class="muted">এখনো কোনো ডেলিভারি সম্পন্ন হয়নি।</p>';
+      return;
+    }
+    box.innerHTML = rows.map(o=>{
+      const t = o.deliveredAt && o.deliveredAt.toDate
+        ? bn(o.deliveredAt.toDate().toLocaleString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))
+        : "";
+      return `<div class="listRow">
+        ${o.orderCode ? `<span class="codeChip">🧾 ${esc(o.orderCode)}</span> ` : ""}
+        <b>${esc(o.productName || "পণ্য")}</b> × ${bn(o.qty || 1)}
+        <div style="color:var(--muted); margin-top:3px;">
+          ${esc(o.pickupName || "")} → ${esc(o.customerName || "গ্রাহক")}${t ? " · " + t : ""}
+        </div>
+      </div>`;
+    }).join("");
+  }catch(e){
+    console.warn("history failed:", e);
+    box.innerHTML = '<p class="muted">হিস্টরি আনা যায়নি — ইন্টারনেট দেখুন।</p>';
+  }
+}
+
+/* ════════ 🧭 নিচের ন্যাভ ════════ */
+document.querySelectorAll(".navItem").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".navItem").forEach(b=> b.classList.remove("active"));
+    btn.classList.add("active");
+    ["Home","History","Profile"].forEach(p=>{
+      $("page" + p).style.display = (p === btn.dataset.page) ? "block" : "none";
+    });
+    if(btn.dataset.page === "History") loadHistory();
+    if(btn.dataset.page === "Home") loadTodayStats();
+  });
+});
+
+/* ════════ 🔔 ব্যাকগ্রাউন্ড পুশ ════════
+   অনুমতি না পেলে বা টোকেন না এলে রাইডারকে সত্যি কথাটাই বলা হয়,
+   "চালু আছে" ভান করা হয় না। */
+// Firebase প্রজেক্টে একটাই VAPID কী — বাজার আর রেস্টুরেন্ট POS-এও হুবহু এটাই
+const VAPID_KEY = "BCEdpLGNUIBG2IW9lTVGcaM7qbFrbaEnGg9N1CYGNCojCVUIruqqcWP4cdX3YietIJ1kWe1ZUulbCQpvSQXAIKg";
 let messaging = null;
 try{ messaging = firebase.messaging.isSupported() ? firebase.messaging() : null; }catch(e){ messaging = null; }
 
-const LS_KEY = "deliveryman-shop-id";
-let __callsUnsub = null;
-let __ringing = false;
-let __ringInterval = null;
-let __audioCtx = null;
-let __lastSeenCallId = null;
-let __firstSnapshot = true;
-
-function $(id){ return document.getElementById(id); }
-
-/* ---------- শুরুতে: কানেক্ট করা আছে কিনা চেক ---------- */
-window.addEventListener("DOMContentLoaded", ()=>{
-  const savedShopId = localStorage.getItem(LS_KEY);
-  if(savedShopId){
-    startListening(savedShopId);
-  } else {
-    $("setupScreen").style.display = "block";
-  }
-
-  $("connectBtn").addEventListener("click", onConnectClick);
-  $("shopCodeInput").addEventListener("keydown", (e)=>{ if(e.key === "Enter") onConnectClick(); });
-  $("disconnectBtn").addEventListener("click", ()=>{
-    if(!confirm("এই দোকানের সংযোগ বিচ্ছিন্ন করে নতুন কোড দিতে চান?")) return;
-    stopListening();
-    if(typeof stopGpsSharing === "function" && isGpsSharingOn()) stopGpsSharing();
-    localStorage.removeItem(LS_KEY);
-    $("mainScreen").style.display = "none";
-    $("setupScreen").style.display = "block";
-    $("shopCodeInput").value = "";
-  });
-  $("acceptRingBtn").addEventListener("click", stopRinging);
-  $("testRingBtn").addEventListener("click", ()=> triggerRing("এটা একটা টেস্ট রিং — দোকান থেকে আসল কল না।"));
-  $("enablePushBtn").addEventListener("click", enablePushNotifications);
-  refreshPushStatus();
-});
-
-async function onConnectClick(){
-  const code = $("shopCodeInput").value.trim();
-  $("connectError").style.display = "none";
-  if(!code){ $("connectError").textContent = "কোড লিখুন।"; $("connectError").style.display = "block"; return; }
-
-  $("connectBtn").disabled = true;
-  $("connectBtn").textContent = "যাচাই হচ্ছে...";
-  try{
-    const snap = await db.collection("shops").doc(code).get();
-    if(!snap.exists){
-      $("connectError").textContent = "এই কোডের কোনো দোকান পাওয়া যায়নি। আবার চেক করুন।";
-      $("connectError").style.display = "block";
-      return;
-    }
-    localStorage.setItem(LS_KEY, code);
-    $("setupScreen").style.display = "none";
-    startListening(code);
-  }catch(e){
-    console.error(e);
-    $("connectError").textContent = "সংযোগে সমস্যা হয়েছে, ইন্টারনেট চেক করে আবার চেষ্টা করুন।";
-    $("connectError").style.display = "block";
-  }finally{
-    $("connectBtn").disabled = false;
-    $("connectBtn").textContent = "✅ কানেক্ট করুন";
-  }
-}
-
-/* ---------- realtime listener চালু ---------- */
-function startListening(shopId){
-  $("mainScreen").style.display = "flex";
-  $("connStatusSub").textContent = "সংযোগ হচ্ছে...";
-
-  db.collection("shops").doc(shopId).get().then((snap)=>{
-    const data = snap.exists ? snap.data() : null;
-    const name = (data && (data.name || data.shopName)) || "দোকান";
-    $("shopNameLbl").textContent = name;
-  }).catch(()=>{ $("shopNameLbl").textContent = "দোকান"; });
-
-  __firstSnapshot = true;
-  __callsUnsub = db.collection("shops").doc(shopId).collection("deliveryCalls")
-    .orderBy("calledAt", "desc").limit(1)
-    .onSnapshot((qs)=>{
-      $("connDot").classList.remove("off");
-      $("connStatusSub").textContent = "🟢 লাইভ — কলের জন্য অপেক্ষা করছে";
-
-      if(qs.empty){ __firstSnapshot = false; return; }
-      const doc = qs.docs[0];
-      const data = doc.data();
-
-      $("lastCallInfo").innerHTML = "সর্বশেষ কল: <b>" +
-        (data.calledAt && data.calledAt.toDate ? data.calledAt.toDate().toLocaleTimeString('bn-BD',{hour:'numeric',minute:'2-digit'}) : "এইমাত্র") +
-        "</b>";
-
-      updateActiveCallCard(shopId, doc.id, data);
-
-      // প্রথমবার সংযোগ হওয়ার সময় পুরনো কল দেখেই রিং বাজানো ঠিক না —
-      // শুধু এরপর নতুন কল আসলেই বাজবে
-      if(__firstSnapshot){ __firstSnapshot = false; __lastSeenCallId = doc.id; return; }
-
-      if(doc.id !== __lastSeenCallId){
-        __lastSeenCallId = doc.id;
-        triggerRing("নতুন ডেলিভারি অর্ডার আছে — দোকানে যোগাযোগ করুন।");
-      }
-    }, (err)=>{
-      console.error("deliveryCalls listener error:", err);
-      $("connDot").classList.add("off");
-      $("connStatusSub").textContent = "🔴 সংযোগ বিচ্ছিন্ন — ইন্টারনেট চেক করুন";
-    });
-
-  window.addEventListener("online", ()=>{ $("connDot").classList.remove("off"); });
-  window.addEventListener("offline", ()=>{ $("connDot").classList.add("off"); $("connStatusSub").textContent = "🔴 অফলাইন"; });
-}
-
-function stopListening(){
-  if(__callsUnsub){ __callsUnsub(); __callsUnsub = null; }
-}
-
-/* ---------- 📦 বর্তমান অর্ডার কার্ড — কাস্টমারের লোকেশন + স্ট্যাটাস স্টেজ ---------- */
-let __activeCallMap = null, __activeCallMarker = null;
-const STAGE_LABELS = {
-  packing: '📦 দোকান প্যাকিং করছে',
-  picked_up: '🛵 আপনি পিকআপ করেছেন',
-  on_the_way: '🚴 আপনি পথে আছেন',
-  delivered: '✅ ডেলিভারি সম্পন্ন হয়েছে'
-};
-
-function updateActiveCallCard(shopId, callId, data){
-  const status = data.status || 'packing';
-  if(status === 'delivered'){
-    $("activeCallCard").style.display = "none";
-    return;
-  }
-  $("activeCallCard").style.display = "block";
-  $("activeCallStatusTxt").textContent = STAGE_LABELS[status] || status;
-  $("activeCallCard").dataset.shopId = shopId;
-  $("activeCallCard").dataset.callId = callId;
-
-  document.querySelectorAll(".stageBtn").forEach(btn=>{
-    const isActive = btn.dataset.stage === status;
-    btn.style.opacity = isActive ? "0.5" : "1";
-    btn.disabled = isActive;
-  });
-
-  if(data.customerLocation){
-    const custLatLng = [data.customerLocation.lat, data.customerLocation.lng];
-
-    $("navigateLinkBtn").style.display = "block";
-    $("navigateLinkBtn").href = `https://www.google.com/maps/dir/?api=1&destination=${custLatLng[0]},${custLatLng[1]}`;
-
-    const mapEl = $("activeCallMapEl");
-    mapEl.style.display = "block";
-    if(!__activeCallMap){
-      __activeCallMap = L.map(mapEl).setView(custLatLng, 14);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap', maxZoom: 19
-      }).addTo(__activeCallMap);
-      __activeCallMarker = L.marker(custLatLng).addTo(__activeCallMap).bindPopup('🏠 কাস্টমার');
-    }else{
-      __activeCallMap.setView(custLatLng, 14);
-      __activeCallMarker.setLatLng(custLatLng);
-      setTimeout(()=> __activeCallMap.invalidateSize(), 100);
-    }
-  }else{
-    $("navigateLinkBtn").style.display = "none";
-    $("activeCallMapEl").style.display = "none";
-  }
-}
-
-document.querySelectorAll(".stageBtn").forEach(btn=>{
-  btn.addEventListener("click", async ()=>{
-    const shopId = $("activeCallCard").dataset.shopId;
-    const callId = $("activeCallCard").dataset.callId;
-    if(!shopId || !callId) return;
-    try{
-      await db.collection("shops").doc(shopId).collection("deliveryCalls").doc(callId).update({
-        status: btn.dataset.stage,
-        statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    }catch(e){ alert("স্ট্যাটাস আপডেট করা যায়নি: " + e.message); }
-  });
-});
-
-/* ---------- FCM চালু/স্ট্যাটাস ---------- */
-function refreshPushStatus(){
+function refreshPushUi(){
+  const desc = $("pushDesc"), btn = $("enablePushBtn");
   if(!messaging || !("Notification" in window)){
-    $("pushCard").style.display = "none";
-    return;
+    desc.textContent = "এই ব্রাউজারে ব্যাকগ্রাউন্ড নোটিফিকেশন কাজ করে না। অ্যাপটা খোলা রাখলে শব্দ ও কাঁপুনি ঠিকই পাবেন।";
+    btn.style.display = "none"; return;
   }
-  if(Notification.permission === "granted" && localStorage.getItem("deliveryman-fcm-token")){
-    $("pushDesc").textContent = "✅ ব্যাকগ্রাউন্ড নোটিফিকেশন চালু আছে — অ্যাপ বন্ধ থাকলেও কল মিস হবে না।";
-    $("enablePushBtn").textContent = "🔄 আবার চালু/আপডেট করুন";
-  } else if(Notification.permission === "denied"){
-    $("pushDesc").textContent = "⚠️ নোটিফিকেশন পারমিশন বন্ধ করা আছে। ফোনের সেটিংসে গিয়ে এই ব্রাউজারের জন্য নোটিফিকেশন অনুমতি দিন।";
+  if(Notification.permission === "granted" && localStorage.getItem("hb-rider-fcm")){
+    desc.textContent = "✅ চালু আছে — অ্যাপ বন্ধ থাকলেও অর্ডার মিস হবে না।";
+    btn.textContent = "🔄 আবার চালু করুন";
+  }else if(Notification.permission === "denied"){
+    desc.textContent = "⚠️ নোটিফিকেশন বন্ধ করা আছে। ফোনের সেটিংসে গিয়ে এই ব্রাউজারকে অনুমতি দিন।";
   }
 }
 
-async function enablePushNotifications(){
-  if(!messaging){ alert("এই ব্রাউজারে পুশ নোটিফিকেশন সাপোর্ট করে না।"); return; }
-  const shopId = localStorage.getItem(LS_KEY);
-  if(!shopId){ alert("আগে দোকানের সাথে কানেক্ট করুন।"); return; }
-
-  $("enablePushBtn").disabled = true;
-  $("enablePushBtn").textContent = "চালু হচ্ছে...";
+$("enablePushBtn").addEventListener("click", async ()=>{
+  if(!messaging || !RIDER) return;
+  const btn = $("enablePushBtn");
+  btn.disabled = true; btn.textContent = "চালু হচ্ছে...";
   try{
-    const permission = await Notification.requestPermission();
-    if(permission !== "granted"){
-      $("pushDesc").textContent = "⚠️ নোটিফিকেশন পারমিশন দেওয়া হয়নি — চালু করা গেল না।";
+    if(await Notification.requestPermission() !== "granted"){
+      $("pushDesc").textContent = "⚠️ অনুমতি দেওয়া হয়নি — চালু করা গেল না।";
       return;
     }
     const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
     const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
     if(!token) throw new Error("টোকেন পাওয়া যায়নি");
-
-    await db.collection("shops").doc(shopId).collection("deliveryDevices").doc(token).set({
-      token,
-      active: true,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      userAgent: navigator.userAgent
-    });
-    localStorage.setItem("deliveryman-fcm-token", token);
-    refreshPushStatus();
+    await db.collection("riders").doc(RIDER.uid).update({ fcmToken: token, fcmUpdatedAt: fbNow() });
+    localStorage.setItem("hb-rider-fcm", token);
+    refreshPushUi();
+    toast("🔔 চালু হয়েছে");
   }catch(e){
-    console.error("Push enable failed:", e);
+    console.warn("push enable:", e);
     $("pushDesc").textContent = "⚠️ চালু করা যায়নি: " + (e && e.message ? e.message : "অজানা সমস্যা");
   }finally{
-    $("enablePushBtn").disabled = false;
+    btn.disabled = false;
+    if(btn.textContent === "চালু হচ্ছে...") btn.textContent = "🔔 চালু করুন";
   }
-}
+});
 
-// অ্যাপ খোলা/সামনে থাকা অবস্থায় FCM মেসেজ এলে সেটাকেও ইন-অ্যাপ রিং হিসেবে দেখানো
 if(messaging){
   try{
-    messaging.onMessage((payload)=>{
-      const body = (payload && payload.notification && payload.notification.body) || "নতুন ডেলিভারি অর্ডার আছে।";
-      triggerRing(body);
+    messaging.onMessage((p)=>{
+      const body = (p && p.notification && p.notification.body) || "নতুন অর্ডার এসেছে।";
+      beep(); toast(body); addNotif(body);
     });
-  }catch(e){ console.warn("onMessage setup failed:", e); }
+  }catch(e){}
 }
 
-/* ==================== 📍 লাইভ GPS লোকেশন শেয়ারিং ====================
-   navigator.geolocation.watchPosition দিয়ে ডিভাইসের লাইভ অবস্থান পাওয়া হয়,
-   কিন্তু প্রতিবার না লিখে প্রতি ~৭ সেকেন্ডে একবার Firestore-এ লেখা হয় (থ্রটল
-   করা) — যাতে অপ্রয়োজনীয় লেখা কম হয়। বন্ধ করলে watchPosition থেমে যায় এবং
-   Firestore-এ "অফলাইন" হিসেবে চিহ্নিত করা হয়। */
-let __gpsWatchId = null;
-let __gpsLastSentAt = 0;
-const GPS_SEND_INTERVAL_MS = 7000;
+$("testRingBtn").addEventListener("click", ()=>{
+  startAlert();
+  setTimeout(stopAlert, 2600);
+  toast("🔔 এভাবেই বাজবে");
+});
 
-function isGpsSharingOn(){ return localStorage.getItem("deliveryman-gps-sharing") === "on"; }
+/* ════════════════════════════════════════════════════
+   🛺 যাত্রী মোড — অটো/সিএনজি চালক অপেক্ষমাণ যাত্রী খোঁজেন
 
-function refreshGpsUi(){
-  const btn = $("toggleGpsBtn");
-  const desc = $("gpsDesc");
-  if(!btn) return;
-  if(isGpsSharingOn()){
-    btn.textContent = "⏹️ লোকেশন শেয়ারিং বন্ধ করুন";
-    desc.textContent = "✅ চালু আছে — দোকান/এজেন্ট এখন আপনার লাইভ অবস্থান দেখতে পাচ্ছে।";
-  }else{
-    btn.textContent = "📍 লোকেশন শেয়ারিং চালু করুন";
-    desc.textContent = "এটা চালু থাকলে দোকান ও এজেন্ট আপনার লাইভ অবস্থান ম্যাপে দেখতে পারবে — কাস্টমারের কাছে পৌঁছাতে সুবিধা হবে।";
+   passenger_waiting_queue ঘরে যাঁরা "WAITING" অবস্থায় আছেন তাঁদের
+   মধ্যে ২ কিমির ভিতরেরজনকে মানচিত্রে দেখানো হয়। POS-এর Transport
+   Mode-এর হুবহু একই ঘর ও একই ফিল্ড, যাতে একজন চালক দুই জায়গার
+   যেটাই ব্যবহার করুন, একই যাত্রী দেখেন।
+
+   ⚠️ একসাথে দুইটা মোড চলে না — সার্ভার transportModeOn == false
+      দেখে ডেলিভারি অফার পাঠায়। তাই যাত্রী-মোডে ডেলিভারি আসবে না,
+      আর চালককে সেটা পরিষ্কার করে বলা হয়।
+   ════════════════════════════════════════════════════ */
+let tmOn = false, tmMap = null, tmUnsub = null;
+let tmPinMarkers = [], tmShopMarkers = [];
+let myLatLng = null;
+let knownPassengerIds = new Set(), radarStarted = false;
+
+function haversineKm(aLat, aLng, bLat, bLng){
+  const R = 6371, toRad = (d)=> d * Math.PI / 180;
+  const dLat = toRad(bLat - aLat), dLng = toRad(bLng - aLng);
+  const h = Math.sin(dLat/2)**2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/* এলাকার নাম — প্রতিবার না ডেকে একবার ডেকে মনে রাখা হয়, নাহলে
+   প্রতি রিফ্রেশে একই জায়গার জন্য বারবার অনুরোধ যেত */
+const geoCache = {};
+async function areaName(lat, lng){
+  const k = lat.toFixed(3) + "," + lng.toFixed(3);
+  if(geoCache[k]) return geoCache[k];
+  try{
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=16`);
+    const d = await r.json();
+    const a = d.address || {};
+    geoCache[k] = a.suburb || a.neighbourhood || a.road || a.village || a.town || "কাছের এলাকা";
+  }catch(e){ geoCache[k] = "কাছের এলাকা"; }
+  return geoCache[k];
+}
+
+async function setMode(passenger){
+  tmOn = passenger;
+  $("modeDelivery").classList.toggle("active", !passenger);
+  $("modePassenger").classList.toggle("active", passenger);
+  $("pagePassenger").style.display = passenger ? "block" : "none";
+  $("pageHome").style.display = passenger ? "none" : "block";
+  // নিচের ন্যাভ হোমেই থাকুক
+  document.querySelectorAll(".navItem").forEach(b=> b.classList.toggle("active", b.dataset.page === "Home"));
+  $("pageHistory").style.display = "none";
+  $("pageProfile").style.display = "none";
+  $("dutySub").textContent = passenger
+    ? "যাত্রী মোডে ডেলিভারি অর্ডার আসবে না"
+    : (isOnline ? "নতুন অর্ডার এলেই বেজে উঠবে" : "অনলাইন হলেই নতুন অর্ডার আসবে");
+
+  try{ await db.collection("riders").doc(RIDER.uid).update({ transportModeOn: passenger }); }
+  catch(e){ console.warn("mode save failed:", e); }
+
+  if(passenger){ startRadar(); } else { stopRadar(); }
+}
+$("modeDelivery").addEventListener("click", ()=>{ unlockAudio(); setMode(false); });
+$("modePassenger").addEventListener("click", ()=>{ unlockAudio(); setMode(true); });
+
+function initRadarMap(){
+  if(tmMap) return;
+  if(typeof L === "undefined"){ $("radarHint").textContent = "মানচিত্র লোড হয়নি — ইন্টারনেট দেখুন।"; return; }
+  tmMap = L.map("radarMap").setView(myLatLng || [23.8103, 90.4125], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(tmMap);
+  setTimeout(()=> tmMap.invalidateSize(), 180);
+}
+
+function startRadar(){
+  initRadarMap();
+  if(!tmMap) return;
+  $("radarHint").textContent = "📡 কাছের অপেক্ষমাণ যাত্রী খোঁজা হচ্ছে...";
+  loadShopPins();
+  if(tmUnsub) return;
+  tmUnsub = db.collection("passenger_waiting_queue").where("status", "==", "WAITING")
+    .onSnapshot((qs)=> renderRadar(qs.docs.map(d=> ({ id:d.id, ...d.data() }))),
+                (e)=>{ console.warn("radar:", e); $("radarHint").textContent = "যাত্রীর তালিকা আনা যায়নি।"; });
+}
+function stopRadar(){
+  if(tmUnsub){ tmUnsub(); tmUnsub = null; }
+  tmPinMarkers.forEach(m=> tmMap && tmMap.removeLayer(m)); tmPinMarkers = [];
+  tmShopMarkers.forEach(m=> tmMap && tmMap.removeLayer(m)); tmShopMarkers = [];
+  radarStarted = false; knownPassengerIds = new Set();
+}
+
+/* 🏪 কাছের দোকান — যেখানে দোকান, সেখানেই মানুষ। চালককে দাঁড়ানোর
+   জায়গা বেছে নিতে সাহায্য করে। */
+async function loadShopPins(){
+  if(!myLatLng || !tmMap) return;
+  tmShopMarkers.forEach(m=> tmMap.removeLayer(m)); tmShopMarkers = [];
+  try{
+    const qs = await db.collection("shops").where("status", "==", "active").get();
+    qs.docs.forEach(d=>{
+      const sh = d.data(), loc = sh.storeLocation;
+      if(!loc || loc.lat == null) return;
+      if(haversineKm(myLatLng[0], myLatLng[1], loc.lat, loc.lng) > 3) return;
+      const icon = L.divIcon({
+        html: `<div style="background:#2563eb; color:#fff; font-weight:700; font-size:10px; padding:3px 8px; border-radius:20px; border:2px solid #fff; white-space:nowrap;">🏪 ${esc(sh.name || sh.shopName || "দোকান")}</div>`,
+        className:'', iconSize:null, iconAnchor:[28,11]
+      });
+      tmShopMarkers.push(L.marker([loc.lat, loc.lng], { icon }).addTo(tmMap));
+    });
+  }catch(e){ console.warn("shop pins:", e); }
+}
+
+async function renderRadar(all){
+  if(!tmMap) return;
+  tmPinMarkers.forEach(m=> tmMap.removeLayer(m)); tmPinMarkers = [];
+  if(!myLatLng){
+    $("radarHint").textContent = "📍 আপনার অবস্থান লাগবে — ডিউটি চালু করে GPS অনুমতি দিন।";
+    return;
+  }
+  const near = all.filter(p=>{
+    const loc = p.location; if(!loc) return false;
+    const lat = loc.latitude != null ? loc.latitude : loc._lat;
+    const lng = loc.longitude != null ? loc.longitude : loc._long;
+    if(lat == null || lng == null) return false;
+    p.__lat = lat; p.__lng = lng;
+    p.__dist = haversineKm(myLatLng[0], myLatLng[1], lat, lng);
+    return p.__dist <= 2;
+  });
+
+  // নতুন যাত্রী এলেই একবার বাজবে — পেজ খোলার মুহূর্তে না
+  const ids = new Set(near.map(p=> p.id));
+  if(radarStarted && [...ids].some(id=> !knownPassengerIds.has(id))){
+    beep(); if(navigator.vibrate) navigator.vibrate([300,120,300]);
+  }
+  radarStarted = true; knownPassengerIds = ids;
+
+  // কাছাকাছি যাত্রীদের এক পিনে জড়ো করা — নাহলে পিনে পিনে ঢেকে যেত
+  const groups = {};
+  near.forEach(p=>{
+    const k = p.__lat.toFixed(3) + "," + p.__lng.toFixed(3);
+    (groups[k] = groups[k] || []).push(p);
+  });
+  for(const k in groups){
+    const g = groups[k];
+    const cLat = g.reduce((a,p)=> a + p.__lat, 0) / g.length;
+    const cLng = g.reduce((a,p)=> a + p.__lng, 0) / g.length;
+    const label = await areaName(cLat, cLng);
+    const icon = L.divIcon({
+      html: `<div class="radarBadge">📍 ${esc(label)} — ${bn(g.length)} জন</div>`,
+      className:'', iconSize:null, iconAnchor:[40,14]
+    });
+    const mk = L.marker([cLat, cLng], { icon }).addTo(tmMap);
+    mk.bindPopup(buildPassengerPopup(g));
+    tmPinMarkers.push(mk);
+  }
+
+  $("radarHint").textContent = near.length
+    ? `📡 ২ কিমির মধ্যে ${bn(near.length)} জন যাত্রী অপেক্ষা করছেন`
+    : "এই মুহূর্তে ২ কিমির মধ্যে কোনো অপেক্ষমাণ যাত্রী নেই।";
+
+  if(near.length){
+    const nearest = near.reduce((a,b)=> a.__dist < b.__dist ? a : b);
+    tmMap.fitBounds([myLatLng, [nearest.__lat, nearest.__lng]], { padding:[40,40], maxZoom:16 });
   }
 }
 
-async function writeRiderLocation(lat, lng, extra){
-  const shopId = localStorage.getItem(LS_KEY);
-  if(!shopId) return;
-  try{
-    await db.collection("shops").doc(shopId).collection("live").doc("riderLocation").set({
-      lat, lng,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      sharing: true,
-      ...(extra || {})
-    }, { merge: true });
-  }catch(e){ console.warn("Rider location write failed:", e); }
+const V_LABELS = { AUTO:"🛺 অটো/সিএনজি", CAR:"🚗 কার", BIKE:"🏍️ বাইক", BUS:"🚌 বাস" };
+function buildPassengerPopup(group){
+  const wrap = document.createElement("div");
+  wrap.style.minWidth = "165px";
+  group.forEach(p=>{
+    const row = document.createElement("div");
+    row.style.marginBottom = "9px";
+    const want = (p.transport_types || []).map(v=> V_LABELS[v] || v).join(", ") || "যেকোনো গাড়ি";
+    row.innerHTML = `<div style="font-size:11.5px; margin-bottom:4px; color:#241605;">🚕 চান: ${esc(want)}<br>~${bn(p.__dist.toFixed(1))} কিমি দূরে</div>`;
+    const btn = document.createElement("button");
+    btn.className = "popBtn";
+    btn.innerHTML = '<span class="holdFill"></span><span class="holdLabel">✅ Pick Up — ২ সেকেন্ড ধরুন</span>';
+    setupHold(btn, 2000, ()=> doPickUp(p));
+    row.appendChild(btn);
+    wrap.appendChild(row);
+  });
+  return wrap;
 }
 
-async function markRiderOffline(){
-  const shopId = localStorage.getItem(LS_KEY);
-  if(!shopId) return;
-  try{
-    await db.collection("shops").doc(shopId).collection("live").doc("riderLocation").set({
-      sharing: false, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-  }catch(e){ /* ignore */ }
+async function doPickUp(p){
+  const input = prompt("ভাড়া কত নেবেন? (৳)\n\nযাত্রীর Wallet-এ টাকা থাকলে সেখান থেকে কাটার চেষ্টা হবে, না কাটা গেলে নগদ নিন।", "");
+  if(input === null){ const e = new Error("বাতিল"); e.__cancelled = true; throw e; }
+  const fare = Number(input) || 0;
+  await db.collection("passenger_waiting_queue").doc(p.id).update({
+    status: "PICKED_UP", picked_up_by: RIDER.uid, picked_up_at: fbNow(), fare: fare || null
+  });
+  if(fare > 0){
+    const r = await chargeWallet(p.user_id, fare);
+    toast(r ? `✅ Wallet থেকে ৳ ${bn(fare)} কাটা হয়েছে` : `✅ Pick Up হলো — নগদ ৳ ${bn(fare)} নিন`);
+  }else{
+    toast("✅ Pick Up হলো");
+  }
+  addNotif("🛺 একজন যাত্রী Pick Up করা হয়েছে");
+  if(tmMap) tmMap.closePopup();
 }
 
-function startGpsSharing(){
-  if(!navigator.geolocation){ alert("এই ডিভাইসে লোকেশন সাপোর্ট নেই।"); return; }
-  __gpsWatchId = navigator.geolocation.watchPosition((pos)=>{
-    const now = Date.now();
-    if(now - __gpsLastSentAt < GPS_SEND_INTERVAL_MS) return; // থ্রটল — প্রতি ৭ সেকেন্ডে একবার
-    __gpsLastSentAt = now;
-    writeRiderLocation(pos.coords.latitude, pos.coords.longitude, {
-      speed: pos.coords.speed || null,
-      heading: pos.coords.heading || null,
-      accuracy: pos.coords.accuracy || null
+/* 💳 যাত্রীর ওয়ালেট থেকে ভাড়া কাটার চেষ্টা। না পারলে false — তখন
+   চালককে নগদ নিতে বলা হয়, চুপচাপ "কাটা হয়েছে" বলা হয় না। */
+async function chargeWallet(passengerId, fare){
+  if(!passengerId || String(passengerId).startsWith("guest_")) return false;
+  try{
+    const ref = db.collection("wallets").doc(passengerId);
+    const ok = await db.runTransaction(async (t)=>{
+      const d = await t.get(ref);
+      const bal = d.exists ? (d.data().balance || 0) : 0;
+      if(bal < fare) return false;
+      t.set(ref, { balance: bal - fare, updatedAt: fbNow() }, { merge:true });
+      return true;
     });
-  }, (err)=>{
-    console.warn("GPS watch error:", err);
-    alert("লোকেশন পাওয়া যাচ্ছে না — লোকেশন পারমিশন চেক করুন।");
-    stopGpsSharing();
-  }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
-
-  localStorage.setItem("deliveryman-gps-sharing", "on");
-  refreshGpsUi();
+    if(!ok) return false;
+    await ref.collection("transactions").add({
+      type:"ride_payment", amount:-fare, note:"ট্রিপ ভাড়া", createdAt: fbNow()
+    });
+    const mine = db.collection("wallets").doc(RIDER.uid);
+    await db.runTransaction(async (t)=>{
+      const d = await t.get(mine);
+      const bal = d.exists ? (d.data().balance || 0) : 0;
+      t.set(mine, { balance: bal + fare, updatedAt: fbNow() }, { merge:true });
+    });
+    return true;
+  }catch(e){ console.warn("wallet charge failed:", e); return false; }
 }
 
-function stopGpsSharing(){
-  if(__gpsWatchId != null){ navigator.geolocation.clearWatch(__gpsWatchId); __gpsWatchId = null; }
-  localStorage.setItem("deliveryman-gps-sharing", "off");
-  markRiderOffline();
-  refreshGpsUi();
-}
-
-$("toggleGpsBtn") && $("toggleGpsBtn").addEventListener("click", ()=>{
-  if(isGpsSharingOn()) stopGpsSharing(); else startGpsSharing();
+/* ════════ 🔗 পুরনো শপ-কোড (ঐচ্ছিক) ════════
+   যেসব দোকান এখনো রাইডার-সিস্টেমে আসেনি তাদের "ডেলিভারি ম্যান কে
+   ডাকুন" ডাকটা এখানেই আসে। এটা বাজারের অর্ডার নয় — তাই উপরের মূল
+   কাজের সাথে মেশানো হয়নি, আলাদা রাখা হয়েছে। */
+let legacyUnsub = null, legacyLastId = null, legacyFirst = true;
+$("legacyLink").addEventListener("click", ()=>{
+  $("legacyCode").value = localStorage.getItem("hb-rider-legacy-shop") || "";
+  $("legacySheet").style.display = "flex";
 });
-
-// পেজ লোড হওয়ার সময় আগে থেকে চালু থাকলে আবার শুরু করা (শপ কানেক্ট থাকা অবস্থায়)
-window.addEventListener("DOMContentLoaded", ()=>{
-  refreshGpsUi();
-  if(isGpsSharingOn() && localStorage.getItem(LS_KEY)) startGpsSharing();
+$("legacyClose").addEventListener("click", ()=> $("legacySheet").style.display = "none");
+$("legacyConnectBtn").addEventListener("click", async ()=>{
+  const code = $("legacyCode").value.trim();
+  if(!code){ $("legacyStatus").textContent = "কোড লিখুন।"; return; }
+  $("legacyStatus").textContent = "যাচাই হচ্ছে...";
+  try{
+    const snap = await db.collection("shops").doc(code).get();
+    if(!snap.exists){ $("legacyStatus").textContent = "এই কোডের কোনো দোকান পাওয়া যায়নি।"; return; }
+    localStorage.setItem("hb-rider-legacy-shop", code);
+    startLegacy(code);
+    $("legacyStatus").textContent = "✅ কানেক্ট হয়েছে — " + ((snap.data().name || snap.data().shopName) || "দোকান") + "। ডাক এলে বেজে উঠবে।";
+  }catch(e){ $("legacyStatus").textContent = "সংযোগে সমস্যা — ইন্টারনেট দেখুন।"; }
 });
-
-/* ---------- ভাইব্রেশন + শব্দ (রিং) ---------- */
-function beepOnce(){
-  try{
-    if(!__audioCtx) __audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if(__audioCtx.state === "suspended") __audioCtx.resume();
-    const osc = __audioCtx.createOscillator();
-    const gain = __audioCtx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(880, __audioCtx.currentTime);
-    osc.frequency.setValueAtTime(660, __audioCtx.currentTime + 0.18);
-    gain.gain.setValueAtTime(0.0001, __audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.35, __audioCtx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, __audioCtx.currentTime + 0.4);
-    osc.connect(gain); gain.connect(__audioCtx.destination);
-    osc.start(); osc.stop(__audioCtx.currentTime + 0.42);
-  }catch(e){ console.warn("beep failed:", e); }
+function startLegacy(shopId){
+  if(legacyUnsub) legacyUnsub();
+  legacyFirst = true;
+  legacyUnsub = db.collection("shops").doc(shopId).collection("deliveryCalls")
+    .orderBy("calledAt", "desc").limit(1)
+    .onSnapshot((qs)=>{
+      if(qs.empty){ legacyFirst = false; return; }
+      const d = qs.docs[0];
+      if(legacyFirst){ legacyFirst = false; legacyLastId = d.id; return; }
+      if(d.id !== legacyLastId){
+        legacyLastId = d.id;
+        startAlert(); setTimeout(stopAlert, 6000);
+        addNotif("🔔 দোকান থেকে ডাকছে (পুরনো ব্যবস্থা)");
+        toast("🔔 দোকান থেকে ডাকছে");
+      }
+    }, ()=>{});
 }
+if(localStorage.getItem("hb-rider-legacy-shop")) startLegacy(localStorage.getItem("hb-rider-legacy-shop"));
 
-function triggerRing(subText){
-  __ringing = true;
-  $("ringSubText").textContent = subText || "নতুন ডেলিভারি অর্ডার আছে।";
-  $("ringOverlay").style.display = "flex";
-
-  if(navigator.vibrate) navigator.vibrate([500,200,500,200,500]);
-  beepOnce();
-  if(__ringInterval) clearInterval(__ringInterval);
-  __ringInterval = setInterval(()=>{
-    if(!__ringing){ clearInterval(__ringInterval); return; }
-    if(navigator.vibrate) navigator.vibrate([500,200,500]);
-    beepOnce();
-  }, 1600);
-}
-
-function stopRinging(){
-  __ringing = false;
-  if(__ringInterval){ clearInterval(__ringInterval); __ringInterval = null; }
-  if(navigator.vibrate) navigator.vibrate(0);
-  $("ringOverlay").style.display = "none";
-}
-
-/* প্রথম ইউজার-ট্যাপে অডিও আনলক করে রাখা (মোবাইল ব্রাউজারের অটোপ্লে বিধিনিষেধ এড়াতে) */
-document.body.addEventListener("click", function unlockAudioOnce(){
-  try{
-    if(!__audioCtx) __audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if(__audioCtx.state === "suspended") __audioCtx.resume();
-  }catch(e){}
-  document.body.removeEventListener("click", unlockAudioOnce);
-}, { once:true });
+/* শীটের বাইরে চাপলে বন্ধ */
+["notifSheet","legacySheet"].forEach(id=>{
+  $(id).addEventListener("click", (e)=>{ if(e.target.id === id) $(id).style.display = "none"; });
+});
 </script>
 </body>
 </html>
