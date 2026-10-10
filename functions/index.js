@@ -91,10 +91,12 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 // প্রতিটা (origin, destination) জোড়া প্রায় ১০০ মিটার নির্ভুলতায় রাউন্ড করে
 // Firestore-এ ২ ঘণ্টার জন্য ক্যাশ করা হয়। API কল ব্যর্থ হলে সরলরেখার
 // (Haversine) দূরত্বে নিরাপদে ফলব্যাক করে।
-async function getRoadDistanceKm(originLat, originLng, destLat, destLng) {
+// ttlMs: ক্যাশ কতক্ষণ চলবে। রাইডারের লাইভ অবস্থানের জন্য ২ ঘণ্টা (ডিফল্ট),
+// দোকান→ক্রেতার ডেলিভারি চার্জের জন্য ৩০ দিন (রাস্তা রোজ বদলায় না)।
+async function getRoadDistanceKm(originLat, originLng, destLat, destLng, ttlMs) {
   const cacheKey = `${originLat.toFixed(3)}_${originLng.toFixed(3)}_${destLat.toFixed(3)}_${destLng.toFixed(3)}`;
   const cacheRef = db.collection("distanceCache").doc(cacheKey);
-  const twoHoursAgoMs = Date.now() - 2 * 60 * 60 * 1000;
+  const twoHoursAgoMs = Date.now() - (ttlMs || 2 * 60 * 60 * 1000);
 
   try {
     const cacheDoc = await cacheRef.get();
@@ -1678,7 +1680,89 @@ exports.adminUpdateShopOwnerEmail = onCall(async (request) => {
 //
 // প্রতি মিনিটে একবার চলে, তাই অপেক্ষা ৬০ থেকে ১২০ সেকেন্ড হতে পারে।
 // গ্রাহককে "প্রায় ১ মিনিট" বলাই সৎ, "ঠিক ৬০ সেকেন্ড" নয়।
-exports.releaseHeldOrders = onSchedule("every 1 minutes", async () => {
+/* ==================== 🚚 ডেলিভারি চার্জ (delivery-pricing.js) ====================
+   ১) quoteDelivery — চেকআউটের আগে ক্রেতার অ্যাপ জিজ্ঞেস করে "চার্জ কত?"
+   ২) releaseHeldOrders — অর্ডারের ১ মিনিট holding শেষে সার্ভার নিজে আবার হিসাব
+      করে চার্জটা অর্ডারে সিল করে দেয়। ফোন থেকে আসা কোনো চার্জ গোনা হয় না।
+   সিল করা হিসাব থাকে orderDeliveryCharges/{orderCode_customerUid}-এ — পরে
+   এজেন্ট চার্জ বদলালেও এই অর্ডারের হিসাব আর বদলায় না। */
+const makeDeliveryPricing = require("./delivery-pricing");
+const deliveryPricing = makeDeliveryPricing({ db, haversineKm, getRoadDistanceKm });
+const ROUTE_RETRY_WINDOW_MS = 5 * 60 * 1000; // Google না পেলে ৫ মিনিট পর্যন্ত আবার চেষ্টা
+
+exports.quoteDelivery = onCall({ secrets: [googleMapsApiKey] }, async (request) => {
+  // যে কেউ (অতিথিও, anonymous লগইনে) জিজ্ঞেস করতে পারেন — তবে লগইন ছাড়া না,
+  // নইলে বাইরের কেউ বারবার ডেকে Google-এর বিল বাড়াতে পারত
+  if (!request.auth) throw new HttpsError("unauthenticated", "লগইন দরকার");
+  const data = request.data || {};
+  const lat = Number(data.lat), lng = Number(data.lng);
+  const ids = Array.isArray(data.sourceIds) ? data.sourceIds.slice(0, 20) : [];
+  try {
+    return await deliveryPricing.computeQuote(ids, { lat, lng }, new Date());
+  } catch (e) {
+    console.error(JSON.stringify({ event: "QUOTE_FAILED", error: String(e && e.message || e) }));
+    throw new HttpsError("internal", "চার্জ হিসাব করা যায়নি");
+  }
+});
+
+/* এক রসিদের (একই orderCode + customerUid) সব পণ্যের জন্য একবার হিসাব করে সিল।
+   ফেরত দেয় প্রতিটা অর্ডার-নথির জন্য কী লিখতে হবে, বা null = এখন ছেড়ো না। */
+async function sealDeliveryForReceipt(docs, now) {
+  const first = docs[0].data();
+  const orderCode = first.orderCode || docs[0].id;
+  const custUid = first.customerUid || "guest";
+  const chargeId = `${orderCode}_${custUid}`.replace(/[\/]/g, "_").slice(0, 300);
+  const dest = { lat: first.deliveryLat, lng: first.deliveryLng };
+  const createdAt = (first.createdAt && first.createdAt.toDate) ? first.createdAt.toDate() : now;
+  const sourceIds = docs.map((d) => d.data().shopId).filter(Boolean);
+
+  let quote;
+  try {
+    quote = await deliveryPricing.computeQuote(sourceIds, dest, createdAt);
+  } catch (e) {
+    quote = { ok: false, status: "error", groups: [], totalCharge: 0, error: String(e && e.message || e) };
+  }
+
+  // Google সাময়িক না পেলে কিছুক্ষণ holding-এই রেখে আবার চেষ্টা
+  const releaseAtMs = (first.releaseAt && first.releaseAt.toMillis) ? first.releaseAt.toMillis() : now.getTime();
+  if (quote.status === "route_unavailable" && now.getTime() - releaseAtMs < ROUTE_RETRY_WINDOW_MS) return null;
+
+  // প্রতিটা দলের চার্জ দলের প্রথম পণ্যের নথিতে বসে, বাকিগুলোতে ০ —
+  // তাই সব নথি যোগ করলে চার্জ একবারই আসে, দুইবার না
+  const holderOf = {};
+  const perDoc = {};
+  docs.forEach((d) => {
+    const sid = d.data().shopId;
+    const g = quote.groups.find((x) => x.sourceIds.includes(sid));
+    const delivery = {
+      chargeId, status: g ? g.status : quote.status,
+      groupKey: g ? g.groupKey : null, charge: 0, sealedAt: FieldValue.serverTimestamp(),
+    };
+    if (g && g.status === "ok" && !holderOf[g.groupKey]) {
+      holderOf[g.groupKey] = d.id;
+      Object.assign(delivery, {
+        charge: g.total, distanceCharge: g.distanceCharge, nightSurcharge: g.nightSurcharge,
+        distanceMeters: g.distanceMeters, approximate: g.approximate,
+      });
+    }
+    perDoc[d.id] = delivery;
+  });
+
+  const snapshot = {
+    orderCode, customerUid: custUid, status: quote.status, ok: !!quote.ok,
+    groups: quote.groups.map((g) => Object.assign({}, g, { chargedOnOrderId: holderOf[g.groupKey] || null })),
+    totalCharge: quote.totalCharge || 0,
+    destination: (typeof dest.lat === "number" && typeof dest.lng === "number") ? dest : null,
+    sourceIds: [...new Set(sourceIds)], orderIds: docs.map((d) => d.id),
+    pricedAt: createdAt, calculatedAt: FieldValue.serverTimestamp(),
+    timezone: quote.timezone || "Asia/Dhaka",
+    clientShownCharge: typeof first.clientDeliveryCharge === "number" ? first.clientDeliveryCharge : null,
+  };
+  if (quote.error) snapshot.error = quote.error;
+  return { chargeId, snapshot, perDoc };
+}
+
+exports.releaseHeldOrders = onSchedule({ schedule: "every 1 minutes", secrets: [googleMapsApiKey] }, async () => {
   const now = new Date();
   const snap = await db.collection("orderRequests")
     .where("status", "==", "holding")
@@ -1688,14 +1772,43 @@ exports.releaseHeldOrders = onSchedule("every 1 minutes", async () => {
 
   if (snap.empty) return;
 
+  // রসিদ ধরে ভাগ — একই orderCode + customerUid = এক রসিদ
+  const receipts = {};
+  snap.docs.forEach((d) => {
+    const o = d.data();
+    const key = (o.orderCode || d.id) + "|" + (o.customerUid || "guest");
+    (receipts[key] = receipts[key] || []).push(d);
+  });
+
   // একসাথে লেখা — একটা ছেড়ে আরেকটা বাদ পড়লে এক রসিদের অর্ধেক
   // দোকানে যেত, বাকি অর্ধেক আটকে থাকত
   const batch = db.batch();
-  snap.docs.forEach((d) => {
-    batch.set(d.ref, { status: "pending", releasedAt: FieldValue.serverTimestamp() }, { merge: true });
-  });
-  await batch.commit();
-  console.log(JSON.stringify({ event: "HELD_ORDERS_RELEASED", count: snap.size }));
+  let released = 0, waiting = 0;
+  for (const docs of Object.values(receipts)) {
+    let sealed = null;
+    // ইতিমধ্যে সিল হয়ে থাকলে (আগের চালানোয় লেখা হয়েছিল) আবার হিসাব না
+    const alreadySealed = docs.every((d) => d.data().delivery && d.data().delivery.chargeId);
+    if (!alreadySealed) {
+      try {
+        sealed = await sealDeliveryForReceipt(docs, now);
+      } catch (e) {
+        console.error(JSON.stringify({ event: "DELIVERY_SEAL_FAILED", error: String(e && e.message || e) }));
+        sealed = undefined; // হিসাব ভাঙলেও অর্ডার আটকে রাখা হবে না
+      }
+      if (sealed === null) { waiting += docs.length; continue; }
+    }
+    if (sealed) {
+      batch.set(db.collection("orderDeliveryCharges").doc(sealed.chargeId), sealed.snapshot, { merge: true });
+    }
+    docs.forEach((d) => {
+      const upd = { status: "pending", releasedAt: FieldValue.serverTimestamp() };
+      if (sealed) upd.delivery = sealed.perDoc[d.id];
+      batch.set(d.ref, upd, { merge: true });
+      released++;
+    });
+  }
+  if (released) await batch.commit();
+  console.log(JSON.stringify({ event: "HELD_ORDERS_RELEASED", count: released, waitingForRoute: waiting }));
 });
 
 // 🔔 অর্ডারের অবস্থা বদলালে গ্রাহককে জানানো — "পথে আছে", "পৌঁছে গেছে",
