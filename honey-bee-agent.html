@@ -66,6 +66,18 @@
     background:transparent; color:var(--muted); font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit;
   }
   .tabBtn.active{ background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); border-color:transparent; }
+  /* 💰 ডেলিভারি চার্জ প্যানেল */
+  .dpTierRow{ display:grid; grid-template-columns:1fr 110px; gap:10px; align-items:center; margin-bottom:8px; }
+  .dpTierRow span{ font-size:13px; }
+  .dpTierRow input{ margin-bottom:0; text-align:right; }
+  .dpGrid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .dpSwitch{ display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; margin-bottom:12px; cursor:pointer; }
+  .dpSwitch input{ width:20px; height:20px; margin:0; accent-color:var(--gold); flex-shrink:0; }
+  .dpSwitch span{ font-size:13px; }
+  .dpHint{ font-size:11.5px; color:var(--muted); margin:-4px 0 12px; line-height:1.5; }
+  .dpTestOut{ background:rgba(255,183,3,0.08); border:1px dashed var(--border); border-radius:10px; padding:12px; font-size:13px; line-height:1.8; }
+  .dpTestOut b{ color:var(--amber); }
+  .dpHist{ font-size:11.5px; color:var(--muted); padding:8px 0; border-bottom:1px solid var(--border); line-height:1.6; }
   .tabPanel{ display:none; }
   .tabPanel.active{ display:block; }
 
@@ -211,16 +223,75 @@
     <div id="walletLookupResult" style="margin-top:14px;"></div>
   </div>
 
-  <!-- ডেলিভারি চার্জ -->
+  <!-- 💰 ডেলিভারি চার্জ — ক্রেতার চার্জ + রাইডারের পাওনা (deliveryPricing/{marketId}) -->
   <div class="tabPanel" id="tabCharge">
+    <p style="font-size:11.5px; color:var(--muted); margin:0 0 12px; line-height:1.6;">
+      আপনার বাজারের সব দোকান এই নিয়মে চলবে। দূরত্ব মাপা হয় দোকান থেকে ক্রেতা পর্যন্ত, রাস্তা ধরে।
+      বদলালে শুধু <b>নতুন অর্ডারে</b> লাগবে — আগের অর্ডারের চার্জ বদলাবে না।
+    </p>
+
     <div class="card">
-      <h2>💰 ডাইনামিক ডেলিভারি চার্জ</h2>
-      <label for="baseChargeInput">বেস চার্জ (৳)</label>
-      <input type="number" id="baseChargeInput" placeholder="যেমনঃ 5" min="0" step="0.5">
-      <label for="perKmInput">প্রতি কিমি অতিরিক্ত চার্জ (৳)</label>
-      <input type="number" id="perKmInput" placeholder="যেমনঃ 1.5" min="0" step="0.5">
-      <button class="btn" id="saveChargeBtn">✅ সেভ করুন</button>
-      <p id="chargeSavedMsg" style="display:none; color:var(--ok); font-size:12px; margin:10px 0 0;">✅ সেভ হয়েছে!</p>
+      <h2>📏 দূরত্বের চার্জ (ক্রেতা দেবেন)</h2>
+      <div id="dpTiers"></div>
+      <div class="dpGrid2" style="margin-top:12px;">
+        <div><label for="dpExtraPerKm">৫ কিমির পরে প্রতি কিমি (৳)</label>
+          <input type="number" id="dpExtraPerKm" min="0" step="1" inputmode="decimal"></div>
+        <div><label for="dpMinCharge">সর্বনিম্ন চার্জ (৳)</label>
+          <input type="number" id="dpMinCharge" min="0" step="1" inputmode="decimal"></div>
+      </div>
+      <label for="dpMaxKm">সর্বোচ্চ দূরত্ব (কিমি)</label>
+      <input type="number" id="dpMaxKm" min="1" max="100" step="0.5" inputmode="decimal">
+      <p class="dpHint">এর বেশি দূরে হলে ক্রেতা অর্ডার দিতে পারবেন না — "এত দূরে ডেলিভারি হয় না" দেখাবে।</p>
+    </div>
+
+    <div class="card">
+      <h2>🌙 রাতের চার্জ</h2>
+      <label class="dpSwitch"><input type="checkbox" id="dpNightOn"><span>রাতের চার্জ চালু</span></label>
+      <label for="dpNightAmt">রাতে অতিরিক্ত (৳)</label>
+      <input type="number" id="dpNightAmt" min="0" step="1" inputmode="decimal">
+      <div class="dpGrid2">
+        <div><label for="dpNightStart">শুরু</label><input type="time" id="dpNightStart"></div>
+        <div><label for="dpNightEnd">শেষ</label><input type="time" id="dpNightEnd"></div>
+      </div>
+      <p class="dpHint">সময় ধরা হয় বাংলাদেশের ঘড়িতে। অর্ডার দেওয়ার মুহূর্তের সময় দেখে ঠিক হয়।</p>
+    </div>
+
+    <div class="card">
+      <h2>🛰️ রাস্তার দূরত্ব না পেলে</h2>
+      <label class="dpSwitch"><input type="checkbox" id="dpApprox"><span>আনুমানিক দূরত্বে অর্ডার নেওয়া চলবে</span></label>
+      <p class="dpHint">চালু থাকলে: Google কাজ না করলে সোজা দূরত্ব × ১.৩ ধরা হবে, অর্ডারে "আনুমানিক" লেখা থাকবে।<br>
+        বন্ধ থাকলে: তখন অর্ডার নেওয়া হবে না, ক্রেতাকে একটু পরে চেষ্টা করতে বলা হবে।</p>
+    </div>
+
+    <div class="card">
+      <h2>🛵 রাইডারের পাওনা</h2>
+      <p class="dpHint" style="margin-top:0;">ক্রেতার চার্জ থেকে আলাদা। রাইডার যেখান থেকে রওনা দেন → দোকান → ক্রেতা, পুরো পথ ধরে।</p>
+      <div class="dpGrid2">
+        <div><label for="baseChargeInput">বেস (৳)</label>
+          <input type="number" id="baseChargeInput" min="0" step="0.5" inputmode="decimal"></div>
+        <div><label for="perKmInput">প্রতি কিমি (৳)</label>
+          <input type="number" id="perKmInput" min="0" step="0.5" inputmode="decimal"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🧮 মিলিয়ে দেখুন</h2>
+      <div class="dpGrid2">
+        <div><label for="dpTestKm">দূরত্ব (কিমি)</label>
+          <input type="number" id="dpTestKm" value="2.5" min="0" step="0.1" inputmode="decimal"></div>
+        <div><label>&nbsp;</label>
+          <label class="dpSwitch" style="margin-bottom:12px;"><input type="checkbox" id="dpTestNight"><span>রাত</span></label></div>
+      </div>
+      <div class="dpTestOut" id="dpTestOut"></div>
+    </div>
+
+    <button class="btn" id="saveChargeBtn">✅ সেভ করুন</button>
+    <p id="chargeSavedMsg" style="display:none; color:var(--ok); font-size:12.5px; margin:10px 0 0;"></p>
+    <p id="dpMeta" style="font-size:11px; color:var(--muted); margin:10px 0 0;"></p>
+
+    <div class="card" style="margin-top:14px;">
+      <h2>📜 পরিবর্তনের ইতিহাস</h2>
+      <div id="dpHistory"><div class="emptyMsg">লোড হচ্ছে...</div></div>
     </div>
   </div>
 </div>
@@ -431,10 +502,8 @@ async function loadDashboard(){
     $("ovCommission").textContent = currentAgent.commissionPercent + "%";
   }
 
-  // ডেলিভারি চার্জ ফর্মে বিদ্যমান মান বসানো
-  const cfg = currentAgent.deliveryChargeConfig || {};
-  $("baseChargeInput").value = cfg.baseCharge != null ? cfg.baseCharge : "";
-  $("perKmInput").value = cfg.perKmRate != null ? cfg.perKmRate : "";
+  // 💰 ডেলিভারি চার্জের সেটিং লোড
+  dpLoad();
 
   listenRiders();
   listenShops();
@@ -937,18 +1006,198 @@ window.toggleShopStatus = async function(shopId, currentStatus){
   }catch(e){ alert("স্ট্যাটাস বদলানো যায়নি: " + e.message); }
 };
 
-/* ---------- ডেলিভারি চার্জ সেভ ---------- */
+/* ==================== 💰 ডেলিভারি চার্জ (ক্রেতা + রাইডার) ====================
+   সব সেটিং থাকে deliveryPricing/{marketId}-এ — বাজারপিছু একটা নথি।
+   প্রতিটা সেভে version এক বাড়ে, আর deliveryPricing/{marketId}/history-তে
+   আগের ও নতুন মান লেখা হয় (কে, কখন)।
+
+   ⚠️ নিচের dpCalcCharge() হুবহু একই হিসাব সার্ভারেও (functions) থাকবে —
+   এখানে শুধু এজেন্ট যেন সেভের আগে মিলিয়ে দেখতে পারেন। আসল চার্জ ঠিক করে সার্ভার। */
+const DP_DEFAULTS = {
+  tiers: [ {upToKm:1, charge:20}, {upToKm:2, charge:25}, {upToKm:3, charge:30},
+           {upToKm:4, charge:35}, {upToKm:5, charge:40} ],
+  extraPerKm: 5, minCharge: 20, maxDistanceKm: 10,
+  night: { enabled:false, amount:0, start:"22:30", end:"08:00" },
+  allowApprox: false, roadFactor: 1.3,
+  rider: { baseCharge: 0, perKmRate: 0 }
+};
+let dpCurrent = null;   // সার্ভারে এখন যা আছে (ইতিহাসে "আগের মান" হিসেবে লাগে)
+
+function dpMerge(saved){
+  const d = JSON.parse(JSON.stringify(DP_DEFAULTS));
+  if(!saved) return d;
+  if(Array.isArray(saved.tiers) && saved.tiers.length) d.tiers = saved.tiers;
+  ["extraPerKm","minCharge","maxDistanceKm","allowApprox","roadFactor"].forEach(k=>{ if(saved[k] != null) d[k] = saved[k]; });
+  if(saved.night) Object.assign(d.night, saved.night);
+  if(saved.rider) Object.assign(d.rider, saved.rider);
+  return d;
+}
+
+/* দূরত্ব (মিটার) → চার্জের ভাগগুলো। সার্ভারেও এটাই হবে। */
+function dpCalcCharge(cfg, meters, isNight){
+  const m = Math.max(0, Math.round(meters));
+  const tiers = cfg.tiers.slice().sort((a,b)=> a.upToKm - b.upToKm);
+  let dist = null;
+  for(const t of tiers){ if(m <= Math.round(t.upToKm * 1000)){ dist = t.charge; break; } }
+  if(dist === null){
+    const last = tiers[tiers.length - 1];
+    const extraKm = Math.ceil((m - Math.round(last.upToKm * 1000)) / 1000);   // প্রতি কিমি বা তার অংশ
+    dist = last.charge + extraKm * cfg.extraPerKm;
+  }
+  dist = Math.max(cfg.minCharge, dist);
+  const night = (isNight && cfg.night.enabled) ? cfg.night.amount : 0;
+  const tooFar = m > Math.round(cfg.maxDistanceKm * 1000);
+  return { distanceCharge: dist, nightSurcharge: night, total: dist + night, tooFar };
+}
+
+const dpNum = (id)=> { const v = $(id).value.trim(); return v === "" ? NaN : Number(v); };
+const dpBn = (n)=> String(n).replace(/\d/g, d=> "০১২৩৪৫৬৭৮৯"[d]);
+
+function dpRenderTiers(cfg){
+  let prev = 0;
+  $("dpTiers").innerHTML = cfg.tiers.map((t,i)=>{
+    const row = `<div class="dpTierRow"><span>${prev === 0 ? "০" : dpBn(prev)}–${dpBn(t.upToKm)} কিমি</span>
+      <input type="number" class="dpTierInput" data-i="${i}" value="${t.charge}" min="0" step="1" inputmode="decimal"></div>`;
+    prev = t.upToKm; return row;
+  }).join("");
+  document.querySelectorAll(".dpTierInput").forEach(el=> el.addEventListener("input", dpRunTest));
+}
+
+function dpFill(cfg){
+  dpRenderTiers(cfg);
+  $("dpExtraPerKm").value = cfg.extraPerKm;
+  $("dpMinCharge").value = cfg.minCharge;
+  $("dpMaxKm").value = cfg.maxDistanceKm;
+  $("dpNightOn").checked = !!cfg.night.enabled;
+  $("dpNightAmt").value = cfg.night.amount;
+  $("dpNightStart").value = cfg.night.start;
+  $("dpNightEnd").value = cfg.night.end;
+  $("dpApprox").checked = !!cfg.allowApprox;
+  $("baseChargeInput").value = cfg.rider.baseCharge;
+  $("perKmInput").value = cfg.rider.perKmRate;
+  dpRunTest();
+}
+
+/* ফর্ম থেকে পড়া + যাচাই। ভুল থাকলে { error } ফেরত দেয়। */
+function dpReadForm(){
+  const base = dpCurrent ? dpMerge(dpCurrent) : dpMerge(null);
+  const tiers = base.tiers.map((t,i)=>{
+    const el = document.querySelector(`.dpTierInput[data-i="${i}"]`);
+    return { upToKm: t.upToKm, charge: el && el.value.trim() !== "" ? Number(el.value) : NaN };
+  });
+  const cfg = {
+    tiers,
+    extraPerKm: dpNum("dpExtraPerKm"), minCharge: dpNum("dpMinCharge"), maxDistanceKm: dpNum("dpMaxKm"),
+    night: { enabled: $("dpNightOn").checked, amount: dpNum("dpNightAmt"),
+             start: $("dpNightStart").value || "22:30", end: $("dpNightEnd").value || "08:00" },
+    allowApprox: $("dpApprox").checked, roadFactor: base.roadFactor,
+    rider: { baseCharge: dpNum("baseChargeInput"), perKmRate: dpNum("perKmInput") }
+  };
+  const nums = [...tiers.map(t=>t.charge), cfg.extraPerKm, cfg.minCharge, cfg.maxDistanceKm,
+                cfg.night.amount, cfg.rider.baseCharge, cfg.rider.perKmRate];
+  if(nums.some(n=> isNaN(n) || n < 0)) return { error: "সব ঘরে ০ বা তার বেশি সংখ্যা দিন।" };
+  if(nums.some(n=> n > 5000)) return { error: "কোনো অঙ্ক ৫০০০-এর বেশি হতে পারবে না।" };
+  for(let i=1;i<tiers.length;i++){
+    if(tiers[i].charge < tiers[i-1].charge) return { error: "দূরত্ব বাড়লে চার্জ কমতে পারে না — টেবিলের অঙ্কগুলো ছোট থেকে বড় দিন।" };
+  }
+  if(cfg.maxDistanceKm < 1 || cfg.maxDistanceKm > 100) return { error: "সর্বোচ্চ দূরত্ব ১ থেকে ১০০ কিমির মধ্যে দিন।" };
+  return { cfg };
+}
+
+function dpRunTest(){
+  const r = dpReadForm();
+  if(r.error){ $("dpTestOut").innerHTML = "⚠️ " + r.error; return; }
+  const km = Number($("dpTestKm").value) || 0;
+  const c = dpCalcCharge(r.cfg, km * 1000, $("dpTestNight").checked);
+  if(c.tooFar){ $("dpTestOut").innerHTML = `🚫 ${dpBn(km)} কিমি — সর্বোচ্চ সীমার বাইরে, অর্ডার নেওয়া হবে না।`; return; }
+  const riderPay = r.cfg.rider.baseCharge + r.cfg.rider.perKmRate * km;
+  $("dpTestOut").innerHTML =
+    `দূরত্বের চার্জ: <b>৳${dpBn(c.distanceCharge)}</b><br>` +
+    (c.nightSurcharge ? `রাতের চার্জ: <b>৳${dpBn(c.nightSurcharge)}</b><br>` : "") +
+    `ক্রেতা দেবেন মোট: <b>৳${dpBn(c.total)}</b><br>` +
+    `<span style="color:var(--muted)">রাইডার পাবেন (শুধু দোকান→ক্রেতা ধরে): ৳${dpBn(Math.round(riderPay*10)/10)}</span>`;
+}
+["dpExtraPerKm","dpMinCharge","dpMaxKm","dpNightOn","dpNightAmt","dpTestKm","dpTestNight",
+ "baseChargeInput","perKmInput"].forEach(id=> $(id).addEventListener("input", dpRunTest));
+
+async function dpLoad(){
+  const mid = currentAgent.marketId;
+  try{
+    const snap = await db.collection("deliveryPricing").doc(mid).get();
+    dpCurrent = snap.exists ? snap.data() : null;
+  }catch(e){ console.warn("deliveryPricing পড়া যায়নি:", e); dpCurrent = null; }
+  let cfg = dpMerge(dpCurrent);
+  // আগের এজেন্ট-সেটিং (রাইডারের বেস/প্রতি কিমি) থাকলে সেটাই শুরুর মান
+  if(!dpCurrent && currentAgent.deliveryChargeConfig){
+    const old = currentAgent.deliveryChargeConfig;
+    if(old.baseCharge != null) cfg.rider.baseCharge = old.baseCharge;
+    if(old.perKmRate != null) cfg.rider.perKmRate = old.perKmRate;
+  }
+  dpFill(cfg);
+  dpShowMeta();
+  dpLoadHistory();
+}
+
+function dpShowMeta(){
+  if(!dpCurrent){ $("dpMeta").textContent = "এখনো সেভ করা হয়নি — উপরের শুরুর মানগুলো চলছে।"; return; }
+  const t = dpCurrent.updatedAt && dpCurrent.updatedAt.toDate ? dpCurrent.updatedAt.toDate() : null;
+  $("dpMeta").textContent = `সংস্করণ ${dpBn(dpCurrent.version || 1)}` + (t ? ` · শেষ বদল ${t.toLocaleString("bn-BD")}` : "");
+}
+
+async function dpLoadHistory(){
+  try{
+    const qs = await db.collection("deliveryPricing").doc(currentAgent.marketId)
+      .collection("history").orderBy("at","desc").limit(5).get();
+    if(qs.empty){ $("dpHistory").innerHTML = '<div class="emptyMsg">এখনো কোনো পরিবর্তন নেই।</div>'; return; }
+    $("dpHistory").innerHTML = qs.docs.map(d=>{
+      const h = d.data();
+      const t = h.at && h.at.toDate ? h.at.toDate().toLocaleString("bn-BD") : "";
+      return `<div class="dpHist">🕐 ${t} · সংস্করণ ${dpBn(h.version || "?")}<br>${dpEsc(h.summary || "")}</div>`;
+    }).join("");
+  }catch(e){ $("dpHistory").innerHTML = '<div class="emptyMsg">ইতিহাস লোড হয়নি।</div>'; }
+}
+function dpEsc(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* কী কী বদলাল — ইতিহাসে এক লাইনে দেখানোর জন্য */
+function dpDiffSummary(a, b){
+  const out = [];
+  b.tiers.forEach((t,i)=>{ const o = a.tiers[i]; if(!o || o.charge !== t.charge) out.push(`${t.upToKm} কিমি পর্যন্ত ৳${o ? o.charge : "-"}→৳${t.charge}`); });
+  const f = (lbl, x, y)=> { if(x !== y) out.push(`${lbl} ${x}→${y}`); };
+  f("প্রতি কিমি", a.extraPerKm, b.extraPerKm); f("সর্বনিম্ন", a.minCharge, b.minCharge);
+  f("সর্বোচ্চ কিমি", a.maxDistanceKm, b.maxDistanceKm);
+  f("রাত", a.night.enabled ? "চালু" : "বন্ধ", b.night.enabled ? "চালু" : "বন্ধ");
+  f("রাতের টাকা", a.night.amount, b.night.amount);
+  f("রাতের সময়", a.night.start + "-" + a.night.end, b.night.start + "-" + b.night.end);
+  f("আনুমানিক", a.allowApprox ? "চালু" : "বন্ধ", b.allowApprox ? "চালু" : "বন্ধ");
+  f("রাইডার বেস", a.rider.baseCharge, b.rider.baseCharge); f("রাইডার প্রতি কিমি", a.rider.perKmRate, b.rider.perKmRate);
+  return out.length ? out.join(" · ") : "কোনো অঙ্ক বদলায়নি";
+}
+
 $("saveChargeBtn").addEventListener("click", async ()=>{
-  const baseCharge = Number($("baseChargeInput").value);
-  const perKmRate = Number($("perKmInput").value);
-  if(isNaN(baseCharge) || isNaN(perKmRate)){ alert("সঠিক সংখ্যা দিন।"); return; }
+  const r = dpReadForm();
+  if(r.error){ alert(r.error); return; }
+  const before = dpMerge(dpCurrent);
+  const summary = dpCurrent ? dpDiffSummary(before, r.cfg) : "প্রথমবার সেভ";
+  if(dpCurrent && summary === "কোনো অঙ্ক বদলায়নি"){ alert("কিছুই বদলানো হয়নি।"); return; }
+  const version = ((dpCurrent && dpCurrent.version) || 0) + 1;
+  const mid = currentAgent.marketId;
+  const ref = db.collection("deliveryPricing").doc(mid);
+  const now = firebase.firestore.FieldValue.serverTimestamp();
   $("saveChargeBtn").disabled = true;
   try{
-    await db.collection("agents").doc(currentAgent.uid).update({
-      deliveryChargeConfig: { baseCharge, perKmRate, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }
+    const batch = db.batch();
+    batch.set(ref, Object.assign({}, r.cfg, { marketId: mid, version, updatedAt: now, updatedBy: currentAgent.uid }));
+    batch.set(ref.collection("history").doc("v" + version), {
+      version, by: currentAgent.uid, at: now, summary,
+      before: dpCurrent ? before : null, after: r.cfg
     });
+    await batch.commit();
+    dpCurrent = Object.assign({}, r.cfg, { version, updatedAt: firebase.firestore.Timestamp.now() });
+    $("chargeSavedMsg").textContent = "✅ সেভ হয়েছে — নতুন অর্ডার থেকে এই চার্জ লাগবে।";
     $("chargeSavedMsg").style.display = "block";
-    setTimeout(()=> $("chargeSavedMsg").style.display = "none", 2500);
+    setTimeout(()=> $("chargeSavedMsg").style.display = "none", 3500);
+    dpShowMeta();
+    dpLoadHistory();
   }catch(e){
     alert("সেভ করা যায়নি: " + e.message);
   }finally{
