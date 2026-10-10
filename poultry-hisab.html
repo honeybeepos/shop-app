@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>হিসাব খাতা — হানি বি পাইকারি</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&display=swap');
+:root{--navy:#103f73;--blue:#0866d9;--blue2:#eaf3ff;--gold:#ffbd36;--green:#13834a;--red:#d93643;--ink:#17243a;--muted:#65758b;--bg:#f3f6fb;--card:#fff;--line:#dce5ef;--shadow:0 8px 26px #14345d12}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans Bengali",system-ui,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer;border:0;border-radius:12px;padding:12px 15px;font-weight:700;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;position:relative;overflow:hidden;transition:transform .12s ease,filter .12s ease,box-shadow .12s ease}button:active{transform:scale(.95);filter:brightness(.88);box-shadow:0 0 0 4px #0866d933;animation:tapPulse .28s ease-out}button.tap-confirmed{animation:tapSuccess .42s ease-out}@keyframes tapPulse{0%{box-shadow:0 0 0 0 #0866d955}100%{box-shadow:0 0 0 8px #0866d900}}@keyframes tapSuccess{0%{transform:scale(.94);filter:brightness(.82)}55%{transform:scale(1.035);filter:brightness(1.12)}100%{transform:scale(1);filter:brightness(1)}}button::after{content:"";position:absolute;inset:0;background:radial-gradient(circle,rgba(255,255,255,.65) 0%,rgba(255,255,255,0) 70%);transform:scale(0);opacity:0;pointer-events:none}button:active::after{transform:scale(2.2);opacity:1;transition:transform .28s ease,opacity .28s ease}.fishrow button,.weightrow button{min-height:48px;min-width:48px}.fishrow .danger,.weightrow .danger{touch-action:manipulation}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#fff;color:var(--ink);min-width:0}label{display:block;font-size:14px;font-weight:700;margin-bottom:6px}.app{max-width:1200px;margin:auto;min-height:100vh}.appbar{padding:10px 14px;border-radius:0 0 16px 16px;position:relative;z-index:8}.appbar .bee{font-size:24px;padding:4px 7px}.appbar .brand h1{font-size:18px}.appbar .brand p{font-size:11px}.headtools{display:flex;align-items:center;gap:8px}.menu-toggle{background:#ffffff20;color:#fff;border:1px solid #ffffff50;font-size:22px;min-width:46px;min-height:46px;padding:6px}.fullscreen-btn{background:#ffffff20;color:#fff;border:1px solid #ffffff50;font-size:12px;padding:9px 10px;white-space:nowrap}.nav{display:none;flex-direction:column;flex-wrap:nowrap;gap:8px;padding:12px;background:#e8f1ff;border:1px solid #cbdcf2;border-radius:0 0 16px 16px;box-shadow:0 8px 20px #14345d18}.nav.menu-open{display:flex;position:relative;z-index:7}.nav button{width:100%;min-height:48px;text-align:left;padding:12px 16px}.app:fullscreen{max-width:none;width:100%;height:100%;overflow:auto;background:var(--bg)}.app:fullscreen .content{padding-bottom:24px}body:has(.app:fullscreen){background:var(--bg)}.top{background:linear-gradient(120deg,#103f73,#0866d9);color:#fff;padding:18px 18px 20px;border-radius:0 0 22px 22px}.toprow{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{display:flex;align-items:center;gap:10px}.bee{font-size:32px;background:#fff2c9;border-radius:14px;padding:5px 9px}.brand h1{font-size:22px;margin:0}.brand p{margin:3px 0 0;color:#e4efff;font-size:12px}.date{font-size:12px;color:#e4efff}.content{padding:16px}.nav{display:flex;gap:8px;overflow:auto;padding:12px 16px 0}.nav button{background:#e3ecf8;color:#234465;white-space:nowrap;padding:10px 13px}.nav button.active{background:var(--blue);color:white}.page{display:none}.page.active{display:block}.sectionhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:5px 0 15px}.sectionhead h2{font-size:20px;margin:0}.muted{color:var(--muted);font-size:13px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.stat{background:linear-gradient(145deg,#ffffff,#f0f6ff);border:1px solid #d6e5f7;border-radius:16px;padding:16px;box-shadow:var(--shadow)}.stats .stat:nth-child(4n+1){background:linear-gradient(145deg,#eef5ff,#dceaff);border-color:#c7dcfb}.stats .stat:nth-child(4n+2){background:linear-gradient(145deg,#effcf3,#d9f7e3);border-color:#c2ebd0}.stats .stat:nth-child(4n+3){background:linear-gradient(145deg,#fff0f0,#ffe0e3);border-color:#f7cbd0}.stats .stat:nth-child(4n+4){background:linear-gradient(145deg,#fff8e7,#ffedc4);border-color:#f1dfad}.stat span{display:block;color:var(--muted);font-size:13px}.stat strong{display:block;font-size:22px;margin-top:8px}.blue{color:var(--blue)}.green{color:var(--green)}.red{color:var(--red)}.orange{color:#b96a00}.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.action{min-height:82px;background:linear-gradient(145deg,#f0f7ff,#dfeeff);color:#124d91;border:1px solid #cfe2fb;box-shadow:0 4px 12px #174b8010}.actions .action:nth-child(4n+2){background:linear-gradient(145deg,#effcf3,#d9f7e3);color:#17683b;border-color:#c2ebd0}.actions .action:nth-child(4n+3){background:linear-gradient(145deg,#fff5e9,#ffe5c4);color:#8a4d08;border-color:#f5d6ad}.actions .action:nth-child(4n+4){background:linear-gradient(145deg,#f5efff,#e8ddff);color:#5b35a1;border-color:#ded0fb}.action b{display:block;font-size:22px;margin-bottom:4px}.primary{background:var(--blue);color:#fff}.success{background:var(--green);color:#fff}.warning{background:#f28b16;color:#fff}.danger{background:var(--red);color:#fff}.soft{background:#edf2f8;color:#29425e}.full{width:100%}.row{display:flex;align-items:end;gap:10px;flex-wrap:wrap}.row>*{flex:1}.smallbtn{padding:7px 10px;border-radius:8px;font-size:13px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:560px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}th{background:#f0f6ff;color:#25496d;white-space:nowrap}.empty{text-align:center;color:var(--muted);padding:25px}.fish-section-head{position:sticky;top:8px;z-index:4;background:linear-gradient(90deg,#fff2c7,#ffe18a);padding:12px;border:1px solid #f0c64e;border-radius:14px;box-shadow:0 5px 14px #a76b001c}.fishrow{display:grid;grid-template-columns:1fr 110px 110px 44px;gap:8px;align-items:end;margin:12px 0;padding:14px;background:linear-gradient(135deg,#eaf4ff 0%,#d5e9ff 100%);border:1px solid #9fcaff;border-left:5px solid #0878f9;border-radius:16px;box-shadow:0 5px 16px #0b63ce18}.fishrow .fishname input{background:#fff;border-color:#9fcaff}.fishrow .frate{background:#fff8df;border-color:#f5ce64}.fishrow .weights{background:#f8fbff;border:1px solid #c8ddf7;border-radius:12px;padding:10px}.weights{display:flex;flex-direction:column;gap:8px}.weightrow{display:grid;grid-template-columns:1fr 1fr 44px;gap:8px;align-items:end;margin:8px 0;padding:10px;background:linear-gradient(135deg,#e7fff1,#c9f7dd);border:1px solid #8be0ae;border-radius:12px}.weightrow input{background:#fff;border-color:#87d6a6}.fishsubtotal{background:linear-gradient(135deg,#fff2c2,#ffe08a)!important;border:1px solid #f1c54d;font-weight:800;color:#634400}.pill{display:inline-block;border-radius:99px;padding:4px 9px;background:#e6f7ed;color:#137542;font-size:12px;font-weight:700}.stickycalc{position:fixed;top:auto;bottom:14px;left:50%;transform:translateX(-50%);width:min(900px,calc(100% - 24px));z-index:20;background:#fff7d9;border:1px solid #f5e3a4;border-radius:14px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 8px 28px #14345d35;margin:0}.page#sale .panel{padding-bottom:105px}.stickycalc strong{font-size:18px}.stickycalc .muted{font-size:12px}.stickycalc strong{font-size:18px}.summary{background:linear-gradient(135deg,#fff3b8,#ffd95d);border:1px solid #edbd32;border-radius:14px;padding:14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 5px 15px #b9820018}.summary strong{font-size:20px}.hidden{display:none!important}.customer-card{border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;gap:10px}.customer-card button{padding:8px 10px}.notice{background:#fff6e6;border:1px solid #f4d9a2;color:#704b00;padding:12px;border-radius:12px;font-size:13px}.modalback{position:fixed;inset:0;background:#06162db8;display:none;align-items:center;justify-content:center;padding:15px;z-index:10}.modalback.show{display:flex}.modal{background:white;border-radius:18px;padding:18px;width:min(680px,100%);max-height:90vh;overflow:auto}.modalhead{display:flex;justify-content:space-between;align-items:center}.modalhead h3{margin:0}.close{background:#edf2f8;padding:7px 11px}.footer{color:var(--muted);text-align:center;padding:20px;font-size:12px}
+@media(max-width:800px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.actions{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3{grid-template-columns:1fr 1fr}.top{border-radius:0 0 16px 16px}.content{padding:12px}.appbar .brand h1{font-size:16px}.appbar .brand p{font-size:10px}.appbar .bee{font-size:21px}.headtools{gap:5px}.fullscreen-btn{font-size:11px;padding:8px}.stat strong{font-size:19px}}
+@media(max-width:480px){.stickycalc{bottom:8px;padding:10px 12px}.stickycalc strong{font-size:16px}.page#sale .panel{padding-bottom:100px}.grid2,.grid3{grid-template-columns:1fr}.fishrow{grid-template-columns:1fr 1fr 1fr 38px}.fishrow .fishname{grid-column:1/-1}.weightrow{grid-template-columns:1fr 1fr 38px}.sectionhead h2{font-size:18px}.panel{padding:12px}.nav{padding-left:10px;padding-right:10px}.date{display:none}.appbar{padding:8px 10px}.menu-toggle{min-width:42px;min-height:42px}.fullscreen-btn{max-width:92px;white-space:normal;line-height:1.15}}
+@media print{body{background:white}.top,.nav,.no-print,.footer{display:none!important}.content{padding:0}.page{display:none!important}#receiptPrint{display:block!important}.panel{box-shadow:none;border:0}.printarea{display:block!important}}
+/* Navigation is hidden until the hamburger menu is opened. */
+.nav{display:none!important;flex-direction:column;flex-wrap:nowrap;gap:8px;overflow:visible;padding:12px;background:#e8f1ff;border:1px solid #cbdcf2;border-radius:0 0 16px 16px;box-shadow:0 8px 20px #14345d18}
+.nav.menu-open{display:flex!important}
+.nav button{width:100%;min-height:48px;text-align:left;padding:12px 16px;white-space:normal}
+.brand .bee,.brand h1,.brand p{cursor:pointer}
+.ledger-open-btn{min-width:112px;min-height:60px;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}.ledger-open-btn:active{transform:scale(.94);filter:brightness(.82);box-shadow:0 0 0 5px #0878f933}.ledger-open-btn.long-pressing{animation:holdGlow .7s ease-in-out infinite alternate;filter:brightness(.9)}@keyframes holdGlow{from{box-shadow:0 0 0 0 #ffb70333}to{box-shadow:0 0 0 8px #ffb70377}}#ledgerPanel{scroll-margin-top:12px;border:2px solid #f2ca55;background:linear-gradient(150deg,#fffdf4,#ffffff);animation:ledgerOpen .32s cubic-bezier(.2,.8,.2,1)}@keyframes ledgerOpen{from{opacity:0;transform:translateY(-16px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}.ledger-share-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;padding:16px;border:1px solid #b9d9fb;border-radius:16px;background:linear-gradient(135deg,#edf6ff,#dbeaff)}.ledger-share-footer button{min-height:48px}.ledger-share-footer .muted{margin-top:4px}@media(max-width:600px){#ledgerPanel .sectionhead{align-items:flex-start;flex-direction:column}#ledgerPanel .sectionhead>div:last-child{width:100%;display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important}#ledgerPanel .sectionhead>div:last-child button{min-height:48px;white-space:normal;font-size:13px;padding:10px 8px}.ledger-share-footer{align-items:stretch}.ledger-share-footer button{width:100%}}
+
+.history-dropdown{border:1px solid #d5e0eb;border-radius:16px;margin:10px 0;background:#fff;overflow:hidden}
+.history-dropdown>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;min-height:70px;cursor:pointer;background:linear-gradient(135deg,#f2f7ff,#e4efff);touch-action:manipulation}
+.history-dropdown>summary::-webkit-details-marker{display:none}
+.history-dropdown>summary:after{content:"＋";font-size:22px;color:#0866d9;margin-left:4px}
+.history-dropdown[open]>summary:after{content:"−"}
+.history-dropdown>summary span{display:flex;flex-direction:column;gap:4px}
+.history-dropdown>summary small{font-size:13px;color:#718096}
+.history-dropdown>summary strong{white-space:nowrap}
+.history-details{padding:12px;border-top:1px solid #dbe6f1;animation:historyDrop .22s ease-out}
+@keyframes historyDrop{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.transaction-trigger{cursor:pointer;text-align:left;color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:5px}
+.transaction-trigger small{color:#0866d9;font-size:12px;font-weight:800}.transaction-trigger{background:linear-gradient(145deg,#fff7dd,#ffe8a8);border:1px solid #efd17a}.transaction-trigger:focus-visible{outline:3px solid #0866d9;outline-offset:3px}
+.transaction-trigger:active{transform:scale(.97);filter:brightness(.92)}
+.metric-card{min-height:112px;transition:transform .18s ease,box-shadow .18s ease;border:1px solid transparent}.metric-card:active{transform:scale(.98)}.metric-sales{background:linear-gradient(135deg,#e7f1ff,#cfe4ff);border-color:#b6d4fb}.metric-paid{background:linear-gradient(135deg,#e5fff0,#c8f5dc);border-color:#afe8c8}.metric-due{background:linear-gradient(135deg,#fff0f2,#ffdce2);border-color:#f4bdc7}.metric-expense{background:linear-gradient(135deg,#fff5dc,#ffe6ad);border-color:#f0d28a}.metric-invest{background:linear-gradient(135deg,#f0e9ff,#dcd0ff);border-color:#cbb9fb}.metric-profit{background:linear-gradient(135deg,#ddfff0,#aef0d0);border-color:#8ce0b8}.metric-loss{background:linear-gradient(135deg,#ffe6e6,#ffc6c6);border-color:#f1aaaa}.purple{color:#6841c6}.metric-note{margin:8px 2px 16px;font-size:13px}@media(max-width:600px){.metric-card{min-height:104px;padding:14px}.metric-card strong{font-size:clamp(18px,4.8vw,26px)}}
+.metric-afterdue{grid-column:1/-1;background:linear-gradient(135deg,#e7ffed,#c9f7d4);border:2px solid #26b84c;min-height:124px;box-shadow:0 8px 24px #22a44720}
+.metric-afterdue strong{font-size:clamp(25px,5vw,34px);color:#087b2a}
+.metric-afterdue-note{display:block;color:#287047;font-size:13px;font-weight:700;margin-top:5px}
+@media(max-width:600px){.metric-afterdue{grid-column:1/-1;min-height:110px}}
+
+.metric-invest-note{display:block;color:#6841c6;font-size:12px;margin-top:5px}.metric-lossrate{background:linear-gradient(135deg,#fff0f0,#ffd9dd);border:1px solid #f2b8c0;min-height:112px}
+.metric-lossrate strong{font-size:clamp(24px,5vw,32px);color:#c92f46}
+.metric-lossrate-note{display:block;color:#91404b;font-size:12px;margin-top:5px}
+
+/* Reliable custom fish suggestions: shown ABOVE the active input, including mobile Chrome */
+.fish-suggest-box{position:fixed;z-index:99999;display:none;background:#fff;border:2px solid #0866d9;border-radius:14px;box-shadow:0 10px 30px #102b4d40;max-height:250px;overflow:auto;padding:5px;overscroll-behavior:contain}
+.fish-suggest-box.show{display:block}
+.fish-suggest-item{display:block;width:100%;text-align:left;background:#fff;color:#17243a;border-radius:9px;padding:11px 13px;min-height:44px;border-bottom:1px solid #e5edf7}
+.fish-suggest-item:active,.fish-suggest-item:focus{background:#eaf3ff}
+.fish-suggest-item small{display:block;color:#65758b;font-size:11px;font-weight:400}
+@media(max-width:480px){#customers>.sectionhead{align-items:flex-start}#customers>.sectionhead>button{width:100%;min-height:48px}}
+
+.farm-card{padding:16px!important}.farm-info{min-width:0;overflow-wrap:anywhere;line-height:1.65}.farm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.farm-actions button{min-height:48px;padding:10px 8px;white-space:normal}@media(max-width:480px){.farm-actions{grid-template-columns:1fr 1fr;gap:8px}.farm-actions button{font-size:14px}}
+</style>
+</head>
+<body>
+<div id="hbHisabCover" style="position:fixed;inset:0;z-index:99999;background:#eef4ff;display:flex;align-items:center;justify-content:center;font-family:inherit;color:#1e3a8a;font-weight:700;font-size:15px">🐝 হিসাব খাতা খোলা হচ্ছে...</div>
+<div class="app">
+<header class="top appbar">
+ <div class="toprow"><div class="brand"><button class="menu-toggle" id="menuToggle" aria-label="মেনু খুলুন" onclick="toggleMenu()">☰</button><div class="bee">🐝</div><div><h1>হানি বি পাইকারি</h1><p>মাছের পাইকারি ব্যবসার সহজ হিসাব</p></div></div><div class="headtools"><a href="poultry-app.html" class="fullscreen-btn" style="text-decoration:none" title="Smart Poultry-তে ফিরুন">← অ্যাপ</a><span id="hbCloudDot" title="ক্লাউড" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;flex-shrink:0"></span><div class="date" id="todayLabel"></div><button class="fullscreen-btn" id="fullscreenBtn" onclick="toggleFullscreen()">⛶ পূর্ণ পর্দা</button></div></div>
+</header>
+<nav class="nav no-print" id="nav">
+ <button class="active" data-page="home">🏠 হোম</button>
+ <button data-page="sale">🐟 নতুন বিক্রি</button>
+ <button data-page="farms">🐠 খামার তৈরি করুন</button>
+ <button data-page="customers">👥 ক্রেতাদের খাতা</button>
+ <button data-page="expenses">🧾 খরচের হিসাব</button>
+ <button data-page="stock">📦 মাছের মজুত</button>
+ <button data-page="reports">📊 রিপোর্ট</button>
+</nav>
+<main class="content">
+<section class="page active" id="home">
+ <div class="sectionhead"><div><h2>আজকের হিসাব</h2><div class="muted">আপনার ব্যবসার সংক্ষিপ্ত চিত্র</div></div><button class="primary" onclick="showPage('sale')">＋ নতুন বিক্রি</button></div>
+ <div class="stats"><div class="stat metric-card metric-sales"><span>আজকের মোট বিক্রি</span><strong class="blue" id="sToday">৳ ০</strong></div><div class="stat metric-card metric-paid"><span>আজ জমা হয়েছে</span><strong class="green" id="sPaid">৳ ০</strong></div><div class="stat metric-card metric-due"><span>মোট বাকি</span><strong class="red" id="sDue">৳ ০</strong></div><div class="stat metric-card metric-lossrate"><span>বর্তমান লোকসান</span><strong class="red" id="sLossRate">৳ ০</strong><small class="metric-lossrate-note">বিনিয়োগ − বিক্রির টাকা</small></div><div class="stat metric-card metric-invest"><span>মোট বিনিয়োগ</span><strong class="purple" id="sInvest">৳ ০</strong><small class="metric-invest-note">মাছ কেনা + সব খরচ</small></div><div class="stat metric-card metric-profit"><span>মোট লাভ</span><strong class="green" id="sProfit">৳ ০</strong></div><div class="stat metric-card metric-afterdue"><span>বাকি বাদে লাভ</span><strong class="green" id="sAfterDueProfit">৳ ০</strong><small class="metric-afterdue-note">মোট লাভ − মোট বাকি</small></div></div>
+ <div class="muted metric-note">লাভ-লোকসান কেনা মাছের খরচ ও যোগ করা খরচের তথ্য অনুযায়ী আনুমানিক হিসাব। কেনার তথ্য না থাকলে হিসাব সম্পূর্ণ নাও হতে পারে।</div>
+ 
+</section>
+<section class="page" id="sale">
+ <div class="sectionhead"><div><h2>নতুন বিক্রি</h2><div class="muted">এক ক্রেতার একাধিক মাছ ও একাধিক ওজন লিখুন</div></div></div>
+  <div class="panel">
+  <div><label>বিক্রির তারিখ</label><input id="saleDate" type="date"></div><div style="margin-top:12px"><label>খামার/প্রজেক্ট নির্বাচন করুন</label><select id="saleFarm"><option value="">সাধারণ পাইকারি বিক্রি</option></select></div><div style="margin-top:12px"><label>ক্রেতার নাম *</label><div id="customerSuggestWrap" style="position:relative"><div id="customerSuggestions" class="hidden" style="position:absolute;left:0;right:0;bottom:calc(100% + 8px);z-index:30;max-height:230px;overflow:auto;background:#fff;border:1px solid #b9d2ef;border-radius:14px;box-shadow:0 8px 24px #14345d30"></div><input id="saleCustomer" autocomplete="off" placeholder="ক্রেতার নাম লিখুন"><datalist id="customerOptions"></datalist></div></div>
+  <div class="stickycalc"><div><span class="muted">মোট ওজন</span><br><strong id="saleTotalWeightSticky">০ কেজি ০ গ্রাম</strong></div><div><span class="muted">মোট দাম</span><br><strong id="saleGrandTotalSticky">৳ ০</strong></div></div>
+  <div class="sectionhead fish-section-head" style="margin-top:20px"><button class="primary" type="button" onclick="saveSale()">✓ বিক্রি সংরক্ষণ করুন</button><button class="soft smallbtn" type="button" onclick="addFishRow()">＋ মাছ যোগ করুন</button></div>
+  <div id="fishRows"></div>
+  <div class="grid2" style="margin-top:14px"><div><label>এখন জমা (টাকা)</label><input id="salePaid" type="number" min="0" value="0" oninput="updateSaleTotals()"></div><div><label>টাকা দেওয়ার ধরন</label><select id="saleMethod"><option>নগদ</option><option>ব্যাংক</option><option>মোবাইল ব্যাংকিং</option><option>অন্যান্য</option></select></div></div>
+  <div style="margin-top:14px"><label>মন্তব্য (ঐচ্ছিক)</label><input id="saleNote" placeholder="যেমন: সকালে নেওয়া মাছ"></div>
+  <div class="row" style="margin-top:16px"><button class="soft full" onclick="resetSale()">ফরম খালি করুন</button></div>
+ </div>
+</section>
+<section class="page" id="customers">
+ <div class="sectionhead"><div><h2>ক্রেতার খাতা</h2><div class="muted">একজন ক্রেতার সব বিক্রি, জমা ও বাকি একসঙ্গে</div></div></div>
+ <div class="panel hidden" id="ledgerPanel"><div class="sectionhead"><div><h2 id="ledgerTitle">ক্রেতার খাতা</h2><div class="muted" id="ledgerSub"></div></div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="primary smallbtn" type="button" onclick="resetSale();showPage('sale')">＋ বিক্রি</button><button class="primary smallbtn" onclick="openPayment(selectedCustomer)">＋ টাকা জমা নিন</button><button class="soft smallbtn" onclick="printLedger()">🖨️ প্রিন্ট</button><button class="soft smallbtn" onclick="shareLedger()">↗ শেয়ার</button><button class="danger smallbtn" onclick="closeLedger()">✕ খাতা বন্ধ</button></div></div><div class="stats"><div class="stat"><span>মোট বিক্রি</span><strong class="blue" id="ledgerSales">৳ ০</strong></div><div class="stat"><span>মোট জমা</span><strong class="green" id="ledgerPaid">৳ ০</strong></div><div class="stat"><span>বর্তমান বাকি</span><strong class="red" id="ledgerDue">৳ ০</strong></div><button type="button" class="stat transaction-trigger" onclick="toggleLedgerHistory()" aria-label="লেনদেনের ইতিহাস খুলুন বা বন্ধ করুন"><span>লেনদেনের ইতিহাস</span><strong id="ledgerCount">০</strong><small id="ledgerHistoryHint">বিস্তারিত দেখতে চাপ দিন ▾</small></button></div><div id="ledgerHistory" class="hidden"></div><div class="ledger-share-footer"><div><b>ক্রেতার হিসাবের কপি</b><div class="muted">প্রিন্ট করুন অথবা মোবাইল থেকে শেয়ার করুন</div></div><button class="primary" onclick="shareLedger()">↗ ক্রেতাকে হিসাব শেয়ার করুন</button></div></div>
+ <div class="panel"><label>ক্রেতা খুঁজুন</label><input id="customerSearch" placeholder="নাম লিখে খুঁজুন..." oninput="renderCustomers()"><div id="customerList"></div></div>
+ 
+</section>
+<section class="page" id="expenses">
+ <div class="sectionhead"><div><h2>খরচের হিসাব</h2><div class="muted">কোন বাবদ খরচ হয়েছে, নিজের ভাষায় লিখুন</div></div></div>
+ <div class="panel"><div class="grid2"><div><label>খরচের তারিখ</label><input id="expenseDate" type="date"></div><div><label>খামার/প্রজেক্ট</label><select id="expenseFarm"><option value="">সাধারণ ব্যবসা/আড়ত</option></select></div><div><label>কোন বাবদ খরচ হচ্ছে? *</label><input id="expenseType" type="text" list="expenseTypeSuggestions" placeholder="নিজে লিখুন, যেমন: মাছের খাবার" required><datalist id="expenseTypeSuggestions"><option value="পরিবহন ভাড়া"></option><option value="বরফ কেনা"></option><option value="শ্রমিকের মজুরি"></option><option value="আড়ত কমিশন"></option><option value="মাছ ওঠানো-নামানো"></option><option value="খাবার/চা-পানি"></option><option value="দোকান ভাড়া"></option><option value="অন্যান্য খরচ"></option></datalist></div></div>
+ <div class="grid2" style="margin-top:12px"><div><label>খরচের পরিমাণ (৳) *</label><input id="expenseAmount" type="number" min="0" placeholder="যেমন: ১০০"></div><div><label>বিবরণ (ঐচ্ছিক)</label><input id="expenseNote" placeholder="যেমন: বাজার থেকে বরফ"></div></div><button class="success full" style="margin-top:14px" onclick="saveExpense()">খরচ সংরক্ষণ করুন</button></div>
+ <div class="panel"><div class="sectionhead"><h2>খরচের তালিকা</h2><button class="soft smallbtn" onclick="exportExpenses()">খরচের তালিকা নামান</button></div><div id="expenseList"></div></div>
+ <div class="notice">এই প্রথম সংস্করণে খরচের তথ্য ফরমে লিখে সংরক্ষণ করা যায়। ফাইল থেকে অনেক খরচ একসঙ্গে ইমপোর্ট করার সুবিধা পরের ধাপে যোগ করা যাবে।</div>
+</section>
+<section class="page" id="farms">
+ <div class="sectionhead"><div><h2>🐠 খামার তৈরি করুন</h2><div class="muted">নিজের খামার/প্রজেক্ট তৈরি ও হিসাব রাখুন</div></div></div>
+ <div class="panel"><label>খামার/প্রজেক্টের নাম *</label><input id="farmName" placeholder="যেমন: পদ্মা মাছের খামার"><div class="grid2" style="margin-top:12px"><div><label>শুরুর তারিখ</label><input id="farmStart" type="date"></div><div><label>বিবরণ (ঐচ্ছিক)</label><input id="farmNote" placeholder="যেমন: ৩টি পুকুর"></div></div><button class="success full" style="margin-top:14px" onclick="createFarm()">＋ খামার সংরক্ষণ করুন</button></div>
+ <div class="panel"><h3>আমার খামার/প্রজেক্ট</h3><div id="farmList"></div></div>
+ </section>
+<section class="page" id="stock">
+ <div class="sectionhead"><div><h2>মাছের মজুত</h2><div class="muted">কেনা, বিক্রি ও হাতে থাকা ওজনের হিসাব</div></div></div>
+ <div class="panel"><h3 style="margin-top:0">মাছ কেনা যোগ করুন</h3><div class="grid3"><div><label>মাছের নাম</label><input id="buyFish" list="fishOptions" placeholder="মাছের নাম লিখুন বা তালিকা থেকে বাছুন" autocomplete="off"></div><div><label>ওজন (কেজি)</label><input id="buyKg" type="number" min="0" value="0"></div><div><label>অতিরিক্ত গ্রাম</label><input id="buyGram" type="number" min="0" max="999" value="0"></div></div><div class="grid2" style="margin-top:12px"><div><label>মোট কেনার দাম (৳)</label><input id="buyCost" type="number" min="0" value="0"></div><div><label>কোথা থেকে কিনেছেন</label><select id="buySource"><option>আড়ত</option><option>জেলে/মাছচাষি</option><option>অন্যান্য</option></select></div></div><button class="primary full" style="margin-top:14px" onclick="savePurchase()">কেনা সংরক্ষণ করুন</button></div>
+ <div class="panel"><div class="sectionhead"><h2>বর্তমান মজুত</h2></div><div id="stockList"></div></div>
+ <div class="notice">মজুতের প্রাথমিক হিসাব কেনা ও বিক্রির ওজন থেকে হবে। নষ্ট/কমে যাওয়া মাছের হিসাব এবং কেনা মাছের খরচ ধরে লাভ-ক্ষতির পূর্ণ হিসাব পরের ধাপে আরও নির্ভুল করা দরকার।</div>
+</section>
+<section class="page" id="reports">
+ <div class="sectionhead"><div><h2>ব্যবসার রিপোর্ট</h2><div class="muted">বিক্রি, জমা ও খরচের সারাংশ</div></div><button class="soft" onclick="downloadBackup()">তথ্যের কপি রাখুন</button></div>
+ <div class="stats"><div class="stat"><span>মোট বিক্রি</span><strong class="blue" id="rSales">৳ ০</strong></div><div class="stat"><span>মোট জমা</span><strong class="green" id="rPaid">৳ ০</strong></div><div class="stat"><span>মোট বাকি</span><strong class="red" id="rDue">৳ ০</strong></div><div class="stat"><span>মোট খরচ</span><strong class="orange" id="rExpense">৳ ০</strong></div></div>
+ <div class="panel"><h3>খামারভিত্তিক লাভ-লোকসান</h3><div class="muted">খামার নির্বাচন করে করা বিক্রি ও খরচের সারাংশ</div><div id="farmReport"></div></div><div class="panel"><h3>সাম্প্রতিক লেনদেন</h3><div id="reportHistory"></div></div>
+ <div class="notice">এই রিপোর্টটি প্রাথমিক সারাংশ। বিক্রি থেকে জমা বাদ দিলে বাকি দেখা যাবে; প্রকৃত লাভ নির্ধারণে বিক্রি হওয়া মাছের ক্রয়মূল্য ও অন্যান্য খরচ সঠিকভাবে যুক্ত করতে হবে।</div>
+</section>
+<section class="page" id="receiptPrint"></section>
+</main><div class="footer">হানি বি পাইকারি · সহজ হিসাব, পরিষ্কার খাতা</div>
+</div>
+<div class="modalback" id="paymentModal"><div class="modal"><div class="modalhead"><h3>ক্রেতার টাকা জমা</h3><button class="close" onclick="closePayment()">✕</button></div><div style="margin-top:16px"><label>ক্রেতার নাম</label><input id="payCustomer" list="customerOptions" placeholder="ক্রেতার নাম লিখুন"></div><div style="margin-top:12px"><label>জমার তারিখ</label><input id="payDate" type="date"></div><div style="margin-top:12px"><label>জমার পরিমাণ (৳)</label><input id="payAmount" type="number" min="1" placeholder="যেমন: ৫০০"></div><div style="margin-top:12px"><label>টাকা দেওয়ার ধরন</label><select id="payMethod"><option>নগদ</option><option>ব্যাংক</option><option>মোবাইল ব্যাংকিং</option><option>অন্যান্য</option></select></div><div style="margin-top:12px"><label>মন্তব্য (ঐচ্ছিক)</label><input id="payNote" placeholder="যেমন: আগের বাকি থেকে জমা"></div><button class="success full" style="margin-top:16px" onclick="savePayment()">জমা সংরক্ষণ করুন</button></div></div>
+<datalist id="fishOptions"></datalist>
+<script>
+let KEY='honeyBeeWholesaleV1'; /* লগইনের পর ইউজারের নিজের KEY বসে (নিচের ক্লাউড সিঙ্ক দেখুন) */
+let db={sales:[],payments:[],expenses:[],purchases:[],farms:[]},selectedCustomer='';
+const $=id=>document.getElementById(id);
+const today=()=>{let d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const bn=n=>Number(n||0).toLocaleString('bn-BD',{maximumFractionDigits:2});
+const money=n=>'৳ '+bn(Math.round(Number(n||0)));
+const dateBn=s=>{if(!s)return '—';let [y,m,d]=s.split('-');return `${d}-${m}-${y}`};
+function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'null');if(x)db={...db,...x,farms:Array.isArray(x.farms)?x.farms:[]}}catch(e){}}
+function save(){localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
+document.querySelector('.brand').addEventListener('click',function(e){if(e.target.closest('button'))return;showPage('home')});
+let beeTapCount=0,beeTapTimer=null;document.querySelector('.brand .bee').style.cursor='pointer';document.querySelector('.brand .bee').addEventListener('click',function(e){e.stopPropagation();beeTapCount++;clearTimeout(beeTapTimer);beeTapTimer=setTimeout(()=>beeTapCount=0,2200);if(beeTapCount>=7){beeTapCount=0;if(confirm('ALL RESET? সব বিক্রি, জমা, খরচ ও কেনার হিসাব স্থায়ীভাবে মুছে যাবে। আগে ব্যাকআপ রেখেছেন তো?')){db={sales:[],payments:[],expenses:[],purchases:[],farms:[]};try{localStorage.removeItem(KEY)}catch(err){}save();closeLedger();alert('ALL RESET সম্পন্ন হয়েছে।')}}});
+function toggleMenu(){const n=$('nav');n.classList.toggle('menu-open');$('menuToggle').textContent=n.classList.contains('menu-open')?'✕':'☰'}
+async function toggleFullscreen(){try{if(!document.fullscreenElement){await document.documentElement.requestFullscreen();$('fullscreenBtn').textContent='⤢ পর্দা ছোট করুন'}else{await document.exitFullscreen();$('fullscreenBtn').textContent='⛶ পূর্ণ পর্দা'}}catch(e){alert('এই ব্রাউজারে পূর্ণ পর্দা চালু করা যাচ্ছে না। Chrome-এর মেনু থেকে “Add to Home screen” করে খুললে বেশি জায়গা পাওয়া যাবে।')}}
+document.addEventListener('fullscreenchange',()=>{if(!$('fullscreenBtn'))return;$('fullscreenBtn').textContent=document.fullscreenElement?'⤢ পর্দা ছোট করুন':'⛶ পূর্ণ পর্দা'});
+function showPage(p){const target=$(p);if(!target)return;document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));target.classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));$('nav').classList.remove('menu-open');$('menuToggle').textContent='☰';if(p==='sale'&&!$('fishRows').children.length)addFishRow();renderAll();/* Always open the selected dashboard/page from the top, not at a leftover scroll position. */window.scrollTo({top:0,left:0,behavior:'auto'});document.documentElement.scrollTop=0;document.body.scrollTop=0;requestAnimationFrame(()=>{window.scrollTo({top:0,left:0,behavior:'auto'});document.documentElement.scrollTop=0;document.body.scrollTop=0})}
+$('nav').addEventListener('click',e=>{let b=e.target.closest('button[data-page]');if(b)showPage(b.dataset.page)});
+function kgGram(totalGrams){totalGrams=Math.max(0,Math.round(totalGrams));return `${bn(Math.floor(totalGrams/1000))} কেজি ${bn(totalGrams%1000)} গ্রাম`}
+function addFishRow(name='',rate=''){let d=document.createElement('div');d.className='fishrow';d.innerHTML=`<div class="fishname"><label>মাছের নাম</label><input class="fname" list="fishOptions" autocomplete="off" placeholder="মাছের নাম লিখুন বা বাছুন" value="${esc(name)}"></div><div><label>দর/কেজি (৳)</label><input class="frate" type="number" min="0" placeholder="১২০" value="${rate}" oninput="updateSaleTotals()"></div><div><label>ওজনের এন্ট্রি</label><button class="soft full smallbtn" onclick="addWeight(this)">＋ ওজন</button></div><button class="danger smallbtn" onclick="if(confirm('এই মাছের সারি ও তার ওজন মুছে ফেলবেন?')){this.parentElement.remove();updateSaleTotals()}">✕</button><div class="weights" style="grid-column:1/-1"></div>`;$('fishRows').prepend(d);addWeight(d.querySelector('.weights').previousElementSibling?.querySelector('button')||d.querySelector('button.soft'));d.querySelector('.fname').addEventListener('input',()=>{updateFishOptions();updateSaleTotals()});updateSaleTotals()}
+function addWeight(btn){let row=btn.closest('.fishrow'),wrap=row.querySelector('.weights');let w=document.createElement('div');w.className='weightrow';w.innerHTML=`<div><label>কেজি</label><input class="wkg" type="number" min="0" placeholder="০" oninput="updateSaleTotals()"></div><div><label>গ্রাম</label><input class="wgram" type="number" min="0" max="999" placeholder="০" oninput="updateSaleTotals()"></div><button class="danger smallbtn" onclick="if(confirm('এই ওজনের এন্ট্রি মুছে ফেলবেন?')){this.parentElement.remove();updateSaleTotals()}">✕</button>`;wrap.prepend(w);updateSaleTotals();setTimeout(()=>w.querySelector('.wkg').focus({preventScroll:true}),0)}
+const COMMON_FISH_NAMES=['রুই','কাতলা','মৃগেল','কালিবাউশ','বাটা','সিলভার কার্প','গ্রাস কার্প','কমন কার্প','বিগহেড কার্প','তেলাপিয়া','পাঙ্গাস','কই','শিং','মাগুর','গুলশা','টেংরা','পাবদা','বায়ম','শোল','গজার','টাকি','চিতল','বোয়াল','আইড়','বাঘাইড়','ফলুই','চিংড়ি','গলদা চিংড়ি','বাগদা চিংড়ি','ইলিশ','চাঁদা','পোয়া','কোরাল','রূপচাঁদা','লইট্টা','ফাইস্যা','টুনা','সার্ডিন','কাঁকড়া','কৈ','মলা','ঢেলা','পুঁটি','সরপুঁটি','চেলা','খলিশা','চাপিলা','বেলে','ফাসা','মেনি','নলা','বাইম','আড়','আলুয়া','আনজু','আঁশটে','আয়ির','উড়ি','এলং','ওলকপি মাছ','কাচকি','কাচকি চেলা','কাকিলা','কানপোনা','কালবাউশ','কালা বাউশ','কালো চিংড়ি','কাঁকড়া মাছ','কাজলি','কাজলি চেলা','কাচকি মাছ','কাতল','কোরাল মাছ','খয়রা','খলসে','খরকি','গাঙ্গ টেংরা','গাংচিল','গজার মাছ','গুতা','গুতুম','গুঁড়া চিংড়ি','চাকা','চেলা মাছ','চিংড়ি মাছ','চিতল মাছ','চুনা','চুনো পুঁটি','চাপিলা মাছ','চ্যাং','ছুরি','জাভা বার্ব','জিয়ল','টাকি মাছ','টাটকিনি','টেংরা মাছ','টুনা মাছ','ডাটিনা','ডানকিনা','ডেলা','ঢেলা মাছ','তারা বাইম','তেলাপিয়া মাছ','দারকিনা','দেশি কৈ','নাইলোটিকা','নাপিত','নন্দিনা','নলা মাছ','পাটা','পাঙ্গাস মাছ','পাপদা','পিয়ালি','পুঁটি মাছ','পোনা','পোয়া মাছ','ফলি','ফলুই মাছ','বাচা','বাচা মাছ','বাইম মাছ','বাইলা','বাইন','বেলে মাছ','বেতি','ভেটকি','ভাঙ্গন','মলা মাছ','মেনি মাছ','মৃগেল মাছ','মহাশোল','মহাশোল মাছ','মাছরাঙা','রানী','রিঠা','রুই মাছ','রূপালি ইলিশ','শাপলা পাতা মাছ','শোল মাছ','শিং মাছ','শিংগি','শোল গজার','সাদা আমুর','সিলভার বার্ব','সার্ডিন মাছ','সাগর ইলিশ','সাগর কোরাল','সাগর চিংড়ি','সাগর পাঙ্গাস','সাগর রূপচাঁদা','সাগর মাছ','সোল','হরিণা চিংড়ি','হলদে','হিলশা','হিলশা ইলিশ','বাগদা চিংড়ি মাছ','গলদা চিংড়ি মাছ','রেড স্ন্যাপার','পমফ্রেট','ব্ল্যাক কার্প','থাই কৈ','ভিয়েতনাম কৈ','মনোসেক্স তেলাপিয়া','জাপানি রুই','নাইল তেলাপিয়া','পাবদা মাছ','বাটা মাছ','কালিবাউশ মাছ','কমন কার্প মাছ','গ্রাস কার্প মাছ','বিগহেড কার্প মাছ','সরপুঁটি মাছ','গোলসা','গোলশা','টাকি শোল','ল্যাটা','ল্যাঠা','লোটে','লটিয়া','সামুদ্রিক চিংড়ি','সামুদ্রিক মাছ','দেশি মাছ','মিশ্র মাছ'];
+function fishKey(n){return String(n||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase('bn-BD')}
+function fishNames(){let all=[...COMMON_FISH_NAMES,...db.purchases.map(p=>p.name),...db.sales.flatMap(s=>(s.items||[]).map(i=>i.name))];let seen=new Set();return all.filter(n=>{let k=fishKey(n);if(!k||seen.has(k))return false;seen.add(k);return true}).sort((a,b)=>a.localeCompare(b,'bn'))}
+function updateFishOptions(){const dl=$('fishOptions');if(!dl)return;dl.innerHTML=fishNames().map(n=>`<option value="${esc(n)}"></option>`).join('')}
+function getSaleItems(){let raw=[...$('fishRows').querySelectorAll('.fishrow')].map(row=>{let weights=[...row.querySelectorAll('.weightrow')].map(w=>Math.max(0,Math.floor(Number(w.querySelector('.wkg').value)||0))*1000+Math.min(999,Math.max(0,Math.floor(Number(w.querySelector('.wgram').value)||0)))).filter(x=>x>0);let grams=weights.reduce((a,b)=>a+b,0),rate=Number(row.querySelector('.frate').value)||0;return{name:row.querySelector('.fname').value.trim(),rate,weights,grams,total:grams/1000*rate,weightText:weights.map(kgGram)} }).filter(x=>x.name&&x.grams>0);let grouped=[];raw.forEach(item=>{let existing=grouped.find(x=>fishKey(x.name)===fishKey(item.name)&&x.rate===item.rate);if(existing){existing.weights.push(...item.weights);existing.weightText.push(...item.weightText);existing.grams+=item.grams;existing.total=existing.grams/1000*existing.rate}else grouped.push({...item})});return grouped}
+function updateSaleTotals(){let items=getSaleItems(),g=items.reduce((a,b)=>a+b.grams,0),t=items.reduce((a,b)=>a+b.total,0);if($('saleTotalWeight'))$('saleTotalWeight').textContent=kgGram(g);if($('saleGrandTotal'))$('saleGrandTotal').textContent=money(t);$('saleTotalWeightSticky').textContent=kgGram(g);$('saleGrandTotalSticky').textContent=money(t)}
+function resetSale(){if(!confirm('এই ফরমের লেখা মুছে ফেলবেন? মুছে গেলে ফেরত আনা যাবে না।'))return;$('saleCustomer').value='';$('salePaid').value=0;$('saleNote').value='';$('fishRows').innerHTML='';addFishRow();$('saleDate').value=today()}
+function saveSale(){let name=$('saleCustomer').value.trim(),items=getSaleItems();if(!name){alert('ক্রেতার নাম লিখুন।');return}if(!items.length){alert('কমপক্ষে একটি মাছের নাম ও ওজন লিখুন।');return}if(items.some(x=>x.rate<=0)){alert('প্রতিটি মাছের প্রতি কেজির দাম লিখুন।');return}let total=items.reduce((a,b)=>a+b.total,0),paid=Math.max(0,Number($('salePaid').value)||0),s={id:Date.now(),customer:name,date:$('saleDate').value||today(),items,total,paid,method:$('saleMethod').value,note:$('saleNote').value.trim(),farmId:$('saleFarm')?.value||'',createdAt:new Date().toISOString()};db.sales.push(s);if(paid>0)db.payments.push({id:Date.now()+1,customer:name,date:s.date,amount:paid,method:s.method,note:'বিক্রির সময় জমা',saleId:s.id});save();renderLedger(name);alert('বিক্রি সংরক্ষণ হয়েছে।');resetSale();showPage('customers')}
+function renderCustomerSuggestions(){const box=$('customerSuggestions'),input=$('saleCustomer');if(!box||!input)return;const q=input.value.trim().toLocaleLowerCase('bn');const names=allCustomers().filter(n=>!q||n.toLocaleLowerCase('bn').includes(q)).slice(0,8);if(!names.length){box.classList.add('hidden');box.innerHTML='';return}box.innerHTML=names.map(n=>{const t=totals(n);return `<button type="button" style="display:block;width:100%;text-align:left;background:#fff;color:#17243a;border:0;border-bottom:1px solid #e5edf7;border-radius:0;padding:12px 14px;white-space:normal" data-name="${esc(n)}"><b>${esc(n)}</b><div style="font-size:12px;color:#65758b;margin-top:4px">মোট বিক্রি ${money(t.sales)} · বাকি ${money(t.due)}</div></button>`}).join('');box.classList.remove('hidden');box.querySelectorAll('button[data-name]').forEach(b=>b.addEventListener('click',()=>{input.value=b.dataset.name;box.classList.add('hidden');input.focus()}))}
+$('saleCustomer').addEventListener('focus',renderCustomerSuggestions);$('saleCustomer').addEventListener('input',renderCustomerSuggestions);$('saleCustomer').addEventListener('blur',()=>setTimeout(()=> $('customerSuggestions')?.classList.add('hidden'),180));
+function custSales(name){return db.sales.filter(s=>s.customer.toLowerCase()===name.toLowerCase())}
+function custPayments(name){return db.payments.filter(p=>p.customer.toLowerCase()===name.toLowerCase())}
+function totals(name){let sales=custSales(name).reduce((a,s)=>a+s.total,0),paid=custPayments(name).reduce((a,p)=>a+p.amount,0);return{sales,paid,due:sales-paid}}
+function allCustomers(){return [...new Set([...db.sales.map(s=>s.customer),...db.payments.map(p=>p.customer)].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'bn'))}
+function renderCustomers(){let names=allCustomers(),q=($('customerSearch').value||'').trim().toLowerCase();$('customerOptions').innerHTML=names.map(n=>`<option value="${esc(n)}"></option>`).join('');let filtered=names.filter(n=>n.toLowerCase().includes(q));$('customerList').innerHTML=filtered.length?filtered.map(n=>{let t=totals(n);return `<div class="customer-card"><div><b>${esc(n)}</b><div class="muted">মোট বিক্রি ${money(t.sales)} · জমা ${money(t.paid)}</div><div class="${t.due>0?'red':'green'}">বর্তমান বাকি: <b>${money(t.due)}</b></div></div><button class="primary ledger-open-btn" data-customer="${esc(n)}" onclick="renderLedger('${escJs(n)}')">খাতা খুলুন</button></div>`}).join(''):'<div class="empty">এখনো কোনো ক্রেতার হিসাব নেই। নতুন বিক্রি করলে এখানে দেখা যাবে।</div>'}
+function toggleLedgerHistory(){const h=$('ledgerHistory'),hint=$('ledgerHistoryHint');const opening=h.classList.contains('hidden');h.classList.toggle('hidden',!opening);hint.textContent=opening?'ইতিহাস বন্ধ করতে আবার চাপ দিন ▴':'বিস্তারিত দেখতে চাপ দিন ▾';if(opening){h.scrollIntoView({behavior:'smooth',block:'start'});}}
+function closeLedger(){const p=$('ledgerPanel');p.classList.add('hidden');selectedCustomer='';}
+function deleteCustomerLedger(name){if(!confirm('সতর্কতা: '+name+'-এর সব বিক্রি ও টাকা জমার ইতিহাস স্থায়ীভাবে মুছে যাবে। মুছে ফেলবেন?'))return;db.sales=db.sales.filter(x=>x.customer!==name);db.payments=db.payments.filter(x=>x.customer!==name);save();closeLedger();alert('ক্রেতার খাতা ও সংশ্লিষ্ট ইতিহাস মুছে ফেলা হয়েছে।')}
+(function attachLedgerLongPress(){let timer=null,target=null;document.addEventListener('pointerdown',e=>{const b=e.target.closest('.ledger-open-btn');if(!b)return;target=b;b.classList.add('long-pressing');timer=setTimeout(()=>{const name=b.dataset.customer;b.classList.remove('long-pressing');target=null;timer=null;if(confirm('“'+name+'” খাতার সব বিক্রি ও জমার ইতিহাস মুছে ফেলবেন?\nOK = মুছুন, Cancel = খাতা খুলুন'))deleteCustomerLedger(name);else renderLedger(name)},800)});const stop=()=>{if(timer)clearTimeout(timer);timer=null;if(target)target.classList.remove('long-pressing');target=null};document.addEventListener('pointerup',stop);document.addEventListener('pointercancel',stop);document.addEventListener('contextmenu',e=>{const b=e.target.closest('.ledger-open-btn');if(!b)return;e.preventDefault();const name=b.dataset.customer;if(confirm('“'+name+'” খাতার সব বিক্রি ও জমার ইতিহাস মুছে ফেলবেন?'))deleteCustomerLedger(name)});})();
+function renderLedger(name){selectedCustomer=name;$('ledgerPanel').classList.remove('hidden');$('ledgerHistory').classList.add('hidden');$('ledgerHistoryHint').textContent='বিস্তারিত দেখতে চাপ দিন ▾';setTimeout(()=>$('ledgerPanel').scrollIntoView({behavior:'smooth',block:'start'}),60);let t=totals(name);$('ledgerTitle').textContent=name+' — ক্রেতার খাতা';$('ledgerSub').textContent='সব বিক্রি ও টাকা জমার ইতিহাস';$('ledgerSales').textContent=money(t.sales);$('ledgerPaid').textContent=money(t.paid);$('ledgerDue').textContent=money(t.due);$('ledgerCount').textContent=bn(custSales(name).length+custPayments(name).filter(p=>!p.saleId).length);let events=[...custSales(name).map(s=>({kind:'sale',date:s.date,id:s.id,data:s})),...custPayments(name).filter(p=>!p.saleId).map(p=>({kind:'payment',date:p.date,id:p.id,data:p}))].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);$('ledgerHistory').innerHTML=events.length?events.map(e=>e.kind==='sale'?`<details class="history-dropdown"><summary><span><b>🐟 বিক্রি · ${dateBn(e.date)}</b><small>বিক্রি নম্বর: ${bn(e.data.id).slice(-6)}</small></span><strong class="blue">${money(e.data.total)}</strong></summary><div class="history-details"><div class="tablewrap"><table><thead><tr><th>মাছ</th><th>মোট ওজন</th><th>দর/কেজি</th><th>মোট দাম</th></tr></thead><tbody>${e.data.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${kgGram(i.grams)}</td><td>${money(i.rate)}</td><td>${money(i.total)}</td></tr>`).join('')}</tbody></table></div>${e.data.note?`<div class="muted">মন্তব্য: ${esc(e.data.note)}</div>`:''}<div class="summary" style="margin-top:10px"><span>এই বিক্রিতে জমা: <b>${money(e.data.paid)}</b></span><span>এই বিক্রির পর বাকি: <b class="red">${money(balanceAfter(name,e))}</b></span><button class="warning smallbtn" onclick="printSale(${e.data.id})">মেমো প্রিন্ট</button></div></div></details>`:`<details class="history-dropdown payment-dropdown"><summary><span><b>💵 টাকা জমা · ${dateBn(e.date)}</b><small>${esc(e.data.method||'')}</small></span><strong class="green">${money(e.data.amount)}</strong></summary><div class="history-details"><p>জমার পরিমাণ: <b class="green">${money(e.data.amount)}</b></p>${e.data.note?`<div class="muted">বিবরণ: ${esc(e.data.note)}</div>`:''}</div></details>`).join(''):'<div class="empty">এই ক্রেতার কোনো লেনদেন নেই।</div>';renderCustomers()}
+function balanceAfter(name,event){let sales=custSales(name).filter(s=>s.date<=event.date).reduce((a,s)=>a+s.total,0),payments=custPayments(name).filter(p=>p.date<=event.date).reduce((a,p)=>a+p.amount,0);return sales-payments}
+function openPayment(name=''){ $('paymentModal').classList.add('show');$('payCustomer').value=name||selectedCustomer||'';$('payDate').value=today();$('payAmount').value='';$('payNote').value=''}
+function closePayment(){$('paymentModal').classList.remove('show')}
+function savePayment(){let name=$('payCustomer').value.trim(),amount=Number($('payAmount').value);if(!name){alert('ক্রেতার নাম লিখুন।');return}if(!(amount>0)){alert('জমার পরিমাণ লিখুন।');return}db.payments.push({id:Date.now(),customer:name,date:$('payDate').value||today(),amount,method:$('payMethod').value,note:$('payNote').value.trim()});save();closePayment();renderLedger(name);showPage('customers');alert('টাকা জমা সংরক্ষণ হয়েছে।')}
+function saveExpense(){let amount=Number($('expenseAmount').value),type=$('expenseType').value.trim();if(!type){alert('কোন বাবদ খরচ হয়েছে তা লিখুন।');$('expenseType').focus();return}if(!(amount>0)){alert('খরচের পরিমাণ লিখুন।');return}db.expenses.push({id:Date.now(),date:$('expenseDate').value||today(),type,amount,note:$('expenseNote').value.trim(),farmId:$('expenseFarm')?.value||''});$('expenseAmount').value='';$('expenseType').value='';$('expenseNote').value='';save();alert('খরচ সংরক্ষণ হয়েছে।')}
+function editExpense(id){const e=db.expenses.find(x=>x.id===id);if(!e)return;const date=prompt('খরচের তারিখ (YYYY-MM-DD):',e.date||today());if(date===null)return;if(date.trim()&&!/^\d{4}-\d{2}-\d{2}$/.test(date.trim())){alert('তারিখ YYYY-MM-DD ফরম্যাটে লিখুন।');return}const type=prompt('কোন বাবদ খরচ হয়েছে?',e.type||'');if(type===null)return;if(!type.trim()){alert('খরচের খাত খালি রাখা যাবে না।');return}const amount=prompt('খরচের পরিমাণ (টাকা):',String(e.amount));if(amount===null)return;if(!(Number(amount)>0)){alert('সঠিক খরচের পরিমাণ লিখুন।');return}const note=prompt('বিবরণ (না থাকলে খালি রাখুন):',e.note||'');if(note===null)return;e.date=date.trim()||today();e.type=type.trim();e.amount=Number(amount);e.note=note.trim();save();alert('খরচের তথ্য আপডেট হয়েছে।')}
+function deleteExpense(id){const e=db.expenses.find(x=>x.id===id);if(!e)return;if(!confirm('“'+e.type+'” খরচের '+money(e.amount)+' এন্ট্রি মুছে ফেলবেন?'))return;db.expenses=db.expenses.filter(x=>x.id!==id);save();alert('খরচের এন্ট্রি মুছে ফেলা হয়েছে।')}
+function canonicalFishName(name){let found=fishNames().find(n=>fishKey(n)===fishKey(name));return found||String(name||'').trim().replace(/\\s+/g,' ')}
+function savePurchase(){let name=canonicalFishName($('buyFish').value),grams=Math.max(0,Math.floor(Number($('buyKg').value)||0))*1000+Math.min(999,Math.max(0,Math.floor(Number($('buyGram').value)||0))),cost=Number($('buyCost').value)||0;if(!name||grams<=0){alert('মাছের নাম ও ওজন লিখুন।');return}db.purchases.push({id:Date.now(),name,grams,cost,source:$('buySource').value,date:today()});$('buyFish').value='';$('buyKg').value='0';$('buyGram').value='0';$('buyCost').value='0';save();updateFishOptions();alert('মাছ কেনার তথ্য সংরক্ষণ হয়েছে।')}
+function createFarm(){const name=$('farmName').value.trim();if(!name){alert('খামারের নাম লিখুন।');return}if(db.farms.some(f=>f.name.trim().toLocaleLowerCase('bn-BD')===name.toLocaleLowerCase('bn-BD'))){alert('এই নামের খামার আগে থেকেই আছে।');return}db.farms.push({id:'farm_'+Date.now(),name,startDate:$('farmStart').value||today(),note:$('farmNote').value.trim(),createdAt:new Date().toISOString()});$('farmName').value='';$('farmNote').value='';$('farmStart').value=today();save();alert('খামার তৈরি হয়েছে।')}
+function renderFarms(){const opts=(id,placeholder)=>{const el=$(id);if(!el)return;const old=el.value;el.innerHTML=`<option value="">${placeholder}</option>`+db.farms.map(f=>`<option value="${esc(f.id)}">${esc(f.name)}</option>`).join('');if([...el.options].some(o=>o.value===old))el.value=old};opts('saleFarm','সাধারণ পাইকারি বিক্রি');opts('expenseFarm','সাধারণ ব্যবসা/আড়ত');const list=$('farmList');if(!list)return;list.innerHTML=db.farms.length?db.farms.map(f=>{const sales=db.sales.filter(s=>s.farmId===f.id).reduce((a,s)=>a+Number(s.total||0),0),expense=db.expenses.filter(e=>e.farmId===f.id).reduce((a,e)=>a+Number(e.amount||0),0);return `<div class="customer-card farm-card" style="display:block"><div class="farm-info"><b>${esc(f.name)}</b><div class="muted">শুরু: ${dateBn(f.startDate)}${f.note?' · '+esc(f.note):''}</div><div>বিক্রি: <b class="blue">${money(sales)}</b> · খরচ: <b class="orange">${money(expense)}</b></div><div class="${sales-expense>=0?'green':'red'}">বিক্রি − নথিভুক্ত খরচ: <b>${money(sales-expense)}</b></div></div><div class="farm-actions"><button class="primary" onclick="editFarm('${escJs(f.id)}')">✏️ এডিট প্রজেক্ট</button><button class="danger" onclick="deleteFarm('${escJs(f.id)}')">🗑️ ডিলিট প্রজেক্ট</button></div></div>`}).join(''):'<div class="empty">এখনো কোনো খামার তৈরি করা হয়নি।</div>'}
+function editFarm(id){const f=db.farms.find(x=>x.id===id);if(!f)return;const name=prompt('খামার/প্রজেক্টের নতুন নাম লিখুন:',f.name);if(name===null)return;const cleanName=name.trim();if(!cleanName){alert('প্রজেক্টের নাম খালি রাখা যাবে না।');return}if(db.farms.some(x=>x.id!==id&&x.name.trim().toLocaleLowerCase('bn-BD')===cleanName.toLocaleLowerCase('bn-BD'))){alert('এই নামের প্রজেক্ট আগে থেকেই আছে।');return}const start=prompt('শুরুর তারিখ লিখুন (YYYY-MM-DD):',f.startDate||today());if(start===null)return;if(start.trim()&&!/^\d{4}-\d{2}-\d{2}$/.test(start.trim())){alert('তারিখ YYYY-MM-DD ফরম্যাটে লিখুন।');return}const note=prompt('প্রজেক্টের বিবরণ লিখুন:',f.note||'');if(note===null)return;f.name=cleanName;f.startDate=start.trim()||f.startDate||today();f.note=note.trim();save();alert('প্রজেক্টের তথ্য আপডেট হয়েছে।')}
+function deleteFarm(id){const f=db.farms.find(x=>x.id===id);if(!f)return;const sales=db.sales.filter(x=>x.farmId===id).length,expenses=db.expenses.filter(x=>x.farmId===id).length;if(!confirm('“'+f.name+'” প্রজেক্টটি মুছে ফেলবেন?\nএর সঙ্গে যুক্ত '+sales+'টি বিক্রি ও '+expenses+'টি খরচের রেকর্ড মুছে যাবে না; সেগুলো সাধারণ ব্যবসা/আড়তের হিসাবে রাখা হবে।'))return;db.sales.forEach(x=>{if(x.farmId===id)x.farmId=''});db.expenses.forEach(x=>{if(x.farmId===id)x.farmId=''});db.farms=db.farms.filter(x=>x.id!==id);save();alert('প্রজেক্ট মুছে ফেলা হয়েছে। সংশ্লিষ্ট বিক্রি ও খরচের রেকর্ড সাধারণ ব্যবসার হিসাবে রাখা হয়েছে।')}
+function renderFarmReport(){const el=$('farmReport');if(!el)return;if(!db.farms.length){el.innerHTML='<div class="empty">প্রথমে “খামার তৈরি করুন” মেনু থেকে খামার তৈরি করুন।</div>';return}el.innerHTML=`<div class="tablewrap"><table><thead><tr><th>খামার/প্রজেক্ট</th><th>মোট বিক্রি</th><th>মোট খরচ</th><th>প্রাথমিক লাভ/লোকসান</th></tr></thead><tbody>${db.farms.map(f=>{const sales=db.sales.filter(s=>s.farmId===f.id).reduce((a,s)=>a+Number(s.total||0),0),exp=db.expenses.filter(e=>e.farmId===f.id).reduce((a,e)=>a+Number(e.amount||0),0),net=sales-exp;return `<tr><td>${esc(f.name)}</td><td>${money(sales)}</td><td>${money(exp)}</td><td class="${net>=0?'green':'red'}"><b>${money(net)}</b></td></tr>`}).join('')}</tbody></table></div><div class="notice" style="margin-top:10px">এটি বিক্রি থেকে খামারে যোগ করা খরচ বাদ দেওয়ার প্রাথমিক হিসাব। মাছের পোনা/মাছ কেনার খরচ খামারভিত্তিকভাবে না যোগ করা থাকলে প্রকৃত লাভ আলাদা হতে পারে।</div>`}
+function renderExpenses(){$('expenseList').innerHTML=db.expenses.length?`<div class="tablewrap"><table><thead><tr><th>তারিখ</th><th>খরচের খাত</th><th>বিবরণ</th><th>টাকা</th><th>কাজ</th></tr></thead><tbody>${[...db.expenses].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>`<tr><td>${dateBn(e.date)}</td><td>${esc(e.type)}</td><td>${esc(e.note||'—')}</td><td>${money(e.amount)}</td><td><button class=\"primary smallbtn\" onclick=\"editExpense(${e.id})\">✏️ এডিট</button> <button class=\"danger smallbtn\" onclick=\"deleteExpense(${e.id})\">🗑️ ডিলিট</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">এখনো কোনো খরচ যোগ করা হয়নি।</div>'}
+function renderStock(){let map={},labels={};const ensure=n=>{let k=fishKey(n);if(!map[k]){map[k]={bought:0,sold:0,cost:0};labels[k]=String(n||'').trim()}return map[k]};db.purchases.forEach(p=>{let m=ensure(p.name);m.bought+=Number(p.grams||0);m.cost+=Number(p.cost||0)});db.sales.forEach(s=>s.items.forEach(i=>{let m=ensure(i.name);m.sold+=Number(i.grams||0)}));let keys=Object.keys(map);$('stockList').innerHTML=keys.length?`<div class="tablewrap"><table><thead><tr><th>মাছের নাম</th><th>মোট কেনা</th><th>মোট বিক্রি</th><th>আনুমানিক মজুত</th><th>কেনার খরচ</th></tr></thead><tbody>${keys.map(k=>`<tr><td>${esc(labels[k])}</td><td>${kgGram(map[k].bought)}</td><td>${kgGram(map[k].sold)}</td><td class="${map[k].bought-map[k].sold<0?'red':'green'}">${kgGram(map[k].bought-map[k].sold)}</td><td>${money(map[k].cost)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">এখনো মাছ কেনার তথ্য নেই।</div>'}
+function renderAll(){let todaySales=db.sales.filter(s=>s.date===today()),todayPaid=db.payments.filter(p=>p.date===today()).reduce((a,p)=>a+p.amount,0),totalSales=db.sales.reduce((a,s)=>a+s.total,0),totalPaid=db.payments.reduce((a,p)=>a+p.amount,0),todayExp=db.expenses.filter(e=>e.date===today()).reduce((a,e)=>a+e.amount,0),allExp=db.expenses.reduce((a,e)=>a+e.amount,0);$('sToday').textContent=money(todaySales.reduce((a,s)=>a+s.total,0));$('sPaid').textContent=money(todayPaid);$('sDue').textContent=money(totalSales-totalPaid);if($('sExpense'))$('sExpense').textContent=money(todayExp);let boughtByFish={},gramsByFish={};db.purchases.forEach(p=>{let k=fishKey(p.name);boughtByFish[k]=(boughtByFish[k]||0)+Number(p.cost||0);gramsByFish[k]=(gramsByFish[k]||0)+Number(p.grams||0)});let soldCost=0;db.sales.forEach(s=>s.items.forEach(i=>{let k=fishKey(i.name),g=gramsByFish[k]||0;soldCost+=g>0?(boughtByFish[k]||0)/g*Number(i.grams||0):0}));let totalFishPurchaseCost=db.purchases.reduce((sum,p)=>sum+Number(p.cost||0),0);let investment=totalFishPurchaseCost+allExp,netProfit=totalSales-soldCost-allExp;$('sInvest').textContent=money(investment);$('sProfit').textContent=money(Math.max(0,netProfit));if($('sLoss'))$('sLoss').textContent=money(Math.max(0,-netProfit));$('sAfterDueProfit').textContent=money(netProfit-(totalSales-totalPaid));$('sLossRate').textContent=money(Math.max(0,investment-totalSales));$('rSales').textContent=money(totalSales);$('rPaid').textContent=money(totalPaid);$('rDue').textContent=money(totalSales-totalPaid);$('rExpense').textContent=money(allExp);renderCustomers();renderExpenses();renderStock();renderFarms();renderFarmReport();updateFishOptions();let recent=[...db.sales].sort((a,b)=>b.id-a.id).slice(0,5);if($('recentSales'))$('recentSales').innerHTML=recent.length?`<div class="tablewrap"><table><thead><tr><th>তারিখ</th><th>ক্রেতা</th><th>মাছ</th><th>বিক্রি</th><th>জমা</th></tr></thead><tbody>${recent.map(s=>`<tr><td>${dateBn(s.date)}</td><td>${esc(s.customer)}</td><td>${s.items.map(i=>esc(i.name)).join(', ')}</td><td>${money(s.total)}</td><td>${money(s.paid)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">এখনো বিক্রি সংরক্ষণ করা হয়নি।</div>';$('reportHistory').innerHTML=$('recentSales')?$('recentSales').innerHTML:(recent.length?`<div class="tablewrap"><table><thead><tr><th>তারিখ</th><th>ক্রেতা</th><th>মাছ</th><th>বিক্রি</th><th>জমা</th></tr></thead><tbody>${recent.map(s=>`<tr><td>${dateBn(s.date)}</td><td>${esc(s.customer)}</td><td>${s.items.map(i=>esc(i.name)).join(', ')}</td><td>${money(s.total)}</td><td>${money(s.paid)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">এখনো বিক্রি সংরক্ষণ করা হয়নি।</div>')}
+function printSale(id){let s=db.sales.find(x=>x.id===id);if(!s)return;let name=s.customer,t=totals(name);$('receiptPrint').innerHTML=`<div class="panel"><div style="text-align:center"><h2>🐝 হানি বি পাইকারি</h2><p>মাছের পাইকারি বিক্রির মেমো</p></div><p>তারিখ: ${dateBn(s.date)}<br>ক্রেতা: ${esc(s.customer)}<br>বিক্রি নম্বর: ${bn(s.id).slice(-6)}</p><div class="tablewrap"><table><thead><tr><th>মাছের নাম</th><th>মোট ওজন</th><th>দর/কেজি</th><th>টাকা</th></tr></thead><tbody>${s.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${kgGram(i.grams)}</td><td>${money(i.rate)}</td><td>${money(i.total)}</td></tr>`).join('')}</tbody></table></div><p>মোট বিল: <b>${money(s.total)}</b><br>এই বিক্রিতে জমা: <b>${money(s.paid)}</b><br>বর্তমান মোট বাকি: <b>${money(t.due)}</b></p><p style="text-align:center">ধন্যবাদ</p></div>`;document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$('receiptPrint').classList.add('active');window.print();showPage('customers');renderLedger(name)}
+async function shareLedger(){if(!selectedCustomer){alert('আগে একজন ক্রেতার খাতা খুলুন।');return}const n=selectedCustomer,t=totals(n);const sales=custSales(n).sort((a,b)=>a.date.localeCompare(b.date));let lines=['🐝 হানি বি পাইকারি','ক্রেতার খাতা: '+n,'মোট বিক্রি: '+money(t.sales),'মোট জমা: '+money(t.paid),'বর্তমান বাকি: '+money(t.due),'','বিক্রির বিস্তারিত:'];sales.forEach(s=>{lines.push('তারিখ: '+dateBn(s.date)+' | বিল: '+money(s.total));s.items.forEach(i=>lines.push('  '+i.name+' — '+kgGram(i.grams)+' × '+money(i.rate)+' = '+money(i.total)));lines.push('  জমা: '+money(s.paid))});custPayments(n).filter(p=>!p.saleId).forEach(p=>lines.push('অতিরিক্ত জমা · '+dateBn(p.date)+': '+money(p.amount)));const text=lines.join('\\n');try{if(navigator.share){await navigator.share({title:'হানি বি পাইকারি — '+n+'-এর খাতা',text})}else if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(text);alert('ক্রেতার হিসাব কপি হয়েছে। এখন WhatsApp বা মেসেজে পেস্ট করে পাঠান।')}else{const w=window.open('','_blank');if(w){w.document.write('<pre style="white-space:pre-wrap;font:16px sans-serif;padding:20px">'+esc(text)+'</pre>');w.document.close()}else alert('শেয়ার করা যাচ্ছে না। ব্রাউজারের শেয়ার সুবিধা ব্যবহার করুন।')}}catch(e){if(e&&e.name!=='AbortError')alert('শেয়ার করা যায়নি। আবার চেষ্টা করুন।')}}
+function printLedger(){if(!selectedCustomer)return;let n=selectedCustomer,t=totals(n);$('receiptPrint').innerHTML=`<div class="panel"><h2>হানি বি পাইকারি — ${esc(n)}-এর খাতা</h2><p>মোট বিক্রি: ${money(t.sales)} · মোট জমা: ${money(t.paid)} · বর্তমান বাকি: ${money(t.due)}</p>${$('ledgerHistory').innerHTML}</div>`;document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$('receiptPrint').classList.add('active');window.print();showPage('customers');renderLedger(n)}
+function exportExpenses(){let rows=[['তারিখ','খরচের খাত','বিবরণ','টাকা'],...db.expenses.map(e=>[e.date,e.type,e.note||'',e.amount])];downloadText('হানি-বি-খরচ.csv','\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n'),'text/csv;charset=utf-8')}
+function downloadBackup(){downloadText('হানি-বি-পাইকারি-তথ্য.json',JSON.stringify(db,null,2),'application/json')}
+function downloadText(name,txt,type){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href)}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
+document.addEventListener('click',function(e){const b=e.target.closest('button');if(!b)return;b.classList.remove('tap-confirmed');void b.offsetWidth;b.classList.add('tap-confirmed');setTimeout(()=>b.classList.remove('tap-confirmed'),450)});
+
+// Custom fish autocomplete (native datalist is unreliable in some Android content:// viewers).
+(function(){
+ let activeInput=null, box=document.createElement('div'); box.className='fish-suggest-box'; box.id='fishSuggestBox'; document.body.appendChild(box);
+ function openFor(input){
+   activeInput=input; const query=String(input.value||'').trim().toLocaleLowerCase('bn-BD');
+   const list=fishNames().filter(n=>!query || n.toLocaleLowerCase('bn-BD').includes(query)).slice(0,35);
+   if(!list.length){box.classList.remove('show');return;}
+   box.innerHTML=list.map(n=>`<button type="button" class="fish-suggest-item" data-fish="${esc(n)}">${esc(n)}<small>মাছের নাম নির্বাচন করুন</small></button>`).join('');
+   const r=input.getBoundingClientRect(), width=Math.max(r.width,Math.min(window.innerWidth-24,300));
+   box.style.width=Math.min(width,window.innerWidth-24)+'px';
+   box.style.left=Math.max(12,Math.min(r.left,window.innerWidth-width-12))+'px';
+   box.style.top=Math.max(8,Math.min(r.top-box.offsetHeight-8,window.innerHeight-260))+'px';
+   box.classList.add('show');
+   // Reposition after display so its actual height is known.
+   requestAnimationFrame(()=>{if(!box.classList.contains('show'))return;let h=box.offsetHeight;box.style.top=Math.max(8,Math.min(r.top-h-8,window.innerHeight-h-8))+'px';});
+ }
+ document.addEventListener('focusin',e=>{if(e.target.matches('.fname,#buyFish'))openFor(e.target)});
+ document.addEventListener('input',e=>{if(e.target.matches('.fname,#buyFish'))openFor(e.target)});
+ box.addEventListener('click',e=>{let b=e.target.closest('[data-fish]');if(!b||!activeInput)return;activeInput.value=b.dataset.fish;activeInput.dispatchEvent(new Event('input',{bubbles:true}));box.classList.remove('show');activeInput.focus({preventScroll:true})});
+ document.addEventListener('pointerdown',e=>{if(!e.target.closest('#fishSuggestBox')&&!e.target.matches('.fname,#buyFish'))box.classList.remove('show')});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')box.classList.remove('show')});
+ window.addEventListener('resize',()=>{if(activeInput&&box.classList.contains('show'))openFor(activeInput)});
+ window.addEventListener('scroll',()=>{if(activeInput&&box.classList.contains('show'))openFor(activeInput)},true);
+})();
+
+$('todayLabel').textContent='আজ: '+dateBn(today());$('saleDate').value=today();$('expenseDate').value=today();$('payDate').value=today();if($('farmStart'))$('farmStart').value=today();window.addEventListener('DOMContentLoaded',()=>hbHisabStart(()=>{load();addFishRow();renderAll();}));
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+/* ════════════ ☁️ হিসাব খাতা — ক্লাউড সিঙ্ক (Honey Bee Smart Poultry) ════════════
+   মূল খাতার কোড (উপরের স্ক্রিপ্ট) একদম বদলানো হয়নি। শুধু:
+     · KEY এখন লগইন করা মানুষের নিজের — এক ফোনে দুইজন থাকলেও হিসাব মিশবে না
+     · save() ডাকলে ফোনে আগের মতোই সেভ হয়, তার সাথে ক্লাউডেও যায়
+   ক্লাউডে প্রতিটা বিক্রি/জমা/খরচ/কেনা/খামার আলাদা নথি:
+       users/{uid}/hisab/{ধরন}_{id}
+   (এক নথিতে সব রাখলে ১ MiB-এ গিয়ে আটকে যেত — বাজারের খাতায় ঠিক এই সমস্যাই হয়েছিল)
+   শুধু যেটা বদলেছে সেটাই যায়। মোছা রেকর্ডে d:true দাগ থাকে, যাতে অন্য ফোনও জানে।
+   অন্য ফোনে কিছু বদলালে কয়েক সেকেন্ডে এখানে চলে আসে। নেট না থাকলে ফোনেই জমা থাকে,
+   নেট এলে নিজে থেকে যায়। */
+(function(){
+  "use strict";
+  const firebaseConfig = {
+    apiKey: "AIzaSyDXNlXwNMapFQs5ez2GHohe19Ud04ip_PU",
+    authDomain: "honeybee-poultry.firebaseapp.com",
+    projectId: "honeybee-poultry",
+    storageBucket: "honeybee-poultry.firebasestorage.app",
+    messagingSenderId: "845877967187",
+    appId: "1:845877967187:web:4c87e884f40dc2138449a6"
+  };
+  if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const fsdb = firebase.firestore();          // ⚠️ "db" নাম খাতার নিজের — এটা আলাদা নাম
+  fsdb.enablePersistence({ synchronizeTabs: true }).catch(function(){});
+  const TS = function(){ return firebase.firestore.FieldValue.serverTimestamp(); };
+
+  const TYPES = ["sales", "payments", "expenses", "purchases", "farms"];
+  const BASE_KEY = "honeyBeeWholesaleV1";
+  const OVERLAP_MS = 60 * 1000;
+  const deviceId = "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  let uid = null, col = null, pushTimer = null, chain = Promise.resolve(), unsub = null;
+
+  function h(str){
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for(let i = 0, ch; i < str.length; i++){ ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+  }
+  const docId = function(t, id){ return t + "_" + String(id).replace(/[\/]/g, "_"); };
+  const idNum = function(id){ const m = String(id).match(/\d+(\.\d+)?/); return m ? Number(m[0]) : 0; };
+  const shadowKey = function(){ return KEY + "::shadow"; };
+  const wmKey = function(){ return KEY + "::wm"; };
+  function loadShadow(){ try{ return JSON.parse(localStorage.getItem(shadowKey()) || "null") || {}; }catch(e){ return {}; } }
+  function saveShadow(s){ try{ localStorage.setItem(shadowKey(), JSON.stringify(s)); }catch(e){} }
+  function getWm(){ return Number(localStorage.getItem(wmKey()) || 0); }
+  function setWm(ms){ if(ms > getWm()) try{ localStorage.setItem(wmKey(), String(ms)); }catch(e){} }
+  const enqueue = function(fn){ const p = chain.then(fn, fn); chain = p.catch(function(){}); return p; };
+
+  function dot(state){
+    const el = document.getElementById("hbCloudDot"); if(!el) return;
+    el.style.background = state === "ok" ? "#22c55e" : state === "err" ? "#ef4444" : "#f59e0b";
+    el.title = state === "ok" ? "ক্লাউডে সেভ আছে" : state === "err" ? "ক্লাউডে যায়নি — নেট দেখুন (ফোনে সেভ আছে)" : "পাঠানো হচ্ছে...";
+  }
+
+  /* ---------- পাঠানো: শুধু বদলানো রেকর্ড ---------- */
+  function doPush(){
+    if(!col) return Promise.resolve();
+    const shadow = loadShadow(), next = {}, ops = [];
+    TYPES.forEach(function(t){
+      const old = shadow[t] || {}, now = {};
+      (Array.isArray(db[t]) ? db[t] : []).forEach(function(rec){
+        if(!rec || rec.id == null) return;
+        const v = JSON.stringify(rec), hv = h(v), id = String(rec.id);
+        now[id] = hv;
+        if(old[id] !== hv) ops.push({ id: docId(t, id), data: { t: t, id: id, v: v, h: hv } });
+      });
+      Object.keys(old).forEach(function(id){
+        if(!(id in now)) ops.push({ id: docId(t, id), data: { t: t, id: id, d: true } });
+      });
+      next[t] = now;
+    });
+    if(!ops.length){ dot("ok"); return Promise.resolve(); }
+    dot("busy");
+    let p = Promise.resolve();
+    for(let i = 0; i < ops.length; i += 400){
+      const part = ops.slice(i, i + 400);
+      p = p.then(function(){
+        const b = fsdb.batch();
+        part.forEach(function(op){ b.set(col.doc(op.id), Object.assign({}, op.data, { u: TS(), by: deviceId })); });
+        return b.commit();
+      });
+    }
+    return p.then(function(){ saveShadow(next); dot("ok"); })
+            .catch(function(e){ console.error("হিসাব ক্লাউডে যায়নি:", e); dot("err"); throw e; });
+  }
+  function push(){ clearTimeout(pushTimer); pushTimer = null; return enqueue(doPush); }
+  function schedulePush(){ if(!col) return; clearTimeout(pushTimer); pushTimer = setTimeout(function(){ push().catch(function(){}); }, 1500); }
+
+  /* ---------- আনা: অন্য ফোনের পরিবর্তন বসানো ---------- */
+  function applyRemote(docs){
+    const shadow = loadShadow();
+    let changed = false, wm = 0;
+    docs.forEach(function(d){
+      const ms = d.u && d.u.toMillis ? d.u.toMillis() : 0; if(ms > wm) wm = ms;
+      if(d.by === deviceId || TYPES.indexOf(d.t) < 0) return;
+      const arr = Array.isArray(db[d.t]) ? db[d.t] : (db[d.t] = []);
+      const sh = shadow[d.t] || (shadow[d.t] = {});
+      const idx = arr.findIndex(function(r){ return r && String(r.id) === d.id; });
+      if(idx >= 0){
+        const localH = h(JSON.stringify(arr[idx]));
+        if(sh[d.id] !== localH) return;               // এখানে বদলানো, পাঠানো বাকি — এটাই থাকবে
+        if(d.d){ arr.splice(idx, 1); delete sh[d.id]; changed = true; return; }
+        if(d.h === localH) return;
+        try{ arr[idx] = JSON.parse(d.v); sh[d.id] = d.h; changed = true; }catch(e){}
+      }else{
+        if(d.d){ delete sh[d.id]; return; }
+        if(sh[d.id]) return;                            // এখানে মোছা, পাঠানো বাকি
+        try{ arr.push(JSON.parse(d.v)); sh[d.id] = d.h; changed = true; }catch(e){}
+      }
+    });
+    saveShadow(shadow); if(wm) setWm(wm);
+    if(changed){ try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){} }
+    return changed;
+  }
+
+  /* নতুন ফোন / প্রথমবার: পুরো খাতা একবার আনা */
+  function fullLoad(){
+    return col.get().then(function(snap){
+      if(snap.empty){
+        // ক্লাউড খালি — এই ফোনে আগের হিসাব থাকলে সেটাই প্রথমবার ক্লাউডে উঠবে
+        let local = localStorage.getItem(KEY);
+        const legacy = localStorage.getItem(BASE_KEY);
+        if(!local && legacy && confirm("এই ফোনে আগের একটা হিসাব খাতা পাওয়া গেছে।\n\nসেটা কি আপনার অ্যাকাউন্টে তুলে রাখবেন?")){
+          localStorage.setItem(KEY, legacy);
+        }
+        saveShadow({}); setWm(1);
+        return;
+      }
+      const fresh = { sales: [], payments: [], expenses: [], purchases: [], farms: [] }, shadow = {};
+      let wm = 0;
+      snap.forEach(function(doc){
+        const d = doc.data();
+        const ms = d.u && d.u.toMillis ? d.u.toMillis() : 0; if(ms > wm) wm = ms;
+        if(d.d || TYPES.indexOf(d.t) < 0) return;
+        try{ fresh[d.t].push(JSON.parse(d.v)); (shadow[d.t] = shadow[d.t] || {})[d.id] = d.h; }catch(e){}
+      });
+      TYPES.forEach(function(t){ fresh[t].sort(function(a, b){ return idNum(a.id) - idNum(b.id); }); });
+      localStorage.setItem(KEY, JSON.stringify(fresh));
+      saveShadow(shadow); setWm(wm || 1);
+    });
+  }
+
+  function listen(){
+    const since = firebase.firestore.Timestamp.fromMillis(Math.max(0, getWm() - OVERLAP_MS));
+    unsub = col.where("u", ">", since).onSnapshot(function(snap){
+      const docs = [];
+      snap.docChanges().forEach(function(c){
+        if(c.type !== "removed" && !c.doc.metadata.hasPendingWrites) docs.push(c.doc.data());
+      });
+      if(!docs.length) return;
+      enqueue(function(){
+        if(applyRemote(docs)){ try{ renderAll(); }catch(e){} }
+      });
+    }, function(err){ console.warn("হিসাব লাইভ সংযোগ:", err); });
+  }
+
+  /* ---------- শুরু: লগইন দেখা → ক্লাউড থেকে আনা → খাতা চালু ---------- */
+  window.hbHisabStart = function(boot){
+    const cover = document.getElementById("hbHisabCover");
+    auth.onAuthStateChanged(function(user){
+      if(!user){ location.replace("poultry-app.html"); return; }   // লগইন ছাড়া খাতা না
+      if(uid) return;
+      uid = user.uid;
+      KEY = BASE_KEY + ":" + uid;
+      col = fsdb.collection("users").doc(uid).collection("hisab");
+      const first = !getWm();
+      const step = first ? fullLoad() : col.where("u", ">", firebase.firestore.Timestamp.fromMillis(Math.max(0, getWm() - OVERLAP_MS))).get()
+        .then(function(snap){ const docs = []; snap.forEach(function(d){ docs.push(d.data()); }); applyRemote(docs); });
+      Promise.race([step, new Promise(function(_, rej){ setTimeout(function(){ rej(new Error("timeout")); }, 12000); })])
+        .catch(function(e){ console.warn("ক্লাউড থেকে আনা গেল না, ফোনের হিসাব দিয়ে চলছে:", e); })
+        .then(function(){
+          boot();
+          if(cover) cover.remove();
+          listen();
+          schedulePush();   // প্রথমবার/অফলাইনে জমা থাকা কিছু থাকলে পাঠিয়ে দেওয়া
+        });
+    });
+  };
+
+  // খাতার নিজের save() — আগের মতোই ফোনে সেভ, সাথে ক্লাউডে পাঠানোর ব্যবস্থা
+  const origSave = save;
+  save = function(){ origSave(); schedulePush(); };
+
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState === "hidden" && pushTimer) push().catch(function(){});
+  });
+  window.addEventListener("online", function(){ schedulePush(); });
+})();
+</script>
+
+</body></html>
