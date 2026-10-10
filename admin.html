@@ -961,18 +961,28 @@ document.getElementById("tmReportPostDeleteBtn").addEventListener("click", async
 });
 
 /* ==================== 📊 Honey Bee Bazar লাইভ অ্যানালিটিক্স ====================
-   Honey Bee Bazar অ্যাপ প্রতি ~১৫ সেকেন্ডে activeSessions/{sessionId}-এ একটা
-   "হার্টবিট" পাঠায় (সময়, স্ক্রল কাউন্ট, কোন দোকান দেখছে)। ৩০ সেকেন্ডের বেশি
-   পুরনো হার্টবিটকে "অফলাইন" ধরা হয় — তাই এটা রিয়েলটাইম লাইভ কাউন্ট দেয়। */
+   Honey Bee Bazar অ্যাপ পেজ খোলা থাকলে প্রতি ~৬০ সেকেন্ডে activeSessions/{sessionId}-এ
+   একটা "হার্টবিট" পাঠায়। ২.৫ মিনিটের বেশি পুরনো হার্টবিটকে "অফলাইন" ধরা হয়।
+
+   💰 আগে পুরো activeSessions ঘর পড়া হতো — কোনো সেশন কখনো মোছা হয় না, তাই প্রতিবার
+   প্যানেল খুললে দিনে দিনে বেশি পড়া হতো। এখন শুধু গত ২৪ ঘণ্টার, সর্বোচ্চ ৫০টা। */
+const ANALYTICS_LIVE_MS = 150000;
+const ANALYTICS_MAX_SESSIONS = 50;
 function startAnalyticsListener(){
-  db.collection("activeSessions").onSnapshot((snap)=>{
+  const since = firebase.firestore.Timestamp.fromMillis(Date.now() - 24*60*60*1000);
+  db.collection("activeSessions")
+    .where("lastHeartbeat", ">", since)
+    .orderBy("lastHeartbeat", "desc")
+    .limit(ANALYTICS_MAX_SESSIONS)
+    .onSnapshot((snap)=>{
     const now = Date.now();
     const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     const live = sessions.filter(s => {
       const last = s.lastHeartbeat && s.lastHeartbeat.toDate ? s.lastHeartbeat.toDate().getTime() : 0;
-      return (now - last) < 30000;
+      return (now - last) < ANALYTICS_LIVE_MS;
     });
-    document.getElementById("liveUserCount").textContent = live.length;
+    document.getElementById("liveUserCount").textContent =
+      (sessions.length >= ANALYTICS_MAX_SESSIONS && live.length >= ANALYTICS_MAX_SESSIONS) ? (live.length + "+") : live.length;
 
     const recent = sessions.sort((a,b)=>{
       const at = a.lastHeartbeat && a.lastHeartbeat.toDate ? a.lastHeartbeat.toDate().getTime() : 0;
@@ -984,7 +994,7 @@ function startAnalyticsListener(){
       ? "<p>এখনো কোনো সেশন রেকর্ড হয়নি।</p>"
       : recent.map(s=>{
           const last = s.lastHeartbeat && s.lastHeartbeat.toDate ? s.lastHeartbeat.toDate().getTime() : 0;
-          const isLive = (now - last) < 30000;
+          const isLive = (now - last) < ANALYTICS_LIVE_MS;
           const durationMin = Math.floor((s.totalDurationSec || 0) / 60);
           const durationSec = (s.totalDurationSec || 0) % 60;
           return `<div style="padding:6px 0; border-bottom:1px solid var(--line);">

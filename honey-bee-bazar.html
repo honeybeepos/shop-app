@@ -13543,34 +13543,57 @@ $("tpWaitToggleBtn") && $("tpWaitToggleBtn").addEventListener("click", async ()=
 
 
 /* ==================== 📊 সুপার অ্যাডমিনের জন্য লাইভ ব্যবহার-অ্যানালিটিক্স ====================
-   কোনো ব্যক্তিগত তথ্য পাঠানো হয় না — শুধু সময়/স্ক্রল/কোন দোকান দেখা হচ্ছে, এটা
-   activeSessions/{sessionId}-এ প্রতি ~১৫ সেকেন্ডে আপডেট হয়। ট্যাব বন্ধ করলে
-   হার্টবিট থেমে যায়, ৩০ সেকেন্ড পর সুপার অ্যাডমিন প্যানেলে "অফলাইন" দেখাবে। */
+   কোনো ব্যক্তিগত তথ্য পাঠানো হয় না — শুধু সময়/স্ক্রল/কোন দোকান দেখা হচ্ছে।
+
+   💰 খরচ কমানো (অক্টোবর ২০২৬): আগে প্রতি ১৫ সেকেন্ডে লেখা হতো, পেজ লুকানো
+   থাকলেও (ঘণ্টায় ২৪০ বার, প্রতি দর্শক)। এখন:
+     · প্রতি ৬০ সেকেন্ডে একবার, আর শুধু যখন পেজটা সত্যিই পর্দায় খোলা
+     · পেজ লুকালে (অন্য অ্যাপে গেলে/স্ক্রিন বন্ধ) লেখা থামে, ফিরলে সাথে সাথে একবার
+     · মানে সর্বোচ্চ ঘণ্টায় ৬০ বার, বাস্তবে আরও অনেক কম
+   expireAt = ৭ দিন পর — Firebase কনসোলে TTL চালু করলে পুরনো সেশন নিজে মুছে যায়। */
 const __sessionId = "s_" + Date.now() + "_" + Math.random().toString(36).slice(2,8);
+const ANALYTICS_HEARTBEAT_MS = 60000;
 let __scrollCount = 0;
 let __sessionStartedAt = Date.now();
+let __heartbeatSentOnce = false;
+let __heartbeatTimer = null;
 
 window.addEventListener("scroll", ()=>{ __scrollCount++; }, { passive: true });
 
 async function sendAnalyticsHeartbeat(){
+  if(document.visibilityState !== "visible") return;
   try{
     const totalDurationSec = Math.floor((Date.now() - __sessionStartedAt) / 1000);
     const currentShop = currentShopId ? allShops.find(s=> s.id === currentShopId) : null;
-    await db.collection("activeSessions").doc(__sessionId).set({
-      customerName: (currentCustomer && currentCustomer.name) || "অতিথি",
+    const data = {
+      customerName: String((currentCustomer && currentCustomer.name) || "অতিথি").slice(0, 80),
       customerUid: currentCustomer ? currentCustomer.uid : null,
       scrollCount: __scrollCount,
       totalDurationSec,
       currentShopId: currentShopId || null,
-      currentShopName: currentShop ? (currentShop.name || currentShop.shopName) : null,
+      currentShopName: currentShop ? String(currentShop.name || currentShop.shopName || "").slice(0, 80) : null,
       lastHeartbeat: firebase.firestore.FieldValue.serverTimestamp(),
-      startedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
+      expireAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 7*24*60*60*1000)
+    };
+    // শুরুর সময় শুধু প্রথমবার — আগে প্রতিবার লেখা হয়ে "শুরু" সবসময় "এখন" দেখাত
+    if(!__heartbeatSentOnce) data.startedAt = firebase.firestore.FieldValue.serverTimestamp();
+    await db.collection("activeSessions").doc(__sessionId).set(data, { merge: true });
+    __heartbeatSentOnce = true;
   }catch(e){ /* অ্যানালিটিক্স ব্যর্থ হলেও অ্যাপের কাজে কোনো প্রভাব পড়বে না */ }
 }
 
-sendAnalyticsHeartbeat();
-setInterval(sendAnalyticsHeartbeat, 15000);
+function __startHeartbeat(){
+  if(__heartbeatTimer) return;
+  sendAnalyticsHeartbeat();
+  __heartbeatTimer = setInterval(sendAnalyticsHeartbeat, ANALYTICS_HEARTBEAT_MS);
+}
+function __stopHeartbeat(){
+  if(__heartbeatTimer){ clearInterval(__heartbeatTimer); __heartbeatTimer = null; }
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible") __startHeartbeat(); else __stopHeartbeat();
+});
+if(document.visibilityState === "visible") __startHeartbeat();
 </script>
 </body>
 </html>
