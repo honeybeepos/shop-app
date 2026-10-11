@@ -6240,30 +6240,65 @@ let hbGsCameFrom = null;
    বাজারের জন্য আলাদা, আর প্রতিটা মানুষের জন্য আলাদা।            */
 const HB_NB_LEGACY_KEY = 'hb-notebook';
 
+/* 👥 অক্টোবর ২০২৬: খাতা এখন **দোকানের সবার একটাই** — মালিক আর সব স্টাফ
+   একই খাতায় লেখেন, প্রতিটা নোটে লেখকের নাম থাকে।
+   নাম: `hb-notebook:team:<দোকান>`। ক্লাউডে প্রতিটা নোট আলাদা নথি হয়ে যায়
+   (firebase-init.js), তাই দুইজন একসাথে লিখলেও কারো নোট হারায় না।
+   তালা দেওয়া নোটের লেখা কেউ দেখতে পান না — মালিকের পাসওয়ার্ড লাগে। */
+function hbNbSession(){
+  try{ return (typeof getSession === 'function') ? getSession() : null; }catch(e){ return null; }
+}
 function hbNbKey(){
-  try{
-    const se = (typeof getSession === 'function') ? getSession() : null;
-    if(se && se.uid) return 'hb-notebook:shop:' + se.uid;
-  }catch(e){}
+  const se = hbNbSession();
+  if(se && se.shopId) return 'hb-notebook:team:' + se.shopId;
   return null;              // কে জানি না — তখন কোনো খাতাই নেই
+}
+function hbNbPersonalKey(){
+  const se = hbNbSession();
+  return (se && se.uid) ? 'hb-notebook:shop:' + se.uid : null;
+}
+function hbNbMe(){
+  const se = hbNbSession() || {};
+  return { uid: se.uid || '', name: se.name || (se.role === 'admin' ? 'মালিক' : 'স্টাফ') };
 }
 
 /* পুরনো নোটগুলো হারাবে না। যিনি প্রথম লগইন করা অবস্থায় খাতা খুলবেন,
    সেগুলো তাঁর নামে চলে যাবে — তারপর পুরনো নামটা মুছে দেওয়া হয়, যাতে
    বাজারের অ্যাপ বা অন্য কেউ ওখান থেকে আর কিছু পড়তে না পারে। */
 function hbNbMigrate(){
-  const k = hbNbKey();
-  if(!k) return;
+  const k = hbNbKey(), pk = hbNbPersonalKey();
+  if(!k || !pk) return;
   try{
+    // ১) সবচেয়ে পুরনো এক-জায়গার খাতা → নিজের ব্যক্তিগত খাতা
     const old = localStorage.getItem(HB_NB_LEGACY_KEY);
-    if(!old) return;
-    if(!localStorage.getItem(k)) localStorage.setItem(k, old);
-    localStorage.removeItem(HB_NB_LEGACY_KEY);
+    if(old){
+      if(!localStorage.getItem(pk)) localStorage.setItem(pk, old);
+      localStorage.removeItem(HB_NB_LEGACY_KEY);
+    }
+    /* ২) নিজের ব্যক্তিগত খাতা → দোকানের সবার খাতা।
+       আগের নোটগুলো এতদিন শুধু নিজের ছিল, তাই সবার খাতায় যাওয়ার সময়
+       তালা দিয়ে নেওয়া হয় — কারো ব্যক্তিগত লেখা হঠাৎ সবার সামনে চলে
+       আসবে না। মালিক পাসওয়ার্ড দিয়ে খুলে দিতে পারবেন। */
+    const mine = JSON.parse(localStorage.getItem(pk) || '[]');
+    if(Array.isArray(mine) && mine.length){
+      const team = JSON.parse(localStorage.getItem(k) || '[]');
+      const list = Array.isArray(team) ? team : [];
+      const have = {}; list.forEach(function(n){ have[n.id] = 1; });
+      const me = hbNbMe();
+      mine.forEach(function(n){
+        if(!n || have[n.id]) return;
+        list.push(Object.assign({}, n, { locked: true, createdBy: n.createdBy || me.uid, createdByName: n.createdByName || me.name }));
+      });
+      localStorage.setItem(k, JSON.stringify(list));
+    }
+    if(localStorage.getItem(pk) !== null) localStorage.removeItem(pk);
   }catch(e){}
 }
 let hbNbEditingId = null;
 let hbNbConfirmId = null;      // এখন কোন নোটের মোছা "নিশ্চিত?" অবস্থায় আছে
 let hbNbOpenIds = {};          // কোন কোন নোট এখন খোলা আছে
+let hbNbRevealed = {};         // তালা দেওয়া কোন নোট এইবার পাসওয়ার্ড দিয়ে দেখা হচ্ছে (বন্ধ করলেই আবার লুকায়)
+function hbNbHidden(n){ return !!(n && n.locked && !hbNbRevealed[n.id]); }
 
 function hbNbLoad(){
   const k = hbNbKey();
@@ -6318,7 +6353,8 @@ function hbNbRender(){
   // hbNorm ব্যবহার — বাংলা/আরবি অঙ্ক আর বাড়তি ফাঁকা একরকম হয়ে যায়
   const q = hbNorm(document.getElementById('nbSearch').value || '');
   let list = hbNbLoad();
-  if(q) list = list.filter(n => hbNorm((n.title || '') + ' ' + (n.text || '')).includes(q));
+  // তালা দেওয়া নোটের ভিতরের লেখা খোঁজায় ধরা হয় না — নইলে খুঁজে খুঁজে ভিতরে কী আছে বোঝা যেত
+  if(q) list = list.filter(n => hbNorm((n.title || '') + ' ' + (hbNbHidden(n) ? '' : (n.text || ''))).includes(q));
   // পিন করা উপরে, তারপর যেটা শেষে বদলানো হয়েছে সেটা
   list.sort(function(a, b){
     if(!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
@@ -6334,6 +6370,7 @@ function hbNbRender(){
 
   box.innerHTML = '';
   list.forEach(function(n){
+    if(hbNbHidden(n)){ box.appendChild(hbNbLockedCard(n, q)); return; }
     const card = document.createElement('div');
     card.className = 'nbCard' + (n.pinned ? ' pin' : '') + (n.locked ? ' locked' : '');
 
@@ -6485,7 +6522,8 @@ function hbNbRender(){
     const sub = document.createElement('div');
     sub.className = 'nbNameSub';
     const nLines = String(n.text || '').split('\n').filter(function(l){ return l.trim(); }).length;
-    sub.textContent = (n.pinned ? '📌 ' : '') + (n.locked ? '🔒 ' : '') +
+    sub.textContent = (n.pinned ? '📌 ' : '') + (n.locked ? '🔓 (এইবার দেখা হচ্ছে) ' : '') +
+                      (n.createdByName ? '✍️ ' + n.createdByName + ' · ' : '') +
                       nLines + ' লাইন · ' + hbNbWhen(n.updatedAt || n.createdAt);
     nameWrap.appendChild(nameTx); nameWrap.appendChild(sub);
 
@@ -6498,6 +6536,8 @@ function hbNbRender(){
     card.classList.toggle('open', !!openNow);
     head.addEventListener('click', function(){
       const nowOpen = !card.classList.contains('open');
+      // তালা দেওয়া নোট বন্ধ করলেই আবার লুকিয়ে যায় — পরের বার আবার পাসওয়ার্ড
+      if(!nowOpen && n.locked){ delete hbNbRevealed[n.id]; delete hbNbOpenIds[n.id]; hbNbRender(); return; }
       card.classList.toggle('open', nowOpen);
       if(nowOpen) hbNbOpenIds[n.id] = true; else delete hbNbOpenIds[n.id];
     });
@@ -6505,6 +6545,42 @@ function hbNbRender(){
     box.appendChild(card);
   });
   hbNbZoomApply(hbNbZoomGet());     // নতুন করে আঁকা হলো, মাপটা আবার বসাই
+}
+
+/* ---------- 🔒 তালা দেওয়া নোটের কার্ড ----------
+   ভিতরের লেখা পর্দায় তো দূরের কথা, পাতার কোডেও বসানো হয় না — শুধু
+   নাম (দেওয়া থাকলে), কে লিখেছেন আর কবে। চাপ দিলে মালিকের পাসওয়ার্ড
+   চায়; ঠিক হলে এইবারের জন্য খোলে, বন্ধ করলেই আবার লুকিয়ে যায়। */
+function hbNbLockedCard(n, q){
+  const card = document.createElement('div');
+  card.className = 'nbCard locked' + (n.pinned ? ' pin' : '');
+  const head = document.createElement('div');
+  head.className = 'nbCardHead';
+  const arrow = document.createElement('span');
+  arrow.className = 'nbArrow';
+  arrow.textContent = '🔒';
+  const nameWrap = document.createElement('div');
+  nameWrap.className = 'nbName';
+  const nameTx = document.createElement('div');
+  nameTx.className = 'nbNameTx';
+  const t = (n.title && n.title.trim()) ? n.title.trim() : 'তালা দেওয়া নোট';
+  nameTx.appendChild(hbNbMark(t, q));
+  const sub = document.createElement('div');
+  sub.className = 'nbNameSub';
+  sub.textContent = (n.pinned ? '📌 ' : '') + '🔒 ' + (n.createdByName ? '✍️ ' + n.createdByName + ' · ' : '') +
+                    hbNbWhen(n.updatedAt || n.createdAt) + ' · দেখতে চাপ দিন';
+  nameWrap.appendChild(nameTx); nameWrap.appendChild(sub);
+  head.appendChild(arrow); head.appendChild(nameWrap);
+  head.addEventListener('click', async function(){
+    const entered = await openPinModal('পাসওয়ার্ড দিন', 'নোটটা তালা দেওয়া। দেখতে মালিকের পাসওয়ার্ড দিন।');
+    if(entered === null) return;
+    if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড'); return; }
+    hbNbRevealed[n.id] = true;
+    hbNbOpenIds[n.id] = true;
+    hbNbRender();
+  });
+  card.appendChild(head);
+  return card;
 }
 
 /* ---------- 🔒 তালা ----------
@@ -6520,10 +6596,13 @@ async function hbNbToggleLock(id){
     if(entered === null) return;
     if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, তালা খোলেনি'); return; }
     it.locked = false;
-    toast('🔓 তালা খুলে গেল');
+    delete hbNbRevealed[id];
+    toast('🔓 তালা খুলে গেল — এখন সবাই দেখতে পাবেন');
   }else{
     it.locked = true;
-    toast('🔒 নোটটা তালা দেওয়া হলো');
+    // তালা দিলেই সাথে সাথে বন্ধ হয়ে লুকিয়ে যায়
+    delete hbNbRevealed[id]; delete hbNbOpenIds[id];
+    toast('🔒 তালা দেওয়া হলো — এখন কেউ ভিতরের লেখা দেখতে পাবেন না');
   }
   hbNbSave(all);
   hbNbRender();
@@ -6532,6 +6611,7 @@ async function hbNbToggleLock(id){
 /* তালা দেওয়া থাকলে আগে পাসওয়ার্ড — বদলানো বা মোছার আগে ডাকা হয় */
 async function hbNbAllowChange(n){
   if(!n || !n.locked) return true;
+  if(hbNbRevealed[n.id]) return true;          // এইবার পাসওয়ার্ড দিয়েই খোলা হয়েছে
   const entered = await openPinModal('পাসওয়ার্ড দিন', 'নোটটা তালা দেওয়া। বদলাতে বা মুছতে পাসওয়ার্ড দিন।');
   if(entered === null) return false;
   if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড'); return false; }
@@ -6675,6 +6755,7 @@ function hbNbAllLines(excludeCurrentText){
   const out = [];
   hbNbLoad().forEach(function(n){
     if(n.id === hbNbEditingId) return;              // এইটার লেখা তো সামনেই আছে
+    if(hbNbHidden(n)) return;                       // তালা দেওয়া নোটের লেখা পরামর্শে আসবে না
     String(n.text || '').split('\n').forEach(function(l){
       const k = hbNbNormLine(l);
       if(!k || seen[k]) return;
@@ -6789,10 +6870,12 @@ function hbNbDropDupes(text){
     const now = new Date().toISOString();
     if(hbNbEditingId){
       const it = all.find(x => x.id === hbNbEditingId);
-      if(it){ it.title = title; it.text = text; it.updatedAt = now; }
+      if(it){ const me = hbNbMe(); it.title = title; it.text = text; it.updatedAt = now; it.updatedBy = me.uid; it.updatedByName = me.name; }
     }else{
+      const me = hbNbMe();
       all.unshift({ id: (typeof genLineId === 'function' ? genLineId() : String(Date.now())),
-                    title: title, text: text, pinned: false, createdAt: now, updatedAt: now });
+                    title: title, text: text, pinned: false, createdAt: now, updatedAt: now,
+                    createdBy: me.uid, createdByName: me.name });
     }
     hbNbSave(all);
     hbNbCloseEditor();
@@ -22560,6 +22643,8 @@ auth.onAuthStateChanged(async (user)=>{
     if(typeof monRenderAll === 'function'){
       try{ monRenderAll(); }catch(e){}
     }
+    // 📓 অন্য স্টাফ নোট লিখলে খোলা খাতাতেও সাথে সাথে দেখা যায়
+    if(typeof hbNbRender === 'function'){ try{ hbNbRender(); hbNbUpdateCount(); }catch(e){} }
     showSyncToast();
   });
   applyRoleRestrictions(session.role);

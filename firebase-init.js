@@ -232,6 +232,14 @@ const ROW_KEYS = {
   "bcc-reco-history": "recoHistory"
 };
 
+/* 📓 দোকানের সবার নোটবুক (hb-notebook:team:<দোকান>) — প্রতিটা নোট আলাদা নথি,
+   যাতে দুইজন স্টাফ একসাথে লিখলেও কারো নোট চাপা না পড়ে */
+function __rowType(k) {
+  if (ROW_KEYS[k]) return ROW_KEYS[k];
+  if (k && k.indexOf("hb-notebook:team:") === 0) return "notes";
+  return null;
+}
+
 /* মোছার তালিকা — দুই দিক থেকে এলে দুটোই রাখা হয় (union), কখনো ছোট হয় না */
 const UNION_KEYS = [
   "phone-shop-deleted-entry-ids", "shop-deleted-expense-ids",
@@ -400,7 +408,7 @@ function pushLocalStorageToCloud() {
   return __enqueue(() => __doPush(__syncShopId));
 }
 
-function __rowDocId(k, id) { return ROW_KEYS[k] + "~" + __enc(id); }
+function __rowDocId(k, id) { return __rowType(k) + "~" + __enc(id); }
 function __kvDocId(k) { return "kv~" + __enc(k); }
 function __kvPartId(k, p) { return "kvp~" + __enc(k) + "~" + p; }
 
@@ -494,7 +502,7 @@ async function __doPush(shopId) {
     const rh = __h(raw);
     const old = shadow.keys[k];
     if (old && old.rh === rh) continue;               // এই কী-তে কিছুই বদলায়নি
-    if (ROW_KEYS[k]) {
+    if (__rowType(k)) {
       let arr = null;
       try { arr = JSON.parse(raw); } catch (e) {}
       if (Array.isArray(arr)) { __diffRows(k, arr, rh, old, ops, next, now); continue; }
