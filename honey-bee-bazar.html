@@ -2240,14 +2240,15 @@
   <!-- 🐝🚕 Honey Bee Transport Media — ফুল-স্ক্রিন ড্যাশবোর্ড, আপাতত প্লেসহোল্ডার
        (Transport স্ক্রিনের উপরের টাইটেল বার থেকে ক্লিক করলে খোলে)। আসল
        কন্টেন্ট/ফিচার পরে এখানে যুক্ত করা হবে। -->
-  <div id="screenTransportMedia" style="padding:20px 16px;">
-    <button class="backBtn" id="backToTransportFromMedia">← ফিরে যান</button>
-    <div style="text-align:center; margin-bottom:16px;">
-      <div style="font-size:32px;">🐝🚕</div>
-      <div style="font-size:16px; font-weight:800;">Honey Bee Transport Media</div>
-      <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">এলাকার ড্রাইভার/গাড়ির সবশেষ আপডেট</div>
+  <!-- 🚕 অক্টোবর ২০২৬: এখানে এখন মালিকের নিজের বানানো যাত্রী অ্যাপের ডিজাইন
+       (honey-bee-transport.html) হুবহু বসানো — iframe-এর ভিতরে, যাতে ওর CSS
+       Bazar-এর বাকি পাতার সাথে না মেশে। উপরে শুধু একটা পাতলা "ফিরে যান" বার। -->
+  <div id="screenTransportMedia" style="padding:0;">
+    <div style="position:fixed; top:0; left:0; right:0; height:40px; z-index:10001; display:flex; align-items:center; padding:0 10px; background:#171717;">
+      <button class="backBtn" id="backToTransportFromMedia" style="margin:0; padding:5px 12px; font-size:13px;">← Bazar-এ ফিরে যান</button>
     </div>
-    <div id="tmFeedList">লোড হচ্ছে...</div>
+    <iframe id="hbTransportFrame" title="Honey Bee Transport" style="position:fixed; top:40px; left:0; width:100%; height:calc(100% - 40px); border:0; z-index:10000; background:#f3f4f6;" allow="geolocation"></iframe>
+    <div id="tmFeedList" style="display:none;"></div>
   </div>
 
   <!-- ✈️ Smart Flight Information — ফুল-স্ক্রিন, আপাতত খালি প্লেসহোল্ডার
@@ -3259,7 +3260,11 @@ let __hbNavigatingViaPopstate = false;
 function showScreen(id){
   ["screenRestaurant","screenRestaurantMenu","screenNotebook","screenHome","screenSmartWatch","screenSmartWatchMenu","screenPanchang","screenPrayer","screenSmartCalculator","screenCalcBasic","screenCalcScientific","screenCalcWeight","screenCalcBusiness","screenCalcMoney","screenCalcUnit","screenCalcConstruction","screenCalcUtility","screenCalcDatetime","screenCalcKids","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenMarketCategories","screenMarketSubcategories","screenMarketProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders","screenEkadashiSpecial"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
-  if(id === "screenTransportMedia") tmListenFeed(); // 📢 Phase 6 — স্ক্রিন খুললেই লাইভ ফিড লোড হয়
+  if(id === "screenTransportMedia"){
+    // 🚕 যাত্রী অ্যাপ প্রথমবার খুললে তবেই লোড হয় (আগে থেকে লোড করে খরচ/সময় নষ্ট না)
+    const __tf = document.getElementById("hbTransportFrame");
+    if(__tf && !__tf.getAttribute("src")) __tf.setAttribute("src", "honey-bee-transport.html");
+  }
   // ✈️ Smart Flight Tracking — অন্য কোনো স্ক্রিনে গেলে auto-refresh টাইমার
   // বন্ধ হয়ে যায় (ব্যাক বাটন/বটম-নেভ/popstate — সব পথ এখান দিয়েই যায়)
   if(id !== "screenSmartFlightInfo" && typeof sfiStopAutoRefresh === "function") sfiStopAutoRefresh();
