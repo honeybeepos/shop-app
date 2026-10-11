@@ -68,9 +68,35 @@ service cloud.firestore {
           (isSuperAdmin() || (myShopId() == shopId && myRole() == 'admin'));
       }
 
+      /* 📍 দোকানের লোকেশন বদলের খাতা — কে, কখন, কোথায় সেট করল।
+         শুধু তৈরি করা যায়; বদলানো বা মোছা যায় না। */
+      match /locationLog/{logId} {
+        allow read: if isSignedIn() && (isSuperAdmin() || myShopId() == shopId || isAgent());
+        allow create: if isSignedIn() && myShopId() == shopId && myRole() == 'admin'
+                      && request.resource.data.by == request.auth.uid
+                      && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+
       match /appdata/{docId} {
         allow read: if isSignedIn() && (isSuperAdmin() || myShopId() == shopId);
         allow write: if isSignedIn() && myShopId() == shopId;
+      }
+
+      /* 📒 দোকানের খাতা — নতুন গঠন (অক্টোবর ২০২৬)। আগে পুরো খাতা উপরের
+         appdata/main-এ একটা নথিতে থাকত (১ MiB সীমায় আটকে যেত)। এখন প্রতিটা
+         বিক্রি/কাস্টমার/পণ্য আলাদা নথি। শুধু এই দোকানের নিজের লোকই পড়তে/লিখতে
+         পারে। u অবশ্যই সার্ভারের সময় হতে হবে — ফোনগুলো এটা দিয়েই বোঝে কোনটা
+         নতুন, তাই কেউ পুরনো/ভবিষ্যতের সময় বসিয়ে গোলমাল করতে পারবে না।
+         মোছা হয় না, d:true দাগ দেওয়া হয় — তাই delete বন্ধ। */
+      match /ledger/{docId} {
+        allow read: if isSignedIn() && (isSuperAdmin() || myShopId() == shopId);
+        allow create, update: if isSignedIn() && myShopId() == shopId
+                              && request.resource.data.t in ['row', 'kv', 'kvp']
+                              && request.resource.data.k is string
+                              && request.resource.data.u == request.time
+                              && request.resource.data.by is string;
+        allow delete: if false;
       }
 
       /* 🇸🇦 কর চালানের খাতা (ZATCA)। প্রতিটা চালান নিজের আলাদা ডকুমেন্ট —
@@ -183,6 +209,15 @@ service cloud.firestore {
 
       /* খাবারের তালিকা। গ্রাহক পড়তে পারেন (Bazar-এ মেনু দেখাতে হয়),
          কিন্তু লিখতে পারেন শুধু ওই রেস্টুরেন্ট নিজে। */
+      /* 📍 রেস্টুরেন্টের লোকেশন বদলের খাতা — শুধু তৈরি করা যায় */
+      match /locationLog/{logId} {
+        allow read: if isSignedIn() && (isSuperAdmin() || request.auth.uid == restaurantId || isAgent());
+        allow create: if isSignedIn() && request.auth.uid == restaurantId
+                      && request.resource.data.by == request.auth.uid
+                      && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+
       match /foods/{foodId} {
         allow read: if true;
         allow write: if isSignedIn() && request.auth.uid == restaurantId;
@@ -225,8 +260,53 @@ service cloud.firestore {
       allow get: if true;
       allow list: if true;
       allow create: if isSuperAdmin();
-      allow update: if isSignedIn() && (isSuperAdmin() || request.auth.uid == agentId);
+      /* এজেন্ট নিজের নথিতে শুধু পুরনো রাইডার-চার্জ ঘরটা বদলাতে পারেন।
+         আগে পুরো নথিই পারতেন — মানে নিজের কমিশন, বাজার বা স্ট্যাটাসও! */
+      allow update: if isSignedIn() && (isSuperAdmin() ||
+        (request.auth.uid == agentId &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryChargeConfig'])));
       allow delete: if isSuperAdmin();
+    }
+
+    /* 💰 ডেলিভারি চার্জ — বাজারপিছু একটা নথি (ক্রেতার চার্জ + রাইডারের পাওনা)।
+       সবাই পড়তে পারে (দাম গোপন কিছু না, ক্রেতার অ্যাপ চেকআউটে দেখায়)।
+       লিখতে পারেন শুধু ওই বাজারের এজেন্ট বা সুপার-অ্যাডমিন। প্রতিটা সেভে
+       version ঠিক এক বাড়তে হবে, আর ইতিহাসের নথি শুধু তৈরি করা যায় —
+       বদলানো বা মোছা যায় না, তাই কে কখন কী বদলাল সেটা মুছে ফেলা যায় না। */
+    function isMarketAgent(marketId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/agents/$(request.auth.uid))
+             && myAgentMarketId() == marketId;
+    }
+    /* 🧾 অর্ডারের সিল করা ডেলিভারি চার্জ — শুধু সার্ভার লেখে (releaseHeldOrders)।
+       পড়তে পারেন: ওই অর্ডারের ক্রেতা, অর্ডারের দোকান/রেস্টুরেন্ট, এজেন্ট, সুপার-অ্যাডমিন। */
+    match /orderDeliveryCharges/{chargeId} {
+      allow read: if isSignedIn() && (
+        resource.data.customerUid == request.auth.uid
+        || request.auth.uid in resource.data.sourceIds
+        || isSuperAdmin() || isAgent());
+      allow write: if false;
+    }
+
+    match /deliveryPricing/{marketId} {
+      allow read: if true;
+      allow create, update: if (isSuperAdmin() || isMarketAgent(marketId))
+        && request.resource.data.marketId == marketId
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.version == (resource == null ? 1 : resource.data.version + 1)
+        && request.resource.data.tiers is list && request.resource.data.tiers.size() <= 10
+        && request.resource.data.minCharge is number && request.resource.data.minCharge >= 0
+        && request.resource.data.extraPerKm is number && request.resource.data.extraPerKm >= 0
+        && request.resource.data.maxDistanceKm is number
+        && request.resource.data.maxDistanceKm >= 1 && request.resource.data.maxDistanceKm <= 100;
+      allow delete: if isSuperAdmin();
+
+      match /history/{histId} {
+        allow read: if isSuperAdmin() || isMarketAgent(marketId);
+        allow create: if (isSuperAdmin() || isMarketAgent(marketId))
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
     }
 
     match /riders/{riderId} {
@@ -588,8 +668,19 @@ service cloud.firestore {
       allow update: if isSignedIn();
     }
 
+    /* 📊 বাজারের লাইভ অ্যানালিটিক্স — অতিথিরাও লেখে, তাই লগইন লাগে না।
+       তবে শুধু নির্দিষ্ট ঘরগুলোই লেখা যায়, নাম ছোট রাখতে হয় — যাতে কেউ
+       এখানে বড় বড় ডেটা ফেলে খরচ বাড়াতে না পারে। */
     match /activeSessions/{sessionId} {
-      allow create, update: if true;
+      allow create, update: if request.resource.data.keys().hasOnly([
+                                 'customerName', 'customerUid', 'scrollCount', 'totalDurationSec',
+                                 'currentShopId', 'currentShopName', 'lastHeartbeat', 'startedAt', 'expireAt'])
+                            && request.resource.data.lastHeartbeat == request.time
+                            && request.resource.data.customerName is string
+                            && request.resource.data.customerName.size() <= 100
+                            && (request.resource.data.currentShopName == null
+                                || (request.resource.data.currentShopName is string
+                                    && request.resource.data.currentShopName.size() <= 100));
       allow read: if isSuperAdmin();
       allow delete: if isSuperAdmin();
     }
