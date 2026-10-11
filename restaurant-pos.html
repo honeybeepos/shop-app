@@ -422,6 +422,11 @@ button{cursor:pointer;border:0}
 
     <section class="page" id="settings">
       <div class="panel" style="margin-bottom:18px">
+        <h2>ℹ️ আমার অ্যাকাউন্ট</h2>
+        <div style="font-size:13px;color:var(--muted);margin:6px 0 12px">মোবাইল নম্বর, জেলা, থানা, বাজার, মুদ্রা — সব তথ্য এক জায়গায়, আর লগইন পাসওয়ার্ড বদল।</div>
+        <button class="btn green" type="button" onclick="hbAcctOpen('restaurant')">দেখুন ও পাসওয়ার্ড বদলান</button>
+      </div>
+      <div class="panel" style="margin-bottom:18px">
         <h2>Restaurant Profile</h2>
         <div class="field" style="margin-top:12px">
           <label>Profile / Shop Banner Photo</label>
@@ -2061,6 +2066,171 @@ async function rstSetLocation(){
   }catch(e){ setBusy(null); toastRP("সেভ হয়নি — " + (e.code || "আবার চেষ্টা করুন"), true); }
 }
 document.getElementById("rstSetLocBtn")?.addEventListener("click", rstSetLocation);
+
+/* ==================== ℹ️ আমার অ্যাকাউন্ট ও পাসওয়ার্ড (দোকানের POS আর রেস্টুরেন্ট — দুই জায়গায় একই কোড) ====================
+   মালিক (বা স্টাফ) এখানে নিজের সব তথ্য এক জায়গায় দেখেন: নাম, ইমেইল/মোবাইল,
+   দেশ, মুদ্রা, জেলা, থানা, বাজার, লোকেশন, কবে নিবন্ধন — আর লগইন পাসওয়ার্ড বদলাতে পারেন।
+   পাসওয়ার্ড বদলাতে আগে বর্তমান পাসওয়ার্ড লাগে (Firebase-এর নিয়ম, আর এটাই নিরাপদ —
+   ফোন খোলা পেয়ে অন্য কেউ পাসওয়ার্ড বদলে দিতে পারবে না)। */
+function hbAcctEsc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+function hbAcctDate(t){
+  try{
+    const d = t && t.toDate ? t.toDate() : (t ? new Date(t) : null);
+    if(!d || isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("bn-BD", { day:"numeric", month:"long", year:"numeric" });
+  }catch(e){ return ""; }
+}
+const HB_ACCT_COUNTRY = { BD:"বাংলাদেশ", SA:"সৌদি আরব", AE:"সংযুক্ত আরব আমিরাত", QA:"কাতার", KW:"কুয়েত", OM:"ওমান", BH:"বাহরাইন", MY:"মালয়েশিয়া", IN:"ভারত" };
+
+async function hbAcctRows(kind){
+  const user = auth.currentUser;
+  const rows = [];
+  const add = function(icon, label, value, extra){ if(value !== undefined && value !== null && value !== "") rows.push({ icon: icon, label: label, value: String(value), extra: extra || "" }); };
+  let marketId = null, loc = null;
+
+  if(kind === "shop"){
+    const se = (typeof getSession === "function") ? getSession() : {};
+    let shop = {}, me = {};
+    try{ const s = await db.collection("shops").doc(se.shopId).get(); shop = s.exists ? s.data() : {}; }catch(e){}
+    try{ const u = await db.collection("users").doc(user.uid).get(); me = u.exists ? u.data() : {}; }catch(e){}
+    rows.push({ section: "👤 আপনি" });
+    add("🙍", "নাম", me.name || se.name);
+    add("🎖️", "ভূমিকা", (se.role === "admin" || me.role === "admin") ? "মালিক (এডমিন)" : "স্টাফ (সাব-ইউজার)");
+    add("📧", "লগইন ইমেইল", user.email, user.emailVerified ? "✅ যাচাই করা" : "⚠️ যাচাই হয়নি");
+    rows.push({ section: "🏪 দোকান" });
+    add("🏷️", "দোকানের নাম", shop.shopName || se.shopName);
+    add("👑", "মালিক", shop.ownerName);
+    if(shop.ownerEmail && shop.ownerEmail !== user.email) add("📨", "মালিকের ইমেইল", shop.ownerEmail);
+    add("🌍", "দেশ", shop.country || HB_ACCT_COUNTRY[shop.countryCode] || shop.countryCode || "বাংলাদেশ");
+    add("💰", "মুদ্রা", [shop.currencyCode, shop.currencySymbol].filter(Boolean).join(" · ") || "BDT · ৳");
+    add("🗺️", "জেলা", shop.district);
+    add("📍", "উপজেলা / থানা", shop.upazila);
+    marketId = shop.marketId; loc = shop.storeLocation;
+    add("🟢", "অবস্থা", shop.status === "blocked" ? "🔴 বন্ধ করা" : "সক্রিয়");
+    add("📅", "নিবন্ধন", hbAcctDate(shop.createdAt));
+    add("🆔", "দোকান আইডি", se.shopId ? String(se.shopId).slice(0, 8) + "…" : "");
+  }else{
+    let r = {};
+    try{ const s = await db.collection("restaurants").doc(user.uid).get(); r = s.exists ? s.data() : {}; }catch(e){}
+    rows.push({ section: "👤 মালিক" });
+    add("🙍", "মালিকের নাম", r.ownerName);
+    add("📱", "লগইনের মোবাইল নম্বর", r.phone);
+    rows.push({ section: "🍽️ রেস্টুরেন্ট" });
+    add("🏷️", "রেস্টুরেন্টের নাম", r.name);
+    add("💰", "মুদ্রা", r.currency || (typeof RP !== "undefined" && RP.cur) || "");
+    add("🗺️", "জেলা", r.district);
+    add("📍", "উপজেলা / থানা", r.upazila);
+    add("🏠", "ঠিকানা", r.address);
+    marketId = r.marketId; loc = r.storeLocation;
+    add("🟢", "অবস্থা", r.status === "blocked" ? "🔴 বন্ধ করা" : (r.isVerified ? "সক্রিয় · ✅ যাচাই করা" : "সক্রিয়"));
+    add("📅", "নিবন্ধন", hbAcctDate(r.createdAt));
+  }
+
+  if(marketId){
+    let mName = marketId;
+    try{ const m = await db.collection("markets").doc(marketId).get(); if(m.exists) mName = m.data().name || marketId; }catch(e){}
+    add("🏬", "বাজার", mName);
+  }
+  if(loc && loc.lat != null){
+    add("📌", "লোকেশন", "সেভ আছে" + (loc.accuracyM ? " (±" + loc.accuracyM + " মি)" : ""),
+        '<a href="https://www.google.com/maps/search/?api=1&query=' + loc.lat + "," + loc.lng + '" target="_blank" rel="noopener">ম্যাপে দেখুন</a>');
+  }else{
+    add("📌", "লোকেশন", "⚠️ দেওয়া হয়নি");
+  }
+  const last = user.metadata && user.metadata.lastSignInTime;
+  if(last) add("🔑", "শেষ লগইন", hbAcctDate(last));
+  return rows;
+}
+
+function hbAcctUsesPassword(){
+  const u = auth.currentUser;
+  return !!(u && (u.providerData || []).some(function(p){ return p && p.providerId === "password"; }));
+}
+
+async function hbAcctOpen(kind){
+  let ov = document.getElementById("hbAcctOverlay");
+  if(ov) ov.remove();
+  ov = document.createElement("div");
+  ov.id = "hbAcctOverlay";
+  ov.style.cssText = "position:fixed;inset:0;z-index:100001;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:16px;";
+  ov.innerHTML =
+    '<div style="background:#fff;color:#1f2937;border-radius:16px;max-width:440px;width:100%;margin:auto;box-shadow:0 12px 40px rgba(0,0,0,.35);font-family:inherit;">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #eee;">'
+    +   '<b style="font-size:16px;">ℹ️ আমার অ্যাকাউন্ট</b>'
+    +   '<button type="button" id="hbAcctClose" style="border:0;background:#f3f4f6;border-radius:10px;padding:8px 12px;font-size:15px;cursor:pointer;">✕</button></div>'
+    + '<div id="hbAcctInfo" style="padding:6px 16px 4px;font-size:13.5px;">⏳ তথ্য আনা হচ্ছে...</div>'
+    + '<div id="hbAcctPass" style="padding:12px 16px 16px;border-top:1px solid #eee;"></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  const close = function(){ ov.remove(); };
+  ov.addEventListener("click", function(e){ if(e.target === ov) close(); });
+  document.getElementById("hbAcctClose").onclick = close;
+
+  // ---- তথ্য ----
+  try{
+    const rows = await hbAcctRows(kind);
+    document.getElementById("hbAcctInfo").innerHTML = rows.map(function(r){
+      if(r.section) return '<div style="margin:12px 0 4px;font-weight:800;font-size:13px;color:#92400e;">' + hbAcctEsc(r.section) + '</div>';
+      return '<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed #eee;align-items:flex-start;">'
+        + '<span style="width:22px;flex-shrink:0;text-align:center;">' + r.icon + '</span>'
+        + '<span style="color:#6b7280;min-width:118px;flex-shrink:0;">' + hbAcctEsc(r.label) + '</span>'
+        + '<span style="font-weight:700;word-break:break-word;">' + hbAcctEsc(r.value)
+        + (r.extra ? '<br><span style="font-weight:400;font-size:12px;color:#6b7280;">' + r.extra + '</span>' : '') + '</span></div>';
+    }).join("");
+  }catch(e){
+    document.getElementById("hbAcctInfo").textContent = "তথ্য আনা যায়নি — ইন্টারনেট দেখে আবার খুলুন।";
+  }
+
+  // ---- পাসওয়ার্ড বদল ----
+  const pass = document.getElementById("hbAcctPass");
+  if(!hbAcctUsesPassword()){
+    pass.innerHTML = '<div style="font-size:13px;color:#6b7280;">🔐 আপনি Google দিয়ে লগইন করেন, তাই পাসওয়ার্ড Google অ্যাকাউন্টেই বদলাতে হয়।</div>';
+    return;
+  }
+  const inp = 'style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #d1d5db;border-radius:10px;font-size:14px;margin:4px 0 10px;font-family:inherit;"';
+  pass.innerHTML =
+      '<div style="font-weight:800;font-size:14px;margin-bottom:8px;">🔑 লগইন পাসওয়ার্ড বদলান</div>'
+    + '<label style="font-size:12.5px;color:#6b7280;">বর্তমান পাসওয়ার্ড</label><input type="password" id="hbAcctCur" autocomplete="current-password" ' + inp + '>'
+    + '<label style="font-size:12.5px;color:#6b7280;">নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label><input type="password" id="hbAcctNew" autocomplete="new-password" ' + inp + '>'
+    + '<label style="font-size:12.5px;color:#6b7280;">নতুন পাসওয়ার্ড আবার</label><input type="password" id="hbAcctNew2" autocomplete="new-password" ' + inp + '>'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:-2px 0 12px;cursor:pointer;"><input type="checkbox" id="hbAcctShow" style="width:18px;height:18px;"> পাসওয়ার্ড দেখান</label>'
+    + '<button type="button" id="hbAcctSave" style="width:100%;padding:12px;border:0;border-radius:11px;background:#16a34a;color:#fff;font-weight:800;font-size:14.5px;cursor:pointer;font-family:inherit;">✅ পাসওয়ার্ড বদলান</button>'
+    + '<div id="hbAcctMsg" style="font-size:13px;margin-top:10px;line-height:1.5;"></div>'
+    + (kind === "shop" ? '<div style="font-size:12px;color:#6b7280;margin-top:10px;line-height:1.5;">বর্তমান পাসওয়ার্ড মনে নেই? লগইন পাতায় "পাসওয়ার্ড ভুলে গেছি" চাপলে ইমেইলে লিংক যাবে।<br>📌 এটা <b>লগইন পাসওয়ার্ড</b> — নোটবুকের তালা বা ক্যাশের "মাস্টার পাসওয়ার্ড" আলাদা জিনিস।</div>'
+                     : '<div style="font-size:12px;color:#6b7280;margin-top:10px;line-height:1.5;">⚠️ মোবাইল দিয়ে নিবন্ধন করা, তাই ইমেইলে পাসওয়ার্ড ফেরত পাওয়ার উপায় নেই — নতুন পাসওয়ার্ড কোথাও লিখে রাখুন।</div>');
+  document.getElementById("hbAcctShow").onchange = function(){
+    const t = this.checked ? "text" : "password";
+    ["hbAcctCur","hbAcctNew","hbAcctNew2"].forEach(function(id){ document.getElementById(id).type = t; });
+  };
+  document.getElementById("hbAcctSave").onclick = async function(){
+    const msg = document.getElementById("hbAcctMsg");
+    const say = function(t, good){ msg.style.color = good ? "#15803d" : "#b91c1c"; msg.textContent = t; };
+    const cur = document.getElementById("hbAcctCur").value;
+    const n1 = document.getElementById("hbAcctNew").value;
+    const n2 = document.getElementById("hbAcctNew2").value;
+    if(!cur){ say("বর্তমান পাসওয়ার্ড লিখুন।"); return; }
+    if(n1.length < 6){ say("নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।"); return; }
+    if(n1 !== n2){ say("দুইবারের নতুন পাসওয়ার্ড এক হয়নি — মিলিয়ে আবার লিখুন।"); return; }
+    if(n1 === cur){ say("নতুন পাসওয়ার্ড আগেরটার মতোই — অন্য কিছু দিন।"); return; }
+    const btn = this; btn.disabled = true; btn.textContent = "⏳ বদলানো হচ্ছে...";
+    try{
+      const u = auth.currentUser;
+      const cred = firebase.auth.EmailAuthProvider.credential(u.email, cur);
+      await u.reauthenticateWithCredential(cred);
+      await u.updatePassword(n1);
+      ["hbAcctCur","hbAcctNew","hbAcctNew2"].forEach(function(id){ document.getElementById(id).value = ""; });
+      say("✅ পাসওয়ার্ড বদলে গেছে। পরের বার লগইনে নতুন পাসওয়ার্ড লাগবে।", true);
+    }catch(e){
+      const c = (e && e.code) || "";
+      if(c === "auth/wrong-password" || c === "auth/invalid-credential" || c === "auth/invalid-login-credentials") say("বর্তমান পাসওয়ার্ড ভুল হয়েছে।");
+      else if(c === "auth/too-many-requests") say("অনেকবার ভুল হয়েছে — কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+      else if(c === "auth/weak-password") say("পাসওয়ার্ড খুব দুর্বল — আরও লম্বা/কঠিন দিন।");
+      else if(c === "auth/network-request-failed") say("ইন্টারনেট নেই — নেট দেখে আবার চেষ্টা করুন।");
+      else say("বদলানো যায়নি: " + (e && e.message ? e.message : c));
+    }
+    btn.disabled = false; btn.textContent = "✅ পাসওয়ার্ড বদলান";
+  };
+}
 
 async function saveRestaurantProfile(){
   if(!RP.uid)return alert("Restaurant login পাওয়া যায়নি।");
