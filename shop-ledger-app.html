@@ -5161,7 +5161,7 @@ window.hbLoadLib = function(name){
         <div style="background:#f3f4f6; border-radius:10px; padding:12px; margin:14px 0;">
           <div style="display:flex; align-items:center; justify-content:space-between;">
             <div>
-              <div style="font-weight:700; font-size:13.5px;">🐝 Honey Bee Bazar-এ প্রকাশ</div>
+              <div style="font-weight:700; font-size:13.5px; color:#1f2937;">🐝 Honey Bee Bazar-এ প্রকাশ</div>
               <div id="bccPublishStatusTxt" style="font-size:11.5px; color:#6b7280; margin-top:2px;">🔴 লুকানো আছে</div>
             </div>
             <label class="bccPublishSwitch">
@@ -11632,6 +11632,7 @@ async function bccSyncProductToBazar(p){
   try{
     const session = (typeof getSession === 'function') ? getSession() : null;
     if(!session || !session.shopId || typeof db === 'undefined') return;
+    if(!hbBazarAllowed()){ p.published = false; bccPendingQueueRemove('bcc-pending-bazar-sync', p.id); bccUnpublishFromBazar(p.id); return; }
     const m = bccGetMarketMeta(p);
     await db.collection('shops').doc(session.shopId).collection('publicStock').doc(p.id).set({
       name: p.name,
@@ -11984,6 +11985,11 @@ function fixBrokenInvoiceNumbers(){
 function hbShopCountry(){
   return localStorage.getItem('shop-country-code') || 'BD';
 }
+/* 🔒 Honey Bee Bazar (অনলাইন বাজার) শুধু বাংলাদেশের দোকানের জন্য।
+   অন্য দেশের দোকানে: পণ্য প্রকাশের সুইচ তালা দেওয়া (সবসময় "লুকানো"),
+   আর দোকান খোলা/বন্ধ সুইচ সবসময় "বন্ধ"। POS-এর বাকি সব কাজ আগের মতোই চলে। */
+function hbBazarAllowed(){ return hbShopCountry() === 'BD'; }
+const HB_BAZAR_LOCK_MSG = '🔒 Honey Bee Bazar এখন শুধু বাংলাদেশের দোকানের জন্য — আপনার দোকানের পণ্য অনলাইনে প্রকাশ হবে না।';
 function hbPrintLang(){
   return hbShopCountry() === 'BD' ? 'bn' : 'en';
 }
@@ -12408,6 +12414,7 @@ document.getElementById('bccBulkModeBtn').addEventListener('click', ()=>{
 });
 
 document.getElementById('bccBulkPublishBtn').addEventListener('click', async ()=>{
+  if(!hbBazarAllowed()){ toast(HB_BAZAR_LOCK_MSG); return; }
   if(bccBulkSelectedIds.size === 0){ toast('অন্তত একটা প্রোডাক্ট সিলেক্ট করুন'); return; }
   const prods = bccLoadProducts();
   let count = 0;
@@ -12791,8 +12798,16 @@ document.getElementById('bccProductModalClose').addEventListener('click', ()=>{
 });
 
 function bccUpdatePublishStatusTxt(){
-  const on = document.getElementById('bccPPublished').checked;
-  document.getElementById('bccPublishStatusTxt').textContent = on ? '🟢 কাস্টমাররা Bazar-এ দেখতে পাচ্ছে' : '🔴 লুকানো আছে';
+  const cb = document.getElementById('bccPPublished');
+  const txt = document.getElementById('bccPublishStatusTxt');
+  if(!hbBazarAllowed()){
+    cb.checked = false; cb.disabled = true;
+    cb.parentElement.style.opacity = '.45'; cb.parentElement.style.pointerEvents = 'none';
+    txt.textContent = '🔒 লুকানো — Bazar শুধু বাংলাদেশের দোকানের জন্য';
+    return;
+  }
+  cb.disabled = false; cb.parentElement.style.opacity = ''; cb.parentElement.style.pointerEvents = '';
+  txt.textContent = cb.checked ? '🟢 কাস্টমাররা Bazar-এ দেখতে পাচ্ছে' : '🔴 লুকানো আছে';
 }
 document.getElementById('bccPPublished').addEventListener('change', bccUpdatePublishStatusTxt);
 
@@ -13437,7 +13452,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
   const enteredBuy = Number(document.getElementById('bccPBuy').value)||0;
   const enteredSell = Number(document.getElementById('bccPSell').value)||0;
   const enteredOfferPrice = Number(document.getElementById('bccPOfferPrice').value) || 0;
-  const enteredPublished = document.getElementById('bccPPublished').checked;
+  const enteredPublished = hbBazarAllowed() && document.getElementById('bccPPublished').checked;
   const enteredUnit = bccIsWeightMode() ? (document.getElementById('bccPUnit').value || 'pcs') : 'pcs';
   const enteredGeneric = document.getElementById('bccPGeneric').value.trim();
   const enteredRack = document.getElementById('bccPRack').value.trim();
@@ -19423,7 +19438,19 @@ function watchShopStatus(shopId){
     }
     // 🟢🔴 হেডারের খোলা/বন্ধ সুইচ — অন্য কোনো ডিভাইস/ট্যাব থেকে বদলালেও এখানে লাইভ সিঙ্ক হবে;
     // ফিল্ড না থাকলে (পুরনো দোকান) ডিফল্ট "খোলা" ধরা হয়, যাতে হঠাৎ বন্ধ দেখানো না হয়ে যায়
-    hbApplyShopOpenToggleUI(shop.isShopOpen !== false);
+    if(shop.countryCode && shop.countryCode !== 'BD'){
+      // 🔒 বাংলাদেশের বাইরের দোকান — অনলাইনে সবসময় বন্ধ
+      try{ localStorage.setItem('shop-country-code', shop.countryCode); }catch(e){}
+      hbApplyShopOpenToggleUI(false);
+      const __w = document.getElementById("headerShopOpenWrap");
+      if(__w){ __w.style.opacity = ".5"; __w.title = "Bazar শুধু বাংলাদেশের দোকানের জন্য"; }
+      const __se = (typeof getSession === 'function') ? getSession() : null;
+      if(shop.isShopOpen !== false && __se && __se.role === 'admin'){
+        db.collection("shops").doc(shopId).set({ isShopOpen: false }, { merge: true }).catch(()=>{});
+      }
+    }else{
+      hbApplyShopOpenToggleUI(shop.isShopOpen !== false);
+    }
 
     // 🏪 দোকানের ছবি — ক্লাউডে (shops/{shopId}.logoUrl) যা আছে সেটাই এখানেও
     // দেখানো হয়, যাতে নতুন ডিভাইস/ব্রাউজারে লগইন করলেও আগে আপলোড করা ছবিটা
@@ -19490,6 +19517,7 @@ document.getElementById("headerShopOpenWrap").addEventListener("click", async ()
     alert("দোকানের তথ্য পাওয়া যাচ্ছে না। একবার পেজ রিলোড করুন, অথবা লগ-আউট করে আবার লগইন করুন।");
     return;
   }
+  if(!hbBazarAllowed()){ toast(HB_BAZAR_LOCK_MSG); hbApplyShopOpenToggleUI(false); return; }
   // 🐞 বাগ-ফিক্স: newState আগে শুধু headerShopOpenState ভ্যারিয়েবলের ওপর
   // নির্ভর করে ঠিক হতো — কোনো কারণে (রেস-কন্ডিশন/অন্য কোনো অসামঞ্জস্য) এই
   // ভ্যারিয়েবলটা স্ক্রিনে আসলে কী দেখাচ্ছে তার সাথে মিলে না গেলে সুইচ একদিকে
