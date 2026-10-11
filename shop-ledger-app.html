@@ -12347,7 +12347,17 @@ function bccPopulateSubSubSelect(selectEl, catId, subId, selectedSubSubId){
 let bccBulkMode = false;
 let bccBulkSelectedIds = new Set();
 
+/* 🔒 "একাধিক সিলেক্ট" শুধু Bazar-এ প্রকাশ/লুকানোর জন্য — বাংলাদেশের বাইরে তালা */
+function hbApplyBazarLockUI(){
+  const b = document.getElementById('bccBulkModeBtn');
+  if(!b || hbBazarAllowed()) return;
+  bccBulkMode = false;
+  b.textContent = '🔒 একাধিক সিলেক্ট (শুধু বাংলাদেশ)';
+  b.style.opacity = '.45'; b.style.filter = 'grayscale(1)';
+  const row = document.getElementById('bccBulkActionRow'); if(row) row.style.display = 'none';
+}
 function bccRenderProducts(){
+  hbApplyBazarLockUI();
   const q = (document.getElementById('bccProductSearch').value||'').trim().toLowerCase();
   const prods = bccLoadProducts().filter(p=> !q ||
     p.name.toLowerCase().includes(q) ||
@@ -12406,6 +12416,7 @@ function bccRenderProducts(){
 document.getElementById('bccProductSearch').addEventListener('input', ()=> bccRenderProducts());
 
 document.getElementById('bccBulkModeBtn').addEventListener('click', ()=>{
+  if(!hbBazarAllowed()){ toast(HB_BAZAR_LOCK_MSG); return; }
   bccBulkMode = !bccBulkMode;
   bccBulkSelectedIds.clear();
   document.getElementById('bccBulkActionRow').style.display = bccBulkMode ? 'flex' : 'none';
