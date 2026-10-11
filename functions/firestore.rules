@@ -1,0 +1,770 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function isSuperAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/superadmins/$(request.auth.uid));
+    }
+    function myUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function myShopId() { return myUserData().shopId; }
+    function myRole() { return myUserData().role; }
+    function isAgent() { return isSignedIn() && myRole() == 'agent'; }
+    // 🍽️ রেস্টুরেন্ট কোন বাজারের — "ডেলিভারি ম্যান" পাতায় নিজের বাজারের
+    //    অনলাইন রাইডার দেখানোর জন্য দরকার।
+    function myRestaurantMarketId() {
+      return get(/databases/$(database)/documents/restaurants/$(request.auth.uid)).data.marketId;
+    }
+    function myAgentMarketId() {
+      return get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.marketId;
+    }
+
+    match /superadmins/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /system/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /users/{uid} {
+      allow create: if isSignedIn() &&
+        (request.auth.uid == uid || isSuperAdmin() || isAgent() ||
+         (myRole() == 'admin' && request.resource.data.shopId == myShopId()));
+      allow read: if isSignedIn() &&
+        (request.auth.uid == uid || isSuperAdmin() ||
+         myShopId() == get(/databases/$(database)/documents/users/$(uid)).data.shopId);
+      allow update: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
+      allow delete: if isSuperAdmin();
+    }
+
+    match /shops/{shopId} {
+      allow create: if isSignedIn() && request.auth.uid == shopId;
+      allow get: if true;
+      allow list: if true;
+      // 👍 দোকানের ছবি/পোস্টে Facebook-এর মতো লাইক — logoLikedBy/logoLikeCount
+      // সরাসরি এই shops/{shopId} ডকুমেন্টেই ডিনরমালাইজড রাখা হয়েছে
+      // (transportMediaPosts-এর likedBy/likeCount-এর একই প্যাটার্ন), তাই
+      // যেকোনো সাইন-ইন করা (নন-অ্যানোনিমাস) কাস্টমারকে শুধু এই দুইটা +
+      // logoCommentCount ফিল্ড বদলানোর অনুমতি দেওয়া হচ্ছে — মালিক/এজেন্ট/
+      // সুপারঅ্যাডমিন ছাড়া বাকি সব ফিল্ড আগের মতোই সুরক্ষিত থাকছে।
+      allow update: if isSignedIn() &&
+        (isSuperAdmin() ||
+         (myShopId() == shopId && myRole() == 'admin') ||
+         (resource.data.assignedAgentId == request.auth.uid) ||
+         (request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['logoLikedBy','logoLikeCount','logoCommentCount'])));
+      allow delete: if isSuperAdmin();
+
+      match /members/{memberUid} {
+        allow read: if isSignedIn() && (isSuperAdmin() || myShopId() == shopId);
+        allow write: if isSignedIn() &&
+          (isSuperAdmin() || (myShopId() == shopId && myRole() == 'admin'));
+      }
+
+      /* 📍 দোকানের লোকেশন বদলের খাতা — কে, কখন, কোথায় সেট করল।
+         শুধু তৈরি করা যায়; বদলানো বা মোছা যায় না। */
+      match /locationLog/{logId} {
+        allow read: if isSignedIn() && (isSuperAdmin() || myShopId() == shopId || isAgent());
+        allow create: if isSignedIn() && myShopId() == shopId && myRole() == 'admin'
+                      && request.resource.data.by == request.auth.uid
+                      && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+
+      match /appdata/{docId} {
+        allow read: if isSignedIn() && (isSuperAdmin() || myShopId() == shopId);
+        allow write: if isSignedIn() && myShopId() == shopId;
+      }
+
+      /* 📒 দোকানের খাতা — নতুন গঠন (অক্টোবর ২০২৬)। আগে পুরো খাতা উপরের
+         appdata/main-এ একটা নথিতে থাকত (১ MiB সীমায় আটকে যেত)। এখন প্রতিটা
+         বিক্রি/কাস্টমার/পণ্য আলাদা নথি। শুধু এই দোকানের নিজের লোকই পড়তে/লিখতে
+         পারে। u অবশ্যই সার্ভারের সময় হতে হবে — ফোনগুলো এটা দিয়েই বোঝে কোনটা
+         নতুন, তাই কেউ পুরনো/ভবিষ্যতের সময় বসিয়ে গোলমাল করতে পারবে না।
+         মোছা হয় না, d:true দাগ দেওয়া হয় — তাই delete বন্ধ। */
+      match /ledger/{docId} {
+        allow read: if isSignedIn() && (isSuperAdmin() || myShopId() == shopId);
+        allow create, update: if isSignedIn() && myShopId() == shopId
+                              && request.resource.data.t in ['row', 'kv', 'kvp']
+                              && request.resource.data.k is string
+                              && request.resource.data.u == request.time
+                              && request.resource.data.by is string;
+        allow delete: if false;
+      }
+
+      /* 🇸🇦 কর চালানের খাতা (ZATCA)। প্রতিটা চালান নিজের আলাদা ডকুমেন্ট —
+         তাই দুই ফোন থেকে একসাথে বিক্রি হলেও একটা আরেকটাকে চাপা দিতে পারে না।
+
+         লেখা যায় শুধু একবার: তৈরি করা যায়, কিন্তু বদলানো বা মোছা যায় না।
+         কর চালান বদলানোর জিনিস নয় — ভুল হলে আলাদা ক্রেডিট নোট দিতে হয়,
+         পুরনো চালান মুছে নয়। নিয়মেই সেটা আটকে দেওয়া হলো, যাতে অ্যাপের
+         কোনো বাগ বা কেউ ইচ্ছে করে চাইলেও খাতা বদলাতে না পারে।
+
+         একটা ব্যতিক্রম আছে, আর সেটা ইচ্ছে করেই: হুবহু একই লেখা আবার
+         পাঠালে আটকানো হয় না। নেট খারাপ থাকলে চালান সার্ভারে পৌঁছেও
+         উত্তরটা ফিরে না-ও আসতে পারে; তখন ফোন ভাবে "যায়নি" আর আবার
+         পাঠায়। সেটাকে "বদলানো" ধরে আটকে দিলে ওই চালানটা চিরকাল
+         আটকে থাকত। শর্তটা দেখে নিচ্ছে নতুন লেখা আর পুরনো লেখা
+         অক্ষরে অক্ষরে এক কিনা — এক হলে কিছুই বদলাচ্ছে না, তাই
+         নিরাপদ; এক বিন্দু আলাদা হলেই সাথে সাথে আটকে যাবে। */
+      match /zatcaInvoices/{invoiceId} {
+        allow read: if isSignedIn() && (isSuperAdmin() || myShopId() == shopId);
+        allow create: if isSignedIn() && myShopId() == shopId
+                      && request.resource.data.icv is number
+                      && request.resource.data.icv > 0;
+        allow update: if isSignedIn() && myShopId() == shopId
+                      && request.resource.data == resource.data;
+        allow delete: if false;
+      }
+
+      // 🏷️ ওজন-ভিত্তিক প্রোডাক্টের বারকোড স্টিকার টিকেট ("🏷️ QR" ট্যাব) — শুধু এই
+      // দোকানের নিজের স্টাফই পড়তে/লিখতে পারবে (পাবলিক না, কাস্টমার/গেস্টের এখানে
+      // কোনো কাজ নেই); ওজন করার ডিভাইস আর কাউন্টারের স্ক্যান-ডিভাইস আলাদা হতে পারে
+      // বলেই এটা localStorage-এর বদলে এখানে রাখা হয়েছে
+      match /weightTickets/{ticketId} {
+        allow read, write: if isSignedIn() && myShopId() == shopId;
+      }
+
+      match /deliveryCalls/{callId} {
+        allow read: if true;
+        allow create: if isSignedIn() && myShopId() == shopId;
+        allow update: if true;
+      }
+
+      match /deliveryDevices/{token} {
+        allow read, write: if true;
+      }
+
+      match /publicStock/{itemId} {
+        allow read: if true;
+        allow write: if isSignedIn() && myShopId() == shopId;
+
+        // 👍 লাইক ও 💬 কমেন্ট (Bazar প্রোডাক্ট পেজ + পাবলিক Facebook লিংক পেজ) —
+        // পড়া সবার জন্য খোলা (গেস্ট/Facebook ভিজিটরও দেখতে পারবে), কিন্তু লেখার
+        // জন্য আসল Google লগইন লাগবে (guest checkout-এর Anonymous Auth দিয়ে
+        // লাইক/কমেন্ট করা যাবে না, যাতে স্প্যাম আটকানো যায়)
+        match /comments/{commentId} {
+          allow read: if true;
+          allow create: if isSignedIn() &&
+            request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+            request.resource.data.customerUid == request.auth.uid &&
+            request.resource.data.text is string &&
+            request.resource.data.text.size() > 0 &&
+            request.resource.data.text.size() <= 500;
+          allow update, delete: if false;
+        }
+
+        match /likes/{uid} {
+          allow read: if true;
+          allow create, delete: if isSignedIn() &&
+            request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+            request.auth.uid == uid;
+          allow update: if false;
+        }
+      }
+
+      // 💬 দোকানের ছবি/পোস্টে মন্তব্য — publicStock/{itemId}/comments-এর
+      // ঠিক একই কনভেনশন (পড়া সবার জন্য খোলা, লেখা শুধু আসল Google
+      // লগইন করা কাস্টমারের জন্য, ইমিউটেবল — এডিট/ডিলিট নেই)।
+      match /logoComments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn() &&
+          request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+          request.resource.data.customerUid == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 500;
+        allow update, delete: if false;
+      }
+
+      match /publicCategories/{catId} {
+        allow read: if true;
+        allow write: if isSignedIn() && myShopId() == shopId;
+      }
+
+      match /live/{docId} {
+        allow read, write: if true;
+      }
+    }
+
+    /* 🍽️ রেস্টুরেন্ট — নিজস্ব POS দিয়ে নিবন্ধন করে, Bazar-এ দেখা যায়।
+       ⚠️ এই ব্লকটা না থাকলে Firestore ডিফল্টে সব আটকে দিত — নিবন্ধন
+          লিখতেই পারত না, আর Bazar-এর তালিকাও চিরকাল খালি থাকত। */
+    match /restaurants/{restaurantId} {
+      // গ্রাহক (লগইন ছাড়াও) তালিকা দেখতে পারেন — Bazar-এর জন্য দরকার
+      allow read: if true;
+
+      // নিজের নথি নিজেই বানায়; অন্য কারও নথিতে হাত দিতে পারে না
+      allow create: if isSignedIn() && request.auth.uid == restaurantId;
+      allow update: if isSignedIn()
+                    && (isSuperAdmin() || request.auth.uid == restaurantId);
+      allow delete: if isSuperAdmin();
+
+      /* খাবারের তালিকা। গ্রাহক পড়তে পারেন (Bazar-এ মেনু দেখাতে হয়),
+         কিন্তু লিখতে পারেন শুধু ওই রেস্টুরেন্ট নিজে। */
+      /* 📍 রেস্টুরেন্টের লোকেশন বদলের খাতা — শুধু তৈরি করা যায় */
+      match /locationLog/{logId} {
+        allow read: if isSignedIn() && (isSuperAdmin() || request.auth.uid == restaurantId || isAgent());
+        allow create: if isSignedIn() && request.auth.uid == restaurantId
+                      && request.resource.data.by == request.auth.uid
+                      && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+
+      match /foods/{foodId} {
+        allow read: if true;
+        allow write: if isSignedIn() && request.auth.uid == restaurantId;
+      }
+
+      /* অর্ডার — গ্রাহক Bazar থেকে অর্ডার বসায়, রেস্টুরেন্ট সেটা দেখে ও
+         অবস্থা বদলায়।
+
+         ⚠️ গ্রাহককে create দেওয়া হয়েছে, update নয়। নাহলে গ্রাহক নিজের
+            অর্ডারকে "ready" বা "completed" বানিয়ে দিতে পারত, কিংবা দাম
+            বদলে দিতে পারত। অবস্থা বদলানো একমাত্র রেস্টুরেন্টের কাজ।     */
+      match /orders/{orderId} {
+        // রেস্টুরেন্ট নিজের সব অর্ডার দেখে; গ্রাহক শুধু নিজেরটা
+        allow read: if isSignedIn()
+                    && (isSuperAdmin() || request.auth.uid == restaurantId
+                        || resource.data.customerUid == request.auth.uid);
+
+        // নতুন অর্ডার — নিজের নামেই বসাতে হবে, আর সবসময় "new" অবস্থায়।
+        // খালি অর্ডার বা অস্বাভাবিক বড় অর্ডার আটকানো হচ্ছে।
+        allow create: if isSignedIn()
+                      && request.resource.data.customerUid == request.auth.uid
+                      && request.resource.data.status == 'new'
+                      && request.resource.data.total is number
+                      && request.resource.data.total >= 0
+                      && request.resource.data.items.size() > 0
+                      && request.resource.data.items.size() <= 50;
+
+        allow update: if isSignedIn()
+                      && (isSuperAdmin() || request.auth.uid == restaurantId);
+        allow delete: if isSuperAdmin();
+      }
+    }
+
+    match /markets/{marketId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /agents/{agentId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSuperAdmin();
+      /* এজেন্ট নিজের নথিতে শুধু পুরনো রাইডার-চার্জ ঘরটা বদলাতে পারেন।
+         আগে পুরো নথিই পারতেন — মানে নিজের কমিশন, বাজার বা স্ট্যাটাসও! */
+      allow update: if isSignedIn() && (isSuperAdmin() ||
+        (request.auth.uid == agentId &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryChargeConfig'])));
+      allow delete: if isSuperAdmin();
+    }
+
+    /* 💰 ডেলিভারি চার্জ — বাজারপিছু একটা নথি (ক্রেতার চার্জ + রাইডারের পাওনা)।
+       সবাই পড়তে পারে (দাম গোপন কিছু না, ক্রেতার অ্যাপ চেকআউটে দেখায়)।
+       লিখতে পারেন শুধু ওই বাজারের এজেন্ট বা সুপার-অ্যাডমিন। প্রতিটা সেভে
+       version ঠিক এক বাড়তে হবে, আর ইতিহাসের নথি শুধু তৈরি করা যায় —
+       বদলানো বা মোছা যায় না, তাই কে কখন কী বদলাল সেটা মুছে ফেলা যায় না। */
+    function isMarketAgent(marketId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/agents/$(request.auth.uid))
+             && myAgentMarketId() == marketId;
+    }
+    /* 🧾 অর্ডারের সিল করা ডেলিভারি চার্জ — শুধু সার্ভার লেখে (releaseHeldOrders)।
+       পড়তে পারেন: ওই অর্ডারের ক্রেতা, অর্ডারের দোকান/রেস্টুরেন্ট, এজেন্ট, সুপার-অ্যাডমিন। */
+    match /orderDeliveryCharges/{chargeId} {
+      allow read: if isSignedIn() && (
+        resource.data.customerUid == request.auth.uid
+        || request.auth.uid in resource.data.sourceIds
+        || isSuperAdmin() || isAgent());
+      allow write: if false;
+    }
+
+    match /deliveryPricing/{marketId} {
+      allow read: if true;
+      allow create, update: if (isSuperAdmin() || isMarketAgent(marketId))
+        && request.resource.data.marketId == marketId
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.version == (resource == null ? 1 : resource.data.version + 1)
+        && request.resource.data.tiers is list && request.resource.data.tiers.size() <= 10
+        && request.resource.data.minCharge is number && request.resource.data.minCharge >= 0
+        && request.resource.data.extraPerKm is number && request.resource.data.extraPerKm >= 0
+        && request.resource.data.maxDistanceKm is number
+        && request.resource.data.maxDistanceKm >= 1 && request.resource.data.maxDistanceKm <= 100;
+      allow delete: if isSuperAdmin();
+
+      match /history/{histId} {
+        allow read: if isSuperAdmin() || isMarketAgent(marketId);
+        allow create: if (isSuperAdmin() || isMarketAgent(marketId))
+          && request.resource.data.by == request.auth.uid
+          && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    match /riders/{riderId} {
+      // 🐛 ফিক্স: আগে দোকানের নিজের "📦 অর্ডার ব্যবস্থাপনা" থেকে ম্যানুয়ালি রাইডার
+      // এসাইন করার সময় riders কালেকশন read করতে পারত না (শুধু superadmin/নিজের
+      // agent/নিজে-রাইডার — দোকানদার এর কোনোটাই না), তাই ড্রপডাউন চিরকাল খালি
+      // দেখাত ("কোনো রাইডার অনলাইনে নেই") এমনকি রাইডার অনলাইন থাকলেও। এখন
+      // নিজের দোকানের marketId-র সাথে মিলে যাওয়া রাইডারও পড়তে পারবে।
+      // 🍽️ রেস্টুরেন্টও নিজের বাজারের রাইডার পড়তে পারবে — নাহলে POS-এর
+      //    "ডেলিভারি ম্যান" পাতাটা চিরকাল খালি দেখাত, ঠিক আগে দোকানের
+      //    ড্রপডাউন যেমন খালি দেখাত।
+      allow read: if isSignedIn() &&
+        (isSuperAdmin() || resource.data.assignedAgentId == request.auth.uid || request.auth.uid == riderId ||
+         (myShopId() != null && get(/databases/$(database)/documents/shops/$(myShopId())).data.marketId == resource.data.marketId) ||
+         (myRole() == 'restaurant' && myRestaurantMarketId() == resource.data.marketId));
+      allow create: if isSignedIn() && request.resource.data.assignedAgentId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        (isSuperAdmin() || resource.data.assignedAgentId == request.auth.uid || request.auth.uid == riderId);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /transportDrivers/{id} {
+      allow get: if true;
+      allow list: if true;
+      // 🪪 ড্রাইভার নিজে সাইন-আপের সময়ও isVerified: true লিখে নিজেকে
+      // ভেরিফাইড বানিয়ে ফেলতে পারবে না — নতুন ডকুমেন্টে এই ফিল্ড
+      // true থাকা মানেই তৈরি ব্লক হয়ে যাবে।
+      allow create: if isSignedIn() && request.auth.uid == id &&
+        (!('isVerified' in request.resource.data) || request.resource.data.isVerified == false);
+      // 🪪 আগে ড্রাইভার পুরো ডকুমেন্ট আপডেট করতে পারতো — অর্থাৎ raw Firestore
+      // কল দিয়ে নিজেই isVerified: true লিখে ভেরিফিকেশন এড়িয়ে যেতে পারতো।
+      // এখন ড্রাইভারের নিজের আপডেট থেকে isVerified/verifiedAt/verifiedBy
+      // ছুঁতে দেওয়া হচ্ছে না (শুধু এজেন্ট/সুপারঅ্যাডমিন সেগুলো বদলাতে
+      // পারবে), আর verificationStatus বদলাতে চাইলে ড্রাইভার শুধু "pending"-ই
+      // সেট করতে পারবে (নিজেকে "verified" বানাতে পারবে না)।
+      allow update: if isSignedIn() &&
+        (isSuperAdmin() ||
+         (isAgent() && resource.data.marketId == myAgentMarketId()) ||
+         (request.auth.uid == id &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isVerified','verifiedAt','verifiedBy']) &&
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus']) ||
+           request.resource.data.verificationStatus == 'pending')));
+      allow delete: if isSuperAdmin();
+
+      // 📊 Honey Bee Transport Media Phase 2 — প্রতিদিনের আয়ের লেজার
+      // (সপ্তাহ/মাসের হিসাবের জন্য)। ম্যাচ ব্লক parent path-এ নেস্টেড হওয়ায়
+      // এখানে {id} উপরের transportDrivers doc-এর id-ই বোঝায়।
+      match /dailyEarnings/{dateId} {
+        allow read: if isSignedIn() &&
+          (request.auth.uid == id || isSuperAdmin() ||
+           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId == myAgentMarketId()));
+        allow write: if isSignedIn() && request.auth.uid == id;
+      }
+
+      // ⭐ Honey Bee Transport Media Phase 8 — যাত্রীর দেওয়া রেটিং। ডকুমেন্ট
+      // আইডি হিসেবে tripId ব্যবহার করা হয় — তাই একই ট্রিপ দুইবার রেট করা
+      // যাবে না (দ্বিতীয়বার create-ই ব্লক হয়ে যায়, doc আগে থেকেই থাকলে)।
+      // get() দিয়ে trips ডকুমেন্ট থেকে যাচাই করা হয় — যিনি রেট করছেন তিনিই
+      // আসলে এই ট্রিপের যাত্রী, ট্রিপটা সত্যিই এই ড্রাইভারের সাথে ছিল, ও
+      // ট্রিপ সত্যিই সম্পন্ন হয়েছে — এলোমেলো/জাল রেটিং আটকাতে। এডিট/ডিলিট
+      // বন্ধ — একবার দেওয়া রেটিং স্থায়ী থাকে (সততার সাথে সংরক্ষিত)।
+      match /ratings/{tripId} {
+        allow read: if true;
+        allow create: if isSignedIn()
+          && request.resource.data.passengerId == request.auth.uid
+          && request.resource.data.stars is int
+          && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+          && get(/databases/$(database)/documents/trips/$(tripId)).data.passengerId == request.auth.uid
+          && get(/databases/$(database)/documents/trips/$(tripId)).data.confirmedDriver.driverId == id
+          && get(/databases/$(database)/documents/trips/$(tripId)).data.status == "completed";
+        allow update, delete: if false;
+      }
+
+      // 🪪 Honey Bee Transport Media — ড্রাইভার-আপলোড করা NID/লাইসেন্স
+      // ডকুমেন্ট (প্রাইভেট সাবকালেকশন)। উপরের transportDrivers ডকুমেন্ট
+      // পাবলিকলি রিডেবল (allow get/list: if true) বলে সংবেদনশীল ছবির URL
+      // এখানে সরাসরি রাখা হয়নি — Firebase Storage-এর ডাউনলোড URL টোকেনই
+      // একধরনের bearer-capability, তাই পাবলিক ডকুমেন্টে URL রাখলে সেটা
+      // কার্যত সবার জন্য উন্মুক্ত হয়ে যেত। এখানে শুধু owner/এজেন্ট(নিজের
+      // মার্কেটের)/সুপারঅ্যাডমিন পড়তে পারবে।
+      match /verification/{docId} {
+        allow read: if isSignedIn() &&
+          (request.auth.uid == id || isSuperAdmin() ||
+           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId == myAgentMarketId()));
+        allow create: if isSignedIn() && request.auth.uid == id;
+        // ড্রাইভার নিজে আবার জমা দিলে status ফিরে "pending"-ই হতে হবে —
+        // নিজেকে "verified" বানানো যাবে না। এজেন্ট/সুপারঅ্যাডমিন approve/
+        // reject করতে পারবে (status যেকোনো মান হতে পারে)।
+        allow update: if isSignedIn() &&
+          (isSuperAdmin() ||
+           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId == myAgentMarketId()) ||
+           (request.auth.uid == id && request.resource.data.status == 'pending'));
+        allow delete: if false;
+      }
+    }
+
+    // 📢 Honey Bee Transport Media Phase 6 — সোশ্যাল ফিড। শুধু নিবন্ধিত
+    // ট্রান্সপোর্ট ড্রাইভাররাই পোস্ট করতে পারবেন (transportDrivers-এ তাদের
+    // ডকুমেন্ট আছে কিনা যাচাই করা হয়) — এলোমেলো কাস্টমার স্প্যাম করতে
+    // পারবেন না। likedBy/likeCount শুধু এই দুইটা ফিল্ডেই সীমাবদ্ধ থাকলে
+    // যেকোনো সাইন-ইন করা ব্যবহারকারী আপডেট করতে পারবেন (লাইক দেওয়া/তোলা) —
+    // বাকি সব ফিল্ড শুধু নিজের পোস্টের মালিকই বদলাতে/সরাতে পারবেন।
+    match /transportMediaPosts/{postId} {
+      allow read: if true;
+      // 🚩 Moderation — যে ড্রাইভারের status "blocked" (এজেন্ট/সুপারঅ্যাডমিন
+      // ব্লক করে থাকলে) তিনি আর নতুন পোস্ট করতে পারবেন না।
+      allow create: if isSignedIn()
+        && request.resource.data.authorId == request.auth.uid
+        && exists(/databases/$(database)/documents/transportDrivers/$(request.auth.uid))
+        && get(/databases/$(database)/documents/transportDrivers/$(request.auth.uid)).data.status != "blocked";
+      // 🚩 Moderation — নিজের পোস্ট মালিক আগের মতোই সব বদলাতে/সরাতে পারবেন,
+      // যেকোনো সাইন-ইন ইউজার likedBy/likeCount বদলাতে পারবেন (আগের মতোই),
+      // আর নতুন করে এজেন্ট (নিজের মার্কেটের ড্রাইভার হলে)/সুপারঅ্যাডমিন
+      // শুধু status/reviewedAt/reviewedBy ফিল্ড বদলে (soft-delete/moderation)
+      // রিপোর্ট-করা পোস্ট সরাতে পারবেন — driver নিজে যেভাবে "removed" করেন
+      // সেই একই convention, সরাসরি Firestore delete না (feed/my-posts
+      // কোয়েরি এমনিতেই status ফিল্টার করে)।
+      allow update: if isSignedIn() &&
+        (request.auth.uid == resource.data.authorId ||
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likedBy','likeCount']) ||
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy']) &&
+          (isSuperAdmin() ||
+           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(resource.data.authorId)).data.marketId == myAgentMarketId()))));
+      allow delete: if false;
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn();
+        allow update, delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+      }
+    }
+
+    // 🚩 Honey Bee Transport Media — কনটেন্ট রিপোর্ট/মডারেশন। প্রতি
+    // পোস্টে প্রতি ইউজার একবারই রিপোর্ট করতে পারবেন — ডকুমেন্ট আইডি-ই
+    // deterministic ({postId}_{reporterUid}), তাই দ্বিতীয়বার একই পোস্টে
+    // রিপোর্ট করলে create ব্যর্থ হয়ে যাবে (আলাদা কোনো ডুপ্লিকেট-চেক
+    // কোয়েরির দরকার নেই)। driverMarketId ফিল্ড রিপোর্ট তৈরির সময়ই
+    // ক্লায়েন্ট denormalize করে রাখে (transportDrivers/{authorId}.marketId
+    // থেকে) — এতে এজেন্টের কিউ-কোয়েরি (driverMarketId==, status==,
+    // কোনো orderBy না) নতুন কম্পোজিট ইনডেক্স ছাড়াই কাজ করে, ঠিক
+    // ড্রাইভার-ডকুমেন্ট-ভেরিফিকেশন কিউয়ের মতোই।
+    match /transportMediaReports/{reportId} {
+      allow read: if isSignedIn() &&
+        (request.auth.uid == resource.data.reporterUid ||
+         isSuperAdmin() ||
+         (isAgent() && resource.data.driverMarketId == myAgentMarketId()));
+      allow create: if isSignedIn()
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.postId is string
+        && request.resource.data.status == "pending"
+        && reportId == (request.resource.data.postId + "_" + request.auth.uid);
+      allow update: if isSignedIn() &&
+        (isSuperAdmin() ||
+         (isAgent() && resource.data.driverMarketId == myAgentMarketId()));
+      allow delete: if false;
+    }
+
+    match /trips/{tripId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      // 📅 Calendar/ম্যানুয়াল-বুকিং Phase 3 — "ব্লক তুলে নিন" ফিচারটা এই
+      // ডকুমেন্ট delete করে (shop-ledger-app.html-এ dmCalToggleBlockBtn),
+      // কিন্তু আগে কোনো delete rule-ই ছিল না বলে সেটা প্রোডাকশনে সবসময়
+      // permission-denied দিয়ে ব্যর্থ হতো। driverId ফিল্ড শুধু
+      // scheduled/blocked ডকুমেন্টেই থাকে (ইনস্ট্যান্ট রিকোয়েস্ট ট্রিপে
+      // থাকে না), তাই এই rule শুধু নিজের ক্যালেন্ডার-এন্ট্রি মোছার
+      // অনুমতি দেয়, অন্য কারো কিছু না।
+      allow delete: if isSignedIn() && resource.data.driverId == request.auth.uid;
+
+      // 💬 ড্রাইভার-প্যাসেঞ্জার ইন-অ্যাপ চ্যাট — ট্রিপ-স্কোপড, নিজস্ব
+      // trips/{tripId}-এর সাবকালেকশন (Honey Messenger-এর থেকে সম্পূর্ণ
+      // আলাদা, ইচ্ছাকৃতভাবে — ড্রাইভারদের কোনো messengerUsers প্রোফাইল
+      // নেই, আর বন্ধু-অনুরোধ ছাড়া Messenger-এ চ্যাটও করা যায় না, যেটা
+      // এই তাৎক্ষণিক দরকারের সাথে মেলে না)। শুধু এই নির্দিষ্ট ট্রিপের
+      // passengerId/confirmedDriver.driverId মিলে গেলেই পড়তে/লিখতে
+      // পারবে — ratings সাবকালেকশনের get()-অন-প্যারেন্ট প্যাটার্নের
+      // মতোই। guest (লগইন-বিহীন) প্যাসেঞ্জারের request.auth.uid থাকে না
+      // বলে তারা চ্যাট ব্যবহার করতে পারবেন না — ট্রিপ হিস্ট্রির মতোই
+      // ইচ্ছাকৃতভাবে শুধু লগইন করা প্যাসেঞ্জারদের জন্য (honeybee-bazar.html
+      // চ্যাট বাটনও তাদের জন্যই লুকানো থাকে)।
+      match /chat/{messageId} {
+        allow read: if isSignedIn() &&
+          (request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.passengerId ||
+           request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.confirmedDriver.driverId);
+        allow create: if isSignedIn() &&
+          request.resource.data.senderId == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000 &&
+          (request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.passengerId ||
+           request.auth.uid == get(/databases/$(database)/documents/trips/$(tripId)).data.confirmedDriver.driverId);
+        allow update, delete: if false;
+      }
+    }
+
+    match /tripOffers/{offerId} {
+      allow read: if true;
+      allow update: if true;
+      allow create, delete: if false;
+    }
+
+    match /deliveryOffers/{offerId} {
+      allow read: if isSignedIn() && (isSuperAdmin() || resource.data.riderId == request.auth.uid);
+      allow update: if isSignedIn() && resource.data.riderId == request.auth.uid;
+      allow create, delete: if false;
+    }
+
+    match /orderRequests/{orderId} {
+      // 🐛 ফিক্স: আগে যেকোনো signed-in ইউজার (এমনকি অন্য কারো গেস্ট/anonymous
+      // সেশনও) যেকোনো দোকানের যেকোনো অর্ডার read/update করতে পারত — নিজের
+      // দোকান/রাইডার/কাস্টমার কিনা কোনো চেক ছিল না। এখন শুধু সেই দোকান
+      // (shopId মিলে), এসাইন করা রাইডার, বা অর্ডারকারী কাস্টমার নিজেই
+      // read/update করতে পারবে।
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() &&
+        (isSuperAdmin() ||
+         (myShopId() != null && resource.data.shopId == myShopId()) ||
+         resource.data.assignedRiderId == request.auth.uid ||
+         resource.data.customerUid == request.auth.uid);
+      allow update: if isSignedIn() &&
+        (isSuperAdmin() ||
+         (myShopId() != null && resource.data.shopId == myShopId()) ||
+         resource.data.assignedRiderId == request.auth.uid);
+    }
+
+    // 🔧 Bazar কাস্টমার শপ ভিজিট / প্রোডাক্ট ডিটেইল দেখার সময় লগ করে (honey-bee-bazar.html,
+    // hbLogShopVisit/hbLogProductView) — এগুলো শুধু create-only (কাস্টমার কখনো নিজের
+    // পুরনো লগ read/update/delete করতে পারবে না), আর দোকান মালিক নিজের দোকানের
+    // (myShopId() মিলে) লগগুলো read করতে পারবে Monitoring-এ দেখানোর জন্য।
+    match /shopVisits/{visitId} {
+      allow create: if isSignedIn() && request.resource.data.shopId is string;
+      allow read: if isSignedIn() && (isSuperAdmin() || (myShopId() != null && resource.data.shopId == myShopId()));
+      allow update, delete: if false;
+    }
+
+    match /productViews/{viewId} {
+      allow create: if isSignedIn() && request.resource.data.shopId is string;
+      allow read: if isSignedIn() && (isSuperAdmin() || (myShopId() != null && resource.data.shopId == myShopId()));
+      allow update, delete: if false;
+    }
+
+    match /passenger_waiting_queue/{docId} {
+      allow read, create, update, delete: if true;
+    }
+
+    match /customers/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+
+      // ✈️ Smart Flight Tracking — Phase 2 (Saved Flights + Notification)।
+      // শুধু মালিক নিজে পড়তে/লিখতে পারবেন — Cloud Function (Admin SDK)
+      // এই একই ডকুমেন্টে lastKnownStatus/trackingEnabled আপডেট করে,
+      // rules বাইপাস করে বলে ক্লায়েন্টের rules-এ প্রভাব পড়ে না।
+      match /savedFlights/{flightId} {
+        allow read, write: if isSignedIn() && request.auth.uid == uid;
+      }
+    }
+
+    // 🐝🧠 মৌ-এর কথোপকথনের মেমোরি (Development #4) — প্রতিটা মেসেজ (কাস্টমারের
+    // + মৌ-এর জবাব) এখানে সেভ থাকে যাতে পরের বার এলে মৌ আগের কথা মনে রাখতে
+    // পারে। uid এখানে লগইন-করা কাস্টমারের আসল uid বা anonymous session-এর
+    // uid হতে পারে — দুটোই isSignedIn()-এ পাস করে (anonymous-ও request.auth
+    // সেট করে), তাই আলাদা কোনো শর্ত লাগে না। শুধু মালিক নিজেই নিজের চ্যাট
+    // ইতিহাস পড়তে/লিখতে পারবেন, edit/delete একদম বন্ধ (immutable log, বাকি
+    // চ্যাট-লগ/কমেন্টের প্যাটার্নের মতোই)।
+    match /mouChats/{uid} {
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && request.auth.uid == uid;
+        allow create: if isSignedIn() && request.auth.uid == uid
+          && request.resource.data.role in ['user', 'mou']
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow update, delete: if false;
+      }
+    }
+
+    match /wallets/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin() || isAgent());
+      allow write: if isSignedIn();
+
+      match /transactions/{txId} {
+        allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin() || isAgent());
+        allow write: if isSignedIn();
+      }
+    }
+
+    match /bloodDonors/{uid} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == uid;
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn();
+        allow update, delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+      }
+    }
+
+    match /bloodRequests/{requestId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.requesterUid == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.requesterUid == request.auth.uid;
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn();
+        allow update, delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+      }
+    }
+
+    match /complaints/{complaintId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.complainantUid == request.auth.uid;
+      allow update: if isSuperAdmin() || isAgent();
+    }
+
+    match /messengerUsers/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /messengerUsernames/{username} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /messengerFriendRequests/{pairId} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.fromUid || request.auth.uid == resource.data.toUid);
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.fromUid;
+      allow update: if isSignedIn() && (request.auth.uid == resource.data.fromUid || request.auth.uid == resource.data.toUid);
+    }
+
+    match /messengerChats/{chatId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
+      allow update: if isSignedIn() && request.auth.uid in resource.data.participants;
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/messengerChats/$(chatId)).data.participants;
+        allow create: if isSignedIn() && request.resource.data.senderUid == request.auth.uid;
+        allow update: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/messengerChats/$(chatId)).data.participants;
+        allow delete: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/messengerChats/$(chatId)).data.participants;
+      }
+    }
+
+    match /ambulance_call_logs/{logId} {
+      allow read: if isSignedIn() && (isSuperAdmin() || isAgent() || resource.data.customerGoogleId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.customerGoogleId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.customerGoogleId == request.auth.uid;
+    }
+
+    match /medicalEquipment/{equipmentId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /medicalEquipmentOrders/{orderId} {
+      allow read: if isSignedIn() && (isSuperAdmin() || isAgent() || resource.data.customerGoogleId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.customerGoogleId == request.auth.uid;
+      allow update: if isSignedIn();
+    }
+
+    /* 📊 বাজারের লাইভ অ্যানালিটিক্স — অতিথিরাও লেখে, তাই লগইন লাগে না।
+       তবে শুধু নির্দিষ্ট ঘরগুলোই লেখা যায়, নাম ছোট রাখতে হয় — যাতে কেউ
+       এখানে বড় বড় ডেটা ফেলে খরচ বাড়াতে না পারে। */
+    match /activeSessions/{sessionId} {
+      allow create, update: if request.resource.data.keys().hasOnly([
+                                 'customerName', 'customerUid', 'scrollCount', 'totalDurationSec',
+                                 'currentShopId', 'currentShopName', 'lastHeartbeat', 'startedAt', 'expireAt'])
+                            && request.resource.data.lastHeartbeat == request.time
+                            && request.resource.data.customerName is string
+                            && request.resource.data.customerName.size() <= 100
+                            && (request.resource.data.currentShopName == null
+                                || (request.resource.data.currentShopName is string
+                                    && request.resource.data.currentShopName.size() <= 100));
+      allow read: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /loginAttempts/{email} {
+      allow read: if true;
+      allow delete: if true;
+      // 🐞 বাগ-ফিক্স: 'autoLockApplied' যোগ করা হলো — এই ফিল্ডটা এখন
+      // functions/index.js-এর onFailedLoginThreshold Cloud Function
+      // (Admin SDK, rules বাইপাস করে) থ্রেশহোল্ড পার হলে merge করে বসিয়ে
+      // দেয়, যাতে বারবার একই একাউন্ট ব্লক করার চেষ্টা না হয়। এই ফিল্ড
+      // ছাড়া hasOnly(['count','lastAttempt']) থাকলে, একবার Cloud
+      // Function লেখার পর ক্লায়েন্টের পরবর্তী যেকোনো ভুল-পাসওয়ার্ড
+      // গণনার merge-write hasOnly ব্যর্থ হয়ে reject হয়ে যেতো (merge-এর
+      // resulting document-এ autoLockApplied-ও থাকতো)।
+      allow create, update: if request.resource.data.keys().hasOnly(['count','lastAttempt','autoLockApplied']) &&
+        request.resource.data.count is int && request.resource.data.count <= 20;
+    }
+
+    match /imageIndex/{imageId} {
+
+      allow read: if isSignedIn() && myShopId() != null;
+
+      allow create: if isSignedIn()
+        && myShopId() != null
+        && request.resource.data.imageId == imageId
+        && request.resource.data.referenceCount == 0
+        && request.resource.data.uploaderShopId == myShopId()
+        && request.resource.data.format == 'webp'
+        && request.resource.data.sizeBytes <= 200 * 1024
+        && request.resource.data.keys().hasAll(
+          ['imageId','sha256','storagePath','imageUrl','sizeBytes',
+           'format','referenceCount','cleanupStatus','orphanedAt',
+           'uploaderShopId','createdAt','updatedAt']);
+
+      allow update: if isSignedIn()
+        && myShopId() != null
+        && request.resource.data.imageId == resource.data.imageId
+        && request.resource.data.sha256 == resource.data.sha256
+        && request.resource.data.storagePath == resource.data.storagePath
+        && request.resource.data.imageUrl == resource.data.imageUrl
+        && request.resource.data.sizeBytes == resource.data.sizeBytes
+        && request.resource.data.format == resource.data.format
+        && request.resource.data.uploaderShopId == resource.data.uploaderShopId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.referenceCount >= 0
+        && (
+          request.resource.data.referenceCount ==
+            resource.data.referenceCount + 1
+          ||
+          request.resource.data.referenceCount ==
+            resource.data.referenceCount - 1
+        );
+
+      allow delete: if false;
+    }
+
+    // ✈️ Smart Flight Tracking — Phase 1 (Foundation + Core Flight)।
+    // flightCache শুধু functions/index.js-এর searchFlight Cloud Function
+    // (Admin SDK, rules বাইপাস করে) লেখে — ক্লায়েন্ট থেকে সরাসরি লেখা
+    // যাবে না, শুধু পড়া যাবে (যাতে ভবিষ্যতে ক্লায়েন্ট-সাইড ক্যাশ-হিট
+    // অপ্টিমাইজেশনও সম্ভব হয়)।
+    match /flightCache/{cacheId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 🕉️ সনাতনী পঞ্জিকা (Panchang) — STEP 1।
+    // panchangDays শুধু functions/index.js-এর getPanchangData Cloud
+    // Function (Admin SDK, rules বাইপাস করে) লেখে — ক্লায়েন্ট থেকে
+    // সরাসরি লেখা যাবে না, শুধু পড়া যাবে (IndexedDB ক্যাশের আগে
+    // ক্লায়েন্ট চাইলে সরাসরি Firestore থেকেও পড়তে পারবে)।
+    match /panchangDays/{dayId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // 🥭 একাদশী স্পেশাল (ও ভবিষ্যতে অন্য উৎসব) — Event → Product Integration।
+    // panchangProductMappings শুধু Admin Panel (ভবিষ্যতে, Phase 4)/কনসোল থেকে
+    // ম্যানুয়ালি লেখা হবে — ক্লায়েন্ট থেকে সরাসরি লেখা যাবে না, শুধু পড়া যাবে,
+    // যাতে honey-bee-bazar.html-এর ডিফল্ট কিওয়ার্ড তালিকা override করা যায়।
+    match /panchangProductMappings/{eventCode} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
