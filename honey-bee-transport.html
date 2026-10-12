@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#ffc400">
+<meta name="theme-color" content="#1a1206">
 <title>Honey Bee Transport — Passenger</title>
 <style>
 :root{--yellow:#ffc400;--gold:#f4aa00;--ink:#171717;--muted:#707070;--paper:#fffdf6;--line:#eee8d9;--green:#079b5a;--blue:#1688f8}
@@ -196,6 +196,45 @@ body { padding-bottom: calc(86px + env(safe-area-inset-bottom)) !important; }
 }
 body { padding-bottom: calc(66px + env(safe-area-inset-bottom)) !important; }
 
+
+/* 🟠 Honey Bee Bazar-এর পুরনো গাঢ় সোনালি রং (অক্টোবর ২০২৬ — মালিকের পছন্দ) */
+:root{--yellow:#ffb703;--gold:#ffd166;--ink:#fff8e8;--muted:rgba(255,248,232,.6);--paper:#1a1206;--line:rgba(255,209,102,.22);--green:#2fbf71}
+body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:var(--ink)}
+.app{background:transparent!important}
+.top{background:linear-gradient(145deg,#3d2405,#1a1206 70%)!important}
+.brand,.hello,.sectop h2,.pagehead h1,.ridehead strong,.market-vehicle-bottom>div strong,.price{color:#fff8e8!important}
+.subbrand,.hint,.meta,.fieldlabel,.quick small,.photo-caption,.market-vehicle-bottom small,.empty,.driver{color:rgba(255,248,232,.6)!important}
+.bee{background:#ffb703}
+.round,.back,.menu-btn{background:rgba(255,255,255,.08)!important;border:1px solid var(--line)!important;color:#fff8e8;box-shadow:none!important}
+.menu-btn span{background:#ffd166}
+.main-menu-panel{background:#241705!important;border-color:var(--line)!important}
+.main-menu-panel button{color:#fff8e8}
+.searchbox{background:#241705!important;border-color:var(--line)!important}
+.search-toggle{background:rgba(255,209,102,.12);color:#ffd166}
+.routefield,.when input,.when select{color:#fff8e8}
+.when select option{background:#241705}
+.divider{background:var(--line)}
+.swap{background:transparent;border-color:var(--line);color:#ffd166}
+.primary,.book{background:#ffb703;color:#1a1206;box-shadow:0 5px 0 #c98a00}
+.quick{background:#241705!important;border:1px solid var(--line)!important;color:#fff8e8!important}
+.chip{background:#241705;border-color:var(--line);color:#fff8e8}.chip.active{background:#ffb703;color:#1a1206;border-color:#ffb703}
+.textbtn{color:#ffd166}
+.market-vehicle-card,.ride{background:#241705!important;border:1px solid var(--line)!important;box-shadow:0 7px 22px rgba(0,0,0,.35)!important;outline:none!important}
+.market-vehicle-photo{background:linear-gradient(135deg,#fff4d6,#f4e2b8)!important}
+.photo-caption{background:rgba(26,18,6,.75)!important;color:#ffd166!important}
+.vehicle-spec-row span{background:rgba(255,255,255,.07);color:#fff8e8}
+.market-vehicle-bottom{border-color:var(--line)}
+.heart{background:transparent;color:#ffd166}
+.badge{background:rgba(47,191,113,.2);color:#6ee7a8}
+.formcard{background:#241705;border-color:var(--line);color:#fff8e8}
+.input{background:#1a1206;border-color:var(--line);color:#fff8e8}
+.input option{background:#241705}
+.notice{background:rgba(255,209,102,.1)!important;color:#ffe8b0!important}
+#detailContent [style*="background"]{background:rgba(255,255,255,.06)!important;color:#fff8e8}
+#detailContent .rating,.rating{color:#ffd166}
+.mapbox{filter:brightness(.8)}
+.toast{background:#ffb703;color:#1a1206}
+.nav button.active{color:#ffb703!important}
 </style>
 </head>
 <body>
@@ -273,7 +312,7 @@ function vehicleArt(type){
 function rideCard(r){return `<article class="ride market-vehicle-card">
  <div class="vehiclepic market-vehicle-photo" onclick="openDetail('${r.id}')" role="button" aria-label="গাড়ির বিস্তারিত দেখুন">
   <span class="badge">${r.verified?'✓ যাচাইকৃত':'চালকের তথ্য দেখুন'}</span>
-  <div class="vehicle-art">${['রিকশা','ইজিবাইক','সিএনজি'].includes(r.type)?vehicleArt(r.type):r.emoji}</div>
+  ${r.img?`<img src="${r.img}" alt="" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`:`<div class="vehicle-art">${['রিকশা','ইজিবাইক','সিএনজি'].includes(r.type)?vehicleArt(r.type):r.emoji}</div>`}
   <span class="photo-caption">গাড়ির ছবি ও বিস্তারিত দেখতে চাপ দিন</span>
  </div>
  <div class="market-vehicle-body">
@@ -371,7 +410,8 @@ function hbPostToRide(id,d){
   return {id:hbEsc(id),type:hbEsc(type||'গাড়ি'),emoji:HB_TYPE_EMOJI[type]||'🚘',route:hbEsc(route),from:hbEsc(d.from||''),to:hbEsc(d.to||''),
     time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,name:hbEsc(d.authorName||'ড্রাইভার'),
     rating:'নতুন',reviews:0,verified:!!d.isVerified,car:hbEsc(d.vehicleModel||d.vehicleLabel||'তথ্য দেওয়া হয়নি'),ac:hbEsc(d.ac||''),
-    plate:hbEsc(d.regNumber||''),color:hbEsc(d.vehicleColor||''),note:hbEsc(d.notes||d.text||''),phone:String(d.authorPhone||'').replace(/[^0-9+]/g,'')};
+    plate:hbEsc(d.regNumber||''),color:hbEsc(d.vehicleColor||''),note:hbEsc(d.notes||d.text||''),phone:String(d.authorPhone||'').replace(/[^0-9+]/g,''),
+    img:(typeof d.imageUrl==='string'&&/^https:\/\/firebasestorage\.googleapis\.com\//.test(d.imageUrl))?hbEsc(d.imageUrl):''};
 }
 try{
   db.collection('transportMediaPosts').where('status','==','active').orderBy('createdAt','desc').limit(30)
