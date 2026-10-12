@@ -2190,6 +2190,19 @@ window.hbLoadLib = function(name){
           </div>
           <div class="row">
             <div>
+              <label>কেন ফেরত দিচ্ছে? (ঐচ্ছিক)</label>
+              <div class="status-group" id="rtReasonGroup">
+                <div class="status-chip" data-rr="নষ্ট/ভাঙা">নষ্ট/ভাঙা</div>
+                <div class="status-chip" data-rr="কাজ করে না">কাজ করে না</div>
+                <div class="status-chip" data-rr="পছন্দ হয়নি">পছন্দ হয়নি</div>
+                <div class="status-chip" data-rr="ভুল মাল">ভুল মাল</div>
+                <div class="status-chip" data-rr="মেয়াদ শেষ">মেয়াদ শেষ</div>
+                <div class="status-chip" data-rr="অন্যান্য">অন্যান্য</div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div>
               <label>মালের মূল্য (৳)</label>
               <input id="rtValue" type="number" inputmode="numeric" placeholder="০">
             </div>
@@ -2503,6 +2516,21 @@ window.hbLoadLib = function(name){
   </div>
 </div>
 <div id="damagedStockPrintArea"></div>
+
+<!-- ↩️ ফেরত মালের খাতা — বাকি কাস্টমারের তালিকার মতোই নাম/নম্বর/মাল দিয়ে খোঁজা যায় -->
+<div class="modal-overlay" id="returnsBookModal">
+  <div class="modal-box" style="max-width:460px; text-align:left; max-height:88vh; display:flex; flex-direction:column;">
+    <h3 style="margin:0 0 6px;">↩️ ফেরত মালের খাতা</h3>
+    <input id="rbSearch" type="text" placeholder="🔍 কাস্টমারের নাম, মোবাইল নম্বর বা মালের নাম লিখুন" autocomplete="off" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font-size:14px; font-family:inherit;">
+    <div class="status-group" id="rbRange" style="margin:8px 0 4px;">
+      <div class="status-chip active" data-rb="all">সব</div><div class="status-chip" data-rb="0">আজ</div><div class="status-chip" data-rb="7">৭ দিন</div><div class="status-chip" data-rb="30">৩০ দিন</div><div class="status-chip" data-rb="custom">তারিখ বেছে</div>
+    </div>
+    <div id="rbCustom" style="display:none; gap:6px; margin-bottom:6px;"><input type="date" id="rbFrom" style="flex:1;"> → <input type="date" id="rbTo" style="flex:1;"></div>
+    <div id="rbSummary" style="font-size:12.5px; background:#fdf2f2; border-radius:10px; padding:8px 10px; margin:4px 0 8px; line-height:1.6;"></div>
+    <div id="rbRows" style="overflow-y:auto; flex:1; min-height:60px;"></div>
+    <button class="mini-btn" id="rbCloseBtn" style="width:100%; margin-top:10px;">বন্ধ করুন</button>
+  </div>
+</div>
 
 <!-- 🔧 একটাই জেনেরিক লিস্ট+প্রিন্ট মডাল — Monitoring > 📦 অর্ডার ট্যাবের ৬টা কার্ড
      (পেন্ডিং/প্রস্তুত/পথে/ডেলিভারী/বাতিল/ইনভয়েস) সবগুলাই এই একটা মডাল শেয়ার করে,
@@ -4151,6 +4179,7 @@ window.hbLoadLib = function(name){
       <div class="glassGrid">
         <div class="glassCard"><div class="ic">📦</div><div class="lbl">Total Stock</div><div class="val" id="monTotalStock">0</div></div>
         <div class="glassCard alert"><div class="ic">❌</div><div class="lbl">Out of Stock</div><div class="val" id="monOutOfStock">0</div></div>
+        <div class="glassCard alert" id="monReturnsCard" style="cursor:pointer;"><div class="ic">↩️</div><div class="lbl">ফেরত মাল</div><div class="val" id="monReturnsCount">0</div></div>
         <div class="glassCard alert" id="monDamagedStockCard" style="cursor:pointer;"><div class="ic">🗑️</div><div class="lbl">নষ্ট মাল</div><div class="val" id="monDamagedStock">0</div></div>
         <div class="glassCard" id="monTodayProductSaleCard" style="cursor:pointer;"><div class="ic">🗓️</div><div class="lbl">আজকের প্রোডাক্ট সেল</div><div class="val" id="monTodayProductSaleCount">0</div></div>
         <div class="glassCard" id="monWeeklyProductSaleCard" style="cursor:pointer;"><div class="ic">📅</div><div class="lbl">সাপ্তাহিক প্রোডাক্ট সেল</div><div class="val" id="monWeeklyProductSaleCount">0</div></div>
@@ -4162,6 +4191,7 @@ window.hbLoadLib = function(name){
     <div class="monSection" id="mtab-customer" style="display:none;">
       <div class="monSectionTitle">👥 Customer &amp; Payment</div>
       <div class="glassGrid">
+        <div class="glassCard alert" id="monReturnsCard2" style="cursor:pointer;"><div class="ic">↩️</div><div class="lbl">ফেরত মাল</div><div class="val" id="monReturnsCount2">0</div></div>
         <div class="glassCard" id="monTotalCustomerCard" style="cursor:pointer;" title="লং প্রেস করে ৭ দিন বা তার বেশি কেনাকাটা না করা কাস্টমার দেখুন"><div class="ic">👥</div><div class="lbl">Total Customer</div><div class="val" id="monTotalCustomer">0</div></div>
         <div class="glassCard"><div class="ic">💵</div><div class="lbl">Total Paid</div><div class="val small" id="monTotalPaid">৳ 0</div></div>
         <div class="glassCard"><div class="ic">💳</div><div class="lbl">Total Due</div><div class="val small" id="monTotalDue">৳ 0</div></div>
@@ -8964,7 +8994,7 @@ function repBuildReportData(){
       .sort((a,b)=> new Date(b.date)-new Date(a.date));
     return {
       title:'Sales Return / Exchange Report',
-      rows: rows.map(e=>({ title:`${e.name} — ${escapeHtml(e.item)}`, amt: e.status==='ফেরত' ? fmt(e.returnValue||0) : 'বদলি', meta:`${formatInvoiceDate(e.date)} · ${e.status}${e.cashBack==='yes'?' · নগদ ফেরত':''}${e.condition?' · '+escapeHtml(e.condition):''}` })),
+      rows: rows.map(e=>({ title:`${e.name} — ${escapeHtml(e.item)}`, amt: e.status==='ফেরত' ? fmt(e.returnValue||0) : 'বদলি', meta:`${formatInvoiceDate(e.date)} · ${e.status}${e.cashBack==='yes'?' · নগদ ফেরত':' · বাকি থেকে কাটা'}${e.returnReason?' · কারণ: '+escapeHtml(e.returnReason):''}${e.condition?' · '+escapeHtml(e.condition):''}` })),
       csv: [['Date','Customer','Item','Status','Return Value','Cash Back'], ...rows.map(e=>[new Date(e.date).toISOString().slice(0,10), e.name, e.item, e.status, e.returnValue||0, e.cashBack||''])]
     };
   }
@@ -14517,7 +14547,7 @@ document.querySelectorAll('.status-chip').forEach(chip=>{
     // ফেরত ফর্মের এই দুইটা গ্রুপে (ভালো/খারাপ, নগদ ফেরত/না) সিলেক্ট-আনসিলেক্ট সিস্টেম:
     // ইতিমধ্যে সিলেক্ট করা অপশনে আবার চাপ দিলে সেটা আনসিলেক্ট হয়ে যাবে (কোনোটাই সিলেক্ট থাকবে না),
     // যাতে ভুল সিলেকশন হলে সহজেই বাতিল করে আবার সঠিকটা বেছে নেওয়া যায়।
-    if((group.id === 'rtConditionGroup' || group.id === 'rtCashGroup') && chip.classList.contains('active')){
+    if((group.id === 'rtConditionGroup' || group.id === 'rtCashGroup' || group.id === 'rtReasonGroup') && chip.classList.contains('active')){
       chip.classList.remove('active');
       return;
     }
@@ -14716,7 +14746,7 @@ function clearAddForm(){
   ].forEach(id=>{ const el=document.getElementById(id); if(el){ el.value=''; delete el.dataset.productId; } });
   ['fQty','rtQty'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value='1'; });
   updateTotalPreview('fQty','fPrice','fTotalPreview');
-  document.querySelectorAll('#rtConditionGroup .status-chip, #rtCashGroup .status-chip').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('#rtConditionGroup .status-chip, #rtCashGroup .status-chip, #rtReasonGroup .status-chip').forEach(c=>c.classList.remove('active'));
   creditCart = [];
   renderCreditCart();
   phoneSuggestBox.classList.remove('show');
@@ -15761,6 +15791,8 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     if(!cashBackChip){ toast('টাকা নগদ ফেরত দেবেন কিনা, সেটা সিলেক্ট করুন'); return; }
     const cashBack = cashBackChip.dataset.rc;
     const condition = conditionChip.dataset.rcond;
+    const reasonChip = document.querySelector('#rtReasonGroup .status-chip.active');
+    const returnReason = reasonChip ? reasonChip.dataset.rr : '';
     if(!item){ toast('কোন মাল ফেরত দিচ্ছে লিখুন'); return; }
     if(cashBack === 'yes' && value > 0 && typeof opsCheckSufficientBalance === 'function' && !opsCheckSufficientBalance('cash', value)) return;
     const rtQty = readRequiredQty('rtQty');
@@ -15768,7 +15800,7 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     let extraNote = (cashBack==='yes' ? `Cash return: ${HB_CUR} ${value}` : `${HB_CUR} ${value} deducted from balance.`) + (condition==='bad' ? ' [খারাপ/নষ্ট মাল — স্টকে যোগ হয়নি]' : ' [ভালো মাল — স্টকে যোগ হয়েছে]');
     if(cashBack === 'no' && value>0){ allocateDuePayment(name, phone, value); }
 
-    const rtNewEntry = { id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, returnValue: value, cashBack, note: (note ? note+' — ' : '')+extraNote, status, condition, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() };
+    const rtNewEntry = { id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, returnValue: value, cashBack, returnReason, note: (note ? note+' — ' : '')+extraNote, status, condition, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() };
     retailEntries.unshift(rtNewEntry);
     backupRecentSaleEntries([rtNewEntry]);
     // ফেরত দেওয়া মাল "ভালো" হলে স্টকে ফেরত যোগ হবে, "খারাপ/নষ্ট" হলে স্টকে যোগ হবে না
@@ -17868,6 +17900,69 @@ function renderDamagedStockList(){
   }).join('') : '<div class="empty">কোনো নষ্ট মাল নেই ✅</div>';
 }
 
+
+/* ==================== ↩️ ফেরত মালের খাতা (অক্টোবর ২০২৬) ====================
+   বাকি কাস্টমারের তালিকার মতো: নাম / মোবাইল / মাল দিয়ে খোঁজা, তারিখ দিয়ে ছাঁকা।
+   প্রতিটা ফেরতে দেখায়: কবে, কে, কী, কয়টা, কত টাকা, কেন, মাল ভালো না নষ্ট,
+   টাকা নগদ ফেরত না বাকি থেকে কাটা, কোন স্টাফ নিয়েছেন, ইনভয়েস নম্বর।
+   (পুরনো ফেরতে "কেন" ঘর থাকবে না — তখন সেটা সেভ হতো না।) */
+let __rbRange='all';
+function rbAllReturns(){ return (typeof retailEntries!=='undefined'?retailEntries:[]).filter(e=>e.status==='ফেরত'); }
+function rbUpdateCount(){
+  const n=rbAllReturns().length;
+  ['monReturnsCount','monReturnsCount2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=n; });
+}
+function rbInRange(e){
+  if(__rbRange==='all') return true;
+  const t=new Date(e.date).getTime(); if(isNaN(t)) return false;
+  if(__rbRange==='custom'){
+    const f=document.getElementById('rbFrom').value, to=document.getElementById('rbTo').value;
+    const ds=new Date(e.date); const d=ds.getFullYear()+'-'+String(ds.getMonth()+1).padStart(2,'0')+'-'+String(ds.getDate()).padStart(2,'0');
+    return (!f||d>=f)&&(!to||d<=to);
+  }
+  const start=new Date(); start.setHours(0,0,0,0); start.setDate(start.getDate()-Number(__rbRange));
+  return t>=start.getTime();
+}
+function renderReturnsBook(){
+  const q=(document.getElementById('rbSearch').value||'').trim().toLowerCase();
+  const qd=q.replace(/[^0-9]/g,'');
+  const list=rbAllReturns().filter(rbInRange).filter(e=>{
+    if(!q) return true;
+    return (e.name||'').toLowerCase().includes(q) || (e.item||'').toLowerCase().includes(q) || (qd.length>=3 && String(e.phone||'').replace(/[^0-9]/g,'').includes(qd));
+  }).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  let cash=0, due=0, bad=0;
+  list.forEach(e=>{ const v=Number(e.returnValue)||0; if(e.cashBack==='yes') cash+=v; else due+=v; if(e.condition==='bad') bad+=(Number(e.qty)||1); });
+  document.getElementById('rbSummary').innerHTML = list.length
+    ? `মোট <b>${list.length}</b>টা ফেরত · 💵 নগদ ফেরত দেওয়া: <b>${fmt(cash)}</b> · 📒 বাকি থেকে কাটা: <b>${fmt(due)}</b>${bad?` · 🗑️ নষ্ট মাল: <b>${bad}</b>টা`:''}`
+    : 'এই খোঁজে কোনো ফেরত পাওয়া যায়নি।';
+  document.getElementById('rbRows').innerHTML = list.map(e=>{
+    const d=new Date(e.date).toLocaleDateString('bn-BD',{day:'numeric',month:'short',year:'numeric'});
+    const ph=String(e.phone||'').replace(/[^0-9+]/g,'');
+    return `<div style="padding:10px 4px; border-bottom:1px solid var(--line);">
+      <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
+        <div style="min-width:0;">
+          <div style="font-weight:800; font-size:14px;"><span class="rbName" data-n="${escapeHtml(e.name||'')}" style="text-decoration:underline; cursor:pointer;">${escapeHtml(e.name||'—')}</span>${ph?` · <a href="tel:${ph}" style="color:inherit; font-weight:600;">${escapeHtml(e.phone)}</a>`:''}</div>
+          <div style="font-size:13px; margin-top:2px;">📦 ${escapeHtml(e.item||'—')} × ${Number(e.qty)||1}</div>
+        </div>
+        <div style="font-weight:800; color:#b91c1c; white-space:nowrap;">${fmt(e.returnValue||0)}</div>
+      </div>
+      <div style="font-size:12px; color:#6b5f52; margin-top:4px; line-height:1.6;">
+        📅 ${d}${e.invoiceNo?` · 🧾 #${escapeHtml(String(e.invoiceNo))}`:''}<br>
+        ${e.cashBack==='yes'?'💵 নগদ টাকা ফেরত দেওয়া হয়েছে':'📒 বাকি থেকে কাটা হয়েছে'} · ${e.condition==='bad'?'🗑️ মাল নষ্ট (স্টকে যায়নি)':'✅ মাল ভালো (স্টকে ফিরেছে)'}
+        ${e.returnReason?`<br>❓ কারণ: <b>${escapeHtml(e.returnReason)}</b>`:''}${e.soldBy?` · 👤 নিয়েছেন: ${escapeHtml(e.soldBy)}`:''}
+      </div></div>`;
+  }).join('') || '<div class="empty">কোনো ফেরত নেই</div>';
+  document.querySelectorAll('#rbRows .rbName').forEach(x=>x.onclick=()=>{ document.getElementById('rbSearch').value=x.dataset.n; renderReturnsBook(); });
+}
+function openReturnsBook(){ document.getElementById('rbSearch').value=''; renderReturnsBook(); document.getElementById('returnsBookModal').classList.add('show'); setTimeout(()=>document.getElementById('rbSearch').focus(),100); }
+['monReturnsCard','monReturnsCard2'].forEach(id=>{ const c=document.getElementById(id); if(c) c.addEventListener('click', openReturnsBook); });
+document.getElementById('rbSearch').addEventListener('input', renderReturnsBook);
+document.querySelectorAll('#rbRange .status-chip').forEach(ch=>ch.addEventListener('click',()=>{
+  __rbRange=ch.dataset.rb; document.getElementById('rbCustom').style.display=__rbRange==='custom'?'flex':'none'; renderReturnsBook(); }));
+['rbFrom','rbTo'].forEach(id=>document.getElementById(id).addEventListener('change', renderReturnsBook));
+document.getElementById('rbCloseBtn').addEventListener('click', ()=> document.getElementById('returnsBookModal').classList.remove('show'));
+document.getElementById('returnsBookModal').addEventListener('click', ev=>{ if(ev.target===document.getElementById('returnsBookModal')) document.getElementById('returnsBookModal').classList.remove('show'); });
+
 document.getElementById('monDamagedStockCard').addEventListener('click', ()=>{
   renderDamagedStockList();
   document.getElementById('damagedStockModal').classList.add('show');
@@ -18713,6 +18808,7 @@ function monRenderAll(){
   document.getElementById('monOutOfStock').textContent = outOfStock.length;
   const damagedCount = retailEntries.filter(e => e.status === 'ফেরত' && e.condition === 'bad').length;
   document.getElementById('monDamagedStock').textContent = damagedCount;
+  if(typeof rbUpdateCount==='function') rbUpdateCount();
   const oosHtml = outOfStock.length ? outOfStock.map(p=>`<div class="glassRow"><span class="nm">${escapeHtml(p.name)}</span><span class="amt red">০ স্টক</span></div>`).join('') : `<div class="glassEmpty">সব প্রোডাক্টে স্টক আছে ✅</div>`;
   document.getElementById('monOutOfStockList').innerHTML = oosHtml;
   document.getElementById('monAlertOutOfStock').innerHTML = oosHtml;
