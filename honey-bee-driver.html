@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Honey Bee Transport — Driver App UI</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#172033;--muted:#6b7280;--yellow:#ffbf24;--dark:#15243b;--green:#15945b;--line:#e7eaf0;--blue:#2864dc}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;color:var(--ink)}
+.app{max-width:1100px;margin:auto;min-height:100vh;display:grid;grid-template-columns:245px 1fr;background:var(--bg)}
+.sidebar{background:var(--dark);color:white;padding:24px 16px;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 24px;border-bottom:1px solid #ffffff22;margin-bottom:10px}
+.bee{background:var(--yellow);color:#182033;width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:24px}
+.brand strong{display:block;font-size:16px}.brand small{color:#cbd5e1}
+.nav{border:0;background:transparent;color:#dbe4f2;padding:13px 12px;text-align:left;border-radius:12px;font:inherit;cursor:pointer}
+.nav.active,.nav:hover{background:#ffffff18;color:var(--yellow)}
+.sidefoot{margin-top:auto;padding:12px;color:#aebbd0;font-size:12px;line-height:1.7}
+main{padding:26px;min-width:0}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:22px}
+h1{font-size:25px;margin:0 0 4px}.sub{color:var(--muted);font-size:13px}
+.status{display:flex;align-items:center;gap:8px;background:white;border:1px solid var(--line);padding:10px 12px;border-radius:14px;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--green)}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 5px 18px #15243b08}
+.stat-label{font-size:12px;color:var(--muted)}.stat{font-size:25px;font-weight:750;margin:8px 0 3px}.stat-note{font-size:12px;color:var(--green)}
+.columns{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.section-title{font-size:17px;font-weight:750;margin:0 0 14px}
+.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.action{border:1px solid var(--line);background:#fff;border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit}
+.action span{display:block;font-size:22px;margin-bottom:8px}.action b{font-size:14px}.action small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+.trip{padding:13px 0;border-bottom:1px solid var(--line)}.trip:last-child{border-bottom:0}
+.trip-head{display:flex;justify-content:space-between;gap:8px;align-items:center;font-weight:700;font-size:14px}
+.route{font-size:13px;margin:8px 0;color:#374151}.meta{font-size:12px;color:var(--muted);line-height:1.8}
+.badge{display:inline-block;background:#e8f8ef;color:#147d4d;padding:4px 8px;border-radius:99px;font-size:11px;font-weight:700}
+.badge.pending{background:#fff4d9;color:#976300}.btn{background:var(--yellow);border:0;border-radius:12px;padding:12px 15px;font:inherit;font-weight:750;cursor:pointer;color:#1b2435}
+.btn.secondary{background:#eef2f8}.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+label{display:block;font-size:12px;font-weight:650;margin:12px 0 6px}
+input,select{width:100%;padding:12px;border:1px solid #dce1e9;border-radius:11px;background:#fff;font:inherit;font-size:14px}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hidden{display:none!important}
+.notice{background:#fff8e6;border:1px solid #ffe5a1;padding:12px;border-radius:12px;font-size:12px;color:#77530a;margin-top:14px;line-height:1.6}
+.mobile-nav{display:none}
+@media(max-width:780px){.app{display:block}.sidebar{display:none}main{padding:18px 14px 88px}.top{align-items:flex-start}h1{font-size:21px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.card{padding:15px}.columns{grid-template-columns:1fr}.status{font-size:11px;padding:8px}.mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);justify-content:space-around;padding:8px 2px calc(8px + env(safe-area-inset-bottom));z-index:5}.mobile-nav button{border:0;background:transparent;font:inherit;font-size:11px;color:#667085;display:flex;flex-direction:column;align-items:center;gap:3px}.mobile-nav button span{font-size:19px}.mobile-nav button.active{color:#b47b00;font-weight:750}.formgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="hbGate" style="position:fixed;inset:0;z-index:99;background:#f4f6fb;display:grid;place-items:center;font-size:14px;color:#6b7280">🐝 লগইন যাচাই হচ্ছে...</div>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="bee">🐝</div><div><strong>Honey Bee</strong><small>Transport · Driver</small></div></div>
+  <button class="nav active" data-page="home">⌂ &nbsp; ড্যাশবোর্ড</button>
+  <button class="nav" data-page="post">＋ &nbsp; যাত্রা পোস্ট করুন</button>
+  <button class="nav" data-page="bookings">▣ &nbsp; বুকিং অনুরোধ</button>
+  <button class="nav" data-page="schedule">▦ &nbsp; সময়সূচি</button>
+  <button class="nav" data-page="vehicle">🚘 &nbsp; আমার গাড়ি</button>
+  <button class="nav" data-page="earnings">৳ &nbsp; আয় ও হিসাব</button>
+  <button class="nav" data-page="profile">♙ &nbsp; প্রোফাইল</button>
+  <button class="nav" id="hbOldModeSide">🔁 &nbsp; আগের ড্রাইভার মোড</button><button class="nav" id="hbLogoutSide">⎋ &nbsp; লগআউট</button>
+  <div class="sidefoot">আপনার গাড়ি, আপনার সময়, আপনার আয়।<br>© Honey Bee Transport</div>
+</aside>
+<main>
+  <div class="top"><div><h1 id="pageTitle">ড্রাইভার ড্যাশবোর্ড</h1><div class="sub" id="pageSub">স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।</div></div>
+  <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">অনলাইন · বুকিং নিচ্ছেন</span><button class="btn secondary" id="toggleOnline" style="padding:7px 9px;font-size:12px">অফলাইন</button></div></div>
+  <section id="home" class="page">
+    <div class="grid">
+      <div class="card"><div class="stat-label">মোট বুকিং</div><div class="stat" id="totalBookings">—</div><div class="stat-note">ডেটা সংযুক্ত হলে দেখাবে</div></div>
+      <div class="card"><div class="stat-label">আসন্ন যাত্রা</div><div class="stat">—</div><div class="stat-note">এখনো ডেটা নেই</div></div>
+      <div class="card"><div class="stat-label">অপেক্ষমাণ অনুরোধ</div><div class="stat">—</div><div class="stat-note" style="color:#976300">নতুন অনুরোধ নেই</div></div>
+      <div class="card"><div class="stat-label">এই মাসের আয়</div><div class="stat">৳০</div><div class="stat-note">এখনো আয়ের ডেটা নেই</div></div>
+    </div>
+    <div class="columns">
+      <div class="card"><h2 class="section-title">দ্রুত কাজ</h2><div class="actions">
+        <button class="action" data-goto="post"><span>🛣️</span><b>নতুন যাত্রা পোস্ট</b><small>রুট, সময় ও খালি আসন দিন</small></button>
+        <button class="action" data-goto="bookings"><span>📩</span><b>বুকিং অনুরোধ</b><small>অনুরোধ দেখুন ও উত্তর দিন</small></button>
+        <button class="action" data-goto="schedule"><span>🗓️</span><b>সময়সূচি</b><small>ব্যস্ত ও ফাঁকা সময় রাখুন</small></button>
+        <button class="action" data-goto="vehicle"><span>🚘</span><b>গাড়ির তথ্য</b><small>গাড়ি ও আসনের বিবরণ</small></button>
+      </div><div class="notice">✅ লগইন, প্রোফাইল, গাড়ির তথ্য আর অনলাইন/অফলাইন এখন আসল — সার্ভারে সেভ হয়।<br>🛠️ যাত্রা পোস্ট, বুকিং, সময়সূচি, আয় পরের ধাপে যুক্ত হবে। ততদিন এগুলো "🔁 আগের ড্রাইভার মোড"-এ আছে।<br><button class="btn secondary" type="button" id="hbOldModeHome" style="margin-top:8px;padding:8px 12px;font-size:12px">🔁 আগের ড্রাইভার মোড খুলুন</button></div></div>
+      <div class="card"><h2 class="section-title">আসন্ন যাত্রা</h2><div class="sub">এখনো কোনো যাত্রার তথ্য নেই। বুকিং বা যাত্রার ডেটা যুক্ত হলে এখানে দেখা যাবে।</div><button class="btn secondary" style="width:100%;margin-top:12px" data-goto="schedule">সময়সূচি দেখুন</button></div>
+    </div>
+  </section>
+  <section id="post" class="page hidden">
+    <div class="card"><h2 class="section-title">নতুন যাত্রা পোস্ট করুন</h2><p class="sub">আপনার রুট ও খালি আসনের তথ্য দিন।</p>
+      <form id="postForm"><div class="formgrid"><div><label>কোথা থেকে</label><input required name="from" placeholder="যেমন: ঢাকা, মিরপুর"></div><div><label>কোথায় যাবেন</label><input required name="to" placeholder="যেমন: কক্সবাজার"></div>
+      <div><label>যাত্রার তারিখ</label><input required type="date" name="date"></div><div><label>সময়</label><input required type="time" name="time"></div>
+      <div><label>গাড়ির ধরন</label><select name="vehicle"><option>কার</option><option>মাইক্রোবাস</option><option>সিএনজি</option><option>বাস</option><option>অ্যাম্বুলেন্স</option><option>অন্যান্য</option></select></div><div><label>খালি আসন</label><input required type="number" min="1" max="60" value="3" name="seats"></div>
+      <div><label>প্রতি যাত্রীর ভাড়া (৳)</label><input required type="number" min="0" name="fare" placeholder="যেমন: 500"></div><div><label>যোগাযোগ নম্বর</label><input required type="tel" name="phone" placeholder="মোবাইল নম্বর"></div></div>
+      <label>অতিরিক্ত তথ্য</label><input name="notes" placeholder="পিকআপ পয়েন্ট বা শর্ত (ঐচ্ছিক)">
+      <div class="btnrow"><button class="btn" type="submit">যাত্রা পোস্ট করুন</button><button class="btn secondary" type="reset">ফর্ম মুছুন</button></div></form>
+    </div><div class="card" style="margin-top:14px"><h2 class="section-title">আপনার পোস্ট</h2><div id="postsList" class="sub">এখনো কোনো নতুন পোস্ট তৈরি হয়নি।</div></div>
+  </section>
+  <section id="bookings" class="page hidden"><div class="card"><h2 class="section-title">বুকিং অনুরোধ</h2><div class="sub" id="emptyBookings">এখনো কোনো বুকিং অনুরোধ নেই। বাস্তব বুকিং সিস্টেম যুক্ত হলে যাত্রীর অনুরোধ এখানে দেখা যাবে।</div></div></section>
+  <section id="schedule" class="page hidden"><div class="card"><h2 class="section-title">সময়সূচি</h2><p class="sub">আপনার প্রকাশিত যাত্রা ও নিশ্চিত বুকিংয়ের সময়সূচি এখানে দেখা যাবে।</p><div class="sub">এখনো কোনো সময়সূচি নেই।</div></div></section>
+  <section id="vehicle" class="page hidden"><div class="card"><h2 class="section-title">আমার গাড়ি</h2><form id="vehicleForm"><label>গাড়ির ধরন</label><input id="vType" readonly style="background:#f4f6fb"><label>গাড়ির মডেল</label><input id="vModel" placeholder="যেমন: Toyota Hiace (2019)" required><div class="formgrid"><div><label>রেজিস্ট্রেশন নম্বর</label><input id="vReg" placeholder="রেজিস্ট্রেশন নম্বর" required></div><div><label>মোট আসন</label><input id="vSeats" type="number" min="1" placeholder="মোট আসন" required></div><div><label>এসি</label><select id="vAc"><option value="">নির্বাচন করুন</option><option>আছে</option><option>নেই</option></select></div><div><label>জ্বালানি</label><select id="vFuel"><option value="">নির্বাচন করুন</option><option>ডিজেল</option><option>পেট্রোল</option><option>সিএনজি</option><option>ইলেকট্রিক</option></select></div></div><button class="btn" type="submit" style="margin-top:14px">তথ্য সংরক্ষণ করুন</button></form><div class="notice">আপনার প্রকৃত গাড়ির তথ্য পূরণ করুন। গাড়ির ধরন বদলাতে এজেন্টের সাথে যোগাযোগ করুন।</div></div></section>
+  <section id="earnings" class="page hidden"><div class="grid"><div class="card"><div class="stat-label">এই মাসে</div><div class="stat">৳০</div><div class="stat-note">আয়ের ডেটা যুক্ত হয়নি</div></div><div class="card"><div class="stat-label">সম্পন্ন যাত্রা</div><div class="stat">০</div></div></div><div class="card"><h2 class="section-title">আয়ের হিসাব</h2><div class="sub">এখনো কোনো আয়ের রেকর্ড নেই। বাস্তব পেমেন্ট/বুকিং ডেটা যুক্ত হলে এখানে হিসাব দেখা যাবে।</div></div></section>
+  <section id="profile" class="page hidden"><div class="card"><h2 class="section-title">ড্রাইভার প্রোফাইল</h2><form id="profileForm"><label>পূর্ণ নাম</label><input id="pName" placeholder="আপনার পূর্ণ নাম" required><div class="formgrid"><div><label>মোবাইল নম্বর (লগইন — বদলানো যায় না)</label><input id="pPhone" readonly style="background:#f4f6fb"></div><div><label>এলাকা</label><input id="pArea" readonly style="background:#f4f6fb"></div></div><label>ড্রাইভিং লাইসেন্স নম্বর</label><input id="pLicense" placeholder="লাইসেন্স নম্বর লিখুন"><button class="btn" style="margin-top:14px">প্রোফাইল আপডেট</button></form><div class="meta" id="pVerify" style="margin-top:12px"></div><div class="btnrow"><button class="btn secondary" type="button" id="hbLogoutProfile">⎋ লগআউট</button></div></div></section>
+</main>
+</div>
+<nav class="mobile-nav"><button class="active" data-page="home"><span>⌂</span>হোম</button><button data-page="post"><span>＋</span>পোস্ট</button><button data-page="bookings"><span>▣</span>বুকিং</button><button data-page="schedule"><span>▦</span>সময়সূচি</button><button data-page="profile"><span>♙</span>প্রোফাইল</button></nav>
+<script>
+const titles={home:['ড্রাইভার ড্যাশবোর্ড','স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।'],post:['নতুন যাত্রা পোস্ট','আপনার রুট, সময় ও খালি আসন দিন।'],bookings:['বুকিং অনুরোধ','যাত্রীর অনুরোধ পর্যালোচনা করুন।'],schedule:['সময়সূচি','আপনার আসন্ন যাত্রার পরিকল্পনা।'],vehicle:['আমার গাড়ি','গাড়ির তথ্য যাচাই ও আপডেট করুন।'],earnings:['আয় ও হিসাব','যাত্রা থেকে আয়ের সারসংক্ষেপ।'],profile:['আমার প্রোফাইল','আপনার যোগাযোগ ও পরিচয় তথ্য।']};
+function go(page){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));document.querySelectorAll('[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));document.getElementById('pageTitle').textContent=titles[page][0];document.getElementById('pageSub').textContent=titles[page][1];window.scrollTo({top:0,behavior:'smooth'})}
+document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.page)));
+document.querySelectorAll('[data-goto]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.goto)));
+let online=true;window.__demoToggle=()=>{online=!online;document.getElementById('statusText').textContent=online?'অনলাইন · বুকিং নিচ্ছেন':'অফলাইন · বুকিং বন্ধ';document.getElementById('statusDot').style.background=online?'#15945b':'#9ca3af';document.getElementById('toggleOnline').textContent=online?'অফলাইন':'অনলাইন'};
+function bookingAction(btn,status){const trip=btn.closest('.trip');trip.querySelector('.badge').textContent=status;trip.querySelector('.badge').className='badge '+(status==='গৃহীত'?'':'pending');trip.querySelectorAll('button').forEach(b=>b.disabled=true);alert('ডেমো: বুকিং '+status+' হয়েছে। বাস্তবে এটি সার্ভারে সংরক্ষিত হবে না।')}
+document.getElementById('postForm').addEventListener('submit',e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));const box=document.getElementById('postsList');if(box.classList.contains('sub')){box.classList.remove('sub');box.textContent=''}const el=document.createElement('div');el.className='trip';el.innerHTML=`<div class="trip-head"><span>${esc(d.from)} → ${esc(d.to)}</span><span class="badge">ড্রাফট</span></div><div class="meta">${esc(d.date)} · ${esc(d.time)} · ${esc(d.vehicle)} · ${esc(d.seats)} আসন · প্রতি জন ৳${esc(d.fare)}</div><div class="meta">যোগাযোগ: ${esc(d.phone)}</div>`;box.prepend(el);e.target.reset();alert('ডেমো পোস্ট তৈরি হয়েছে। এটি অনলাইনে প্রকাশ বা স্থায়ীভাবে সংরক্ষিত হয়নি।')});
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-init.js"></script>
+<script>
+/* ==================== 🚑 ড্রাইভার অ্যাপ — আসল লগইন ও তথ্য (ধাপ ১) ====================
+   login.html-এ ড্রাইভার নিবন্ধন/লগইন করলে এখানে আসে। লগইন না থাকলে বা অন্য
+   কেউ (দোকান/রেস্টুরেন্ট) খুললে login.html-এ ফেরত পাঠানো হয়।
+   ডেটা: transportDrivers/{uid} — প্রোফাইল, গাড়ি, driverStatus। পড়া হয় একবারই। */
+let DRV = { uid:null, data:null };
+const $id = (x)=>document.getElementById(x);
+function drvToLogin(){ try{ clearSession(); }catch(e){} location.replace("login.html"); }
+async function drvLogout(){
+  if(!confirm("লগআউট করবেন?")) return;
+  try{ if(DRV.uid && DRV.data && DRV.data.driverStatus !== "offline") await db.collection("transportDrivers").doc(DRV.uid).update({ driverStatus:"offline" }); }catch(e){}
+  try{ await auth.signOut(); }catch(e){}
+  drvToLogin();
+}
+function drvOldMode(){ location.href = "shop-ledger-app.html"; }
+["hbLogoutSide","hbLogoutProfile"].forEach(id=>{ const b=$id(id); if(b) b.onclick=drvLogout; });
+["hbOldModeSide","hbOldModeHome"].forEach(id=>{ const b=$id(id); if(b) b.onclick=drvOldMode; });
+
+function drvPaintStatus(st){
+  const on = st === "online" || st === "busy";
+  $id("statusText").textContent = st === "busy" ? "ব্যস্ত · যাত্রায় আছেন" : (on ? "অনলাইন · বুকিং নিচ্ছেন" : "অফলাইন · বুকিং বন্ধ");
+  $id("statusDot").style.background = st === "busy" ? "#f59e0b" : (on ? "#15945b" : "#9ca3af");
+  $id("toggleOnline").textContent = on ? "অফলাইন" : "অনলাইন";
+}
+$id("toggleOnline").onclick = async ()=>{
+  if(!DRV.uid) return;
+  const cur = DRV.data.driverStatus || "offline";
+  if(cur === "busy"){ alert("যাত্রা চলছে — শেষ হলে অফলাইন করতে পারবেন।"); return; }
+  const next = cur === "online" ? "offline" : "online";
+  const btn = $id("toggleOnline"); btn.disabled = true;
+  try{
+    await db.collection("transportDrivers").doc(DRV.uid).update({ driverStatus: next, statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    DRV.data.driverStatus = next; drvPaintStatus(next);
+  }catch(e){ alert("বদলানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
+  btn.disabled = false;
+};
+
+function drvFill(){
+  const d = DRV.data, v = d.vehicle || {};
+  $id("pageSub").textContent = "স্বাগতম, " + (d.name || "ড্রাইভার") + "! আজকের যাত্রা ও বুকিং দেখুন।";
+  titles.home[1] = $id("pageSub").textContent;
+  drvPaintStatus(d.driverStatus || "offline");
+  $id("vType").value = v.type || "";
+  $id("vModel").value = v.model || "";
+  $id("vReg").value = v.regNumber || "";
+  $id("vSeats").value = v.seatCount || "";
+  $id("vAc").value = v.ac || "";
+  $id("vFuel").value = v.fuel || "";
+  $id("pName").value = d.name || "";
+  $id("pPhone").value = d.phone || "";
+  $id("pArea").value = [d.upazila, d.district].filter(Boolean).join(", ");
+  $id("pLicense").value = d.licenseNumber || "";
+  $id("pVerify").textContent = d.isVerified ? "🪪 যাচাই: ✅ এজেন্ট যাচাই করেছেন" : "🪪 যাচাই: ⏳ এখনো এজেন্ট যাচাই করেননি";
+}
+
+$id("vehicleForm").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true;
+  try{
+    const upd = {
+      "vehicle.model": $id("vModel").value.trim() || null,
+      "vehicle.regNumber": $id("vReg").value.trim() || null,
+      "vehicle.seatCount": Number($id("vSeats").value) || null,
+      "vehicle.ac": $id("vAc").value || null,
+      "vehicle.fuel": $id("vFuel").value || null
+    };
+    await db.collection("transportDrivers").doc(DRV.uid).update(upd);
+    const v = DRV.data.vehicle = DRV.data.vehicle || {};
+    v.model = upd["vehicle.model"]; v.regNumber = upd["vehicle.regNumber"]; v.seatCount = upd["vehicle.seatCount"]; v.ac = upd["vehicle.ac"]; v.fuel = upd["vehicle.fuel"];
+    alert("✅ গাড়ির তথ্য সেভ হয়েছে।");
+  }catch(err){ alert("সেভ করা যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
+  btn.disabled = false;
+});
+
+$id("profileForm").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const name = $id("pName").value.trim();
+  if(!name){ alert("নাম লিখুন।"); return; }
+  const btn = e.target.querySelector("button"); btn.disabled = true;
+  try{
+    const license = $id("pLicense").value.trim() || null;
+    await db.collection("transportDrivers").doc(DRV.uid).update({ name, licenseNumber: license });
+    DRV.data.name = name; DRV.data.licenseNumber = license;
+    const se = getSession() || {}; se.name = name; saveSession(se);
+    drvFill(); go("profile");
+    alert("✅ প্রোফাইল সেভ হয়েছে।");
+  }catch(err){ alert("সেভ করা যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
+  btn.disabled = false;
+});
+
+auth.onAuthStateChanged(async (user)=>{
+  const se = getSession();
+  if(!user || !se || se.uid !== user.uid || se.role !== "transport_driver"){ drvToLogin(); return; }
+  try{
+    const snap = await db.collection("transportDrivers").doc(user.uid).get();
+    if(!snap.exists || snap.data().status === "blocked"){
+      alert("আপনার অ্যাকাউন্টটি ব্লক করা আছে অথবা প্রোফাইল পাওয়া যায়নি।");
+      await auth.signOut(); drvToLogin(); return;
+    }
+    DRV.uid = user.uid; DRV.data = snap.data();
+    drvFill();
+    $id("hbGate").remove();
+  }catch(e){
+    $id("hbGate").innerHTML = '<div style="text-align:center;padding:20px">তথ্য আনা যায়নি — ইন্টারনেট দেখে <button class="btn" onclick="location.reload()">আবার চেষ্টা</button></div>';
+  }
+});
+</script>
+</body>
+</html>
