@@ -255,17 +255,8 @@ body { padding-bottom: calc(66px + env(safe-area-inset-bottom)) !important; }
 <div id="toast" class="toast"></div>
 </div>
 <script>
-const rides=[
-{id:1,type:'মাইক্রোবাস',emoji:'🚐',route:'গাবতলী → মিরপুর',from:'ঢাকা, গাবতলী',to:'ঢাকা, মিরপুর',time:'আজ 6:00 PM',price:600,seats:3,name:'রহিম মিয়া',rating:'4.8',reviews:120,verified:true,car:'Toyota Hiace',ac:'এসি',year:'2022',color:'সাদা',plate:'ডেমো নম্বর',luggage:'বড় ব্যাগ ৩টি',note:'গাবতলী থেকে যাত্রা শুরু'},
-{id:2,type:'প্রাইভেট কার',emoji:'🚙',route:'গাবতলী → মিরপুর',from:'ঢাকা, গাবতলী',to:'ঢাকা, মিরপুর',time:'আজ 6:30 PM',price:2500,seats:2,name:'আলমগীর',rating:'4.7',reviews:64,verified:true,car:'Toyota Axio',ac:'এসি',year:'2021',color:'সিলভার',plate:'ডেমো নম্বর',luggage:'বড় ব্যাগ ২টি',note:'সময় নিয়ে আলোচনা করা যাবে'},
-{id:3,type:'সিএনজি',emoji:'🛺',route:'গাবতলী → মিরপুর',from:'ঢাকা, গাবতলী',to:'ঢাকা, মিরপুর',time:'আজ 7:00 PM',price:350,seats:3,name:'জাকির হোসেন',rating:'4.6',reviews:98,verified:true,car:'CNG Auto-rickshaw',ac:'এসি নেই',year:'তথ্য দেওয়া হয়নি',color:'সবুজ',plate:'ডেমো নম্বর',luggage:'ছোট ব্যাগ',note:'শেয়ার করে যাওয়া যাবে'},
-{id:4,type:'মোটরসাইকেল',emoji:'🏍️',route:'গাবতলী → মিরপুর',from:'ঢাকা, গাবতলী',to:'ঢাকা, মিরপুর',time:'আজ 5:30 PM',price:900,seats:1,name:'সোহেল মিয়া',rating:'4.7',reviews:38,verified:true,car:'মোটরসাইকেল',ac:'এসি প্রযোজ্য নয়',year:'2023',color:'কালো',plate:'ডেমো নম্বর',luggage:'ছোট ব্যাগ',note:'একজন যাত্রী নেওয়া যাবে'},
-{id:5,type:'রিকশা',emoji:'🛺',route:'মিরপুরের আশেপাশে',from:'ঢাকা, মিরপুর',to:'ঢাকা, মিরপুর',time:'এখন পাওয়া যেতে পারে',price:50,seats:2,name:'করিম মিয়া',rating:'4.5',reviews:26,verified:true,car:'প্যাডেল রিকশা',ac:'এসি নেই',year:'তথ্য দেওয়া হয়নি',color:'রঙিন',plate:'প্রযোজ্য নয়',luggage:'ছোট ব্যাগ',note:'স্থানীয় স্বল্প দূরত্বের যাত্রা'},
-{id:6,type:'ইজিবাইক',emoji:'🛺',route:'মিরপুর → বাসস্ট্যান্ড',from:'ঢাকা, মিরপুর',to:'ঢাকা, মিরপুর বাসস্ট্যান্ড',time:'এখন পাওয়া যেতে পারে',price:30,seats:4,name:'রফিকুল ইসলাম',rating:'4.6',reviews:31,verified:true,car:'ব্যাটারিচালিত ইজিবাইক',ac:'এসি নেই',year:'তথ্য দেওয়া হয়নি',color:'সবুজ',plate:'ডেমো নম্বর',luggage:'ছোট ব্যাগ',note:'স্থানীয় যাত্রা'},
-{id:7,type:'অ্যাম্বুলেন্স',emoji:'🚑',route:'মিরপুর → গাবতলী',from:'ঢাকা, মিরপুর',to:'ঢাকা, গাবতলী',time:'প্রাপ্যতা যাচাই করতে হবে',price:4500,seats:1,name:'জরুরি সেবা চালক',rating:'4.8',reviews:19,verified:true,car:'অ্যাম্বুলেন্স',ac:'এসি আছে (যাচাই প্রয়োজন)',year:'তথ্য দেওয়া হয়নি',color:'সাদা',plate:'ডেমো নম্বর',luggage:'স্ট্রেচার/চিকিৎসা সরঞ্জাম',note:'জরুরি অবস্থায় স্থানীয় জরুরি সেবায়ও যোগাযোগ করুন'},
-{id:8,type:'পিকআপ / মালবাহী গাড়ি',emoji:'🛻',route:'গাবতলী → মিরপুর',from:'ঢাকা, গাবতলী',to:'ঢাকা, মিরপুর',time:'আগামীকাল 8:00 AM',price:3500,seats:0,name:'মো. জামাল',rating:'4.6',reviews:42,verified:true,car:'পিকআপ',ac:'যাত্রী এসি প্রযোজ্য নয়',year:'তথ্য দেওয়া হয়নি',color:'তথ্য দেওয়া হয়নি',plate:'ডেমো নম্বর',luggage:'মালামালের ধরন ও ওজন জানাতে হবে',note:'মালামাল পরিবহনের জন্য; ভাড়া আলোচনা সাপেক্ষ'},
-{id:9,type:'ট্রাক / কাভার্ড ভ্যান',emoji:'🚚',route:'গাবতলী → মিরপুর',from:'ঢাকা, গাবতলী',to:'ঢাকা, মিরপুর',time:'আগামীকাল 9:00 AM',price:8000,seats:0,name:'মো. হানিফ',rating:'4.7',reviews:34,verified:true,car:'মালবাহী ট্রাক',ac:'যাত্রী এসি প্রযোজ্য নয়',year:'তথ্য দেওয়া হয়নি',color:'তথ্য দেওয়া হয়নি',plate:'ডেমো নম্বর',luggage:'লোডের ওজন/আয়তন জানাতে হবে',note:'পণ্য ও মালামাল পরিবহন; লোডের তথ্য দিন'},
-{id:10,type:'বাইসাইকেল',emoji:'🚲',route:'স্থানীয় এলাকা',from:'ঢাকা, বাংলাদেশ',to:'ঢাকা, বাংলাদেশ',time:'পোস্ট অনুযায়ী',price:20,seats:1,name:'স্থানীয় সাইকেল চালক',rating:'4.3',reviews:12,verified:false,car:'বাইসাইকেল',note:'শুধু যেখানে এ ধরনের সেবা পাওয়া যায়'}];let filtered='সব';
+let rides=[]; // 🚕 আসল ড্রাইভার পোস্ট — নিচের Firebase অংশ transportMediaPosts থেকে ভরে
+let filtered='সব';
 // Keep demo activity on this device until Firebase is connected.
 const safeLoad=(key)=>{try{return JSON.parse(localStorage.getItem(key)||'[]')}catch(e){return []}};
 let bookings=safeLoad('hbPassengerBookings'),requests=safeLoad('hbPassengerRequests');
@@ -280,7 +271,7 @@ function vehicleArt(type){
 }
 
 function rideCard(r){return `<article class="ride market-vehicle-card">
- <div class="vehiclepic market-vehicle-photo" onclick="openDetail(${r.id})" role="button" aria-label="গাড়ির বিস্তারিত দেখুন">
+ <div class="vehiclepic market-vehicle-photo" onclick="openDetail('${r.id}')" role="button" aria-label="গাড়ির বিস্তারিত দেখুন">
   <span class="badge">${r.verified?'✓ যাচাইকৃত':'চালকের তথ্য দেখুন'}</span>
   <div class="vehicle-art">${['রিকশা','ইজিবাইক','সিএনজি'].includes(r.type)?vehicleArt(r.type):r.emoji}</div>
   <span class="photo-caption">গাড়ির ছবি ও বিস্তারিত দেখতে চাপ দিন</span>
@@ -290,11 +281,11 @@ function rideCard(r){return `<article class="ride market-vehicle-card">
   <div class="routeText">📍 ${r.route}</div>
   <div class="meta">🕒 ${r.time} · ${r.seats>0?'💺 '+r.seats+' আসন':'📦 মালামাল পরিবহন'}</div>
   <div class="vehicle-spec-row"><span>❄️ ${r.ac||'এসি তথ্য নেই'}</span><span>⭐ ${r.rating||'নতুন'}</span></div>
-  <div class="market-vehicle-bottom"><div><small>প্রস্তাবিত ভাড়া</small><strong>৳${r.price}</strong></div><button class="primary vehicle-detail-btn" onclick="openDetail(${r.id})">বিস্তারিত দেখুন ›</button></div>
+  <div class="market-vehicle-bottom"><div><small>প্রস্তাবিত ভাড়া</small><strong>৳${r.price}</strong></div><button class="primary vehicle-detail-btn" onclick="openDetail('${r.id}')">বিস্তারিত দেখুন ›</button></div>
  </div></article>`}
 
 function toggleHomeSearch(){const box=document.getElementById('homeSearchBox');const btn=document.getElementById('homeSearchToggle');const collapsed=box.classList.toggle('collapsed');btn.setAttribute('aria-expanded',String(!collapsed));}
-function render(){let list=rides.filter(r=>filtered==='সব'||r.type===filtered);document.getElementById('homeRides').innerHTML=list.slice(0,3).map(rideCard).join('');document.getElementById('searchRides').innerHTML=list.map(rideCard).join('')||'<div class="empty">এই ধরনের গাড়ি পাওয়া যায়নি। অন্য ধরন নির্বাচন করুন।</div>';document.getElementById('postsRides').innerHTML=rides.map(rideCard).join('');document.getElementById('searchSummary').textContent=`${document.getElementById('from').value} থেকে ${document.getElementById('to').value} · ${list.length}টি ডেমো পোস্ট`;document.getElementById('bookingList').innerHTML=bookings.length?bookings.map(b=>`<div class="ride" style="margin-bottom:10px"><div class="vehiclepic">${b.emoji||'🚘'}</div><div><b>${b.route||((b.from||'')+' → '+(b.to||''))}</b><p class="meta">${b.name||b.type||'যাত্রার অনুরোধ'} · ${b.time||b.date||'তারিখ দেওয়া হয়নি'}</p><div class="rating">${b.status||'বুকিং অনুরোধ পাঠানো হয়েছে'}</div><button class="book" onclick="showPage('trackingPage')">যাত্রার তথ্য</button></div></div>`).join(''):'<div class="empty">এখনো কোনো বুকিং নেই।<br>গন্তব্যের গাড়ি খুঁজে বুকিং দিন।</div>';const rh=document.getElementById('requestHistory');if(rh)rh.innerHTML=requests.length?'<h3>আপনার সংরক্ষিত অনুরোধ</h3>'+requests.map(q=>`<div class="notice" style="margin:8px 0"><b>${q.from} → ${q.to}</b><br><span>${q.type} · ${q.date||'তারিখ নেই'} · ${q.count||1} জন</span><br><small>${q.status||'ডেমো অনুরোধ'}</small></div>`).join(''):''}
+function render(){let list=rides.filter(r=>filtered==='সব'||r.type===filtered);document.getElementById('homeRides').innerHTML=list.slice(0,3).map(rideCard).join('')||'<div class="empty">'+(window.__ridesLoaded?'এখনো কোনো ড্রাইভারের পোস্ট নেই — ড্রাইভাররা পোস্ট করলে এখানে দেখা যাবে।':'⏳ পোস্ট আনা হচ্ছে...')+'</div>';document.getElementById('searchRides').innerHTML=list.map(rideCard).join('')||'<div class="empty">এই ধরনের গাড়ি পাওয়া যায়নি। অন্য ধরন নির্বাচন করুন।</div>';document.getElementById('postsRides').innerHTML=rides.map(rideCard).join('')||'<div class="empty">এখনো কোনো পোস্ট নেই।</div>';document.getElementById('searchSummary').textContent=`${document.getElementById('from').value} থেকে ${document.getElementById('to').value} · ${list.length}টি পোস্ট`;document.getElementById('bookingList').innerHTML=bookings.length?bookings.map(b=>`<div class="ride" style="margin-bottom:10px"><div class="vehiclepic">${b.emoji||'🚘'}</div><div><b>${b.route||((b.from||'')+' → '+(b.to||''))}</b><p class="meta">${b.name||b.type||'যাত্রার অনুরোধ'} · ${b.time||b.date||'তারিখ দেওয়া হয়নি'}</p><div class="rating">${b.status||'বুকিং অনুরোধ পাঠানো হয়েছে'}</div><button class="book" onclick="showPage('trackingPage')">যাত্রার তথ্য</button></div></div>`).join(''):'<div class="empty">এখনো কোনো বুকিং নেই।<br>গন্তব্যের গাড়ি খুঁজে বুকিং দিন।</div>';const rh=document.getElementById('requestHistory');if(rh)rh.innerHTML=requests.length?'<h3>আপনার সংরক্ষিত অনুরোধ</h3>'+requests.map(q=>`<div class="notice" style="margin:8px 0"><b>${q.from} → ${q.to}</b><br><span>${q.type} · ${q.date||'তারিখ নেই'} · ${q.count||1} জন</span><br><small>${q.status||'ডেমো অনুরোধ'}</small></div>`).join(''):''}
 function showPage(id,btn){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));let page=document.getElementById(id);if(page)page.classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));let navbtn=btn||document.querySelector(`.nav button[data-page="${id}"]`);if(!navbtn){const fallback=id==='requestPage'?'searchPage':(id==='detailPage'||id==='trackingPage'?'bookingsPage':'homePage');navbtn=document.querySelector(`.nav button[data-page="${fallback}"]`)}if(navbtn)navbtn.classList.add('active');if(id==='searchPage')render();window.scrollTo({top:0,behavior:'smooth'})}
 function filterType(type,btn){filtered=type;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));if(btn)btn.classList.add('active');render()}
 function useCurrentLocation(){
@@ -336,12 +327,12 @@ function openDetail(id){
  <p style="margin:10px 0 4px"><b>চালকের বিবরণ</b></p><p class="meta">রুট: ${r.route}<br>অভিজ্ঞতা: চালকের সঙ্গে নিশ্চিত করুন<br>লাইসেন্স: ${r.verified?'যাচাই করা হয়েছে':'যাচাইয়ের তথ্য নেই'}<br>ফোন: বুকিং/যোগাযোগের সময় চালকের সম্মতিতে দেখানো হবে</p>
  </div>
  <div class="notice" style="margin:12px 0"><h3 style="margin:0 0 8px">📅 চালকের বুকিং সূচি</h3><p style="margin:0 0 6px">আগে থেকে বুকিং থাকা তারিখ:</p>${history}<p class="hint" style="margin-bottom:0">এগুলো ডেমো সূচি। বাস্তব বুকিংয়ের তারিখ Driver App ও Firebase যুক্ত হওয়ার পর দেখা যাবে। বুকিংয়ের আগে চালককে কল করে সময় ও আসন খালি আছে কি না নিশ্চিত করুন।</p></div>
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><button class="primary" onclick="bookRide(${r.id})">🎫 বুকিং অনুরোধ</button><button class="input" onclick="callDriver(${r.id})">📞 চালককে কল</button></div>
- <button class="input" style="margin-top:9px" onclick="showFareAgreement(${r.id})">🤝 ভাড়ার দরদাম করুন</button>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><button class="primary" onclick="bookRide('${r.id}')">🎫 বুকিং অনুরোধ</button><button class="input" onclick="callDriver('${r.id}')">📞 চালককে কল</button></div>
+ <button class="input" style="margin-top:9px" onclick="showFareAgreement('${r.id}')">🤝 ভাড়ার দরদাম করুন</button>
  </div>`;
  showPage('detailPage')
 }
-function callDriver(id){const r=rides.find(x=>x.id===id);toast('চালকের ফোন নম্বর Firebase/Driver App যুক্ত হলে অনুমতি অনুযায়ী দেখানো যাবে। এখন '+r.name+'-এর সঙ্গে যোগাযোগ ডেমো মাত্র।')}
+function callDriver(id){const r=rides.find(x=>x.id===id);if(r&&r.phone){const a=document.createElement('a');a.href='tel:'+r.phone;a.target='_top';document.body.appendChild(a);a.click();a.remove()}else{toast('এই পোস্টে ফোন নম্বর দেওয়া নেই')}}
 
 function showFareAgreement(rideId){
  const ride=(rides||[]).find(x=>x.id===rideId);
@@ -361,6 +352,32 @@ const today=new Date();document.getElementById('date').value=today.toISOString()
 function toggleMainMenu(){const panel=document.getElementById('mainMenuPanel');const btn=document.getElementById('mainMenuButton');if(!panel||!btn)return;const open=panel.style.display!=='block';panel.hidden=!open;panel.style.display=open?'block':'none';btn.setAttribute('aria-expanded',String(open));}
 function closeMainMenu(){const panel=document.getElementById('mainMenuPanel');const btn=document.getElementById('mainMenuButton');if(panel){panel.hidden=true;panel.style.display='none';}if(btn)btn.setAttribute('aria-expanded','false');}
 document.addEventListener('click',function(e){const panel=document.getElementById('mainMenuPanel');const btn=document.getElementById('mainMenuButton');if(panel&&panel.style.display==='block'&&!panel.contains(e.target)&&btn&&!btn.contains(e.target))closeMainMenu();});
+</script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-init.js"></script>
+<script>
+/* ==================== 🚕 আসল ড্রাইভার পোস্ট (Transport Media) ====================
+   ড্রাইভার অ্যাপ (honey-bee-driver.html) থেকে পোস্ট হলে transportMediaPosts-এ
+   যায়, এখানে সবাই সাথে সাথে দেখে। সর্বশেষ ৩০টা সক্রিয় পোস্ট — খরচ কম রাখতে। */
+const HB_TYPE_EMOJI={'মোটরসাইকেল':'🏍️','বাইসাইকেল':'🚲','রিকশা':'🛺','ইজিবাইক':'🛺','সিএনজি':'🛺','প্রাইভেট কার':'🚙','পিকআপ / মালবাহী গাড়ি':'🛻','ট্রাক / কাভার্ড ভ্যান':'🚚','মাইক্রোবাস':'🚐','মিনিবাস / বাস':'🚌','অ্যাম্বুলেন্স':'🚑'};
+function hbEsc(x){return String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function hbPostToRide(id,d){
+  const type=d.vehicleType||'';
+  const route=(d.from&&d.to)?(d.from+' → '+d.to):((d.text||'').split('\n')[0].slice(0,60)||'রুট দেওয়া নেই');
+  let when=[d.date,d.time].filter(Boolean).join(' ');
+  if(!when&&d.createdAt&&d.createdAt.toDate){try{when='পোস্ট: '+d.createdAt.toDate().toLocaleDateString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){}}
+  return {id:hbEsc(id),type:hbEsc(type||'গাড়ি'),emoji:HB_TYPE_EMOJI[type]||'🚘',route:hbEsc(route),from:hbEsc(d.from||''),to:hbEsc(d.to||''),
+    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,name:hbEsc(d.authorName||'ড্রাইভার'),
+    rating:'নতুন',reviews:0,verified:!!d.isVerified,car:hbEsc(d.vehicleModel||d.vehicleLabel||'তথ্য দেওয়া হয়নি'),ac:hbEsc(d.ac||''),
+    plate:hbEsc(d.regNumber||''),color:hbEsc(d.vehicleColor||''),note:hbEsc(d.notes||d.text||''),phone:String(d.authorPhone||'').replace(/[^0-9+]/g,'')};
+}
+try{
+  db.collection('transportMediaPosts').where('status','==','active').orderBy('createdAt','desc').limit(30)
+    .onSnapshot(qs=>{window.__ridesLoaded=true;rides=qs.docs.map(x=>hbPostToRide(x.id,x.data()));render();},
+      err=>{console.warn('posts',err);window.__ridesLoaded=true;render();toast('পোস্ট আনা যায়নি — ইন্টারনেট দেখুন');});
+}catch(e){console.warn(e)}
 </script>
 </body>
 </html>
