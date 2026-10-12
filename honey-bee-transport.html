@@ -247,7 +247,7 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
   <button onclick="document.getElementById('vehicleType').value='সব';searchRides();closeMainMenu()">🚘 গাড়ি খুঁজুন <small>আপনার রুটে</small></button>
   <button onclick="showPage('requestPage');closeMainMenu()">📝 যাত্রার অনুরোধ <small>গাড়ি না পেলে পোস্ট দিন</small></button>
   <button onclick="showPage('postsPage');closeMainMenu()">🕘 যাত্রার পোস্ট <small>চালকের যাত্রা দেখুন</small></button>
-  <button onclick="showPage('bookingsPage');closeMainMenu()">🎫 আমার বুকিং <small>যাত্রার অবস্থা</small></button>
+  <button onclick="showPage('bookingsPage');closeMainMenu()">🎫 আমার যাত্রা <small>চলতি ও আগের যাত্রা</small></button>
   <button onclick="showPage('profilePage');closeMainMenu()">👤 প্রোফাইল</button>
  </div>
  <div class="searchbox collapsed" id="homeSearchBox">
@@ -278,8 +278,16 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
 </section>
 <section id="searchPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>গন্তব্যের গাড়ি</h1></div><div class="section"><div class="hint" id="searchSummary"></div><div class="chips" style="margin-top:10px"><button class="chip active" onclick="filterType('সব',this)">সব</button><button class="chip" onclick="filterType('মোটরসাইকেল',this)">মোটরসাইকেল</button><button class="chip" onclick="filterType('রিকশা',this)">রিকশা</button><button class="chip" onclick="filterType('ইজিবাইক',this)">ইজিবাইক</button><button class="chip" onclick="filterType('সিএনজি',this)">সিএনজি</button><button class="chip" onclick="filterType('অ্যাম্বুলেন্স',this)">অ্যাম্বুলেন্স</button><button class="chip" onclick="filterType('পিকআপ / মালবাহী গাড়ি',this)">মালবাহী গাড়ি</button></div><div id="searchRides" class="cards"></div></div></section>
 <section id="postsPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>চালকদের যাত্রার পোস্ট</h1></div><div class="notice">ফেরার পথে খালি গাড়ি? চালকের পোস্টে রুট ও সময় দেখে বুকিং করতে পারবেন।</div><div id="postsRides" class="cards" style="padding:0 16px"></div></section>
-<section id="requestPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>যাত্রার অনুরোধ দিন</h1></div><div class="formcard"><div class="hint">আপনার যাত্রার তথ্য দিন। চালকেরা অনুরোধটি দেখতে পারবেন।</div><div class="formlabel">কোথা থেকে যাবেন?</div><input id="reqFrom" class="input" value="ঢাকা, গাবতলী"><div class="formlabel">কোথায় যাবেন?</div><input id="reqTo" class="input" value="ঢাকা, মিরপুর"><div class="formlabel">যাত্রার তারিখ</div><input id="reqDate" type="date" class="input"><div class="formlabel">গাড়ির ধরন</div><select id="reqType" class="input"><option>যেকোনো গাড়ি</option><option>বাইসাইকেল</option><option>মোটরসাইকেল</option><option>রিকশা</option><option>ইজিবাইক</option><option>সিএনজি</option><option>প্রাইভেট কার</option><option>পিকআপ / মালবাহী গাড়ি</option><option>ট্রাক / কাভার্ড ভ্যান</option><option>মাইক্রোবাস</option><option>মিনিবাস / বাস</option><option>অ্যাম্বুলেন্স</option></select><div class="formlabel">যাত্রীর সংখ্যা</div><input id="reqCount" type="number" min="1" value="1" class="input"><div class="formlabel">অতিরিক্ত তথ্য (ঐচ্ছিক)</div><input id="reqNote" class="input" placeholder="যেমন: বিকেল ৫টার পরে"><button class="primary" style="margin-top:18px" onclick="createRequest()">📨 অনুরোধ প্রকাশ করুন</button><div id="requestHistory" style="margin-top:18px"></div></div></section>
-<section id="bookingsPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>আমার বুকিং</h1></div><div id="bookingList" class="formcard"><div class="empty">এখনো কোনো বুকিং নেই।<br>গন্তব্যের গাড়ি খুঁজে বুকিং দিন।</div></div></section>
+<section id="requestPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>🚕 গাড়ি ডাকুন</h1></div><div class="formcard"><div class="hint">গন্তব্য লিখে পাঠান — কাছের অনলাইন ড্রাইভাররা ভাড়া অফার দেবেন, আপনি পছন্দেরটা বেছে নেবেন। ৬ মিনিট খোঁজা হবে।</div>
+<div class="formlabel">🏁 কোথায় যাবেন?</div><input id="reqTo" class="input" placeholder="যেমন: সিলেট, আম্বরখানা">
+<div class="formlabel">📍 কোথা থেকে উঠবেন? (ঐচ্ছিক — না লিখলে আপনার GPS লোকেশন যাবে)</div><input id="reqFrom" class="input" placeholder="যেমন: বাজারের মসজিদের সামনে">
+<div class="formlabel">🚗 গাড়ির ধরন</div><select id="reqType" class="input"><option>মোটরসাইকেল</option><option>বাইসাইকেল</option><option>রিকশা</option><option>ইজিবাইক</option><option>সিএনজি</option><option>প্রাইভেট কার</option><option>পিকআপ / মালবাহী গাড়ি</option><option>ট্রাক / কাভার্ড ভ্যান</option><option>মাইক্রোবাস</option><option>মিনিবাস / বাস</option><option>অ্যাম্বুলেন্স</option></select>
+<div class="formlabel">📱 আপনার মোবাইল নম্বর (ড্রাইভার এই নম্বরে কল করবেন)</div><input id="reqPhone" type="tel" class="input" placeholder="01XXXXXXXXX">
+<div class="formlabel">💰 ভাড়া</div><div style="display:flex;gap:8px"><button type="button" class="chip active" id="fareNeg" onclick="setFareType('negotiable')">🤝 ড্রাইভার অফার দিক</button><button type="button" class="chip" id="fareFix" onclick="setFareType('fixed')">🔒 আমি ঠিক করব</button></div>
+<input id="reqFare" type="number" min="1" class="input" placeholder="কত টাকা দেবেন?" style="display:none;margin-top:8px">
+<button class="primary" id="reqSend" style="margin-top:18px" onclick="createRequest()">🔍 ড্রাইভার খুঁজুন</button></div></section>
+<section id="bookingsPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>আমার যাত্রা</h1></div><div id="myTripCard" class="formcard"><div class="empty">এখন কোনো যাত্রা চলছে না।<br><button class="primary" style="margin-top:12px" onclick="showPage('requestPage')">🚕 গাড়ি ডাকুন</button></div></div><div class="formcard"><b>🕘 আগের যাত্রা</b><div id="tripHistory" class="hint" style="margin-top:8px">⏳ আনা হচ্ছে...</div></div></section>
+<div id="chatSheet" style="display:none;position:fixed;inset:0;z-index:10000;background:#1a1206;flex-direction:column"><div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)"><button class="back" onclick="closeChat()">‹</button><b id="chatTitle">💬 চ্যাট</b></div><div id="chatList" style="flex:1;overflow:auto;padding:12px 14px"></div><div style="display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line)"><input id="chatInput" class="input" placeholder="লিখুন..." maxlength="1000" onkeydown="if(event.key==='Enter')sendChat()"><button class="primary" style="width:auto;padding:0 16px" onclick="sendChat()">➤</button></div></div>
 <section id="detailPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('searchPage')">‹</button><h1>গাড়ির বিস্তারিত</h1></div><div id="detailContent"></div></section>
 <section id="trackingPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('bookingsPage')">‹</button><h1>যাত্রার তথ্য</h1></div><div class="mapbox"><div class="maproute"></div><div class="maplabel a">📍 ঢাকা</div><div class="maplabel b">📍 চাঁদপুর</div></div><div class="formcard"><b>🛰️ লাইভ ট্র্যাকিং</b><p class="hint">বাস্তব GPS ট্র্যাকিং চালু করতে অ্যাপের লোকেশন অনুমতি এবং backend সংযোগ প্রয়োজন। এই প্রোটোটাইপে শুধু ডিজাইন দেখানো হচ্ছে।</p><button class="primary" onclick="toast('ডেমো: চালকের সঙ্গে যোগাযোগ')">📞 চালকের সঙ্গে যোগাযোগ</button></div></section>
 <section id="profilePage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>আমার প্রোফাইল</h1></div><div class="formcard"><div style="display:flex;align-items:center;gap:12px"><div style="width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:#fff2bf;font-size:30px">👤</div><div><b>যাত্রী প্রোফাইল</b><div class="hint">ডেমো প্রোফাইল · লগইন চালু হয়নি</div></div></div><div class="notice" style="margin:14px 0 0">📱 বুকিং, চালকের সঙ্গে যোগাযোগ ও বাস্তব যাত্রার তথ্য ব্যবহারের জন্য পরবর্তী ধাপে ফোন যাচাইকরণ যুক্ত হবে।</div><button class="primary" style="margin-top:14px" onclick="toast('ফোন যাচাইকরণ Firebase যুক্ত হলে চালু হবে')">ফোন নম্বর যাচাই করুন</button></div></section>
@@ -324,7 +332,7 @@ function rideCard(r){return `<article class="ride market-vehicle-card">
  </div></article>`}
 
 function toggleHomeSearch(){const box=document.getElementById('homeSearchBox');const btn=document.getElementById('homeSearchToggle');const collapsed=box.classList.toggle('collapsed');btn.setAttribute('aria-expanded',String(!collapsed));}
-function render(){let list=rides.filter(r=>filtered==='সব'||r.type===filtered);document.getElementById('homeRides').innerHTML=list.slice(0,3).map(rideCard).join('')||'<div class="empty">'+(window.__ridesLoaded?'এখনো কোনো ড্রাইভারের পোস্ট নেই — ড্রাইভাররা পোস্ট করলে এখানে দেখা যাবে।':'⏳ পোস্ট আনা হচ্ছে...')+'</div>';document.getElementById('searchRides').innerHTML=list.map(rideCard).join('')||'<div class="empty">এই ধরনের গাড়ি পাওয়া যায়নি। অন্য ধরন নির্বাচন করুন।</div>';document.getElementById('postsRides').innerHTML=rides.map(rideCard).join('')||'<div class="empty">এখনো কোনো পোস্ট নেই।</div>';document.getElementById('searchSummary').textContent=`${document.getElementById('from').value} থেকে ${document.getElementById('to').value} · ${list.length}টি পোস্ট`;document.getElementById('bookingList').innerHTML=bookings.length?bookings.map(b=>`<div class="ride" style="margin-bottom:10px"><div class="vehiclepic">${b.emoji||'🚘'}</div><div><b>${b.route||((b.from||'')+' → '+(b.to||''))}</b><p class="meta">${b.name||b.type||'যাত্রার অনুরোধ'} · ${b.time||b.date||'তারিখ দেওয়া হয়নি'}</p><div class="rating">${b.status||'বুকিং অনুরোধ পাঠানো হয়েছে'}</div><button class="book" onclick="showPage('trackingPage')">যাত্রার তথ্য</button></div></div>`).join(''):'<div class="empty">এখনো কোনো বুকিং নেই।<br>গন্তব্যের গাড়ি খুঁজে বুকিং দিন।</div>';const rh=document.getElementById('requestHistory');if(rh)rh.innerHTML=requests.length?'<h3>আপনার সংরক্ষিত অনুরোধ</h3>'+requests.map(q=>`<div class="notice" style="margin:8px 0"><b>${q.from} → ${q.to}</b><br><span>${q.type} · ${q.date||'তারিখ নেই'} · ${q.count||1} জন</span><br><small>${q.status||'ডেমো অনুরোধ'}</small></div>`).join(''):''}
+function render(){let list=rides.filter(r=>filtered==='সব'||r.type===filtered);document.getElementById('homeRides').innerHTML=list.slice(0,3).map(rideCard).join('')||'<div class="empty">'+(window.__ridesLoaded?'এখনো কোনো ড্রাইভারের পোস্ট নেই — ড্রাইভাররা পোস্ট করলে এখানে দেখা যাবে।':'⏳ পোস্ট আনা হচ্ছে...')+'</div>';document.getElementById('searchRides').innerHTML=list.map(rideCard).join('')||'<div class="empty">এই ধরনের গাড়ি পাওয়া যায়নি। অন্য ধরন নির্বাচন করুন।</div>';document.getElementById('postsRides').innerHTML=rides.map(rideCard).join('')||'<div class="empty">এখনো কোনো পোস্ট নেই।</div>';document.getElementById('searchSummary').textContent=`${document.getElementById('from').value} থেকে ${document.getElementById('to').value} · ${list.length}টি পোস্ট`;if(document.getElementById('bookingList'))document.getElementById('bookingList').innerHTML=bookings.length?bookings.map(b=>`<div class="ride" style="margin-bottom:10px"><div class="vehiclepic">${b.emoji||'🚘'}</div><div><b>${b.route||((b.from||'')+' → '+(b.to||''))}</b><p class="meta">${b.name||b.type||'যাত্রার অনুরোধ'} · ${b.time||b.date||'তারিখ দেওয়া হয়নি'}</p><div class="rating">${b.status||'বুকিং অনুরোধ পাঠানো হয়েছে'}</div><button class="book" onclick="showPage('trackingPage')">যাত্রার তথ্য</button></div></div>`).join(''):'<div class="empty">এখনো কোনো বুকিং নেই।<br>গন্তব্যের গাড়ি খুঁজে বুকিং দিন।</div>';const rh=null;if(rh)rh.innerHTML=requests.length?'<h3>আপনার সংরক্ষিত অনুরোধ</h3>'+requests.map(q=>`<div class="notice" style="margin:8px 0"><b>${q.from} → ${q.to}</b><br><span>${q.type} · ${q.date||'তারিখ নেই'} · ${q.count||1} জন</span><br><small>${q.status||'ডেমো অনুরোধ'}</small></div>`).join(''):''}
 function showPage(id,btn){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));let page=document.getElementById(id);if(page)page.classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));let navbtn=btn||document.querySelector(`.nav button[data-page="${id}"]`);if(!navbtn){const fallback=id==='requestPage'?'searchPage':(id==='detailPage'||id==='trackingPage'?'bookingsPage':'homePage');navbtn=document.querySelector(`.nav button[data-page="${fallback}"]`)}if(navbtn)navbtn.classList.add('active');if(id==='searchPage')render();window.scrollTo({top:0,behavior:'smooth'})}
 function filterType(type,btn){filtered=type;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));if(btn)btn.classList.add('active');render()}
 function useCurrentLocation(){
@@ -366,8 +374,7 @@ function openDetail(id){
  <p style="margin:10px 0 4px"><b>চালকের বিবরণ</b></p><p class="meta">রুট: ${r.route}<br>অভিজ্ঞতা: চালকের সঙ্গে নিশ্চিত করুন<br>লাইসেন্স: ${r.verified?'যাচাই করা হয়েছে':'যাচাইয়ের তথ্য নেই'}<br>ফোন: বুকিং/যোগাযোগের সময় চালকের সম্মতিতে দেখানো হবে</p>
  </div>
  <div class="notice" style="margin:12px 0"><h3 style="margin:0 0 8px">📅 চালকের বুকিং সূচি</h3><p style="margin:0 0 6px">আগে থেকে বুকিং থাকা তারিখ:</p>${history}<p class="hint" style="margin-bottom:0">এগুলো ডেমো সূচি। বাস্তব বুকিংয়ের তারিখ Driver App ও Firebase যুক্ত হওয়ার পর দেখা যাবে। বুকিংয়ের আগে চালককে কল করে সময় ও আসন খালি আছে কি না নিশ্চিত করুন।</p></div>
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><button class="primary" onclick="bookRide('${r.id}')">🎫 বুকিং অনুরোধ</button><button class="input" onclick="callDriver('${r.id}')">📞 চালককে কল</button></div>
- <button class="input" style="margin-top:9px" onclick="showFareAgreement('${r.id}')">🤝 ভাড়ার দরদাম করুন</button>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><button class="primary" onclick="callDriver('${r.id}')">📞 চালককে কল</button><button class="input" onclick="requestFromPost('${r.id}')">🚕 এই রুটে গাড়ি ডাকুন</button></div>
  </div>`;
  showPage('detailPage')
 }
@@ -384,9 +391,9 @@ function showFareAgreement(rideId){
  if(accepted){toast('ভাড়ার প্রস্তাব ডেমো হিসেবে সংরক্ষিত। বাস্তব চালকের সম্মতি ও দুজনের ট্রিপ রেকর্ড Firebase যুক্ত হলে কাজ করবে।')}
 }
 function bookRide(id){let r=rides.find(x=>x.id===id);if(!r)return;if(bookings.some(b=>b.id===r.id&&b.createdAt&&Date.now()-b.createdAt<60000)){toast('এই গাড়ির জন্য অনুরোধটি ইতিমধ্যে তৈরি হয়েছে');return}bookings.unshift({...r,createdAt:Date.now(),status:'অনুরোধ পাঠানো হয়েছে'});persistDemoData();render();showPage('bookingsPage');toast('ডেমো বুকিং অনুরোধ তৈরি হয়েছে')}
-function createRequest(){let req={from:document.getElementById('reqFrom').value,to:document.getElementById('reqTo').value,date:document.getElementById('reqDate').value,type:document.getElementById('reqType').value,count:document.getElementById('reqCount').value,note:document.getElementById('reqNote').value};if(!req.from.trim()||!req.to.trim()){toast('শুরুর স্থান ও গন্তব্য লিখুন');return}req.id=Date.now();req.status='প্রকাশিত (শুধু এই ডিভাইসে)';requests.unshift(req);persistDemoData();toast('ডেমো অনুরোধ এই ডিভাইসে সংরক্ষণ হয়েছে। চালকের কাছে পাঠাতে Firebase প্রয়োজন।');showPage('homePage')}
+
 let toastTimer;function toast(msg){let el=document.getElementById('toast');el.textContent=msg;el.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.style.display='none',2500)}
-const today=new Date();document.getElementById('date').value=today.toISOString().slice(0,10);document.getElementById('reqDate').value=today.toISOString().slice(0,10);render();
+const today=new Date();document.getElementById('date').value=today.toISOString().slice(0,10);render();
 
 function toggleMainMenu(){const panel=document.getElementById('mainMenuPanel');const btn=document.getElementById('mainMenuButton');if(!panel||!btn)return;const open=panel.style.display!=='block';panel.hidden=!open;panel.style.display=open?'block':'none';btn.setAttribute('aria-expanded',String(open));}
 function closeMainMenu(){const panel=document.getElementById('mainMenuPanel');const btn=document.getElementById('mainMenuButton');if(panel){panel.hidden=true;panel.style.display='none';}if(btn)btn.setAttribute('aria-expanded','false');}
@@ -418,6 +425,156 @@ try{
     .onSnapshot(qs=>{window.__ridesLoaded=true;rides=qs.docs.map(x=>hbPostToRide(x.id,x.data()));render();},
       err=>{console.warn('posts',err);window.__ridesLoaded=true;render();toast('পোস্ট আনা যায়নি — ইন্টারনেট দেখুন');});
 }catch(e){console.warn(e)}
+
+/* ==================== 🚕 ধাপ ৩খ — যাত্রী গাড়ি ডাকেন, অফার বেছে নেন, চ্যাট, রেটিং ====================
+   Bazar-এর পুরনো ট্রান্সপোর্ট পাতার একই ডেটা (trips/{id}) — তাই নতুন ড্রাইভার অ্যাপ
+   আর আগের Driver Mode দুটোই এই অনুরোধ পায়। চলতি যাত্রার id "hbActiveTripId"-এ থাকে। */
+let __fareType='negotiable', __myTripId=null, __myTripUnsub=null, __drvLocUnsub=null, __cdTimer=null, __chatUnsub=null, __stars=0;
+function setFareType(t){ __fareType=t; document.getElementById('fareNeg').classList.toggle('active',t==='negotiable'); document.getElementById('fareFix').classList.toggle('active',t==='fixed'); document.getElementById('reqFare').style.display=t==='fixed'?'':'none'; }
+function hbParentCustomer(){ try{ return (window.parent&&window.parent!==window&&window.parent.currentCustomer)||null; }catch(e){ return null; } }
+async function hbMyUid(){
+  if(auth.currentUser) return auth.currentUser.uid;
+  await new Promise(r=>{ const u=auth.onAuthStateChanged(()=>{u();r();}); setTimeout(r,3000); });
+  if(auth.currentUser) return auth.currentUser.uid;
+  try{ return (await auth.signInAnonymously()).user.uid; }catch(e){ return null; }
+}
+function hbUnesc(x){ const t=document.createElement('textarea'); t.innerHTML=x||''; return t.value; }
+function requestFromPost(id){ const r=rides.find(x=>x.id===id); showPage('requestPage');
+  if(r){ document.getElementById('reqTo').value=hbUnesc(r.to);
+    const sel=document.getElementById('reqType'), ty=hbUnesc(r.type); [...sel.options].forEach(o=>{ if(o.text===ty) sel.value=o.text; }); } }
+async function hbPickup(manual){
+  const out={address:manual||'লোকেশন পাওয়া যায়নি',lat:null,lng:null};
+  if(!navigator.geolocation) return out;
+  try{ const pos=await new Promise((ok,bad)=>navigator.geolocation.getCurrentPosition(ok,bad,{enableHighAccuracy:true,timeout:10000}));
+    out.lat=pos.coords.latitude; out.lng=pos.coords.longitude;
+    if(!manual){ out.address=out.lat.toFixed(4)+', '+out.lng.toFixed(4);
+      try{ const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${out.lat}&lon=${out.lng}&format=json`,{headers:{'Accept-Language':'bn'}}); const d=await r.json(); if(d&&d.display_name) out.address=d.display_name; }catch(e){} }
+  }catch(e){}
+  return out;
+}
+async function createRequest(){
+  const to=document.getElementById('reqTo').value.trim(), phone=document.getElementById('reqPhone').value.trim();
+  if(!to){ toast('কোথায় যাবেন লিখুন'); return; }
+  if(!/^[0-9+\s-]{6,}$/.test(phone)){ toast('সঠিক মোবাইল নম্বর লিখুন'); return; }
+  let fare=null; if(__fareType==='fixed'){ fare=Number(document.getElementById('reqFare').value); if(!fare||fare<=0){ toast('কত ভাড়া দেবেন লিখুন'); return; } }
+  if(__myTripId){ toast('আগের যাত্রা এখনো চলছে — আমার যাত্রা পাতায় দেখুন'); showPage('bookingsPage'); return; }
+  const btn=document.getElementById('reqSend'); btn.disabled=true; btn.textContent='📍 লোকেশন নেওয়া হচ্ছে...';
+  try{
+    const uid=await hbMyUid(); if(!uid) throw new Error('লগইন করা যায়নি — ইন্টারনেট দেখুন');
+    const pickup=await hbPickup(document.getElementById('reqFrom').value.trim());
+    btn.textContent='পাঠানো হচ্ছে...';
+    const c=hbParentCustomer();
+    try{ localStorage.setItem('hbPassengerPhone',phone); }catch(e){}
+    const ref=await db.collection('trips').add({
+      passengerId:uid, passengerName:(c&&c.name)||'যাত্রী', passengerPhone:phone, pickupLocation:pickup,
+      vehicleType:document.getElementById('reqType').value, destination:to, status:'searching',
+      fareType:__fareType, proposedFare:fare, tripType:'normal', flightInfo:null, arrivalStatus:null, arrivalStatusAt:null,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(), sessionExpiresAt:firebase.firestore.Timestamp.fromMillis(Date.now()+6*60*1000),
+      rejectedDrivers:[], waitingList:[], confirmedDriver:{driverId:null,finalFare:0,confirmedAt:null}, source:'transport-app'
+    });
+    document.getElementById('reqTo').value=''; document.getElementById('reqFare').value='';
+    watchMyTrip(ref.id); showPage('bookingsPage');
+  }catch(e){ toast('পাঠানো যায়নি: '+e.message); }
+  btn.disabled=false; btn.textContent='🔍 ড্রাইভার খুঁজুন';
+}
+function watchMyTrip(id){
+  __myTripId=id; try{ localStorage.setItem('hbActiveTripId',id); }catch(e){}
+  if(__myTripUnsub) __myTripUnsub();
+  __myTripUnsub=db.collection('trips').doc(id).onSnapshot(d=>{ if(!d.exists){ endMyTrip(); return; } renderMyTrip(d.data()); }, ()=>{});
+}
+function endMyTrip(keepCard){
+  if(__myTripUnsub){__myTripUnsub();__myTripUnsub=null;} if(__drvLocUnsub){__drvLocUnsub();__drvLocUnsub=null;} if(__cdTimer){clearInterval(__cdTimer);__cdTimer=null;}
+  __myTripId=null; try{ localStorage.removeItem('hbActiveTripId'); }catch(e){}
+  if(!keepCard) document.getElementById('myTripCard').innerHTML='<div class="empty">এখন কোনো যাত্রা চলছে না।<br><button class="primary" style="margin-top:12px" onclick="showPage(\'requestPage\')">🚕 গাড়ি ডাকুন</button></div>';
+  loadTripHistory();
+}
+function chosenDriver(t){ const list=t.waitingList||[]; return (t.confirmedDriver&&t.confirmedDriver.driverName)?t.confirmedDriver:(list.find(o=>t.confirmedDriver&&o.driverId===t.confirmedDriver.driverId)||{}); }
+function renderMyTrip(t){
+  const box=document.getElementById('myTripCard'), E=hbEsc;
+  if(__cdTimer){clearInterval(__cdTimer);__cdTimer=null;}
+  const head=`<div class="hint">🏁 ${E(t.destination)} · 🚗 ${E(t.vehicleType)}</div>`;
+  const cancelBtn=`<button class="input" style="margin-top:10px" onclick="cancelMyTrip()">✕ যাত্রা বাতিল করুন</button>`;
+  if(t.status==='searching'||t.status==='waiting_selection'){
+    const list=t.waitingList||[];
+    box.innerHTML=head+`<h3 style="margin:10px 0 4px">${t.status==='searching'?(t.fareType==='fixed'?'🔒 ৳'+E(t.proposedFare)+' — ড্রাইভার রাজি হওয়ার অপেক্ষা':'🔍 ড্রাইভার খোঁজা হচ্ছে...'):'💰 ড্রাইভারদের অফার ('+list.length+'/৩)'}</h3>
+      <div class="hint">বাকি সময়: <b id="cdTxt">—</b></div>`+
+      list.map((o,i)=>`<div class="notice" style="margin:10px 0 0"><b>${E(o.driverName||'ড্রাইভার')}</b> · ${E(o.vehicleModel||'')} ${o.eta?'· ⏱ '+E(o.eta):''}<div style="font-size:20px;font-weight:900;margin:6px 0">৳${E(o.offeredFare)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="input" onclick="rejectOffer(${i})">❌ না</button><button class="primary" style="padding:10px" onclick="pickOffer(${i})">✅ এটা নিন</button></div></div>`).join('')+cancelBtn;
+    window.__offers=list;
+    const end=t.sessionExpiresAt&&t.sessionExpiresAt.toMillis?t.sessionExpiresAt.toMillis():Date.now()+360000;
+    const tick=()=>{ const el=document.getElementById('cdTxt'); const ms=end-Date.now(); if(!el) return;
+      if(ms<=0){ el.textContent='শেষ'; clearInterval(__cdTimer); __cdTimer=null; db.collection('trips').doc(__myTripId).update({status:'expired'}).catch(()=>{}); return; }
+      el.textContent=String(Math.floor(ms/60000)).padStart(2,'0')+':'+String(Math.floor(ms%60000/1000)).padStart(2,'0'); };
+    tick(); __cdTimer=setInterval(tick,1000);
+    return;
+  }
+  if(t.status==='confirmed'){
+    const c=chosenDriver(t), did=t.confirmedDriver.driverId, ph=String(c.driverPhone||'').replace(/[^0-9+]/g,'');
+    box.innerHTML=head+`<h3 style="margin:10px 0 4px">✅ ড্রাইভার আসছেন!</h3>
+      <div class="notice" style="margin:8px 0"><b style="font-size:16px">${E(c.driverName||'ড্রাইভার')}</b><br>${E(c.vehicleModel||'')} · ভাড়া <b>৳${E(t.confirmedDriver.finalFare)}</b><div id="drvWhere" class="hint" style="margin-top:6px">📍 ড্রাইভারের লোকেশন আনা হচ্ছে...</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${ph?`<a class="primary" style="text-align:center;text-decoration:none;padding:12px" href="tel:${ph}" target="_top">📞 কল</a>`:''}<button class="input" onclick="openChat()">💬 চ্যাট</button></div>`+cancelBtn;
+    window.__chatName=c.driverName||'ড্রাইভার';
+    if(!__drvLocUnsub) __drvLocUnsub=db.collection('transportDrivers').doc(did).onSnapshot(d=>{
+      const el=document.getElementById('drvWhere'); if(!el) return; const L=d.exists&&d.data().liveLocation, P=t.pickupLocation||{};
+      if(!L||L.lat==null){ el.textContent='📍 ড্রাইভারের লাইভ লোকেশন এখনো পাওয়া যায়নি'; return; }
+      let txt='📍 ড্রাইভার'; if(P.lat!=null){ txt+=' আপনার থেকে প্রায় '+hbKm(L,P).toFixed(1)+' কিমি দূরে'; }
+      el.innerHTML=E(txt)+` · <a href="https://www.google.com/maps/search/?api=1&query=${Number(L.lat)},${Number(L.lng)}" target="_blank" style="color:#ffd166">ম্যাপে দেখুন</a>`;
+    },()=>{});
+    return;
+  }
+  if(t.status==='completed'){
+    const c=chosenDriver(t), did=t.confirmedDriver&&t.confirmedDriver.driverId;
+    if(__drvLocUnsub){__drvLocUnsub();__drvLocUnsub=null;}
+    window.__rateDriver=did;
+    box.innerHTML=head+`<h3 style="margin:10px 0 4px">🏁 যাত্রা শেষ</h3><div class="hint">ড্রাইভার: ${E(c.driverName||'—')} · ৳${E(t.confirmedDriver.finalFare)}</div>
+      <div id="rateBox" class="notice" style="margin:10px 0"><b>⭐ ড্রাইভারকে রেটিং দিন</b><div id="starRow" style="font-size:30px;margin:8px 0;letter-spacing:4px">${[1,2,3,4,5].map(n=>`<span style="cursor:pointer" onclick="setStars(${n})">☆</span>`).join('')}</div>
+      <input id="rateNote" class="input" placeholder="কিছু বলতে চাইলে লিখুন (ঐচ্ছিক)"><button class="primary" style="margin-top:10px" onclick="sendRating()">পাঠান</button></div>
+      <button class="input" onclick="endMyTrip()">✓ ঠিক আছে</button>`;
+    __stars=0;
+    if(did) db.collection('transportDrivers').doc(did).collection('ratings').doc(__myTripId).get().then(d=>{ if(d.exists){ const rb=document.getElementById('rateBox'); if(rb) rb.innerHTML='✅ রেটিং দেওয়ার জন্য ধন্যবাদ!'; } }).catch(()=>{});
+    return;
+  }
+  const msg=t.status==='expired'?'⏱️ সময় শেষ — কোনো ড্রাইভার পাওয়া যায়নি। আবার চেষ্টা করুন।':'✕ যাত্রা বাতিল হয়েছে।';
+  endMyTrip(true);
+  box.innerHTML=head+`<h3 style="margin:10px 0">${msg}</h3><button class="primary" onclick="showPage('requestPage')">🚕 আবার গাড়ি ডাকুন</button>`;
+}
+function hbKm(a,b){ const R=6371,t=Math.PI/180,x=Math.sin((b.lat-a.lat)*t/2)**2+Math.cos(a.lat*t)*Math.cos(b.lat*t)*Math.sin((b.lng-a.lng)*t/2)**2; return 2*R*Math.asin(Math.sqrt(x)); }
+async function pickOffer(i){ const o=(window.__offers||[])[i]; if(!o||!__myTripId) return;
+  try{ await db.collection('trips').doc(__myTripId).update({status:'confirmed',confirmedDriver:{driverId:o.driverId,finalFare:o.offeredFare,driverName:o.driverName||'ড্রাইভার',driverPhone:o.driverPhone||'',vehicleModel:o.vehicleModel||'',confirmedAt:firebase.firestore.FieldValue.serverTimestamp()}}); }
+  catch(e){ toast('হয়নি: '+e.message); } }
+async function rejectOffer(i){ const o=(window.__offers||[])[i]; if(!o||!__myTripId) return; if(!confirm('এই অফারটা বাতিল করবেন?')) return;
+  try{ const ref=db.collection('trips').doc(__myTripId), d=await ref.get(); const left=(d.data().waitingList||[]).filter(x=>x.driverId!==o.driverId);
+    await ref.update({waitingList:left,rejectedDrivers:firebase.firestore.FieldValue.arrayUnion(o.driverId),status:left.length?'waiting_selection':'searching'}); }catch(e){ toast('হয়নি: '+e.message); } }
+async function cancelMyTrip(){ if(!__myTripId||!confirm('যাত্রা বাতিল করবেন?')) return; try{ await db.collection('trips').doc(__myTripId).update({status:'cancelled'}); }catch(e){} }
+function setStars(n){ __stars=n; document.querySelectorAll('#starRow span').forEach((s,i)=>s.textContent=i<n?'★':'☆'); }
+async function sendRating(){
+  const did=window.__rateDriver; if(!did) return;
+  if(!__stars){ toast('কয়টা তারা দেবেন বেছে নিন'); return; }
+  try{ await db.collection('transportDrivers').doc(did).collection('ratings').doc(__myTripId).set({ stars:__stars, comment:(document.getElementById('rateNote').value||'').trim().slice(0,300), passengerId:auth.currentUser.uid, createdAt:firebase.firestore.FieldValue.serverTimestamp() });
+    document.getElementById('rateBox').innerHTML='✅ রেটিং দেওয়ার জন্য ধন্যবাদ!'; }catch(e){ toast('রেটিং পাঠানো যায়নি'); } }
+/* 💬 চ্যাট — trips/{id}/chat, আগের পাতার একই গঠন */
+function openChat(){ if(!__myTripId) return; const sh=document.getElementById('chatSheet'); sh.style.display='flex'; document.getElementById('chatTitle').textContent='💬 '+(window.__chatName||'ড্রাইভার');
+  if(__chatUnsub) __chatUnsub();
+  __chatUnsub=db.collection('trips').doc(__myTripId).collection('chat').orderBy('sentAt','asc').limit(200).onSnapshot(qs=>{
+    const me=auth.currentUser&&auth.currentUser.uid, L=document.getElementById('chatList');
+    L.innerHTML=qs.docs.map(d=>{ const m=d.data(), mine=m.senderId===me; return `<div style="display:flex;justify-content:${mine?'flex-end':'flex-start'};margin:6px 0"><div style="max-width:78%;padding:9px 12px;border-radius:14px;background:${mine?'#ffb703':'rgba(255,255,255,.08)'};color:${mine?'#1a1206':'#fff8e8'};font-size:14px">${hbEsc(m.text)}</div></div>`; }).join('')||'<div class="empty">এখনো কোনো মেসেজ নেই।</div>';
+    L.scrollTop=L.scrollHeight; }, ()=>{ document.getElementById('chatList').innerHTML='<div class="empty">চ্যাট খোলা যায়নি।</div>'; }); }
+function closeChat(){ document.getElementById('chatSheet').style.display='none'; if(__chatUnsub){__chatUnsub();__chatUnsub=null;} }
+async function sendChat(){ const i=document.getElementById('chatInput'), text=i.value.trim(); if(!text||!__myTripId||!auth.currentUser) return; i.value='';
+  try{ await db.collection('trips').doc(__myTripId).collection('chat').add({senderId:auth.currentUser.uid,senderRole:'passenger',text,sentAt:firebase.firestore.FieldValue.serverTimestamp()}); }catch(e){ i.value=text; toast('পাঠানো যায়নি'); } }
+async function loadTripHistory(){
+  const el=document.getElementById('tripHistory'); const uid=auth.currentUser&&auth.currentUser.uid;
+  if(!uid){ el.textContent='এখনো কোনো যাত্রা নেই।'; return; }
+  try{ const qs=await db.collection('trips').where('passengerId','==',uid).orderBy('createdAt','desc').limit(10).get();
+    const L={completed:'🏁 শেষ',cancelled:'✕ বাতিল',expired:'⏱️ ড্রাইভার পাওয়া যায়নি',confirmed:'🚗 চলছে',searching:'🔍 খোঁজা হচ্ছে',waiting_selection:'💰 অফার এসেছে'};
+    el.innerHTML=qs.docs.map(d=>{ const t=d.data(); return `<div style="padding:8px 0;border-bottom:1px solid var(--line)"><b style="color:#fff8e8">${hbEsc(t.destination||'—')}</b> · ${hbEsc(t.vehicleType||'')}<br>${L[t.status]||hbEsc(t.status)}${t.confirmedDriver&&t.confirmedDriver.finalFare?' · ৳'+hbEsc(t.confirmedDriver.finalFare):''}</div>`; }).join('')||'এখনো কোনো যাত্রা নেই।';
+  }catch(e){ el.textContent='আগের যাত্রা আনা যায়নি।'; }
+}
+try{ const ph=localStorage.getItem('hbPassengerPhone'); if(ph) document.getElementById('reqPhone').value=ph; }catch(e){}
+(function(){ const c=hbParentCustomer(); if(c&&c.phone&&!document.getElementById('reqPhone').value) document.getElementById('reqPhone').value=c.phone; })();
+auth.onAuthStateChanged(()=>{ loadTripHistory(); });
+try{ const a=localStorage.getItem('hbActiveTripId'); if(a) watchMyTrip(a); }catch(e){}
+
 </script>
 </body>
 </html>
