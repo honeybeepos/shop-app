@@ -2939,3 +2939,63 @@ exports.panchangDailyReminder = onSchedule("every 60 minutes", async () => {
   }
   if (sent > 0) console.log(JSON.stringify({ event: "PANCHANG_REMINDERS_SENT", count: sent }));
 });
+
+/* ==================== 🔔 Transport Media বুকিং — পুশ নোটিফিকেশন (অক্টোবর ২০২৬) ====================
+   transportBookings/{bid} বদলালে:
+     · নতুন অনুরোধ (pending)         → চালকের ফোনে  → চাপলে honey-bee-driver.html#bookings
+     · যাত্রী বাতিল করলে             → চালকের ফোনে
+     · গ্রহণ / না / যাত্রা শেষ        → যাত্রীর ফোনে → চাপলে honey-bee-transport.html?page=bookings
+   টোকেন: চালক → transportDrivers/{uid}.fcmToken, যাত্রী → customers/{uid}.fcmToken
+   ⚠️ আগের নোটিফিকেশন ফাংশনগুলো ছোঁয়া হয়নি — এটা সম্পূর্ণ আলাদা। */
+const TM_DRIVER_URL = `${APP_DOMAIN}/honey-bee-driver.html#bookings`;
+const TM_PASSENGER_URL = `${APP_DOMAIN}/honey-bee-transport.html?page=bookings`;
+
+async function tmPush(col, uid, title, body, data, link) {
+  try {
+    const snap = await db.collection(col).doc(uid).get();
+    const token = snap.exists ? snap.data().fcmToken : null;
+    if (!token) return false;
+    await getMessaging().send({
+      token,
+      notification: { title, body },
+      data: Object.assign({}, data, { link }),
+      webpush: { fcmOptions: { link } },
+    });
+    return true;
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "TM_BOOKING_FCM_FAILED", col, uid, error: String(e && e.message || e) }));
+    if (e && e.code === "messaging/registration-token-not-registered") {
+      await db.collection(col).doc(uid).update({ fcmToken: FieldValue.delete() }).catch(() => {});
+    }
+    return false;
+  }
+}
+
+exports.onTransportBookingNotify = onDocumentWritten("transportBookings/{bid}", async (event) => {
+  const before = event.data.before.exists ? event.data.before.data() : null;
+  const after = event.data.after.exists ? event.data.after.data() : null;
+  if (!after) return;
+  if (before && before.status === after.status) return; // শুধু অবস্থা বদলালে
+  const bid = event.params.bid;
+  const route = `${after.from || ""} → ${after.to || ""}`.trim();
+  const what = after.seats > 0 ? `${after.seats}টা আসন` : "মালামাল";
+  const dData = { type: "tm-booking-driver", bookingId: bid };
+  const pData = { type: "tm-booking-passenger", bookingId: bid };
+
+  if (!before && after.status === "pending") {
+    await tmPush("transportDrivers", after.driverId, "🎫 নতুন বুকিং অনুরোধ",
+      `${after.passengerName || "একজন যাত্রী"} — ${route} (${what})। চাপ দিয়ে গ্রহণ করুন।`, dData, TM_DRIVER_URL);
+    return;
+  }
+  if (after.status === "cancelled") {
+    await tmPush("transportDrivers", after.driverId, "✕ যাত্রী বুকিং বাতিল করেছেন",
+      `${after.passengerName || "যাত্রী"} — ${route}`, dData, TM_DRIVER_URL);
+    return;
+  }
+  const msg = {
+    accepted: ["✅ চালক আপনার বুকিং গ্রহণ করেছেন", `${route} — চালক ${after.driverName || ""} শিগগিরই কল করবেন।`],
+    declined: ["❌ চালক এই বুকিং নিতে পারছেন না", `${route} — অন্য গাড়ি দেখুন।`],
+    completed: ["🏁 যাত্রা শেষ — চালককে রেটিং দিন", `${route} — আপনার মতামত অন্য যাত্রীদের সাহায্য করবে।`],
+  }[after.status];
+  if (msg) await tmPush("customers", after.passengerId, msg[0], msg[1], pData, TM_PASSENGER_URL);
+});
