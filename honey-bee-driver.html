@@ -88,7 +88,7 @@ select option{background:#173a29;color:#eafff2}
       <div class="card" data-goto="earnings" style="cursor:pointer"><div class="stat-label">এই মাসের আয়</div><div class="stat" id="stMonth">৳০</div><div class="stat-note" id="stRating">⭐ এখনো রেটিং নেই</div></div>
     </div>
     <div class="columns">
-      <div class="card"><h2 class="section-title">দ্রুত কাজ</h2><div class="actions">
+      <div class="card"><button class="btn" type="button" id="pushBtn" style="width:100%;margin-bottom:12px;display:none">🔔 নতুন বুকিংয়ের খবর ফোনে পেতে চাপুন</button><h2 class="section-title">দ্রুত কাজ</h2><div class="actions">
         <button class="action" data-goto="post"><span>🛣️</span><b>নতুন যাত্রা পোস্ট</b><small>রুট, সময় ও খালি আসন দিন</small></button>
         <button class="action" data-goto="bookings"><span>📩</span><b>বুকিং অনুরোধ</b><small>অনুরোধ দেখুন ও উত্তর দিন</small></button>
         <button class="action" data-goto="schedule"><span>🗓️</span><b>সময়সূচি</b><small>ব্যস্ত ও ফাঁকা সময় রাখুন</small></button>
@@ -147,6 +147,7 @@ function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="firebase-init.js"></script>
 <script>
 /* ==================== 🚑 ড্রাইভার অ্যাপ — আসল লগইন ও তথ্য (ধাপ ১) ====================
@@ -583,6 +584,33 @@ $id("blockDayBtn").onclick=async()=>{
 };
 document.querySelectorAll('[data-page="earnings"],[data-goto="earnings"]').forEach(x=>x.addEventListener("click",()=>{ if(DRV.uid) drvLoadEarnings(); }));
 document.querySelectorAll('[data-page="schedule"],[data-goto="schedule"]').forEach(x=>x.addEventListener("click",()=>{ if(DRV.uid) drvLoadSched(); }));
+
+/* 🔔 ফোনের উপরে নোটিফিকেশন — অ্যাপ বন্ধ থাকলেও খবর আসে (firebase-messaging-sw.js)।
+   অনুমতি চাইতে একটা চাপ লাগে (ব্রাউজারের নিয়ম), তাই বোতাম দেখানো হয়;
+   আগে অনুমতি দেওয়া থাকলে চুপচাপ টোকেন নবায়ন হয়। */
+const HB_VAPID="BCEdpLGNUIBG2IW9lTVGcaM7qbFrbaEnGg9N1CYGNCojCVUIruqqcWP4cdX3YietIJ1kWe1ZUulbCQpvSQXAIKg";
+async function hbPushSetup(col,uid,ask){
+  try{
+    if(!("Notification" in window)||!("serviceWorker" in navigator)||!firebase.messaging) return false;
+    let perm=Notification.permission;
+    if(perm!=="granted"){ if(!ask) return false; perm=await Notification.requestPermission(); }
+    if(perm!=="granted") return false;
+    const reg=await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const token=await firebase.messaging().getToken({vapidKey:HB_VAPID,serviceWorkerRegistration:reg});
+    if(token) await db.collection(col).doc(uid).set({fcmToken:token},{merge:true});
+    return !!token;
+  }catch(e){ console.warn("push setup",e); return false; }
+}
+
+async function drvPushInit(){
+  const btn=$id("pushBtn");
+  const ok=await hbPushSetup("transportDrivers",DRV.uid,false);
+  if(ok||!("Notification" in window)||Notification.permission==="denied"){ btn.style.display="none"; return; }
+  btn.style.display="";
+  btn.onclick=async()=>{ btn.disabled=true; const r=await hbPushSetup("transportDrivers",DRV.uid,true); btn.disabled=false;
+    if(r){ btn.style.display="none"; alert("✅ চালু হয়েছে — অ্যাপ বন্ধ থাকলেও নতুন বুকিং এলে ফোনে খবর আসবে।"); }
+    else alert("চালু করা যায়নি। ফোনের সেটিংসে এই সাইটের নোটিফিকেশন অনুমতি দিন।"); };
+}
 auth.onAuthStateChanged(async (user)=>{
   const se = getSession();
   if(!user || !se || se.uid !== user.uid || se.role !== "transport_driver"){ drvToLogin(); return; }
@@ -601,6 +629,8 @@ auth.onAuthStateChanged(async (user)=>{
     drvLoadEarnings(true);
     $id("schedForm").date.value=drvDayStr(0);
     drvListenBookings();
+    drvPushInit();
+    if(location.hash==="#bookings") go("bookings");
     $id("hbGate").remove();
     if(!(DRV.data.vehicle && DRV.data.vehicle.type)){ go("vehicle"); setTimeout(()=>alert("🚗 শুরুতে আপনার গাড়ির ধরন বেছে নিয়ে সেভ করুন।"), 200); }
   }catch(e){

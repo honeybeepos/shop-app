@@ -278,7 +278,7 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
 </section>
 <section id="searchPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>গন্তব্যের গাড়ি</h1></div><div class="section"><div class="hint" id="searchSummary"></div><div class="chips" style="margin-top:10px"><button class="chip active" onclick="filterType('সব',this)">সব</button><button class="chip" onclick="filterType('মোটরসাইকেল',this)">মোটরসাইকেল</button><button class="chip" onclick="filterType('রিকশা',this)">রিকশা</button><button class="chip" onclick="filterType('ইজিবাইক',this)">ইজিবাইক</button><button class="chip" onclick="filterType('সিএনজি',this)">সিএনজি</button><button class="chip" onclick="filterType('অ্যাম্বুলেন্স',this)">অ্যাম্বুলেন্স</button><button class="chip" onclick="filterType('পিকআপ / মালবাহী গাড়ি',this)">মালবাহী গাড়ি</button></div><div id="searchRides" class="cards"></div></div></section>
 <section id="postsPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>চালকদের যাত্রার পোস্ট</h1></div><div class="notice">ফেরার পথে খালি গাড়ি? চালকের পোস্টে রুট ও সময় দেখে বুকিং করতে পারবেন।</div><div id="postsRides" class="cards" style="padding:0 16px"></div></section>
-<section id="bookingsPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>🎫 আমার বুকিং</h1></div><div class="formcard"><div class="hint">🔒 আপনার ফোন নম্বর চালক শুধু বুকিং "গ্রহণ" করার পরেই দেখতে পান। আপনার লোকেশন কারো কাছে যায় না।</div><div id="myBookings"><div class="empty">⏳ আনা হচ্ছে...</div></div></div></section>
+<section id="bookingsPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>🎫 আমার বুকিং</h1></div><div class="formcard"><div class="hint">🔒 আপনার ফোন নম্বর চালক শুধু বুকিং "গ্রহণ" করার পরেই দেখতে পান। আপনার লোকেশন কারো কাছে যায় না।</div><button class="primary" id="pushBtn" style="display:none;margin-top:10px" onclick="hbAskPush()">🔔 চালক গ্রহণ করলে ফোনে খবর পেতে চাপুন</button><div id="myBookings"><div class="empty">⏳ আনা হচ্ছে...</div></div></div></section>
 <div id="bookSheet" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.6);align-items:flex-end;justify-content:center"><div class="formcard" style="width:100%;max-width:480px;margin:0;border-radius:22px 22px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom))">
 <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">🎫 বুকিং অনুরোধ</b><button class="back" onclick="closeBooking()">✕</button></div>
 <div id="bkRoute" class="hint" style="margin:8px 0"></div>
@@ -401,6 +401,7 @@ document.addEventListener('click',function(e){const panel=document.getElementByI
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="firebase-init.js"></script>
 <script>
 /* ==================== 🚕 আসল ড্রাইভার পোস্ট (Transport Media) ====================
@@ -449,6 +450,28 @@ async function hbDriverRating(did){
 const __origOpenDetail=openDetail;
 openDetail=function(id){ __origOpenDetail(id); const r=rides.find(x=>x.id===id); if(!r) return;
   hbDriverRating(r.driverId).then(x=>{ const el=document.querySelector('#detailContent .rating'); if(el) el.textContent=x?`★ ${x.avg} · ${x.n}টি রেটিং`:'★ নতুন চালক · এখনো রেটিং নেই'; }); };
+
+/* 🔔 ফোনের উপরে নোটিফিকেশন — অ্যাপ বন্ধ থাকলেও খবর আসে (firebase-messaging-sw.js)।
+   অনুমতি চাইতে একটা চাপ লাগে (ব্রাউজারের নিয়ম), তাই বোতাম দেখানো হয়;
+   আগে অনুমতি দেওয়া থাকলে চুপচাপ টোকেন নবায়ন হয়। */
+const HB_VAPID="BCEdpLGNUIBG2IW9lTVGcaM7qbFrbaEnGg9N1CYGNCojCVUIruqqcWP4cdX3YietIJ1kWe1ZUulbCQpvSQXAIKg";
+async function hbPushSetup(col,uid,ask){
+  try{
+    if(!("Notification" in window)||!("serviceWorker" in navigator)||!firebase.messaging) return false;
+    let perm=Notification.permission;
+    if(perm!=="granted"){ if(!ask) return false; perm=await Notification.requestPermission(); }
+    if(perm!=="granted") return false;
+    const reg=await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const token=await firebase.messaging().getToken({vapidKey:HB_VAPID,serviceWorkerRegistration:reg});
+    if(token) await db.collection(col).doc(uid).set({fcmToken:token},{merge:true});
+    return !!token;
+  }catch(e){ console.warn("push setup",e); return false; }
+}
+
+async function hbAskPush(){ const uid=await hbMyUid(); if(!uid) return; const ok=await hbPushSetup('customers',uid,true);
+  document.getElementById('pushBtn').style.display=ok?'none':''; toast(ok?'✅ চালু হয়েছে — বুকিংয়ের খবর ফোনে আসবে':'চালু হয়নি — ফোনের সেটিংসে নোটিফিকেশন অনুমতি দিন'); }
+async function hbPushInit(uid){ const ok=await hbPushSetup('customers',uid,false);
+  const b=document.getElementById('pushBtn'); if(b) b.style.display=(ok||!('Notification' in window)||Notification.permission==='denied')?'none':''; }
 /* ==================== 🎫 সিট / গাড়ি বুকিং (Transport Media) ====================
    যাত্রী ড্রাইভারের পোস্ট দেখে বুকিং অনুরোধ পাঠান → transportBookings/{id}।
    🔒 নিরাপত্তা: যাত্রীর ফোন নম্বর আলাদা গোপন ঘরে (…/private/contact) থাকে —
@@ -493,6 +516,7 @@ async function sendBooking(){
   try{
     const uid=await hbMyUid(); if(!uid) throw new Error('লগইন করা যায়নি — ইন্টারনেট দেখুন');
     try{ localStorage.setItem('hbPassengerPhone',phone); }catch(e){}
+    hbPushSetup('customers',uid,true).then(ok=>{ const pb=document.getElementById('pushBtn'); if(pb&&ok) pb.style.display='none'; });
     const ref=db.collection('transportBookings').doc(), b=db.batch();
     b.set(ref,{ postId:hbUnesc(r.id), driverId:r.driverId, passengerId:uid, passengerName:name.slice(0,60), seats,
       note:document.getElementById('bkNote').value.trim().slice(0,300),
@@ -540,9 +564,10 @@ async function hbRate(bid,did,n){
 }
 async function cancelBooking(id){ if(!confirm('বুকিং বাতিল করবেন?')) return;
   try{ await db.collection('transportBookings').doc(id).update({status:'cancelled',updatedAt:firebase.firestore.FieldValue.serverTimestamp()}); }catch(e){ toast('বাতিল হয়নি'); } }
-auth.onAuthStateChanged(u=>{ if(u) listenMyBookings(u.uid); else document.getElementById('myBookings').innerHTML='<div class="empty">এখনো কোনো বুকিং নেই।</div>'; });
+auth.onAuthStateChanged(u=>{ if(u){ listenMyBookings(u.uid); hbPushInit(u.uid); } else document.getElementById('myBookings').innerHTML='<div class="empty">এখনো কোনো বুকিং নেই।</div>'; });
 
 
+if(/[?&]page=bookings/.test(location.search)) setTimeout(()=>showPage('bookingsPage'),50);
 </script>
 </body>
 </html>

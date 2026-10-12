@@ -33,7 +33,7 @@ messaging.onBackgroundMessage((payload) => {
   // 📢 Honey Bee Transport Media Phase 7 — tripId/postId-ও tagId হিসেবে ব্যবহার হয়
   // 🔔 পঞ্জিকা রিমাইন্ডারে dateKey (যেদিনের তিথির কথা বলা হচ্ছে) tagId হিসেবে
   // যায়, নাহলে পরপর কয়েক দিনের রিমাইন্ডার একটা আরেকটাকে replace করে ফেলত
-  const tagId = (payload.data && (payload.data.chatId || payload.data.offerId || payload.data.orderId || payload.data.tripId || payload.data.postId || payload.data.dateKey)) || "general";
+  const tagId = (payload.data && (payload.data.chatId || payload.data.offerId || payload.data.orderId || payload.data.tripId || payload.data.postId || payload.data.bookingId || payload.data.dateKey)) || "general";
   const tag = `honeybee-${type}-${tagId}`;
 
   // 🔕 মেসেজ/মন্তব্যের মতো হালকা নোটিফিকেশন নিজে থেকেই কিছুক্ষণ পর সরে
@@ -59,6 +59,21 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const type = (event.notification.data && event.notification.data.type) || "delivery-offer";
+  // 🎫 Transport Media বুকিং — নোটিফিকেশনে নিজের ঠিকানা (link) থাকে:
+  //    চালক → honey-bee-driver.html#bookings, যাত্রী → honey-bee-transport.html?page=bookings
+  const link = event.notification.data && event.notification.data.link;
+  if (link && (type === "tm-booking-driver" || type === "tm-booking-passenger")) {
+    const file = type === "tm-booking-driver" ? "honey-bee-driver.html" : "honey-bee-transport.html";
+    event.waitUntil(
+      clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+        for (const c of list) {
+          if (c.url.includes(file) && "navigate" in c) return c.navigate(link).then((w) => w && w.focus());
+        }
+        return clients.openWindow ? clients.openWindow(link) : null;
+      })
+    );
+    return;
+  }
   // 📢 Honey Bee Transport Media Phase 7 — যাত্রী-মুখী পুশ (নতুন ভাড়া
   // অফার, ট্রিপ কনফার্ম) Bazar অ্যাপে যাবে; ড্রাইভার-মুখী পুশ (ট্রিপ
   // কনফার্ম, পোস্টে মন্তব্য) Rider/Driver Mode-এ (shop-ledger-app.html)
