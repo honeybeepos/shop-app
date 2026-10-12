@@ -216,6 +216,8 @@
     box-shadow:0 12px 26px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,209,102,0.15);
     position:relative; z-index:2;
   }
+  /* 🔍 আর ⚙️ — শুধু আইকন, তাই লেখা-ওয়ালা ট্যাবের চেয়ে সরু */
+  .tab-btn[data-tab="gsearch"], .tab-btn[data-tab="settings"]{ flex:0.55 !important; font-size:17px !important; }
   .tab-btn{
     flex:1; text-align:center; padding:10px 3px; font-size:12px; font-weight:800;
     border-radius:14px; cursor:pointer; color:rgba(255,248,232,0.6);
@@ -1856,6 +1858,7 @@ window.hbLoadLib = function(name){
          জড়ানো আছে; উপরের নতুন বাটন দুইটা এদেরই .click() করে)। -->
     <div class="tab-btn" data-tab="print" style="display:none;">🖨️ প্রিন্ট</div>
     <div class="tab-btn" data-tab="qr" style="display:none;">🏷️ QR</div>
+    <div class="tab-btn" data-tab="gsearch" id="tabSearchBtn" title="সব কিছু খুঁজুন — প্রোডাক্ট, কাস্টমার, বিক্রি, নোট">🔍</div>
     <div class="tab-btn" data-tab="settings">⚙️</div>
   </div>
 
@@ -3236,7 +3239,7 @@ window.hbLoadLib = function(name){
   <div class="nbBody">
     <!-- 🔍 সব কিছু খোঁজা — নোটবুকের ভেতর থেকেই। খাতাটা এখন শুধু নোট
          রাখার জায়গা নয়, এখান থেকেই পুরো দোকান খুঁজে পাওয়া যায়। -->
-    <div class="nbSearchAll" id="nbSearchAllBtn">
+    <div class="nbSearchAll" id="nbSearchAllBtn" style="display:none;">
       <span class="ic">🔍</span>
       <span class="tx">সব কিছু খুঁজুন — প্রোডাক্ট, কাস্টমার, বিক্রি, নোট</span>
       <span class="go">›</span>
@@ -6062,6 +6065,9 @@ function reconcileRecentSaleBackup(){
 
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
+    // 🔍 খোঁজার বোতাম কোনো ট্যাব না — পুরো পর্দার খোঁজা খোলে; ← চাপলে বা
+    // কোনো ফলাফলে চাপলে নিজে থেকেই বন্ধ হয়ে সেই জায়গায় নিয়ে যায়
+    if(btn.dataset.tab === 'gsearch'){ if(typeof hbGsOpen === 'function') hbGsOpen(null); return; }
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
     btn.classList.add('active');
@@ -19512,7 +19518,7 @@ const FEATURE_CARD_MAP = {
 function applyRoleRestrictions(role){
   if(role !== "subuser") return;
   document.querySelectorAll(".tab-btn").forEach(btn=>{
-    if(!ALLOWED_TABS_FOR_SUBUSER.includes(btn.dataset.tab)) btn.classList.add("subuser-hide");
+    if(btn.dataset.tab !== "gsearch" && !ALLOWED_TABS_FOR_SUBUSER.includes(btn.dataset.tab)) btn.classList.add("subuser-hide");
   });
   BIZ_CARDS_HIDDEN_FOR_SUBUSER.forEach(id=>{
     const card = document.getElementById(id);
