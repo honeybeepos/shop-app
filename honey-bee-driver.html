@@ -83,8 +83,8 @@ select option{background:#173a29;color:#eafff2}
   <section id="home" class="page">
     <div class="grid">
       <div class="card"><div class="stat-label">মোট বুকিং</div><div class="stat" id="totalBookings">—</div><div class="stat-note">ডেটা সংযুক্ত হলে দেখাবে</div></div>
-      <div class="card"><div class="stat-label">আসন্ন যাত্রা</div><div class="stat">—</div><div class="stat-note">এখনো ডেটা নেই</div></div>
-      <div class="card"><div class="stat-label">অপেক্ষমাণ অনুরোধ</div><div class="stat">—</div><div class="stat-note" style="color:#976300">নতুন অনুরোধ নেই</div></div>
+      <div class="card" data-goto="bookings" style="cursor:pointer"><div class="stat-label">চলতি যাত্রা</div><div class="stat" id="stActive">—</div><div class="stat-note" id="stActiveNote">কোনো যাত্রা চলছে না</div></div>
+      <div class="card" data-goto="bookings" style="cursor:pointer"><div class="stat-label">অপেক্ষমাণ অনুরোধ</div><div class="stat" id="stReq">০</div><div class="stat-note" id="stReqNote" style="color:#fbbf24">অনলাইন হলে যাত্রীর অনুরোধ আসবে</div></div>
       <div class="card"><div class="stat-label">এই মাসের আয়</div><div class="stat">৳০</div><div class="stat-note">এখনো আয়ের ডেটা নেই</div></div>
     </div>
     <div class="columns">
@@ -93,7 +93,7 @@ select option{background:#173a29;color:#eafff2}
         <button class="action" data-goto="bookings"><span>📩</span><b>বুকিং অনুরোধ</b><small>অনুরোধ দেখুন ও উত্তর দিন</small></button>
         <button class="action" data-goto="schedule"><span>🗓️</span><b>সময়সূচি</b><small>ব্যস্ত ও ফাঁকা সময় রাখুন</small></button>
         <button class="action" data-goto="vehicle"><span>🚘</span><b>গাড়ির তথ্য</b><small>গাড়ি ও আসনের বিবরণ</small></button>
-      </div><div class="notice">✅ লগইন, প্রোফাইল, গাড়ির তথ্য আর অনলাইন/অফলাইন এখন আসল — সার্ভারে সেভ হয়।<br>🛣️ যাত্রা পোস্ট এখন আসল — সব যাত্রী দেখেন। 📍 অনলাইন থাকলে লাইভ লোকেশন যায়। 🛠️ বুকিং, সময়সূচি, আয় পরের ধাপে যুক্ত হবে। ততদিন এগুলো "🔁 আগের ড্রাইভার মোড"-এ আছে।<br><button class="btn secondary" type="button" id="hbOldModeHome" style="margin-top:8px;padding:8px 12px;font-size:12px">🔁 আগের ড্রাইভার মোড খুলুন</button></div></div>
+      </div><div class="notice">✅ লগইন, প্রোফাইল, গাড়ির তথ্য আর অনলাইন/অফলাইন এখন আসল — সার্ভারে সেভ হয়।<br>🛣️ যাত্রা পোস্ট এখন আসল — সব যাত্রী দেখেন। 📍 অনলাইন থাকলে লাইভ লোকেশন যায়। 📩 যাত্রীর অনুরোধ ও চলতি যাত্রা এখন আসল। 🛠️ সময়সূচি, আয় পরের ধাপে যুক্ত হবে। ততদিন এগুলো "🔁 আগের ড্রাইভার মোড"-এ আছে।<br><button class="btn secondary" type="button" id="hbOldModeHome" style="margin-top:8px;padding:8px 12px;font-size:12px">🔁 আগের ড্রাইভার মোড খুলুন</button></div></div>
       <div class="card"><h2 class="section-title">আসন্ন যাত্রা</h2><div class="sub">এখনো কোনো যাত্রার তথ্য নেই। বুকিং বা যাত্রার ডেটা যুক্ত হলে এখানে দেখা যাবে।</div><button class="btn secondary" style="width:100%;margin-top:12px" data-goto="schedule">সময়সূচি দেখুন</button><div id="agentBox" class="hidden" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><h2 class="section-title" style="margin-bottom:6px">🤝 আপনার এজেন্ট</h2><div style="display:flex;align-items:center;gap:10px"><b id="agentName" style="flex:1">—</b><a id="agentCall" class="btn" style="text-decoration:none;padding:9px 13px;font-size:13px">📞 কল</a></div></div></div>
     </div>
   </section>
@@ -107,7 +107,7 @@ select option{background:#173a29;color:#eafff2}
       <div class="btnrow"><button class="btn" type="submit">যাত্রা পোস্ট করুন</button><button class="btn secondary" type="reset">ফর্ম মুছুন</button></div></form>
     </div><div class="card" style="margin-top:14px"><h2 class="section-title">আপনার পোস্ট</h2><div id="postsList" class="sub">এখনো কোনো নতুন পোস্ট তৈরি হয়নি।</div></div>
   </section>
-  <section id="bookings" class="page hidden"><div class="card"><h2 class="section-title">বুকিং অনুরোধ</h2><div class="sub" id="emptyBookings">এখনো কোনো বুকিং অনুরোধ নেই। বাস্তব বুকিং সিস্টেম যুক্ত হলে যাত্রীর অনুরোধ এখানে দেখা যাবে।</div></div></section>
+  <section id="bookings" class="page hidden"><div class="card" id="activeTripCard" style="display:none;margin-bottom:14px"></div><div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h2 class="section-title" style="margin:0">📩 যাত্রীর অনুরোধ</h2><button class="btn secondary" type="button" id="muteBtn" style="padding:7px 10px;font-size:12px;display:none">🔕 রিং থামান</button></div><div class="sub" id="reqList" style="margin-top:12px">অনলাইন করলে আশেপাশের যাত্রীদের অনুরোধ এখানে আসবে — ভাড়া অফার করতে পারবেন।</div></div></section>
   <section id="schedule" class="page hidden"><div class="card"><h2 class="section-title">সময়সূচি</h2><p class="sub">আপনার প্রকাশিত যাত্রা ও নিশ্চিত বুকিংয়ের সময়সূচি এখানে দেখা যাবে।</p><div class="sub">এখনো কোনো সময়সূচি নেই।</div></div></section>
   <section id="vehicle" class="page hidden"><div class="card"><h2 class="section-title">আমার গাড়ি</h2><form id="vehicleForm"><label>গাড়ির ধরন</label><select id="vType" required><option value="">-- গাড়ির ধরন বেছে নিন --</option><option value="bike">🏍️ বাইক</option><option value="cng">🛺 CNG / অটো রিকশা</option><option value="easy_bike">🛺✨ ইজি বাইক</option><option value="sedan">🚗 সেডান / প্রাইভেট কার</option><option value="hiace">🚐 হাইএস</option><option value="microbus">🚐 মাইক্রোবাস</option><option value="pickup">🛻 পিকআপ / ট্রাক</option><option value="ambulance_ac">🚑 অ্যাম্বুলেন্স (AC)</option><option value="ambulance_non_ac">🚑 অ্যাম্বুলেন্স (Non-AC)</option><option value="ambulance_icu">🚑 অ্যাম্বুলেন্স (ICU)</option></select><label>গাড়ির মডেল</label><input id="vModel" placeholder="যেমন: Toyota Hiace (2019)" required><div class="formgrid"><div><label>রেজিস্ট্রেশন নম্বর</label><input id="vReg" placeholder="রেজিস্ট্রেশন নম্বর" required></div><div><label>মোট আসন</label><input id="vSeats" type="number" min="1" placeholder="মোট আসন" required></div><div><label>এসি</label><select id="vAc"><option value="">নির্বাচন করুন</option><option>আছে</option><option>নেই</option></select></div><div><label>জ্বালানি</label><select id="vFuel"><option value="">নির্বাচন করুন</option><option>ডিজেল</option><option>পেট্রোল</option><option>সিএনজি</option><option>ইলেকট্রিক</option></select></div></div><button class="btn" type="submit" style="margin-top:14px">তথ্য সংরক্ষণ করুন</button></form><div class="notice">আপনার প্রকৃত গাড়ির তথ্য পূরণ করুন। গাড়ির ধরন ঠিকভাবে দিন — যাত্রী ও অ্যাম্বুলেন্স খোঁজায় এটা দেখেই আপনাকে দেখানো হয়।</div></div></section>
   <section id="earnings" class="page hidden"><div class="grid"><div class="card"><div class="stat-label">এই মাসে</div><div class="stat">৳০</div><div class="stat-note">আয়ের ডেটা যুক্ত হয়নি</div></div><div class="card"><div class="stat-label">সম্পন্ন যাত্রা</div><div class="stat">০</div></div></div><div class="card"><h2 class="section-title">আয়ের হিসাব</h2><div class="sub">এখনো কোনো আয়ের রেকর্ড নেই। বাস্তব পেমেন্ট/বুকিং ডেটা যুক্ত হলে এখানে হিসাব দেখা যাবে।</div></div></section>
@@ -157,12 +157,12 @@ function drvPaintStatus(st){
 $id("toggleOnline").onclick = async ()=>{
   if(!DRV.uid) return;
   const cur = DRV.data.driverStatus || "offline";
-  if(cur === "busy"){ alert("যাত্রা চলছে — শেষ হলে অফলাইন করতে পারবেন।"); return; }
+  if(cur === "busy" || DRV.data.currentStatus === "on_trip"){ alert("যাত্রা চলছে — শেষ হলে অফলাইন করতে পারবেন।"); return; }
   const next = cur === "online" ? "offline" : "online";
   const btn = $id("toggleOnline"); btn.disabled = true;
   try{
     await db.collection("transportDrivers").doc(DRV.uid).update({ driverStatus: next, statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-    DRV.data.driverStatus = next; drvPaintStatus(next); drvSyncGps();
+    DRV.data.driverStatus = next; drvPaintStatus(next); drvSyncGps(); drvSyncRequests();
   }catch(e){ alert("বদলানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
   btn.disabled = false;
 };
@@ -378,6 +378,170 @@ $id("docSubmit").onclick=async()=>{
   b.disabled=false; b.textContent="✅ যাচাইয়ের জন্য জমা দিন";
 };
 document.querySelectorAll('[data-page="profile"]').forEach(x=>x.addEventListener("click",()=>{ if(DRV.uid) drvLoadDocs(); }));
+
+/* ==================== 📩 ধাপ ৩ক — যাত্রীর অনুরোধ, রিংটোন, চলতি যাত্রা ====================
+   আগের Driver Mode-এর একই নিয়ম ও একই ডেটা (trips/{id}):
+   যাত্রী গন্তব্য দিয়ে খোঁজেন → status "searching" → ড্রাইভাররা ভাড়া অফার দেন
+   (waitingList, সর্বোচ্চ ৩ জন) → যাত্রী একজনকে বেছে নেন → "confirmed"।
+   নির্দিষ্ট ভাড়ার অনুরোধে প্রথম যে ড্রাইভার "গ্রহণ" চাপেন তিনিই পান (transaction)। */
+const CUR="৳";
+let __reqUnsub=null, __known=new Set(), __reqInit=false, __ringTimer=null, __muted=new Set(), __audio=null;
+let __tripUnsub=null, __waitTimer=null;
+function drvUnlockAudio(){ try{ if(!__audio) __audio=new (window.AudioContext||window.webkitAudioContext)(); if(__audio.state==="suspended") __audio.resume(); }catch(e){} }
+function drvBeep(){
+  if(navigator.vibrate) navigator.vibrate([200,100,200,100,300]);
+  try{ drvUnlockAudio(); const c=__audio, t=c.currentTime;
+    [0,0.3].forEach(o=>{ const g=c.createGain(), a=c.createOscillator(), b=c.createOscillator();
+      a.type="sawtooth"; a.frequency.setValueAtTime(220,t+o); a.frequency.linearRampToValueAtTime(260,t+o+0.25);
+      b.type="sine"; b.frequency.setValueAtTime(440,t+o);
+      g.gain.setValueAtTime(0.0001,t+o); g.gain.exponentialRampToValueAtTime(0.25,t+o+0.03); g.gain.exponentialRampToValueAtTime(0.0001,t+o+0.27);
+      a.connect(g); b.connect(g); g.connect(c.destination); a.start(t+o); b.start(t+o); a.stop(t+o+0.28); b.stop(t+o+0.28); });
+  }catch(e){}
+}
+function drvRing(on){
+  $id("muteBtn").style.display = on ? "" : "none";
+  if(on && !__ringTimer){ drvBeep(); __ringTimer=setInterval(drvBeep,3500); }
+  if(!on && __ringTimer){ clearInterval(__ringTimer); __ringTimer=null; }
+}
+$id("muteBtn").onclick=()=>{ __known.forEach(id=>__muted.add(id)); drvRing(false); };
+$id("toggleOnline").addEventListener("click", drvUnlockAudio);
+
+function drvBusy(){ const c=DRV.data.currentStatus; return c==="on_waiting"||c==="on_trip"; }
+function drvSyncRequests(){
+  const on=DRV.data.driverStatus==="online"||DRV.data.driverStatus==="busy";
+  const box=$id("reqList");
+  if(!on){ if(__reqUnsub){__reqUnsub();__reqUnsub=null;} drvRing(false); box.className="sub"; box.textContent="অনলাইন করলে আশেপাশের যাত্রীদের অনুরোধ এখানে আসবে — ভাড়া অফার করতে পারবেন।"; drvSetReqCount(0); return; }
+  if(!DRV.data.canReceivePassengerRequests){ box.className="sub"; box.textContent="🔒 যাত্রীর অনুরোধ পাওয়ার সুবিধা এখনো চালু হয়নি। আপনার এজেন্টকে বলুন — তিনি এক ক্লিকে চালু করে দেবেন।"; $id("stReqNote").textContent="এজেন্টকে বলে চালু করুন"; return; }
+  if(__reqUnsub) return;
+  __reqUnsub=db.collection("trips").where("status","in",["searching","waiting_selection"]).limit(40)
+    .onSnapshot(qs=>drvRenderRequests(qs.docs.map(d=>({id:d.id,...d.data()}))), err=>{ box.className="sub"; box.textContent="অনুরোধ আনা যায়নি — ইন্টারনেট দেখুন।"; });
+}
+function drvSetReqCount(n){ $id("stReq").textContent=n; $id("stReqNote").textContent = n ? "👉 এখনই দেখুন" : "নতুন অনুরোধ নেই"; }
+function drvKm(t){ const p=t.pickupLocation; if(!__gpsLast||!p||p.lat==null) return ""; return " · 📏 "+(drvDistM(__gpsLast,p)/1000).toFixed(1)+" কিমি দূরে"; }
+function drvRenderRequests(trips){
+  const box=$id("reqList");
+  if(drvBusy()){ drvRing(false); drvSetReqCount(0); box.className="sub"; box.textContent="একটা যাত্রা চলছে — শেষ হলে নতুন অনুরোধ দেখাবে।"; return; }
+  const list=trips.filter(t=>!(t.rejectedDrivers||[]).includes(DRV.uid) && !(t.waitingList||[]).some(o=>o.driverId===DRV.uid)
+    && !(t.sessionExpiresAt && t.sessionExpiresAt.toMillis && t.sessionExpiresAt.toMillis()<Date.now()));
+  const ids=new Set(list.map(t=>t.id));
+  __known=ids;
+  const fresh=[...ids].some(id=>!__muted.has(id));
+  if(__reqInit || list.length) drvRing(fresh && list.length>0);
+  __reqInit=true;
+  drvSetReqCount(list.length);
+  if(!list.length){ box.className="sub"; box.textContent="এই মুহূর্তে কোনো নতুন অনুরোধ নেই।"; return; }
+  box.className="";
+  box.innerHTML=list.map(t=>{
+    const pick=(t.pickupLocation&&t.pickupLocation.address)||"জানা নেই";
+    const fixed=t.fareType==="fixed", n=(t.waitingList||[]).length, full=n>=3;
+    return `<div class="trip"><div class="trip-head"><span>🏁 ${esc(t.destination||"—")}</span><span class="badge ${fixed?'pending':''}">${fixed?'নির্দিষ্ট ভাড়া':n+'/৩ অফার'}</span></div>
+      <div class="meta">🚗 ${esc(t.vehicleType||"যেকোনো")}${esc(drvKm(t))}<br>📍 পিকআপ: ${esc(pick)}<br>👤 ${esc(t.passengerName||"যাত্রী")}</div>
+      ${fixed?`<div class="stat" style="font-size:20px;margin:6px 0">${CUR} ${esc(t.proposedFare)}</div>`:''}
+      <div class="btnrow"><button class="btn secondary" type="button" data-rej="${esc(t.id)}">❌ না</button>
+      ${fixed?`<button class="btn" type="button" data-acc="${esc(t.id)}">✅ গ্রহণ করুন</button>`
+             :`<button class="btn" type="button" data-off="${esc(t.id)}" ${full?'disabled style="opacity:.5"':''}>${full?'🔒 ৩ জন পূর্ণ':'💰 ভাড়া অফার করুন'}</button>`}</div></div>`;
+  }).join("");
+  box.querySelectorAll("[data-rej]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await db.collection("trips").doc(b.dataset.rej).update({rejectedDrivers:firebase.firestore.FieldValue.arrayUnion(DRV.uid)}); }catch(e){ alert("হয়নি: "+e.message); b.disabled=false; } });
+  box.querySelectorAll("[data-off]").forEach(b=>b.onclick=()=>drvOffer(b.dataset.off));
+  box.querySelectorAll("[data-acc]").forEach(b=>b.onclick=()=>drvAcceptFixed(b.dataset.acc,b));
+}
+function drvVehLabel(){ const v=DRV.data.vehicle||{}; return v.model||DRV_TYPE_MAP[v.type]||v.type||""; }
+async function drvSetMyTrip(st,tripId){ DRV.data.currentStatus=st; DRV.data.activeTripId=tripId; await db.collection("transportDrivers").doc(DRV.uid).update({currentStatus:st,activeTripId:tripId}); }
+async function drvOffer(tripId){
+  const f=prompt(`কত ভাড়া অফার করবেন? (${CUR})`,""); if(f===null) return;
+  const fare=Number(f); if(!fare||fare<=0){ alert("সঠিক ভাড়া লিখুন।"); return; }
+  const eta=(prompt("কত মিনিটে যাত্রীর কাছে পৌঁছাবেন? (শুধু সংখ্যা)","5")||"5").replace(/[^0-9]/g,"")||"5";
+  try{
+    const ref=db.collection("trips").doc(tripId), d=await ref.get();
+    if(!d.exists){ alert("এই অনুরোধটা আর নেই।"); return; }
+    const t=d.data();
+    if((t.waitingList||[]).length>=3){ alert("দুঃখিত, ৩ জন ড্রাইভার আগেই অফার দিয়েছেন।"); return; }
+    const master=t.sessionExpiresAt?t.sessionExpiresAt.toMillis():Date.now()+360000;
+    await ref.update({ status:"waiting_selection", waitingList:firebase.firestore.FieldValue.arrayUnion({
+      driverId:DRV.uid, driverName:DRV.data.name||"ড্রাইভার", driverPhone:DRV.data.phone||"", vehicleModel:drvVehLabel(),
+      offeredFare:fare, eta:eta+" min", waitingStartedAt:firebase.firestore.Timestamp.now(),
+      timerExpiresAt:firebase.firestore.Timestamp.fromMillis(Math.min(master,Date.now()+360000)) }) });
+    await drvSetMyTrip("on_waiting",tripId);
+    drvRing(false); drvWatchTrip(tripId);
+    alert("✅ অফার গেছে — যাত্রী আপনাকে বেছে নিলে এখানে জানাবে।");
+  }catch(e){ alert("অফার পাঠানো যায়নি: "+e.message); }
+}
+async function drvAcceptFixed(tripId,btn){
+  btn.disabled=true; btn.textContent="⏳...";
+  try{
+    const ref=db.collection("trips").doc(tripId), v=DRV.data.vehicle||{};
+    await db.runTransaction(async tx=>{
+      const d=await tx.get(ref); if(!d.exists) throw new Error("এই অনুরোধটা আর নেই।");
+      const t=d.data(); if(t.status!=="searching") throw new Error("দুঃখিত, অন্য একজন ড্রাইভার আগেই নিয়ে নিয়েছেন।");
+      tx.update(ref,{ status:"confirmed", driverId:DRV.uid, confirmedDriver:{ driverId:DRV.uid, finalFare:t.proposedFare, driverName:DRV.data.name||"ড্রাইভার",
+        driverPhone:DRV.data.phone||"", vehicleModel:drvVehLabel(), confirmedAt:firebase.firestore.FieldValue.serverTimestamp() } });
+    });
+    await drvSetMyTrip("on_trip",tripId);
+    drvRing(false); drvWatchTrip(tripId);
+  }catch(e){ alert(e.message||"গ্রহণ করা যায়নি।"); btn.disabled=false; btn.textContent="✅ গ্রহণ করুন"; }
+}
+function drvWatchTrip(tripId){
+  if(__tripUnsub) __tripUnsub();
+  __tripUnsub=db.collection("trips").doc(tripId).onSnapshot(d=>{ if(d.exists) drvRenderTrip(d.data(),tripId); else drvResetTrip(); });
+}
+async function drvResetTrip(){
+  if(__tripUnsub){__tripUnsub();__tripUnsub=null;} if(__waitTimer){clearInterval(__waitTimer);__waitTimer=null;}
+  $id("activeTripCard").style.display="none"; $id("stActive").textContent="—"; $id("stActiveNote").textContent="কোনো যাত্রা চলছে না";
+  try{ await drvSetMyTrip("available",null); }catch(e){}
+  if(__reqUnsub){ __reqUnsub(); __reqUnsub=null; } drvSyncRequests();
+}
+function drvRenderTrip(t,tripId){
+  const card=$id("activeTripCard");
+  const mine=t.confirmedDriver&&t.confirmedDriver.driverId===DRV.uid;
+  if(t.status==="completed"||t.status==="expired"||t.status==="cancelled"||(t.status==="confirmed"&&!mine)){
+    if(t.status==="cancelled"&&mine) alert("যাত্রী যাত্রাটা বাতিল করেছেন।");
+    drvResetTrip(); return;
+  }
+  card.style.display="";
+  if(t.status==="confirmed"){
+    if(DRV.data.currentStatus!=="on_trip") drvSetMyTrip("on_trip",tripId).catch(()=>{});
+    $id("stActive").textContent="১"; $id("stActiveNote").textContent="🚗 যাত্রা চলছে — দেখুন";
+    const p=t.pickupLocation||{};
+    card.innerHTML=`<h2 class="section-title" style="color:#4ade80">🚗 চলতি যাত্রা</h2>
+      <div class="meta" style="font-size:13px;color:var(--ink)">👤 যাত্রী: <b>${esc(t.passengerName||"—")}</b><br>📍 পিকআপ: ${esc(p.address||"জানা নেই")}<br>🏁 গন্তব্য: ${esc(t.destination||"—")}</div>
+      <div class="stat" style="font-size:22px">${CUR} ${esc(t.confirmedDriver.finalFare||0)}</div>
+      <div class="btnrow"><button class="btn secondary" type="button" id="tNav">🧭 পিকআপে যান</button><button class="btn secondary" type="button" id="tCall">📞 যাত্রীকে কল</button></div>
+      <button class="btn" type="button" id="tDone" style="width:100%;margin-top:10px">✅ যাত্রা শেষ করুন</button>`;
+    $id("tNav").onclick=()=>{ if(p.lat!=null) window.open(`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`,"_blank"); else alert("যাত্রীর সঠিক লোকেশন নেই — কল করে জেনে নিন।"); };
+    $id("tCall").onclick=()=>{ if(t.passengerPhone) location.href="tel:"+String(t.passengerPhone).replace(/[^0-9+]/g,""); else alert("যাত্রীর নম্বর নেই।"); };
+    $id("tDone").onclick=()=>drvComplete(tripId,t);
+    return;
+  }
+  if(!(t.waitingList||[]).some(o=>o.driverId===DRV.uid)){ drvResetTrip(); return; }
+  $id("stActive").textContent="⏳"; $id("stActiveNote").textContent="যাত্রীর উত্তরের অপেক্ষা";
+  card.innerHTML=`<h2 class="section-title" style="color:#fbbf24">🟡 যাত্রীর উত্তরের অপেক্ষা</h2>
+    <div class="meta" style="font-size:13px;color:var(--ink)">🏁 ${esc(t.destination||"—")}</div>
+    <div class="stat" id="tWait" style="font-size:30px;color:#fbbf24">—:—</div>
+    <button class="btn secondary" type="button" id="tCancelWait" style="width:100%">🛑 অফার তুলে নিন</button>`;
+  $id("tCancelWait").onclick=async()=>{
+    try{ const ref=db.collection("trips").doc(tripId), d=await ref.get();
+      if(d.exists){ const left=(d.data().waitingList||[]).filter(o=>o.driverId!==DRV.uid); await ref.update({waitingList:left,status:left.length?"waiting_selection":"searching"}); } }catch(e){}
+    drvResetTrip();
+  };
+  if(__waitTimer) clearInterval(__waitTimer);
+  const end=t.sessionExpiresAt&&t.sessionExpiresAt.toMillis?t.sessionExpiresAt.toMillis():Date.now()+360000;
+  const tick=()=>{ const el=$id("tWait"); if(!el){clearInterval(__waitTimer);return;} const ms=end-Date.now();
+    if(ms<=0){ clearInterval(__waitTimer); __waitTimer=null; db.collection("trips").doc(tripId).update({status:"expired"}).catch(()=>{}); drvResetTrip(); return; }
+    el.textContent=String(Math.floor(ms/60000)).padStart(2,"0")+":"+String(Math.floor(ms%60000/1000)).padStart(2,"0"); };
+  tick(); __waitTimer=setInterval(tick,1000);
+}
+function drvToday(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+async function drvComplete(tripId,t){
+  if(!confirm("যাত্রা শেষ হয়েছে? ভাড়া বুঝে পেয়েছেন?")) return;
+  const fare=Number(t.confirmedDriver&&t.confirmedDriver.finalFare)||0;
+  try{
+    await db.collection("trips").doc(tripId).update({status:"completed"});
+    await db.collection("transportDrivers").doc(DRV.uid).collection("dailyEarnings").doc(drvToday()).set({
+      date:drvToday(), earning:firebase.firestore.FieldValue.increment(fare), tripCount:firebase.firestore.FieldValue.increment(1),
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp() },{merge:true}).catch(()=>{});
+    alert("✅ যাত্রা শেষ। আয়ে "+CUR+" "+fare+" যোগ হয়েছে।");
+  }catch(e){ alert("শেষ করা যায়নি: "+e.message); }
+}
 auth.onAuthStateChanged(async (user)=>{
   const se = getSession();
   if(!user || !se || se.uid !== user.uid || se.role !== "transport_driver"){ drvToLogin(); return; }
@@ -393,6 +557,8 @@ auth.onAuthStateChanged(async (user)=>{
     drvLoadMyPosts();
     drvLoadAgent();
     drvSyncGps();
+    drvSyncRequests();
+    if(DRV.data.activeTripId && (DRV.data.currentStatus==="on_waiting"||DRV.data.currentStatus==="on_trip")) drvWatchTrip(DRV.data.activeTripId);
     $id("hbGate").remove();
     if(!(DRV.data.vehicle && DRV.data.vehicle.type)){ go("vehicle"); setTimeout(()=>alert("🚗 শুরুতে আপনার গাড়ির ধরন বেছে নিয়ে সেভ করুন।"), 200); }
   }catch(e){
