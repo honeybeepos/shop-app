@@ -270,7 +270,7 @@ $id("postForm").addEventListener("submit", async (e)=>{
       vehicleLabel: [d.vehicle, v.model, v.regNumber].filter(Boolean).join(" · "),
       kind: "trip", from: d.from.trim(), to: d.to.trim(), date: d.date, time: d.time,
       vehicleType: d.vehicle, vehicleModel: v.model||null, regNumber: v.regNumber||null, vehicleColor: v.color||null, ac: v.ac||null,
-      seats, fare, notes: (d.notes||"").trim(), text,
+      seats, seatsTotal: seats, fare, notes: (d.notes||"").trim(), text,
       marketId: DRV.data.marketId||null,
       imageUrl, likedBy: [], likeCount: 0, status: "active",
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -289,7 +289,7 @@ async function drvLoadMyPosts(){
     if(!list.length){ box.className="sub"; box.textContent="এখনো কোনো পোস্ট নেই।"; return; }
     box.className="";
     box.innerHTML=list.map(p=>`<div class="trip"><div class="trip-head"><span>${esc(p.from&&p.to?p.from+" → "+p.to:(p.text||"").split("\n")[0])}</span><span class="badge">চালু</span></div>
-      <div class="meta">${esc([p.date,p.time].filter(Boolean).join(" "))}${p.vehicleType?" · "+esc(p.vehicleType):""}${p.seats?" · "+esc(p.seats)+" আসন":""}${p.fare?" · প্রতি জন ৳"+esc(p.fare):""}</div>
+      <div class="meta">${esc([p.date,p.time].filter(Boolean).join(" "))}${p.vehicleType?" · "+esc(p.vehicleType):""}${p.seatsTotal>0||p.seats>0?" · 💺 "+esc(p.seats||0)+"/"+esc(p.seatsTotal!=null?p.seatsTotal:p.seats)+" আসন খালি":""}${p.fare?" · প্রতি জন ৳"+esc(p.fare):""}</div>
       <div class="btnrow"><button class="btn secondary" type="button" data-rm="${esc(p.id)}" style="padding:7px 11px;font-size:12px">🗑️ পোস্ট সরান</button></div></div>`).join("");
     box.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{
       if(!confirm("পোস্টটা সরাবেন? যাত্রীরা আর দেখবেন না।")) return;
@@ -405,6 +405,7 @@ function drvListenBookings(){
     $id("stReq").textContent=pend.length; $id("stReqNote").textContent=pend.length?"👉 এখনই দেখুন":"নতুন অনুরোধ নেই";
     $id("stActive").textContent=acc.length||"—"; $id("stActiveNote").textContent=acc.length?"নিশ্চিত বুকিং আছে":"নিশ্চিত বুকিং নেই";
     drvRenderBookings(pend,acc,all.filter(b=>b.status!=="pending"&&b.status!=="accepted").slice(0,10));
+    drvRestoreSeats(all);
   },()=>{ $id("reqList").textContent="বুকিং আনা যায়নি — ইন্টারনেট দেখুন।"; });
 }
 function drvBkCard(b,btns){
@@ -423,9 +424,47 @@ function drvRenderBookings(pend,acc,old){
   // নিশ্চিত বুকিংয়ের যাত্রীর নম্বর — গ্রহণের পরেই পড়া যায়
   acc.forEach(async b=>{ try{ const c=await db.collection("transportBookings").doc(b.id).collection("private").doc("contact").get();
     const el=$id("ph_"+b.id); if(el&&c.exists){ const ph=String(c.data().phone||"").replace(/[^0-9+]/g,""); el.innerHTML=`📞 <a href="tel:${ph}" style="color:#4ade80;font-weight:800">${esc(c.data().phone)}</a> — কল করে সময় ও জায়গা ঠিক করুন`; } }catch(e){} });
-  document.querySelectorAll("[data-yes]").forEach(x=>x.onclick=()=>drvSetBooking(x.dataset.yes,"accepted",x));
+  document.querySelectorAll("[data-yes]").forEach(x=>x.onclick=()=>drvAcceptBooking(x.dataset.yes,x));
   document.querySelectorAll("[data-no]").forEach(x=>x.onclick=()=>{ if(confirm("এই বুকিং নিতে পারছেন না?")) drvSetBooking(x.dataset.no,"declined",x); });
   document.querySelectorAll("[data-done]").forEach(x=>x.onclick=()=>drvDoneBooking(x.dataset.done,x));
+}
+/* 💺 গ্রহণ করলে পোস্টের খালি আসন কমে (transaction — একই আসন দুইজনকে যায় না)।
+   গ্রহণ করা বুকিং পরে বাতিল/না হলে আসন আবার ফেরত যায় (seatsHeld দেখে)। */
+async function drvAcceptBooking(id,btn){
+  btn.disabled=true;
+  try{
+    const bRef=db.collection("transportBookings").doc(id);
+    await db.runTransaction(async tx=>{
+      const b=(await tx.get(bRef)).data(); if(!b||b.status!=="pending") throw new Error("এই অনুরোধটা আর অপেক্ষায় নেই।");
+      const n=Number(b.seats)||0;
+      if(n>0){
+        const pRef=db.collection("transportMediaPosts").doc(b.postId), p=(await tx.get(pRef)).data()||{};
+        const left=Number(p.seats)||0;
+        if(left<n) throw new Error(`খালি আসন মাত্র ${left}টা — এই অনুরোধে ${n}টা চাওয়া হয়েছে। "না" চাপুন অথবা যাত্রীকে কল করুন।`);
+        tx.update(pRef,{ seats:left-n, seatsTotal:(p.seatsTotal!=null?p.seatsTotal:left) });
+      }
+      tx.update(bRef,{ status:"accepted", seatsHeld:n>0, updatedAt:firebase.firestore.FieldValue.serverTimestamp() });
+    });
+    drvLoadMyPosts();
+  }catch(e){ alert(e.message||"গ্রহণ করা যায়নি।"); btn.disabled=false; }
+}
+let __restoring=new Set();
+async function drvRestoreSeats(list){
+  for(const b of list){
+    if(!b.seatsHeld || (b.status!=="cancelled"&&b.status!=="declined") || __restoring.has(b.id)) continue;
+    __restoring.add(b.id);
+    try{
+      const bRef=db.collection("transportBookings").doc(b.id), pRef=db.collection("transportMediaPosts").doc(b.postId);
+      await db.runTransaction(async tx=>{
+        const cur=(await tx.get(bRef)).data(); if(!cur||!cur.seatsHeld) return;
+        const p=(await tx.get(pRef)).data();
+        if(p) tx.update(pRef,{ seats:(Number(p.seats)||0)+(Number(cur.seats)||0) });
+        tx.update(bRef,{ seatsHeld:false });
+      });
+      drvLoadMyPosts();
+    }catch(e){}
+    __restoring.delete(b.id);
+  }
 }
 async function drvSetBooking(id,status,btn){
   btn.disabled=true;

@@ -325,7 +325,7 @@ function rideCard(r){return `<article class="ride market-vehicle-card">
  <div class="market-vehicle-body">
   <div class="ridehead"><strong>${r.type}</strong><button class="heart" onclick="event.stopPropagation();toast('পছন্দের তালিকায় যোগ করতে লগইন করুন')">♡</button></div>
   <div class="routeText">📍 ${r.route}</div>
-  <div class="meta">🕒 ${r.time} · ${r.seats>0?'💺 '+r.seats+' আসন':'📦 মালামাল পরিবহন'}</div>
+  <div class="meta">🕒 ${r.time} · ${r.seats>0?'💺 '+r.seats+' আসন খালি':(r.seatsTotal>0?'🔴 আসন পূর্ণ':'📦 মালামাল পরিবহন')}</div>
   <div class="vehicle-spec-row"><span>❄️ ${r.ac||'এসি তথ্য নেই'}</span><span>⭐ ${r.rating||'নতুন'}</span></div>
   <div class="market-vehicle-bottom"><div><small>প্রস্তাবিত ভাড়া</small><strong>৳${r.price}</strong></div><button class="primary vehicle-detail-btn" onclick="openDetail('${r.id}')">বিস্তারিত দেখুন ›</button></div>
  </div></article>`}
@@ -362,7 +362,7 @@ function openDetail(id){
  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><div style="width:66px;height:66px;border-radius:18px;background:#fff3c4;display:grid;place-items:center;font-size:38px">${r.emoji}</div><div><span style="background:#e4f8e9;color:#187447;border-radius:20px;padding:4px 8px;font-size:11px">✓ ${r.verified?'যাচাইকৃত':'তথ্য যাচাই করুন'}</span><h2 style="margin:7px 0 2px">${r.type}</h2><div class="meta">${r.route}</div></div></div>
  <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0">
  <div style="background:#fff8e2;border-radius:13px;padding:12px"><small class="hint">প্রস্তাবিত ভাড়া</small><div style="font-size:22px;font-weight:800">৳${r.price}</div><small>প্রতি আসন/প্রস্তাবিত</small></div>
- <div style="background:#edf8ff;border-radius:13px;padding:12px"><small class="hint">যাত্রার সময়</small><div style="font-weight:800">${r.time}</div><small>${r.seats>0?'খালি আসন: '+r.seats:'মালামাল পরিবহন'}</small></div>
+ <div style="background:#edf8ff;border-radius:13px;padding:12px"><small class="hint">যাত্রার সময়</small><div style="font-weight:800">${r.time}</div><small>${r.seats>0?'খালি আসন: '+r.seats:(r.seatsTotal>0?'🔴 আসন পূর্ণ':'মালামাল পরিবহন')}</small></div>
  </div>
  <h3>🚘 গাড়ির বিবরণ</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0">
  <div class="notice">🚗 <b>মডেল</b><br>${r.car}</div><div class="notice">❄️ <b>এসি</b><br>${r.ac||'তথ্য দেওয়া হয়নি'}</div>
@@ -414,7 +414,7 @@ function hbPostToRide(id,d){
   let when=[d.date,d.time].filter(Boolean).join(' ');
   if(!when&&d.createdAt&&d.createdAt.toDate){try{when='পোস্ট: '+d.createdAt.toDate().toLocaleDateString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){}}
   return {id:hbEsc(id),type:hbEsc(type||'গাড়ি'),emoji:HB_TYPE_EMOJI[type]||'🚘',route:hbEsc(route),from:hbEsc(d.from||''),to:hbEsc(d.to||''),
-    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,name:hbEsc(d.authorName||'ড্রাইভার'),
+    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,seatsTotal:Number(d.seatsTotal!=null?d.seatsTotal:d.seats)||0,name:hbEsc(d.authorName||'ড্রাইভার'),
     rating:'নতুন',reviews:0,verified:!!d.isVerified,car:hbEsc(d.vehicleModel||d.vehicleLabel||'তথ্য দেওয়া হয়নি'),ac:hbEsc(d.ac||''),
     plate:hbEsc(d.regNumber||''),color:hbEsc(d.vehicleColor||''),note:hbEsc(d.notes||d.text||''),phone:String(d.authorPhone||'').replace(/[^0-9+]/g,''),driverId:typeof d.authorId==='string'?d.authorId:'',
     img:(typeof d.imageUrl==='string'&&/^https:\/\/firebasestorage\.googleapis\.com\//.test(d.imageUrl))?hbEsc(d.imageUrl):''};
@@ -442,9 +442,10 @@ async function hbMyUid(){
 function openBooking(id){
   const r=rides.find(x=>x.id===id); if(!r) return;
   if(!r.driverId){ toast('এই পোস্টে বুকিং নেওয়া যায় না — চালককে কল করুন'); return; }
+  if(r.seatsTotal>0 && !(r.seats>0)){ toast('🔴 এই গাড়ির সব আসন বুক হয়ে গেছে'); return; }
   __bkPost=r;
   document.getElementById('bkRoute').innerHTML=`${r.route}<br><small>🕒 ${r.time} · ${r.type}${r.price?' · প্রতি জন ৳'+r.price:''}</small>`;
-  const goods=!(r.seats>0);
+  const goods=!(r.seatsTotal>0);
   document.getElementById('bkSeatsWrap').style.display=goods?'none':'';
   document.getElementById('bkSeats').max=r.seats||1; document.getElementById('bkSeats').value=1;
   document.getElementById('bkSeatsHint').textContent=goods?'':`খালি আসন: ${r.seats}`;
@@ -459,7 +460,7 @@ function closeBooking(){ document.getElementById('bookSheet').style.display='non
 async function sendBooking(){
   const r=__bkPost; if(!r) return;
   const name=document.getElementById('bkName').value.trim(), phone=document.getElementById('bkPhone').value.trim();
-  const goods=!(r.seats>0), seats=goods?0:Math.floor(Number(document.getElementById('bkSeats').value)||0);
+  const goods=!(r.seatsTotal>0), seats=goods?0:Math.floor(Number(document.getElementById('bkSeats').value)||0);
   if(!name){ toast('আপনার নাম লিখুন'); return; }
   if(!/^[0-9+\s-]{6,20}$/.test(phone)){ toast('সঠিক মোবাইল নম্বর লিখুন'); return; }
   if(!goods&&(seats<1||seats>r.seats)){ toast(`১ থেকে ${r.seats}টা আসন বুক করা যায়`); return; }
