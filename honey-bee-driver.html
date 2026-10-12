@@ -180,6 +180,7 @@ $id("toggleOnline").onclick = async ()=>{
   try{
     await db.collection("transportDrivers").doc(DRV.uid).update({ driverStatus: next, statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp() });
     DRV.data.driverStatus = next; drvPaintStatus(next);
+    drvMarkPostsOnline(next === "online");
   }catch(e){ alert("বদলানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
   btn.disabled = false;
 };
@@ -272,7 +273,7 @@ $id("postForm").addEventListener("submit", async (e)=>{
       vehicleType: d.vehicle, vehicleModel: v.model||null, regNumber: v.regNumber||null, vehicleColor: v.color||null, ac: v.ac||null,
       seats, seatsTotal: seats, fare, notes: (d.notes||"").trim(), text,
       marketId: DRV.data.marketId||null,
-      imageUrl, likedBy: [], likeCount: 0, status: "active",
+      imageUrl, likedBy: [], likeCount: 0, status: "active", driverOnline: DRV.data.driverStatus === "online",
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     e.target.reset(); drvPostDefaults();
@@ -281,6 +282,15 @@ $id("postForm").addEventListener("submit", async (e)=>{
   }catch(err){ alert("পোস্ট করা যায়নি: "+(err&&err.message||err)); }
   btn.disabled=false; btn.textContent="যাত্রা পোস্ট করুন";
 });
+/* ⚪ অফলাইনে থাকলে যাত্রীরা পোস্টে "চালক অফলাইন" দেখেন, বুক করতে পারেন না */
+async function drvMarkPostsOnline(on){
+  try{
+    const qs=await db.collection("transportMediaPosts").where("authorId","==",DRV.uid).orderBy("createdAt","desc").limit(20).get();
+    const b=db.batch(); let n=0;
+    qs.docs.forEach(d=>{ const x=d.data(); if(x.status==="active" && x.driverOnline!==on){ b.update(d.ref,{driverOnline:on}); n++; } });
+    if(n) await b.commit();
+  }catch(e){}
+}
 async function drvLoadMyPosts(){
   const box=$id("postsList");
   try{
@@ -288,7 +298,7 @@ async function drvLoadMyPosts(){
     const list=qs.docs.map(x=>({id:x.id,...x.data()})).filter(p=>p.status!=="removed");
     if(!list.length){ box.className="sub"; box.textContent="এখনো কোনো পোস্ট নেই।"; return; }
     box.className="";
-    box.innerHTML=list.map(p=>`<div class="trip"><div class="trip-head"><span>${esc(p.from&&p.to?p.from+" → "+p.to:(p.text||"").split("\n")[0])}</span><span class="badge">চালু</span></div>
+    box.innerHTML=list.map(p=>`<div class="trip"><div class="trip-head"><span>${esc(p.from&&p.to?p.from+" → "+p.to:(p.text||"").split("\n")[0])}</span><span class="badge ${/^\d{4}-\d{2}-\d{2}$/.test(p.date||"")&&p.date<drvDayStr(0)?"pending":""}">${/^\d{4}-\d{2}-\d{2}$/.test(p.date||"")&&p.date<drvDayStr(0)?"তারিখ পেরিয়েছে":"চালু"}</span></div>
       <div class="meta">${esc([p.date,p.time].filter(Boolean).join(" "))}${p.vehicleType?" · "+esc(p.vehicleType):""}${p.seatsTotal>0||p.seats>0?" · 💺 "+esc(p.seats||0)+"/"+esc(p.seatsTotal!=null?p.seatsTotal:p.seats)+" আসন খালি":""}${p.fare?" · প্রতি জন ৳"+esc(p.fare):""}</div>
       <div class="btnrow"><button class="btn secondary" type="button" data-rm="${esc(p.id)}" style="padding:7px 11px;font-size:12px">🗑️ পোস্ট সরান</button></div></div>`).join("");
     box.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{
