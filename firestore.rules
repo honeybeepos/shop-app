@@ -334,8 +334,12 @@ service cloud.firestore {
       // 🪪 ড্রাইভার নিজে সাইন-আপের সময়ও isVerified: true লিখে নিজেকে
       // ভেরিফাইড বানিয়ে ফেলতে পারবে না — নতুন ডকুমেন্টে এই ফিল্ড
       // true থাকা মানেই তৈরি ব্লক হয়ে যাবে।
+      // 🚑 অক্টোবর ২০২৬ — নিজে নিবন্ধন করা ড্রাইভার নিজেকে "এজেন্টের খোলা"
+      // (createdByAgent) বানাতে বা যাত্রী-অনুরোধ নিজে চালু করতে পারবেন না।
       allow create: if isSignedIn() && request.auth.uid == id &&
-        (!('isVerified' in request.resource.data) || request.resource.data.isVerified == false);
+        (!('isVerified' in request.resource.data) || request.resource.data.isVerified == false) &&
+        (!('createdByAgent' in request.resource.data) || request.resource.data.createdByAgent == false) &&
+        (!('canReceivePassengerRequests' in request.resource.data) || request.resource.data.canReceivePassengerRequests == false);
       // 🪪 আগে ড্রাইভার পুরো ডকুমেন্ট আপডেট করতে পারতো — অর্থাৎ raw Firestore
       // কল দিয়ে নিজেই isVerified: true লিখে ভেরিফিকেশন এড়িয়ে যেতে পারতো।
       // এখন ড্রাইভারের নিজের আপডেট থেকে isVerified/verifiedAt/verifiedBy
@@ -346,7 +350,7 @@ service cloud.firestore {
         (isSuperAdmin() ||
          (isAgent() && resource.data.marketId == myAgentMarketId()) ||
          (request.auth.uid == id &&
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isVerified','verifiedAt','verifiedBy']) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isVerified','verifiedAt','verifiedBy','createdByAgent','canReceivePassengerRequests']) &&
           (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus']) ||
            request.resource.data.verificationStatus == 'pending')));
       allow delete: if isSuperAdmin();

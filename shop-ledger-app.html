@@ -22697,10 +22697,13 @@ auth.onAuthStateChanged(async (user)=>{
   // বাকি POS-এর কোনো কোড/ডেটা-লোড এখানে চলবে না (কারণ ড্রাইভারের session-এ
   // shopId নেই, POS-এর কোড সেটা আশা করে)
   if(session.role === "transport_driver"){
-    // 🚑 অক্টোবর ২০২৬ — ড্রাইভারের আসল অ্যাপ এখন honey-bee-driver.html।
-    // পুরনো লগইন পাতা/হোম-স্ক্রিন শর্টকাট থেকে এখানে এলেও নতুন অ্যাপে পাঠানো হয়।
-    // শুধু নতুন অ্যাপের "আগের ড্রাইভার মোড" বোতাম (?oldmode=1) দিয়ে এলে পুরনোটা খোলে।
-    if(!/[?&]oldmode=1/.test(location.search)){ location.replace("honey-bee-driver.html"); return; }
+    // 🚑 অক্টোবর ২০২৬ — নিজে নিবন্ধন করা ড্রাইভার পুরনো Driver Mode কখনো পাবেন না,
+    // সবসময় নতুন অ্যাপ (honey-bee-driver.html)। শুধু এজেন্টের খোলা অ্যাকাউন্ট
+    // (transportDrivers/{uid}.createdByAgent == true) পুরনো মোড পায়।
+    try{
+      const __d = await db.collection("transportDrivers").doc(session.uid).get();
+      if(!(__d.exists && __d.data().createdByAgent === true)){ location.replace("honey-bee-driver.html"); return; }
+    }catch(e){ location.replace("honey-bee-driver.html"); return; }
     document.getElementById("authGate").style.display = "none";
     document.getElementById("posHeader").style.display = "none";
     document.getElementById("cloudTopBar").style.display = "none";

@@ -74,7 +74,7 @@ select option{background:#173a29;color:#eafff2}
   <button class="nav" data-page="vehicle">🚘 &nbsp; আমার গাড়ি</button>
   <button class="nav" data-page="earnings">৳ &nbsp; আয় ও হিসাব</button>
   <button class="nav" data-page="profile">♙ &nbsp; প্রোফাইল</button>
-  <button class="nav" id="hbOldModeSide">🔁 &nbsp; আগের ড্রাইভার মোড</button><button class="nav" id="hbLogoutSide">⎋ &nbsp; লগআউট</button>
+  <button class="nav" id="hbLogoutSide">⎋ &nbsp; লগআউট</button>
   <div class="sidefoot">আপনার গাড়ি, আপনার সময়, আপনার আয়।<br>© Honey Bee Transport</div>
 </aside>
 <main>
@@ -93,7 +93,7 @@ select option{background:#173a29;color:#eafff2}
         <button class="action" data-goto="bookings"><span>📩</span><b>বুকিং অনুরোধ</b><small>অনুরোধ দেখুন ও উত্তর দিন</small></button>
         <button class="action" data-goto="schedule"><span>🗓️</span><b>সময়সূচি</b><small>ব্যস্ত ও ফাঁকা সময় রাখুন</small></button>
         <button class="action" data-goto="vehicle"><span>🚘</span><b>গাড়ির তথ্য</b><small>গাড়ি ও আসনের বিবরণ</small></button>
-      </div><div class="notice">✅ লগইন, প্রোফাইল, গাড়ির তথ্য আর অনলাইন/অফলাইন এখন আসল — সার্ভারে সেভ হয়।<br>🛣️ যাত্রা পোস্ট এখন আসল — সব যাত্রী দেখেন। 📍 অনলাইন থাকলে লাইভ লোকেশন যায়। 📩 যাত্রীর অনুরোধ, চলতি যাত্রা, চ্যাট, আয়ের হিসাব, রেটিং আর আগাম বুকিং — সব এখন আসল। ততদিন এগুলো "🔁 আগের ড্রাইভার মোড"-এ আছে।<br><button class="btn secondary" type="button" id="hbOldModeHome" style="margin-top:8px;padding:8px 12px;font-size:12px">🔁 আগের ড্রাইভার মোড খুলুন</button></div></div>
+      </div><div class="notice">✅ লগইন, প্রোফাইল, গাড়ির তথ্য আর অনলাইন/অফলাইন এখন আসল — সার্ভারে সেভ হয়।<br>🛣️ যাত্রা পোস্ট এখন আসল — সব যাত্রী দেখেন। 📍 অনলাইন থাকলে লাইভ লোকেশন যায়। 📩 যাত্রীর অনুরোধ, চলতি যাত্রা, চ্যাট, আয়ের হিসাব, রেটিং আর আগাম বুকিং — সব এখন আসল। </div></div>
       <div class="card"><h2 class="section-title">আসন্ন যাত্রা</h2><div class="sub">এখনো কোনো যাত্রার তথ্য নেই। বুকিং বা যাত্রার ডেটা যুক্ত হলে এখানে দেখা যাবে।</div><button class="btn secondary" style="width:100%;margin-top:12px" data-goto="schedule">সময়সূচি দেখুন</button><div id="agentBox" class="hidden" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><h2 class="section-title" style="margin-bottom:6px">🤝 আপনার এজেন্ট</h2><div style="display:flex;align-items:center;gap:10px"><b id="agentName" style="flex:1">—</b><a id="agentCall" class="btn" style="text-decoration:none;padding:9px 13px;font-size:13px">📞 কল</a></div></div></div>
     </div>
   </section>
@@ -164,9 +164,9 @@ async function drvLogout(){
   try{ await auth.signOut(); }catch(e){}
   drvToLogin();
 }
-function drvOldMode(){ location.href = "shop-ledger-app.html?oldmode=1"; }
+
 ["hbLogoutSide","hbLogoutProfile"].forEach(id=>{ const b=$id(id); if(b) b.onclick=drvLogout; });
-["hbOldModeSide","hbOldModeHome"].forEach(id=>{ const b=$id(id); if(b) b.onclick=drvOldMode; });
+
 
 function drvPaintStatus(st){
   const on = st === "online" || st === "busy";
@@ -678,6 +678,7 @@ auth.onAuthStateChanged(async (user)=>{
       alert("আপনার অ্যাকাউন্টটি ব্লক করা আছে অথবা প্রোফাইল পাওয়া যায়নি।");
       await auth.signOut(); drvToLogin(); return;
     }
+    if(snap.data().createdByAgent === true){ location.replace("shop-ledger-app.html"); return; } // এজেন্টের খোলা অ্যাকাউন্ট → পুরনো অ্যাপ
     DRV.uid = user.uid; DRV.data = snap.data();
     drvFill();
     drvPostDefaults();
