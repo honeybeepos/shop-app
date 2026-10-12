@@ -111,19 +111,6 @@
     <label>পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
     <input type="password" id="pvPass" placeholder="••••••••">
 
-    <label>গাড়ির ধরন</label>
-    <select id="pvVehicleType">
-      <option value="bike">🏍️ বাইক</option>
-      <option value="cng">🛺 CNG / অটো রিকশা</option>
-      <option value="easy_bike">🛺✨ ইজি বাইক</option>
-      <option value="sedan">🚗 সেডান / প্রাইভেট কার</option>
-      <option value="hiace">🚐 হাইএস</option>
-      <option value="microbus">🚐 মাইক্রোবাস</option>
-      <option value="pickup">🛻 পিকআপ / ট্রাক</option>
-      <option value="ambulance_ac">🚑 অ্যাম্বুলেন্স (AC)</option>
-      <option value="ambulance_non_ac">🚑 অ্যাম্বুলেন্স (Non-AC)</option>
-      <option value="ambulance_icu">🚑 অ্যাম্বুলেন্স (ICU)</option>
-    </select>
     <label>গাড়ির মডেল (ঐচ্ছিক)</label>
     <input type="text" id="pvVehicleModel" placeholder="যেমনঃ Toyota Hiace 2018">
     <label>রেজিস্ট্রেশন নম্বর (ঐচ্ছিক)</label>
@@ -145,7 +132,7 @@
     <select id="pvUpazila" disabled><option value="">-- আগে জেলা নির্বাচন করুন --</option></select>
     <label>বাজার/এলাকা</label>
     <select id="pvMarket" disabled><option value="">-- আগে উপজেলা নির্বাচন করুন --</option></select>
-    <label>আপনার এজেন্ট (ঐচ্ছিক)</label>
+    <label>আপনার এজেন্ট <span style="color:#b91c1c">*</span></label>
     <select id="pvAgent" disabled><option value="">-- আগে বাজার নির্বাচন করুন --</option></select>
 
     <button class="btn" id="providerSignupBtn">✅ নিবন্ধন করুন</button>
@@ -421,11 +408,11 @@ document.getElementById("pvMarket").addEventListener("change", async (e)=>{
   try{
     const qs = await db.collection("agents").where("marketId","==",marketId).where("status","==","active").get();
     if(qs.empty){
-      agentSel.innerHTML = '<option value="">এই বাজারে এখনো কোনো এজেন্ট নেই (ঐচ্ছিক, খালি রাখতে পারেন)</option>';
+      agentSel.innerHTML = '<option value="">⚠️ এই বাজারে এখনো কোনো এজেন্ট নেই</option>';
       agentSel.disabled = true;
       return;
     }
-    agentSel.innerHTML = '<option value="">-- এজেন্ট নির্বাচন করুন (ঐচ্ছিক) --</option>' +
+    agentSel.innerHTML = '<option value="">-- এজেন্ট নির্বাচন করুন --</option>' +
       qs.docs.map(d=> `<option value="${d.id}">${d.data().name || d.id}</option>`).join("");
     agentSel.disabled = false;
   }catch(e){
@@ -441,7 +428,7 @@ document.getElementById("providerSignupBtn").addEventListener("click", async ()=
   const assignedAgentId = document.getElementById("pvAgent").value || null;
   const district = document.getElementById("pvDistrict").value;
   const upazila = document.getElementById("pvUpazila").value;
-  const vehicleType = document.getElementById("pvVehicleType").value;
+  const vehicleType = null; // 🚗 নিবন্ধনে আর জিজ্ঞেস করা হয় না — ড্রাইভার অ্যাপের "আমার গাড়ি" থেকে বেছে নেন
   const vehicleModel = document.getElementById("pvVehicleModel").value.trim();
   const vehicleReg = document.getElementById("pvVehicleReg").value.trim();
   const vehicleColor = document.getElementById("pvVehicleColor").value.trim();
@@ -452,6 +439,10 @@ document.getElementById("providerSignupBtn").addEventListener("click", async ()=
   }
   if(!marketId){
     showMsg("providerMsg","জেলা, উপজেলা ও বাজার/এলাকা নির্বাচন করুন।",false); return;
+  }
+  // 🧑‍💼 এজেন্ট বাধ্যতামূলক — এজেন্টই ড্রাইভার যাচাই করেন, তাই এজেন্ট ছাড়া নিবন্ধন হয় না
+  if(!assignedAgentId){
+    showMsg("providerMsg","আপনার এজেন্ট নির্বাচন করুন। এই বাজারে এজেন্ট না থাকলে কাছের অন্য বাজার বেছে নিন।",false); return;
   }
 
   const btn = document.getElementById("providerSignupBtn");
