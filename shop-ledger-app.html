@@ -1976,7 +1976,7 @@ window.hbLoadLib = function(name){
           <div>
             <label>ধরন</label>
             <div class="status-group" id="qsTypeGroup">
-              <div class="status-chip active" data-s="নগদ-বিক্রি">নগদ বিক্রি</div>
+              <div class="status-chip" data-s="নগদ-বিক্রি">নগদ বিক্রি</div>
               <div class="status-chip" data-s="বাকি">বাকি</div>
             </div>
           </div>
@@ -2054,7 +2054,7 @@ window.hbLoadLib = function(name){
           <div>
             <label>ধরন</label>
             <div class="status-group" id="esTypeGroup">
-              <div class="status-chip active" data-s="নগদ-বিক্রি">নগদ বিক্রি</div>
+              <div class="status-chip" data-s="নগদ-বিক্রি">নগদ বিক্রি</div>
               <div class="status-chip" data-s="বাকি">বাকি</div>
             </div>
           </div>
@@ -14060,8 +14060,8 @@ document.querySelectorAll('#customerModeGroup .status-chip').forEach(chip=>{
     if(mode !== 'new' && mode !== 'old' && creditCart.length){ creditCart = []; renderCreditCart(); }
     if(mode !== 'quick' && qsCart.length){ qsCart = []; renderQsCart(); }
     if(mode !== 'extrasale' && esCart.length){ esCart = []; renderEsCart(); }
-    if(mode !== 'quick'){ qsCustPicker.reset(); const qsCash = document.querySelector('#qsTypeGroup .status-chip[data-s="নগদ-বিক্রি"]'); if(qsCash) qsCash.click(); }
-    if(mode !== 'extrasale'){ esCustPicker.reset(); const esCash = document.querySelector('#esTypeGroup .status-chip[data-s="নগদ-বিক্রি"]'); if(esCash) esCash.click(); }
+    if(mode !== 'quick'){ qsCustPicker.reset(); hbClearSaleType('qsTypeGroup'); }
+    if(mode !== 'extrasale'){ esCustPicker.reset(); hbClearSaleType('esTypeGroup'); }
 
     if(mode === 'old') renderOldCustList('');
     updateCustDueInfo();
@@ -15174,7 +15174,8 @@ function resumeHeldCart(id){
     document.querySelector('#customerModeGroup .status-chip[data-m="quick"]').click();
     const hasCust = hc.customer && hc.customer !== 'General Customer';
     qsCustPicker.setSelected(hasCust ? { name: hc.customer, phone: hc.customerPhone||'' } : null);
-    const typeChip = document.querySelector(`#qsTypeGroup .status-chip[data-s="${hc.status}"]`);
+    hbClearSaleType('qsTypeGroup');
+    const typeChip = hc.status ? document.querySelector(`#qsTypeGroup .status-chip[data-s="${hc.status}"]`) : null;
     if(typeChip) typeChip.click();
     qsCart = hc.items.slice();
     renderQsCart();
@@ -15182,7 +15183,8 @@ function resumeHeldCart(id){
     document.querySelector('#customerModeGroup .status-chip[data-m="extrasale"]').click();
     const hasCust = hc.customer && hc.customer !== 'General Customer';
     esCustPicker.setSelected(hasCust ? { name: hc.customer, phone: hc.customerPhone||'' } : null);
-    const typeChip = document.querySelector(`#esTypeGroup .status-chip[data-s="${hc.status}"]`);
+    hbClearSaleType('esTypeGroup');
+    const typeChip = hc.status ? document.querySelector(`#esTypeGroup .status-chip[data-s="${hc.status}"]`) : null;
     if(typeChip) typeChip.click();
     esCart = hc.items.slice();
     renderEsCart();
@@ -15226,7 +15228,7 @@ document.getElementById('qsHoldBtn').addEventListener('click', ()=>{
   if(!qsCart.length){ toast('তালিকায় কোনো আইটেম নেই — হোল্ড করার কিছু নেই'); return; }
   const sel = qsCustPicker.getSelected();
   const customerName = sel && sel.name ? sel.name : 'General Customer';
-  const status = document.querySelector('#qsTypeGroup .status-chip.active')?.dataset.s || 'নগদ-বিক্রি';
+  const status = document.querySelector('#qsTypeGroup .status-chip.active')?.dataset.s || '';
   heldCarts.push({
     id: Date.now(),
     cartType: 'quick',
@@ -15247,7 +15249,7 @@ document.getElementById('esHoldBtn').addEventListener('click', ()=>{
   if(!esCart.length){ toast('তালিকায় কোনো আইটেম নেই — হোল্ড করার কিছু নেই'); return; }
   const sel = esCustPicker.getSelected();
   const customerName = sel && sel.name ? sel.name : 'General Customer';
-  const status = document.querySelector('#esTypeGroup .status-chip.active')?.dataset.s || 'নগদ-বিক্রি';
+  const status = document.querySelector('#esTypeGroup .status-chip.active')?.dataset.s || '';
   heldCarts.push({
     id: Date.now(),
     cartType: 'extrasale',
@@ -15900,7 +15902,18 @@ document.getElementById('addCustomerOnlyBtn').addEventListener('click', async ()
   }
 });
 
+/* 🟢🔴 নগদ না বাকি — আগে থেকে কিছু বাছা থাকে না (অক্টোবর ২০২৬)। প্রতিটা বিক্রিতে
+   দোকানদারকে নিজে বেছে নিতে হয়, যাতে ভুল করে বাকির বিক্রি নগদে না চলে যায়। */
+function hbClearSaleType(groupId){ document.querySelectorAll('#'+groupId+' .status-chip').forEach(c=>c.classList.remove('active')); }
+function hbNeedSaleType(groupId){
+  if(document.querySelector('#'+groupId+' .status-chip.active')) return false;
+  toast('⚠️ আগে "নগদ বিক্রি" না "বাকি" — একটা বেছে নিন');
+  const g=document.getElementById(groupId);
+  if(g){ g.scrollIntoView({behavior:'smooth',block:'center'}); g.style.outline='2px solid #ef4444'; g.style.borderRadius='12px'; setTimeout(()=>{ g.style.outline=''; },1800); }
+  return true;
+}
 document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
+  if(hbNeedSaleType('qsTypeGroup')) return;
   const pendingItem = document.getElementById('qsItem').value.trim();
   if(pendingItem){
     const line = readCartLineFromFields('qsItem','qsQty','qsCost','qsPrice');
@@ -15974,7 +15987,7 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
     renderQsCart();
     resetLineFields('qsItem','qsQty','qsCost','qsPrice','qsTotalPreview');
     qsCustPicker.reset();
-    document.querySelector('#qsTypeGroup .status-chip[data-s="নগদ-বিক্রি"]').click();
+    hbClearSaleType('qsTypeGroup');
 
     await persistData();
     render();
@@ -15999,6 +16012,7 @@ document.getElementById('quickSellBtn').addEventListener('click', async ()=>{
 });
 
 document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
+  if(hbNeedSaleType('esTypeGroup')) return;
   const pendingItem = document.getElementById('esItem').value.trim();
   if(pendingItem){
     const line = readEsCartLine();
@@ -16094,7 +16108,7 @@ document.getElementById('extraSaleBtn').addEventListener('click', async ()=>{
   document.getElementById('esQty').value = '1';
   updateTotalPreview('esQty','esPrice','esTotalPreview');
   esCustPicker.reset();
-  document.querySelector('#esTypeGroup .status-chip[data-s="নগদ-বিক্রি"]').click();
+  hbClearSaleType('esTypeGroup');
 
   await persistData();
   render();
