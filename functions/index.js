@@ -2948,7 +2948,8 @@ exports.panchangDailyReminder = onSchedule("every 60 minutes", async () => {
    টোকেন: চালক → transportDrivers/{uid}.fcmToken, যাত্রী → customers/{uid}.fcmToken
    ⚠️ আগের নোটিফিকেশন ফাংশনগুলো ছোঁয়া হয়নি — এটা সম্পূর্ণ আলাদা। */
 const TM_DRIVER_URL = `${APP_DOMAIN}/honey-bee-driver.html#bookings`;
-const TM_PASSENGER_URL = `${APP_DOMAIN}/honey-bee-transport.html?page=bookings`;
+// যাত্রী Bazar-এর ভিতরেই Transport Media ব্যবহার করেন — তাই নোটিফিকেশনে চাপ দিলে Bazar খুলে সরাসরি "আমার বুকিং"
+const TM_PASSENGER_URL = `${APP_DOMAIN}/honey-bee-bazar.html?screen=tmbookings`;
 
 async function tmPush(col, uid, title, body, data, link, withActions) {
   try {
@@ -2957,15 +2958,12 @@ async function tmPush(col, uid, title, body, data, link, withActions) {
     if (!token) return false;
     // withActions — শুধু data পাঠানো হয়, যাতে firebase-messaging-sw.js নিজে
     // "✅ গ্রহণ করুন / ❌ বাতিল করুন" বোতামসহ নোটিফিকেশন দেখাতে পারে
-    await getMessaging().send(withActions ? {
+    // সবসময় শুধু data পাঠানো হয় — firebase-messaging-sw.js নিজে নোটিফিকেশন দেখায়,
+    // তাই ডাবল নোটিফিকেশন হয় না আর চাপ দিলে ঠিক পাতাটাই খোলে
+    await getMessaging().send({
       token,
-      data: Object.assign({}, data, { link, title, body, actions: "1" }),
+      data: Object.assign({}, data, { link, title, body }, withActions ? { actions: "1" } : {}),
       webpush: { headers: { Urgency: "high" } },
-    } : {
-      token,
-      notification: { title, body },
-      data: Object.assign({}, data, { link }),
-      webpush: { fcmOptions: { link } },
     });
     return true;
   } catch (e) {
@@ -2998,9 +2996,10 @@ exports.onTransportBookingNotify = onDocumentWritten("transportBookings/{bid}", 
       `${after.passengerName || "যাত্রী"} — ${route}`, dData, TM_DRIVER_URL);
     return;
   }
+  const drv = after.driverName || "চালক";
   const msg = {
-    accepted: ["✅ চালক আপনার বুকিং গ্রহণ করেছেন", `${route} — চালক ${after.driverName || ""} শিগগিরই কল করবেন।`],
-    declined: ["❌ চালক এই বুকিং নিতে পারছেন না", `${route} — অন্য গাড়ি দেখুন।`],
+    accepted: [`✅ ${drv} আপনার বুকিং গ্রহণ করেছেন`, `${route} (${what}) — চালক শিগগিরই কল করবেন। চাপ দিয়ে দেখুন।`],
+    declined: [`❌ ${drv} আপনার বুকিং বাতিল করেছেন`, `${route} — এই গাড়ি এখন নিতে পারছে না। চাপ দিয়ে অন্য গাড়ি দেখুন।`],
     completed: ["🏁 যাত্রা শেষ — চালককে রেটিং দিন", `${route} — আপনার মতামত অন্য যাত্রীদের সাহায্য করবে।`],
   }[after.status];
   if (msg) await tmPush("customers", after.passengerId, msg[0], msg[1], pData, TM_PASSENGER_URL);
