@@ -601,10 +601,31 @@ async function sendBooking(){
   btn.disabled=false; btn.textContent='📨 বুকিং অনুরোধ পাঠান';
 }
 const BK_LABEL={pending:'⏳ চালকের উত্তরের অপেক্ষা',accepted:'✅ চালক গ্রহণ করেছেন',declined:'❌ চালক নিতে পারছেন না',cancelled:'✕ আপনি বাতিল করেছেন',completed:'🏁 যাত্রা শেষ'};
+/* 🔔 অ্যাপ খোলা থাকা অবস্থায় চালক গ্রহণ/বাতিল করলে সাথে সাথে জানানো
+   (অ্যাপ বন্ধ/পেছনে থাকলে functions থেকে পুশ নোটিফিকেশন যায়) */
+let __bkPrev=null;
+function hbBkStatusAlert(list){
+  const now={}; list.forEach(b=>now[b.id]=b.status);
+  if(__bkPrev){
+    list.forEach(b=>{
+      const was=__bkPrev[b.id]; if(!was||was===b.status) return;
+      const drv=b.driverName||'চালক', route=`${b.from||''} → ${b.to||''}`;
+      const m=b.status==='accepted'?[`✅ ${drv} আপনার বুকিং গ্রহণ করেছেন`,`${route} — চালক শিগগিরই কল করবেন।`]
+             :b.status==='declined'?[`❌ ${drv} আপনার বুকিং বাতিল করেছেন`,`${route} — অন্য গাড়ি দেখুন।`]
+             :b.status==='completed'?['🏁 যাত্রা শেষ — চালককে রেটিং দিন',route]:null;
+      if(!m) return;
+      toast(m[0]); if(navigator.vibrate) navigator.vibrate([200,100,200]);
+      if(document.visibilityState!=='visible') try{ navigator.serviceWorker&&navigator.serviceWorker.getRegistration('firebase-messaging-sw.js').then(r=>r&&r.showNotification(m[0],{body:m[1],icon:'icon-192.png',tag:'honeybee-tm-booking-passenger-'+b.id,data:{type:'tm-booking-passenger',bookingId:b.id,link:'honey-bee-bazar.html?screen=tmbookings'}})); }catch(e){}
+      if(b.status!=='completed') try{ showPage('bookingsPage'); }catch(e){}
+    });
+  }
+  __bkPrev=now;
+}
 function listenMyBookings(uid){
   if(__myBkUnsub) __myBkUnsub();
   __myBkUnsub=db.collection('transportBookings').where('passengerId','==',uid).limit(30).onSnapshot(qs=>{
     const list=qs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toMillis&&b.createdAt.toMillis())||Date.now())-((a.createdAt&&a.createdAt.toMillis&&a.createdAt.toMillis())||Date.now()));
+    hbBkStatusAlert(list);
     const E=hbEsc, el=document.getElementById('myBookings');
     el.innerHTML=list.length?list.map(b=>{
       const ph=String(b.driverPhone||'').replace(/[^0-9+]/g,''), live=b.status==='pending'||b.status==='accepted';

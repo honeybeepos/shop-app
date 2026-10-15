@@ -72,7 +72,9 @@ self.addEventListener("notificationclick", (event) => {
     link = new URL("honey-bee-driver.html?bk=" + encodeURIComponent(bid) + "&act=" + event.action + "#bookings", self.registration.scope).href;
   }
   if (link && (type === "tm-booking-driver" || type === "tm-booking-passenger")) {
-    const file = type === "tm-booking-driver" ? "honey-bee-driver.html" : "honey-bee-transport.html";
+    // যে অ্যাপের ঠিকানা (চালক → honey-bee-driver.html, যাত্রী → honey-bee-bazar.html), সেই উইন্ডো খোলা থাকলে সেটাতেই যায়
+    let file = type === "tm-booking-driver" ? "honey-bee-driver.html" : "honey-bee-bazar.html";
+    try { file = new URL(link, self.registration.scope).pathname.split("/").pop() || file; } catch (e) {}
     event.waitUntil(
       clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
         for (const c of list) {

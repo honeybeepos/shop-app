@@ -11143,7 +11143,7 @@ function hbCloseCart(){
 (function hbHandleShortcut(){
   let which = null;
   try{ which = new URLSearchParams(location.search).get("screen"); }catch(e){ return; }
-  if(which !== "cart" && which !== "orders") return;
+  if(which !== "cart" && which !== "orders" && which !== "tmbookings") return;
 
   const go = function(){
     // ঠিকানাটা পরিষ্কার করে দেওয়া হচ্ছে, নাহলে পরে রিফ্রেশ করলে
@@ -11151,6 +11151,13 @@ function hbCloseCart(){
     try{ history.replaceState(null, "", location.pathname); }catch(e){}
     if(which === "cart" && typeof hbOpenCart === "function") hbOpenCart();
     else if(which === "orders" && typeof hbOpenOrderTracking === "function") hbOpenOrderTracking();
+    else if(which === "tmbookings"){
+      // 🎫 চালক বুকিং গ্রহণ/বাতিল করলে যাত্রীর নোটিফিকেশন → সরাসরি Transport Media-র "আমার বুকিং"
+      const f = document.getElementById("hbTransportFrame");
+      if(f) f.setAttribute("src", "honey-bee-transport.html?page=bookings");
+      showScreen("screenTransportMedia");
+      try{ history.pushState({ hbScreen: "tmBookings" }, "", location.href); }catch(e){}
+    }
   };
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", go);
   else go();
