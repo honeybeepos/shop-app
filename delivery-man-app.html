@@ -594,6 +594,7 @@ function startApp(){
   listenForJobs();
   loadTodayStats();
   refreshPushUi();
+  riderPushSilentRefresh();
 }
 
 /* ════════ 🟢 ডিউটি অন/অফ ════════ */
@@ -951,6 +952,18 @@ const VAPID_KEY = "BCEdpLGNUIBG2IW9lTVGcaM7qbFrbaEnGg9N1CYGNCojCVUIruqqcWP4cdX3Y
 let messaging = null;
 try{ messaging = firebase.messaging.isSupported() ? firebase.messaging() : null; }catch(e){ messaging = null; }
 
+/* 🔄 আগে চালু করা থাকলে নিঃশব্দে টোকেন আর "কোন অ্যাপ" নতুন করে লেখা হয় —
+   যাতে নোটিফিকেশনে চাপ দিলে এই রাইডার অ্যাপটাই খোলে */
+async function riderPushSilentRefresh(){
+  try{
+    if(!messaging || !RIDER || Notification.permission !== "granted") return;
+    const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+    if(!token) return;
+    await db.collection("riders").doc(RIDER.uid).update({ fcmToken: token, fcmUpdatedAt: fbNow(), fcmApp: "delivery-man-app.html" });
+    localStorage.setItem("hb-rider-fcm", token);
+  }catch(e){}
+}
 function refreshPushUi(){
   const desc = $("pushDesc"), btn = $("enablePushBtn");
   if(!messaging || !("Notification" in window)){
@@ -977,7 +990,7 @@ $("enablePushBtn").addEventListener("click", async ()=>{
     const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
     const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
     if(!token) throw new Error("টোকেন পাওয়া যায়নি");
-    await db.collection("riders").doc(RIDER.uid).update({ fcmToken: token, fcmUpdatedAt: fbNow() });
+    await db.collection("riders").doc(RIDER.uid).update({ fcmToken: token, fcmUpdatedAt: fbNow(), fcmApp: "delivery-man-app.html" });
     localStorage.setItem("hb-rider-fcm", token);
     refreshPushUi();
     toast("🔔 চালু হয়েছে");
@@ -993,7 +1006,7 @@ $("enablePushBtn").addEventListener("click", async ()=>{
 if(messaging){
   try{
     messaging.onMessage((p)=>{
-      const body = (p && p.notification && p.notification.body) || "নতুন অর্ডার এসেছে।";
+      const body = (p && p.notification && p.notification.body) || (p && p.data && (p.data.title ? p.data.title + " — " + (p.data.body || "") : p.data.body)) || "নতুন অর্ডার এসেছে।";
       beep(); toast(body); addNotif(body);
     });
   }catch(e){}

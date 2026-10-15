@@ -7324,6 +7324,77 @@ let __ordNotifFirstLoad = true;
 
 let __ordPendingOrders = []; // 🔔 বেল-এ ক্লিক করলে সরাসরি দেখানোর জন্য সবশেষ পেন্ডিং তালিকা মনে রাখা হয়
 
+
+/* ==================== 🔔 দোকানের পুশ নোটিফিকেশন (অক্টোবর ২০২৬) ====================
+   অ্যাপ বন্ধ থাকলেও দোকানের ফোনে খবর আসে: নতুন অর্ডার, রাইডার অর্ডার নিয়েছেন,
+   রাইডার পাওয়া যায়নি, মাল তুলে নিয়েছেন, পৌঁছে গেছে, "রাইডার ডাকুন"-এ সাড়া।
+   প্রতিটা ডিভাইসের টোকেন shops/{shopId}/pushTokens/{uid}-এ থাকে (মালিক + স্টাফ
+   সবাই পান)। পাঠায় functions/index.js-এর onOrderPushHub / onDeliveryCallAnswered। */
+let __shopPushOn = false;
+async function shopPushSetup(ask){
+  try{
+    const se = (typeof getSession === 'function') ? getSession() : null;
+    if(!se || !se.shopId || !se.uid) return false;
+    if(!("Notification" in window) || !("serviceWorker" in navigator) || !firebase.messaging) return false;
+    let perm = Notification.permission;
+    if(perm === "default" && ask) perm = await Notification.requestPermission();
+    if(perm !== "granted"){ shopPushBanner(perm === "default"); return false; }
+    const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({ vapidKey: RM_FCM_VAPID_KEY, serviceWorkerRegistration: reg });
+    if(!token) return false;
+    await db.collection("shops").doc(se.shopId).collection("pushTokens").doc(se.uid)
+      .set({ token, uid: se.uid, role: se.role || null, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    shopPushBanner(false);
+    if(!__shopPushOn){
+      __shopPushOn = true;
+      // অ্যাপ খোলা থাকলে পুশ ফোনের উপরে আসে না — তাই এখানেই শব্দ + লেখা
+      messaging.onMessage((p)=>{
+        const d = (p && p.data) || {};
+        if(!d.type || d.type.indexOf("shop-") !== 0) return;
+        if(d.type !== "shop-new-order" && typeof playBeeAlert === "function") playBeeAlert(); // নতুন অর্ডারে নিজের লিসেনার আগেই বাজায়
+        if(d.type !== "shop-new-order" && typeof toast === "function") toast((d.title || "🔔") + (d.body ? " — " + d.body : ""));
+      });
+    }
+    return true;
+  }catch(e){ console.warn("shop push setup:", e && (e.code || e.message)); return false; }
+}
+function shopPushBanner(show){
+  let el = document.getElementById("shopPushBanner");
+  if(!show){ if(el) el.remove(); return; }
+  try{ if(localStorage.getItem("hbShopPushLater") === new Date().toDateString()) return; }catch(e){}
+  if(el) return;
+  el = document.createElement("div");
+  el.id = "shopPushBanner";
+  el.style.cssText = "position:fixed;left:10px;right:10px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:9000;background:#fff7d6;border:1.5px solid #f2c94c;border-radius:14px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.18);display:flex;gap:8px;align-items:center;font-size:13px;color:#4a3500;max-width:520px;margin:auto";
+  el.innerHTML = '<div style="flex:1"><b>🔔 অ্যাপ বন্ধ থাকলেও খবর পান</b><br>নতুন অর্ডার, রাইডারের খবর — ফোনের উপরে নোটিফিকেশন আসবে।</div>'
+    + '<button type="button" id="shopPushYes" style="background:#f2b705;border:0;border-radius:10px;padding:9px 12px;font-weight:800;color:#2b1d00">চালু করুন</button>'
+    + '<button type="button" id="shopPushNo" style="background:transparent;border:0;font-size:18px;color:#7a5c00">✕</button>';
+  document.body.appendChild(el);
+  document.getElementById("shopPushYes").onclick = async ()=>{
+    const ok = await shopPushSetup(true);
+    if(typeof toast === "function") toast(ok ? "🔔 নোটিফিকেশন চালু হয়েছে" : (Notification.permission === "denied" ? "⚠️ ব্রাউজারে নোটিফিকেশন বন্ধ করা — ঠিকানার পাশের 🔒 চিহ্ন থেকে Allow করুন" : "চালু করা যায়নি"));
+    if(Notification.permission === "denied") shopPushBanner(false);
+  };
+  document.getElementById("shopPushNo").onclick = ()=>{ try{ localStorage.setItem("hbShopPushLater", new Date().toDateString()); }catch(e){} shopPushBanner(false); };
+}
+// POS আগে থেকেই খোলা থাকলে পাতা রিলোড হয় না — service worker খবর পাঠায়, এখানে বেল খোলা হয়
+try{
+  navigator.serviceWorker && navigator.serviceWorker.addEventListener("message", (ev)=>{
+    const d = ev.data && ev.data.hbPushOpen;
+    if(!d || !d.type || String(d.type).indexOf("shop-") !== 0) return;
+    const bb = document.getElementById("ordBellBtn"); if(bb) bb.click();
+  });
+}catch(e){}
+// নোটিফিকেশনে চাপ দিলে ?open=orders দিয়ে আসে → সরাসরি নতুন অর্ডারের তালিকা
+function shopPushDeepLink(){
+  try{
+    if(new URLSearchParams(location.search).get("open") !== "orders") return;
+    history.replaceState(null, "", location.pathname);
+    setTimeout(()=>{ const bb = document.getElementById("ordBellBtn"); if(bb) bb.click(); }, 600);
+  }catch(e){}
+}
+
 function ordStartNotificationListener(){
   const session = (typeof getSession === 'function') ? getSession() : null;
   if(!session || !session.shopId || __ordNotifUnsub) return;
@@ -21910,15 +21981,16 @@ async function rmSetupFcm(riderUid){
     const messaging = firebase.messaging();
     const token = await messaging.getToken({ vapidKey: RM_FCM_VAPID_KEY, serviceWorkerRegistration: registration });
     if(token){
-      await db.collection("riders").doc(riderUid).update({ fcmToken: token });
+      await db.collection("riders").doc(riderUid).update({ fcmToken: token, fcmApp: "shop-ledger-app.html" });
     }
 
     // অ্যাপ খোলা থাকা অবস্থায় ফোরগ্রাউন্ডে পুশ এলে (ব্যাকগ্রাউন্ড হ্যান্ডলার
     // ফোরগ্রাউন্ডে চলে না) — Bee Alert শব্দ + একটা সাধারণ browser notification
     messaging.onMessage((payload)=>{
       if(typeof playBeeAlert === "function") playBeeAlert();
-      const title = (payload.notification && payload.notification.title) || "🚚 নতুন Delivery Order";
-      const body = (payload.notification && payload.notification.body) || "";
+      const pd = payload.data || {};
+      const title = (payload.notification && payload.notification.title) || pd.title || "🚚 নতুন Delivery Order";
+      const body = (payload.notification && payload.notification.body) || pd.body || "";
       try{ new Notification(title, { body, icon: "icon-192.png" }); }catch(e){}
     });
   }catch(e){
@@ -22983,6 +23055,7 @@ auth.onAuthStateChanged(async (user)=>{
   applyRoleRestrictions(session.role);
   initBackButtonHandling();
   if(typeof ordStartNotificationListener === 'function') ordStartNotificationListener();
+  if(typeof shopPushSetup === 'function'){ shopPushSetup(false); shopPushDeepLink(); }
 
   document.getElementById("authGate").style.display = "none";
   loadSystemData();

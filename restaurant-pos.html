@@ -1312,7 +1312,12 @@ async function ooSetupPush(){
               .set({ fcmToken: token, fcmUpdatedAt: fbNow() }, { merge:true });
     }
     // অ্যাপ খোলা থাকলে ব্যাকগ্রাউন্ড হ্যান্ডলার চলে না — তাই এখানে শব্দ
-    messaging.onMessage(function(){ ooPlayChime(); });
+    messaging.onMessage(function(p){
+      ooPlayChime();
+      // রাইডার অর্ডার নিয়েছেন / মাল তুলেছেন / পৌঁছে গেছে — খোলা অ্যাপেও লেখা দেখানো
+      const d = (p && p.data) || {};
+      if(d.title && typeof toastRP === "function") toastRP(d.title + (d.body ? " — " + d.body : ""));
+    });
   }catch(e){
     console.warn("push setup:", e && (e.code || e.message));
   }

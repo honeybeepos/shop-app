@@ -37,7 +37,8 @@ messaging.onBackgroundMessage((payload) => {
   // 🔔 পঞ্জিকা রিমাইন্ডারে dateKey (যেদিনের তিথির কথা বলা হচ্ছে) tagId হিসেবে
   // যায়, নাহলে পরপর কয়েক দিনের রিমাইন্ডার একটা আরেকটাকে replace করে ফেলত
   const tagId = (payload.data && (payload.data.chatId || payload.data.offerId || payload.data.orderId || payload.data.tripId || payload.data.postId || payload.data.bookingId || payload.data.dateKey)) || "general";
-  const tag = `honeybee-${type}-${tagId}`;
+  // 🔔 অর্ডার-খবরের পুশ হাব নিজের tag পাঠায় (একই রসিদের খবর একটাই নোটিফিকেশনে থাকে)
+  const tag = (payload.data && payload.data.tag) ? `honeybee-${payload.data.tag}` : `honeybee-${type}-${tagId}`;
 
   // 🔕 মেসেজ/মন্তব্যের মতো হালকা নোটিফিকেশন নিজে থেকেই কিছুক্ষণ পর সরে
   // যাক — শুধু ডেলিভারি-কল আর ট্রিপ-কনফার্মের মতো সরাসরি অ্যাকশন-দরকার
@@ -71,14 +72,23 @@ self.addEventListener("notificationclick", (event) => {
   if (type === "tm-booking-driver" && bid && (event.action === "accept" || event.action === "decline")) {
     link = new URL("honey-bee-driver.html?bk=" + encodeURIComponent(bid) + "&act=" + event.action + "#bookings", self.registration.scope).href;
   }
-  if (link && (type === "tm-booking-driver" || type === "tm-booking-passenger")) {
+  // 🔗 ঠিকানা (link) সহ নোটিফিকেশন — বুকিং, আর দোকান/রেস্টুরেন্ট/রাইডারের অর্ডার-খবর —
+  //    সেই অ্যাপটাই খোলে। অ্যাপ আগে থেকে খোলা থাকলে: বুকিংয়ে পাতা বদলায়; দোকান/রাইডারে
+  //    পাতা রিলোড না করে শুধু সামনে আনে (চলতি বিক্রির হিসাব যেন না হারায়) আর খবর পাঠায়
+  const isBooking = type === "tm-booking-driver" || type === "tm-booking-passenger";
+  if (link) {
     // যে অ্যাপের ঠিকানা (চালক → honey-bee-driver.html, যাত্রী → honey-bee-bazar.html), সেই উইন্ডো খোলা থাকলে সেটাতেই যায়
     let file = type === "tm-booking-driver" ? "honey-bee-driver.html" : "honey-bee-bazar.html";
     try { file = new URL(link, self.registration.scope).pathname.split("/").pop() || file; } catch (e) {}
     event.waitUntil(
       clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
         for (const c of list) {
-          if (c.url.includes(file) && "navigate" in c) return c.navigate(link).then((w) => w && w.focus());
+          if (!c.url.includes(file)) continue;
+          if (isBooking && "navigate" in c) return c.navigate(link).then((w) => w && w.focus());
+          if (!isBooking && "focus" in c) {
+            try { c.postMessage({ hbPushOpen: event.notification.data || {} }); } catch (e) {}
+            return c.focus();
+          }
         }
         return clients.openWindow ? clients.openWindow(link) : null;
       })
