@@ -1370,15 +1370,19 @@ function normalizeAviationstackFlight(raw) {
 function flightCacheTtlMs(status) {
   switch (status) {
     case "active":
-    case "diverted": return 3 * 60 * 1000; // ৩ মিনিট
-    case "scheduled": return 20 * 60 * 1000; // ২০ মিনিট
+    case "diverted": return 10 * 60 * 1000; // ১০ মিনিট (আগে ৩) — ফ্রি প্ল্যানে মাসে মাত্র ১০০ অনুরোধ
+    case "scheduled": return 30 * 60 * 1000; // ৩০ মিনিট
     case "landed":
-    case "cancelled": return 45 * 60 * 1000; // ৪৫ মিনিট
-    default: return 10 * 60 * 1000; // unknown
+    case "cancelled": return 6 * 60 * 60 * 1000; // ৬ ঘণ্টা — আর বদলায় না
+    default: return 20 * 60 * 1000; // unknown
   }
 }
 
 exports.searchFlight = onCall({ secrets: [aviationstackApiKey] }, async (request) => {
+  // 🔒 লগইন ছাড়া না (অতিথি/anonymous-ও না) — নইলে যে কেউ বারবার ডেকে মাসের সীমা শেষ করে দিত
+  if (!request.auth || (request.auth.token && request.auth.token.firebase && request.auth.token.firebase.sign_in_provider === "anonymous")) {
+    throw new HttpsError("unauthenticated", "ফ্লাইট দেখতে আগে লগইন করুন।");
+  }
   const data = request.data || {};
   const flightNumber = normalizeFlightNumber(data.flightNumber);
   const depIata = normalizeIata(data.departureIata);
@@ -1420,7 +1424,10 @@ exports.searchFlight = onCall({ secrets: [aviationstackApiKey] }, async (request
   if (flightNumber) params.set("flight_iata", flightNumber);
   if (depIata) params.set("dep_iata", depIata);
   if (arrIata) params.set("arr_iata", arrIata);
-  if (flightDate) params.set("flight_date", flightDate); // ⚠️ AviationStack-এর কিছু প্ল্যানে date-ফিল্টার সমর্থিত না-ও হতে পারে
+  // ⚠️ flight_date মানে AviationStack-এর "পুরনো দিনের ফ্লাইট" — ফ্রি প্ল্যানে নেই। আজকের তারিখ হলে
+  //    পাঠানোই হয় না (আজকেরটা এমনিতেই আসে); অন্য তারিখে চেষ্টা করা হয়, না পারলে পরিষ্কার করে বলা হয়
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (flightDate && flightDate !== todayStr) params.set("flight_date", flightDate);
 
   let apiRes;
   try {
@@ -1446,7 +1453,17 @@ exports.searchFlight = onCall({ secrets: [aviationstackApiKey] }, async (request
     throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
   }
   if (json.error) {
-    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_API_LOGICAL_ERROR", error: json.error }));
+    const code = String((json.error && (json.error.code || json.error.type)) || "");
+    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_API_LOGICAL_ERROR", code, error: json.error }));
+    if (/usage_limit|limit_reached/i.test(code)) {
+      throw new HttpsError("resource-exhausted", "এই মাসের ফ্লাইট-তথ্যের সীমা শেষ হয়ে গেছে — নতুন মাসে আবার চালু হবে।");
+    }
+    if (/function_access_restricted|historical/i.test(code)) {
+      throw new HttpsError("failed-precondition", "অন্য দিনের ফ্লাইট দেখা এখনকার প্ল্যানে নেই — তারিখ ফাঁকা রেখে আজকের ফ্লাইট খুঁজুন।");
+    }
+    if (/invalid_access_key|missing_access_key|inactive_user/i.test(code)) {
+      throw new HttpsError("unavailable", "ফ্লাইট সার্ভিসের চাবি (API key) ঠিক নেই — অ্যাডমিনকে জানান।");
+    }
     throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
   }
 
@@ -1509,7 +1526,7 @@ function flightChangeNotificationText(flight) {
   return { title: "✈️ ফ্লাইটের তথ্য আপডেট হয়েছে", body: `${flight.flightNumber}-এর সর্বশেষ তথ্য দেখুন — Smart Flight Information-এ চেক করুন।` };
 }
 
-exports.checkWatchedFlights = onSchedule({ schedule: "every 5 minutes", secrets: [aviationstackApiKey] }, async () => {
+exports.checkWatchedFlights = onSchedule({ schedule: "every 15 minutes", secrets: [aviationstackApiKey] }, async () => { // ⏱️ আগে ৫ মিনিট — মাসের ১০০ অনুরোধ বাঁচাতে
   const apiKey = aviationstackApiKey.value();
   if (!apiKey) {
     console.warn(JSON.stringify({ event: "FLIGHT_WATCH_NO_API_KEY" }));
@@ -1549,7 +1566,7 @@ exports.checkWatchedFlights = onSchedule({ schedule: "every 5 minutes", secrets:
       }
 
       if (!normalized) {
-        const params = new URLSearchParams({ access_key: apiKey, flight_iata: flightNumber, flight_date: todayKey });
+        const params = new URLSearchParams({ access_key: apiKey, flight_iata: flightNumber }); // আজকেরটা — flight_date ফ্রি প্ল্যানে নেই
         const apiRes = await fetch(`https://api.aviationstack.com/v1/flights?${params.toString()}`);
         if (!apiRes.ok) continue;
         const json = await apiRes.json();
