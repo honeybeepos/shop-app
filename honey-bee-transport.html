@@ -233,14 +233,14 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
 #detailContent [style*="background"]{background:rgba(255,255,255,.06)!important;color:#fff8e8}
 #detailContent .rating,.rating{color:#ffd166}
 .mapbox{filter:brightness(.8)}
-.toast{background:#ffb703;color:#1a1206}
+.toast{background:#ffb703;color:#1a1206;white-space:normal!important;width:max-content;max-width:calc(100% - 32px);text-align:center;line-height:1.5;border-radius:16px!important}
 .nav button.active{color:#ffb703!important}
 </style>
 </head>
 <body>
 <div class="app">
 <header class="top">
- <div class="brandrow"><div class="brand"><div class="bee">🐝</div><div>Honey Bee<div class="subbrand">TRANSPORT · PASSENGER</div></div></div><div class="header-actions"><button class="round notification-btn" aria-label="নোটিফিকেশন" onclick="toast('নোটিফিকেশন শিগগিরই চালু হবে')">♧</button><button class="round menu-btn" aria-label="মেনু খুলুন" onclick="toggleMainMenu()" aria-expanded="false" id="mainMenuButton"><span></span><span></span><span></span></button></div></div>
+ <div class="brandrow"><div class="brand"><div class="bee">🐝</div><div>Honey Bee<div class="subbrand">TRANSPORT · PASSENGER</div></div></div><div class="header-actions"><button class="round notification-btn" aria-label="নোটিফিকেশন" onclick="showPage('bookingsPage')" title="আমার বুকিং">🔔</button><button class="round menu-btn" aria-label="মেনু খুলুন" onclick="toggleMainMenu()" aria-expanded="false" id="mainMenuButton"><span></span><span></span><span></span></button></div></div>
  
  <div class="main-menu-panel" id="mainMenuPanel" hidden>
   <button onclick="showPage('homePage');closeMainMenu()">🏠 হোম</button>
@@ -289,7 +289,11 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
 <button class="primary" id="bkSend" style="margin-top:16px" onclick="sendBooking()">📨 বুকিং অনুরোধ পাঠান</button></div></div>
 <section id="detailPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('searchPage')">‹</button><h1>গাড়ির বিস্তারিত</h1></div><div id="detailContent"></div></section>
 <section id="trackingPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('bookingsPage')">‹</button><h1>যাত্রার তথ্য</h1></div><div class="mapbox"><div class="maproute"></div><div class="maplabel a">📍 ঢাকা</div><div class="maplabel b">📍 চাঁদপুর</div></div><div class="formcard"><b>🛰️ লাইভ ট্র্যাকিং</b><p class="hint">বাস্তব GPS ট্র্যাকিং চালু করতে অ্যাপের লোকেশন অনুমতি এবং backend সংযোগ প্রয়োজন। এই প্রোটোটাইপে শুধু ডিজাইন দেখানো হচ্ছে।</p><button class="primary" onclick="toast('ডেমো: চালকের সঙ্গে যোগাযোগ')">📞 চালকের সঙ্গে যোগাযোগ</button></div></section>
-<section id="profilePage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>আমার প্রোফাইল</h1></div><div class="formcard"><div style="display:flex;align-items:center;gap:12px"><div style="width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:#fff2bf;font-size:30px">👤</div><div><b>যাত্রী প্রোফাইল</b><div class="hint">ডেমো প্রোফাইল · লগইন চালু হয়নি</div></div></div><div class="notice" style="margin:14px 0 0">📱 বুকিং, চালকের সঙ্গে যোগাযোগ ও বাস্তব যাত্রার তথ্য ব্যবহারের জন্য পরবর্তী ধাপে ফোন যাচাইকরণ যুক্ত হবে।</div><button class="primary" style="margin-top:14px" onclick="toast('ফোন যাচাইকরণ Firebase যুক্ত হলে চালু হবে')">ফোন নম্বর যাচাই করুন</button></div></section>
+<section id="profilePage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>আমার প্রোফাইল</h1></div><div class="formcard"><div style="display:flex;align-items:center;gap:12px"><div style="width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:#fff2bf;font-size:30px;flex-shrink:0">👤</div><div><b id="pfName">যাত্রী</b><div class="hint" id="pfPhone">মোবাইল নম্বর এখনো দেননি</div></div></div>
+<div class="formlabel">📱 আপনার মোবাইল নম্বর (বুকিংয়ের সময় নিজে থেকে বসবে)</div><input id="pfPhoneIn" type="tel" class="input" placeholder="01XXXXXXXXX"><button class="primary" style="margin-top:10px" onclick="hbSaveProfilePhone()">💾 সেভ করুন</button>
+<button class="input" style="margin-top:10px" onclick="showPage('bookingsPage')">🎫 আমার বুকিং দেখুন</button>
+<button class="input" style="margin-top:10px" id="pfPushBtn" onclick="hbAskPush()">🔔 বুকিংয়ের খবর ফোনে পেতে চালু করুন</button>
+<div class="notice" style="margin:14px 0 0">🔒 আপনার নম্বর চালক শুধু বুকিং গ্রহণের পরে দেখতে পান। আপনার লোকেশন কারো কাছে যায় না।</div></div></section>
 </main>
 <nav class="nav">
  <button class="active" data-page="homePage" onclick="showPage('homePage',this)"><span class="ni">⌂</span>হোম</button>
@@ -333,7 +337,7 @@ function rideCard(r){return `<article class="ride market-vehicle-card">
 
 function toggleHomeSearch(){const box=document.getElementById('homeSearchBox');const btn=document.getElementById('homeSearchToggle');const collapsed=box.classList.toggle('collapsed');btn.setAttribute('aria-expanded',String(!collapsed));}
 function render(){let list=rides.filter(r=>filtered==='সব'||r.type===filtered).filter(r=>typeof hbMatchQ!=='function'||hbMatchQ(r));document.getElementById('homeRides').innerHTML=list.slice(0,3).map(rideCard).join('')||'<div class="empty">'+(window.__ridesLoaded?'এখনো কোনো ড্রাইভারের পোস্ট নেই — ড্রাইভাররা পোস্ট করলে এখানে দেখা যাবে।':'⏳ পোস্ট আনা হচ্ছে...')+'</div>';document.getElementById('searchRides').innerHTML=list.map(rideCard).join('')||'<div class="empty">এই ধরনের গাড়ি পাওয়া যায়নি। অন্য ধরন নির্বাচন করুন।</div>';document.getElementById('postsRides').innerHTML=rides.map(rideCard).join('')||'<div class="empty">এখনো কোনো পোস্ট নেই।</div>';document.getElementById('searchSummary').textContent=`${document.getElementById('from').value} থেকে ${document.getElementById('to').value} · ${list.length}টি পোস্ট`;if(document.getElementById('bookingList'))document.getElementById('bookingList').innerHTML=bookings.length?bookings.map(b=>`<div class="ride" style="margin-bottom:10px"><div class="vehiclepic">${b.emoji||'🚘'}</div><div><b>${b.route||((b.from||'')+' → '+(b.to||''))}</b><p class="meta">${b.name||b.type||'যাত্রার অনুরোধ'} · ${b.time||b.date||'তারিখ দেওয়া হয়নি'}</p><div class="rating">${b.status||'বুকিং অনুরোধ পাঠানো হয়েছে'}</div><button class="book" onclick="showPage('trackingPage')">যাত্রার তথ্য</button></div></div>`).join(''):'<div class="empty">এখনো কোনো বুকিং নেই।<br>গন্তব্যের গাড়ি খুঁজে বুকিং দিন।</div>';const rh=null;if(rh)rh.innerHTML=requests.length?'<h3>আপনার সংরক্ষিত অনুরোধ</h3>'+requests.map(q=>`<div class="notice" style="margin:8px 0"><b>${q.from} → ${q.to}</b><br><span>${q.type} · ${q.date||'তারিখ নেই'} · ${q.count||1} জন</span><br><small>${q.status||'ডেমো অনুরোধ'}</small></div>`).join(''):''}
-function showPage(id,btn){if(id==='requestPage')id='postsPage';if(id==='homePage')window.__q=null;document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));let page=document.getElementById(id);if(page)page.classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));let navbtn=btn||document.querySelector(`.nav button[data-page="${id}"]`);if(!navbtn){const fallback=id==='requestPage'?'searchPage':(id==='detailPage'||id==='trackingPage'?'bookingsPage':'homePage');navbtn=document.querySelector(`.nav button[data-page="${fallback}"]`)}if(navbtn)navbtn.classList.add('active');if(id==='searchPage')render();window.scrollTo({top:0,behavior:'smooth'})}
+function showPage(id,btn){if(id==='requestPage')id='postsPage';if(id==='profilePage'&&typeof hbFillProfile==='function')setTimeout(hbFillProfile,0);if(id==='homePage')window.__q=null;document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));let page=document.getElementById(id);if(page)page.classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));let navbtn=btn||document.querySelector(`.nav button[data-page="${id}"]`);if(!navbtn){const fallback=id==='requestPage'?'searchPage':(id==='detailPage'||id==='trackingPage'?'bookingsPage':'homePage');navbtn=document.querySelector(`.nav button[data-page="${fallback}"]`)}if(navbtn)navbtn.classList.add('active');if(id==='searchPage')render();window.scrollTo({top:0,behavior:'smooth'})}
 function filterType(type,btn){filtered=type;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));if(btn)btn.classList.add('active');render()}
 function useCurrentLocation(){
  if(!navigator.geolocation){toast('এই ব্রাউজারে লোকেশন সুবিধা পাওয়া যাচ্ছে না');return}
@@ -371,9 +375,9 @@ function openDetail(id){
  <div class="notice">🪪 <b>রেজিস্ট্রেশন</b><br>${r.plate||'যাচাই প্রয়োজন'}</div><div class="notice">🧳 <b>ব্যাগ/লোড</b><br>${r.luggage||'চালকের সঙ্গে নিশ্চিত করুন'}</div>
  </div><p class="hint">${r.note||'চূড়ান্ত তথ্য চালকের সঙ্গে নিশ্চিত করুন।'}</p>
  <div style="background:#f7f2ff;border-radius:14px;padding:14px;margin:14px 0"><h3 style="margin:0 0 8px">👨‍✈️ চালকের পরিচিতি</h3><div style="display:flex;gap:12px;align-items:center"><div style="width:58px;height:58px;border-radius:50%;background:#e9e4ff;display:grid;place-items:center;font-size:30px">👨</div><div><b style="font-size:17px">${r.name}</b><div class="rating">★ ${r.rating} · ${r.reviews}টি রিভিউ</div><div class="meta">পরিচয় যাচাই: ${r.verified?'যাচাইকৃত':'যাচাই বাকি'}</div></div></div>
- <p style="margin:10px 0 4px"><b>চালকের বিবরণ</b></p><p class="meta">রুট: ${r.route}<br>অভিজ্ঞতা: চালকের সঙ্গে নিশ্চিত করুন<br>লাইসেন্স: ${r.verified?'যাচাই করা হয়েছে':'যাচাইয়ের তথ্য নেই'}<br>ফোন: বুকিং/যোগাযোগের সময় চালকের সম্মতিতে দেখানো হবে</p>
+ <p style="margin:10px 0 4px"><b>চালকের বিবরণ</b></p><p class="meta">রুট: ${r.route}<br>লাইসেন্স: ${r.verified?'যাচাই করা হয়েছে':'যাচাইয়ের তথ্য নেই'}</p>
  </div>
- <div class="notice" style="margin:12px 0"><h3 style="margin:0 0 8px">📅 চালকের বুকিং সূচি</h3><p style="margin:0 0 6px">আগে থেকে বুকিং থাকা তারিখ:</p>${history}<p class="hint" style="margin-bottom:0">এগুলো ডেমো সূচি। বাস্তব বুকিংয়ের তারিখ Driver App ও Firebase যুক্ত হওয়ার পর দেখা যাবে। বুকিংয়ের আগে চালককে কল করে সময় ও আসন খালি আছে কি না নিশ্চিত করুন।</p></div>
+ <div class="notice" style="margin:12px 0">🔒 নিরাপত্তা: বুকিং পাঠালে আপনার নম্বর চালক শুধু গ্রহণ করার পরেই দেখেন। আপনার লোকেশন চালকের কাছে যায় না। যাত্রার আগে চালককে কল করে সময় ও জায়গা নিশ্চিত করুন।</div>
  <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><button class="primary" onclick="callDriver('${r.id}')">📞 চালককে কল</button><button class="input" onclick="openBooking('${r.id}')">🎫 বুক করুন</button></div>
  </div>`;
  showPage('detailPage')
@@ -453,7 +457,7 @@ async function hbDriverRating(did){
 const __origOpenDetail=openDetail;
 openDetail=function(id){ __origOpenDetail(id); const r=rides.find(x=>x.id===id); if(!r) return;
   // 📷 ড্রাইভারের আসল ছবি আর গাড়ির ছবিগুলো
-  if(r.driverPhoto){ document.querySelectorAll('#detailContent div').forEach(el=>{ if(el.children.length===0 && el.textContent.trim()==='👨'){ el.innerHTML=`<img src="${r.driverPhoto}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`; } }); }
+  if(r.driverPhoto){ document.querySelectorAll('#detailContent div').forEach(el=>{ if(el.children.length===0 && el.textContent.trim()==='👨'){ el.style.overflow='hidden'; el.style.flexShrink='0'; el.innerHTML=`<img src="${r.driverPhoto}" alt="" style="width:58px;height:58px;display:block;border-radius:50%;object-fit:cover">`; } }); }
   const pics=r.photos.length?r.photos:(r.img?[r.img]:[]);
   const card=document.querySelector('#detailContent .formcard');
   if(card&&pics.length){ const g=document.createElement('div'); g.style.cssText='display:flex;gap:8px;overflow-x:auto;margin:0 0 12px';
@@ -478,9 +482,20 @@ async function hbPushSetup(col,uid,ask){
 }
 
 async function hbAskPush(){ const uid=await hbMyUid(); if(!uid) return; const ok=await hbPushSetup('customers',uid,true);
-  document.getElementById('pushBtn').style.display=ok?'none':''; toast(ok?'✅ চালু হয়েছে — বুকিংয়ের খবর ফোনে আসবে':'চালু হয়নি — ফোনের সেটিংসে নোটিফিকেশন অনুমতি দিন'); }
+  document.getElementById('pushBtn').style.display=ok?'none':''; const pf=document.getElementById('pfPushBtn'); if(pf&&ok) pf.style.display='none'; toast(ok?'✅ চালু হয়েছে — বুকিংয়ের খবর ফোনে আসবে':'চালু হয়নি — ফোনের সেটিংসে নোটিফিকেশন অনুমতি দিন'); }
 async function hbPushInit(uid){ const ok=await hbPushSetup('customers',uid,false);
   const b=document.getElementById('pushBtn'); if(b) b.style.display=(ok||!('Notification' in window)||Notification.permission==='denied')?'none':''; }
+/* 👤 যাত্রীর প্রোফাইল — Bazar-এর লগইন থাকলে নাম সেখান থেকে, নম্বর এই ফোনে সেভ থাকে */
+function hbFillProfile(){
+  const c=hbParentCustomer(); let ph=''; try{ ph=localStorage.getItem('hbPassengerPhone')||''; }catch(e){}
+  if(!ph&&c&&c.phone) ph=c.phone;
+  document.getElementById('pfName').textContent=(c&&c.name)||'যাত্রী';
+  document.getElementById('pfPhone').textContent=ph?('📱 '+ph):'মোবাইল নম্বর এখনো দেননি';
+  document.getElementById('pfPhoneIn').value=ph;
+  const pb=document.getElementById('pfPushBtn'); if(pb) pb.style.display=('Notification' in window && Notification.permission==='granted')?'none':'';
+}
+function hbSaveProfilePhone(){ const v=document.getElementById('pfPhoneIn').value.trim(); if(!/^[0-9+\s-]{6,20}$/.test(v)){ toast('সঠিক মোবাইল নম্বর লিখুন'); return; }
+  try{ localStorage.setItem('hbPassengerPhone',v); }catch(e){} const b=document.getElementById('bkPhone'); if(b) b.value=v; hbFillProfile(); toast('✅ সেভ হয়েছে'); }
 /* ==================== 🎫 সিট / গাড়ি বুকিং (Transport Media) ====================
    যাত্রী ড্রাইভারের পোস্ট দেখে বুকিং অনুরোধ পাঠান → transportBookings/{id}।
    🔒 নিরাপত্তা: যাত্রীর ফোন নম্বর আলাদা গোপন ঘরে (…/private/contact) থাকে —
