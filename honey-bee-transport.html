@@ -278,7 +278,7 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
 </section>
 <section id="searchPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>গন্তব্যের গাড়ি</h1></div><div class="section"><div class="hint" id="searchSummary"></div><div class="chips" style="margin-top:10px"><button class="chip active" onclick="filterType('সব',this)">সব</button><button class="chip" onclick="filterType('মোটরসাইকেল',this)">মোটরসাইকেল</button><button class="chip" onclick="filterType('রিকশা',this)">রিকশা</button><button class="chip" onclick="filterType('ইজিবাইক',this)">ইজিবাইক</button><button class="chip" onclick="filterType('সিএনজি',this)">সিএনজি</button><button class="chip" onclick="filterType('অ্যাম্বুলেন্স',this)">অ্যাম্বুলেন্স</button><button class="chip" onclick="filterType('পিকআপ / মালবাহী গাড়ি',this)">মালবাহী গাড়ি</button></div><div id="searchRides" class="cards"></div></div></section>
 <section id="postsPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>চালকদের যাত্রার পোস্ট</h1></div><div class="notice">ফেরার পথে খালি গাড়ি? চালকের পোস্টে রুট ও সময় দেখে বুকিং করতে পারবেন।</div><div id="postsRides" class="cards" style="padding:0 16px"></div></section>
-<section id="bookingsPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>🎫 আমার বুকিং</h1></div><div class="formcard"><div class="hint">🔒 আপনার ফোন নম্বর চালক শুধু বুকিং "গ্রহণ" করার পরেই দেখতে পান। আপনার লোকেশন কারো কাছে যায় না।</div><button class="primary" id="pushBtn" style="display:none;margin-top:10px" onclick="hbAskPush()">🔔 চালক গ্রহণ করলে ফোনে খবর পেতে চাপুন</button><div id="myBookings"><div class="empty">⏳ আনা হচ্ছে...</div></div></div></section>
+<section id="bookingsPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('homePage')">‹</button><h1>🎫 আমার বুকিং</h1></div><div class="formcard"><div class="hint">🔒 আপনার ফোন নম্বর ও লোকেশন চালক শুধু বুকিং "গ্রহণ" করার পরেই দেখতে পান — তার আগে কেউ দেখে না।</div><button class="primary" id="pushBtn" style="display:none;margin-top:10px" onclick="hbAskPush()">🔔 চালক গ্রহণ করলে ফোনে খবর পেতে চাপুন</button><div id="myBookings"><div class="empty">⏳ আনা হচ্ছে...</div></div></div></section>
 <div id="bookSheet" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.6);align-items:flex-end;justify-content:center"><div class="formcard" style="width:100%;max-width:480px;margin:0;border-radius:22px 22px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom))">
 <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">🎫 বুকিং অনুরোধ</b><button class="back" onclick="closeBooking()">✕</button></div>
 <div id="bkRoute" class="hint" style="margin:8px 0"></div>
@@ -286,6 +286,7 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
 <div class="formlabel">📱 মোবাইল নম্বর (চালক গ্রহণ করলে তবেই দেখবেন)</div><input id="bkPhone" type="tel" class="input" placeholder="01XXXXXXXXX">
 <div id="bkSeatsWrap"><div class="formlabel">কয়টা আসন? <small id="bkSeatsHint"></small></div><input id="bkSeats" type="number" min="1" value="1" class="input"></div>
 <div class="formlabel">কিছু বলার থাকলে (ঐচ্ছিক)</div><input id="bkNote" class="input" maxlength="300">
+<div class="formlabel">📍 আপনার লোকেশন (বাধ্যতামূলক — চালক গ্রহণ করলে তবেই দেখবেন)</div><div id="bkLoc" class="hint" style="border-radius:12px;padding:10px 12px;line-height:1.55">⏳ লোকেশন নেওয়া হচ্ছে…</div><button type="button" class="textbtn" id="bkLocBtn" style="padding:6px 0" onclick="hbBookLoc(true)">◎ আবার লোকেশন নিন</button>
 <button class="primary" id="bkSend" style="margin-top:16px" onclick="sendBooking()">📨 বুকিং অনুরোধ পাঠান</button></div></div>
 <section id="detailPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('searchPage')">‹</button><h1>গাড়ির বিস্তারিত</h1></div><div id="detailContent"></div></section>
 <section id="trackingPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('bookingsPage')">‹</button><h1>যাত্রার তথ্য</h1></div><div class="mapbox"><div class="maproute"></div><div class="maplabel a">📍 ঢাকা</div><div class="maplabel b">📍 চাঁদপুর</div></div><div class="formcard"><b>🛰️ লাইভ ট্র্যাকিং</b><p class="hint">বাস্তব GPS ট্র্যাকিং চালু করতে অ্যাপের লোকেশন অনুমতি এবং backend সংযোগ প্রয়োজন। এই প্রোটোটাইপে শুধু ডিজাইন দেখানো হচ্ছে।</p><button class="primary" onclick="toast('ডেমো: চালকের সঙ্গে যোগাযোগ')">📞 চালকের সঙ্গে যোগাযোগ</button></div></section>
@@ -293,7 +294,7 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
 <div class="formlabel">📱 আপনার মোবাইল নম্বর (বুকিংয়ের সময় নিজে থেকে বসবে)</div><input id="pfPhoneIn" type="tel" class="input" placeholder="01XXXXXXXXX"><button class="primary" style="margin-top:10px" onclick="hbSaveProfilePhone()">💾 সেভ করুন</button>
 <button class="input" style="margin-top:10px" onclick="showPage('bookingsPage')">🎫 আমার বুকিং দেখুন</button>
 <button class="input" style="margin-top:10px" id="pfPushBtn" onclick="hbAskPush()">🔔 বুকিংয়ের খবর ফোনে পেতে চালু করুন</button>
-<div class="notice" style="margin:14px 0 0">🔒 আপনার নম্বর চালক শুধু বুকিং গ্রহণের পরে দেখতে পান। আপনার লোকেশন কারো কাছে যায় না।</div></div></section>
+<div class="notice" style="margin:14px 0 0">🔒 আপনার নম্বর ও লোকেশন চালক শুধু বুকিং গ্রহণের পরে দেখতে পান।</div></div></section>
 </main>
 <nav class="nav">
  <button class="active" data-page="homePage" onclick="showPage('homePage',this)"><span class="ni">⌂</span>হোম</button>
@@ -548,8 +549,30 @@ async function openBooking(id){
   try{ const ph=localStorage.getItem('hbPassengerPhone'); if(ph&&!document.getElementById('bkPhone').value) document.getElementById('bkPhone').value=ph; }catch(e){}
   if(!document.getElementById('bkPhone').value&&c&&c.phone) document.getElementById('bkPhone').value=c.phone;
   document.getElementById('bookSheet').style.display='flex';
+  hbBookLoc(false);
 }
 function closeBooking(){ document.getElementById('bookSheet').style.display='none'; }
+/* 📍 বুকিংয়ে লোকেশন বাধ্যতামূলক — মোবাইলের লোকেশন বন্ধ বা অনুমতি না দিলে বুকিং যাবে না।
+   লোকেশন ফোন নম্বরের মতোই private/contact-এ থাকে: চালক "গ্রহণ" করার পরেই দেখতে পান। */
+let __bkLoc=null;
+function hbBookLocMsg(html,bad){ const el=document.getElementById('bkLoc'); if(!el) return; el.innerHTML=html; el.style.setProperty('background',bad?'rgba(239,68,68,.16)':'rgba(34,197,94,.14)','important'); el.style.setProperty('color',bad?'#fca5a5':'#86efac','important'); el.style.setProperty('border','1px solid '+(bad?'rgba(239,68,68,.5)':'rgba(34,197,94,.45)'),'important'); }
+async function hbBookLoc(force){
+  if(__bkLoc && !force && Date.now()-__bkLoc.t<5*60000){ hbBookLocMsg('✅ লোকেশন নেওয়া হয়েছে (চালক গ্রহণ করলে তবেই দেখবেন)'); return __bkLoc; }
+  if(!navigator.geolocation){ hbBookLocMsg('❌ এই ব্রাউজারে লোকেশন পাওয়া যায় না — Chrome দিয়ে খুলুন। লোকেশন ছাড়া বুকিং হবে না।',true); return null; }
+  try{ if(navigator.permissions){ const st=await navigator.permissions.query({name:'geolocation'}); if(st.state==='denied'){ hbBookLocMsg('🔒 লোকেশনের অনুমতি বন্ধ করা আছে।<br><b>চালু করুন:</b> ব্রাউজারের ঠিকানার পাশের 🔒/ⓘ চিহ্ন → <b>অনুমতি (Permissions) → লোকেশন → Allow</b>, তারপর "আবার লোকেশন নিন" চাপুন।<br>লোকেশন ছাড়া বুকিং হবে না।',true); toast('📍 লোকেশনের অনুমতি দিন — না হলে বুকিং হবে না'); return null; } } }catch(e){}
+  hbBookLocMsg('⏳ লোকেশন নেওয়া হচ্ছে…');
+  return await new Promise(res=>{
+    navigator.geolocation.getCurrentPosition(p=>{
+      __bkLoc={lat:Math.round(p.coords.latitude*1e6)/1e6,lng:Math.round(p.coords.longitude*1e6)/1e6,acc:Math.round(p.coords.accuracy||0),t:Date.now()};
+      hbBookLocMsg('✅ লোকেশন নেওয়া হয়েছে (চালক গ্রহণ করলে তবেই দেখবেন)'); res(__bkLoc);
+    },err=>{
+      __bkLoc=null;
+      if(err&&err.code===1){ hbBookLocMsg('🔒 লোকেশনের অনুমতি দেওয়া হয়নি।<br><b>চালু করুন:</b> ব্রাউজারের ঠিকানার পাশের 🔒/ⓘ চিহ্ন → <b>অনুমতি → লোকেশন → Allow</b>, তারপর "আবার লোকেশন নিন" চাপুন।<br>লোকেশন ছাড়া বুকিং হবে না।',true); toast('📍 লোকেশনের অনুমতি দিন — না হলে বুকিং হবে না'); }
+      else { hbBookLocMsg('📴 মোবাইলের লোকেশন (GPS) বন্ধ মনে হচ্ছে।<br><b>চালু করুন:</b> উপর থেকে টেনে নামিয়ে <b>📍 Location</b> চালু করুন, তারপর "আবার লোকেশন নিন" চাপুন।<br>লোকেশন ছাড়া বুকিং হবে না।',true); toast('📍 মোবাইলের লোকেশন চালু করুন — না হলে বুকিং হবে না'); }
+      res(null);
+    },{enableHighAccuracy:true,timeout:20000,maximumAge:60000});
+  });
+}
 async function sendBooking(){
   const r=__bkPost; if(!r) return;
   const name=document.getElementById('bkName').value.trim(), phone=document.getElementById('bkPhone').value.trim();
@@ -559,6 +582,7 @@ async function sendBooking(){
   if(!goods&&(seats<1||seats>r.seats)){ toast(`১ থেকে ${r.seats}টা আসন বুক করা যায়`); return; }
   const btn=document.getElementById('bkSend'); btn.disabled=true; btn.textContent='পাঠানো হচ্ছে...';
   try{
+    const loc=await hbBookLoc(true); if(!loc){ btn.disabled=false; btn.textContent='📨 বুকিং অনুরোধ পাঠান'; return; }
     const uid=await hbMyUid(); if(!uid) throw new Error('লগইন করা যায়নি — ইন্টারনেট দেখুন');
     try{ localStorage.setItem('hbPassengerPhone',phone); }catch(e){}
     hbPushSetup('customers',uid,true).then(ok=>{ const pb=document.getElementById('pushBtn'); if(pb&&ok) pb.style.display='none'; });
@@ -568,7 +592,7 @@ async function sendBooking(){
       from:hbUnesc(r.from), to:hbUnesc(r.to), when:hbUnesc(r.time), vehicleType:hbUnesc(r.type), fare:Number(r.price)||0,
       driverName:hbUnesc(r.name), driverPhone:r.phone||'', status:'pending',
       createdAt:firebase.firestore.FieldValue.serverTimestamp(), updatedAt:firebase.firestore.FieldValue.serverTimestamp() });
-    b.set(ref.collection('private').doc('contact'),{ phone, passengerId:uid });
+    b.set(ref.collection('private').doc('contact'),{ phone, passengerId:uid, lat:loc.lat, lng:loc.lng, acc:loc.acc, locAt:firebase.firestore.FieldValue.serverTimestamp() });
     await b.commit();
     closeBooking(); document.getElementById('bkNote').value='';
     toast('✅ বুকিং অনুরোধ গেছে — চালক গ্রহণ করলে এখানে জানাবে');

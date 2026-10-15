@@ -23,8 +23,11 @@ const messaging = firebase.messaging();
 // অ্যাপ ব্যাকগ্রাউন্ডে/বন্ধ থাকা অবস্থায় পুশ আসলে এখানে হ্যান্ডেল হয়
 messaging.onBackgroundMessage((payload) => {
   const type = (payload.data && payload.data.type) || "delivery-offer";
-  const title = (payload.notification && payload.notification.title) || "🔔 দোকান থেকে ডাকছে!";
-  const body = (payload.notification && payload.notification.body) || "নতুন ডেলিভারি অর্ডার আছে — দোকানে যোগাযোগ করুন।";
+  const title = (payload.notification && payload.notification.title) || (payload.data && payload.data.title) || "🔔 দোকান থেকে ডাকছে!";
+  const body = (payload.notification && payload.notification.body) || (payload.data && payload.data.body) || "নতুন ডেলিভারি অর্ডার আছে — দোকানে যোগাযোগ করুন।";
+  // 🎫 চালকের কাছে নতুন বুকিং — নোটিফিকেশনেই "গ্রহণ / বাতিল" বোতাম
+  const actions = (type === "tm-booking-driver" && payload.data && payload.data.actions === "1")
+    ? [{ action: "accept", title: "✅ গ্রহণ করুন" }, { action: "decline", title: "❌ বাতিল করুন" }] : undefined;
 
   // 🏷️ tag আলাদা রাখা হয় টাইপ+আইডি দিয়ে — নাহলে একজন ইউজারের কাছে
   // একের-পর-এক ভিন্ন নোটিফিকেশন (যেমন দুটো ভিন্ন চ্যাটের মেসেজ) এলে
@@ -50,6 +53,7 @@ messaging.onBackgroundMessage((payload) => {
     requireInteraction: !softTypes.includes(type),
     tag,
     renotify: true,
+    actions,
     data: payload.data || {}
   });
 });
@@ -61,7 +65,12 @@ self.addEventListener("notificationclick", (event) => {
   const type = (event.notification.data && event.notification.data.type) || "delivery-offer";
   // 🎫 Transport Media বুকিং — নোটিফিকেশনে নিজের ঠিকানা (link) থাকে:
   //    চালক → honey-bee-driver.html#bookings, যাত্রী → honey-bee-transport.html?page=bookings
-  const link = event.notification.data && event.notification.data.link;
+  let link = event.notification.data && event.notification.data.link;
+  // ✅/❌ বোতাম চাপলে চালকের অ্যাপ খুলে নিজে থেকেই গ্রহণ/বাতিল করবে
+  const bid = event.notification.data && event.notification.data.bookingId;
+  if (type === "tm-booking-driver" && bid && (event.action === "accept" || event.action === "decline")) {
+    link = new URL("honey-bee-driver.html?bk=" + encodeURIComponent(bid) + "&act=" + event.action + "#bookings", self.registration.scope).href;
+  }
   if (link && (type === "tm-booking-driver" || type === "tm-booking-passenger")) {
     const file = type === "tm-booking-driver" ? "honey-bee-driver.html" : "honey-bee-transport.html";
     event.waitUntil(

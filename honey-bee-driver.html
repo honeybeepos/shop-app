@@ -471,7 +471,8 @@ function drvRenderBookings(pend,acc,old){
     +(old.length?`<div class="sub" style="margin-top:14px">আগের বুকিং</div>`+old.map(b=>drvBkCard(b,"")).join(""):"");
   // নিশ্চিত বুকিংয়ের যাত্রীর নম্বর — গ্রহণের পরেই পড়া যায়
   acc.forEach(async b=>{ try{ const c=await db.collection("transportBookings").doc(b.id).collection("private").doc("contact").get();
-    const el=$id("ph_"+b.id); if(el&&c.exists){ const ph=String(c.data().phone||"").replace(/[^0-9+]/g,""); el.innerHTML=`📞 <a href="tel:${ph}" style="color:#4ade80;font-weight:800">${esc(c.data().phone)}</a> — কল করে সময় ও জায়গা ঠিক করুন`; } }catch(e){} });
+    const el=$id("ph_"+b.id); if(el&&c.exists){ const ph=String(c.data().phone||"").replace(/[^0-9+]/g,""); const cd=c.data(), ll=(typeof cd.lat==="number"&&typeof cd.lng==="number")?cd.lat+","+cd.lng:"";
+      el.innerHTML=`📞 <a href="tel:${ph}" style="color:#4ade80;font-weight:800">${esc(cd.phone)}</a> — কল করে সময় ও জায়গা ঠিক করুন`+(ll?`<br>📍 <a href="https://www.google.com/maps?q=${ll}" target="_blank" rel="noopener" style="color:#4ade80;font-weight:800">যাত্রীর লোকেশন ম্যাপে দেখুন</a>${cd.acc?` <small>(±${esc(cd.acc)} মি.)</small>`:""}`:""); } }catch(e){} });
   document.querySelectorAll("[data-yes]").forEach(x=>x.onclick=()=>drvAcceptBooking(x.dataset.yes,x));
   document.querySelectorAll("[data-no]").forEach(x=>x.onclick=()=>{ if(confirm("এই বুকিং নিতে পারছেন না?")) drvSetBooking(x.dataset.no,"declined",x); });
   document.querySelectorAll("[data-done]").forEach(x=>x.onclick=()=>drvDoneBooking(x.dataset.done,x));
@@ -494,7 +495,8 @@ async function drvAcceptBooking(id,btn){
       tx.update(bRef,{ status:"accepted", seatsHeld:n>0, updatedAt:firebase.firestore.FieldValue.serverTimestamp() });
     });
     drvLoadMyPosts();
-  }catch(e){ alert(e.message||"গ্রহণ করা যায়নি।"); btn.disabled=false; }
+    return true;
+  }catch(e){ alert(e.message||"গ্রহণ করা যায়নি।"); btn.disabled=false; return false; }
 }
 let __restoring=new Set();
 async function drvRestoreSeats(list){
@@ -513,6 +515,21 @@ async function drvRestoreSeats(list){
     }catch(e){}
     __restoring.delete(b.id);
   }
+}
+/* 🔔 নোটিফিকেশনের "✅ গ্রহণ করুন" / "❌ বাতিল করুন" বোতাম — অ্যাপ খুলে ?bk=…&act=… দিয়ে আসে */
+async function drvNotifAction(){
+  const q=new URLSearchParams(location.search), id=q.get("bk"), act=q.get("act");
+  if(!id||!act) return;
+  try{ history.replaceState(null,"",location.pathname+"#bookings"); }catch(e){}
+  go("bookings");
+  const fake={disabled:false};
+  try{
+    const b=(await db.collection("transportBookings").doc(id).get()).data();
+    if(!b||b.driverId!==DRV.uid) return;
+    if(b.status!=="pending"){ alert("এই বুকিং আর অপেক্ষায় নেই ("+(BK_TXT[b.status]||b.status)+")।"); return; }
+    if(act==="accept"){ const ok=await drvAcceptBooking(id,fake); if(ok) alert("✅ "+(b.passengerName||"যাত্রী")+"-এর বুকিং গ্রহণ করা হয়েছে।\nযাত্রীর নম্বর ও লোকেশন এখন \"নিশ্চিত বুকিং\"-এ দেখুন।"); }
+    else if(act==="decline"){ await drvSetBooking(id,"declined",fake); alert("❌ "+(b.passengerName||"যাত্রী")+"-এর বুকিং বাতিল করা হয়েছে।"); }
+  }catch(e){}
 }
 async function drvSetBooking(id,status,btn){
   btn.disabled=true;
@@ -746,6 +763,7 @@ auth.onAuthStateChanged(async (user)=>{
     drvMarkPostsOnline(DRV.data.driverStatus === "online" || DRV.data.driverStatus === "busy");
     drvPushInit();
     if(location.hash==="#bookings") go("bookings");
+    drvNotifAction();
     $id("hbGate").remove();
     if(!(DRV.data.vehicle && DRV.data.vehicle.type)){ go("vehicle"); setTimeout(()=>alert("🚗 শুরুতে আপনার গাড়ির ধরন বেছে নিয়ে সেভ করুন।"), 200); }
   }catch(e){
