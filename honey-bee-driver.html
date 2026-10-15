@@ -92,6 +92,7 @@ select option{background:#173a29;color:#eafff2}
         <button class="action" type="button" id="anyPostHome" style="border-color:rgba(74,222,128,.6)"><span>⚡</span><b>যেকোনো জায়গায় যেতে প্রস্তুত</b><small>এক চাপেই পোস্ট হয়ে যাবে</small></button>
         <button class="action" data-goto="post"><span>🛣️</span><b>নতুন যাত্রা পোস্ট</b><small>রুট, সময় ও খালি আসন দিন</small></button>
         <button class="action" data-goto="bookings"><span>📩</span><b>বুকিং অনুরোধ</b><small>অনুরোধ দেখুন ও উত্তর দিন</small></button>
+        <button class="action" data-goto="flight"><span>✈️</span><b>যাত্রীর ফ্লাইট</b><small>বিমান কখন নামবে দেখুন</small></button>
         <button class="action" data-goto="schedule"><span>🗓️</span><b>সময়সূচি</b><small>ব্যস্ত ও ফাঁকা সময় রাখুন</small></button>
         <button class="action" data-goto="vehicle"><span>🚘</span><b>গাড়ির তথ্য</b><small>গাড়ি ও আসনের বিবরণ</small></button>
       </div><div class="notice">✅ লগইন, প্রোফাইল, গাড়ির তথ্য আর অনলাইন/অফলাইন এখন আসল — সার্ভারে সেভ হয়।<br>🛣️ যাত্রা পোস্ট এখন আসল — সব যাত্রী দেখেন। 🎫 যাত্রীরা আপনার পোস্ট দেখে সিট/গাড়ি বুক করেন — "বুকিং" পাতায় গ্রহণ করুন। আয়ের হিসাব, রেটিং আর আগাম বুকিংও আসল। </div></div>
@@ -124,6 +125,12 @@ select option{background:#173a29;color:#eafff2}
     <div class="card" style="margin-top:14px"><h2 class="section-title">🗓️ সামনের বুকিং</h2><div id="schedList" class="sub">⏳ আনা হচ্ছে...</div></div>
   </section>
   <section id="vehicle" class="page hidden"><div class="card"><h2 class="section-title">📷 ছবি (একবার দিলেই সব পোস্টে যাবে)</h2><p class="sub">যাত্রীরা আপনার মুখ আর গাড়ি দেখে ভরসা পান। ছবিতে চাপ দিয়ে দিন বা বদলান।</p><div class="formgrid" id="photoGrid" style="grid-template-columns:1fr 1fr"></div></div><div class="card" style="margin-top:14px"><h2 class="section-title">আমার গাড়ি</h2><form id="vehicleForm"><label>গাড়ির ধরন</label><select id="vType" required><option value="">-- গাড়ির ধরন বেছে নিন --</option><option value="bike">🏍️ বাইক</option><option value="cng">🛺 CNG / অটো রিকশা</option><option value="easy_bike">🛺✨ ইজি বাইক</option><option value="sedan">🚗 সেডান / প্রাইভেট কার</option><option value="hiace">🚐 হাইএস</option><option value="microbus">🚐 মাইক্রোবাস</option><option value="pickup">🛻 পিকআপ / ট্রাক</option><option value="ambulance_ac">🚑 অ্যাম্বুলেন্স (AC)</option><option value="ambulance_non_ac">🚑 অ্যাম্বুলেন্স (Non-AC)</option><option value="ambulance_icu">🚑 অ্যাম্বুলেন্স (ICU)</option></select><label>গাড়ির মডেল</label><input id="vModel" placeholder="যেমন: Toyota Hiace (2019)" required><div class="formgrid"><div><label>রেজিস্ট্রেশন নম্বর</label><input id="vReg" placeholder="রেজিস্ট্রেশন নম্বর" required></div><div><label>মোট আসন</label><input id="vSeats" type="number" min="1" placeholder="মোট আসন" required></div><div><label>এসি</label><select id="vAc"><option value="">নির্বাচন করুন</option><option>আছে</option><option>নেই</option></select></div><div><label>জ্বালানি</label><select id="vFuel"><option value="">নির্বাচন করুন</option><option>ডিজেল</option><option>পেট্রোল</option><option>সিএনজি</option><option>ইলেকট্রিক</option></select></div></div><button class="btn" type="submit" style="margin-top:14px">তথ্য সংরক্ষণ করুন</button></form><div class="notice">আপনার প্রকৃত গাড়ির তথ্য পূরণ করুন। গাড়ির ধরন ঠিকভাবে দিন — যাত্রী ও অ্যাম্বুলেন্স খোঁজায় এটা দেখেই আপনাকে দেখানো হয়।</div></div></section>
+  <section id="flight" class="page hidden"><div class="card">
+    <h2 class="section-title">✈️ যাত্রীর ফ্লাইট দেখুন</h2>
+    <p class="sub">এয়ারপোর্ট থেকে যাত্রী আনতে যাওয়ার আগে দেখে নিন বিমান কখন নামবে, দেরি আছে কিনা, কোন টার্মিনাল। যাত্রী বুকিংয়ে ফ্লাইট নম্বর দিলে বুকিং কার্ড থেকে এক চাপেই খোলে।</p>
+    <div style="display:flex;gap:8px;margin-top:10px"><input id="flNo" placeholder="ফ্লাইট নম্বর, যেমন: BG147, EK585" style="flex:1;text-transform:uppercase" maxlength="10"><button class="btn" type="button" id="flBtn">🔍 খুঁজুন</button></div>
+    <div id="flOut" class="sub" style="margin-top:14px"></div>
+  </div></section>
   <section id="earnings" class="page hidden">
     <div class="grid"><div class="card"><div class="stat-label">আজ</div><div class="stat" id="eToday">৳০</div><div class="stat-note" id="eTodayN">০ যাত্রা</div></div>
       <div class="card"><div class="stat-label">গত ৭ দিন</div><div class="stat" id="eWeek">৳০</div><div class="stat-note" id="eWeekN">০ যাত্রা</div></div>
@@ -137,7 +144,7 @@ select option{background:#173a29;color:#eafff2}
 </div>
 <nav class="mobile-nav"><button class="active" data-page="home"><span>⌂</span>হোম</button><button data-page="post"><span>＋</span>পোস্ট</button><button data-page="bookings"><span>▣</span>বুকিং</button><button data-page="schedule"><span>▦</span>সময়সূচি</button><button data-page="profile"><span>♙</span>প্রোফাইল</button></nav>
 <script>
-const titles={home:['ড্রাইভার ড্যাশবোর্ড','স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।'],post:['নতুন যাত্রা পোস্ট','আপনার রুট, সময় ও খালি আসন দিন।'],bookings:['বুকিং অনুরোধ','যাত্রীর অনুরোধ পর্যালোচনা করুন।'],schedule:['সময়সূচি','আপনার আসন্ন যাত্রার পরিকল্পনা।'],vehicle:['আমার গাড়ি','গাড়ির তথ্য যাচাই ও আপডেট করুন।'],earnings:['আয় ও হিসাব','যাত্রা থেকে আয়ের সারসংক্ষেপ।'],profile:['আমার প্রোফাইল','আপনার যোগাযোগ ও পরিচয় তথ্য।']};
+const titles={flight:['যাত্রীর ফ্লাইট','বিমান কখন নামবে — লাইভ খবর।'],home:['ড্রাইভার ড্যাশবোর্ড','স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।'],post:['নতুন যাত্রা পোস্ট','আপনার রুট, সময় ও খালি আসন দিন।'],bookings:['বুকিং অনুরোধ','যাত্রীর অনুরোধ পর্যালোচনা করুন।'],schedule:['সময়সূচি','আপনার আসন্ন যাত্রার পরিকল্পনা।'],vehicle:['আমার গাড়ি','গাড়ির তথ্য যাচাই ও আপডেট করুন।'],earnings:['আয় ও হিসাব','যাত্রা থেকে আয়ের সারসংক্ষেপ।'],profile:['আমার প্রোফাইল','আপনার যোগাযোগ ও পরিচয় তথ্য।']};
 function go(page){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));document.querySelectorAll('[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));document.getElementById('pageTitle').textContent=titles[page][0];document.getElementById('pageSub').textContent=titles[page][1];window.scrollTo({top:0,behavior:'smooth'})}
 document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.page)));
 document.querySelectorAll('[data-goto]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.goto)));
@@ -150,6 +157,7 @@ function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script src="firebase-init.js"></script>
 <script>
 /* ==================== 🚑 ড্রাইভার অ্যাপ — আসল লগইন ও তথ্য (ধাপ ১) ====================
@@ -464,6 +472,7 @@ function drvListenBookings(){
 function drvBkCard(b,btns){
   return `<div class="trip"><div class="trip-head"><span>${esc(b.from)} → ${esc(b.to)}</span><span class="badge ${b.status==="pending"?"pending":""}">${BK_TXT[b.status]||esc(b.status)}</span></div>
     <div class="meta">👤 ${esc(b.passengerName||"যাত্রী")} · ${b.seats>0?esc(b.seats)+" আসন":"মালামাল"}${b.fare?` · ${CUR}${esc(b.fare*(b.seats||1))}`:""}<br>🕒 ${esc(b.when||"")}${b.note?"<br>📝 "+esc(b.note):""}</div>
+    ${b.flightNo?`<div class="meta">✈️ ফ্লাইট: <b>${esc(b.flightNo)}</b> <button type="button" class="btn secondary" style="padding:4px 10px;font-size:12px" data-fl="${esc(b.flightNo)}">ফ্লাইট দেখুন</button></div>`:""}
     <div class="meta" id="ph_${esc(b.id)}"></div>${btns?`<div class="btnrow">${btns}</div>`:""}</div>`;
 }
 function drvRenderBookings(pend,acc,old){
@@ -481,6 +490,7 @@ function drvRenderBookings(pend,acc,old){
   document.querySelectorAll("[data-yes]").forEach(x=>x.onclick=()=>drvAcceptBooking(x.dataset.yes,x));
   document.querySelectorAll("[data-no]").forEach(x=>x.onclick=()=>{ if(confirm("এই বুকিং নিতে পারছেন না?")) drvSetBooking(x.dataset.no,"declined",x); });
   document.querySelectorAll("[data-done]").forEach(x=>x.onclick=()=>drvDoneBooking(x.dataset.done,x));
+  document.querySelectorAll("[data-fl]").forEach(x=>x.onclick=()=>drvOpenFlight(x.dataset.fl));
 }
 /* 💺 গ্রহণ করলে পোস্টের খালি আসন কমে (transaction — একই আসন দুইজনকে যায় না)।
    গ্রহণ করা বুকিং পরে বাতিল/না হলে আসন আবার ফেরত যায় (seatsHeld দেখে)। */
@@ -746,6 +756,44 @@ async function drvAnyPost(btn){
 }
 $id("anyPostBtn").onclick=function(){ drvAnyPost(this); };
 $id("anyPostHome").onclick=function(){ drvAnyPost(this); };
+
+/* ==================== ✈️ যাত্রীর ফ্লাইট (অক্টোবর ২০২৬) ====================
+   Bazar-এর Smart Flight-এর একই সার্ভার ফাংশন (searchFlight) — চাবি সার্ভারে থাকে।
+   খোলা থাকলে প্রতি ৩ মিনিটে নিজে থেকে নতুন খবর আনে (সার্ভারের cache থাকায় বাড়তি খরচ হয় না)।
+   ⚠️ AviationStack সময়গুলো বিমানবন্দরের স্থানীয় সময়ে দেয় (শেষে +00:00 লেখা থাকলেও) —
+      তাই সময় বদলানো ছাড়াই হুবহু দেখানো হয়, পাশে "স্থানীয় সময়" লেখা থাকে। */
+const FL_ST={scheduled:["🕒 সময়মতো নির্ধারিত","#60a5fa"],active:["🟢 আকাশে উড়ছে","#4ade80"],landed:["🛬 নেমে গেছে","#4ade80"],cancelled:["❌ বাতিল","#f87171"],diverted:["↪️ অন্য জায়গায় নেমেছে","#fbbf24"],unknown:["❔ খবর পাওয়া যায়নি","#9ca3af"]};
+let __flTimer=null, __flNo="";
+function flTime(iso){ const m=String(iso||"").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/); if(!m) return "—";
+  let h=+m[4], ap=h<12?"সকাল":(h<16?"দুপুর":(h<18?"বিকাল":"রাত")); const h12=((h+11)%12)+1;
+  return `${m[3]}/${m[2]} · ${ap} ${h12}:${m[5]}`; }
+async function drvFlightSearch(no, quiet){
+  no=String(no||"").toUpperCase().replace(/\s+/g,""); if(!no){ $id("flOut").textContent="ফ্লাইট নম্বর লিখুন।"; return; }
+  __flNo=no; $id("flNo").value=no;
+  if(!quiet) $id("flOut").innerHTML="⏳ খোঁজা হচ্ছে...";
+  try{
+    const r=await firebase.functions().httpsCallable("searchFlight")({flightNumber:no});
+    const f=((r.data&&r.data.flights)||[])[0];
+    if(!f){ $id("flOut").textContent="এই ফ্লাইটের খবর পাওয়া যায়নি।"; return; }
+    const st=FL_ST[f.status]||FL_ST.unknown;
+    const arrT=f.actualArrival||f.estimatedArrival||f.scheduledArrival;
+    $id("flOut").innerHTML=`<div class="trip" style="border-color:${st[1]}">
+      <div class="trip-head"><span>✈️ ${esc(f.flightNumber||no)} · ${esc(f.airline||"")}</span><span class="badge" style="background:${st[1]}22;color:${st[1]}">${st[0]}</span></div>
+      <div class="meta" style="font-size:14px">🛫 ${esc(f.departureIata||"—")} ${esc(f.departureAirport||"")}<br>🛬 ${esc(f.arrivalIata||"—")} ${esc(f.arrivalAirport||"")}</div>
+      ${f.isDelayed?`<div class="meta" style="color:#fbbf24;font-weight:800">🟡 প্রায় ${esc(f.delayMinutes||"")} মিনিট দেরি</div>`:""}
+      <div class="meta" style="font-size:15px;font-weight:800;color:#4ade80">🛬 ${f.actualArrival?"নেমেছে":"নামবে"}: ${flTime(arrT)} <small style="font-weight:400;color:#8fb9a3">(বিমানবন্দরের স্থানীয় সময়)</small></div>
+      <div class="meta">নির্ধারিত: ${flTime(f.scheduledArrival)}${f.arrivalTerminal?` · টার্মিনাল ${esc(f.arrivalTerminal)}`:""}${f.arrivalGate?` · গেট ${esc(f.arrivalGate)}`:""}</div>
+      <div class="meta" style="color:#8fb9a3">🔄 ৩ মিনিট পর পর নিজে থেকে নতুন খবর আসবে</div></div>`;
+  }catch(e){
+    $id("flOut").innerHTML=`<span style="color:#f87171">${esc((e&&e.message)||"ফ্লাইটের খবর আনা যায়নি।")}</span>`;
+  }
+}
+function drvOpenFlight(no){ go("flight"); drvFlightSearch(no); }
+$id("flBtn").onclick=()=>drvFlightSearch($id("flNo").value);
+$id("flNo").addEventListener("keydown",e=>{ if(e.key==="Enter") drvFlightSearch($id("flNo").value); });
+clearInterval(__flTimer);
+__flTimer=setInterval(()=>{ if(__flNo && !$id("flight").classList.contains("hidden") && document.visibilityState==="visible") drvFlightSearch(__flNo,true); }, 180000);
+
 auth.onAuthStateChanged(async (user)=>{
   const se = getSession();
   if(!user || !se || se.uid !== user.uid || se.role !== "transport_driver"){ drvToLogin(); return; }

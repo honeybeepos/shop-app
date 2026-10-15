@@ -296,6 +296,7 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
 <div class="formlabel">📱 মোবাইল নম্বর (চালক গ্রহণ করলে তবেই দেখবেন)</div><input id="bkPhone" type="tel" class="input" placeholder="01XXXXXXXXX">
 <div id="bkSeatsWrap"><div class="formlabel">কয়টা আসন? <small id="bkSeatsHint"></small></div><input id="bkSeats" type="number" min="1" value="1" class="input"></div>
 <div class="formlabel">কিছু বলার থাকলে (ঐচ্ছিক)</div><input id="bkNote" class="input" maxlength="300">
+<div class="formlabel">✈️ এয়ারপোর্ট থেকে আনতে হলে ফ্লাইট নম্বর (ঐচ্ছিক) — চালক দেখতে পাবেন বিমান কখন নামবে</div><input id="bkFlight" class="input" maxlength="10" placeholder="যেমন: BG147" style="text-transform:uppercase">
 <div class="formlabel">📍 আপনার লোকেশন (বাধ্যতামূলক — চালক গ্রহণ করলে তবেই দেখবেন)</div><div id="bkLoc" class="hint" style="border-radius:12px;padding:10px 12px;line-height:1.55">⏳ লোকেশন নেওয়া হচ্ছে…</div><button type="button" class="textbtn" id="bkLocBtn" style="padding:6px 0" onclick="hbBookLoc(true)">◎ আবার লোকেশন নিন</button>
 <div id="bkErr" style="display:none;margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.5);color:#fca5a5;font-size:13px;line-height:1.55"></div>
 <button class="primary" id="bkSend" style="margin-top:16px" onclick="sendBooking()">📨 বুকিং অনুরোধ পাঠান</button></div></div>
@@ -673,6 +674,7 @@ async function sendBooking(){
     const ref=db.collection('transportBookings').doc(), b=db.batch();
     b.set(ref,{ postId:hbUnesc(r.id), driverId:r.driverId, passengerId:uid, passengerName:name.slice(0,60), seats,
       note:document.getElementById('bkNote').value.trim().slice(0,300),
+      flightNo:(document.getElementById('bkFlight').value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)||null,
       from:hbUnesc(r.from), to:hbUnesc(r.to), when:hbUnesc(r.time), vehicleType:hbUnesc(r.type), fare:Number(r.price)||0,
       driverName:hbUnesc(r.name), driverPhone:r.phone||'', status:'pending',
       createdAt:firebase.firestore.FieldValue.serverTimestamp(), updatedAt:firebase.firestore.FieldValue.serverTimestamp() });

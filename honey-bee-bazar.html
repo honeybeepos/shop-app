@@ -465,6 +465,7 @@
     #nbPrintArea.printing, #nbPrintArea.printing *{ visibility:visible; }
     #nbPrintArea.printing{ position:absolute; left:0; top:0; width:100%; background:#fff; }
   }
+#screenSmartFlightInfo.sfiLocked > *:not(.backBtn):not(.sfiHead):not(#sfiLoginGate){display:none!important}
 </style>
 <style>
   :root{
@@ -2263,12 +2264,19 @@
        ক্লিক করলে খোলে)। পরে এখানে আসল ফ্লাইট ট্র্যাকিং ড্যাশবোর্ড বানানো হবে। -->
   <div id="screenSmartFlightInfo" style="padding:20px 16px;">
     <button class="backBtn" id="backToTransportFromFlightInfo">← ফিরে যান</button>
-    <div style="text-align:center; margin-bottom:16px;">
+    <div class="sfiHead" style="text-align:center; margin-bottom:16px;">
       <div style="font-size:32px;">✈️</div>
       <div style="font-size:16px; font-weight:800;">Smart Flight Information</div>
       <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">লাইভ ফ্লাইট স্ট্যাটাস ও তথ্য — Honey Bee Bazar/Delivery থেকে সম্পূর্ণ আলাদা</div>
     </div>
 
+    <!-- 🔒 লগইন ছাড়া ফ্লাইট দেখা যায় না — নইলে একই ফোনে একজনের সেভ করা ফ্লাইট আরেকজন দেখে ফেলতেন -->
+    <div id="sfiLoginGate" class="card" style="display:none; text-align:center; padding:22px 16px;">
+      <div style="font-size:34px;">🔒</div>
+      <div style="font-weight:800; font-size:15px; margin:6px 0 4px;">ফ্লাইট দেখতে আগে লগইন করুন</div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">আপনার সেভ করা ফ্লাইট আর নোটিফিকেশন শুধু আপনিই দেখবেন।</div>
+      <div class="googleLoginBtn" id="sfiGoogleLoginBtn">🔵 Google দিয়ে লগইন</div>
+    </div>
     <!-- ⭐ Saved Flights — Phase 2 -->
     <button id="sfiSavedToggleBtn" class="card" style="width:100%; text-align:left; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:10px; margin-bottom:12px; border:none;">
       <span style="font-size:18px;">⭐</span>
@@ -3104,6 +3112,7 @@ let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], a
 
 /* ---------- 🔐 Google দিয়ে লগইন — কাস্টমারের অর্ডার/পছন্দ UID-এর সাথে বাঁধা ---------- */
 function renderAuthArea(){
+  try{ if(typeof sfiApplyGate === "function") setTimeout(sfiApplyGate, 0); }catch(e){} // 🔒 লগইন/লগআউটে ফ্লাইট পাতাও সাথে সাথে খোলে/বন্ধ হয়
   const area = document.getElementById("authArea");
   if(currentCustomer){
     area.innerHTML = `
@@ -7546,7 +7555,25 @@ $("menuProfileSaveBtn").addEventListener("click", async ()=>{
 
 document.getElementById("backToHomeFromTransport") && document.getElementById("backToHomeFromTransport").addEventListener("click", ()=> showScreen("screenHome"));
 document.getElementById("backToTransportFromMedia") && document.getElementById("backToTransportFromMedia").addEventListener("click", ()=> showScreen("screenTransport"));
-document.getElementById("smartFlightInfoBtn") && document.getElementById("smartFlightInfoBtn").addEventListener("click", ()=> showScreen("screenSmartFlightInfo"));
+document.getElementById("smartFlightInfoBtn") && document.getElementById("smartFlightInfoBtn").addEventListener("click", ()=>{ showScreen("screenSmartFlightInfo"); sfiApplyGate(); });
+/* 🔒 Smart Flight — লগইন ছাড়া খোলে না (অতিথির কাছে শুধু লগইনের বাক্স) */
+function sfiApplyGate(){
+  const scr = document.getElementById("screenSmartFlightInfo"), gate = document.getElementById("sfiLoginGate");
+  if(!scr || !gate) return;
+  const locked = !currentCustomer;
+  scr.classList.toggle("sfiLocked", locked);
+  gate.style.display = locked ? "block" : "none";
+  if(locked){
+    if(typeof sfiStopAutoRefresh === "function") sfiStopAutoRefresh();
+    // আগের জনের খোলা ফলাফল/সেভ তালিকা মুছে ফেলা
+    ["sfiResultsList","sfiSavedList"].forEach(id=>{ const el = document.getElementById(id); if(el) el.innerHTML = ""; });
+    const dc = document.getElementById("sfiDetailCard"); if(dc) dc.style.display = "none";
+  }
+}
+document.getElementById("sfiGoogleLoginBtn") && document.getElementById("sfiGoogleLoginBtn").addEventListener("click", async ()=>{
+  try{ await auth.signInWithPopup(googleProvider); }
+  catch(e){ if(e && e.code === "auth/popup-blocked") auth.signInWithRedirect(googleProvider); else if(e && e.code !== "auth/popup-closed-by-user") alert("লগইন হয়নি: " + (e.message||"")); }
+});
 document.getElementById("backToTransportFromFlightInfo") && document.getElementById("backToTransportFromFlightInfo").addEventListener("click", ()=> showScreen("screenTransport"));
 
 /* ==================== ✈️ Smart Flight Tracking ====================
@@ -7586,11 +7613,15 @@ const SFI_STAGE_LABEL = { scheduled:"Scheduled", boarding:"Boarding", departed:"
 // stage থেকে timeline-এ কতদূর পর্যন্ত dot ভরাট হবে তার ইনডেক্স
 const SFI_STAGE_TO_INDEX = { scheduled:0, boarding:1, in_air:3, approaching:4, landed:5 };
 
+// ⚠️ AviationStack সময় দেয় বিমানবন্দরের স্থানীয় সময়ে, কিন্তু শেষে "+00:00" লিখে —
+//    new Date() দিয়ে বদলালে ফোনের সময়-অঞ্চল অনুযায়ী কয়েক ঘণ্টা সরে যেত। তাই হুবহু দেখানো হয়।
 function sfiFmtTime(iso){
   if(!iso) return "—";
-  const d = new Date(iso);
-  if(isNaN(d.getTime())) return "—";
-  return d.toLocaleString("bn-BD", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if(!m) return "—";
+  const mon = ["জানু","ফেব্রু","মার্চ","এপ্রিল","মে","জুন","জুলাই","আগস্ট","সেপ্টে","অক্টো","নভে","ডিসে"][Number(m[2])-1] || m[2];
+  const h = Number(m[4]), h12 = ((h+11)%12)+1, ap = h<12 ? "AM" : "PM";
+  return `${m[3]} ${mon}, ${h12}:${m[5]} ${ap} (স্থানীয়)`;
 }
 
 function sfiShowMsg(text){
