@@ -89,6 +89,7 @@ select option{background:#173a29;color:#eafff2}
     </div>
     <div class="columns">
       <div class="card"><button class="btn" type="button" id="pushBtn" style="width:100%;margin-bottom:12px;display:none">🔔 নতুন বুকিংয়ের খবর ফোনে পেতে চাপুন</button><h2 class="section-title">দ্রুত কাজ</h2><div class="actions">
+        <button class="action" type="button" id="anyPostHome" style="border-color:rgba(74,222,128,.6)"><span>⚡</span><b>যেকোনো জায়গায় যেতে প্রস্তুত</b><small>এক চাপেই পোস্ট হয়ে যাবে</small></button>
         <button class="action" data-goto="post"><span>🛣️</span><b>নতুন যাত্রা পোস্ট</b><small>রুট, সময় ও খালি আসন দিন</small></button>
         <button class="action" data-goto="bookings"><span>📩</span><b>বুকিং অনুরোধ</b><small>অনুরোধ দেখুন ও উত্তর দিন</small></button>
         <button class="action" data-goto="schedule"><span>🗓️</span><b>সময়সূচি</b><small>ব্যস্ত ও ফাঁকা সময় রাখুন</small></button>
@@ -98,6 +99,7 @@ select option{background:#173a29;color:#eafff2}
     </div>
   </section>
   <section id="post" class="page hidden">
+    <div class="card" style="margin-bottom:14px;border-color:rgba(74,222,128,.5)"><h2 class="section-title">⚡ এক চাপে পোস্ট</h2><p class="sub">কোনো নির্দিষ্ট রুট নেই? এক চাপেই জানিয়ে দিন — আপনি যেকোনো জায়গায় যেতে প্রস্তুত। আপনার এলাকা, গাড়ি, আসন আর ছবি নিজে থেকে বসবে, আজকের দিন শেষে পোস্ট নিজে থেকে লুকিয়ে যাবে।</p><button class="btn" type="button" id="anyPostBtn" style="width:100%;font-size:15px;padding:14px">🚐 আমি যেকোনো জায়গায় যেতে প্রস্তুত — পোস্ট করুন</button></div>
     <div class="card"><h2 class="section-title">নতুন যাত্রা পোস্ট করুন</h2><p class="sub">আপনার রুট ও খালি আসনের তথ্য দিন। পোস্ট করলেই Honey Bee Transport-এ সব যাত্রী দেখতে পাবেন। মালামাল নিলে খালি আসন ০ দিন।</p>
       <form id="postForm"><div class="formgrid"><div><label>কোথা থেকে</label><input required name="from" placeholder="যেমন: ঢাকা, মিরপুর"></div><div><label>কোথায় যাবেন</label><input required name="to" placeholder="যেমন: কক্সবাজার"></div>
       <div><label>যাত্রার তারিখ</label><input required type="date" name="date"></div><div><label>সময়</label><input required type="time" name="time"></div>
@@ -692,6 +694,36 @@ async function drvSyncPostPhotos(){
     if(n) await b.commit();
   }catch(e){}
 }
+
+/* ⚡ এক চাপে পোস্ট — "যেকোনো জায়গায় যেতে প্রস্তুত" (অক্টোবর ২০২৬)
+   এলাকা, গাড়ি, আসন, ফোন আর প্রোফাইলের ছবি নিজে থেকে বসে। তারিখ আজকের, তাই
+   দিন শেষে যাত্রীদের কাছ থেকে নিজে থেকে লুকায়। একই দিনে দুইবার হয় না। */
+async function drvAnyPost(btn){
+  if(!DRV.uid) return;
+  const v=DRV.data.vehicle||{}, vp=v.photos||{};
+  const today=drvDayStr(0), now=new Date(), time=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+  const old=(__myPosts||[]).find(p=>p.kind==="available" && p.date===today && p.status==="active");
+  if(old){ if(confirm("আজকের \"যেকোনো জায়গায় যেতে প্রস্তুত\" পোস্ট আগেই দেওয়া আছে।\n\nসেটা সরিয়ে দেবেন?")){ await db.collection("transportMediaPosts").doc(old.id).update({status:"removed"}); drvLoadMyPosts(); alert("✅ সরানো হয়েছে।"); } return; }
+  const vt=DRV_TYPE_MAP[v.type]||"গাড়ি", seats=Number(v.seatCount)||0;
+  const from=[DRV.data.upazila,DRV.data.district].filter(Boolean).join(", ")||"আমার এলাকা";
+  if(!confirm(`এই পোস্ট যাবে:\n\n📍 ${from} → যেকোনো জায়গা\n🚗 ${vt}${seats?" · "+seats+" আসন":""}\n💰 ভাড়া আলোচনা সাপেক্ষে\n\nপোস্ট করবেন?`)) return;
+  if(btn){ btn.disabled=true; }
+  try{
+    await db.collection("transportMediaPosts").doc().set({
+      authorId:DRV.uid, authorName:DRV.data.name||"ড্রাইভার", authorPhone:DRV.data.phone||"", isVerified:!!DRV.data.isVerified,
+      vehicleLabel:[vt, v.model, v.regNumber].filter(Boolean).join(" · "),
+      kind:"available", anywhere:true, from, to:"যেকোনো জায়গা", date:today, time,
+      vehicleType:vt, vehicleModel:v.model||null, regNumber:v.regNumber||null, vehicleColor:v.color||null, ac:v.ac||null,
+      seats, seatsTotal:seats, fare:0, notes:"যেকোনো জায়গায় যেতে প্রস্তুত — ভাড়া আলোচনা সাপেক্ষে", text:`🚐 ${from} থেকে যেকোনো জায়গায় যেতে প্রস্তুত · ${vt}`,
+      marketId:DRV.data.marketId||null, imageUrl:vp.front||vp.side||vp.inside||null, vehiclePhotos:[vp.front,vp.inside,vp.side].filter(Boolean), driverPhoto:DRV.data.photoURL||null,
+      likedBy:[], likeCount:0, status:"active", driverOnline:DRV.data.driverStatus==="online", createdAt:firebase.firestore.FieldValue.serverTimestamp() });
+    alert("✅ পোস্ট হয়ে গেছে! যাত্রীরা দেখছেন আপনি যেকোনো জায়গায় যেতে প্রস্তুত।"+(DRV.data.driverStatus==="online"?"":"\n\n⚠️ আপনি এখন অফলাইন — যাত্রীরা বুক করতে পারবেন না। উপরের \"অনলাইন\" চাপুন।"));
+    drvLoadMyPosts();
+  }catch(e){ alert("পোস্ট করা যায়নি: "+e.message); }
+  if(btn) btn.disabled=false;
+}
+$id("anyPostBtn").onclick=function(){ drvAnyPost(this); };
+$id("anyPostHome").onclick=function(){ drvAnyPost(this); };
 auth.onAuthStateChanged(async (user)=>{
   const se = getSession();
   if(!user || !se || se.uid !== user.uid || se.role !== "transport_driver"){ drvToLogin(); return; }

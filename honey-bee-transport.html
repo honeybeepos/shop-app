@@ -332,7 +332,7 @@ function rideCard(r){return `<article class="ride market-vehicle-card">
   <div class="meta" style="display:flex;align-items:center;gap:6px;margin:2px 0 4px">${r.driverPhoto?`<img src="${r.driverPhoto}" alt="" style="width:26px;height:26px;border-radius:50%;object-fit:cover">`:'👤'} ${r.name}${r.verified?' <span style="color:#6ee7a8">✓</span>':''}</div>
   <div class="meta">🕒 ${r.time} · ${r.seats>0?'💺 '+r.seats+' আসন খালি':(r.seatsTotal>0?'🔴 আসন পূর্ণ':'📦 মালামাল পরিবহন')}${r.online?'':' · ⚪ চালক এখন অফলাইন'}</div>
   <div class="vehicle-spec-row"><span>❄️ ${r.ac||'এসি তথ্য নেই'}</span><span>⭐ ${r.rating||'নতুন'}</span></div>
-  <div class="market-vehicle-bottom"><div><small>প্রস্তাবিত ভাড়া</small><strong>৳${r.price}</strong></div><button class="primary vehicle-detail-btn" onclick="openDetail('${r.id}')">বিস্তারিত দেখুন ›</button></div>
+  <div class="market-vehicle-bottom"><div><small>প্রস্তাবিত ভাড়া</small><strong>${r.price?'৳'+r.price:'<span style="font-size:15px">আলোচনা সাপেক্ষ</span>'}</strong></div><button class="primary vehicle-detail-btn" onclick="openDetail('${r.id}')">বিস্তারিত দেখুন ›</button></div>
  </div></article>`}
 
 function toggleHomeSearch(){const box=document.getElementById('homeSearchBox');const btn=document.getElementById('homeSearchToggle');const collapsed=box.classList.toggle('collapsed');btn.setAttribute('aria-expanded',String(!collapsed));}
@@ -366,7 +366,7 @@ function openDetail(id){
  document.getElementById('detailContent').innerHTML=`<div class="formcard">
  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><div style="width:66px;height:66px;border-radius:18px;background:#fff3c4;display:grid;place-items:center;font-size:38px">${r.emoji}</div><div><span style="background:#e4f8e9;color:#187447;border-radius:20px;padding:4px 8px;font-size:11px">✓ ${r.verified?'যাচাইকৃত':'তথ্য যাচাই করুন'}</span><h2 style="margin:7px 0 2px">${r.type}</h2><div class="meta">${r.route}</div></div></div>
  <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0">
- <div style="background:#fff8e2;border-radius:13px;padding:12px"><small class="hint">প্রস্তাবিত ভাড়া</small><div style="font-size:22px;font-weight:800">৳${r.price}</div><small>প্রতি আসন/প্রস্তাবিত</small></div>
+ <div style="background:#fff8e2;border-radius:13px;padding:12px"><small class="hint">প্রস্তাবিত ভাড়া</small><div style="font-size:22px;font-weight:800">${r.price?'৳'+r.price:'<span style="font-size:15px">আলোচনা সাপেক্ষ</span>'}</div><small>প্রতি আসন/প্রস্তাবিত</small></div>
  <div style="background:#edf8ff;border-radius:13px;padding:12px"><small class="hint">যাত্রার সময়</small><div style="font-weight:800">${r.time}</div><small>${r.seats>0?'খালি আসন: '+r.seats:(r.seatsTotal>0?'🔴 আসন পূর্ণ':'মালামাল পরিবহন')}</small></div>
  </div>
  <h3>🚘 গাড়ির বিবরণ</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0">
@@ -420,7 +420,7 @@ function hbPostToRide(id,d){
   let when=[d.date,d.time].filter(Boolean).join(' ');
   if(!when&&d.createdAt&&d.createdAt.toDate){try{when='পোস্ট: '+d.createdAt.toDate().toLocaleDateString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){}}
   return {id:hbEsc(id),type:hbEsc(type||'গাড়ি'),emoji:HB_TYPE_EMOJI[type]||'🚘',route:hbEsc(route),from:hbEsc(d.from||''),to:hbEsc(d.to||''),
-    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,seatsTotal:Number(d.seatsTotal!=null?d.seatsTotal:d.seats)||0,online:d.driverOnline!==false,tripDate:typeof d.date==='string'?d.date:'',createdMs:(d.createdAt&&d.createdAt.toMillis)?d.createdAt.toMillis():Date.now(),name:hbEsc(d.authorName||'ড্রাইভার'),
+    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,seatsTotal:Number(d.seatsTotal!=null?d.seatsTotal:d.seats)||0,anywhere:d.anywhere===true,online:d.driverOnline!==false,tripDate:typeof d.date==='string'?d.date:'',createdMs:(d.createdAt&&d.createdAt.toMillis)?d.createdAt.toMillis():Date.now(),name:hbEsc(d.authorName||'ড্রাইভার'),
     rating:'নতুন',reviews:0,verified:!!d.isVerified,car:hbEsc(d.vehicleModel||d.vehicleLabel||'তথ্য দেওয়া হয়নি'),ac:hbEsc(d.ac||''),
     plate:hbEsc(d.regNumber||''),color:hbEsc(d.vehicleColor||''),note:hbEsc(d.notes||d.text||''),phone:String(d.authorPhone||'').replace(/[^0-9+]/g,''),driverId:typeof d.authorId==='string'?d.authorId:'',
     driverPhoto:(typeof d.driverPhoto==='string'&&/^https:\/\/firebasestorage\.googleapis\.com\//.test(d.driverPhoto))?hbEsc(d.driverPhoto):'',
@@ -441,6 +441,7 @@ function hbNotExpired(r){ if(/^\d{4}-\d{2}-\d{2}$/.test(r.tripDate)) return r.tr
 function hbWords(x){ return hbUnesc(String(x||'')).toLowerCase().replace(/[,।.\-–→()]/g,' ').split(/\s+/).filter(w=>w.length>=2); }
 function hbMatchQ(r){
   const q=window.__q; if(!q) return true;
+  if(r.anywhere) return true; // "যেকোনো জায়গায় যেতে প্রস্তুত" — সব খোঁজায় দেখায়
   const hay=' '+hbWords((r.from||'')+' '+(r.to||'')+' '+(r.route||'')+' '+(r.note||'')).join(' ')+' ';
   const tw=hbWords(q.to); if(!tw.length) return true;
   return tw.some(w=>hay.includes(w));
