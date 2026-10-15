@@ -233,7 +233,7 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
 #detailContent [style*="background"]{background:rgba(255,255,255,.06)!important;color:#fff8e8}
 #detailContent .rating,.rating{color:#ffd166}
 .mapbox{filter:brightness(.8)}
-.toast{background:#ffb703;color:#1a1206;white-space:normal!important;width:max-content;max-width:calc(100% - 32px);text-align:center;line-height:1.5;border-radius:16px!important}
+.toast{z-index:10050!important;background:#ffb703;color:#1a1206;white-space:normal!important;width:max-content;max-width:calc(100% - 32px);text-align:center;line-height:1.5;border-radius:16px!important}
 .nav button.active{color:#ffb703!important}
 </style>
 </head>
@@ -287,6 +287,7 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
 <div id="bkSeatsWrap"><div class="formlabel">কয়টা আসন? <small id="bkSeatsHint"></small></div><input id="bkSeats" type="number" min="1" value="1" class="input"></div>
 <div class="formlabel">কিছু বলার থাকলে (ঐচ্ছিক)</div><input id="bkNote" class="input" maxlength="300">
 <div class="formlabel">📍 আপনার লোকেশন (বাধ্যতামূলক — চালক গ্রহণ করলে তবেই দেখবেন)</div><div id="bkLoc" class="hint" style="border-radius:12px;padding:10px 12px;line-height:1.55">⏳ লোকেশন নেওয়া হচ্ছে…</div><button type="button" class="textbtn" id="bkLocBtn" style="padding:6px 0" onclick="hbBookLoc(true)">◎ আবার লোকেশন নিন</button>
+<div id="bkErr" style="display:none;margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.5);color:#fca5a5;font-size:13px;line-height:1.55"></div>
 <button class="primary" id="bkSend" style="margin-top:16px" onclick="sendBooking()">📨 বুকিং অনুরোধ পাঠান</button></div></div>
 <section id="detailPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('searchPage')">‹</button><h1>গাড়ির বিস্তারিত</h1></div><div id="detailContent"></div></section>
 <section id="trackingPage" class="page"><div class="pagehead"><button class="back" onclick="showPage('bookingsPage')">‹</button><h1>যাত্রার তথ্য</h1></div><div class="mapbox"><div class="maproute"></div><div class="maplabel a">📍 ঢাকা</div><div class="maplabel b">📍 চাঁদপুর</div></div><div class="formcard"><b>🛰️ লাইভ ট্র্যাকিং</b><p class="hint">বাস্তব GPS ট্র্যাকিং চালু করতে অ্যাপের লোকেশন অনুমতি এবং backend সংযোগ প্রয়োজন। এই প্রোটোটাইপে শুধু ডিজাইন দেখানো হচ্ছে।</p><button class="primary" onclick="toast('ডেমো: চালকের সঙ্গে যোগাযোগ')">📞 চালকের সঙ্গে যোগাযোগ</button></div></section>
@@ -573,8 +574,16 @@ async function hbBookLoc(force){
     },{enableHighAccuracy:true,timeout:20000,maximumAge:60000});
   });
 }
+function hbBkErr(msg){ const el=document.getElementById('bkErr'); if(!el) return; el.style.display=msg?'':'none'; el.innerHTML=msg||''; if(msg) toast(String(msg).replace(/<[^>]*>/g,' ').slice(0,90)); }
+function hbBkErrText(e){
+  const code=(e&&e.code)||'', m=(e&&e.message)||String(e||'');
+  if(code==='permission-denied'||/permission/i.test(m)) return '❌ বুকিং সার্ভারে আটকে গেছে (permission-denied)।<br>পোস্টটা হয়তো আর চালু নেই বা আসন শেষ — পাতা রিফ্রেশ করে আবার চেষ্টা করুন। বারবার হলে এই লেখাটার ছবি পাঠান।';
+  if(code==='unavailable'||/offline|network/i.test(m)) return '📶 ইন্টারনেট নেই বা খুব ধীর — নেট দেখে আবার চাপুন।';
+  return '❌ পাঠানো যায়নি: '+hbEsc(m)+(code?' ('+hbEsc(code)+')':'');
+}
 async function sendBooking(){
   const r=__bkPost; if(!r) return;
+  hbBkErr('');
   const name=document.getElementById('bkName').value.trim(), phone=document.getElementById('bkPhone').value.trim();
   const goods=!(r.seatsTotal>0), seats=goods?0:Math.floor(Number(document.getElementById('bkSeats').value)||0);
   if(!name){ toast('আপনার নাম লিখুন'); return; }
@@ -582,10 +591,12 @@ async function sendBooking(){
   if(!goods&&(seats<1||seats>r.seats)){ toast(`১ থেকে ${r.seats}টা আসন বুক করা যায়`); return; }
   const btn=document.getElementById('bkSend'); btn.disabled=true; btn.textContent='পাঠানো হচ্ছে...';
   try{
-    const loc=await hbBookLoc(true); if(!loc){ btn.disabled=false; btn.textContent='📨 বুকিং অনুরোধ পাঠান'; return; }
+    btn.textContent='📍 লোকেশন দেখা হচ্ছে...';
+    const loc=await hbBookLoc(false); if(!loc){ btn.disabled=false; btn.textContent='📨 বুকিং অনুরোধ পাঠান'; hbBkErr('📍 লোকেশন পাওয়া যায়নি — উপরের লাল লেখা দেখে লোকেশন চালু করুন, তারপর আবার চাপুন।'); return; }
+    btn.textContent='পাঠানো হচ্ছে...';
     const uid=await hbMyUid(); if(!uid) throw new Error('লগইন করা যায়নি — ইন্টারনেট দেখুন');
     try{ localStorage.setItem('hbPassengerPhone',phone); }catch(e){}
-    hbPushSetup('customers',uid,true).then(ok=>{ const pb=document.getElementById('pushBtn'); if(pb&&ok) pb.style.display='none'; });
+    try{ hbPushSetup('customers',uid,true).then(ok=>{ const pb=document.getElementById('pushBtn'); if(pb&&ok) pb.style.display='none'; }).catch(()=>{}); }catch(e){}
     const ref=db.collection('transportBookings').doc(), b=db.batch();
     b.set(ref,{ postId:hbUnesc(r.id), driverId:r.driverId, passengerId:uid, passengerName:name.slice(0,60), seats,
       note:document.getElementById('bkNote').value.trim().slice(0,300),
@@ -593,11 +604,12 @@ async function sendBooking(){
       driverName:hbUnesc(r.name), driverPhone:r.phone||'', status:'pending',
       createdAt:firebase.firestore.FieldValue.serverTimestamp(), updatedAt:firebase.firestore.FieldValue.serverTimestamp() });
     b.set(ref.collection('private').doc('contact'),{ phone, passengerId:uid, lat:loc.lat, lng:loc.lng, acc:loc.acc, locAt:firebase.firestore.FieldValue.serverTimestamp() });
-    await b.commit();
+    // ⏱️ ২০ সেকেন্ডে সাড়া না এলে ঝুলে না থেকে জানানো
+    await Promise.race([b.commit(), new Promise((_,rej)=>setTimeout(()=>rej({code:'unavailable',message:'timeout'}),20000))]);
     closeBooking(); document.getElementById('bkNote').value='';
     toast('✅ বুকিং অনুরোধ গেছে — চালক গ্রহণ করলে এখানে জানাবে');
     showPage('bookingsPage');
-  }catch(e){ toast('পাঠানো যায়নি: '+e.message); }
+  }catch(e){ console.warn('booking failed',e); hbBkErr(hbBkErrText(e)); }
   btn.disabled=false; btn.textContent='📨 বুকিং অনুরোধ পাঠান';
 }
 const BK_LABEL={pending:'⏳ চালকের উত্তরের অপেক্ষা',accepted:'✅ চালক গ্রহণ করেছেন',declined:'❌ চালক নিতে পারছেন না',cancelled:'✕ আপনি বাতিল করেছেন',completed:'🏁 যাত্রা শেষ'};
