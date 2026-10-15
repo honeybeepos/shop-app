@@ -2114,6 +2114,7 @@
         <div style="font-size:32px;" id="tripStatusIcon">🔍</div>
         <div style="font-size:14px; font-weight:700;" id="tripStatusTitle">ড্রাইভার খোঁজা হচ্ছে...</div>
         <div style="font-size:11.5px; color:var(--muted);" id="tripStatusSub"></div>
+        <div id="tripDispatchInfo" style="display:none; margin-top:8px; font-size:12px; color:var(--amber); font-weight:700;"></div>
         <div id="tripCountdownTxt" style="font-size:11px; color:#fb923c; margin-top:4px; font-family:'Space Mono',monospace;"></div>
       </div>
       <div id="tripOffersList"></div>
@@ -11634,7 +11635,49 @@ loadMarkets();
    তাদের ভাড়া/ETA-সহ waitingList-এ নিজেদের যোগ করে (system স্বয়ংক্রিয়ভাবে
    একজনকে বেছে দেয় না) — যাত্রী নিজে সবচেয়ে ভালো অফারটা বেছে confirmedDriver
    সেট করে। এতে দুইজন ড্রাইভার একসাথে দাবি করার সমস্যা (race condition) হয় না। */
-let tripCurrentId = null, tripUnsub = null, tripCountdownInterval = null;
+let tripCurrentId = null, tripUnsub = null, tripCountdownInterval = null, __tripLast = null;
+/* 🚕 এক এক করে চালককে পাঠানো — যাত্রীর পর্দায় কততম চালককে পাঠানো হয়েছে আর কত সেকেন্ড বাকি।
+   যাত্রীর অ্যাপ খোলা থাকলে ৪০ সেকেন্ড পেরোলেই পরের জনকে দেয় (সার্ভারও প্রতি মিনিটে দেখে)। */
+function tripDispatchTick(tripId, trip){
+  const d = trip.dispatch, el = document.getElementById("tripDispatchInfo");
+  if(!d || (trip.status !== "searching" && trip.status !== "waiting_selection")){ if(el) el.style.display = "none"; return; }
+  if(d.active && Array.isArray(d.queue) && Date.now() > (Number(d.untilMs)||0) && !trip.__adv){
+    trip.__adv = true;
+    const ref = db.collection("trips").doc(tripId);
+    db.runTransaction(async (tx)=>{
+      const sn = await tx.get(ref); if(!sn.exists) return;
+      const t = sn.data(), x = t.dispatch;
+      if(!x || !x.active || x.pending || Date.now() < (Number(x.untilMs)||0)) return;
+      if(t.status !== "searching" && t.status !== "waiting_selection") return;
+      const ni = (Number(x.idx)||0) + 1, upd = { "dispatch.idx": ni, "dispatch.untilMs": Date.now() + 40000 };
+      if(ni >= x.queue.length || (t.waitingList||[]).length >= 3){ upd["dispatch.active"] = false; upd["dispatch.exhausted"] = true; }
+      tx.update(ref, upd);
+    }).catch(()=>{});
+  }
+  if(!el) return;
+  el.style.display = "block";
+  if(d.pending){ el.innerHTML = "🔎 কাছের চালক খোঁজা হচ্ছে..."; return; }
+  const n = Array.isArray(d.queue) ? d.queue.length : 0;
+  if(d.active && n){
+    const sec = Math.max(0, Math.ceil(((Number(d.untilMs)||0) - Date.now())/1000));
+    el.innerHTML = `📨 ${Math.min(d.idx+1, n)}/${n} নম্বর চালককে জানানো হয়েছে — ${sec} সেকেন্ড অপেক্ষা`;
+    return;
+  }
+  if(trip.status === "waiting_selection"){ el.style.display = "none"; return; }
+  el.innerHTML = (n ? `😕 কাছের ${n} জন চালক এখন সাড়া দেননি।` : "😕 এই মুহূর্তে কাছে কোনো চালক অনলাইনে নেই।")
+    + `<br><button type="button" id="tripRetryDispatchBtn" style="margin-top:8px; padding:9px 14px; border:none; border-radius:10px; background:var(--amber); color:#1a1408; font-weight:800; font-family:inherit; cursor:pointer;">🔄 আবার খুঁজুন</button>`;
+  const rb = document.getElementById("tripRetryDispatchBtn");
+  if(rb) rb.onclick = async ()=>{
+    rb.disabled = true; rb.textContent = "...";
+    try{
+      await db.collection("trips").doc(tripId).update({
+        "dispatch.pending": true, "dispatch.round": (Number(d.round)||1) + 1,
+        // আবার খুঁজলে যাত্রী আরও ৬ মিনিট পান
+        sessionExpiresAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 6*60*1000)
+      });
+    }catch(e){ rb.disabled = false; rb.textContent = "🔄 আবার খুঁজুন"; alert("হয়নি — আবার চেষ্টা করুন।"); }
+  };
+}
 
 // ⭐ Honey Bee Transport Media Phase 9 — Phase 8-এ যাত্রীরা রেটিং দেওয়া
 // শুরু করেছেন, কিন্তু সেটা এতদিন শুধু ড্রাইভারের নিজের ড্যাশবোর্ডেই দেখা
@@ -12943,7 +12986,9 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
       sessionExpiresAt: firebase.firestore.Timestamp.fromMillis(now + 6*60*1000), // ৬ মিনিটের মাস্টার টাইমার
       rejectedDrivers: [],
       waitingList: [],
-      confirmedDriver: { driverId: null, finalFare: 0, confirmedAt: null }
+      confirmedDriver: { driverId: null, finalFare: 0, confirmedAt: null },
+      // 🚕 এক এক করে কাছের ৫ জন চালককে, ৪০ সেকেন্ড করে — সার্ভার লাইন বানায় (onTripDispatch)
+      dispatch: { pending: true, round: 1, tried: [] }
     });
     tripCurrentId = tripRef.id;
     try{ localStorage.setItem("hbActiveTripId", tripCurrentId); }catch(e){}
@@ -12981,17 +13026,21 @@ async function tripGetPickupLocation(){
 
 function tripWatchTrip(tripId){
   if(tripUnsub) tripUnsub();
+  __tripLast = null;
   tripUnsub = db.collection("trips").doc(tripId).onSnapshot((doc)=>{
     if(!doc.exists) return;
     const trip = doc.data();
+    __tripLast = trip;
     tripRenderStatus(trip);
   });
 
+  // 💸 আগে প্রতি সেকেন্ডে সার্ভার থেকে ট্রিপ আবার পড়া হতো (মিনিটে ৬০টা read) —
+  //    এখন উপরের লাইভ snapshot-এর শেষ কপিটাই ব্যবহার হয়
   if(tripCountdownInterval) clearInterval(tripCountdownInterval);
   tripCountdownInterval = setInterval(()=>{
-    db.collection("trips").doc(tripId).get().then(doc=>{
-      if(!doc.exists) return;
-      const trip = doc.data();
+    Promise.resolve(__tripLast).then(trip=>{
+      if(!trip) return;
+      tripDispatchTick(tripId, trip);
       if(!trip.sessionExpiresAt) return;
       const msLeft = trip.sessionExpiresAt.toMillis() - Date.now();
       if(msLeft <= 0){

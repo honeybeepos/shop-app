@@ -20742,6 +20742,74 @@ function dmShowPassengerFeatureLockedMsg(){
   if(tripList) tripList.textContent = lockedMsg;
 }
 
+/* ==================== 🚕 এক এক করে চালককে পাঠানো (অক্টোবর ২০২৬) ====================
+   আগে যাত্রীর প্রতিটা রিকোয়েস্ট একসাথে সব অনলাইন চালক/রাইডারের কাছে যেত আর
+   সবার ফোন একসাথে বাজত। এখন সার্ভার (functions/index.js → onTripDispatch)
+   কাছের ৫ জনের একটা লাইন বানায় — trips/{id}.dispatch = { queue, idx, untilMs }।
+   একবারে শুধু একজন দেখেন, ৪০ সেকেন্ড সময় পান। Reject/অফার করলে বা সময়
+   শেষ হলে পরের জনের কাছে যায়। dispatch ছাড়া পুরনো ট্রিপ আগের মতোই সবাই দেখেন। */
+const HB_TRIP_TURN_MS = 40000;
+function hbTripVisibleTo(t, me){
+  const d = t.dispatch;
+  if(!d) return true; // পুরনো ধরনের ট্রিপ
+  if(d.pending || !d.active || !Array.isArray(d.queue)) return false;
+  return d.queue[d.idx] === me && Date.now() < (Number(d.untilMs)||0) + 2000;
+}
+function hbTripSecsLeft(t){
+  const d = t.dispatch; if(!d || !d.untilMs) return null;
+  return Math.max(0, Math.ceil((Number(d.untilMs) - Date.now())/1000));
+}
+// reason: "timeout" (সময় শেষ) | "reject" | "offer" — me শুধু reject/offer-এ লাগে
+async function hbTripAdvance(tripId, reason, me){
+  try{
+    const ref = db.collection("trips").doc(tripId);
+    await db.runTransaction(async (tx)=>{
+      const snap = await tx.get(ref); if(!snap.exists) return;
+      const t = snap.data(), d = t.dispatch;
+      if(!d || !d.active || d.pending || !Array.isArray(d.queue)) return;
+      if(t.status !== "searching" && t.status !== "waiting_selection") return;
+      if(reason === "timeout"){ if(Date.now() < (Number(d.untilMs)||0)) return; }
+      else if(d.queue[d.idx] !== me) return;
+      const ni = (Number(d.idx)||0) + 1;
+      const upd = { "dispatch.idx": ni, "dispatch.untilMs": Date.now() + HB_TRIP_TURN_MS };
+      if(ni >= d.queue.length || (t.waitingList||[]).length >= 3){ upd["dispatch.active"] = false; upd["dispatch.exhausted"] = true; }
+      tx.update(ref, upd);
+    });
+  }catch(e){ console.warn("trip advance:", e && e.message); }
+}
+function hbTripTurnBadge(t){
+  const sec = hbTripSecsLeft(t);
+  if(sec == null) return "";
+  return `<div class="hbTripTurn" data-until="${Number(t.dispatch.untilMs)||0}" style="background:rgba(251,191,36,0.14); border:1px solid rgba(251,191,36,0.45); border-radius:8px; padding:6px 8px; margin-bottom:8px; font-size:11.5px; color:#fbbf24; font-weight:800;">⏱️ শুধু আপনাকে পাঠানো হয়েছে — <span class="hbTripTurnSec">${sec}</span> সেকেন্ডের মধ্যে সাড়া দিন</div>`;
+}
+// প্রতি সেকেন্ডে: গোনা কমানো, নিজের সময় শেষ হলে পরের জনকে দেওয়া আর তালিকা আবার আঁকা
+let __hbTripTicker = null, __dmLastTrips = [], __rmLastTrips = [];
+function hbTripTickerStart(){
+  if(__hbTripTicker) return;
+  __hbTripTicker = setInterval(()=>{
+    document.querySelectorAll(".hbTripTurn").forEach(el=>{
+      const sec = Math.max(0, Math.ceil((Number(el.dataset.until) - Date.now())/1000));
+      const sp = el.querySelector(".hbTripTurnSec"); if(sp) sp.textContent = sec;
+    });
+    [["dm", __dmLastTrips, (typeof __dmDriverId !== "undefined") ? __dmDriverId : null],
+     ["rm", __rmLastTrips, (typeof rmCurrentRider !== "undefined" && rmCurrentRider) ? rmCurrentRider.uid : null]].forEach(([mode, list, me])=>{
+      if(!me || !list.length) return;
+      let changed = false;
+      list.forEach(t=>{
+        const d = t.dispatch;
+        if(d && d.active && Array.isArray(d.queue) && d.queue[d.idx] === me && Date.now() > (Number(d.untilMs)||0)){
+          if(!t.__hbAdv){ t.__hbAdv = true; hbTripAdvance(t.id, "timeout"); }
+          changed = true;
+        }
+      });
+      if(changed){
+        if(mode === "dm" && typeof dmRenderTripRequests === "function" && dmTripRequestsUnsub) dmRenderTripRequests(__dmLastTrips);
+        if(mode === "rm" && typeof rmRenderTripRequests === "function" && rmTripRequestsUnsub) rmRenderTripRequests(__rmLastTrips);
+      }
+    });
+  }, 1000);
+}
+
 /* ==================== 🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট — ভাড়া অফার করা ====================
    যাত্রী destination + vehicleType দিয়ে বুক করলে trips/{tripId} (status:'searching')
    তৈরি হয়। ড্রাইভার এখানে ভাড়া+ETA অফার করে waitingList-এ যোগ হন — যাত্রী নিজে
@@ -20754,6 +20822,7 @@ function dmListenTripRequests(){
     .where("status", "in", ["searching", "waiting_selection"])
     .onSnapshot((qs)=>{
       const trips = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+      __dmLastTrips = trips; hbTripTickerStart();
       dmRenderTripRequests(trips);
     }, (err)=> console.warn("trip requests listener error:", err));
 }
@@ -20795,6 +20864,7 @@ function dmRenderTripRequests(trips){
   }
 
   const relevant = trips.filter(t=>
+    hbTripVisibleTo(t, __dmDriverId) &&
     !(t.rejectedDrivers||[]).includes(__dmDriverId) &&
     !(t.waitingList||[]).some(o=> o.driverId === __dmDriverId)
   );
@@ -20829,7 +20899,7 @@ function dmRenderTripRequests(trips){
       <div style="background:#173a29; border:1px solid rgba(251,191,36,0.4); border-radius:12px; padding:12px; margin-bottom:10px;">
         <div style="font-weight:700; font-size:13px; color:#eafff2;">📍 ${escapeHtmlDm(t.destination||"—")}</div>
         <div style="font-size:11px; color:#a8d9c0; margin:2px 0 8px;">🚗 ${escapeHtmlDm(t.vehicleType||"")} · 🔒 নির্দিষ্ট ভাড়া</div>
-        ${dmAirportBadgeHtml(t)}
+        ${hbTripTurnBadge(t)}${dmAirportBadgeHtml(t)}
         <div style="font-weight:800; color:#fbbf24; font-size:16px; margin-bottom:8px;">${HB_CUR} ${t.proposedFare}</div>
         <div style="display:flex; gap:8px;">
           <button class="dmTripRejectBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#444; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ Reject</button>
@@ -20843,7 +20913,7 @@ function dmRenderTripRequests(trips){
     <div style="background:#173a29; border:1px solid rgba(74,222,128,0.2); border-radius:12px; padding:12px; margin-bottom:10px;">
       <div style="font-weight:700; font-size:13px; color:#eafff2;">📍 ${escapeHtmlDm(t.destination||"—")}</div>
       <div style="font-size:11px; color:#a8d9c0; margin:2px 0 8px;">🚗 ${escapeHtmlDm(t.vehicleType||"")} · ${waitCount}/3 জন ইতিমধ্যে অফার করেছেন</div>
-      ${dmAirportBadgeHtml(t)}
+      ${hbTripTurnBadge(t)}${dmAirportBadgeHtml(t)}
       <div style="display:flex; gap:8px;">
         <button class="dmTripRejectBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#444; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ Reject</button>
         <button class="dmTripOfferBtn" data-trip="${t.id}" ${isFull ? "disabled" : ""} style="flex:1; padding:8px; border:none; border-radius:8px; background:${isFull ? "#333" : "#16a34a"}; color:${isFull ? "#888" : "#fff"}; font-weight:800; font-size:11.5px; cursor:${isFull ? "not-allowed" : "pointer"}; font-family:inherit;">${isFull ? "🔒 ৩ জন পূর্ণ" : "💰 ভাড়া অফার করুন"}</button>
@@ -20853,7 +20923,7 @@ function dmRenderTripRequests(trips){
 
   listEl.querySelectorAll(".dmTripRejectBtn").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
-      try{ await db.collection("trips").doc(btn.dataset.trip).update({ rejectedDrivers: firebase.firestore.FieldValue.arrayUnion(__dmDriverId) }); }
+      try{ await db.collection("trips").doc(btn.dataset.trip).update({ rejectedDrivers: firebase.firestore.FieldValue.arrayUnion(__dmDriverId) }); hbTripAdvance(btn.dataset.trip, "reject", __dmDriverId); }
       catch(e){ alert("রিজেক্ট করা যায়নি: " + e.message); }
     });
   });
@@ -20946,6 +21016,7 @@ async function dmOfferTripFare(tripId){
     });
     // 🔵 ড্রাইভারের নিজস্ব স্ট্যাটাস আপডেট — এখন "on_waiting", তাই তাকে আর
     // নতুন ট্রিপ রিকোয়েস্ট দেখানো হবে না যতক্ষণ না এটার একটা সমাধান হয়
+    hbTripAdvance(tripId, "offer", __dmDriverId); // যাত্রী তুলনা করতে পারেন — লাইনের পরের জনকেও জানানো
     __dmDriver.currentStatus = "on_waiting"; __dmDriver.activeTripId = tripId;
     await db.collection("transportDrivers").doc(__dmDriverId).update({
       currentStatus: "on_waiting", activeTripId: tripId
@@ -22448,6 +22519,7 @@ function rmListenTripRequests(){
     .where("status", "in", ["searching", "waiting_selection"])
     .onSnapshot((qs)=>{
       const trips = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+      __rmLastTrips = trips; hbTripTickerStart();
       rmRenderTripRequests(trips);
     }, (err)=> console.warn("rm trip requests listener error:", err));
 }
@@ -22475,6 +22547,7 @@ function rmRenderTripRequests(trips){
   }
 
   const relevant = trips.filter(t=>
+    hbTripVisibleTo(t, rmCurrentRider.uid) &&
     !(t.rejectedDrivers||[]).includes(rmCurrentRider.uid) &&
     !(t.waitingList||[]).some(o=> o.driverId === rmCurrentRider.uid)
   );
@@ -22503,6 +22576,7 @@ function rmRenderTripRequests(trips){
     <div style="background:#2b2b2b; border:1px solid rgba(255,193,7,0.25); border-radius:12px; padding:12px; margin-bottom:10px;">
       <div style="font-weight:700; font-size:13px; color:#fff;">📍 ${escapeHtml(t.destination||"—")}</div>
       <div style="font-size:11px; color:#a8a8a8; margin:2px 0 8px;">🚗 ${escapeHtml(t.vehicleType||"")} · ${waitCount}/3 জন ইতিমধ্যে অফার করেছেন</div>
+      ${hbTripTurnBadge(t)}
       <div style="display:flex; gap:8px;">
         <button class="rmTripRejectBtn" data-trip="${t.id}" style="flex:1; padding:8px; border:none; border-radius:8px; background:#444; color:#fff; font-weight:800; font-size:11.5px; cursor:pointer; font-family:inherit;">❌ Reject</button>
         <button class="rmTripOfferBtn" data-trip="${t.id}" ${isFull ? "disabled" : ""} style="flex:1; padding:8px; border:none; border-radius:8px; background:${isFull ? "#3a3a3a" : "#FFC107"}; color:${isFull ? "#888" : "#1a1a1a"}; font-weight:800; font-size:11.5px; cursor:${isFull ? "not-allowed" : "pointer"}; font-family:inherit;">${isFull ? "🔒 ৩ জন পূর্ণ" : "💰 ভাড়া অফার করুন"}</button>
@@ -22512,7 +22586,7 @@ function rmRenderTripRequests(trips){
 
   listEl.querySelectorAll(".rmTripRejectBtn").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
-      try{ await db.collection("trips").doc(btn.dataset.trip).update({ rejectedDrivers: firebase.firestore.FieldValue.arrayUnion(rmCurrentRider.uid) }); }
+      try{ await db.collection("trips").doc(btn.dataset.trip).update({ rejectedDrivers: firebase.firestore.FieldValue.arrayUnion(rmCurrentRider.uid) }); hbTripAdvance(btn.dataset.trip, "reject", rmCurrentRider.uid); }
       catch(e){ alert("রিজেক্ট করা যায়নি: " + e.message); }
     });
   });
@@ -22557,6 +22631,7 @@ async function rmOfferTripFare(tripId){
       waitingList: firebase.firestore.FieldValue.arrayUnion(offer),
       status: "waiting_selection"
     });
+    hbTripAdvance(tripId, "offer", rmCurrentRider.uid);
     rmCurrentRider.currentStatus = "on_waiting"; rmCurrentRider.activeTripId = tripId;
     await db.collection("riders").doc(rmCurrentRider.uid).update({ currentStatus: "on_waiting", activeTripId: tripId });
     rmWatchActiveTrip(tripId);
