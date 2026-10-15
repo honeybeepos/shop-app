@@ -68,7 +68,8 @@ const aviationstackApiKey = defineSecret("AVIATIONSTACK_API_KEY");
 // আসে না আর পেইড প্ল্যানে মাসিক খরচ — গণিতে একই ফল বিনামূল্যে পাওয়া যায়
 // বলে নির্ভরতাটা বাদ দেওয়া হয়েছে)।
 
-const OFFER_TIMEOUT_SECONDS = 60;
+const OFFER_TIMEOUT_SECONDS = 40; // ⏱️ প্রতি রাইডার ৪০ সেকেন্ড (অক্টোবর ২০২৬ — আগে ৬০)
+const MAX_RIDERS_PER_ORDER = 5;  // 🔁 এক অর্ডার সর্বোচ্চ ৫ জন রাইডারের কাছে, এক এক করে
 // রাইডার/এজেন্ট/হানি-বি — আয়ের ভাগ (Phase 5 ব্লুপ্রিন্ট অনুযায়ী: ৭০/২০/১০)
 const RIDER_SHARE = 0.7;
 // একজন রাইডারকে একসাথে সর্বোচ্চ কতগুলো চলমান (shipped) অর্ডার দেওয়া যাবে —
@@ -459,15 +460,41 @@ exports.onDeliveryCall = onDocumentCreated(
 function riderEligibilityQuery() {
   return db.collection("riders")
     .where("online", "==", true)
-    .where("transportModeOn", "==", false)
+    // 🔀 ডেলিভারি আর যাত্রী এখন এক সাথে — Transport Mode চালু থাকলেও ডেলিভারি পান
     .where("status", "==", "active")
     .where("currentStatus", "==", "available");
 }
 
 async function dispatchOrderToNearestRider(orderId, orderData, excludeRiderIds) {
-  const shopDoc = await db.collection("shops").doc(orderData.shopId).get();
+  // 🔁 ৫ জন রাইডার কেউ নিলেন না → আর কারো ফোনে বাজানো হয় না; দোকান নিজে বেছে দেবে
+  //    (dispatchState "waiting_for_rider" হলে onOrderPushHub দোকানকে জানায়)
+  if ((excludeRiderIds || []).length >= MAX_RIDERS_PER_ORDER) {
+    console.log(JSON.stringify({ event: "MAX_RIDERS_TRIED", orderId }));
+    await db.collection("orderRequests").doc(orderId).set({ dispatchState: "waiting_for_rider" }, { merge: true });
+    return null;
+  }
+  // 🍽️ বিক্রেতা দোকান না রেস্টুরেন্ট — দুই জায়গাতেই দেখা (আগে শুধু দোকান দেখত,
+  //    তাই রেস্টুরেন্টের অর্ডারে রাইডার নাম/লোকেশন পেতেন না)
+  let shopDoc = await db.collection("shops").doc(orderData.shopId).get();
+  let pickupIsRestaurant = false;
+  if (!shopDoc.exists) {
+    const rDoc = await db.collection("restaurants").doc(orderData.shopId).get();
+    if (rDoc.exists) { shopDoc = rDoc; pickupIsRestaurant = true; }
+  }
   const shopData = shopDoc.exists ? shopDoc.data() : {};
-  const shopName = shopData.name || shopData.shopName || "দোকান";
+  const shopName = shopData.name || shopData.shopName || (pickupIsRestaurant ? "রেস্টুরেন্ট" : "দোকান");
+  const pickupAddress = shopData.address || shopData.shopAddress || (shopData.storeLocation && shopData.storeLocation.address) || null;
+  // 💰 এই দোকানের ডেলিভারি চার্জ — রসিদের সিল করা হিসাব থেকে (একাধিক দোকানের রসিদে নিজের দলেরটা)
+  let deliveryCharge = null;
+  try {
+    const dl = orderData.delivery || {};
+    if (dl.chargeId) {
+      const cs = await db.collection("orderDeliveryCharges").doc(dl.chargeId).get();
+      const g = cs.exists ? (cs.data().groups || []).find((x) => (x.sourceIds || []).includes(orderData.shopId)) : null;
+      if (g && typeof g.total === "number") deliveryCharge = g.total;
+    }
+    if (deliveryCharge == null && typeof dl.charge === "number" && dl.charge > 0) deliveryCharge = dl.charge;
+  } catch (e) { console.warn("DELIVERY_CHARGE_LOOKUP_FAILED", String(e && e.message || e)); }
   const shopMarketId = shopData.marketId || null;
   const storeLoc = shopData.storeLocation || null;
   const dropLoc = (orderData.deliveryLat != null && orderData.deliveryLng != null)
@@ -553,7 +580,9 @@ async function dispatchOrderToNearestRider(orderId, orderData, excludeRiderIds) 
     shopId: orderData.shopId, orderId, // 🔗 callId-এর জায়গায় orderId — একই কালেকশন পুনর্ব্যবহার
     riderId: chosen.id,
     status: "pending",
-    pickupName: shopName,
+    pickupName: shopName, pickupIsRestaurant, pickupAddress,
+    orderCode: orderData.orderCode || null, // 🧾 ইনভয়েস নম্বর — দোকানের রসিদে বড় করে যেটা ছাপা হয়
+    deliveryCharge,
     pickupLat: storeLoc ? storeLoc.lat : null, pickupLng: storeLoc ? storeLoc.lng : null,
     dropLat: dropLoc ? dropLoc.lat : null, dropLng: dropLoc ? dropLoc.lng : null,
     dropAddress: orderData.deliveryAddress || null, // ইতিমধ্যেই আছে — নতুন করে reverse-geocode করতে হয়নি
@@ -578,8 +607,8 @@ async function dispatchOrderToNearestRider(orderId, orderData, excludeRiderIds) 
 
   await sendFcmToRider(
     chosen.id,
-    "🚚 নতুন Delivery Order",
-    "আপনার কাছে একটি Delivery Offer এসেছে — ১ মিনিটের মধ্যে গ্রহণ করুন",
+    "📦 ডেলিভারি করতে ইচ্ছুক?",
+    `${shopName}${orderData.orderCode ? " · ইনভয়েস " + orderData.orderCode : ""}${deliveryCharge != null ? " · চার্জ ৳" + Math.round(deliveryCharge) : ""} — ৪০ সেকেন্ডের মধ্যে সাড়া দিন`,
     { offerId: offerRef.id, orderId }
   );
 
@@ -775,7 +804,7 @@ exports.onOfferAccepted = onDocumentUpdated(
   }
 );
 
-exports.checkExpiredOffers = onSchedule("every 2 minutes", async () => {
+exports.checkExpiredOffers = onSchedule("every 1 minutes", async () => {
   const now = Timestamp.now();
   const expiredSnap = await db.collection("deliveryOffers")
     .where("status", "==", "pending")
@@ -3153,4 +3182,121 @@ exports.onDeliveryCallAnswered = onDocumentUpdated("shops/{shopId}/deliveryCalls
   } catch (err) {
     console.error("onDeliveryCallAnswered ব্যর্থ:", err);
   }
+});
+
+/* ==================== 🚕 গন্তব্য-ভিত্তিক ট্রিপ — এক এক করে ৫ জনকে, ৪০ সেকেন্ড করে (অক্টোবর ২০২৬) ====================
+   আগে Bazar-এর "গন্তব্য দিয়ে বুক করুন" ট্রিপ একসাথে সব অনলাইন চালক/রাইডারের ফোনে
+   বাজত। এখন Bazar ট্রিপ বানানোর সময় dispatch.pending:true লেখে; এখানে কাছের ৫
+   জনের লাইন বানানো হয় (Transport Mode চালু রাইডার + এজেন্টের যোগ করা ড্রাইভার)।
+   একবারে একজন — শুধু তাঁর অ্যাপে দেখায় আর শুধু তাঁর ফোনে পুশ যায়। ৪০ সেকেন্ডে সাড়া
+   না দিলে/Reject করলে/অফার দিলে পরের জন। অ্যাপগুলো নিজেরাই সময় ধরে এগিয়ে নেয়;
+   সবার অ্যাপ বন্ধ থাকলে নিচের প্রতি-মিনিটের পাহারাদার এগিয়ে দেয়।
+   "আবার খুঁজুন" চাপলে আগের জনদের বাদ দিয়ে নতুন ৫ জন। */
+const TRIP_TURN_MS = 40 * 1000;
+const TRIP_QUEUE_SIZE = 5;
+const TRIP_MAX_KM = 25;
+
+async function tripBuildQueue(trip, exclude) {
+  const ex = new Set(exclude || []);
+  const p = trip.pickupLocation || {};
+  const hasPickup = p.lat != null && p.lng != null;
+  const cands = [];
+  const busy = (x) => x.currentStatus === "on_trip" || x.currentStatus === "on_waiting";
+  try {
+    const rs = await db.collection("riders").where("online", "==", true).get(); // 🔀 ডেলিভারি+যাত্রী এক সাথে
+    rs.docs.forEach((d) => { const r = d.data(); if (r.status && r.status !== "active") return; if (busy(r)) return; cands.push({ id: d.id, kind: "rider", loc: r.liveLocation }); });
+  } catch (e) { console.warn("TRIP_QUEUE_RIDERS_FAILED", String(e && e.message || e)); }
+  try {
+    const ds = await db.collection("transportDrivers").where("driverStatus", "==", "online").get();
+    ds.docs.forEach((d) => { const r = d.data(); if (r.createdByAgent !== true) return; if (r.status === "blocked") return; if (busy(r)) return; cands.push({ id: d.id, kind: "driver", loc: r.liveLocation }); });
+  } catch (e) { console.warn("TRIP_QUEUE_DRIVERS_FAILED", String(e && e.message || e)); }
+  const seen = new Set();
+  let list = cands.filter((c) => !ex.has(c.id) && !seen.has(c.id) && seen.add(c.id));
+  list.forEach((c) => {
+    c.km = (hasPickup && c.loc && c.loc.lat != null) ? haversineKm(p.lat, p.lng, c.loc.lat, c.loc.lng) : null;
+  });
+  if (hasPickup) list = list.filter((c) => c.km == null || c.km <= TRIP_MAX_KM);
+  list.sort((a, b) => (a.km == null ? 1e9 : a.km) - (b.km == null ? 1e9 : b.km));
+  return list.slice(0, TRIP_QUEUE_SIZE);
+}
+
+async function tripPushTurn(tripId, trip, uid, kinds) {
+  const title = `🚕 নতুন যাত্রী — গন্তব্য: ${trip.destination || "—"}`;
+  const body = `${trip.fareType === "fixed" ? "নির্দিষ্ট ভাড়া " + (trip.proposedFare || "") + " · " : ""}শুধু আপনাকে পাঠানো হয়েছে — ৪০ সেকেন্ডের মধ্যে অ্যাপ খুলে সাড়া দিন।`;
+  const payload = { type: "trip-turn", tag: `trip-turn-${tripId}`, tripId, title, body };
+  const kind = (kinds && kinds[uid]) || "rider";
+  if (kind === "rider") return pushToRiderHub(uid, payload);
+  const snap = await db.collection("transportDrivers").doc(uid).get();
+  const token = snap.exists ? snap.data().fcmToken : null;
+  if (!token) return false;
+  try {
+    await getMessaging().send({ token, data: hubData(Object.assign({ link: RIDER_MODE_URL }, payload)), webpush: { headers: { Urgency: "high" } } });
+    return true;
+  } catch (e) {
+    if (DEAD_TOKEN(e)) await snap.ref.update({ fcmToken: FieldValue.delete() }).catch(() => {});
+    return false;
+  }
+}
+
+async function tripAdvance(ref, force) {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref); if (!snap.exists) return null;
+    const t = snap.data(), d = t.dispatch;
+    if (!d || !d.active || d.pending || !Array.isArray(d.queue)) return null;
+    const live = (t.status === "searching" || t.status === "waiting_selection") &&
+      !(t.sessionExpiresAt && t.sessionExpiresAt.toMillis && t.sessionExpiresAt.toMillis() < Date.now());
+    if (!live) { tx.update(ref, { "dispatch.active": false }); return null; }
+    if (!force && Date.now() < (Number(d.untilMs) || 0) + 3000) return null;
+    const ni = (Number(d.idx) || 0) + 1;
+    const upd = { "dispatch.idx": ni, "dispatch.untilMs": Date.now() + TRIP_TURN_MS };
+    if (ni >= d.queue.length || (t.waitingList || []).length >= 3) { upd["dispatch.active"] = false; upd["dispatch.exhausted"] = true; }
+    tx.update(ref, upd);
+    return ni;
+  });
+}
+
+exports.onTripDispatch = onDocumentWritten("trips/{tripId}", async (event) => {
+  try {
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    if (!after || !after.dispatch) return;
+    const before = event.data.before.exists ? event.data.before.data() : {};
+    const tripId = event.params.tripId;
+    const ref = db.collection("trips").doc(tripId);
+    const d = after.dispatch;
+
+    // ১) লাইন বানানো (নতুন ট্রিপ বা "আবার খুঁজুন")
+    if (d.pending === true) {
+      if (after.status !== "searching" && after.status !== "waiting_selection") return;
+      const tried = Array.isArray(d.tried) ? d.tried : [];
+      const exclude = tried.concat(after.rejectedDrivers || [], (after.waitingList || []).map((o) => o.driverId));
+      const q = await tripBuildQueue(after, exclude);
+      const kinds = {}; q.forEach((c) => { kinds[c.id] = c.kind; });
+      await ref.update({
+        dispatch: {
+          pending: false, queue: q.map((c) => c.id), kinds, idx: 0,
+          untilMs: Date.now() + TRIP_TURN_MS, active: q.length > 0, exhausted: q.length === 0,
+          tried: tried.concat(q.map((c) => c.id)), round: (Number(d.round) || 1),
+        },
+      });
+      console.log(JSON.stringify({ event: "TRIP_QUEUE_BUILT", tripId, size: q.length }));
+      return; // এই লেখাটাই আবার এই ফাংশন চালাবে — তখন প্রথম জনকে পুশ যাবে
+    }
+
+    // ২) যাঁর পালা এলো, শুধু তাঁকে পুশ
+    const bd = before.dispatch || {};
+    if (!d.active || !Array.isArray(d.queue)) return;
+    const cur = d.queue[d.idx];
+    const prev = (!bd.pending && Array.isArray(bd.queue)) ? bd.queue[bd.idx] : null;
+    if (!cur || (cur === prev && bd.active)) return;
+    await tripPushTurn(tripId, after, cur, d.kinds);
+  } catch (err) {
+    console.error("onTripDispatch ব্যর্থ:", err);
+  }
+});
+
+// ⏱️ পাহারাদার — কারো অ্যাপ খোলা না থাকলেও ৪০ সেকেন্ড পেরোলে পরের জনের কাছে যায়
+exports.advanceTripDispatch = onSchedule("every 1 minutes", async () => {
+  const snap = await db.collection("trips").where("dispatch.active", "==", true).limit(100).get();
+  if (snap.empty) return;
+  await Promise.all(snap.docs.map((doc) => tripAdvance(doc.ref, false).catch((e) => console.warn("TRIP_ADVANCE_FAILED", doc.id, String(e && e.message || e)))));
 });
