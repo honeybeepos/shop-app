@@ -190,7 +190,7 @@ async function sendFcmToRider(riderId, title, body, data) {
       token,
       notification: { title, body },
       data: Object.assign({ type: "delivery-offer" }, data || {}),
-      webpush: { fcmOptions: { link: RIDER_MODE_URL } },
+      webpush: { fcmOptions: { link: riderAppUrl(riderDoc.data()) } },
     });
     console.log(JSON.stringify({ event: "FCM_SENT", riderId }));
     return true;
@@ -3003,4 +3003,154 @@ exports.onTransportBookingNotify = onDocumentWritten("transportBookings/{bid}", 
     completed: ["🏁 যাত্রা শেষ — চালককে রেটিং দিন", `${route} — আপনার মতামত অন্য যাত্রীদের সাহায্য করবে।`],
   }[after.status];
   if (msg) await tmPush("customers", after.passengerId, msg[0], msg[1], pData, TM_PASSENGER_URL);
+});
+
+/* ==================== 🔔 অর্ডার-খবরের পুশ হাব (অক্টোবর ২০২৬) ====================
+   দোকান, রেস্টুরেন্ট আর রাইডারের মধ্যে যা যা খবর আদান-প্রদান হয়, অ্যাপ বন্ধ
+   থাকলেও সেগুলোর পুশ নোটিফিকেশন যায়। সব পুশ শুধু "data" হিসেবে যায় —
+   firebase-messaging-sw.js নিজে দেখায় (title/body/link/tag data-তেই থাকে),
+   তাই ডাবল নোটিফিকেশন হয় না আর চাপ দিলে ঠিক অ্যাপটাই খোলে।
+   ⚠️ আগের পুশগুলো (গ্রাহক, রেস্টুরেন্টের নতুন অর্ডার, রাইডারের অফার) যেমন
+      ছিল তেমনই আছে — এটা শুধু যেগুলো একদমই যেত না সেগুলো যোগ করে।        */
+const SHOP_POS_URL = `${APP_DOMAIN}/shop-ledger-app.html?open=orders`;
+const RESTAURANT_POS_URL = `${APP_DOMAIN}/restaurant-pos.html`;
+const RIDER_APPS = ["shop-ledger-app.html", "delivery-man-app.html"];
+function riderAppUrl(r) {
+  const app = r && RIDER_APPS.includes(r.fcmApp) ? r.fcmApp : "shop-ledger-app.html";
+  return `${APP_DOMAIN}/${app}`;
+}
+function hubData(o) {
+  const d = {};
+  Object.keys(o).forEach((k) => { if (o[k] != null) d[k] = String(o[k]); });
+  return d;
+}
+const DEAD_TOKEN = (e) => e && (e.code === "messaging/registration-token-not-registered" || e.code === "messaging/invalid-registration-token");
+
+// 🏪 দোকানের সব ডিভাইস (মালিক + স্টাফ) — shops/{shopId}/pushTokens/{uid}
+async function pushToShop(shopId, payload) {
+  const snap = await db.collection("shops").doc(shopId).collection("pushTokens").get();
+  const docs = snap.docs.filter((d) => d.data() && d.data().token);
+  if (!docs.length) return false;
+  const tokens = docs.map((d) => d.data().token);
+  const res = await getMessaging().sendEachForMulticast({
+    tokens, data: hubData(Object.assign({ link: SHOP_POS_URL }, payload)), webpush: { headers: { Urgency: "high" } },
+  });
+  await Promise.all(res.responses.map((r, i) => (!r.success && DEAD_TOKEN(r.error)) ? docs[i].ref.delete().catch(() => {}) : null));
+  return res.successCount > 0;
+}
+async function pushToRestaurant(rid, payload) {
+  const snap = await db.collection("restaurants").doc(rid).get();
+  const token = snap.exists ? snap.data().fcmToken : null;
+  if (!token) return false;
+  try {
+    await getMessaging().send({ token, data: hubData(Object.assign({ link: RESTAURANT_POS_URL }, payload)), webpush: { headers: { Urgency: "high" } } });
+    return true;
+  } catch (e) {
+    if (DEAD_TOKEN(e)) await snap.ref.update({ fcmToken: FieldValue.delete() }).catch(() => {});
+    return false;
+  }
+}
+async function pushToRiderHub(riderId, payload) {
+  const snap = await db.collection("riders").doc(riderId).get();
+  const token = snap.exists ? snap.data().fcmToken : null;
+  if (!token) return false;
+  try {
+    await getMessaging().send({ token, data: hubData(Object.assign({ link: riderAppUrl(snap.data()) }, payload)), webpush: { headers: { Urgency: "high" } } });
+    return true;
+  } catch (e) {
+    if (DEAD_TOKEN(e)) await snap.ref.update({ fcmToken: FieldValue.delete() }).catch(() => {});
+    return false;
+  }
+}
+// বিক্রেতা রেস্টুরেন্ট না দোকান — সেই অনুযায়ী তার ফোনে পাঠানো
+async function pushToSeller(shopId, payload) {
+  const r = await db.collection("restaurants").doc(shopId).get();
+  if (r.exists) return pushToRestaurant(shopId, payload);
+  return pushToShop(shopId, payload);
+}
+
+exports.onOrderPushHub = onDocumentWritten("orderRequests/{orderId}", async (event) => {
+  try {
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    if (!after || !after.shopId) return;
+    const b = event.data.before.exists ? event.data.before.data() : {};
+    const orderId = event.params.orderId;
+    const qty = Number(after.qty) || 1;
+    const item = `${after.productName || "প্রোডাক্ট"}${qty > 1 ? " ×" + qty : ""}`;
+    const who = after.customerName || "গ্রাহক";
+    const receipt = `${after.customerUid || "g"}-${after.orderCode || orderId}`;
+    const jobs = [];
+
+    // ১) দোকানে নতুন অর্ডার (রেস্টুরেন্টেরটা notifyRestaurantNewOrder আগে থেকেই পাঠায়)
+    if (after.status === "pending" && b.status !== "pending") {
+      const isRest = (await db.collection("restaurants").doc(after.shopId).get()).exists;
+      if (!isRest) {
+        jobs.push(pushToShop(after.shopId, { type: "shop-new-order", tag: `shop-new-${receipt}`,
+          title: "🔔 নতুন অর্ডার এসেছে!", body: `${item} — ${who}। চাপ দিয়ে গ্রহণ করুন।` }));
+      }
+    }
+
+    // ২) রাইডার বসানো হলো
+    if (after.assignedRiderId && after.assignedRiderId !== b.assignedRiderId && b.dispatchState !== "batched") {
+      let auto = false;
+      if (b.dispatchState === "offer_sent" && b.currentOfferId) {
+        const off = await db.collection("deliveryOffers").doc(b.currentOfferId).get().catch(() => null);
+        auto = !!(off && off.exists && off.data().riderId === after.assignedRiderId);
+      }
+      const riderName = after.assignedRiderName || "রাইডার";
+      if (auto) {
+        // রাইডার নিজে অফার নিয়েছেন → দোকান/রেস্টুরেন্টকে জানানো
+        jobs.push(pushToSeller(after.shopId, { type: "shop-rider-assigned", tag: `shop-rider-${receipt}`,
+          title: `🛵 রাইডার ${riderName} অর্ডার নিয়েছেন`, body: `${item} (${who}) — মাল তুলতে আসছেন, প্রস্তুত রাখুন।` }));
+      } else {
+        // দোকান/রেস্টুরেন্ট হাতে রাইডার বেছে দিয়েছে → রাইডারকে জানানো
+        const seller = await sellerDisplayName(after.shopId);
+        jobs.push(pushToRiderHub(after.assignedRiderId, { type: "rider-assigned", tag: `rider-new-${receipt}`, orderId,
+          title: "🚚 নতুন ডেলিভারি এসাইন হয়েছে", body: `${seller} থেকে ${item} — দোকানে গিয়ে মাল তুলুন।` }));
+      }
+    }
+
+    // ৩) কোনো রাইডার পাওয়া যায়নি
+    if (after.dispatchState === "waiting_for_rider" && b.dispatchState !== "waiting_for_rider") {
+      jobs.push(pushToSeller(after.shopId, { type: "shop-no-rider", tag: `shop-norider-${receipt}`,
+        title: "⚠️ এখন কোনো রাইডার পাওয়া যায়নি", body: `${item} (${who}) — অর্ডারে গিয়ে নিজে রাইডার বেছে দিন বা নিজে পাঠান।` }));
+    }
+
+    // ৪) রাইডার মাল তুলে নিয়েছেন
+    if (after.pickedUp === true && b.pickedUp !== true) {
+      jobs.push(pushToSeller(after.shopId, { type: "shop-picked-up", tag: `shop-pick-${receipt}`,
+        title: "📦 রাইডার মাল তুলে নিয়েছেন", body: `${after.assignedRiderName || "রাইডার"} — ${item} নিয়ে ${who}-এর কাছে রওনা দিয়েছেন।` }));
+    }
+
+    // ৫) পৌঁছে গেছে (রাইডার/গ্রাহক জানালে — দোকান নিজে চাপলে নিজেকে আর জানানো হয় না)
+    if (after.status === "delivered" && b.status && b.status !== "delivered" && after.assignedRiderId) {
+      jobs.push(pushToSeller(after.shopId, { type: "shop-delivered", tag: `shop-done-${receipt}`,
+        title: "✅ অর্ডার পৌঁছে গেছে", body: `${item} — ${who} বুঝে পেয়েছেন।` }));
+    }
+
+    // ৬) রাইডার বসানোর পরে অর্ডার বাতিল
+    if (after.status === "cancelled" && b.status && b.status !== "cancelled" && after.assignedRiderId) {
+      const seller = await sellerDisplayName(after.shopId);
+      jobs.push(pushToRiderHub(after.assignedRiderId, { type: "rider-cancelled", tag: `rider-cancel-${receipt}`, orderId,
+        title: "❌ ডেলিভারি বাতিল হয়েছে", body: `${seller}-এর ${item} অর্ডারটি বাতিল — আর যেতে হবে না।` }));
+    }
+
+    if (jobs.length) await Promise.all(jobs.map((j) => j.catch((e) => console.warn("ORDER_HUB_PUSH_FAILED", String(e && e.message || e)))));
+  } catch (err) {
+    console.error("onOrderPushHub ব্যর্থ:", err);
+  }
+});
+
+// 📞 পুরনো "রাইডার ডাকুন" (deliveryCalls) — রাইডার সাড়া দিলে দোকানকে জানানো
+exports.onDeliveryCallAnswered = onDocumentUpdated("shops/{shopId}/deliveryCalls/{callId}", async (event) => {
+  try {
+    const b = event.data.before.data() || {}, a = event.data.after.data() || {};
+    if (!a.assignedRiderId || a.assignedRiderId === b.assignedRiderId) return;
+    const r = await db.collection("riders").doc(a.assignedRiderId).get();
+    const name = (r.exists && r.data().name) || "একজন রাইডার";
+    await pushToShop(event.params.shopId, { type: "shop-call-answered", tag: `shop-call-${event.params.callId}`,
+      title: `🛵 ${name} আপনার ডাকে সাড়া দিয়েছেন`, body: "রাইডার দোকানে আসছেন — মাল প্রস্তুত রাখুন।" });
+  } catch (err) {
+    console.error("onDeliveryCallAnswered ব্যর্থ:", err);
+  }
 });
