@@ -2950,12 +2950,18 @@ exports.panchangDailyReminder = onSchedule("every 60 minutes", async () => {
 const TM_DRIVER_URL = `${APP_DOMAIN}/honey-bee-driver.html#bookings`;
 const TM_PASSENGER_URL = `${APP_DOMAIN}/honey-bee-transport.html?page=bookings`;
 
-async function tmPush(col, uid, title, body, data, link) {
+async function tmPush(col, uid, title, body, data, link, withActions) {
   try {
     const snap = await db.collection(col).doc(uid).get();
     const token = snap.exists ? snap.data().fcmToken : null;
     if (!token) return false;
-    await getMessaging().send({
+    // withActions — শুধু data পাঠানো হয়, যাতে firebase-messaging-sw.js নিজে
+    // "✅ গ্রহণ করুন / ❌ বাতিল করুন" বোতামসহ নোটিফিকেশন দেখাতে পারে
+    await getMessaging().send(withActions ? {
+      token,
+      data: Object.assign({}, data, { link, title, body, actions: "1" }),
+      webpush: { headers: { Urgency: "high" } },
+    } : {
       token,
       notification: { title, body },
       data: Object.assign({}, data, { link }),
@@ -2983,8 +2989,8 @@ exports.onTransportBookingNotify = onDocumentWritten("transportBookings/{bid}", 
   const pData = { type: "tm-booking-passenger", bookingId: bid };
 
   if (!before && after.status === "pending") {
-    await tmPush("transportDrivers", after.driverId, "🎫 নতুন বুকিং অনুরোধ",
-      `${after.passengerName || "একজন যাত্রী"} — ${route} (${what})। চাপ দিয়ে গ্রহণ করুন।`, dData, TM_DRIVER_URL);
+    await tmPush("transportDrivers", after.driverId, `🎫 নতুন বুকিং — ${after.passengerName || "একজন যাত্রী"}`,
+      `👤 ${after.passengerName || "একজন যাত্রী"} · ${route} (${what})`, dData, TM_DRIVER_URL, true);
     return;
   }
   if (after.status === "cancelled") {
