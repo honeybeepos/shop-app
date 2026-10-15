@@ -353,18 +353,19 @@
 <!-- ══════════ নতুন অর্ডারের অফার ══════════ -->
 <div id="offerOverlay">
   <div class="ring">📦</div>
-  <div class="timerBig" id="offerTimer">৬০</div>
-  <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">সেকেন্ডের মধ্যে সাড়া দিন</div>
+  <div style="font-size:18px; font-weight:800; margin-bottom:2px;">ডেলিভারি করতে ইচ্ছুক?</div>
+  <div class="timerBig" id="offerTimer">৪০</div>
+  <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">সেকেন্ডের মধ্যে সাড়া দিন — না চাইলে পরের জনের কাছে যাবে</div>
   <div class="offerBox">
-    <div class="offerRow"><span class="k" id="offerPickupIcon">🏪</span><span id="offerPickup">—</span></div>
-    <div class="offerRow"><span class="k">🧾</span><span id="offerCode">—</span></div>
-    <div class="offerRow"><span class="k">📍</span><span id="offerDrop">—</span></div>
+    <div class="offerRow"><span class="k">🧾</span><span>ইনভয়েস নম্বর: <b id="offerCode" style="font-size:17px; letter-spacing:3px; color:var(--amber);">—</b></span></div>
+    <div class="offerRow"><span class="k" id="offerPickupIcon">🏪</span><span><b>দোকানের লোকেশন:</b> <span id="offerPickup">—</span> <small id="offerPickupAddr" style="color:var(--muted);"></small> <a id="offerPickupMap" target="_blank" rel="noopener" style="color:var(--amber); font-weight:800; display:none;">🗺️ ম্যাপ</a></span></div>
+    <div class="offerRow"><span class="k">👤</span><span><b>কাস্টমারের লোকেশন:</b> <span id="offerDrop">—</span> <a id="offerDropMap" target="_blank" rel="noopener" style="color:var(--amber); font-weight:800; display:none;">🗺️ ম্যাপ</a></span></div>
     <div class="offerRow"><span class="k">📏</span><span id="offerDist">—</span></div>
-    <div class="offerRow"><span class="k">💰</span><span id="offerIncome">—</span></div>
+    <div class="offerRow"><span class="k">💰</span><span>ডেলিভারি চার্জ: <b id="offerIncome">—</b></span></div>
   </div>
   <div class="offerBtns">
-    <button class="btn ok" id="offerAcceptBtn">✅ অর্ডারটা নিচ্ছি</button>
-    <button class="btn ghost" id="offerSkipBtn">পরেরটা দেখি</button>
+    <button class="btn ok" id="offerAcceptBtn">✅ হ্যাঁ, ডেলিভারি করব</button>
+    <button class="btn ghost" id="offerSkipBtn">❌ না, পারব না</button>
   </div>
 </div>
 
@@ -672,14 +673,21 @@ function showOffer(offerId, o){
   // আইকনটা লেখার সাথে জুড়লে পাশের স্থির আইকনটার সাথে দুইটা পাশাপাশি পড়ত
   $("offerPickupIcon").textContent = o.pickupIsRestaurant ? "🍽️" : "🏪";
   $("offerPickup").textContent = o.pickupName || (o.pickupIsRestaurant ? "রেস্টুরেন্ট" : "দোকান");
-  $("offerCode").textContent = o.orderCode ? ("অর্ডার নম্বর " + o.orderCode) : "নম্বর পরে দেখা যাবে";
+  $("offerCode").textContent = o.orderCode || "—";
+  $("offerPickupAddr").textContent = o.pickupAddress || "";
+  const mapUrl = (lat,lng)=> (lat != null && lng != null) ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` : null;
+  const pm = mapUrl(o.pickupLat, o.pickupLng), dm = mapUrl(o.dropLat, o.dropLng);
+  $("offerPickupMap").style.display = pm ? "inline" : "none"; if(pm) $("offerPickupMap").href = pm;
+  $("offerDropMap").style.display = dm ? "inline" : "none"; if(dm) $("offerDropMap").href = dm;
   $("offerDrop").textContent = o.dropAddress || "কাস্টমারের ঠিকানা";
-  $("offerDist").textContent = o.distanceKm != null ? bn(o.distanceKm.toFixed(1)) + " কিমি দূরে" : "দূরত্ব জানা যায়নি";
-  const inc = o.riderIncome != null ? o.riderIncome : o.estimatedCharge;
-  $("offerIncome").textContent = inc != null ? "৳ " + bn(Math.round(inc)) : "ভাড়া পরে জানানো হবে";
+  $("offerDist").textContent = o.distanceKm != null ? "আপনার থেকে দোকান " + bn(Number(o.distanceKm).toFixed(1)) + " কিমি" : "দূরত্ব জানা যায়নি";
+  const inc = o.deliveryCharge != null ? o.deliveryCharge : (o.riderIncome != null ? o.riderIncome : o.estimatedCharge);
+  $("offerIncome").textContent = inc != null ? "৳ " + bn(Math.round(inc)) : "পরে জানানো হবে";
   $("offerOverlay").style.display = "flex";
 
-  let left = 60;
+  // ⏱️ ৪০ সেকেন্ড — সার্ভারের দেওয়া শেষ সময় ধরে
+  const expMs = (o.expiresAt && o.expiresAt.toMillis) ? o.expiresAt.toMillis() : Date.now() + 40000;
+  let left = Math.max(1, Math.min(40, Math.ceil((expMs - Date.now())/1000)));
   $("offerTimer").textContent = bn(left);
   clearInterval(offerTimer);
   offerTimer = setInterval(()=>{

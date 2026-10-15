@@ -1718,7 +1718,8 @@ window.hbLoadLib = function(name){
       <div class="rmSwitch" id="rmRingtoneSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
       <button id="rmRingtoneTestBtn" style="flex-shrink:0; padding:7px 12px; border:1px solid rgba(255,193,7,0.25); background:transparent; color:#a8a8a8; border-radius:8px; font-size:11px; cursor:pointer; font-family:inherit;">🔊 টেস্ট</button>
     </div>
-    <div style="display:flex; align-items:center; gap:10px;">
+    <!-- 🔀 ডেলিভারি আর যাত্রী এখন এক সাথে চলে — আলাদা সুইচ লাগে না (লুকানো রাখা হলো) -->
+    <div style="display:none; align-items:center; gap:10px;">
       <div style="flex:1;">
         <div style="font-size:12.5px; font-weight:700;" id="rmTmOffLbl">🚕 Transport Mode</div>
         <div style="font-size:10.5px; color:#a8a8a8;" id="rmTmHintTxt">ফ্রি সময়ে রাস্তার যাত্রীও পিক করতে পারবেন</div>
@@ -1805,14 +1806,17 @@ window.hbLoadLib = function(name){
 
 <div id="rmOfferOverlay">
   <div class="card">
-    <h2 style="margin:0 0 4px; font-size:18px; text-align:center;">📦 নতুন অর্ডার এসেছে!</h2>
-    <div id="rmOfferTimer">০০:৬০</div>
-    <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:10px; font-size:13.5px;"><span style="font-size:16px;">📍</span><span>পিকআপ: <b id="rmOfferPickup">—</b> (<span id="rmOfferDistance">—</span>)</span></div>
-    <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:10px; font-size:13.5px;"><span style="font-size:16px;">➡️</span><span>ড্রপ: <b id="rmOfferDrop">দোকান থেকে ঠিকানা</b></span></div>
-    <div style="text-align:center; font-size:22px; font-weight:800; color:#2fbf71; margin:14px 0;">💰 আয়: ৳ <span id="rmOfferIncome">—</span></div>
+    <h2 style="margin:0 0 2px; font-size:18px; text-align:center;">📦 ডেলিভারি করতে ইচ্ছুক?</h2>
+    <div style="text-align:center; font-size:11.5px; color:#a8a8a8;">শুধু আপনাকে পাঠানো হয়েছে — না চাইলে পরের জনের কাছে যাবে</div>
+    <div id="rmOfferTimer">৪০</div>
+    <div style="background:rgba(255,193,7,0.12); border:1px solid rgba(255,193,7,0.4); border-radius:12px; padding:8px 10px; margin-bottom:10px; text-align:center; font-size:13px;">🧾 ইনভয়েস নম্বর: <b id="rmOfferCode" style="font-size:18px; letter-spacing:3px; color:#FFC107;">—</b></div>
+    <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:9px; font-size:13.5px;"><span style="font-size:16px;" id="rmOfferPickupIcon">🏪</span><span style="flex:1;"><b>দোকানের লোকেশন:</b> <span id="rmOfferPickup">—</span><br><small id="rmOfferPickupAddr" style="color:#a8a8a8;"></small> <a id="rmOfferPickupMap" target="_blank" rel="noopener" style="color:#FFC107; font-size:12px; font-weight:800; display:none;">🗺️ ম্যাপে দেখুন</a></span></div>
+    <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:9px; font-size:13.5px;"><span style="font-size:16px;">👤</span><span style="flex:1;"><b>কাস্টমারের লোকেশন:</b> <span id="rmOfferDrop">—</span> <a id="rmOfferDropMap" target="_blank" rel="noopener" style="color:#FFC107; font-size:12px; font-weight:800; display:none;">🗺️ ম্যাপে দেখুন</a></span></div>
+    <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:6px; font-size:13px; color:#a8a8a8;"><span style="font-size:15px;">📏</span><span>আপনার থেকে দোকান: <span id="rmOfferDistance">—</span></span></div>
+    <div style="text-align:center; font-size:21px; font-weight:800; color:#2fbf71; margin:12px 0;">💰 ডেলিভারি চার্জ: <span id="rmOfferIncome">—</span></div>
     <div style="display:flex; gap:10px; margin-top:14px;">
-      <button style="flex:1; padding:13px; border:none; border-radius:11px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; background:#444; color:#fff;" id="rmOfferSkipBtn">❌ গ্রহণ করব না</button>
-      <button style="flex:1; padding:13px; border:none; border-radius:11px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; background:#2fbf71; color:#fff;" id="rmOfferAcceptBtn">🟢 একসেপ্ট করুন</button>
+      <button style="flex:1; padding:13px; border:none; border-radius:11px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; background:#444; color:#fff;" id="rmOfferSkipBtn">❌ না, পারব না</button>
+      <button style="flex:1; padding:13px; border:none; border-radius:11px; font-size:15px; font-weight:800; cursor:pointer; font-family:inherit; background:#2fbf71; color:#fff;" id="rmOfferAcceptBtn">✅ হ্যাঁ, ডেলিভারি করব</button>
     </div>
   </div>
 </div>
@@ -22006,7 +22010,9 @@ async function initRiderMode(uid){
   // 🔧 আসল বাগ এখানে ছিল — rmTransportModeOn সবসময় false দিয়ে শুরু হতো,
   // Firestore-এ সেভ করা থাকলেও পেজ রিফ্রেশ/পুনরায় লগইনের পর মনে থাকত না।
   // এখন আগের অবস্থা ঠিকভাবে পুনরুদ্ধার করা হচ্ছে।
-  rmTransportModeOn = !!rmCurrentRider.transportModeOn;
+  // 🔀 ডেলিভারি + যাত্রী এক সাথে — Transport Mode সবসময় চালু, আলাদা সুইচ নেই
+  rmTransportModeOn = true;
+  if(rmCurrentRider.transportModeOn !== true){ rmCurrentRider.transportModeOn = true; db.collection("riders").doc(rmCurrentRider.uid).update({ transportModeOn: true }).catch(()=>{}); }
   document.getElementById("rmTransportModeSwitch").classList.toggle("on", rmTransportModeOn);
   document.getElementById("rmRadarCard").style.display = rmTransportModeOn ? "block" : "none";
   document.getElementById("rmTripRequestsCard").style.display = rmTransportModeOn ? "block" : "none";
@@ -22231,7 +22237,7 @@ function rmStartBazarDeliveryListener(riderUid){
 function rmRefreshModeLabel(){
   const el = document.getElementById("rmCurrentModeTxt");
   if(!el) return;
-  el.textContent = rmTransportModeOn ? "🚕 Transport Mode" : "📦 Delivery Mode";
+  el.textContent = "📦 ডেলিভারি + 🚕 যাত্রী";
   el.style.color = rmTransportModeOn ? "#FFC107" : "#a8a8a8";
 }
 
@@ -22262,6 +22268,11 @@ document.getElementById("rmOnlineSwitch").addEventListener("click", async ()=>{
   }
   try{ await db.collection("riders").doc(rmCurrentRider.uid).update(updatePayload); }catch(e){ console.warn(e); }
   if(rmIsOnline) rmStartGps(); else rmStopGps();
+  // 🔀 Online হলেই যাত্রীর রিকোয়েস্টও আসে, Offline হলে বন্ধ
+  if(rmIsOnline){
+    rmTmStartRadar(); rmListenTripRequests();
+    if((rmCurrentRider.currentStatus === "on_waiting" || rmCurrentRider.currentStatus === "on_trip") && rmCurrentRider.activeTripId) rmWatchActiveTrip(rmCurrentRider.activeTripId);
+  }else{ rmTmStopRadar(); rmStopTripRequests(); }
 });
 
 /* ---------- লাইভ GPS ---------- */
@@ -22304,18 +22315,29 @@ function rmShowOfferCard(offerId, data){
   playBeeAlert(); // 🐝 জরুরি ডেলিভারি অর্ডার — টোন + ভাইব্রেশন
   rmAddNotification(`📦 নতুন ডেলিভারি অর্ডার — ${data.pickupName || "দোকান"}`);
   rmCurrentOfferId = offerId;
-  document.getElementById("rmOfferPickup").textContent = data.pickupName || "দোকান";
-  document.getElementById("rmOfferDistance").textContent = data.distanceKm ? data.distanceKm.toFixed(1) + " কিমি দূরে" : "—";
-  document.getElementById("rmOfferDrop").textContent = data.dropAddress || "কাস্টমারের ঠিকানা";
-  document.getElementById("rmOfferIncome").textContent = data.riderIncome != null ? data.riderIncome : (data.estimatedCharge || "—");
-  document.getElementById("rmOfferOverlay").style.display = "flex";
+  const $o = (id)=> document.getElementById(id);
+  const mapUrl = (lat,lng)=> (lat != null && lng != null) ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` : null;
+  $o("rmOfferPickupIcon").textContent = data.pickupIsRestaurant ? "🍽️" : "🏪";
+  $o("rmOfferPickup").textContent = data.pickupName || (data.pickupIsRestaurant ? "রেস্টুরেন্ট" : "দোকান");
+  $o("rmOfferPickupAddr").textContent = data.pickupAddress || "";
+  const pm = mapUrl(data.pickupLat, data.pickupLng), dm = mapUrl(data.dropLat, data.dropLng);
+  $o("rmOfferPickupMap").style.display = pm ? "inline" : "none"; if(pm) $o("rmOfferPickupMap").href = pm;
+  $o("rmOfferDropMap").style.display = dm ? "inline" : "none"; if(dm) $o("rmOfferDropMap").href = dm;
+  $o("rmOfferCode").textContent = data.orderCode || "—";
+  $o("rmOfferDistance").textContent = data.distanceKm != null ? Number(data.distanceKm).toFixed(1) + " কিমি" : "জানা যায়নি";
+  $o("rmOfferDrop").textContent = data.dropAddress || "কাস্টমারের ঠিকানা";
+  const chg = data.deliveryCharge != null ? data.deliveryCharge : (data.riderIncome != null ? data.riderIncome : data.estimatedCharge);
+  $o("rmOfferIncome").textContent = chg != null ? `${HB_CUR} ${Math.round(chg)}` : "পরে জানানো হবে";
+  $o("rmOfferOverlay").style.display = "flex";
 
-  let secondsLeft = 60;
-  document.getElementById("rmOfferTimer").textContent = "০০:৬০";
+  // ⏱️ ৪০ সেকেন্ড — সার্ভারের দেওয়া শেষ সময় (expiresAt) ধরে, যাতে দেরিতে খুললেও হিসাব মেলে
+  const expMs = (data.expiresAt && data.expiresAt.toMillis) ? data.expiresAt.toMillis() : Date.now() + 40000;
+  let secondsLeft = Math.max(1, Math.min(40, Math.ceil((expMs - Date.now())/1000)));
+  document.getElementById("rmOfferTimer").textContent = secondsLeft;
   if(rmActiveOfferTimer) clearInterval(rmActiveOfferTimer);
   rmActiveOfferTimer = setInterval(()=>{
     secondsLeft--;
-    document.getElementById("rmOfferTimer").textContent = "০০:" + String(secondsLeft).padStart(2,'0');
+    document.getElementById("rmOfferTimer").textContent = Math.max(0, secondsLeft);
     if(secondsLeft <= 0){ clearInterval(rmActiveOfferTimer); rmRespondToOffer(offerId, "expired"); }
   }, 1000);
 }
