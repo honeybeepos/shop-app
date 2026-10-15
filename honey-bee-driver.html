@@ -286,7 +286,7 @@ $id("postForm").addEventListener("submit", async (e)=>{
       kind: "trip", from: d.from.trim(), to: d.to.trim(), date: d.date, time: d.time,
       vehicleType: d.vehicle, vehicleModel: v.model||null, regNumber: v.regNumber||null, vehicleColor: v.color||null, ac: v.ac||null,
       seats, seatsTotal: seats, fare, notes: (d.notes||"").trim(), text,
-      marketId: DRV.data.marketId||null,
+      marketId: DRV.data.marketId||null, district: DRV.data.district||null, upazila: DRV.data.upazila||null, // 📍 যাত্রী এলাকা দিয়ে খুঁজতে পারেন
       imageUrl, vehiclePhotos:[vp.front,vp.inside,vp.side].filter(Boolean), driverPhoto: DRV.data.photoURL||null, likedBy: [], likeCount: 0, status: "active", driverOnline: DRV.data.driverStatus === "online",
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -319,7 +319,12 @@ async function drvMarkPostsOnline(on){
   try{
     const qs=await db.collection("transportMediaPosts").where("authorId","==",DRV.uid).orderBy("createdAt","desc").limit(20).get();
     const b=db.batch(); let n=0;
-    qs.docs.forEach(d=>{ const x=d.data(); if(x.status==="active" && x.driverOnline!==on){ b.update(d.ref,{driverOnline:on}); n++; } });
+    qs.docs.forEach(d=>{ const x=d.data(); if(x.status!=="active") return;
+      const u={};
+      if(x.driverOnline!==on) u.driverOnline=on;
+      // 📍 পুরনো পোস্টে এলাকা বসানো — যাত্রী জেলা/থানা/বাজার দিয়ে খুঁজলে যেন পাওয়া যায়
+      if(!x.district && DRV.data.district){ u.district=DRV.data.district; u.upazila=DRV.data.upazila||null; if(!x.marketId) u.marketId=DRV.data.marketId||null; }
+      if(Object.keys(u).length){ b.update(d.ref,u); n++; } });
     if(n) await b.commit();
   }catch(e){}
 }
@@ -732,7 +737,7 @@ async function drvAnyPost(btn){
       kind:"available", anywhere:true, from, to:"যেকোনো জায়গা", date:today, time,
       vehicleType:vt, vehicleModel:v.model||null, regNumber:v.regNumber||null, vehicleColor:v.color||null, ac:v.ac||null,
       seats, seatsTotal:seats, fare:0, notes:"যেকোনো জায়গায় যেতে প্রস্তুত — ভাড়া আলোচনা সাপেক্ষে", text:`🚐 ${from} থেকে যেকোনো জায়গায় যেতে প্রস্তুত · ${vt}`,
-      marketId:DRV.data.marketId||null, imageUrl:vp.front||vp.side||vp.inside||null, vehiclePhotos:[vp.front,vp.inside,vp.side].filter(Boolean), driverPhoto:DRV.data.photoURL||null,
+      marketId:DRV.data.marketId||null, district:DRV.data.district||null, upazila:DRV.data.upazila||null, imageUrl:vp.front||vp.side||vp.inside||null, vehiclePhotos:[vp.front,vp.inside,vp.side].filter(Boolean), driverPhoto:DRV.data.photoURL||null,
       likedBy:[], likeCount:0, status:"active", driverOnline:DRV.data.driverStatus==="online", createdAt:firebase.firestore.FieldValue.serverTimestamp() });
     alert("✅ পোস্ট হয়ে গেছে! যাত্রীরা দেখছেন আপনি যেকোনো জায়গায় যেতে প্রস্তুত।"+(DRV.data.driverStatus==="online"?"":"\n\n⚠️ আপনি এখন অফলাইন — যাত্রীরা বুক করতে পারবেন না। উপরের \"অনলাইন\" চাপুন।"));
     drvLoadMyPosts();
