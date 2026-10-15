@@ -429,7 +429,7 @@ function hbPostToRide(id,d){
 }
 try{
   db.collection('transportMediaPosts').where('status','==','active').orderBy('createdAt','desc').limit(30)
-    .onSnapshot(qs=>{window.__ridesLoaded=true;rides=qs.docs.map(x=>hbPostToRide(x.id,x.data())).filter(hbNotExpired);render();},
+    .onSnapshot(qs=>{window.__ridesLoaded=true;rides=qs.docs.map(x=>hbPostToRide(x.id,x.data())).filter(hbNotExpired);render();hbRefreshDriverStatus();},
       err=>{console.warn('posts',err);window.__ridesLoaded=true;render();toast('পোস্ট আনা যায়নি — ইন্টারনেট দেখুন');});
 }catch(e){console.warn(e)}
 
@@ -496,6 +496,23 @@ function hbFillProfile(){
 }
 function hbSaveProfilePhone(){ const v=document.getElementById('pfPhoneIn').value.trim(); if(!/^[0-9+\s-]{6,20}$/.test(v)){ toast('সঠিক মোবাইল নম্বর লিখুন'); return; }
   try{ localStorage.setItem('hbPassengerPhone',v); }catch(e){} const b=document.getElementById('bkPhone'); if(b) b.value=v; hbFillProfile(); toast('✅ সেভ হয়েছে'); }
+/* 🟢 চালক অনলাইন কিনা — transportDrivers/{id}.driverStatus থেকে (১ মিনিট মনে রাখা হয়) */
+var __drvSt=__drvSt||{};
+async function hbDriverStatus(did,fresh){
+  if(!__drvSt) __drvSt={};
+  if(!did) return 'online';
+  const c=__drvSt[did]; if(!fresh&&c&&Date.now()-c.t<60000) return c.v;
+  try{ const d=await db.collection('transportDrivers').doc(did).get(); const v=(d.exists&&d.data().driverStatus)||'offline'; __drvSt[did]={v:v==='offline'?'offline':'online',t:Date.now()}; }
+  catch(e){ return c?c.v:'online'; }
+  return __drvSt[did].v;
+}
+async function hbRefreshDriverStatus(){
+  if(!__drvSt) __drvSt={};
+  const ids=[...new Set(rides.map(r=>r.driverId).filter(Boolean))].slice(0,30);
+  await Promise.all(ids.map(id=>hbDriverStatus(id,false)));
+  let changed=false; rides.forEach(r=>{ const c=__drvSt[r.driverId]; if(c){ const on=c.v!=='offline'; if(r.online!==on){ r.online=on; changed=true; } } });
+  if(changed) render();
+}
 /* ==================== 🎫 সিট / গাড়ি বুকিং (Transport Media) ====================
    যাত্রী ড্রাইভারের পোস্ট দেখে বুকিং অনুরোধ পাঠান → transportBookings/{id}।
    🔒 নিরাপত্তা: যাত্রীর ফোন নম্বর আলাদা গোপন ঘরে (…/private/contact) থাকে —
@@ -510,11 +527,14 @@ async function hbMyUid(){
   if(auth.currentUser) return auth.currentUser.uid;
   try{ return (await auth.signInAnonymously()).user.uid; }catch(e){ return null; }
 }
-function openBooking(id){
+async function openBooking(id){
   const r=rides.find(x=>x.id===id); if(!r) return;
   if(!r.driverId){ toast('এই পোস্টে বুকিং নেওয়া যায় না — চালককে কল করুন'); return; }
   if(r.seatsTotal>0 && !(r.seats>0)){ toast('🔴 এই গাড়ির সব আসন বুক হয়ে গেছে'); return; }
-  if(!r.online){ toast('⚪ চালক এখন অফলাইন — অনলাইন হলে বুক করতে পারবেন, অথবা কল করুন'); return; }
+  // চালকের আসল অবস্থা সরাসরি তার প্রোফাইল থেকে দেখে নেওয়া (পোস্টের পুরনো তথ্যে ভরসা না করে)
+  const st=await hbDriverStatus(r.driverId,true);
+  if(st==='offline'){ r.online=false; render(); toast('⚪ চালক এখন অফলাইন — অনলাইন হলে বুক করতে পারবেন, অথবা কল করুন'); return; }
+  r.online=true;
   __bkPost=r;
   document.getElementById('bkRoute').innerHTML=`${r.route}<br><small>🕒 ${r.time} · ${r.type}${r.price?' · প্রতি জন ৳'+r.price:''}</small>`;
   const goods=!(r.seatsTotal>0);

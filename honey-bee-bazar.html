@@ -2051,11 +2051,17 @@
     <button class="backBtn" id="backToHomeFromTransport">← হোমে ফিরে যান</button>
 
     <!-- 📜 আমার ট্রিপ হিস্ট্রি — আগের সব ট্রিপ (সম্পন্ন/বাতিল/মেয়াদ শেষ) একসাথে দেখা যায় -->
-    <button id="tripHistoryOpenBtn" class="card" style="width:100%; text-align:left; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:10px; margin-bottom:12px; border:none;">
-      <span style="font-size:20px;">📜</span>
-      <span style="flex:1; text-align:left; font-weight:800; font-size:13.5px;">আমার ট্রিপ হিস্ট্রি</span>
-      <span style="color:var(--muted); font-size:16px;">›</span>
+    <!-- 🚐 অক্টোবর ২০২৬: মালিকের কথায় জায়গা বদল — Transport Media এখন এই বড় কার্ডে
+         (এক নজরে বোঝা যায় কিসের মিডিয়া), আর "আমার ট্রিপ হিস্ট্রি" উপরের শিরোনামে। -->
+    <button id="tmOpenCardBtn" class="card" onclick="showScreen('screenTransportMedia')" style="width:100%; text-align:left; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:12px; margin-bottom:12px; border:1px solid rgba(255,209,102,0.45); background:linear-gradient(135deg,rgba(255,183,3,0.18),rgba(255,183,3,0.05));">
+      <span style="font-size:30px;">🚐</span>
+      <span style="flex:1; text-align:left;">
+        <span style="display:block; font-weight:800; font-size:14.5px; color:var(--amber);">Honey Bee Transport Media</span>
+        <span style="display:block; font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.5;">দূরপাল্লার গাড়ি · সিট বুকিং · গাড়ি ভাড়া — চালকদের পোস্ট দেখে বুক করুন</span>
+      </span>
+      <span style="color:var(--amber); font-size:18px;">›</span>
     </button>
+    <button id="tripHistoryOpenBtn" style="display:none;"></button>
 
     <!-- ✈️ Smart Flight Information — আপাতত খালি প্লেসহোল্ডার ফুল-স্ক্রিন
          ড্যাশবোর্ড, আসল ফ্লাইট ট্র্যাকিং সিস্টেম পরে এখানে যুক্ত হবে -->
@@ -3277,9 +3283,9 @@ function showScreen(id){
   const headerTaglineEl = document.getElementById("appHeaderTagline");
   const headerWrapEl = document.getElementById("appHeaderTextWrap");
   if(id === "screenTransport"){
-    if(headerTitleEl) headerTitleEl.textContent = "Honey Bee Transport Media";
-    if(headerTaglineEl) headerTaglineEl.textContent = "ক্লিক করে ট্রান্সপোর্ট ড্যাশবোর্ড দেখুন ›";
-    if(headerWrapEl){ headerWrapEl.style.cursor = "pointer"; headerWrapEl.onclick = ()=> showScreen("screenTransportMedia"); }
+    if(headerTitleEl) headerTitleEl.textContent = "📜 আমার ট্রিপ হিস্ট্রি";
+    if(headerTaglineEl) headerTaglineEl.textContent = "ক্লিক করে আগের সব ট্রিপ দেখুন ›";
+    if(headerWrapEl){ headerWrapEl.style.cursor = "pointer"; headerWrapEl.onclick = ()=> { if(typeof tripOpenHistory === "function") tripOpenHistory(); }; }
   }else{
     if(headerTitleEl) headerTitleEl.textContent = "Honey Bee Bazar";
     if(headerTaglineEl) headerTaglineEl.textContent = "আপনার এলাকার সবকিছু, এক জায়গায়";
