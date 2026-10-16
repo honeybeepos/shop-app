@@ -142,6 +142,12 @@ service cloud.firestore {
         allow read, write: if true;
       }
 
+      // 🔔 দোকানের পুশ নোটিফিকেশন — প্রতিটা ডিভাইসের (মালিক/স্টাফ) টোকেন নিজের uid-এর নামে।
+      //    নিজের দোকানের লোক শুধু নিজের ঘরটাই লিখতে/মুছতে পারেন; পড়ে শুধু Cloud Function।
+      match /pushTokens/{uid} {
+        allow read, write: if isSignedIn() && request.auth.uid == uid && myShopId() == shopId;
+      }
+
       match /publicStock/{itemId} {
         allow read: if true;
         allow write: if isSignedIn() && myShopId() == shopId;
@@ -378,9 +384,15 @@ service cloud.firestore {
           && request.resource.data.passengerId == request.auth.uid
           && request.resource.data.stars is int
           && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
-          && get(/databases/$(database)/documents/trips/$(tripId)).data.passengerId == request.auth.uid
-          && get(/databases/$(database)/documents/trips/$(tripId)).data.confirmedDriver.driverId == id
-          && get(/databases/$(database)/documents/trips/$(tripId)).data.status == "completed";
+          && ((exists(/databases/$(database)/documents/trips/$(tripId))
+               && get(/databases/$(database)/documents/trips/$(tripId)).data.passengerId == request.auth.uid
+               && get(/databases/$(database)/documents/trips/$(tripId)).data.confirmedDriver.driverId == id
+               && get(/databases/$(database)/documents/trips/$(tripId)).data.status == "completed")
+              // 🎫 Transport Media বুকিং শেষ হলেও রেটিং দেওয়া যায় (ডক id = বুকিং id)
+              || (exists(/databases/$(database)/documents/transportBookings/$(tripId))
+               && get(/databases/$(database)/documents/transportBookings/$(tripId)).data.passengerId == request.auth.uid
+               && get(/databases/$(database)/documents/transportBookings/$(tripId)).data.driverId == id
+               && get(/databases/$(database)/documents/transportBookings/$(tripId)).data.status == "completed"));
         allow update, delete: if false;
       }
 
@@ -413,6 +425,48 @@ service cloud.firestore {
     // পারবেন না। likedBy/likeCount শুধু এই দুইটা ফিল্ডেই সীমাবদ্ধ থাকলে
     // যেকোনো সাইন-ইন করা ব্যবহারকারী আপডেট করতে পারবেন (লাইক দেওয়া/তোলা) —
     // বাকি সব ফিল্ড শুধু নিজের পোস্টের মালিকই বদলাতে/সরাতে পারবেন।
+    // 🎫 Honey Bee Transport Media — সিট/গাড়ি বুকিং (অক্টোবর ২০২৬)।
+    // যাত্রী শুধু চালু পোস্টে, সেই পোস্টের চালকের কাছেই অনুরোধ পাঠাতে পারেন।
+    // পড়তে পারেন শুধু সেই যাত্রী আর সেই চালক। চালক: pending → accepted/declined,
+    // accepted → completed/declined। যাত্রী: pending/accepted → cancelled।
+    // 🔒 যাত্রীর ফোন private/contact-এ — চালক শুধু গ্রহণ করার পরে পড়তে পারেন।
+    match /transportBookings/{bid} {
+      allow create: if isSignedIn()
+        && request.resource.data.passengerId == request.auth.uid
+        && request.resource.data.status == "pending"
+        && request.resource.data.seats is int && request.resource.data.seats >= 0 && request.resource.data.seats <= 60
+        && request.resource.data.postId is string
+        && exists(/databases/$(database)/documents/transportMediaPosts/$(request.resource.data.postId))
+        && get(/databases/$(database)/documents/transportMediaPosts/$(request.resource.data.postId)).data.authorId == request.resource.data.driverId
+        && get(/databases/$(database)/documents/transportMediaPosts/$(request.resource.data.postId)).data.status == "active"
+        && request.resource.data.seats <= get(/databases/$(database)/documents/transportMediaPosts/$(request.resource.data.postId)).data.seats;
+      allow read: if isSignedIn()
+        && (resource.data.passengerId == request.auth.uid || resource.data.driverId == request.auth.uid);
+      // seatsHeld — চালক গ্রহণ করলে পোস্টের আসন কমে; বাতিল হলে চালকের অ্যাপ ফেরত দিয়ে false করে
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","seatsHeld"])
+        && ((request.auth.uid == resource.data.driverId
+             && (request.resource.data.status == resource.data.status
+                 || (resource.data.status == "pending" && request.resource.data.status in ["accepted","declined"])
+                 || (resource.data.status == "accepted" && request.resource.data.status in ["completed","declined"])))
+            || (request.auth.uid == resource.data.passengerId
+             && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["seatsHeld"])
+             && resource.data.status in ["pending","accepted"] && request.resource.data.status == "cancelled"));
+      allow delete: if false;
+
+      match /private/{docId} {
+        allow create: if isSignedIn()
+          && getAfter(/databases/$(database)/documents/transportBookings/$(bid)).data.passengerId == request.auth.uid
+          && request.resource.data.passengerId == request.auth.uid
+          && request.resource.data.phone is string && request.resource.data.phone.size() <= 20;
+        allow read: if isSignedIn()
+          && (get(/databases/$(database)/documents/transportBookings/$(bid)).data.passengerId == request.auth.uid
+              || (get(/databases/$(database)/documents/transportBookings/$(bid)).data.driverId == request.auth.uid
+                  && get(/databases/$(database)/documents/transportBookings/$(bid)).data.status in ["accepted","completed"]));
+        allow update, delete: if false;
+      }
+    }
+
     match /transportMediaPosts/{postId} {
       allow read: if true;
       // 🚩 Moderation — যে ড্রাইভারের status "blocked" (এজেন্ট/সুপারঅ্যাডমিন
