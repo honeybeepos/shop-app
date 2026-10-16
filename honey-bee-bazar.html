@@ -3516,16 +3516,18 @@ document.getElementById("backToHomeFromSmartCalculator") && document.getElementB
    দর্জির রসিদে যাবে। মাপ থাকে customers/{uid}.tailorMeasures-এ (নিজের নথি — নিজেই
    পড়েন/লেখেন, আলাদা নিয়ম বা deploy লাগে না)। পায়জামার ছবির নম্বর আর ঘরের নম্বর এক। */
 const TLR_FIELDS = {
+  // জামার ছবির নম্বরের সাথে মিল রেখে সাজানো (১-৬), তারপর ছবির "অতিরিক্ত গুরুত্বপূর্ণ মাপ" (★)
   kameez: [
-    ["length","জামার লম্বা","কাঁধের উঁচু জায়গা থেকে জামা যতদূর নামবে"],
-    ["chest","বুক (ছাতি)","বুকের সবচেয়ে চওড়া জায়গায় চারদিকে ঘুরিয়ে"],
-    ["waist","কোমর","কোমরের সরু জায়গায় চারদিকে ঘুরিয়ে"],
-    ["hip","হিপ / নিচের ঘের","নিতম্বের সবচেয়ে চওড়া জায়গায় চারদিকে ঘুরিয়ে"],
-    ["shoulder","কাঁধ (পুট)","এক কাঁধের কোনা থেকে আরেক কাঁধের কোনা"],
-    ["sleeve","হাতার লম্বা","কাঁধের কোনা থেকে হাতা যতদূর নামবে"],
-    ["cuff","হাতার মুখ","হাতার শেষ মাথায় হাতের চারদিকে"],
-    ["neck","গলা","গলার গোড়ায় চারদিকে ঘুরিয়ে"],
-    ["armhole","বগল (আর্মহোল)","কাঁধ থেকে বগলের নিচ দিয়ে ঘুরিয়ে"],
+    ["chest","বুকের মাপ","বুকের সবচেয়ে ভরা অংশ দিয়ে চারদিকে ঘুরিয়ে — বেশি টাইট বা ঢিলা নয়"],
+    ["waist","কোমরের মাপ","কোমরের স্বাভাবিক সরু অংশে চারদিকে ঘুরিয়ে"],
+    ["hip","হিপের মাপ","নিতম্বের সবচেয়ে ভরা অংশ দিয়ে চারদিকে ঘুরিয়ে"],
+    ["shoulder","কাঁধের মাপ","এক কাঁধের শেষ (হাড়ের উপরে) থেকে অন্য কাঁধের শেষ পর্যন্ত সোজা"],
+    ["sleeve","হাতার লম্বা","কাঁধের মাথা থেকে হাতার শেষ (কবজি পর্যন্ত)"],
+    ["length","জামার লম্বা","কাঁধের উপরের অংশ থেকে জামার নিচের কাঙ্ক্ষিত পয়েন্ট পর্যন্ত সোজা"],
+    ["neck","গলার মাপ","গলার চারদিকে ফিতা সোজা করে", 1],
+    ["armhole","বাহুমূল (আর্মহোল)","বাহুমূল ঘিরে ফিতা সোজা করে", 1],
+    ["cuff","হাতার মুখের ঘের","হাতার মুখের সবচেয়ে চওড়া অংশে ঘুরিয়ে", 1],
+    ["neckToBust","গলা থেকে বুক পয়েন্ট","গলার শুরুর পয়েন্ট থেকে বুকের ভরা অংশ পর্যন্ত (ডিজাইনের জন্য)", 1],
   ],
   pajama: [
     ["waist","কোমরের মাপ","কোমরের সরু অংশে চারদিকে ঘুরিয়ে — বেশি টাইট বা ঢিলা নয়"],
@@ -3578,9 +3580,9 @@ function tlrShowTab(tab){
   document.querySelectorAll(".tlrTab").forEach(b=>{ const on = b.dataset.tab === tab; b.style.background = on ? "var(--amber)" : "rgba(255,255,255,0.06)"; b.style.color = on ? "#1a1408" : "#fff8e8"; });
   $("tlrGuide").innerHTML = tab === "pajama"
     ? `<a href="tailor-pajama-guide.jpg" target="_blank" rel="noopener"><img src="tailor-pajama-guide.jpg" alt="পায়জামার মাপ নেওয়ার নিয়ম" style="width:100%; border-radius:12px; display:block;"></a><div style="font-size:11px; color:var(--muted); text-align:center; margin-top:4px;">ছবিতে চাপ দিলে বড় হবে · ছবির নম্বর আর নিচের ঘরের নম্বর একই</div>`
-    : `<div style="font-size:12px; color:var(--muted); background:rgba(255,255,255,0.04); border-radius:10px; padding:10px;">👗 প্রতিটা ঘরের নিচে লেখা আছে কোথায় ফিতা ধরবেন। পুরনো একটা মাপমতো জামা থাকলে সেটা মেপে দিলেও হবে।</div>`;
-  $("tlrFields").innerHTML = TLR_FIELDS[tab].map(([k,label,hint],i)=>`<div style="display:flex; gap:10px; align-items:center; padding:8px 0; border-top:1px solid var(--border);">
-      <div style="width:26px; height:26px; border-radius:50%; background:#be185d; color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${i+1}</div>
+    : `<a href="tailor-kameez-guide.jpg" target="_blank" rel="noopener"><img src="tailor-kameez-guide.jpg" alt="জামার মাপ নেওয়ার নিয়ম" style="width:100%; border-radius:12px; display:block;"></a><div style="font-size:11px; color:var(--muted); text-align:center; margin-top:4px;">ছবিতে চাপ দিলে বড় হবে · ১-৬ নম্বর ছবির সাথে মেলানো, ★ = ছবির "অতিরিক্ত মাপ"</div>`;
+  $("tlrFields").innerHTML = TLR_FIELDS[tab].map(([k,label,hint,extra],i)=>`<div style="display:flex; gap:10px; align-items:center; padding:8px 0; border-top:1px solid var(--border);">
+      <div style="width:26px; height:26px; border-radius:50%; background:${extra ? "#9d174d" : "#be185d"}; color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${extra ? "★" : i+1}</div>
       <div style="flex:1; min-width:0;"><div style="font-weight:800; font-size:13.5px;">${label}</div><div style="font-size:11px; color:var(--muted);">${hint}</div></div>
       <input data-k="${k}" inputmode="decimal" type="number" step="0.25" min="0" max="80" value="${__tlrDraft[tab][k] === undefined ? "" : escapeHtml(String(__tlrDraft[tab][k]))}" placeholder="ইঞ্চি" style="width:76px; padding:10px 6px; border-radius:9px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:15px; text-align:center;">
     </div>`).join("");
