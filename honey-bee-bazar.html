@@ -467,6 +467,32 @@
   .mfSheetHead .t{ font-size:15px; font-weight:800; color:var(--amber); }
   .mfSheetClose{ font-size:20px; cursor:pointer; color:var(--muted); }
 
+  /* ☰ বাজারের মেনু — নিচ থেকে না উঠে ডান পাশ থেকে আসে (ড্রয়ার), ভেতরে ক্যাটাগরির গাছ */
+  #mfMenuSheet{ align-items:stretch; justify-content:flex-end; }
+  #mfMenuSheet .mfSheetBox{
+    border-radius:0; border-top:0; border-left:1px solid rgba(255,183,3,0.35);
+    width:min(86vw,360px); max-width:none; max-height:none; height:100%;
+    padding:calc(16px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));
+    box-shadow:-10px 0 30px rgba(0,0,0,0.45); animation:mfDrawerIn .25s ease both;
+  }
+  @keyframes mfDrawerIn{ from{ transform:translateX(100%); } to{ transform:none; } }
+  .mfCatRow{
+    width:100%; display:flex; align-items:center; gap:10px; text-align:left; font-family:inherit; color:inherit;
+    padding:10px 10px; margin-bottom:6px; border-radius:12px; cursor:pointer;
+    border:1px solid var(--border); background:rgba(255,255,255,0.04);
+  }
+  .mfCatRow.on{ border-color:rgba(255,183,3,0.6); background:rgba(230,126,34,0.18); }
+  .mfCatRow .ic{ width:34px; height:34px; border-radius:9px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:18px; overflow:hidden; background:rgba(255,255,255,0.06); }
+  .mfCatRow .ic img{ width:100%; height:100%; object-fit:cover; }
+  .mfCatRow .nm{ flex:1; min-width:0; font-weight:700; font-size:13.5px; }
+  .mfCatRow .ct{ font-size:11px; font-weight:800; padding:2px 7px; border-radius:10px; background:rgba(255,183,3,0.18); color:var(--amber); }
+  .mfCatRow .chev{ color:var(--muted); font-size:15px; transition:transform .2s; }
+  .mfCatRow .chev.open{ transform:rotate(90deg); }
+  .mfCatKids{ margin:-2px 0 8px 14px; padding-left:10px; border-left:2px solid rgba(255,183,3,0.25); }
+  .mfCatKids .mfCatRow{ padding:8px 10px; }
+  .mfCatKids .mfCatRow .nm{ font-size:12.5px; }
+  .mfCatAll{ color:var(--amber) !important; }
+
   .mfChipRow{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
   .mfChip{
     padding:8px 13px; border-radius:20px; border:1px solid var(--border); background:transparent;
@@ -2043,7 +2069,7 @@
   <div id="mfMenuSheet" class="mfSheetOverlay">
     <div class="mfSheetBox">
       <div class="mfSheetHead">
-        <div class="t">☰ খুঁজুন ও ফিল্টার করুন</div>
+        <div class="t">☰ মেনু</div>
         <span class="mfSheetClose" id="mfMenuCloseBtn">✕</span>
       </div>
       <button class="mfMenuRow" id="mfMenuChangeAreaBtn">
@@ -2051,6 +2077,10 @@
         <span class="mfMenuRowBody"><span class="t">এলাকা নির্বাচন করুন</span><span class="d">জেলা, উপজেলা, বাজার</span></span>
         <span class="mfMenuRowChev">›</span>
       </button>
+      <!-- 🗂️ এই বাজারের সব দোকানের ক্যাটাগরি একসাথে — ক্যাটাগরি › সাব › সাব-সাব।
+           কোনোটায় চাপলে সেই জিনিস কোন দোকানে কত দামে আছে, কম দাম আগে দেখায়। -->
+      <div class="mfMenuSectionLabel" style="margin-top:14px;">🗂️ সব ক্যাটাগরি</div>
+      <div id="mfCatTree"><div class="mfEmpty" style="padding:16px;">লোড হচ্ছে…</div></div>
       <div class="mfMenuSectionLabel">⚡ দ্রুত ফিল্টার</div>
       <div class="mfChipRow" id="mfQuickChips">
         <button class="mfChip active" data-quick="">সব</button>
@@ -9496,10 +9526,15 @@ $("backToMarkets").addEventListener("click", ()=> showScreen("screenHome"));
 let marketFeedProducts = [];
 let mfShopTypeFilter = "";
 let mfQuickFilter = ""; // "" | "offer" | "highlight"
+let mfCatPath = { cat:"", sub:"", ss:"" };   // ☰ মেনু থেকে বাছা ক্যাটাগরি › সাব › সাব-সাব
+let __mfCatOpen = { cat:"", sub:"" };         // মেনুর গাছে কোন ঘর খোলা
+let __mcAllProducts = null;                   // এই বাজারের সব প্রোডাক্ট, ক্যাটাগরির নামসহ (মেনুর দর-তুলনার জন্য)
 
 function mfResetFilters(){
   mfShopTypeFilter = "";
   mfQuickFilter = "";
+  mfCatPath = { cat:"", sub:"", ss:"" }; __mfCatOpen = { cat:"", sub:"" };
+  $("mfAllProductsTitle") && ($("mfAllProductsTitle").textContent = "🛍️ সব পণ্য");
   const note = $("mfActiveFilterNote");
   if(note){ note.style.display = "none"; note.textContent = ""; }
   const quickWrap = $("mfQuickChips");
@@ -9629,6 +9664,27 @@ function mfUpdateFilterNote(){
   if(mfQuickFilter === "offer") parts.push("🎁 আজকের অফার");
   else if(mfQuickFilter === "highlight") parts.push("⭐ ফিচার্ড");
   if(mfShopTypeFilter) parts.push(`🏪 ${mfShopTypeFilter}`);
+  const titleEl = $("mfAllProductsTitle");
+  if(mfCatPath.cat){
+    const path = [mfCatPath.cat, mfCatPath.sub, mfCatPath.ss].filter(Boolean).join(" › ");
+    if(titleEl) titleEl.textContent = "🗂️ " + path;
+    const list = mfGetFilteredSortedList();
+    const prices = list.map(p=> Number(hbGetOfferMeta(p).finalPrice)||0).filter(x=> x > 0);
+    const shops = new Set(list.map(p=> p.__shopId)).size;
+    const cur = (list[0] && list[0].__cur) || "৳";
+    note.style.display = "block";
+    note.innerHTML = `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:rgba(230,126,34,0.14); border:1px solid rgba(255,183,3,0.45); border-radius:14px; padding:10px 12px;">
+        <div style="min-width:0;">
+          <div style="font-weight:800; font-size:13px;">📂 ${escapeHtml(path)}</div>
+          <div style="font-size:12px; margin-top:3px; color:var(--muted);">${prices.length
+            ? `💰 আজকের দর: <b style="color:var(--amber);">${cur}${Math.min(...prices)}</b>${Math.max(...prices) !== Math.min(...prices) ? ` থেকে <b style="color:var(--amber);">${cur}${Math.max(...prices)}</b>` : ""} · ${shops}টা দোকানে · কম দাম আগে`
+            : "এই ঘরে এখনো কোনো পণ্য নেই"}${parts.length ? " · " + escapeHtml(parts.join(" · ")) : ""}</div>
+        </div>
+        <button type="button" onclick="mfClearCatFilter()" style="flex-shrink:0; border:0; border-radius:10px; padding:7px 10px; background:rgba(255,255,255,0.1); color:inherit; font-weight:800; font-family:inherit; cursor:pointer;">✕</button>
+      </div>`;
+    return;
+  }
+  if(titleEl) titleEl.textContent = "🛍️ সব পণ্য";
   if(parts.length){ note.style.display = "block"; note.textContent = "ফিল্টার: " + parts.join(" · ") + " (মুছতে ☰ মেনু → সব)"; }
   else{ note.style.display = "none"; note.textContent = ""; }
 }
@@ -9723,6 +9779,14 @@ function mfGetFilteredSortedList(){
   // 🇧🇩 মোড চালু থাকলে দেশের সব পণ্য, নাহলে আগের মতোই এই বাজারের
   const source = (__mfBdMode && __mfBdProducts) ? __mfBdProducts : marketFeedProducts;
   let list = source.slice();
+  // 🗂️ ক্যাটাগরি বাছা থাকলে — সেই জিনিসের দর তুলনা: কম দাম আগে
+  if(mfCatPath.cat && __mcAllProducts){
+    list = __mcAllProducts.filter(mfCatMatch);
+    if(mfShopTypeFilter) list = list.filter(p=> p.__shopCategory === mfShopTypeFilter);
+    if(mfQuickFilter === "offer") list = list.filter(p=> hbGetOfferMeta(p).hasOffer);
+    else if(mfQuickFilter === "highlight") list = list.filter(p=> hbGetOfferMeta(p).highlight);
+    return list.sort((a,b)=> (Number(hbGetOfferMeta(a).finalPrice)||0) - (Number(hbGetOfferMeta(b).finalPrice)||0));
+  }
   if(mfShopTypeFilter) list = list.filter(p=> p.__shopCategory === mfShopTypeFilter);
   if(mfQuickFilter === "offer") list = list.filter(p=> hbGetOfferMeta(p).hasOffer);
   else if(mfQuickFilter === "highlight") list = list.filter(p=> hbGetOfferMeta(p).highlight);
@@ -9846,7 +9910,7 @@ function mfCardHTML(p, idx){
         <span class="mfShopTag">🏪 ${escapeHtml(p.__shopName||"দোকান")}</span>
         ${p.__shopArea ? `<div class="mfCardArea">📍 ${escapeHtml(p.__shopArea)}</div>` : ""}
         <div class="pCardPriceRow">
-          <span class="pCardPrice">${cur}${om.finalPrice}</span>
+          <span class="pCardPrice">${cur}${om.finalPrice}${p.unit === 'kg' ? '<span style="font-size:11px; font-weight:700; opacity:.75;">/কেজি</span>' : ''}</span>
           ${om.hasDiscount ? `<span class="pCardOldPrice">${cur}${p.price}</span>` : ""}
         </div>
         ${stockLabel ? `<div class="pCardStock ${outOfStock?'out':'low'}">${stockLabel}</div>` : ""}
@@ -10560,8 +10624,86 @@ $("mfOfferCloseBtn") && $("mfOfferCloseBtn").addEventListener("click", ()=> $("m
 $("mfMenuBtn") && $("mfMenuBtn").addEventListener("click", ()=>{
   mfBuildShopTypeChips();
   $("mfMenuSheet").classList.add("show");
+  mfLoadCatTree();
 });
 $("mfMenuCloseBtn") && $("mfMenuCloseBtn").addEventListener("click", ()=> $("mfMenuSheet").classList.remove("show"));
+$("mfMenuSheet") && $("mfMenuSheet").addEventListener("click", (e)=>{ if(e.target.id === "mfMenuSheet") $("mfMenuSheet").classList.remove("show"); });
+
+/* ==================== 🗂️ মেনুর ক্যাটাগরি গাছ (ক্যাটাগরি › সাব › সাব-সাব) ====================
+   ডেটা আসে mcLoadMarketCategories থেকে (বাজারের সব দোকানের ক্যাটাগরি নাম দিয়ে একত্র করা)।
+   যে ঘরের ভেতরে আরও ঘর আছে, চাপলে ভেতরেরগুলো খুলে যায়; শেষ ঘরে চাপলে ফিডে সেই জিনিসের
+   সব দোকানের দাম দেখায় — কাস্টমার আজকের দর দেখে নিজের বাজার থেকে কিনতে পারে। */
+function mfCatMatch(p){
+  return p.__catName === mfCatPath.cat && (!mfCatPath.sub || p.__subName === mfCatPath.sub) && (!mfCatPath.ss || p.__subSubName === mfCatPath.ss);
+}
+function mfCatCount(cat, sub, ss){
+  if(!__mcAllProducts) return 0;
+  return __mcAllProducts.filter(p=> p.__catName === cat && (!sub || p.__subName === sub) && (!ss || p.__subSubName === ss)).length;
+}
+async function mfLoadCatTree(){
+  const box = $("mfCatTree"); if(!box) return;
+  if(!currentMarketId){ box.innerHTML = '<div class="mfEmpty" style="padding:16px;">আগে উপরে 📍 এলাকা থেকে বাজার বাছুন।</div>'; return; }
+  if(!(__mcMarketId === currentMarketId && __mcCategoryMap)){
+    box.innerHTML = '<div class="mfEmpty" style="padding:16px;">⏳ ক্যাটাগরি আনা হচ্ছে…</div>';
+    const keepFeed = marketFeedProducts; // mcLoad ফিডের লিস্ট বদলে দেয় — ফিড যেমন ছিল তেমন রাখা
+    await mcLoadMarketCategories(currentMarketId);
+    if(keepFeed && keepFeed.length){
+      const seen = new Set(keepFeed.map(p=> p.__shopId + "/" + p.id));
+      (__mcAllProducts||[]).forEach(p=>{ if(!seen.has(p.__shopId + "/" + p.id)) keepFeed.push(p); });
+      marketFeedProducts = keepFeed;
+    }
+  }
+  mfRenderCatTree();
+}
+function mfCatRowHTML(o){
+  const ic = o.img ? `<img src="${escapeHtml(o.img)}" alt="" onerror="this.parentElement.textContent='🗂️'">` : (o.icon || "🗂️");
+  return `<button type="button" class="mfCatRow ${o.on ? "on" : ""} ${o.allRow ? "mfCatAll" : ""}" data-act="${o.act}" data-cat="${escapeHtml(o.cat||"")}" data-sub="${escapeHtml(o.sub||"")}" data-ss="${escapeHtml(o.ss||"")}">
+      <span class="ic">${ic}</span><span class="nm">${escapeHtml(o.label)}</span>
+      ${o.count != null ? `<span class="ct">${o.count}</span>` : ""}
+      ${o.hasKids ? `<span class="chev ${o.open ? "open" : ""}">›</span>` : ""}
+    </button>`;
+}
+function mfRenderCatTree(){
+  const box = $("mfCatTree"); if(!box) return;
+  const cats = __mcCategoryMap ? Array.from(__mcCategoryMap.values()).sort((a,b)=> a.name.localeCompare(b.name,"bn")) : [];
+  if(!cats.length){ box.innerHTML = '<div class="mfEmpty" style="padding:16px;">😕 এই বাজারে এখনো কোনো ক্যাটাগরি নেই।</div>'; return; }
+  box.innerHTML = cats.map(c=>{
+    const subs = Array.from(c.subs.keys()).sort((a,b)=> a.localeCompare(b,"bn"));
+    const open = __mfCatOpen.cat === c.name;
+    let html = mfCatRowHTML({ act: subs.length ? "toggleCat" : "pick", cat:c.name, label:c.name, img:c.imageUrl, icon:guessCategoryIcon(c.name),
+      count: mfCatCount(c.name), hasKids: !!subs.length, open, on: mfCatPath.cat === c.name && !mfCatPath.sub });
+    if(open && subs.length){
+      html += `<div class="mfCatKids">` + mfCatRowHTML({ act:"pick", cat:c.name, label:"সব " + c.name, icon:"✨", allRow:true, count: mfCatCount(c.name) }) +
+        subs.map(sName=>{
+          const subE = c.subs.get(sName);
+          const ss = Array.from(subE.subSubs || []).sort((a,b)=> a.localeCompare(b,"bn"));
+          const sOpen = open && __mfCatOpen.sub === sName;
+          let h = mfCatRowHTML({ act: ss.length ? "toggleSub" : "pick", cat:c.name, sub:sName, label:sName, img:subE.imageUrl, icon:guessCategoryIcon(sName),
+            count: mfCatCount(c.name, sName), hasKids: !!ss.length, open:sOpen, on: mfCatPath.cat === c.name && mfCatPath.sub === sName && !mfCatPath.ss });
+          if(sOpen && ss.length){
+            h += `<div class="mfCatKids">` + mfCatRowHTML({ act:"pick", cat:c.name, sub:sName, label:"সব " + sName, icon:"✨", allRow:true, count: mfCatCount(c.name, sName) }) +
+              ss.map(x=> mfCatRowHTML({ act:"pick", cat:c.name, sub:sName, ss:x, label:x, icon:guessCategoryIcon(x),
+                count: mfCatCount(c.name, sName, x), on: mfCatPath.ss === x && mfCatPath.sub === sName && mfCatPath.cat === c.name })).join("") + `</div>`;
+          }
+          return h;
+        }).join("") + `</div>`;
+    }
+    return html;
+  }).join("");
+  box.querySelectorAll(".mfCatRow").forEach(b=> b.addEventListener("click", ()=>{
+    const { act, cat, sub, ss } = b.dataset;
+    if(act === "toggleCat"){ __mfCatOpen = { cat: __mfCatOpen.cat === cat ? "" : cat, sub:"" }; mfRenderCatTree(); return; }
+    if(act === "toggleSub"){ __mfCatOpen = { cat, sub: __mfCatOpen.sub === sub ? "" : sub }; mfRenderCatTree(); return; }
+    mfCatPath = { cat, sub, ss };
+    $("mfMenuSheet").classList.remove("show");
+    mfUpdateFilterNote(); renderMarketFeed();
+    const head = $("mfActiveFilterNote"); head && head.scrollIntoView({ behavior:"smooth", block:"start" });
+  }));
+}
+window.mfClearCatFilter = function(){
+  mfCatPath = { cat:"", sub:"", ss:"" };
+  mfUpdateFilterNote(); renderMarketFeed();
+};
 
 /* ---------- ধাপ ২: দোকানের তালিকা (আর সরাসরি Market থেকে ঢোকা যায় না, Market Feed
    এটা প্রতিস্থাপন করেছে — ফাংশনগুলো নিচে রাখা হয়েছে যদি ভবিষ্যতে "এই দোকানের সব প্রোডাক্ট
@@ -11203,6 +11345,7 @@ async function mcLoadMarketCategories(marketId){
 
     __mcMarketId = marketId;
     __mcCategoryMap = catMap;
+    __mcAllProducts = allProducts;
     // 🛒 mfCardHTML/hbOpenMarketProductDetail/mfAddToCartAnimated — এই ফাংশনগুলো
     // marketFeedProducts থেকেই প্রোডাক্ট খুঁজে বের করে, তাই এখানেও একই ভ্যারিয়েবল
     // ব্যবহার করা হলো (Market Feed স্ক্রিনে ঢুকলে এটা আবার তার নিজের মতো রিফ্রেশ হয়)
