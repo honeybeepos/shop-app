@@ -1211,6 +1211,20 @@
     </div>
     <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">পবিত্র দিনের প্রয়োজনীয় পণ্য একসাথে</div>
 
+    <!-- 📍 এলাকা বাছাই — বাজার বাছতে হয় না, জেলা + থানা দিলেই সেই থানার সব দোকানের
+         একাদশী পণ্য দেখায়। বাছাইটা ফোনে মনে থাকে। -->
+    <div class="card" style="padding:12px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:800; font-size:13.5px;">📍 আপনার এলাকা</div>
+        <button type="button" id="hbEkaAreaClear" style="display:none; border:0; background:transparent; color:var(--amber); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✕ মুছুন</button>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+        <select id="hbEkaDist" aria-label="জেলা" style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">জেলা</option></select>
+        <select id="hbEkaUpz" aria-label="থানা" style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">থানা</option></select>
+      </div>
+      <div id="hbEkaAreaNote" style="font-size:11px; color:var(--muted); margin-top:7px;"></div>
+    </div>
+
     <div style="display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;">
       <button class="hbEkaFilterBtn" data-ekafilter="all" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">সব</button>
       <button class="hbEkaFilterBtn" data-ekafilter="package" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">📦 প্যাকেজ</button>
@@ -1221,7 +1235,7 @@
     </div>
 
     <div id="hbEkaGrid" class="pGrid"><div class="loadingMsg">প্রোডাক্ট লোড হচ্ছে...</div></div>
-    <div style="font-size:9.5px; color:var(--muted); margin-top:10px; line-height:1.4;">* এই তালিকা আপনার বেছে নেওয়া বাজারের দোকানগুলোর আসল স্টক থেকে, প্রোডাক্টের নামে কিওয়ার্ড মিলিয়ে বানানো — কোনো নতুন/নকল প্রোডাক্ট যুক্ত করা হয়নি। কোনো ভুল মিলে গেলে দোকানের বিস্তারিত পেজে গিয়ে যাচাই করে নিন।</div>
+    <div style="font-size:9.5px; color:var(--muted); margin-top:10px; line-height:1.4;">* এই তালিকা আপনার বাছা এলাকার দোকানগুলোর আসল স্টক থেকে — দোকানদারের দেওয়া একাদশী পণ্য/প্যাকেজ আর নামে মিলে যাওয়া পণ্য — কোনো নতুন/নকল প্রোডাক্ট যুক্ত করা হয়নি। কোনো ভুল মিলে গেলে দোকানের বিস্তারিত পেজে গিয়ে যাচাই করে নিন।</div>
 
     <div id="hbEkaCartBar" style="display:none; position:fixed; left:16px; right:16px; bottom:16px; background:var(--amber); color:#1a1206; border-radius:16px; padding:13px 18px; align-items:center; justify-content:space-between; font-weight:800; font-size:14px; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,0.4); z-index:60;">
       <span>🛒 কার্টে যান</span>
@@ -6458,18 +6472,77 @@ function hbEkaProductMatches(name, groupKey){
   return groups.some((kw)=> n.includes(String(kw).toLowerCase()));
 }
 
+/* 📍 একাদশী পাতার এলাকা — জেলা + থানা। থানা বাছলে সেই থানার সব সক্রিয় দোকান থেকে পণ্য আসে
+   (শুধু একটা ফিল্ডে কোয়েরি, তাই নতুন ইনডেক্স লাগে না; বাকিটা ফোনে ছাঁকা হয়)।
+   থানা না বাছলে আগের মতো কাস্টমারের বাছা বাজারের দোকানগুলো দেখায়। */
+let hbEkaArea = { d:"", u:"" };
+try{ const a = JSON.parse(localStorage.getItem("hbEkaArea")||"null"); if(a) hbEkaArea = Object.assign(hbEkaArea, a); }catch(e){}
+if(!hbEkaArea.d){ try{ const t = JSON.parse(localStorage.getItem("hbTlrArea")||"null"); if(t && t.d){ hbEkaArea = { d:t.d, u:t.u||"" }; } }catch(e){} }
+let __hbEkaAreaReady = false;
+function hbEkaAreaFill(){
+  const dS = document.getElementById("hbEkaDist"), uS = document.getElementById("hbEkaUpz");
+  if(!dS || !uS || typeof getAllDistricts !== "function") return;
+  dS.innerHTML = '<option value="">জেলা</option>' + getAllDistricts().map(d=>`<option value="${d}"${d===hbEkaArea.d?" selected":""}>${d}</option>`).join("");
+  uS.disabled = !hbEkaArea.d;
+  uS.innerHTML = '<option value="">থানা</option>' + (hbEkaArea.d ? getUpazilasForDistrict(hbEkaArea.d).map(u=>`<option value="${u}"${u===hbEkaArea.u?" selected":""}>${u}</option>`).join("") : "");
+  document.getElementById("hbEkaAreaClear").style.display = hbEkaArea.d ? "" : "none";
+}
+function hbEkaAreaSet(d, u){
+  hbEkaArea = { d:d||"", u:u||"" };
+  try{ localStorage.setItem("hbEkaArea", JSON.stringify(hbEkaArea)); }catch(e){}
+  hbEkaAreaFill();
+  hbEkaLoadProducts();
+}
+function hbEkaAreaInit(){
+  if(!__hbEkaAreaReady){
+    __hbEkaAreaReady = true;
+    document.getElementById("hbEkaDist").addEventListener("change", e=> hbEkaAreaSet(e.target.value, ""));
+    document.getElementById("hbEkaUpz").addEventListener("change", e=> hbEkaAreaSet(hbEkaArea.d, e.target.value));
+    document.getElementById("hbEkaAreaClear").addEventListener("click", ()=> hbEkaAreaSet("", ""));
+  }
+  hbEkaAreaFill();
+}
+async function hbEkaAreaShops(){
+  const qs = await db.collection("shops").where("upazila","==",hbEkaArea.u).limit(150).get();
+  return qs.docs.map(d=> ({ id:d.id, ...d.data() }))
+    .filter(sh=> sh.status === "active" && sh.marketId && (!hbEkaArea.d || sh.district === hbEkaArea.d) && (!sh.countryCode || sh.countryCode === "BD"));
+}
+
+let __hbEkaLoadSeq = 0; // এলাকা দ্রুত বদলালে পুরনো লোডের ফল যেন নতুনটার উপর না বসে
 async function hbEkaLoadProducts(){
   const gridEl = document.getElementById("hbEkaGrid");
   if(!gridEl) return;
-  if(!allShops || allShops.length === 0){
+  const mySeq = ++__hbEkaLoadSeq;
+  const noteEl = document.getElementById("hbEkaAreaNote");
+  let shops = [];
+  if(hbEkaArea.u){
+    gridEl.innerHTML = "<div class='loadingMsg'>এলাকার দোকান খোঁজা হচ্ছে...</div>";
+    try{ shops = await hbEkaAreaShops(); if(mySeq !== __hbEkaLoadSeq) return; }
+    catch(e){ console.error(e); gridEl.innerHTML = "<div class='mfEmpty'>📶 দোকানের তালিকা আনা যায়নি — ইন্টারনেট দেখে আবার খুলুন।</div>"; return; }
+    if(noteEl) noteEl.textContent = shops.length ? `🏪 ${hbEkaArea.u}-এর ${shops.length}টা দোকান থেকে দেখানো হচ্ছে` : "";
+    if(!shops.length){
+      __hbEkaProducts = [];
+      gridEl.innerHTML = "<div class='mfEmpty'>এই থানায় এখনো কোনো সক্রিয় দোকান নেই।<br>পাশের থানা বেছে দেখুন।</div>";
+      return;
+    }
+  }else if(hbEkaArea.d){
     __hbEkaProducts = [];
-    gridEl.innerHTML = "<div class='mfEmpty'>আগে আপনার বাজার/এলাকা বেছে নিন, তারপর এখানে পণ্য দেখা যাবে।</div>";
+    if(noteEl) noteEl.textContent = "";
+    gridEl.innerHTML = "<div class='mfEmpty'>এবার থানা বেছে নিন — সেই থানার সব দোকানের একাদশী পণ্য দেখাবে।</div>";
     return;
+  }else{
+    shops = allShops || [];
+    if(noteEl) noteEl.textContent = shops.length ? "জেলা আর থানা বাছলে আপনার এলাকার সব দোকানের পণ্য দেখবেন।" : "";
+    if(!shops.length){
+      __hbEkaProducts = [];
+      gridEl.innerHTML = "<div class='mfEmpty'>উপরে আপনার জেলা আর থানা বেছে নিন — বাজার বাছতে হবে না।</div>";
+      return;
+    }
   }
   gridEl.innerHTML = "<div class='loadingMsg'>প্রোডাক্ট লোড হচ্ছে...</div>";
   await hbEkaMaybeLoadMapping();
   try{
-    const perShop = await Promise.all(allShops.map(async (shop)=>{
+    const perShop = await Promise.all(shops.map(async (shop)=>{
       try{
         const qs = await db.collection("shops").doc(shop.id).collection("publicStock").get();
         const cur = shop.currencySymbol
@@ -6482,6 +6555,7 @@ async function hbEkaLoadProducts(){
         }));
       }catch(e){ console.warn("Ekadashi special: shop stock load failed", shop.id, e); return []; }
     }));
+    if(mySeq !== __hbEkaLoadSeq) return;
     __hbEkaProducts = perShop.flat().filter((p)=> hbEkaInGroup(p, "all"))
       .sort((a,b)=> hbEkaRank(a) - hbEkaRank(b) || ((b.highlight?1:0) - (a.highlight?1:0)));
     // পণ্যে চাপলে ডিটেইল পেজ যেন খোলে — ডিটেইল পেজ marketFeedProducts থেকে খোঁজে
@@ -6545,6 +6619,7 @@ document.getElementById("backFromEkadashiSpecial") && document.getElementById("b
 function hbEkaOpenScreen(from){
   __hbEkaBackTo = (typeof from === "string") ? from : "screenPanchang";
   showScreen("screenEkadashiSpecial");
+  hbEkaAreaInit();
   hbEkaLoadProducts();
 }
 document.getElementById("hbswPanEkadashiBtn") && document.getElementById("hbswPanEkadashiBtn").addEventListener("click", hbEkaOpenScreen);
