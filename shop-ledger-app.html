@@ -4920,6 +4920,7 @@ window.hbLoadLib = function(name){
       <div class="bccSubtab" data-btab="products">📦 প্রোডাক্ট</div>
       <div class="bccSubtab" data-btab="categories">🏷️ ক্যাটাগরি</div>
       <div class="bccSubtab" data-btab="market">🐝 Market</div>
+      <div class="bccSubtab" data-btab="ekadashi">🛍️ একাদশী</div>
     </div>
 
     <div class="bccSubpanel" id="btab-overview">
@@ -4995,6 +4996,60 @@ window.hbLoadLib = function(name){
       <p class="pin-desc" style="margin:-8px 0 12px; font-size:11px;">💡 POS-এ Bazar-এ "প্রকাশ" করা সব পণ্য এখানে দেখাবে। কোনো পণ্য এখানে না থাকলে সেটা এখনো Bazar-এ প্রকাশ করা হয়নি — প্রোডাক্ট ট্যাব থেকে Edit করে প্রকাশ করুন।</p>
       <div class="bccMarketGrid" id="bccMarketGrid"></div>
       <div id="bccMarketOrphanBox" style="display:none;"></div>
+    </div>
+
+    <!-- 🛍️ একাদশী পণ্য — দোকানদার এখান থেকে নিজের পণ্য "একাদশী"-তে দেখান আর প্যাকেজ বানান।
+         প্যাকেজ আসলে একটা সাধারণ প্রোডাক্ট (productType:'package'), তাই Bazar-এর অর্ডার
+         আগের মতোই আসে; প্যাকেজ বিক্রি হলে ভেতরের পণ্যের স্টকও কমে। -->
+    <div class="bccSubpanel" id="btab-ekadashi" style="display:none;">
+      <div style="background:linear-gradient(135deg,rgba(249,115,22,0.22),rgba(190,24,93,0.18)); border:1px solid rgba(255,183,3,0.4); border-radius:16px; padding:14px; margin-bottom:14px; display:flex; gap:12px; align-items:center;">
+        <div style="font-size:34px;">🪷</div>
+        <div style="min-width:0;">
+          <div style="font-weight:800; font-size:15px; color:#ffd166;">একাদশী পণ্য</div>
+          <div style="font-size:11.5px; color:#cbd2ea; line-height:1.45;">এখানে চালু করা পণ্য আর প্যাকেজ Bazar-এর "🛍️ একাদশী পণ্য" পাতায় দেখাবে। অর্ডার আগের মতোই আসবে।</div>
+        </div>
+      </div>
+      <div class="bccMarketSummary" style="grid-template-columns:repeat(2,1fr);">
+        <div class="bccMarketSumCard"><div class="val" id="ekaSumProducts">0</div><div class="lbl">একাদশীতে পণ্য</div></div>
+        <div class="bccMarketSumCard"><div class="val" id="ekaSumPackages">0</div><div class="lbl">📦 প্যাকেজ</div></div>
+      </div>
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <button type="button" class="ekaSegBtn" data-ekaseg="products" style="flex:1;">🛍️ পণ্য বাছাই</button>
+        <button type="button" class="ekaSegBtn" data-ekaseg="packages" style="flex:1;">📦 প্যাকেজ</button>
+      </div>
+
+      <div id="ekaSegProducts">
+        <input class="bccSearchInput" id="ekaProdSearch" placeholder="🔍 পণ্য খুঁজুন...">
+        <p class="pin-desc" style="margin:-8px 0 10px; font-size:11px;">💡 সুইচ চালু করলে পণ্যটা একাদশী পাতায় যাবে। নামের সাথে মিলে এমন পণ্য (কলা, দুধ, সাবু…) উপরে "মিলেছে" লেখা থাকে।</p>
+        <div id="ekaProdList"></div>
+      </div>
+
+      <div id="ekaSegPackages" style="display:none;">
+        <button type="button" class="bccBtnPrimary" id="ekaNewPkgBtn" style="width:100%; margin-bottom:12px;">➕ নতুন প্যাকেজ বানান</button>
+        <div id="ekaPkgList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📦 একাদশী প্যাকেজ বানানো/এডিট মোডাল -->
+  <div class="bccModalOverlay" id="ekaPkgModalOverlay">
+    <div class="bccModalBox">
+      <div class="bccModalHead"><h3 id="ekaPkgModalTitle">📦 নতুন একাদশী প্যাকেজ</h3><button class="bccModalClose" id="ekaPkgModalClose">✕</button></div>
+      <div class="bccModalBody">
+        <label>📝 প্যাকেজের নাম</label>
+        <input id="ekaPkgName" placeholder="যেমন: একাদশী ফলের প্যাকেজ">
+        <label>🧺 প্যাকেজে কী কী থাকবে</label>
+        <div id="ekaPkgItems"></div>
+        <button type="button" id="ekaPkgAddItem" style="width:100%; padding:10px; border-radius:10px; border:1px dashed rgba(255,255,255,0.25); background:transparent; color:#ffd166; font-family:inherit; font-weight:800; cursor:pointer; margin:4px 0 10px;">➕ আরেকটা পণ্য যোগ করুন</button>
+        <div id="ekaPkgTotals" style="font-size:12px; color:#cbd2ea; background:#0e1327; border-radius:10px; padding:10px; line-height:1.6; margin-bottom:6px;"></div>
+        <div class="bccTwoCol">
+          <div><label>💵 প্যাকেজের দাম</label><input type="number" id="ekaPkgPrice" placeholder="0"></div>
+          <div><label>🔢 কয়টা প্যাকেজ</label><input type="number" id="ekaPkgCount" placeholder="0"></div>
+        </div>
+        <label>🗒️ নোট (ঐচ্ছিক)</label>
+        <input id="ekaPkgNote" placeholder="যেমন: পূজার জন্য সব একসাথে">
+        <button class="bccBtnPrimary" id="ekaPkgSaveBtn" style="width:100%; margin-top:14px;">✅ সেভ করে Bazar-এ দিন</button>
+      </div>
     </div>
   </div>
 
@@ -11766,6 +11821,13 @@ async function bccSyncProductToBazar(p){
       offerLive: bccMarketOfferActive(p),
       offerType: bccMarketOfferActive(p) ? (m.offerType || 'discount') : null,
       offerNote: bccMarketOfferActive(p) ? (m.offerNote || null) : null,
+      // 🛍️ একাদশী পণ্য — Bazar-এর একাদশী পাতা এগুলো দেখে পণ্য দেখায়
+      ekadashi: !!p.ekadashi,
+      ekaGroup: p.ekadashi ? (p.ekaGroup || null) : null,
+      packageItems: p.productType === 'package' && p.packageItems ? p.packageItems.map(it=> ({ name: it.name, qty: Number(it.qty)||1 })) : null,
+      description: p.productType === 'package' && p.packageItems
+        ? ('📦 এই প্যাকেজে আছে: ' + p.packageItems.map(it=> it.name + ' ×' + it.qty).join(', ') + (p.note ? '\n🗒️ ' + p.note : ''))
+        : null,
       updatedAt: fbNow()
     });
     bccPendingQueueRemove('bcc-pending-bazar-sync', p.id);
@@ -11874,6 +11936,16 @@ function bccAdjustStockForSale(items){
     } else {
       p.qty = Math.max(0, (Number(p.qty)||0) - qtySold);
     }
+    // 📦 একাদশী প্যাকেজ বিক্রি হলে ভেতরের প্রতিটা পণ্যের স্টকও কমে
+    if(p.productType === 'package' && p.packageItems && p.packageItems.length){
+      p.packageItems.forEach(pi=>{
+        const c = prods.find(x=> x.id === pi.id);
+        if(!c) return;
+        c.qty = Math.max(0, (Number(c.qty)||0) - qtySold * (Number(pi.qty)||1));
+        if(c.qty === 0 && c.published){ c.published = false; autoUnpublished.push(c.id); }
+        else if(c.published) bccSyncProductToBazar(c);
+      });
+    }
     changed = true;
     if(p.qty === 0 && p.published){
       // 📦 স্টক শূন্য → স্বয়ংক্রিয়ভাবে Bazar থেকে সরিয়ে ফেলা (ভুল অর্ডার আটকাতে)
@@ -11884,6 +11956,13 @@ function bccAdjustStockForSale(items){
     }
   });
   if(changed){
+    // 📦 ভেতরের মাল কমে গেলে প্যাকেজের সংখ্যাও সেই অনুযায়ী কমে
+    if(typeof ekaCapPackagesToStock === 'function'){
+      ekaCapPackagesToStock(prods).forEach(pk=>{
+        if(pk.qty === 0 && pk.published){ pk.published = false; autoUnpublished.push(pk.id); }
+        else if(pk.published) bccSyncProductToBazar(pk);
+      });
+    }
     bccSaveProducts(prods);
     autoUnpublished.forEach(id => bccUnpublishFromBazar(id));
     if(document.getElementById('program-bcc') && document.getElementById('program-bcc').style.display !== 'none'){
@@ -12321,6 +12400,7 @@ document.querySelectorAll('#program-bcc .bccSubtab').forEach(t=>{
     if(t.dataset.btab==='overview') bccRenderOverview();
     if(t.dataset.btab==='products') bccRenderProducts();
     if(t.dataset.btab==='categories'){ bccRenderCategories(); bccSyncCategoriesToBazar(); } // ট্যাব খোলামাত্রই Bazar-এর সাথে রিকনসাইল/সাফাই হবে, কোনো এডিট ছাড়াই
+    if(t.dataset.btab==='ekadashi') ekaSetSeg(ekaSeg);
     if(t.dataset.btab==='market'){ bccMarketExpirySweep(); bccRenderMarket(); bccRetryPendingBazarSync(); bccRenderBazarOrphans(); } // ট্যাব খোলামাত্রই মেয়াদ-শেষ Highlight/Offer অটো বন্ধ করে Bazar-এর সাথে রিসিঙ্ক, আগে ব্যর্থ হওয়া সিঙ্ক আবার চেষ্টা, আর ভুতুড়ে Bazar-এন্ট্রি চেক
   });
 });
@@ -12612,6 +12692,270 @@ function bccRenderMarket(){
   gridEl.querySelectorAll('[data-mkid]').forEach(el=> el.addEventListener('click', ()=> bccOpenMarketDetail(el.dataset.mkid)));
 }
 document.getElementById('bccMarketSearch').addEventListener('input', ()=> bccRenderMarket());
+
+/* ==================== 🛍️ একাদশী পণ্য — POS অংশ (অক্টোবর ২০২৬) ====================
+   ১) পণ্য বাছাই: যেকোনো পণ্যে সুইচ চালু করলে p.ekadashi = true হয়, Bazar-এ প্রকাশ হয়,
+      আর Bazar-এর "একাদশী পণ্য" পাতায় দেখায় (কোন ঘরে — ফল/দুধ/শুকনা/উপবাস — সেটাও বাছা যায়)।
+   ২) প্যাকেজ: কয়েকটা পণ্য মিলিয়ে একটা প্যাকেজ — এটা একটা সাধারণ প্রোডাক্ট
+      (productType:'package', packageItems:[{id,name,qty}]), তাই কার্ট/অর্ডার আগের মতোই কাজ করে।
+      প্যাকেজ বিক্রি হলে bccAdjustStockForSale ভেতরের পণ্যগুলোর স্টকও কমিয়ে দেয়। */
+const EKA_GROUPS = { fruit:"🍌 ফল", milk:"🥛 দুধ পণ্য", dry:"🥜 শুকনা পণ্য", fasting:"🥔 উপবাসের খাদ্য" };
+const EKA_KEYWORDS = {
+  fruit:   ["কলা","আম","আপেল","আঙুর","কমলা","মাল্টা","পেয়ারা","বেল","তরমুজ","নারিকেল","নারকেল","খেজুর","লেবু","আনারস","পেঁপে"],
+  milk:    ["দুধ","দই","ঘি","পনির","ছানা","মাখন"],
+  dry:     ["সাবু","সাবুদানা","বাদাম","কাজু","কিশমিশ","চিনাবাদাম","পেস্তা","ধূপ","আগরবাতি","প্রদীপ"],
+  fasting: ["আলু","মিষ্টি আলু"],
+};
+function ekaGuessGroup(name){
+  const n = (name||"").toLowerCase();
+  for(const g of Object.keys(EKA_KEYWORDS)){ if(EKA_KEYWORDS[g].some(k=> n.includes(k))) return g; }
+  return null;
+}
+let ekaSeg = 'products';
+function ekaSetSeg(seg){
+  ekaSeg = seg;
+  document.querySelectorAll('.ekaSegBtn').forEach(b=>{
+    const on = b.dataset.ekaseg === seg;
+    b.style.cssText = 'flex:1; padding:10px; border-radius:12px; font-family:inherit; font-weight:800; font-size:13px; cursor:pointer; border:1px solid ' + (on ? 'rgba(255,183,3,0.6)' : 'rgba(255,255,255,0.12)') + '; background:' + (on ? 'rgba(249,115,22,0.22)' : '#10152a') + '; color:' + (on ? '#ffd166' : '#9aa5c4') + ';';
+  });
+  document.getElementById('ekaSegProducts').style.display = seg === 'products' ? 'block' : 'none';
+  document.getElementById('ekaSegPackages').style.display = seg === 'packages' ? 'block' : 'none';
+  ekaRender();
+}
+document.querySelectorAll('.ekaSegBtn').forEach(b=> b.addEventListener('click', ()=> ekaSetSeg(b.dataset.ekaseg)));
+
+function ekaRender(){
+  const all = bccLoadProducts();
+  const pkgs = all.filter(p=> p.productType === 'package');
+  document.getElementById('ekaSumProducts').textContent = all.filter(p=> p.ekadashi && p.productType !== 'package').length;
+  document.getElementById('ekaSumPackages').textContent = pkgs.length;
+  if(ekaSeg === 'products') ekaRenderProducts(all); else ekaRenderPackages(pkgs);
+}
+
+function ekaRenderProducts(all){
+  const box = document.getElementById('ekaProdList');
+  const q = (document.getElementById('ekaProdSearch').value||'').trim().toLowerCase();
+  const list = all.filter(p=> p.productType !== 'package' && (!q || (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q)))
+    .map(p=> ({ p, guess: ekaGuessGroup(p.name) }))
+    .sort((a,b)=> ((b.p.ekadashi?2:0)+(b.guess?1:0)) - ((a.p.ekadashi?2:0)+(a.guess?1:0)));
+  if(!list.length){
+    box.innerHTML = `<div style="text-align:center; color:#8b94b8; padding:30px 0; font-size:13px;">${all.length ? 'কোনো পণ্য পাওয়া যায়নি' : 'এখনো কোনো প্রোডাক্ট নেই — আগে 📦 প্রোডাক্ট ট্যাবে পণ্য যোগ করুন।'}</div>`;
+    return;
+  }
+  box.innerHTML = list.slice(0, 200).map(({p, guess})=>{
+    const grp = p.ekaGroup || guess || 'fruit';
+    const opts = Object.keys(EKA_GROUPS).map(g=> `<option value="${g}" ${g===grp?'selected':''}>${EKA_GROUPS[g]}</option>`).join('');
+    const thumb = p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" style="width:100%; height:100%; object-fit:cover;">` : '📦';
+    return `<div style="display:flex; align-items:center; gap:10px; background:${p.ekadashi ? 'rgba(249,115,22,0.12)' : '#10152a'}; border:1px solid ${p.ekadashi ? 'rgba(255,183,3,0.45)' : 'rgba(255,255,255,0.08)'}; border-radius:12px; padding:10px; margin-bottom:8px;">
+      <div style="width:44px; height:44px; border-radius:10px; overflow:hidden; background:#0e1327; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px;">${thumb}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:800; font-size:13px; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.name||'')}</div>
+        <div style="font-size:11px; color:#8b94b8;">${fmt(p.sell)} · স্টক ${Number(p.qty)||0}${guess && !p.ekadashi ? ' · <span style="color:#ffd166;">💡 মিলেছে</span>' : ''}</div>
+        <select data-ekagrp="${p.id}" style="margin-top:5px; width:100%; max-width:170px; padding:5px 6px; border-radius:8px; background:#0e1327; color:#e7e2d4; border:1px solid rgba(255,255,255,0.12); font-family:inherit; font-size:11.5px;">${opts}</select>
+      </div>
+      <label class="bccPublishSwitch" style="flex-shrink:0;"><input type="checkbox" data-ekaon="${p.id}" ${p.ekadashi?'checked':''}><span></span></label>
+    </div>`;
+  }).join('') + (list.length > 200 ? `<div style="text-align:center; color:#8b94b8; font-size:11px; padding:6px;">আরও ${list.length-200}টা আছে — উপরে খুঁজে নিন</div>` : '');
+
+  box.querySelectorAll('[data-ekaon]').forEach(cb=> cb.addEventListener('change', ()=> ekaToggleProduct(cb.dataset.ekaon, cb.checked, cb)));
+  box.querySelectorAll('[data-ekagrp]').forEach(sel=> sel.addEventListener('change', ()=>{
+    const prods = bccLoadProducts();
+    const p = prods.find(x=> x.id === sel.dataset.ekagrp); if(!p) return;
+    p.ekaGroup = sel.value;
+    bccSaveProducts(prods);
+    if(p.ekadashi && p.published) bccSyncProductToBazar(p);
+    toast('ঘর বদলানো হলো ✅');
+  }));
+}
+document.getElementById('ekaProdSearch').addEventListener('input', ()=> ekaRender());
+
+function ekaToggleProduct(id, on, cb){
+  const prods = bccLoadProducts();
+  const p = prods.find(x=> x.id === id); if(!p) return;
+  if(on){
+    if((Number(p.qty)||0) <= 0){ toast('এই পণ্যের স্টক নেই — আগে স্টক যোগ করুন'); cb.checked = false; return; }
+    if(!p.published){
+      if(!confirm(`"${p.name}" এখনো Bazar-এ প্রকাশ করা নেই। একাদশীতে দিলে এটা Bazar-এ প্রকাশ হয়ে যাবে। চালিয়ে যাবেন?`)){ cb.checked = false; return; }
+      p.published = true;
+    }
+    p.ekadashi = true;
+    if(!p.ekaGroup){
+      const sel = document.querySelector(`[data-ekagrp="${id}"]`);
+      p.ekaGroup = sel ? sel.value : (ekaGuessGroup(p.name) || 'fruit');
+    }
+    toast('🛍️ একাদশী পাতায় যোগ হলো');
+  }else{
+    p.ekadashi = false;
+    toast('একাদশী পাতা থেকে সরানো হলো (Bazar-এ সাধারণভাবে থাকবে)');
+  }
+  bccSaveProducts(prods);
+  if(p.published) bccSyncProductToBazar(p);
+  ekaRender();
+}
+
+/* ---------- 📦 প্যাকেজ ---------- */
+function ekaRenderPackages(pkgs){
+  const box = document.getElementById('ekaPkgList');
+  if(!pkgs.length){
+    box.innerHTML = `<div style="text-align:center; color:#8b94b8; padding:26px 0; font-size:13px; line-height:1.6;">এখনো কোনো প্যাকেজ নেই।<br>কয়েকটা পণ্য মিলিয়ে একটা প্যাকেজ বানান — যেমন কলা + দুধ + সাবু।</div>`;
+    return;
+  }
+  box.innerHTML = pkgs.map(p=>{
+    const items = (p.packageItems||[]).map(it=> `${escapeHtml(it.name)} ×${it.qty}`).join(', ');
+    return `<div style="background:#10152a; border:1px solid ${p.published ? 'rgba(255,183,3,0.45)' : 'rgba(255,255,255,0.08)'}; border-radius:12px; padding:11px; margin-bottom:8px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="font-size:24px;">📦</div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:800; font-size:13.5px; color:#fff;">${escapeHtml(p.name||'')}</div>
+          <div style="font-size:11.5px; color:#ffd166; font-weight:800;">${fmt(p.sell)} · ${Number(p.qty)||0}টা আছে</div>
+        </div>
+        <label class="bccPublishSwitch" style="flex-shrink:0;" title="Bazar-এ দেখান"><input type="checkbox" data-ekapub="${p.id}" ${p.published?'checked':''}><span></span></label>
+      </div>
+      <div style="font-size:11.5px; color:#cbd2ea; margin:7px 0 8px; line-height:1.5;">🧺 ${items || '—'}</div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" data-ekaedit="${p.id}" style="flex:1; padding:8px; border-radius:9px; border:1px solid rgba(255,255,255,0.15); background:#0e1327; color:#fff; font-family:inherit; font-weight:700; font-size:12px; cursor:pointer;">✏️ এডিট</button>
+        <button type="button" data-ekadel="${p.id}" style="flex:1; padding:8px; border-radius:9px; border:none; background:rgba(220,38,38,0.85); color:#fff; font-family:inherit; font-weight:700; font-size:12px; cursor:pointer;">🗑️ মুছুন</button>
+      </div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('[data-ekaedit]').forEach(b=> b.addEventListener('click', ()=> ekaOpenPkgModal(b.dataset.ekaedit)));
+  box.querySelectorAll('[data-ekadel]').forEach(b=> b.addEventListener('click', async ()=>{ await bccDeleteProduct(b.dataset.ekadel); ekaRender(); }));
+  box.querySelectorAll('[data-ekapub]').forEach(cb=> cb.addEventListener('change', ()=>{
+    const prods = bccLoadProducts();
+    const p = prods.find(x=> x.id === cb.dataset.ekapub); if(!p) return;
+    if(cb.checked && (Number(p.qty)||0) <= 0){ toast('প্যাকেজের সংখ্যা ০ — আগে এডিট করে সংখ্যা দিন'); cb.checked = false; return; }
+    p.published = cb.checked;
+    bccSaveProducts(prods);
+    if(p.published) bccSyncProductToBazar(p); else bccUnpublishFromBazar(p.id);
+    toast(p.published ? '🟢 Bazar-এ দেখানো হচ্ছে' : '🔴 Bazar থেকে লুকানো হলো');
+    ekaRender();
+  }));
+}
+
+let ekaEditingPkgId = null;
+let ekaPkgRows = []; // [{id, qty}]
+function ekaPkgSourceProducts(){ return bccLoadProducts().filter(p=> p.productType !== 'package' && p.productType !== 'variant'); }
+
+function ekaOpenPkgModal(id){
+  ekaEditingPkgId = id || null;
+  const prods = bccLoadProducts();
+  const pkg = id ? prods.find(x=> x.id === id) : null;
+  document.getElementById('ekaPkgModalTitle').textContent = pkg ? '✏️ প্যাকেজ এডিট' : '📦 নতুন একাদশী প্যাকেজ';
+  document.getElementById('ekaPkgName').value = pkg ? pkg.name : '';
+  document.getElementById('ekaPkgPrice').value = pkg ? (Number(pkg.sell)||'') : '';
+  document.getElementById('ekaPkgCount').value = pkg ? (Number(pkg.qty)||'') : '';
+  document.getElementById('ekaPkgNote').value = pkg ? (pkg.note||'') : '';
+  ekaPkgRows = pkg && pkg.packageItems ? pkg.packageItems.map(it=> ({ id: it.id, qty: Number(it.qty)||1 })) : [{ id:'', qty:1 }];
+  document.getElementById('ekaPkgPrice').dataset.touched = pkg ? '1' : '';
+  ekaRenderPkgRows();
+  document.getElementById('ekaPkgModalOverlay').classList.add('show');
+}
+document.getElementById('ekaNewPkgBtn').addEventListener('click', ()=>{
+  if(!ekaPkgSourceProducts().length){ toast('আগে 📦 প্রোডাক্ট ট্যাবে পণ্য যোগ করুন'); return; }
+  ekaOpenPkgModal(null);
+});
+document.getElementById('ekaPkgModalClose').addEventListener('click', ()=> document.getElementById('ekaPkgModalOverlay').classList.remove('show'));
+document.getElementById('ekaPkgAddItem').addEventListener('click', ()=>{ ekaPkgRows.push({ id:'', qty:1 }); ekaRenderPkgRows(); });
+document.getElementById('ekaPkgPrice').addEventListener('input', (e)=>{ e.target.dataset.touched = '1'; });
+
+function ekaRenderPkgRows(){
+  const src = ekaPkgSourceProducts()
+    .sort((a,b)=> (ekaGuessGroup(b.name)?1:0) - (ekaGuessGroup(a.name)?1:0) || (a.name||'').localeCompare(b.name||''));
+  const box = document.getElementById('ekaPkgItems');
+  box.innerHTML = ekaPkgRows.map((r, i)=>{
+    const opts = '<option value="">-- পণ্য বেছে নিন --</option>' + src.map(p=>
+      `<option value="${p.id}" ${p.id===r.id?'selected':''}>${escapeHtml(p.name)} (${fmt(p.sell)}, স্টক ${Number(p.qty)||0})</option>`).join('');
+    return `<div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+      <select data-pkgrow="${i}" style="flex:1; min-width:0; margin:0;">${opts}</select>
+      <input type="number" min="1" data-pkgqty="${i}" value="${r.qty}" style="width:62px; margin:0; text-align:center;">
+      <button type="button" data-pkgdel="${i}" style="flex-shrink:0; width:36px; height:38px; border-radius:8px; border:none; background:rgba(220,38,38,0.8); color:#fff; cursor:pointer;">✕</button>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('[data-pkgrow]').forEach(s=> s.addEventListener('change', ()=>{ ekaPkgRows[+s.dataset.pkgrow].id = s.value; ekaUpdatePkgTotals(); }));
+  box.querySelectorAll('[data-pkgqty]').forEach(s=> s.addEventListener('input', ()=>{ ekaPkgRows[+s.dataset.pkgqty].qty = Math.max(1, Number(s.value)||1); ekaUpdatePkgTotals(); }));
+  box.querySelectorAll('[data-pkgdel]').forEach(b=> b.addEventListener('click', ()=>{ ekaPkgRows.splice(+b.dataset.pkgdel, 1); if(!ekaPkgRows.length) ekaPkgRows.push({ id:'', qty:1 }); ekaRenderPkgRows(); }));
+  ekaUpdatePkgTotals();
+}
+
+// প্যাকেজের ভেতরের পণ্যগুলোর মোট দাম/ক্রয়মূল্য আর স্টক অনুযায়ী সর্বোচ্চ কয়টা প্যাকেজ বানানো যায়
+function ekaPkgCalc(){
+  const prods = bccLoadProducts();
+  const rows = ekaPkgRows.filter(r=> r.id).map(r=> ({ ...r, p: prods.find(x=> x.id === r.id) })).filter(r=> r.p);
+  const sell = rows.reduce((s,r)=> s + (Number(r.p.sell)||0) * r.qty, 0);
+  const buy  = rows.reduce((s,r)=> s + (Number(r.p.buy)||0) * r.qty, 0);
+  // প্যাকেজ বানালে ভেতরের মাল আলাদা করে আটকে রাখা হয় না — প্যাকেজ বিক্রি হলেই ভেতরের স্টক কমে
+  const maxCount = rows.length ? Math.min(...rows.map(r=> Math.floor((Number(r.p.qty)||0) / r.qty))) : 0;
+  return { rows, sell, buy, maxCount };
+}
+function ekaUpdatePkgTotals(){
+  const c = ekaPkgCalc();
+  const priceEl = document.getElementById('ekaPkgPrice');
+  if(!priceEl.dataset.touched) priceEl.value = c.sell || '';
+  document.getElementById('ekaPkgTotals').innerHTML = c.rows.length
+    ? `আলাদা কিনলে মোট দাম: <b style="color:#fff;">${fmt(c.sell)}</b><br>স্টক অনুযায়ী সর্বোচ্চ <b style="color:#ffd166;">${c.maxCount}টা</b> প্যাকেজ বানানো যাবে`
+    : 'উপরে পণ্য বেছে নিলে মোট দাম এখানে দেখাবে';
+}
+
+document.getElementById('ekaPkgSaveBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('ekaPkgName').value.trim();
+  if(!name){ toast('প্যাকেজের নাম দিন'); return; }
+  const c = ekaPkgCalc();
+  if(!c.rows.length){ toast('অন্তত একটা পণ্য বেছে নিন'); return; }
+  const ids = c.rows.map(r=> r.id);
+  if(new Set(ids).size !== ids.length){ toast('একই পণ্য দুইবার বাছা হয়েছে — একবার রেখে সংখ্যা বাড়ান'); return; }
+  const price = Number(document.getElementById('ekaPkgPrice').value)||0;
+  if(price <= 0){ toast('প্যাকেজের দাম দিন'); return; }
+  const count = Math.floor(Number(document.getElementById('ekaPkgCount').value)||0);
+  if(count <= 0){ toast('কয়টা প্যাকেজ বানাবেন সেটা দিন'); return; }
+  if(count > c.maxCount){ toast(`স্টকে আছে মাত্র ${c.maxCount}টা প্যাকেজের মাল — সংখ্যা কমান`); return; }
+
+  const prods = bccLoadProducts();
+  if(bccFindExactProductByName(prods, name, ekaEditingPkgId)){ toast('এই নামে আগে থেকেই একটা প্রোডাক্ট আছে — অন্য নাম দিন'); return; }
+  const note = document.getElementById('ekaPkgNote').value.trim();
+  const items = c.rows.map(r=> ({ id: r.id, name: r.p.name, qty: r.qty }));
+  const img = c.rows.map(r=> r.p.imageUrl).find(Boolean) || null;
+  const old = ekaEditingPkgId ? prods.find(x=> x.id === ekaEditingPkgId) : null;
+  const data = Object.assign({}, old || {}, {
+    id: old ? old.id : bccUid(),
+    name,
+    code: old && old.code ? old.code : bccNextProductCode(),
+    productType: 'package',
+    packageItems: items,
+    variants: [],
+    buy: c.buy,
+    sell: price,
+    qty: count,
+    unit: 'pcs',
+    note,
+    imageUrl: (old && old.imageUrl) || img,
+    ekadashi: true,
+    ekaGroup: 'package',
+    published: true,
+  });
+  if(old){ const i = prods.findIndex(x=> x.id === old.id); prods[i] = data; } else prods.push(data);
+  bccSaveProducts(prods);
+  bccSyncProductToBazar(data);
+  document.getElementById('ekaPkgModalOverlay').classList.remove('show');
+  toast(old ? 'প্যাকেজ আপডেট হলো ✅' : '📦 প্যাকেজ তৈরি হয়ে Bazar-এ গেল ✅');
+  ekaRender();
+});
+
+// 🔒 ভেতরের কোনো পণ্যের স্টক কমে গেলে (দোকানে আলাদা বিক্রি হলে) প্যাকেজের সংখ্যাও সেই
+// অনুযায়ী কমিয়ে আনা হয়, যাতে Bazar-এ এমন প্যাকেজ না দেখায় যেটা বানানোর মাল নেই।
+// পরিবর্তিত প্যাকেজের লিস্ট ফেরত দেয় (কলকারী সেভ ও Bazar সিঙ্ক করবে)।
+function ekaCapPackagesToStock(prods){
+  const changed = [];
+  prods.forEach(pk=>{
+    if(pk.productType !== 'package' || !pk.packageItems || !pk.packageItems.length) return;
+    const can = Math.min(...pk.packageItems.map(it=>{
+      const c = prods.find(x=> x.id === it.id);
+      return c ? Math.floor((Number(c.qty)||0) / (Number(it.qty)||1)) : 0;
+    }));
+    if((Number(pk.qty)||0) > can){ pk.qty = Math.max(0, can); changed.push(pk); }
+  });
+  return changed;
+}
+
 
 // ⚠️ Bazar-orphan সেকশন রেন্ডার — POS-এ নেই কিন্তু Bazar-এ এখনো দেখা যাচ্ছে এমন
 // প্রোডাক্ট থাকলে এখানে দেখাবে, প্রতিটার সাথে একটা "সরান" বাটন — শপকিপার নিজে
@@ -13732,6 +14076,12 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
     imageUrl: imageIntegrationResult ? imageIntegrationResult.imageUrl : (existingProduct ? (existingProduct.imageUrl || null) : null),
     note: document.getElementById('bccPNote').value.trim(),
   };
+  // 🛍️ সাধারণ এডিট ফর্মে সেভ করলেও একাদশী/প্যাকেজের তথ্য যেন হারিয়ে না যায়
+  if(existingProduct){
+    if(existingProduct.ekadashi) data.ekadashi = true;
+    if(existingProduct.ekaGroup) data.ekaGroup = existingProduct.ekaGroup;
+    if(existingProduct.productType === 'package'){ data.productType = 'package'; data.packageItems = existingProduct.packageItems || []; data.variants = []; }
+  }
   const newBatchForData = bccMakeNewBatchEntry();
   if(newBatchForData) data.batches.push(newBatchForData);
   if(bccEditingProductId){

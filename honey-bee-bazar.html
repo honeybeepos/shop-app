@@ -1213,6 +1213,7 @@
 
     <div style="display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;">
       <button class="hbEkaFilterBtn" data-ekafilter="all" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">সব</button>
+      <button class="hbEkaFilterBtn" data-ekafilter="package" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">📦 প্যাকেজ</button>
       <button class="hbEkaFilterBtn" data-ekafilter="fruit" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">ফল</button>
       <button class="hbEkaFilterBtn" data-ekafilter="milk" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">দুধ পণ্য</button>
       <button class="hbEkaFilterBtn" data-ekafilter="dry" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">শুকনা পণ্য</button>
@@ -6440,6 +6441,17 @@ async function hbEkaMaybeLoadMapping(){
   }catch(e){ /* Firestore-এ mapping না থাকলে/পড়া না গেলেও ডিফল্ট কিওয়ার্ড তালিকা দিয়েই চলবে */ }
 }
 
+// 🛍️ দোকানদার POS থেকে যে পণ্য "একাদশী"-তে দিয়েছেন (ekadashi:true) সেটা নিজের বাছা ঘরে
+// দেখায়; প্যাকেজ শুধু "📦 প্যাকেজ" আর "সব"-এ। বাকি পণ্য আগের মতো নামের কিওয়ার্ড দিয়ে মেলে।
+function hbEkaInGroup(p, groupKey){
+  if(groupKey === "package") return p.productType === "package";
+  if(groupKey === "all") return p.ekadashi === true || hbEkaProductMatches(p.name, "all");
+  if(p.productType === "package") return false;
+  if(p.ekadashi === true && p.ekaGroup && p.ekaGroup === groupKey) return true;
+  return hbEkaProductMatches(p.name, groupKey);
+}
+function hbEkaRank(p){ return p.productType === "package" ? 0 : (p.ekadashi === true ? 1 : 2); }
+
 function hbEkaProductMatches(name, groupKey){
   const n = (name || "").toLowerCase();
   const groups = groupKey === "all" ? Object.values(__hbEkaKeywordGroups).flat() : (__hbEkaKeywordGroups[groupKey] || []);
@@ -6470,7 +6482,12 @@ async function hbEkaLoadProducts(){
         }));
       }catch(e){ console.warn("Ekadashi special: shop stock load failed", shop.id, e); return []; }
     }));
-    __hbEkaProducts = perShop.flat().filter((p)=> hbEkaProductMatches(p.name, "all"));
+    __hbEkaProducts = perShop.flat().filter((p)=> hbEkaInGroup(p, "all"))
+      .sort((a,b)=> hbEkaRank(a) - hbEkaRank(b) || ((b.highlight?1:0) - (a.highlight?1:0)));
+    // পণ্যে চাপলে ডিটেইল পেজ যেন খোলে — ডিটেইল পেজ marketFeedProducts থেকে খোঁজে
+    if(Array.isArray(marketFeedProducts)){
+      __hbEkaProducts.forEach((p)=>{ if(!marketFeedProducts.some((x)=> x.id === p.id && x.__shopId === p.__shopId)) marketFeedProducts.push(p); });
+    }
   }catch(e){
     console.error(e);
     gridEl.innerHTML = "<div class='mfEmpty'>প্রোডাক্ট লোড করা যায়নি।</div>";
@@ -6484,7 +6501,7 @@ function hbEkaRenderGrid(){
   if(!gridEl) return;
   const activeBtn = document.querySelector('.hbEkaFilterBtn[data-active="1"]') || document.querySelector('.hbEkaFilterBtn[data-ekafilter="all"]');
   const filter = activeBtn ? activeBtn.dataset.ekafilter : "all";
-  const list = filter === "all" ? __hbEkaProducts : __hbEkaProducts.filter((p)=> hbEkaProductMatches(p.name, filter));
+  const list = filter === "all" ? __hbEkaProducts : __hbEkaProducts.filter((p)=> hbEkaInGroup(p, filter));
   if(list.length === 0){
     gridEl.innerHTML = "<div class='mfEmpty'>এই ক্যাটাগরিতে কোনো পণ্য পাওয়া যায়নি।</div>";
   }else{
@@ -9655,6 +9672,7 @@ function mfCardHTML(p, idx){
         <div class="pCardBadges">
           ${shopClosed ? '<span class="pCardOfferBadge" style="background:#6b7280;">🔴 দোকান বন্ধ</span>' : ''}
           ${om.highlight ? '<span class="pCardHighlightBadge">⭐</span>' : ''}
+          ${p.productType === 'package' ? '<span class="pCardOfferBadge" style="background:#be185d;">📦 প্যাকেজ</span>' : ''}
           ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
         </div>
         <span class="pCardFav" onclick="mfToggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
