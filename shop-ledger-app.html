@@ -5009,6 +5009,7 @@ window.hbLoadLib = function(name){
           <div style="font-size:11.5px; color:#cbd2ea; line-height:1.45;">এখানে চালু করা পণ্য আর প্যাকেজ Bazar-এর "🛍️ একাদশী পণ্য" পাতায় দেখাবে। অর্ডার আগের মতোই আসবে।</div>
         </div>
       </div>
+      <div id="ekaBazarStatus" style="font-size:12px; line-height:1.55; border-radius:12px; padding:10px 12px; margin-bottom:12px; background:#10152a; border:1px solid rgba(255,255,255,0.1); color:#cbd2ea;">⏳ Bazar-এর সাথে সংযোগ দেখা হচ্ছে…</div>
       <div class="bccMarketSummary" style="grid-template-columns:repeat(2,1fr);">
         <div class="bccMarketSumCard"><div class="val" id="ekaSumProducts">0</div><div class="lbl">একাদশীতে পণ্য</div></div>
         <div class="bccMarketSumCard"><div class="val" id="ekaSumPackages">0</div><div class="lbl">📦 প্যাকেজ</div></div>
@@ -12400,7 +12401,7 @@ document.querySelectorAll('#program-bcc .bccSubtab').forEach(t=>{
     if(t.dataset.btab==='overview') bccRenderOverview();
     if(t.dataset.btab==='products') bccRenderProducts();
     if(t.dataset.btab==='categories'){ bccRenderCategories(); bccSyncCategoriesToBazar(); } // ট্যাব খোলামাত্রই Bazar-এর সাথে রিকনসাইল/সাফাই হবে, কোনো এডিট ছাড়াই
-    if(t.dataset.btab==='ekadashi') ekaSetSeg(ekaSeg);
+    if(t.dataset.btab==='ekadashi'){ ekaSetSeg(ekaSeg); ekaCheckBazarStatus(); }
     if(t.dataset.btab==='market'){ bccMarketExpirySweep(); bccRenderMarket(); bccRetryPendingBazarSync(); bccRenderBazarOrphans(); } // ট্যাব খোলামাত্রই মেয়াদ-শেষ Highlight/Offer অটো বন্ধ করে Bazar-এর সাথে রিসিঙ্ক, আগে ব্যর্থ হওয়া সিঙ্ক আবার চেষ্টা, আর ভুতুড়ে Bazar-এন্ট্রি চেক
   });
 });
@@ -12706,6 +12707,40 @@ const EKA_KEYWORDS = {
   dry:     ["সাবু","সাবুদানা","বাদাম","কাজু","কিশমিশ","চিনাবাদাম","পেস্তা","ধূপ","আগরবাতি","প্রদীপ"],
   fasting: ["আলু","মিষ্টি আলু"],
 };
+// 🔎 Bazar-এ আসলে দেখা যাবে কি না — দোকানের দেশ, দোকান সক্রিয় কি না, কোন বাজারে আছে
+// সেটা পরিষ্কার দেখায়। কাস্টমার শুধু নিজের বাছা বাজারের "সক্রিয়" দোকানের পণ্য দেখে।
+async function ekaCheckBazarStatus(){
+  const box = document.getElementById('ekaBazarStatus'); if(!box) return;
+  const warn = (html)=>{ box.style.background='rgba(251,191,36,0.08)'; box.style.borderColor='rgba(251,191,36,0.4)'; box.style.color='#fde68a'; box.innerHTML = html; };
+  if(!hbBazarAllowed()){ warn('🔒 আপনার দোকান বাংলাদেশের বাইরের হিসেবে সেট করা, তাই কোনো পণ্য বা প্যাকেজ Bazar-এ দেখাবে না। ⚙️ সেটিংসে দেশ <b>বাংলাদেশ</b> থাকলে তবেই দেখাবে।'); return; }
+  const session = (typeof getSession === 'function') ? getSession() : null;
+  if(!session || !session.shopId || typeof db === 'undefined'){ warn('⚠️ লগইন পাওয়া যায়নি — লগইন করে আবার খুলুন।'); return; }
+  try{
+    const d = await db.collection('shops').doc(session.shopId).get();
+    const shop = d.exists ? d.data() : {};
+    let mName = shop.marketId || '';
+    if(shop.marketId){ try{ const m = await db.collection('markets').doc(shop.marketId).get(); if(m.exists) mName = m.data().name || mName; }catch(e){} }
+    if(!shop.marketId){ warn('⚠️ আপনার দোকান এখনো কোনো বাজারে যুক্ত নেই, তাই Bazar-এ দেখা যাবে না। এজেন্টের সাথে কথা বলুন।'); return; }
+    if(shop.status !== 'active'){ warn(`⚠️ আপনার দোকান (বাজার: <b>${escapeHtml(mName)}</b>) এখনো Bazar-এ <b>সক্রিয় নয়</b>, তাই কাস্টমার পণ্য দেখতে পাবে না। এজেন্ট দোকান সক্রিয় করলে দেখাবে।`); return; }
+    if(shop.isShopOpen === false){ warn(`🔴 দোকান এখন "বন্ধ" করা আছে — পণ্য দেখাবে, কিন্তু কাস্টমার অর্ডার দিতে পারবে না। বাজার: <b>${escapeHtml(mName)}</b>`); return; }
+    box.style.background='rgba(22,163,74,0.1)'; box.style.borderColor='rgba(22,163,74,0.4)'; box.style.color='#bbf7d0';
+    box.innerHTML = `✅ আপনার দোকান Bazar-এ সক্রিয় · বাজার: <b>${escapeHtml(mName)}</b><br><span style="color:#9aa5c4;">কাস্টমার Bazar-এ এই বাজার বাছলে একাদশী পাতায় আপনার পণ্য দেখবে।</span>`;
+  }catch(e){ warn('📶 Bazar-এর সাথে সংযোগ হয়নি — ইন্টারনেট দেখে আবার খুলুন।'); }
+}
+
+// 📤 Bazar-এ পাঠিয়ে সত্যিই পৌঁছেছে কি না জানায় (আগে সুইচ সবুজ দেখালেও আসলে না-ও পৌঁছাতে পারত)
+async function ekaPublishNow(p, prods){
+  if(!hbBazarAllowed()){
+    p.published = false; bccSaveProducts(prods);
+    toast(HB_BAZAR_LOCK_MSG); ekaRender(); return false;
+  }
+  await bccSyncProductToBazar(p);
+  if(bccPendingQueueGet('bcc-pending-bazar-sync').includes(p.id)){
+    toast('📶 Bazar-এ পাঠানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন'); return false;
+  }
+  return true;
+}
+
 function ekaGuessGroup(name){
   const n = (name||"").toLowerCase();
   for(const g of Object.keys(EKA_KEYWORDS)){ if(EKA_KEYWORDS[g].some(k=> n.includes(k))) return g; }
@@ -12789,8 +12824,8 @@ function ekaToggleProduct(id, on, cb){
     toast('একাদশী পাতা থেকে সরানো হলো (Bazar-এ সাধারণভাবে থাকবে)');
   }
   bccSaveProducts(prods);
-  if(p.published) bccSyncProductToBazar(p);
   ekaRender();
+  if(p.published) ekaPublishNow(p, prods).then(ok=>{ if(ok && on) toast('✅ Bazar-এর একাদশী পাতায় পৌঁছেছে'); });
 }
 
 /* ---------- 📦 প্যাকেজ ---------- */
@@ -12826,9 +12861,9 @@ function ekaRenderPackages(pkgs){
     if(cb.checked && (Number(p.qty)||0) <= 0){ toast('প্যাকেজের সংখ্যা ০ — আগে এডিট করে সংখ্যা দিন'); cb.checked = false; return; }
     p.published = cb.checked;
     bccSaveProducts(prods);
-    if(p.published) bccSyncProductToBazar(p); else bccUnpublishFromBazar(p.id);
-    toast(p.published ? '🟢 Bazar-এ দেখানো হচ্ছে' : '🔴 Bazar থেকে লুকানো হলো');
     ekaRender();
+    if(p.published) ekaPublishNow(p, prods).then(ok=>{ if(ok) toast('✅ Bazar-এ পৌঁছেছে'); });
+    else { bccUnpublishFromBazar(p.id); toast('🔴 Bazar থেকে লুকানো হলো'); }
   }));
 }
 
@@ -12938,10 +12973,9 @@ document.getElementById('ekaPkgSaveBtn').addEventListener('click', ()=>{
   });
   if(old){ const i = prods.findIndex(x=> x.id === old.id); prods[i] = data; } else prods.push(data);
   bccSaveProducts(prods);
-  bccSyncProductToBazar(data);
   document.getElementById('ekaPkgModalOverlay').classList.remove('show');
-  toast(old ? 'প্যাকেজ আপডেট হলো ✅' : '📦 প্যাকেজ তৈরি হয়ে Bazar-এ গেল ✅');
   ekaRender();
+  ekaPublishNow(data, prods).then(ok=>{ if(ok) toast(old ? '✅ প্যাকেজ আপডেট হয়ে Bazar-এ পৌঁছেছে' : '✅ প্যাকেজ তৈরি হয়ে Bazar-এ পৌঁছেছে'); });
 });
 
 // 🔒 ভেতরের কোনো পণ্যের স্টক কমে গেলে (দোকানে আলাদা বিক্রি হলে) প্যাকেজের সংখ্যাও সেই
