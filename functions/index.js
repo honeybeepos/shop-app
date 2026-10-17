@@ -286,7 +286,7 @@ async function sendOrderPushToCustomer(uid, title, body, data) {
         token,
         notification: { title, body },
         data: Object.assign({ type: "order-status" }, data || {}),
-        webpush: { fcmOptions: { link: BAZAR_APP_URL } },
+        webpush: { fcmOptions: { link: (data && data.link) || BAZAR_APP_URL } }, // 🧵 সেলাই ঘরের খবর সরাসরি সেলাই ঘরে খোলে
       });
       console.log(JSON.stringify({ event: "CUSTOMER_FCM_SENT", uid, from: place.col }));
       return true;
@@ -682,6 +682,9 @@ exports.onOfferResolved = onDocumentUpdated(
     if (before.status === after.status) return;
     if (after.status !== "skipped" && after.status !== "expired") return;
 
+    // 🧵 সেলাই ঘরের অফার — নিজের আলাদা পথে (নাহলে নিচের পুরনো পথে shopId না পেয়ে ভেঙে পড়ত)
+    if (after.tailorOrderId) { await tailorOfferResolved(event.params.offerId, after); return; }
+
     if (after.orderId) {
       // 🆕 orderRequests-চালিত অফার — পরের প্রার্থীকে খোঁজা
       console.log(JSON.stringify({ event: "OFFER_EXPIRED", orderId: after.orderId, riderId: after.riderId }));
@@ -717,6 +720,9 @@ exports.onOfferAccepted = onDocumentUpdated(
     const before = event.data.before.data();
     const after = event.data.after.data();
     if (before.status === after.status || after.status !== "accepted") return;
+
+    // 🧵 সেলাই ঘরের অফার
+    if (after.tailorOrderId) { await tailorOfferAccepted(event.params.offerId, after, event.data.after.ref); return; }
 
     if (after.orderId) {
       // 🆕 orderRequests-চালিত অফার — Firestore transaction দিয়ে ডুপ্লিকেট-এসাইনমেন্ট প্রতিরোধ
@@ -3317,3 +3323,234 @@ exports.advanceTripDispatch = onSchedule("every 1 minutes", async () => {
   if (snap.empty) return;
   await Promise.all(snap.docs.map((doc) => tripAdvance(doc.ref, false).catch((e) => console.warn("TRIP_ADVANCE_FAILED", doc.id, String(e && e.message || e)))));
 });
+
+/* ==================== 🧵 সেলাই ঘর — অর্ডার, রাইডার আর পুশ (অক্টোবর ২০২৬) ====================
+   ধাপগুলো (tailorOrders/{id}.status):
+     placed → (দর্জি) accepted → (রাইডার নিলেন) collecting → (দর্জিকে দিলেন) stitching
+            → (দর্জি) ready → (রাইডার নিলেন) returning → (গ্রাহককে দিলেন) delivered
+     placed → declined (দর্জি) / cancelled (গ্রাহক)
+   রাইডার দুইবার লাগে: কাপড় আনা (গ্রাহক → দর্জি) আর পোশাক ফেরত (দর্জি → গ্রাহক)।
+   দুইবারই বাজারের অর্ডারের মতো — একজন একজন করে সর্বোচ্চ ৫ জন, প্রত্যেকে ৪০ সেকেন্ড।
+   ডেলিভারি চার্জ সার্ভারেই হিসাব হয় (গ্রাহক নিজে লিখে কম দিতে পারেন না)।
+   Google Maps-এর খরচ নেই — সোজা দূরত্ব (haversine) দিয়ে হিসাব। */
+const TAILOR_APP_URL = `${APP_DOMAIN}/tailor-app.html`;
+const TAILOR_BAZAR_URL = `${APP_DOMAIN}/honey-bee-bazar.html?screen=tailor`;
+// 💰 প্রতি যাত্রা (একদিক): ৩০ + কিমি প্রতি ১২ টাকা, কমপক্ষে ৪০, বেশি হলে ৩০০ — bazar-এর tlrLegCharge()-এর সাথে হুবহু এক
+const TAILOR_LEG_BASE = 30, TAILOR_LEG_PER_KM = 12, TAILOR_LEG_MIN = 40, TAILOR_LEG_MAX = 300;
+const TAILOR_RIDER_MAX_KM = 25;
+function tailorLegCharge(km) {
+  if (km == null || !isFinite(km)) return TAILOR_LEG_MIN;
+  return Math.min(TAILOR_LEG_MAX, Math.max(TAILOR_LEG_MIN, Math.round(TAILOR_LEG_BASE + TAILOR_LEG_PER_KM * km)));
+}
+
+// 🧵 দর্জির ফোনে — টোকেন tailors/{id}/private/push-এ (দোকানের নথি সবাই পড়তে পারে, তাই টোকেন আলাদা ঘরে)
+async function pushToTailor(tailorId, payload) {
+  try {
+    const ref = db.collection("tailors").doc(tailorId).collection("private").doc("push");
+    const snap = await ref.get();
+    const token = snap.exists ? snap.data().token : null;
+    if (!token) return false;
+    try {
+      await getMessaging().send({ token, data: hubData(Object.assign({ link: TAILOR_APP_URL }, payload)), webpush: { headers: { Urgency: "high" } } });
+      return true;
+    } catch (e) {
+      if (DEAD_TOKEN(e)) await ref.delete().catch(() => {});
+      return false;
+    }
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "TAILOR_PUSH_FAILED", tailorId, error: String(e && e.message || e) }));
+    return false;
+  }
+}
+
+async function dispatchTailorLeg(orderId, o, excludeRiderIds) {
+  const ref = db.collection("tailorOrders").doc(orderId);
+  const leg = o.status === "ready" ? "return" : "pickup";
+  const exclude = excludeRiderIds || [];
+  const setDispatch = (d) => ref.set({ dispatch: d }, { merge: true });
+  if (exclude.length >= MAX_RIDERS_PER_ORDER) {
+    await setDispatch({ leg, state: "waiting_for_rider", offered: exclude, offerId: null });
+    return null;
+  }
+  const custLoc = o.customerLoc && o.customerLoc.lat != null ? o.customerLoc : null;
+  const tlLoc = o.tailorLoc && o.tailorLoc.lat != null ? o.tailorLoc : null;
+  const from = leg === "pickup" ? custLoc : tlLoc;
+  const to = leg === "pickup" ? tlLoc : custLoc;
+
+  const snap = await riderEligibilityQuery().get();
+  const cands = snap.docs
+    .filter((d) => !exclude.includes(d.id))
+    .map((d) => {
+      const r = { id: d.id, ...d.data() };
+      r.km = (from && r.liveLocation && r.liveLocation.lat != null)
+        ? haversineKm(from.lat, from.lng, r.liveLocation.lat, r.liveLocation.lng) : null;
+      return r;
+    })
+    // কাপড় যেখান থেকে তুলতে হবে তার ২৫ কিমির মধ্যে; লোকেশন না থাকলে শুধু তখনই নেওয়া হয় যখন জায়গাটাই অজানা
+    .filter((r) => from ? (r.km != null && r.km <= TAILOR_RIDER_MAX_KM) : true)
+    .sort((a, b) => (a.km == null ? Infinity : a.km) - (b.km == null ? Infinity : b.km));
+
+  if (!cands.length) {
+    console.log(JSON.stringify({ event: "TAILOR_NO_RIDER", orderId, leg }));
+    await setDispatch({ leg, state: "waiting_for_rider", offered: exclude, offerId: null });
+    return null;
+  }
+  const r = cands[0];
+  const legCharge = typeof o.legCharge === "number" ? o.legCharge : TAILOR_LEG_MIN;
+  const offerRef = await db.collection("deliveryOffers").add({
+    tailorOrderId: orderId, leg, riderId: r.id, status: "pending",
+    jobKind: "tailor",
+    jobLabel: leg === "pickup" ? "🧵 সেলাই — গ্রাহকের কাপড় দর্জির কাছে" : "🧵 সেলাই — তৈরি পোশাক গ্রাহকের কাছে",
+    pickupName: leg === "pickup" ? `👤 ${o.customerName || "গ্রাহক"} (কাপড় আনুন)` : `🧵 ${o.tailorName || "সেলাই ঘর"}`,
+    pickupIsRestaurant: false,
+    pickupAddress: leg === "pickup" ? (o.customerAddress || null) : (o.tailorAddress || null),
+    orderCode: o.orderCode || null,
+    deliveryCharge: legCharge,
+    pickupLat: from ? from.lat : null, pickupLng: from ? from.lng : null,
+    dropLat: to ? to.lat : null, dropLng: to ? to.lng : null,
+    dropAddress: leg === "pickup" ? `🧵 ${o.tailorName || "সেলাই ঘর"}${o.tailorAddress ? " — " + o.tailorAddress : ""}` : `👤 ${o.customerName || "গ্রাহক"}${o.customerAddress ? " — " + o.customerAddress : ""}`,
+    distanceKm: r.km != null ? Math.round(r.km * 10) / 10 : null,
+    createdAt: FieldValue.serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(Date.now() + OFFER_TIMEOUT_SECONDS * 1000),
+  });
+  await setDispatch({ leg, state: "offer_sent", offered: exclude.concat([r.id]), offerId: offerRef.id });
+  console.log(JSON.stringify({ event: "TAILOR_OFFER_CREATED", orderId, leg, riderId: r.id, offerId: offerRef.id }));
+  await sendFcmToRider(r.id, "🧵 সেলাইয়ের কাপড় নিতে ইচ্ছুক?",
+    `${leg === "pickup" ? "গ্রাহক → দর্জি" : "দর্জি → গ্রাহক"}${o.orderCode ? " · " + o.orderCode : ""} · চার্জ ৳${legCharge} — ৪০ সেকেন্ডের মধ্যে সাড়া দিন`,
+    { offerId: offerRef.id, tailorOrderId: orderId });
+  return offerRef.id;
+}
+
+// রাইডার "না" বললেন / ৪০ সেকেন্ড পেরোল → পরের জন (onOfferResolved থেকে ডাকা হয়)
+async function tailorOfferResolved(offerId, offer) {
+  const snap = await db.collection("tailorOrders").doc(offer.tailorOrderId).get();
+  if (!snap.exists) return;
+  const o = snap.data(), d = o.dispatch || {};
+  if (d.offerId !== offerId || d.state !== "offer_sent") return; // পুরনো অফার — এর মধ্যে অন্য কিছু ঘটে গেছে
+  if (o.status !== "accepted" && o.status !== "ready") return;
+  await dispatchTailorLeg(offer.tailorOrderId, o, d.offered || []);
+}
+
+// রাইডার "হ্যাঁ" বললেন → এই অর্ডারটা তাঁর (একসাথে দুইজন নিলেও একজনই পাবেন)
+async function tailorOfferAccepted(offerId, offer, offerRef) {
+  const ref = db.collection("tailorOrders").doc(offer.tailorOrderId);
+  const rd = await db.collection("riders").doc(offer.riderId).get();
+  const rider = rd.exists ? rd.data() : {};
+  const ok = await db.runTransaction(async (tx) => {
+    const s = await tx.get(ref);
+    if (!s.exists) return false;
+    const o = s.data(), d = o.dispatch || {};
+    if (d.offerId !== offerId || d.state === "assigned") return false;
+    const leg = d.leg === "return" ? "return" : "pickup";
+    if (leg === "pickup" && o.status !== "accepted") return false;
+    if (leg === "return" && o.status !== "ready") return false;
+    tx.set(ref, {
+      status: leg === "pickup" ? "collecting" : "returning",
+      riderId: offer.riderId, riderName: rider.name || "রাইডার", riderPhone: rider.phone || null,
+      pickedUp: false,
+      [leg + "RiderId"]: offer.riderId,
+      [leg + "AssignedAt"]: FieldValue.serverTimestamp(),
+      dispatch: Object.assign({}, d, { state: "assigned" }),
+    }, { merge: true });
+    return true;
+  });
+  if (!ok) {
+    console.log(JSON.stringify({ event: "TAILOR_ASSIGN_BLOCKED", orderId: offer.tailorOrderId, riderId: offer.riderId }));
+    await offerRef.update({ status: "cancelled" }).catch(() => {});
+  }
+}
+
+exports.onTailorOrderWritten = onDocumentWritten("tailorOrders/{id}", async (event) => {
+  const id = event.params.id;
+  const before = event.data.before.exists ? event.data.before.data() : null;
+  const after = event.data.after.exists ? event.data.after.data() : null;
+  if (!after) return;
+  const ref = event.data.after.ref;
+  const code = after.orderCode ? after.orderCode + " · " : "";
+  const toCust = (t, b) => sendOrderPushToCustomer(after.customerUid, t, b, { type: "tailor-order", orderId: id, link: TAILOR_BAZAR_URL })
+    .catch(() => false);
+  const toTailor = (t, b) => pushToTailor(after.tailorId, { type: "tailor-order", title: t, body: b, tag: "tailor-" + id });
+  try {
+    // 🆕 নতুন অর্ডার — দর্জির লোকেশন/ঠিকানা আর চার্জ সার্ভার নিজে বসায়
+    if (!before) {
+      const ts = await db.collection("tailors").doc(after.tailorId).get();
+      const t = ts.exists ? ts.data() : {};
+      const tLoc = t.storeLocation && t.storeLocation.lat != null ? { lat: t.storeLocation.lat, lng: t.storeLocation.lng } : null;
+      const cLoc = after.customerLoc && after.customerLoc.lat != null ? after.customerLoc : null;
+      const km = (tLoc && cLoc) ? haversineKm(tLoc.lat, tLoc.lng, cLoc.lat, cLoc.lng) : null;
+      const legCharge = tailorLegCharge(km);
+      const stitch = Math.round(Number(after.price || 0) * Number(after.qty || 1));
+      const orderCode = "S" + String(Math.floor(1000 + Math.random() * 9000));
+      await ref.set({
+        orderCode, tailorLoc: tLoc, tailorName: t.name || after.tailorName || "সেলাই ঘর",
+        tailorPhone: t.phone || null, tailorAddress: [t.address, t.area].filter(Boolean).join(", ") || null,
+        distanceKm: km != null ? Math.round(km * 10) / 10 : null,
+        legCharge, deliveryCharge: legCharge * 2, stitchTotal: stitch, total: stitch + legCharge * 2,
+      }, { merge: true });
+      await toTailor("🧵 নতুন সেলাই অর্ডার!", `${orderCode} · ${after.customerName || "গ্রাহক"} — ${after.designTitle || "ডিজাইন"} × ${after.qty || 1}. চাপ দিয়ে গ্রহণ করুন।`);
+      return;
+    }
+
+    const st = after.status;
+    if (st !== before.status) {
+      const total = after.total != null ? ` · মোট ৳${after.total}` : "";
+      if (st === "accepted") {
+        await toCust("✅ দর্জি অর্ডার নিয়েছেন", `${code}${after.tailorName || "সেলাই ঘর"} — রাইডার শিগগিরই আপনার কাপড় নিতে আসবেন।`);
+        await dispatchTailorLeg(id, after, []);
+      } else if (st === "declined") {
+        await toCust("❌ দর্জি এই অর্ডারটা নিতে পারছেন না", `${code}${after.tailorName || ""}${after.tailorNote ? " — " + after.tailorNote : ""}. অন্য দর্জি দেখুন।`);
+      } else if (st === "cancelled") {
+        await toTailor("✕ গ্রাহক অর্ডার বাতিল করেছেন", `${code}${after.customerName || "গ্রাহক"} — ${after.designTitle || ""}`);
+      } else if (st === "collecting") {
+        await toCust("🛵 রাইডার আসছেন কাপড় নিতে", `${code}${after.riderName || "রাইডার"}${after.riderPhone ? " (" + after.riderPhone + ")" : ""} — কাপড় গুছিয়ে রাখুন।`);
+        await toTailor("🛵 রাইডার পাওয়া গেছে", `${code}${after.riderName || "রাইডার"} গ্রাহকের কাপড় নিয়ে আসবেন।`);
+      } else if (st === "stitching") {
+        await toTailor("📦 কাপড় পৌঁছেছে — সেলাই শুরু করুন", `${code}${after.customerName || "গ্রাহক"} — ${after.designTitle || ""} × ${after.qty || 1}`);
+        await toCust("✂️ কাপড় দর্জির হাতে পৌঁছেছে", `${code}${after.days ? after.days + " দিনের মধ্যে" : "শিগগিরই"} তৈরি হবে — তৈরি হলেই জানাব।`);
+        await markTailorLegDone(after);
+      } else if (st === "ready") {
+        await toCust("🎉 আপনার পোশাক তৈরি!", `${code}রাইডার শিগগিরই নিয়ে আসবেন${total}`);
+        await dispatchTailorLeg(id, after, []);
+      } else if (st === "returning") {
+        await toCust("🛵 রাইডার আপনার পোশাক আনতে যাচ্ছেন", `${code}${after.riderName || "রাইডার"}${after.riderPhone ? " (" + after.riderPhone + ")" : ""}${total} — নগদ রাখুন।`);
+        await toTailor("🛵 রাইডার পোশাক নিতে আসছেন", `${code}${after.riderName || "রাইডার"} — প্যাকেট তৈরি রাখুন।`);
+      } else if (st === "delivered") {
+        await toTailor("✅ পোশাক গ্রাহকের হাতে পৌঁছেছে", `${code}${after.customerName || "গ্রাহক"}${total}`);
+        await toCust("✅ পোশাক পৌঁছে গেছে", `${code}সেলাই ঘর ব্যবহারের জন্য ধন্যবাদ!`);
+        await markTailorLegDone(after);
+      }
+      return;
+    }
+
+    // 🛵 রাইডার মাল তুলে রওনা দিলেন
+    if (!before.pickedUp && after.pickedUp) {
+      if (st === "collecting") await toTailor("🛵 কাপড় নিয়ে রওনা দিয়েছেন", `${code}${after.riderName || "রাইডার"} গ্রাহকের কাপড় নিয়ে আসছেন।`);
+      if (st === "returning") await toCust("🛵 পোশাক নিয়ে রওনা দিয়েছেন", `${code}${after.riderName || "রাইডার"} আসছেন — মোট ৳${after.total || ""} নগদ রাখুন।`);
+      return;
+    }
+
+    // 🔁 দর্জি "আবার রাইডার খুঁজুন" চাপলেন
+    const ms = (x) => (x && x.toMillis ? x.toMillis() : 0);
+    const d = after.dispatch || {}, bd = before.dispatch || {};
+    if (ms(after.retryAt) > ms(before.retryAt) && (st === "accepted" || st === "ready") && d.state === "waiting_for_rider") {
+      await dispatchTailorLeg(id, after, []);
+      return;
+    }
+
+    // ⚠️ কাউকে পাওয়া গেল না — দর্জিকে জানানো (একবারই)
+    if (d.state === "waiting_for_rider" && bd.state !== "waiting_for_rider") {
+      await toTailor("⚠️ এখন কোনো রাইডার পাওয়া যায়নি", `${code}অ্যাপ খুলে "🔁 আবার রাইডার খুঁজুন" চাপুন।`);
+    }
+  } catch (e) {
+    console.error(JSON.stringify({ event: "TAILOR_ORDER_HANDLER_FAILED", id, error: String(e && e.message || e) }));
+  }
+});
+
+// 💰 যাত্রা শেষ — রাইডারের আজকের আয়ে যোগ হয় (অ্যাপের হিসাব deliveryOffers-এর delivered দেখে)
+async function markTailorLegDone(o) {
+  const offerId = o.dispatch && o.dispatch.offerId;
+  if (!offerId) return;
+  await db.collection("deliveryOffers").doc(offerId)
+    .set({ status: "delivered", riderIncome: typeof o.legCharge === "number" ? o.legCharge : TAILOR_LEG_MIN, deliveredAt: FieldValue.serverTimestamp() }, { merge: true })
+    .catch(() => {});
+}
