@@ -200,6 +200,40 @@ service cloud.firestore {
       }
     }
 
+    /* 🧵 সেলাই ঘর (দর্জি) — tailor-app.html দিয়ে নিবন্ধন ও ডিজাইন পোস্ট।
+       মালিক নিজের status/isVerified বদলাতে পারে না (ব্লক হলে নিজে খুলতে পারবে না)। */
+    match /tailors/{tailorId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.auth.uid == tailorId
+                    && request.resource.data.status == 'active'
+                    && request.resource.data.isVerified == false;
+      allow update: if isSuperAdmin() ||
+                    (isSignedIn() && request.auth.uid == tailorId
+                     && !request.resource.data.diff(resource.data).affectedKeys()
+                          .hasAny(['status', 'isVerified']));
+      allow delete: if isSuperAdmin();
+    }
+
+    // ডিজাইন — ছবি data-URL হিসেবে নথির ভেতরেই (১০০ KB ছবি ≈ ১৩৭ KB লেখা)
+    match /tailorDesigns/{designId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+                    && request.resource.data.tailorId == request.auth.uid
+                    && request.resource.data.img is string
+                    && request.resource.data.img.size() <= 140000
+                    && request.resource.data.price is number
+                    && request.resource.data.price > 0;
+      allow update: if isSuperAdmin() ||
+                    (isSignedIn() && resource.data.tailorId == request.auth.uid
+                     && request.resource.data.tailorId == request.auth.uid
+                     && request.resource.data.img is string
+                     && request.resource.data.img.size() <= 140000
+                     && request.resource.data.price is number
+                     && request.resource.data.price > 0);
+      allow delete: if isSuperAdmin() ||
+                    (isSignedIn() && resource.data.tailorId == request.auth.uid);
+    }
+
     /* 🍽️ রেস্টুরেন্ট — নিজস্ব POS দিয়ে নিবন্ধন করে, Bazar-এ দেখা যায়।
        ⚠️ এই ব্লকটা না থাকলে Firestore ডিফল্টে সব আটকে দিত — নিবন্ধন
           লিখতেই পারত না, আর Bazar-এর তালিকাও চিরকাল খালি থাকত। */
