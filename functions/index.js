@@ -159,6 +159,7 @@ async function notifyLegacyDevices(shopId, shopName) {
     },
     data: { type: "delivery-call", shopId },
     webpush: {
+      headers: { Urgency: "high" },
       fcmOptions: { link: RIDER_MODE_URL },
     },
     tokens,
@@ -191,7 +192,7 @@ async function sendFcmToRider(riderId, title, body, data) {
       token,
       notification: { title, body },
       data: Object.assign({ type: "delivery-offer" }, data || {}),
-      webpush: { fcmOptions: { link: riderAppUrl(riderDoc.data()) } },
+      webpush: { headers: { Urgency: "high" }, fcmOptions: { link: riderAppUrl(riderDoc.data()) } },
     });
     console.log(JSON.stringify({ event: "FCM_SENT", riderId }));
     return true;
@@ -218,7 +219,7 @@ async function sendFcmToTransportDriver(driverId, title, body, data) {
       token,
       notification: { title, body },
       data: Object.assign({ type: "trip-update" }, data || {}),
-      webpush: { fcmOptions: { link: RIDER_MODE_URL } },
+      webpush: { headers: { Urgency: "high" }, fcmOptions: { link: RIDER_MODE_URL } },
     });
     console.log(JSON.stringify({ event: "DRIVER_FCM_SENT", driverId }));
     return true;
@@ -241,7 +242,7 @@ async function sendFcmToCustomer(customerUid, title, body, data) {
       token,
       notification: { title, body },
       data: Object.assign({ type: "trip-update" }, data || {}),
-      webpush: { fcmOptions: { link: BAZAR_APP_URL } },
+      webpush: { headers: { Urgency: "high" }, fcmOptions: { link: BAZAR_APP_URL } },
     });
     console.log(JSON.stringify({ event: "CUSTOMER_FCM_SENT", customerUid }));
     return true;
@@ -286,7 +287,7 @@ async function sendOrderPushToCustomer(uid, title, body, data) {
         token,
         notification: { title, body },
         data: Object.assign({ type: "order-status" }, data || {}),
-        webpush: { fcmOptions: { link: (data && data.link) || BAZAR_APP_URL } }, // 🧵 সেলাই ঘরের খবর সরাসরি সেলাই ঘরে খোলে
+        webpush: { headers: { Urgency: "high" }, fcmOptions: { link: (data && data.link) || BAZAR_APP_URL } }, // 🧵 সেলাই ঘরের খবর সরাসরি সেলাই ঘরে খোলে
       });
       console.log(JSON.stringify({ event: "CUSTOMER_FCM_SENT", uid, from: place.col }));
       return true;
@@ -330,7 +331,7 @@ async function sendFcmToMessengerUser(uid, title, body, data) {
       token,
       notification: { title, body },
       data: Object.assign({ type: "messenger-message" }, data || {}),
-      webpush: { fcmOptions: { link: BAZAR_APP_URL } },
+      webpush: { headers: { Urgency: "high" }, fcmOptions: { link: BAZAR_APP_URL } },
     });
     console.log(JSON.stringify({ event: "MESSENGER_FCM_SENT", uid }));
     return true;
@@ -1950,7 +1951,7 @@ exports.notifyRestaurantNewOrder = onDocumentWritten(
           orderId: String(after.customerUid || event.params.orderId),
           shopId: String(after.shopId),
         },
-        webpush: { fcmOptions: { link: "/restaurant-pos.html" } },
+        webpush: { headers: { Urgency: "high" }, fcmOptions: { link: `${APP_DOMAIN}/restaurant-pos.html` } }, // ⚠️ আগে "/restaurant-pos.html" ছিল — Firebase পুরো https ঠিকানা ছাড়া পুশ পাঠাতেই রাজি হয় না, তাই রেস্টুরেন্টে নতুন অর্ডারের পুশ কখনো যেত না
       });
     } catch (err) {
       if (err && (err.code === "messaging/registration-token-not-registered" ||
