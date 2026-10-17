@@ -745,6 +745,18 @@ auth.onAuthStateChanged(u=>{ if(u){ listenMyBookings(u.uid); hbPushInit(u.uid); 
 
 
 if(/[?&]page=bookings/.test(location.search)) setTimeout(()=>showPage('bookingsPage'),50);
+/* 🚑 Bazar-এর জীবন তরী → অ্যাম্বুলেন্স থেকে "বুক করুন" চাপলে ?book=<পোস্ট id> দিয়ে আসে —
+   পোস্টগুলো আসা পর্যন্ত অপেক্ষা করে সরাসরি সেই পোস্টের বুকিং ফর্ম খোলে */
+(function(){
+  const m=location.search.match(/[?&]book=([A-Za-z0-9_-]{1,64})/); if(!m) return;
+  const id=m[1]; let tries=0;
+  const t=setInterval(()=>{
+    tries++;
+    const r=(typeof rides!=='undefined'&&Array.isArray(rides))?rides.find(x=>hbUnesc(x.id)===id):null;
+    if(r){ clearInterval(t); try{ showPage('postsPage'); }catch(e){} openBooking(r.id); return; }
+    if(tries>40 || (window.__ridesLoaded && tries>8)){ clearInterval(t); if(window.__ridesLoaded) toast('এই পোস্টটা আর চালু নেই — অন্য গাড়ি দেখুন'); }
+  },500);
+})();
 </script>
 </body>
 </html>
