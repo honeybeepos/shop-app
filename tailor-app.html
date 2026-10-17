@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>সেলাই ঘর — Honey Bee</title>
+<meta name="theme-color" content="#9d174d">
+<!-- 🧵 সেলাই ঘর (দর্জির অ্যাপ) — অক্টোবর ২০২৬
+     খুব সহজ রাখা হয়েছে: ডিজাইনের ছবি + মজুরি দেওয়া, অর্ডার দেখা, দোকানের লোকেশন।
+     ছবি ফোনেই ছোট করা হয় (লক্ষ্য ৫০ KB, কোনোভাবেই ১০০ KB-র বেশি না) — তাই খরচ কম,
+     আর গ্রামের ধীর নেটেও দ্রুত খোলে। অর্ডার আর রাইডার পরের ধাপে যোগ হবে। -->
+<style>
+  :root{
+    --plum:#9d174d; --rose:#be185d; --pink:#fce7f3; --pink2:#fbcfe8;
+    --bg:#fff7fa; --card:#fff; --ink:#3b0a24; --muted:#8a6475; --line:#f3d3e2;
+    --green:#15803d; --red:#b91c1c; --gold:#b45309;
+    --shadow:0 4px 18px rgba(157,23,77,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:"Noto Sans Bengali","Hind Siliguri",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);-webkit-text-size-adjust:100%;line-height:1.55}
+  .wrap{max-width:520px;margin:0 auto;padding:0 14px 96px}
+  header.top{background:linear-gradient(135deg,var(--plum),var(--rose));color:#fff;padding:16px 16px 18px;border-radius:0 0 22px 22px;margin:0 -14px 14px;box-shadow:var(--shadow)}
+  .top .row{display:flex;align-items:center;gap:12px}
+  .top .logo{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+  .top h1{font-size:18px;margin:0;line-height:1.25}
+  .top small{opacity:.85;font-size:12px}
+  .openSw{margin-left:auto;border:0;border-radius:20px;padding:8px 12px;font-weight:800;font-family:inherit;font-size:12.5px;cursor:pointer}
+  .openSw.on{background:#dcfce7;color:var(--green)} .openSw.off{background:#fee2e2;color:var(--red)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:var(--shadow)}
+  .card h2{font-size:15.5px;margin:0 0 8px}
+  .muted{color:var(--muted);font-size:12.5px}
+  .btn{border:0;border-radius:14px;padding:13px 14px;font-weight:800;font-family:inherit;font-size:15px;cursor:pointer;background:var(--rose);color:#fff;width:100%}
+  .btn.ghost{background:var(--pink);color:var(--plum)}
+  .btn.small{width:auto;padding:8px 12px;font-size:13px;border-radius:10px}
+  .btn:disabled{opacity:.6}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;text-align:center;box-shadow:var(--shadow)}
+  .stat b{display:block;font-size:24px;color:var(--plum)} .stat span{font-size:12px;color:var(--muted)}
+  .banner{border-radius:14px;padding:12px;margin-bottom:12px;font-size:13px;display:flex;gap:10px;align-items:center}
+  .banner.warn{background:#fff1f2;border:1.5px solid #fda4af;color:#9f1239}
+  .banner.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:var(--green)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .dz{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
+  .dz img,.dz .noimg{width:100%;aspect-ratio:3/4;object-fit:cover;background:var(--pink);display:flex;align-items:center;justify-content:center;font-size:40px}
+  .dz .b{padding:9px 10px 10px;display:flex;flex-direction:column;gap:4px;flex:1}
+  .dz .t{font-weight:800;font-size:13.5px;line-height:1.3}
+  .dz .p{color:var(--plum);font-weight:800;font-size:14px}
+  .dz .acts{display:flex;gap:6px;margin-top:auto}
+  .dz .acts button{flex:1;border:1px solid var(--line);background:#fff;border-radius:9px;padding:6px 0;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:var(--ink)}
+  .tag{display:inline-block;font-size:10.5px;font-weight:800;border-radius:10px;padding:2px 8px}
+  .tag.pub{background:#dcfce7;color:var(--green)} .tag.hid{background:#f1f5f9;color:#64748b}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 4px;font-weight:700}
+  input,select,textarea{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#fff;font-family:inherit;font-size:15px;color:var(--ink)}
+  textarea{min-height:70px;resize:vertical}
+  .photoBox{border:2px dashed var(--pink2);border-radius:16px;padding:12px;text-align:center;background:#fffafc;cursor:pointer}
+  .photoBox img{max-width:100%;max-height:260px;border-radius:12px;display:block;margin:0 auto 6px}
+  nav.bottom{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 4px calc(8px + env(safe-area-inset-bottom));z-index:20}
+  nav.bottom button{border:0;background:transparent;font-family:inherit;font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;min-width:64px}
+  nav.bottom button span{font-size:21px} nav.bottom button.active{color:var(--rose);font-weight:800}
+  .page{display:none} .page.active{display:block}
+  .modal{position:fixed;inset:0;background:rgba(59,10,36,.55);z-index:50;display:none;align-items:flex-end;justify-content:center}
+  .modal .sheet{background:var(--bg);width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:16px 14px calc(16px + env(safe-area-inset-bottom))}
+  .toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 16px;border-radius:14px;font-size:13.5px;z-index:99;display:none;max-width:calc(100% - 32px);text-align:center}
+  .empty{text-align:center;color:var(--muted);font-size:13px;padding:22px 10px}
+  #gate{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--plum);font-weight:800}
+</style>
+</head>
+<body>
+<div id="gate"><div style="font-size:40px">🧵</div>সেলাই ঘর খোলা হচ্ছে…</div>
+
+<div class="wrap">
+  <header class="top">
+    <div class="row">
+      <div class="logo">🧵</div>
+      <div style="min-width:0"><h1 id="shopName">সেলাই ঘর</h1><small id="shopArea">—</small></div>
+      <button class="openSw on" id="openSw" type="button">🟢 খোলা</button>
+    </div>
+  </header>
+
+  <!-- 🏠 হোম -->
+  <section class="page active" id="pg-home">
+    <div id="locBanner"></div>
+    <div class="stats">
+      <div class="stat"><b id="stDesigns">০</b><span>✂️ আমার ডিজাইন</span></div>
+      <div class="stat"><b id="stPublished">০</b><span>👀 গ্রাহক দেখছেন</span></div>
+    </div>
+    <button class="btn" type="button" id="homeAddBtn" style="font-size:16.5px;padding:16px">➕ নতুন ডিজাইন দিন</button>
+    <div class="card" style="margin-top:12px">
+      <h2>🧵 কীভাবে কাজ করবে</h2>
+      <div class="muted" style="font-size:13.5px;line-height:1.75">
+        ১. ডিজাইনের ছবি আর সেলাইয়ের মজুরি দিন — Honey Bee Bazar-এর "সেলাই ঘর"-এ আপনার এলাকার গ্রাহক দেখবেন।<br>
+        ২. গ্রাহক নিজের কাপড় আর মাপ দিয়ে অর্ডার দেবেন — মাপ রসিদে লেখা থাকবে।<br>
+        ৩. রাইডার গ্রাহকের কাছ থেকে কাপড় এনে দেবেন, সেলাই শেষে নিয়ে যাবেন।<br>
+        <b style="color:var(--plum)">অর্ডার নেওয়া খুব শীঘ্রই চালু হবে — এখন ডিজাইন দিয়ে রাখুন।</b>
+      </div>
+    </div>
+  </section>
+
+  <!-- ✂️ ডিজাইন -->
+  <section class="page" id="pg-designs">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-weight:800;font-size:16px">✂️ আমার ডিজাইন</div>
+      <button class="btn small" type="button" id="addBtn">➕ নতুন</button>
+    </div>
+    <div id="designGrid" class="grid"></div>
+  </section>
+
+  <!-- 📦 অর্ডার -->
+  <section class="page" id="pg-orders">
+    <div class="card empty">
+      <div style="font-size:40px">📦</div>
+      <b style="color:var(--ink);font-size:15px">অর্ডার এখানে আসবে</b><br>
+      গ্রাহক অর্ডার দিলে এখানে দেখবেন — মাপসহ রসিদ, রাইডার কখন কাপড় আনবেন, কবে ফেরত দেবেন।<br>
+      <span style="color:var(--plum);font-weight:800">এই অংশ খুব শীঘ্রই চালু হচ্ছে।</span>
+    </div>
+  </section>
+
+  <!-- 👤 প্রোফাইল -->
+  <section class="page" id="pg-profile">
+    <div class="card">
+      <h2>👤 আমার সেলাই ঘর</h2>
+      <label>সেলাই ঘরের নাম</label><input id="pfName" maxlength="60">
+      <label>মালিকের নাম</label><input id="pfOwner" maxlength="60">
+      <label>ঠিকানা</label><input id="pfAddress" maxlength="120" placeholder="যেমন: মার্কেটের ২য় তলা, ১২ নম্বর দোকান">
+      <label>মোবাইল (লগইন)</label><input id="pfPhone" disabled>
+      <label>এলাকা</label><input id="pfArea" disabled>
+      <button class="btn" type="button" id="pfSave" style="margin-top:14px">💾 সেভ করুন</button>
+    </div>
+    <div class="card">
+      <h2>📍 দোকানের লোকেশন</h2>
+      <div class="muted" id="pfLocTxt">—</div>
+      <button class="btn ghost" type="button" id="pfLocBtn" style="margin-top:10px">📍 দোকানে দাঁড়িয়ে লোকেশন সেট করুন</button>
+    </div>
+    <button class="btn ghost" type="button" id="logoutBtn" style="color:var(--red)">🚪 লগআউট</button>
+  </section>
+</div>
+
+<nav class="bottom">
+  <button type="button" data-pg="home" class="active"><span>🏠</span>হোম</button>
+  <button type="button" data-pg="designs"><span>✂️</span>ডিজাইন</button>
+  <button type="button" data-pg="orders"><span>📦</span>অর্ডার</button>
+  <button type="button" data-pg="profile"><span>👤</span>প্রোফাইল</button>
+</nav>
+
+<!-- ডিজাইন যোগ/বদল -->
+<div class="modal" id="dzModal">
+  <div class="sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <b style="font-size:17px" id="dzTitle">➕ নতুন ডিজাইন</b>
+      <button type="button" class="btn small ghost" id="dzClose">✕</button>
+    </div>
+    <div class="photoBox" id="dzPhotoBox">
+      <div id="dzPhotoPrev"><div style="font-size:38px">📷</div><b>ডিজাইনের ছবি দিন</b><div class="muted">ছবি নিজে থেকেই ছোট হয়ে যাবে (৫০ KB-র কাছাকাছি)</div></div>
+    </div>
+    <input type="file" id="dzFile" accept="image/*" style="display:none">
+    <label>ডিজাইনের নাম</label><input id="dzName" maxlength="60" placeholder="যেমন: গোল গলা কামিজ, কুচি দেওয়া">
+    <label>ধরন</label>
+    <select id="dzCat">
+      <option value="kameez">👗 জামা / কামিজ</option>
+      <option value="pajama">👖 পায়জামা / সালোয়ার</option>
+      <option value="set">👗👖 জামা + পায়জামা (সেট)</option>
+      <option value="blouse">🥻 ব্লাউজ</option>
+      <option value="kids">🧒 ছোটদের পোশাক</option>
+      <option value="other">🧵 অন্যান্য</option>
+    </select>
+    <div class="grid">
+      <div><label>সেলাইয়ের মজুরি (৳)</label><input id="dzPrice" type="number" inputmode="numeric" min="0" max="100000" placeholder="যেমন: 450"></div>
+      <div><label>কত দিনে দেবেন</label><input id="dzDays" type="number" inputmode="numeric" min="1" max="60" placeholder="যেমন: 5"></div>
+    </div>
+    <label>বিবরণ (ঐচ্ছিক)</label><textarea id="dzNote" maxlength="300" placeholder="যেমন: লাইনিং সহ, হাতায় লেস"></textarea>
+    <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink)"><input type="checkbox" id="dzPub" checked style="width:auto"> গ্রাহককে দেখান (Bazar-এ)</label>
+    <button class="btn" type="button" id="dzSave" style="margin-top:12px">💾 ডিজাইন সেভ করুন</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-init.js"></script>
+<script>
+const $ = (id)=> document.getElementById(id);
+const esc = (s)=> String(s == null ? "" : s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const bn = (n)=> String(n).replace(/\d/g, d=> "০১২৩৪৫৬৭৮৯"[d]);
+const CAT = { kameez:"👗 জামা", pajama:"👖 পায়জামা", set:"👗👖 সেট", blouse:"🥻 ব্লাউজ", kids:"🧒 ছোটদের", other:"🧵 অন্যান্য" };
+let T = { uid:null, data:{} }, designs = [], editId = null, editImg = null, toastTimer = null;
+
+function toast(m){ const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toastTimer); toastTimer = setTimeout(()=> t.style.display = "none", 2800); }
+function go(pg){
+  document.querySelectorAll(".page").forEach(p=> p.classList.toggle("active", p.id === "pg-" + pg));
+  document.querySelectorAll("nav.bottom button").forEach(b=> b.classList.toggle("active", b.dataset.pg === pg));
+  window.scrollTo({ top:0, behavior:"smooth" });
+}
+document.querySelectorAll("nav.bottom button").forEach(b=> b.addEventListener("click", ()=> go(b.dataset.pg)));
+
+/* ── 📷 ছবি ছোট করা — লক্ষ্য ৫০ KB, কোনোভাবেই ১০০ KB-র বেশি না ── */
+function dataUrlBytes(u){ const b = (u.split(",")[1]||"").replace(/=+$/,""); return Math.floor(b.length*3/4); }
+function loadImg(file){
+  return new Promise((res, rej)=>{ const r = new FileReader(); r.onerror = rej;
+    r.onload = ()=>{ const im = new Image(); im.onload = ()=> res(im); im.onerror = rej; im.src = r.result; }; r.readAsDataURL(file); });
+}
+async function shrinkImage(file){
+  const img = await loadImg(file);
+  const c = document.createElement("canvas"), ctx = c.getContext("2d");
+  let w = img.width, h = img.height, best = null;
+  const scale = Math.min(1, 900 / Math.max(w, h)); w = Math.round(w*scale); h = Math.round(h*scale);
+  for(let pass = 0; pass < 7; pass++){
+    c.width = w; c.height = h; ctx.fillStyle = "#fff"; ctx.fillRect(0,0,w,h); ctx.drawImage(img, 0, 0, w, h);
+    for(const q of [.8,.7,.6,.5,.42,.35]){
+      const out = c.toDataURL("image/jpeg", q), kb = dataUrlBytes(out)/1024;
+      if(!best || kb < best.kb) best = { url: out, kb };
+      if(kb <= 50) return best;               // 🎯 ৫০ KB-র নিচে — চমৎকার
+    }
+    w = Math.round(w*.82); h = Math.round(h*.82);
+    if(Math.max(w,h) < 360) break;
+  }
+  return best;                                 // ৫০-এর একটু উপরে হতে পারে — ১০০-র বেশি হলে নিচে আটকানো হয়
+}
+
+/* ── 🏠 হোম ── */
+function renderHeader(){
+  const d = T.data;
+  $("shopName").textContent = d.name || "সেলাই ঘর";
+  $("shopArea").textContent = [d.area, d.address].filter(Boolean).join(" · ") || "—";
+  const on = d.isOpen !== false, sw = $("openSw");
+  sw.className = "openSw " + (on ? "on" : "off"); sw.textContent = on ? "🟢 খোলা" : "🔴 বন্ধ";
+  const loc = d.storeLocation;
+  $("locBanner").innerHTML = loc && loc.lat != null
+    ? ""
+    : `<div class="banner warn"><span style="font-size:22px">📍</span><div style="flex:1"><b>দোকানের লোকেশন দিন</b><br>রাইডার কাপড় আনতে-নিতে এটাই দেখে আসবেন।</div><button class="btn small" type="button" onclick="setLocation()">সেট করুন</button></div>`;
+  $("pfLocTxt").textContent = loc && loc.lat != null ? `✅ সেট করা আছে (${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)}) — দোকান বদলালে আবার সেট করুন।` : "এখনো সেট করা হয়নি।";
+}
+$("openSw").addEventListener("click", async ()=>{
+  const next = T.data.isOpen === false;
+  try{ await db.collection("tailors").doc(T.uid).update({ isOpen: next }); T.data.isOpen = next; renderHeader(); toast(next ? "🟢 সেলাই ঘর খোলা — গ্রাহক অর্ডার দিতে পারবেন" : "🔴 বন্ধ — গ্রাহক এখন অর্ডার দিতে পারবেন না"); }
+  catch(e){ toast("বদলানো যায়নি — ইন্টারনেট দেখুন"); }
+});
+
+/* ── ✂️ ডিজাইন ── */
+function renderDesigns(){
+  $("stDesigns").textContent = bn(designs.length);
+  $("stPublished").textContent = bn(designs.filter(d=> d.published).length);
+  const g = $("designGrid");
+  if(!designs.length){ g.className = ""; g.innerHTML = `<div class="card empty"><div style="font-size:36px">✂️</div>এখনো কোনো ডিজাইন নেই।<br>"➕ নতুন" চেপে প্রথম ডিজাইনের ছবি দিন।</div>`; return; }
+  g.className = "grid";
+  g.innerHTML = designs.map(d=> `<div class="dz">
+      ${d.img ? `<img src="${esc(d.img)}" alt="">` : `<div class="noimg">🧵</div>`}
+      <div class="b">
+        <div class="t">${esc(d.title)}</div>
+        <div class="muted" style="font-size:11.5px">${CAT[d.category]||""}${d.days ? " · "+bn(d.days)+" দিনে" : ""}</div>
+        <div class="p">৳ ${bn(d.price)}</div>
+        <span class="tag ${d.published ? "pub" : "hid"}">${d.published ? "👀 গ্রাহক দেখছেন" : "🙈 লুকানো"}</span>
+        <div class="acts"><button type="button" data-ed="${esc(d.id)}">✏️ বদলান</button><button type="button" data-del="${esc(d.id)}" style="color:var(--red)">🗑️</button></div>
+      </div></div>`).join("");
+  g.querySelectorAll("[data-ed]").forEach(b=> b.onclick = ()=> openEditor(b.dataset.ed));
+  g.querySelectorAll("[data-del]").forEach(b=> b.onclick = ()=> delDesign(b.dataset.del));
+}
+function listenDesigns(){
+  db.collection("tailorDesigns").where("tailorId","==",T.uid).onSnapshot(qs=>{
+    designs = qs.docs.map(x=> ({ id:x.id, ...x.data() })).filter(d=> d.status !== "removed")
+      .sort((a,b)=> ((b.createdAt&&b.createdAt.toMillis&&b.createdAt.toMillis())||Date.now()) - ((a.createdAt&&a.createdAt.toMillis&&a.createdAt.toMillis())||Date.now()));
+    renderDesigns();
+  }, ()=> toast("ডিজাইন আনা যায়নি — ইন্টারনেট দেখুন"));
+}
+function openEditor(id){
+  const d = id ? designs.find(x=> x.id === id) : null;
+  editId = d ? d.id : null; editImg = d ? (d.img||null) : null;
+  $("dzTitle").textContent = d ? "✏️ ডিজাইন বদলান" : "➕ নতুন ডিজাইন";
+  $("dzName").value = d ? d.title : ""; $("dzCat").value = d ? d.category : "kameez";
+  $("dzPrice").value = d ? d.price : ""; $("dzDays").value = d && d.days ? d.days : "";
+  $("dzNote").value = d ? (d.note||"") : ""; $("dzPub").checked = d ? !!d.published : true;
+  showPhoto(editImg ? { url: editImg, kb: dataUrlBytes(editImg)/1024 } : null);
+  $("dzModal").style.display = "flex";
+}
+function showPhoto(p){
+  $("dzPhotoPrev").innerHTML = p
+    ? `<img src="${p.url}" alt=""><div class="muted">✅ ছবি প্রস্তুত · ${bn(Math.round(p.kb))} KB · বদলাতে চাপ দিন</div>`
+    : `<div style="font-size:38px">📷</div><b>ডিজাইনের ছবি দিন</b><div class="muted">ছবি নিজে থেকেই ছোট হয়ে যাবে (৫০ KB-র কাছাকাছি)</div>`;
+}
+$("dzPhotoBox").addEventListener("click", ()=> $("dzFile").click());
+$("dzFile").addEventListener("change", async (e)=>{
+  const f = e.target.files && e.target.files[0]; e.target.value = "";
+  if(!f) return;
+  if(!/^image\//.test(f.type)){ toast("শুধু ছবি দিন"); return; }
+  $("dzPhotoPrev").innerHTML = `<div style="font-size:30px">⏳</div>ছবি ছোট করা হচ্ছে…`;
+  try{
+    const p = await shrinkImage(f);
+    if(!p || p.kb > 100){ editImg = null; showPhoto(null); alert("ছবিটা ১০০ KB-র নিচে নামানো গেল না — অন্য (কম ঝকঝকে/ছোট) একটা ছবি দিন।"); return; }
+    editImg = p.url; showPhoto(p);
+  }catch(err){ showPhoto(null); toast("ছবি পড়া যায়নি — আবার চেষ্টা করুন"); }
+});
+$("dzClose").addEventListener("click", ()=> $("dzModal").style.display = "none");
+$("addBtn").addEventListener("click", ()=> openEditor(null));
+$("homeAddBtn").addEventListener("click", ()=>{ go("designs"); openEditor(null); });
+$("dzSave").addEventListener("click", async ()=>{
+  const title = $("dzName").value.trim(), price = Math.round(Number($("dzPrice").value)), days = Math.round(Number($("dzDays").value)) || null;
+  if(!editImg){ alert("ডিজাইনের একটা ছবি দিন — গ্রাহক ছবি দেখেই বাছবেন।"); return; }
+  if(!title){ alert("ডিজাইনের একটা নাম দিন।"); return; }
+  if(!(price > 0)){ alert("সেলাইয়ের মজুরি (টাকা) লিখুন।"); return; }
+  if(dataUrlBytes(editImg) > 100*1024){ alert("ছবিটা ১০০ KB-র বেশি — অন্য ছবি দিন।"); return; }
+  const d = T.data, btn = $("dzSave"); btn.disabled = true; btn.textContent = "সেভ হচ্ছে…";
+  const rec = { tailorId: T.uid, tailorName: d.name || "", district: d.district || null, upazila: d.upazila || null, marketId: d.marketId || null,
+    title: title.slice(0,60), category: $("dzCat").value, price, days, note: $("dzNote").value.trim().slice(0,300),
+    img: editImg, published: $("dzPub").checked, status: "active", updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  try{
+    if(editId) await db.collection("tailorDesigns").doc(editId).update(rec);
+    else { rec.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("tailorDesigns").add(rec); }
+    $("dzModal").style.display = "none";
+    toast(rec.published ? "✅ সেভ হয়েছে — গ্রাহক এখন Bazar-এ দেখতে পাবেন" : "✅ সেভ হয়েছে (লুকানো আছে)");
+  }catch(e){ alert("সেভ করা যায়নি — " + (e.code === "permission-denied" ? "অনুমতি নেই (নতুন নিয়ম এখনো চালু হয়নি)" : "ইন্টারনেট দেখে আবার চেষ্টা করুন")); }
+  btn.disabled = false; btn.textContent = "💾 ডিজাইন সেভ করুন";
+});
+async function delDesign(id){
+  const d = designs.find(x=> x.id === id); if(!d) return;
+  if(!confirm(`"${d.title}" ডিজাইনটা মুছে ফেলবেন?`)) return;
+  try{ await db.collection("tailorDesigns").doc(id).delete(); toast("🗑️ মুছে ফেলা হয়েছে"); }
+  catch(e){ toast("মোছা যায়নি — আবার চেষ্টা করুন"); }
+}
+
+/* ── 📍 লোকেশন ── */
+async function setLocation(){
+  if(!navigator.geolocation){ alert("এই ফোনে লোকেশন সাপোর্ট নেই।"); return; }
+  if(!confirm("দোকানে দাঁড়িয়ে আছেন তো? এখানকার লোকেশনটাই রাইডার দেখবেন।")) return;
+  toast("📍 লোকেশন নেওয়া হচ্ছে…");
+  navigator.geolocation.getCurrentPosition(async (p)=>{
+    const loc = { lat: p.coords.latitude, lng: p.coords.longitude, accuracyM: Math.round(p.coords.accuracy||0), updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+    try{ await db.collection("tailors").doc(T.uid).update({ storeLocation: loc }); T.data.storeLocation = { lat: loc.lat, lng: loc.lng }; renderHeader(); toast("✅ দোকানের লোকেশন সেভ হয়েছে"); }
+    catch(e){ toast("সেভ করা যায়নি — আবার চেষ্টা করুন"); }
+  }, ()=> alert("লোকেশন পাওয়া যায়নি — ফোনের Location চালু আছে কিনা আর অনুমতি দেওয়া আছে কিনা দেখুন।"), { enableHighAccuracy:true, timeout:20000 });
+}
+$("pfLocBtn").addEventListener("click", setLocation);
+
+/* ── 👤 প্রোফাইল ── */
+function fillProfile(){
+  const d = T.data;
+  $("pfName").value = d.name || ""; $("pfOwner").value = d.ownerName || ""; $("pfAddress").value = d.address || "";
+  $("pfPhone").value = d.phone || ""; $("pfArea").value = d.area || "";
+}
+$("pfSave").addEventListener("click", async ()=>{
+  const name = $("pfName").value.trim(); if(!name){ alert("সেলাই ঘরের নাম লিখুন।"); return; }
+  const upd = { name: name.slice(0,60), ownerName: $("pfOwner").value.trim().slice(0,60), address: $("pfAddress").value.trim().slice(0,120) || null };
+  try{
+    await db.collection("tailors").doc(T.uid).update(upd);
+    Object.assign(T.data, upd); renderHeader();
+    // ডিজাইনগুলোতে দোকানের নামও বদলে দেওয়া (গ্রাহক যেন নতুন নামই দেখেন)
+    const b = db.batch(); designs.filter(x=> x.tailorName !== upd.name).forEach(x=> b.update(db.collection("tailorDesigns").doc(x.id), { tailorName: upd.name }));
+    await b.commit().catch(()=>{});
+    toast("✅ সেভ হয়েছে");
+  }catch(e){ toast("সেভ করা যায়নি — আবার চেষ্টা করুন"); }
+});
+$("logoutBtn").addEventListener("click", async ()=>{
+  if(!confirm("লগআউট করবেন?")) return;
+  try{ clearSession(); }catch(e){}
+  await auth.signOut(); location.href = "login.html";
+});
+
+/* ── 🔐 শুরু ── */
+auth.onAuthStateChanged(async (user)=>{
+  if(!user){ location.href = "login.html"; return; }
+  try{
+    const u = await db.collection("users").doc(user.uid).get();
+    if(!u.exists || u.data().role !== "tailor"){ location.href = "login.html"; return; }
+    const t = await db.collection("tailors").doc(user.uid).get();
+    if(!t.exists || t.data().status === "blocked"){ alert("আপনার সেলাই ঘরের অ্যাকাউন্ট বন্ধ আছে — এজেন্টের সাথে যোগাযোগ করুন।"); await auth.signOut(); location.href = "login.html"; return; }
+    T = { uid: user.uid, data: t.data() };
+    renderHeader(); fillProfile(); listenDesigns();
+    $("gate").remove();
+  }catch(e){
+    $("gate").innerHTML = `<div style="font-size:36px">📶</div>খোলা যায়নি — ইন্টারনেট দেখে <button class="btn small" onclick="location.reload()">আবার চেষ্টা</button>`;
+  }
+});
+</script>
+</body>
+</html>

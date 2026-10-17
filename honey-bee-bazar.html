@@ -3510,6 +3510,7 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
     }else if(svc === "tailor"){
       showScreen("screenTailor");
       tlrAreaInit();
+      tlrRenderFeed();
     }else if(svc === "jibontori"){
       showScreen("screenJibonTori");
     }else if(svc === "bloodbank"){
@@ -3661,7 +3662,7 @@ function tlrAreaSet(d,u,m){
   tlrArea = { d:d||"", u:u||"", m:m||"" };
   try{ localStorage.setItem("hbTlrArea", JSON.stringify(tlrArea)); }catch(e){}
   tlrAreaFill();
-  if(typeof tlrRenderFeed === "function") tlrRenderFeed();
+  tlrRenderFeed();
 }
 function tlrAreaInit(){
   if(!__tlrAreaReady){
@@ -3672,6 +3673,44 @@ function tlrAreaInit(){
     $("tlrAreaClear").addEventListener("click", ()=> tlrAreaSet("","",""));
   }
   tlrAreaFill();
+}
+/* 🧵 দর্জিদের ডিজাইন — tailor-app.html থেকে পোস্ট হয় (tailorDesigns, published==true)।
+   একক-ফিল্ড কোয়েরি, তাই আলাদা ইনডেক্স লাগে না; এলাকা ফোনেই ছাঁকা হয়। */
+const TLR_CAT = { kameez:"👗 জামা", pajama:"👖 পায়জামা", set:"👗👖 সেট", blouse:"🥻 ব্লাউজ", kids:"🧒 ছোটদের", other:"🧵 অন্যান্য" };
+let __tlrDesigns = null, __tlrDesignsAt = 0;
+async function tlrRenderFeed(){
+  const box = $("tlrFeed"); if(!box) return;
+  const msg = (t)=> `<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px; padding:22px 14px;">${t}</div>`;
+  if(!__tlrDesigns || Date.now() - __tlrDesignsAt > 120000){
+    if(!__tlrDesigns) box.innerHTML = msg("⏳ ডিজাইন আনা হচ্ছে…");
+    try{
+      const qs = await db.collection("tailorDesigns").where("published","==",true).limit(300).get();
+      __tlrDesigns = qs.docs.map(x=> ({ id:x.id, ...x.data() })).filter(d=> d.status === "active" && d.img);
+      __tlrDesignsAt = Date.now();
+    }catch(e){ box.innerHTML = msg("📶 ডিজাইন আনা যায়নি — ইন্টারনেট দেখে আবার খুলুন।"); return; }
+  }
+  const list = __tlrDesigns.filter(d=>
+      (!tlrArea.d || d.district === tlrArea.d) && (!tlrArea.u || d.upazila === tlrArea.u) && (!tlrArea.m || d.marketId === tlrArea.m))
+    .sort((a,b)=> ((b.createdAt&&b.createdAt.toMillis&&b.createdAt.toMillis())||0) - ((a.createdAt&&a.createdAt.toMillis&&a.createdAt.toMillis())||0));
+  if(!list.length){
+    box.innerHTML = msg(__tlrDesigns.length
+      ? "✂️ এই এলাকায় এখনো কোনো দর্জি ডিজাইন দেননি।<br>উপরে অন্য এলাকা বাছুন বা \"✕ সব এলাকা\" চাপুন।"
+      : "✂️ এখনো কোনো দর্জি ডিজাইন পোস্ট করেননি।<br>দর্জিরা পোস্ট দিলে এখানে দেখা যাবে — ছবি দেখে পছন্দের ডিজাইনে অর্ডার দিতে পারবেন।");
+    return;
+  }
+  box.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">` + list.map(d=> `
+    <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0;">
+      <img src="${escapeHtml(d.img)}" alt="" loading="lazy" style="width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:#fce7f3;">
+      <div style="padding:8px 9px 10px; display:flex; flex-direction:column; gap:3px; flex:1;">
+        <div style="font-weight:800; font-size:13px; line-height:1.3;">${escapeHtml(d.title)}</div>
+        <div style="font-size:11px; color:var(--muted);">${TLR_CAT[d.category]||""}${d.days ? " · "+escapeHtml(String(d.days))+" দিনে" : ""}</div>
+        <div style="font-size:11px; color:var(--muted);">🧵 ${escapeHtml(d.tailorName||"")}${d.upazila ? " · "+escapeHtml(d.upazila) : ""}</div>
+        <div style="font-weight:800; color:#f472b6; font-size:14px;">৳ ${escapeHtml(String(d.price))} <span style="font-size:10.5px; font-weight:600; color:var(--muted);">মজুরি</span></div>
+        <button type="button" data-tlr-order="${escapeHtml(d.id)}" style="margin-top:auto; border:0; border-radius:10px; padding:8px 0; background:#be185d; color:#fff; font-weight:800; font-family:inherit; font-size:12.5px; cursor:pointer;">🧵 অর্ডার দিন</button>
+      </div>
+    </div>`).join("") + `</div>`;
+  box.querySelectorAll("[data-tlr-order]").forEach(b=> b.addEventListener("click", ()=>
+    nbToast("🧵 অর্ডার নেওয়া খুব শীঘ্রই চালু হচ্ছে — আপনার মাপ এখনই \"📏 আমার মাপের খাতা\"-য় সেভ করে রাখুন।")));
 }
 $("tlrAddBtn") && $("tlrAddBtn").addEventListener("click", ()=> tlrOpenEditor(null));
 $("tlrCancelBtn") && $("tlrCancelBtn").addEventListener("click", ()=>{ $("tlrEditor").style.display = "none"; });

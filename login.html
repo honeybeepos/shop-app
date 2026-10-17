@@ -57,6 +57,7 @@
     <div class="tab-sw" data-p="signup">নতুন দোকান নিবন্ধন</div>
     <div class="tab-sw" data-p="provider">🚑 ট্রান্সপোর্ট ড্রাইভার নিবন্ধন</div>
     <div class="tab-sw" data-p="restaurant">🍽️ নতুন রেস্টুরেন্ট নিবন্ধন</div>
+    <div class="tab-sw" data-p="tailor">🧵 সেলাই ঘর নিবন্ধন</div>
   </div>
 
   <div class="panel active" id="panel-login">
@@ -165,6 +166,31 @@
     <button class="btn" id="restaurantSignupBtn">✅ নিবন্ধন করুন</button>
     <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:10px;">নিবন্ধনের পর সরাসরি আপনার Restaurant POS খুলে যাবে — সেখানে খাবারের তালিকা বসাবেন। Publish করলে Honey Bee Bazar-এ গ্রাহক দেখতে পাবেন।</p>
     <div class="msg" id="restaurantMsg"></div>
+  </div>
+
+  <!-- 🧵 সেলাই ঘর (দর্জি) নিবন্ধন — রেস্টুরেন্টের মতোই নিজের আলাদা অ্যাপ (tailor-app.html) -->
+  <div class="panel" id="panel-tailor">
+    <label>সেলাই ঘর / দোকানের নাম</label>
+    <input type="text" id="tlName" placeholder="যেমনঃ রহিম টেইলার্স">
+    <label>মালিকের নাম</label>
+    <input type="text" id="tlOwner" placeholder="পূর্ণ নাম">
+    <label>মোবাইল নম্বর (লগইনের জন্য ব্যবহার হবে)</label>
+    <input type="text" id="tlPhone" placeholder="01XXXXXXXXX">
+    <label>পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
+    <input type="password" id="tlPass" placeholder="••••••••">
+    <label>পাসওয়ার্ড আবার লিখুন</label>
+    <input type="password" id="tlPass2" placeholder="একই পাসওয়ার্ড">
+    <label>জেলা</label>
+    <select id="tlDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
+    <label>উপজেলা/থানা</label>
+    <select id="tlUpazila" disabled><option value="">-- আগে জেলা নির্বাচন করুন --</option></select>
+    <label>বাজার/এলাকা</label>
+    <select id="tlMarket" disabled><option value="">-- আগে উপজেলা নির্বাচন করুন --</option></select>
+    <label>ঠিকানা (ঐচ্ছিক)</label>
+    <input type="text" id="tlAddress" placeholder="যেমনঃ মার্কেটের ২য় তলা, ১২ নম্বর দোকান">
+    <button class="btn" id="tailorSignupBtn">✅ নিবন্ধন করুন</button>
+    <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:10px;">নিবন্ধনের পর আপনার সেলাই ঘরের অ্যাপ খুলে যাবে — সেখানে ডিজাইনের ছবি আর সেলাইয়ের মজুরি দেবেন। Honey Bee Bazar-এর "সেলাই ঘর"-এ গ্রাহক দেখে অর্ডার দেবেন।</p>
+    <div class="msg" id="tailorMsg"></div>
   </div>
 
   <!-- 📧 ইমেইল ভেরিফিকেশন গেট — ভুয়া/ভুল ইমেইল দিয়ে দোকান নিবন্ধন ঠেকাতে।
@@ -526,6 +552,61 @@ document.getElementById("rsUpazila").addEventListener("change", async (e)=>{
   }
 });
 
+
+/* ==================== 🧵 সেলাই ঘর (দর্জি) নিবন্ধন ==================== */
+document.getElementById("tlDistrict").innerHTML += getAllDistricts().map(d=>`<option value="${d}">${d}</option>`).join("");
+document.getElementById("tlDistrict").addEventListener("change", (e)=>{
+  const district = e.target.value, upSel = document.getElementById("tlUpazila"), marketSel = document.getElementById("tlMarket");
+  marketSel.innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; marketSel.disabled = true;
+  if(!district){ upSel.innerHTML = '<option value="">-- আগে জেলা নির্বাচন করুন --</option>'; upSel.disabled = true; return; }
+  upSel.disabled = false;
+  upSel.innerHTML = '<option value="">-- উপজেলা/থানা নির্বাচন করুন --</option>' + getUpazilasForDistrict(district).map(u=>`<option value="${u}">${u}</option>`).join("");
+});
+document.getElementById("tlUpazila").addEventListener("change", async (e)=>{
+  const district = document.getElementById("tlDistrict").value, upazila = e.target.value, marketSel = document.getElementById("tlMarket");
+  if(!upazila){ marketSel.innerHTML = '<option value="">-- আগে উপজেলা নির্বাচন করুন --</option>'; marketSel.disabled = true; return; }
+  marketSel.innerHTML = '<option value="">লোড হচ্ছে...</option>'; marketSel.disabled = true;
+  try{
+    const qs = await db.collection("markets").where("district","==",district).where("upazila","==",upazila).get();
+    if(qs.empty){ marketSel.innerHTML = '<option value="">এই উপজেলায় এখনো কোনো বাজার নিবন্ধিত হয়নি</option>'; return; }
+    marketSel.innerHTML = '<option value="">-- বাজার/এলাকা নির্বাচন করুন --</option>' + qs.docs.map(d=> `<option value="${d.id}">${d.data().name || d.id}</option>`).join("");
+    marketSel.disabled = false;
+  }catch(e){ marketSel.innerHTML = '<option value="">লোড করা যায়নি</option>'; }
+});
+document.getElementById("tailorSignupBtn").addEventListener("click", async ()=>{
+  const v = (id)=> document.getElementById(id).value.trim();
+  const name = v("tlName"), owner = v("tlOwner"), phone = v("tlPhone"), pass = document.getElementById("tlPass").value;
+  const district = v("tlDistrict"), upazila = v("tlUpazila"), marketId = v("tlMarket"), address = v("tlAddress");
+  if(!name){ showMsg("tailorMsg","সেলাই ঘরের নাম লিখুন।",false); return; }
+  if(!owner || !phone || pass.length < 6){ showMsg("tailorMsg","মালিকের নাম, মোবাইল নম্বর ও পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর) সঠিকভাবে দিন।",false); return; }
+  if(pass !== document.getElementById("tlPass2").value){ showMsg("tailorMsg","দুইবারের পাসওয়ার্ড এক হয়নি — মিলিয়ে আবার লিখুন।",false); return; }
+  if(!marketId){ showMsg("tailorMsg","জেলা, উপজেলা ও বাজার/এলাকা নির্বাচন করুন।",false); return; }
+  const btn = document.getElementById("tailorSignupBtn");
+  btn.disabled = true; btn.textContent = "নিবন্ধন হচ্ছে...";
+  __authFlowInProgress = true;
+  try{
+    const cred = await auth.createUserWithEmailAndPassword(phoneToAuthEmail(phone), pass);
+    const uid = cred.user.uid;
+    await db.collection("users").doc(uid).set({ role: "tailor", phone, createdAt: fbNow() });
+    await db.collection("tailors").doc(uid).set({
+      name, ownerName: owner, phone, district, upazila, marketId,
+      area: [upazila, district].filter(Boolean).join(", "),
+      address: address || null, storeLocation: null,
+      isOpen: true, isVerified: false, status: "active", designCount: 0,
+      createdAt: fbNow()
+    });
+    showMsg("tailorMsg","✅ নিবন্ধন সম্পন্ন হয়েছে! আপনার সেলাই ঘরের অ্যাপ খোলা হচ্ছে…", true);
+    await afterLoginRoute(uid);
+  }catch(e){
+    console.error(e);
+    let friendly = e.message;
+    if(e.code === "auth/email-already-in-use") friendly = "এই মোবাইল নম্বর দিয়ে আগে থেকেই একটা অ্যাকাউন্ট নিবন্ধিত আছে।";
+    showMsg("tailorMsg","⚠️ নিবন্ধন করা যায়নি: " + friendly, false);
+  }
+  __authFlowInProgress = false;
+  btn.disabled = false; btn.textContent = "✅ নিবন্ধন করুন";
+});
+
 document.getElementById("restaurantSignupBtn").addEventListener("click", async ()=>{
   const name = document.getElementById("rsName").value.trim();
   const owner = document.getElementById("rsOwner").value.trim();
@@ -634,6 +715,18 @@ async function afterLoginRoute(uid){
   /* 🍽️ রেস্টুরেন্ট — নিজস্ব POS এখনো বানানো হয়নি। তাই সৎভাবে সেটাই
      বলা হয়, ভাঙা কোনো পাতায় পাঠানো হয় না। অ্যাকাউন্টটা থেকে যায়,
      POS তৈরি হলে একই মোবাইল-পাসওয়ার্ড দিয়েই ঢোকা যাবে। */
+  if (userDoc.role === "tailor") {
+    const doc = await db.collection("tailors").doc(uid).get();
+    if (!doc.exists || doc.data().status === "blocked") {
+      showMsg("loginMsg", "আপনার অ্যাকাউন্টটি ব্লক করা আছে অথবা প্রোফাইল পাওয়া যায়নি।", false);
+      await auth.signOut();
+      return;
+    }
+    saveSession({ uid, role: "tailor", name: doc.data().name || "" });
+    window.location.href = "tailor-app.html";
+    return;
+  }
+
   if (userDoc.role === "restaurant") {
     const doc = await db.collection("restaurants").doc(uid).get();
     if (!doc.exists || doc.data().status === "blocked") {
@@ -989,6 +1082,7 @@ document.getElementById("verifySignOutLink").addEventListener("click", async (e)
 function routeByRole(role){
   if (role === "superadmin") return "admin.html";
   if (role === "restaurant") return "restaurant-pos.html";
+  if (role === "tailor") return "tailor-app.html";
   if (role === "transport_driver") return "honey-bee-driver.html";
   // রাইডার আর ট্রান্সপোর্ট ড্রাইভার ইচ্ছে করেই POS-এ যায় — ওই অ্যাপ
   // নিজে থেকেই তাদের Rider Mode / Driver Mode দেখায়।
