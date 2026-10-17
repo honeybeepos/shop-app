@@ -1204,7 +1204,11 @@
        নামের কিওয়ার্ড মিলিয়ে ফিল্টার করা হয়) — কোনো প্রোডাক্ট আলাদাভাবে/নকল করে
        বানানো হয়নি -->
   <div id="screenEkadashiSpecial" style="padding:20px 16px 90px;">
-    <button class="backBtn" id="backFromEkadashiSpecial">← ফিরে যান</button>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+      <button class="backBtn" id="backFromEkadashiSpecial">← ফিরে যান</button>
+      <!-- ☰ একাদশী ও পূজার সব ঘরের তালিকা — ডান পাশ থেকে খোলে -->
+      <button type="button" id="hbEkaMenuBtn" aria-label="ক্যাটাগরি মেনু" style="flex-shrink:0; display:flex; align-items:center; gap:6px; border:1px solid rgba(255,183,3,0.55); background:linear-gradient(135deg,rgba(249,115,22,0.25),rgba(190,24,93,0.2)); color:#ffd166; font-family:inherit; font-weight:800; font-size:13px; padding:9px 13px; border-radius:12px; cursor:pointer; box-shadow:0 0 14px rgba(249,115,22,0.25);">☰ মেনু</button>
+    </div>
     <div style="display:flex; align-items:center; margin-bottom:4px; gap:10px;">
       <span style="font-size:26px;">🌸</span>
       <h2 style="margin:0; font-size:19px; color:#ffb703;">একাদশী স্পেশাল</h2>
@@ -1234,8 +1238,19 @@
       <button class="hbEkaFilterBtn" data-ekafilter="fasting" style="flex-shrink:0; border:none; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">উপবাসের খাদ্য</button>
     </div>
 
+    <div id="hbEkaActiveGroup" style="display:none; margin:-4px 0 12px;"></div>
     <div id="hbEkaGrid" class="pGrid"><div class="loadingMsg">প্রোডাক্ট লোড হচ্ছে...</div></div>
     <div style="font-size:9.5px; color:var(--muted); margin-top:10px; line-height:1.4;">* এই তালিকা আপনার বাছা এলাকার দোকানগুলোর আসল স্টক থেকে — দোকানদারের দেওয়া একাদশী পণ্য/প্যাকেজ আর নামে মিলে যাওয়া পণ্য — কোনো নতুন/নকল প্রোডাক্ট যুক্ত করা হয়নি। কোনো ভুল মিলে গেলে দোকানের বিস্তারিত পেজে গিয়ে যাচাই করে নিন।</div>
+
+    <!-- ☰ ডান পাশের মেনু (ড্রয়ার) -->
+    <div id="hbEkaDrawerShade" style="display:none; position:fixed; inset:0; z-index:9000; background:rgba(0,0,0,0.55);"></div>
+    <div id="hbEkaDrawer" style="position:fixed; top:0; right:0; bottom:0; z-index:9001; width:min(84vw,340px); background:linear-gradient(180deg,#2a1d0a,#1a1206); border-left:1px solid rgba(255,183,3,0.35); box-shadow:-10px 0 30px rgba(0,0,0,0.5); transform:translateX(105%); transition:transform .25s ease; overflow-y:auto; padding:16px 14px calc(20px + env(safe-area-inset-bottom));">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <b style="font-size:16px; color:#ffd166;">🪷 সব ক্যাটাগরি</b>
+        <button type="button" id="hbEkaDrawerClose" style="border:0; background:rgba(255,255,255,0.08); color:#fff8e8; border-radius:10px; padding:7px 12px; font-family:inherit; cursor:pointer;">✕</button>
+      </div>
+      <div id="hbEkaDrawerList"></div>
+    </div>
 
     <div id="hbEkaCartBar" style="display:none; position:fixed; left:16px; right:16px; bottom:16px; background:var(--amber); color:#1a1206; border-radius:16px; padding:13px 18px; align-items:center; justify-content:space-between; font-weight:800; font-size:14px; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,0.4); z-index:60;">
       <span>🛒 কার্টে যান</span>
@@ -6436,11 +6451,45 @@ document.querySelectorAll(".hbPanFestFilterBtn").forEach((btn)=>{
    কিওয়ার্ড তালিকা ডিফল্ট এখানেই আছে, কিন্তু panchangProductMappings/EKADASHI
    Firestore ডকুমেন্টে override দিলে (ভবিষ্যতে Admin Panel থেকে) সেটাই ব্যবহার
    হবে — architecture-টা override-এর জন্য রেডি রাখা হয়েছে। ==================== */
+/* 🪷 একাদশী + 🛕 পূজার সামগ্রী — ডান পাশের মেনুর সব ঘর। POS-এর একাদশী ট্যাবেও হুবহু একই
+   key ব্যবহার হয় (দোকানদার পণ্যকে এই ঘরগুলোর একটায় দেন)। */
+const HB_EKA_GROUPS = [
+  { sec:"🪷 একাদশী" },
+  { key:"all",      ic:"✨", label:"সব পণ্য" },
+  { key:"package",  ic:"📦", label:"প্যাকেজ" },
+  { key:"fruit",    ic:"🍌", label:"ফল" },
+  { key:"milk",     ic:"🥛", label:"দুধ পণ্য" },
+  { key:"dry",      ic:"🥜", label:"শুকনা পণ্য" },
+  { key:"fasting",  ic:"🥔", label:"উপবাসের খাদ্য" },
+  { sec:"🛕 পূজার সামগ্রী" },
+  { key:"nitya",    ic:"🪔", label:"নিত্য পূজার সামগ্রী" },
+  { key:"flower",   ic:"🌺", label:"ফুল, তুলসী ও বেলপাতা" },
+  { key:"prasad",   ic:"🍬", label:"মিষ্টি ও প্রসাদ" },
+  { key:"vessel",   ic:"🔔", label:"পূজার বাসন ও সরঞ্জাম" },
+  { key:"idol",     ic:"🛕", label:"দেবদেবীর মূর্তি ও ছবি" },
+  { key:"cloth",    ic:"🧣", label:"পূজার কাপড় ও পবিত্র সামগ্রী" },
+  { key:"homa",     ic:"🔥", label:"হোম ও যজ্ঞের সামগ্রী" },
+  { key:"festival", ic:"🎉", label:"উৎসবভিত্তিক পূজার সামগ্রী" },
+  { key:"decor",    ic:"🏮", label:"পূজার সাজসজ্জা" },
+  { key:"kit",      ic:"🧺", label:"রেডিমেড পূজার কিট" },
+];
+// নামে মিলিয়ে খোঁজার শব্দ — ভুল মিল এড়াতে পূজার ঘরে শুধু স্পষ্ট শব্দ রাখা হয়েছে;
+// বাকিটা দোকানদার POS থেকে নিজে ঘর বেছে দেন।
 const HB_EKA_KEYWORD_GROUPS_DEFAULT = {
-  fruit:   ["কলা","আম","আপেল","আঙুর","কমলা","মাল্টা","পেয়ারা","বেল","তরমুজ","নারিকেল","নারকেল","খেজুর","লেবু","আনারস","পেঁপে"],
-  milk:    ["দুধ","দই","ঘি","পনির","ছানা","মাখন"],
-  dry:     ["সাবু","সাবুদানা","বাদাম","কাজু","কিশমিশ","চিনাবাদাম","পেস্তা","ধূপ","আগরবাতি","প্রদীপ"],
-  fasting: ["আলু","মিষ্টি আলু","সাবু","দই","দুধ"],
+  fruit:    ["কলা","আম","আপেল","আঙুর","কমলা","মাল্টা","পেয়ারা","বেল","তরমুজ","নারিকেল","নারকেল","খেজুর","লেবু","আনারস","পেঁপে"],
+  milk:     ["দুধ","দই","ঘি","পনির","ছানা","মাখন"],
+  dry:      ["সাবু","সাবুদানা","বাদাম","কাজু","কিশমিশ","চিনাবাদাম","পেস্তা"],
+  fasting:  ["আলু","মিষ্টি আলু","সাবু","দই","দুধ"],
+  nitya:    ["ধূপ","আগরবাতি","প্রদীপ","কর্পূর","কর্পুর","সিঁদুর","চন্দন","সলতে","গঙ্গাজল"],
+  flower:   ["তুলসী","বেলপাতা","দূর্বা","গাঁদা","জবা ফুল","পদ্ম ফুল"],
+  prasad:   ["বাতাসা","নকুলদানা","প্রসাদ","কদমা","মুড়কি"],
+  vessel:   ["ঘণ্টা","ঘন্টা","শঙ্খ","শাঁখ","কোশাকুশি","ধুনুচি","পঞ্চপ্রদীপ","প্রদীপদানি","মঙ্গল ঘট","পূজার থালা"],
+  idol:     ["মূর্তি","প্রতিমা","ঠাকুরের ছবি","দেবতার ছবি"],
+  cloth:    ["পৈতা","নামাবলি","নামাবলী","রুদ্রাক্ষ","পূজার আসন","লাল সুতা"],
+  homa:     ["যজ্ঞ","সমিধ","হোমকুণ্ড","হোম কুণ্ড","হোমের"],
+  festival: ["দুর্গা পূজা","কালী পূজা","লক্ষ্মী পূজা","সরস্বতী পূজা","জন্মাষ্টমী","দীপাবলি","শিবরাত্রি"],
+  decor:    ["আলপনা","রঙ্গোলি","তোরণ","ফুলের মালা","ঝালর"],
+  kit:      ["পূজার কিট","পূজা কিট"],
 };
 let __hbEkaKeywordGroups = HB_EKA_KEYWORD_GROUPS_DEFAULT;
 let __hbEkaProducts = [];
@@ -6459,6 +6508,7 @@ async function hbEkaMaybeLoadMapping(){
 // দেখায়; প্যাকেজ শুধু "📦 প্যাকেজ" আর "সব"-এ। বাকি পণ্য আগের মতো নামের কিওয়ার্ড দিয়ে মেলে।
 function hbEkaInGroup(p, groupKey){
   if(groupKey === "package") return p.productType === "package";
+  if(groupKey === "kit" && p.productType === "package") return true;
   if(groupKey === "all") return p.ekadashi === true || hbEkaProductMatches(p.name, "all");
   if(p.productType === "package") return false;
   if(p.ekadashi === true && p.ekaGroup && p.ekaGroup === groupKey) return true;
@@ -6573,11 +6623,11 @@ async function hbEkaLoadProducts(){
 function hbEkaRenderGrid(){
   const gridEl = document.getElementById("hbEkaGrid");
   if(!gridEl) return;
-  const activeBtn = document.querySelector('.hbEkaFilterBtn[data-active="1"]') || document.querySelector('.hbEkaFilterBtn[data-ekafilter="all"]');
-  const filter = activeBtn ? activeBtn.dataset.ekafilter : "all";
+  const filter = __hbEkaFilter || "all";
   const list = filter === "all" ? __hbEkaProducts : __hbEkaProducts.filter((p)=> hbEkaInGroup(p, filter));
+  hbEkaPaintFilterUI();
   if(list.length === 0){
-    gridEl.innerHTML = "<div class='mfEmpty'>এই ক্যাটাগরিতে কোনো পণ্য পাওয়া যায়নি।</div>";
+    gridEl.innerHTML = "<div class='mfEmpty'>এই ক্যাটাগরিতে এখনো কোনো পণ্য নেই।<br>☰ মেনু থেকে অন্য ঘর দেখুন।</div>";
   }else{
     gridEl.innerHTML = list.map((p, idx)=> mfCardHTML(p, idx)).join("");
   }
@@ -6600,21 +6650,59 @@ function hbEkaUpdateCartBar(){
 }
 document.getElementById("hbEkaCartBar") && document.getElementById("hbEkaCartBar").addEventListener("click", ()=>{ if(typeof hbOpenCart === "function") hbOpenCart(); });
 
-document.querySelectorAll(".hbEkaFilterBtn").forEach((btn)=>{
-  btn.addEventListener("click", ()=>{
-    document.querySelectorAll(".hbEkaFilterBtn").forEach((b)=>{ delete b.dataset.active; b.style.background = "rgba(255,255,255,0.05)"; b.style.color = "var(--muted)"; });
-    btn.dataset.active = "1";
-    btn.style.background = "rgba(230,126,34,0.22)"; btn.style.color = "#ffb703";
-    hbEkaRenderGrid();
+let __hbEkaFilter = "all";
+function hbEkaSetFilter(key){ __hbEkaFilter = key || "all"; hbEkaRenderGrid(); hbEkaCloseDrawer(); }
+// চিপ আর মেনুর "বাছা" অবস্থা একসাথে রঙ করা; চিপে নেই এমন ঘর (পূজার) বাছলে নিচে একটা লেবেল দেখায়
+function hbEkaPaintFilterUI(){
+  let chipFound = false;
+  document.querySelectorAll(".hbEkaFilterBtn").forEach((b)=>{
+    const on = b.dataset.ekafilter === __hbEkaFilter;
+    if(on) chipFound = true;
+    b.style.background = on ? "rgba(230,126,34,0.22)" : "rgba(255,255,255,0.05)";
+    b.style.color = on ? "#ffb703" : "var(--muted)";
   });
-});
-(function hbEkaInitFilterDefault(){
-  const defaultBtn = document.querySelector('.hbEkaFilterBtn[data-ekafilter="all"]');
-  if(defaultBtn){ defaultBtn.dataset.active = "1"; defaultBtn.style.background = "rgba(230,126,34,0.22)"; defaultBtn.style.color = "#ffb703"; }
-})();
+  const pill = document.getElementById("hbEkaActiveGroup");
+  if(pill){
+    const g = HB_EKA_GROUPS.find((x)=> x.key === __hbEkaFilter);
+    if(!chipFound && g){
+      pill.style.display = "block";
+      pill.innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px; background:rgba(230,126,34,0.22); color:#ffb703; border:1px solid rgba(255,183,3,0.45); border-radius:20px; padding:6px 12px; font-weight:800; font-size:12px;">${g.ic} ${g.label} <button type="button" onclick="hbEkaSetFilter('all')" style="border:0; background:transparent; color:#ffd166; font-weight:800; cursor:pointer; font-family:inherit; padding:0;">✕</button></span>`;
+    }else{ pill.style.display = "none"; pill.innerHTML = ""; }
+  }
+}
+document.querySelectorAll(".hbEkaFilterBtn").forEach((btn)=> btn.addEventListener("click", ()=> hbEkaSetFilter(btn.dataset.ekafilter)));
+hbEkaPaintFilterUI();
+
+/* ☰ ডান পাশের মেনু — প্রতিটা ঘরের পাশে এই এলাকায় কয়টা পণ্য আছে সেটাও দেখায় */
+function hbEkaOpenDrawer(){
+  const listEl = document.getElementById("hbEkaDrawerList");
+  if(listEl){
+    listEl.innerHTML = HB_EKA_GROUPS.map((g)=>{
+      if(g.sec) return `<div style="font-size:12px; font-weight:800; color:var(--muted); margin:14px 4px 6px; letter-spacing:.3px;">${g.sec}</div>`;
+      const n = g.key === "all" ? __hbEkaProducts.length : __hbEkaProducts.filter((p)=> hbEkaInGroup(p, g.key)).length;
+      const on = g.key === __hbEkaFilter;
+      return `<button type="button" data-ekagroup="${g.key}" style="width:100%; display:flex; align-items:center; gap:10px; text-align:left; margin-bottom:6px; padding:11px 12px; border-radius:12px; cursor:pointer; font-family:inherit; border:1px solid ${on ? "rgba(255,183,3,0.6)" : "rgba(255,255,255,0.08)"}; background:${on ? "rgba(230,126,34,0.22)" : "rgba(255,255,255,0.04)"}; color:${on ? "#ffd166" : "#fff8e8"};">
+        <span style="font-size:20px; width:26px; text-align:center;">${g.ic}</span>
+        <span style="flex:1; font-weight:700; font-size:13.5px;">${g.label}</span>
+        <span style="font-size:11px; font-weight:800; min-width:22px; text-align:center; padding:2px 7px; border-radius:10px; background:${n ? "rgba(255,183,3,0.2)" : "rgba(255,255,255,0.06)"}; color:${n ? "#ffd166" : "var(--muted)"};">${n}</span>
+      </button>`;
+    }).join("");
+    listEl.querySelectorAll("[data-ekagroup]").forEach((b)=> b.addEventListener("click", ()=> hbEkaSetFilter(b.dataset.ekagroup)));
+  }
+  document.getElementById("hbEkaDrawerShade").style.display = "block";
+  document.getElementById("hbEkaDrawer").style.transform = "translateX(0)";
+}
+function hbEkaCloseDrawer(){
+  const sh = document.getElementById("hbEkaDrawerShade"), dr = document.getElementById("hbEkaDrawer");
+  if(sh) sh.style.display = "none";
+  if(dr) dr.style.transform = "translateX(105%)";
+}
+document.getElementById("hbEkaMenuBtn") && document.getElementById("hbEkaMenuBtn").addEventListener("click", hbEkaOpenDrawer);
+document.getElementById("hbEkaDrawerClose") && document.getElementById("hbEkaDrawerClose").addEventListener("click", hbEkaCloseDrawer);
+document.getElementById("hbEkaDrawerShade") && document.getElementById("hbEkaDrawerShade").addEventListener("click", hbEkaCloseDrawer);
 
 let __hbEkaBackTo = "screenPanchang"; // হোম কার্ড থেকে খুললে হোমে, পঞ্জিকা থেকে খুললে পঞ্জিকায় ফেরে
-document.getElementById("backFromEkadashiSpecial") && document.getElementById("backFromEkadashiSpecial").addEventListener("click", ()=> showScreen(__hbEkaBackTo));
+document.getElementById("backFromEkadashiSpecial") && document.getElementById("backFromEkadashiSpecial").addEventListener("click", ()=>{ hbEkaCloseDrawer(); showScreen(__hbEkaBackTo); });
 
 function hbEkaOpenScreen(from){
   __hbEkaBackTo = (typeof from === "string") ? from : "screenPanchang";

@@ -4920,7 +4920,7 @@ window.hbLoadLib = function(name){
       <div class="bccSubtab" data-btab="products">📦 প্রোডাক্ট</div>
       <div class="bccSubtab" data-btab="categories">🏷️ ক্যাটাগরি</div>
       <div class="bccSubtab" data-btab="market">🐝 Market</div>
-      <div class="bccSubtab" data-btab="ekadashi">🛍️ একাদশী</div>
+      <div class="bccSubtab" data-btab="ekadashi">🛍️ একাদশী ও পূজা</div>
     </div>
 
     <div class="bccSubpanel" id="btab-overview">
@@ -5005,8 +5005,8 @@ window.hbLoadLib = function(name){
       <div style="background:linear-gradient(135deg,rgba(249,115,22,0.22),rgba(190,24,93,0.18)); border:1px solid rgba(255,183,3,0.4); border-radius:16px; padding:14px; margin-bottom:14px; display:flex; gap:12px; align-items:center;">
         <div style="font-size:34px;">🪷</div>
         <div style="min-width:0;">
-          <div style="font-weight:800; font-size:15px; color:#ffd166;">একাদশী পণ্য</div>
-          <div style="font-size:11.5px; color:#cbd2ea; line-height:1.45;">এখানে চালু করা পণ্য আর প্যাকেজ Bazar-এর "🛍️ একাদশী পণ্য" পাতায় দেখাবে। অর্ডার আগের মতোই আসবে।</div>
+          <div style="font-weight:800; font-size:15px; color:#ffd166;">একাদশী ও পূজার পণ্য</div>
+          <div style="font-size:11.5px; color:#cbd2ea; line-height:1.45;">এখানে চালু করা পণ্য আর প্যাকেজ Bazar-এর "🛍️ একাদশী পণ্য" পাতায় দেখাবে — ফল, দুধ থেকে শুরু করে ধূপ, প্রদীপ, মূর্তি, পূজার কিট সব। অর্ডার আগের মতোই আসবে।</div>
         </div>
       </div>
       <div id="ekaBazarStatus" style="font-size:12px; line-height:1.55; border-radius:12px; padding:10px 12px; margin-bottom:12px; background:#10152a; border:1px solid rgba(255,255,255,0.1); color:#cbd2ea;">⏳ Bazar-এর সাথে সংযোগ দেখা হচ্ছে…</div>
@@ -5021,7 +5021,7 @@ window.hbLoadLib = function(name){
 
       <div id="ekaSegProducts">
         <input class="bccSearchInput" id="ekaProdSearch" placeholder="🔍 পণ্য খুঁজুন...">
-        <p class="pin-desc" style="margin:-8px 0 10px; font-size:11px;">💡 সুইচ চালু করলে পণ্যটা একাদশী পাতায় যাবে। নামের সাথে মিলে এমন পণ্য (কলা, দুধ, সাবু…) উপরে "মিলেছে" লেখা থাকে।</p>
+        <p class="pin-desc" style="margin:-8px 0 10px; font-size:11px;">💡 সুইচ চালু করলে পণ্যটা একাদশী পাতায় যাবে। নিচের ঘর থেকে বেছে দিন কোথায় দেখাবে — একাদশী (ফল, দুধ…) নাকি পূজার সামগ্রী (ধূপ, বাসন, মূর্তি, কিট…)। নামের সাথে মিলে এমন পণ্য উপরে "মিলেছে" লেখা থাকে।</p>
         <div id="ekaProdList"></div>
       </div>
 
@@ -12700,13 +12700,36 @@ document.getElementById('bccMarketSearch').addEventListener('input', ()=> bccRen
    ২) প্যাকেজ: কয়েকটা পণ্য মিলিয়ে একটা প্যাকেজ — এটা একটা সাধারণ প্রোডাক্ট
       (productType:'package', packageItems:[{id,name,qty}]), তাই কার্ট/অর্ডার আগের মতোই কাজ করে।
       প্যাকেজ বিক্রি হলে bccAdjustStockForSale ভেতরের পণ্যগুলোর স্টকও কমিয়ে দেয়। */
-const EKA_GROUPS = { fruit:"🍌 ফল", milk:"🥛 দুধ পণ্য", dry:"🥜 শুকনা পণ্য", fasting:"🥔 উপবাসের খাদ্য" };
+// ⚠️ এই key-গুলো Bazar-এর HB_EKA_GROUPS-এর সাথে হুবহু মিলতে হবে (honey-bee-bazar.html)
+const EKA_GROUP_SECTIONS = [
+  { sec:"🪷 একাদশী", items:{ fruit:"🍌 ফল", milk:"🥛 দুধ পণ্য", dry:"🥜 শুকনা পণ্য", fasting:"🥔 উপবাসের খাদ্য" } },
+  { sec:"🛕 পূজার সামগ্রী", items:{
+      nitya:"🪔 নিত্য পূজার সামগ্রী", flower:"🌺 ফুল, তুলসী ও বেলপাতা", prasad:"🍬 মিষ্টি ও প্রসাদ",
+      vessel:"🔔 পূজার বাসন ও সরঞ্জাম", idol:"🛕 দেবদেবীর মূর্তি ও ছবি", cloth:"🧣 পূজার কাপড় ও পবিত্র সামগ্রী",
+      homa:"🔥 হোম ও যজ্ঞের সামগ্রী", festival:"🎉 উৎসবভিত্তিক পূজার সামগ্রী", decor:"🏮 পূজার সাজসজ্জা", kit:"🧺 রেডিমেড পূজার কিট" } },
+];
+const EKA_GROUPS = Object.assign({}, ...EKA_GROUP_SECTIONS.map(x=> x.items));
 const EKA_KEYWORDS = {
-  fruit:   ["কলা","আম","আপেল","আঙুর","কমলা","মাল্টা","পেয়ারা","বেল","তরমুজ","নারিকেল","নারকেল","খেজুর","লেবু","আনারস","পেঁপে"],
-  milk:    ["দুধ","দই","ঘি","পনির","ছানা","মাখন"],
-  dry:     ["সাবু","সাবুদানা","বাদাম","কাজু","কিশমিশ","চিনাবাদাম","পেস্তা","ধূপ","আগরবাতি","প্রদীপ"],
-  fasting: ["আলু","মিষ্টি আলু"],
+  fruit:    ["কলা","আম","আপেল","আঙুর","কমলা","মাল্টা","পেয়ারা","বেল","তরমুজ","নারিকেল","নারকেল","খেজুর","লেবু","আনারস","পেঁপে"],
+  milk:     ["দুধ","দই","ঘি","পনির","ছানা","মাখন"],
+  dry:      ["সাবু","সাবুদানা","বাদাম","কাজু","কিশমিশ","চিনাবাদাম","পেস্তা"],
+  fasting:  ["মিষ্টি আলু","আলু"],
+  nitya:    ["ধূপ","আগরবাতি","প্রদীপ","কর্পূর","কর্পুর","সিঁদুর","চন্দন","সলতে","গঙ্গাজল"],
+  flower:   ["তুলসী","বেলপাতা","দূর্বা","গাঁদা","জবা ফুল","পদ্ম ফুল"],
+  prasad:   ["বাতাসা","নকুলদানা","প্রসাদ","কদমা","মুড়কি"],
+  vessel:   ["ঘণ্টা","ঘন্টা","শঙ্খ","শাঁখ","কোশাকুশি","ধুনুচি","পঞ্চপ্রদীপ","প্রদীপদানি","মঙ্গল ঘট","পূজার থালা"],
+  idol:     ["মূর্তি","প্রতিমা","ঠাকুরের ছবি","দেবতার ছবি"],
+  cloth:    ["পৈতা","নামাবলি","নামাবলী","রুদ্রাক্ষ","পূজার আসন","লাল সুতা"],
+  homa:     ["যজ্ঞ","সমিধ","হোমকুণ্ড","হোম কুণ্ড","হোমের"],
+  festival: ["দুর্গা পূজা","কালী পূজা","লক্ষ্মী পূজা","সরস্বতী পূজা","জন্মাষ্টমী","দীপাবলি","শিবরাত্রি"],
+  decor:    ["আলপনা","রঙ্গোলি","তোরণ","ফুলের মালা","ঝালর"],
+  kit:      ["পূজার কিট","পূজা কিট"],
 };
+// ঘর বাছার ড্রপডাউন — একাদশী আর পূজা আলাদা ভাগে
+function ekaGroupOptions(sel){
+  return EKA_GROUP_SECTIONS.map(x=> `<optgroup label="${x.sec}">` +
+    Object.keys(x.items).map(g=> `<option value="${g}" ${g===sel?'selected':''}>${x.items[g]}</option>`).join('') + '</optgroup>').join('');
+}
 // 🔎 Bazar-এ আসলে দেখা যাবে কি না — দোকানের দেশ, দোকান সক্রিয় কি না, কোন বাজারে আছে
 // সেটা পরিষ্কার দেখায়। কাস্টমার শুধু নিজের বাছা বাজারের "সক্রিয়" দোকানের পণ্য দেখে।
 async function ekaCheckBazarStatus(){
@@ -12779,14 +12802,14 @@ function ekaRenderProducts(all){
   }
   box.innerHTML = list.slice(0, 200).map(({p, guess})=>{
     const grp = p.ekaGroup || guess || 'fruit';
-    const opts = Object.keys(EKA_GROUPS).map(g=> `<option value="${g}" ${g===grp?'selected':''}>${EKA_GROUPS[g]}</option>`).join('');
+    const opts = ekaGroupOptions(grp);
     const thumb = p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" style="width:100%; height:100%; object-fit:cover;">` : '📦';
     return `<div style="display:flex; align-items:center; gap:10px; background:${p.ekadashi ? 'rgba(249,115,22,0.12)' : '#10152a'}; border:1px solid ${p.ekadashi ? 'rgba(255,183,3,0.45)' : 'rgba(255,255,255,0.08)'}; border-radius:12px; padding:10px; margin-bottom:8px;">
       <div style="width:44px; height:44px; border-radius:10px; overflow:hidden; background:#0e1327; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:20px;">${thumb}</div>
       <div style="flex:1; min-width:0;">
         <div style="font-weight:800; font-size:13px; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.name||'')}</div>
         <div style="font-size:11px; color:#8b94b8;">${fmt(p.sell)} · স্টক ${Number(p.qty)||0}${guess && !p.ekadashi ? ' · <span style="color:#ffd166;">💡 মিলেছে</span>' : ''}</div>
-        <select data-ekagrp="${p.id}" style="margin-top:5px; width:100%; max-width:170px; padding:5px 6px; border-radius:8px; background:#0e1327; color:#e7e2d4; border:1px solid rgba(255,255,255,0.12); font-family:inherit; font-size:11.5px;">${opts}</select>
+        <select data-ekagrp="${p.id}" style="margin-top:5px; width:100%; max-width:220px; padding:5px 6px; border-radius:8px; background:#0e1327; color:#e7e2d4; border:1px solid rgba(255,255,255,0.12); font-family:inherit; font-size:11.5px;">${opts}</select>
       </div>
       <label class="bccPublishSwitch" style="flex-shrink:0;"><input type="checkbox" data-ekaon="${p.id}" ${p.ekadashi?'checked':''}><span></span></label>
     </div>`;
