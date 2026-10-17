@@ -214,6 +214,72 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // দর্জির পুশ টোকেন — দোকানের নথি সবাই পড়ে, তাই টোকেন আলাদা ঘরে, শুধু নিজে
+    match /tailors/{tailorId}/private/{docId} {
+      allow read, write: if isSignedIn() && request.auth.uid == tailorId;
+    }
+
+    /* 🧵 সেলাইয়ের অর্ডার — গ্রাহক বানান; দাম ডিজাইনের সাথে মিলতে হয়।
+       চার্জ, রাইডার, কোড শুধু সার্ভার (Cloud Function) বসায়।
+       কে কোন ধাপ বদলাতে পারে:
+         গ্রাহক: placed → cancelled
+         দর্জি : placed → accepted/declined, stitching → ready, রাইডার না পেলে retryAt
+         রাইডার: collecting/returning-এ pickedUp, তারপর collecting → stitching, returning → delivered */
+    match /tailorOrders/{orderId} {
+      allow read: if isSignedIn() &&
+        (isSuperAdmin() ||
+         resource.data.customerUid == request.auth.uid ||
+         resource.data.tailorId == request.auth.uid ||
+         resource.data.riderId == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.status == 'placed'
+        && request.resource.data.qty is int
+        && request.resource.data.qty >= 1 && request.resource.data.qty <= 20
+        && exists(/databases/$(database)/documents/tailorDesigns/$(request.resource.data.designId))
+        && get(/databases/$(database)/documents/tailorDesigns/$(request.resource.data.designId)).data.published == true
+        && get(/databases/$(database)/documents/tailorDesigns/$(request.resource.data.designId)).data.tailorId == request.resource.data.tailorId
+        && get(/databases/$(database)/documents/tailorDesigns/$(request.resource.data.designId)).data.price == request.resource.data.price
+        && !request.resource.data.keys().hasAny(['riderId', 'orderCode', 'legCharge', 'deliveryCharge',
+             'stitchTotal', 'total', 'dispatch', 'tailorLoc', 'pickedUp', 'retryAt']);
+
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        // 👤 গ্রাহক — দর্জি নেওয়ার আগে বাতিল
+        (resource.data.customerUid == request.auth.uid
+          && resource.data.status == 'placed'
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])) ||
+        // 🧵 দর্জি
+        (resource.data.tailorId == request.auth.uid && (
+          (resource.data.status == 'placed'
+            && request.resource.data.status in ['accepted', 'declined']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedAt', 'declinedAt', 'tailorNote'])) ||
+          (resource.data.status == 'stitching'
+            && request.resource.data.status == 'ready'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'readyAt'])) ||
+          (resource.data.status in ['accepted', 'ready']
+            && resource.data.get('dispatch', {}).get('state', '') == 'waiting_for_rider'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['retryAt']))
+        )) ||
+        // 🛵 এই যাত্রার রাইডার
+        (resource.data.riderId == request.auth.uid && (
+          (resource.data.status in ['collecting', 'returning']
+            && request.resource.data.pickedUp == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pickedUp', 'pickedUpAt'])) ||
+          (resource.data.status == 'collecting' && resource.data.pickedUp == true
+            && request.resource.data.status == 'stitching'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'stitchingAt'])) ||
+          (resource.data.status == 'returning' && resource.data.pickedUp == true
+            && request.resource.data.status == 'delivered'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliveredAt']))
+        ))
+      );
+      allow delete: if isSuperAdmin();
+    }
+
     // ডিজাইন — ছবি data-URL হিসেবে নথির ভেতরেই (১০০ KB ছবি ≈ ১৩৭ KB লেখা)
     match /tailorDesigns/{designId} {
       allow read: if true;
