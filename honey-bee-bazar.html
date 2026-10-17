@@ -1223,6 +1223,7 @@
        মাপের খাতা আলাদা ড্যাশবোর্ডে (উপরের টাইটেল বারে চাপ দিলে খোলে)। -->
   <div id="screenTailor" style="padding:20px 16px;">
     <button class="backBtn" id="backToHomeFromTailor">← হোমে ফিরে যান</button>
+    <div id="tlrMyOrders"></div>
     <div class="card" style="padding:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <div style="font-weight:800; font-size:13.5px;">📍 এলাকার দর্জি খুঁজুন</div>
@@ -3177,6 +3178,7 @@ let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], a
 function renderAuthArea(){
   try{ if(typeof sfiApplyGate === "function") setTimeout(sfiApplyGate, 0); }catch(e){}
   try{ if(typeof bloodRenderMyRequests === "function") setTimeout(bloodRenderMyRequests, 0); }catch(e){}
+  try{ const tm = document.getElementById("screenTailor"); if(tm && tm.classList.contains("active") && typeof tlrMyOrdersStart === "function") setTimeout(tlrMyOrdersStart, 0); }catch(e){}
   try{ const ts = document.getElementById("screenTailorMeasure"); if(ts && ts.classList.contains("active") && typeof tlrRender === "function") setTimeout(tlrRender, 0); }catch(e){} // 🩸 লগইন হলেই নিজের রক্তের অনুরোধ // 🔒 লগইন/লগআউটে ফ্লাইট পাতাও সাথে সাথে খোলে/বন্ধ হয়
   const area = document.getElementById("authArea");
   if(currentCustomer){
@@ -3511,6 +3513,7 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
       showScreen("screenTailor");
       tlrAreaInit();
       tlrRenderFeed();
+      tlrMyOrdersStart();
     }else if(svc === "jibontori"){
       showScreen("screenJibonTori");
     }else if(svc === "bloodbank"){
@@ -3710,8 +3713,244 @@ async function tlrRenderFeed(){
       </div>
     </div>`).join("") + `</div>`;
   box.querySelectorAll("[data-tlr-order]").forEach(b=> b.addEventListener("click", ()=>
-    nbToast("🧵 অর্ডার নেওয়া খুব শীঘ্রই চালু হচ্ছে — আপনার মাপ এখনই \"📏 আমার মাপের খাতা\"-য় সেভ করে রাখুন।")));
+    tlrOpenOrder(b.dataset.tlrOrder)));
 }
+/* ==================== 🧵 সেলাই ঘর — ধাপ ৩: অর্ডার (অক্টোবর ২০২৬) ====================
+   গ্রাহক ডিজাইন বেছে নিজের সেভ করা মাপ দিয়ে অর্ডার দেন → দর্জি মাপসহ রসিদ পান।
+   রাইডার গ্রাহকের কাপড় দর্জির কাছে নেন, সেলাই শেষে ফেরত আনেন।
+   বিল = সেলাইয়ের মজুরি × কয়টা + ডেলিভারি (আনা + ফেরত)। ডেলিভারির আসল হিসাব
+   সার্ভার করে (Cloud Function) — এখানে শুধু আনুমানিক দেখানো হয়, একই সূত্রে। */
+const TLR_LEG = { base:30, perKm:12, min:40, max:300 }; // ⚠️ functions/index.js-এর TAILOR_LEG_*-এর সাথে হুবহু এক রাখতে হবে
+function tlrLegCharge(km){ if(km == null || !isFinite(km)) return TLR_LEG.min; return Math.min(TLR_LEG.max, Math.max(TLR_LEG.min, Math.round(TLR_LEG.base + TLR_LEG.perKm*km))); }
+function tlrKm(a, b){
+  const R = 6371, t = (x)=> x*Math.PI/180;
+  const dLat = t(b.lat-a.lat), dLng = t(b.lng-a.lng);
+  const h = Math.sin(dLat/2)**2 + Math.cos(t(a.lat))*Math.cos(t(b.lat))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+// কোন ধরনে কোন মাপ লাগে
+function tlrNeeds(cat){ return cat === "pajama" ? ["pajama"] : cat === "set" ? ["kameez","pajama"] : cat === "other" ? [] : ["kameez"]; }
+function tlrFilled(o){ return Object.values(o||{}).filter(v=> v !== "" && v != null).length; }
+const TLR_STATUS = {
+  placed:     ["⏳", "দর্জির উত্তরের অপেক্ষায়", "#fbbf24"],
+  accepted:   ["🔎", "দর্জি নিয়েছেন — রাইডার খোঁজা হচ্ছে", "#38bdf8"],
+  collecting: ["🛵", "রাইডার কাপড় নিতে আসছেন", "#38bdf8"],
+  stitching:  ["✂️", "সেলাই চলছে", "#f472b6"],
+  ready:      ["🎉", "তৈরি — রাইডার খোঁজা হচ্ছে", "#4ade80"],
+  returning:  ["🛵", "পোশাক নিয়ে রাইডার আসছেন", "#4ade80"],
+  delivered:  ["✅", "পৌঁছে গেছে", "#4ade80"],
+  declined:   ["❌", "দর্জি নিতে পারেননি", "#f87171"],
+  cancelled:  ["✕", "বাতিল করেছেন", "#a8a8a8"],
+};
+const TLR_STEPS = ["placed","accepted","collecting","stitching","ready","returning","delivered"];
+
+let __tlrOrd = null; // { design, tailor, loc }
+function tlrSheetEl(){
+  let el = document.getElementById("tlrOrderSheet");
+  if(el) return el;
+  el = document.createElement("div");
+  el.id = "tlrOrderSheet";
+  el.style.cssText = "position:fixed; inset:0; z-index:10040; background:rgba(0,0,0,0.72); display:none; align-items:flex-end; justify-content:center;";
+  el.innerHTML = `<div style="background:#1a1408; color:#fff8e8; width:100%; max-width:520px; max-height:94vh; overflow:auto; border-radius:20px 20px 0 0; padding:16px 14px calc(18px + env(safe-area-inset-bottom)); border-top:2px solid #be185d;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <b style="font-size:16.5px;">🧵 সেলাইয়ের অর্ডার</b>
+        <button type="button" id="tlrOrdClose" style="border:0; background:rgba(255,255,255,0.08); color:#fff8e8; border-radius:10px; padding:7px 12px; font-family:inherit; cursor:pointer;">✕</button>
+      </div>
+      <div id="tlrOrdBody"></div>
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener("click", (e)=>{ if(e.target === el) el.style.display = "none"; });
+  el.querySelector("#tlrOrdClose").onclick = ()=> el.style.display = "none";
+  return el;
+}
+const TLR_IN = "width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:15px; box-sizing:border-box;";
+const TLR_LBL = "display:block; font-size:12px; color:var(--muted); font-weight:700; margin:10px 0 4px;";
+
+async function tlrOpenOrder(designId){
+  const d = (__tlrDesigns||[]).find(x=> x.id === designId);
+  if(!d) return;
+  if(!currentCustomer){ alert("অর্ডার দিতে আগে ☰ Menu থেকে Google দিয়ে লগইন করুন — আপনার মাপ আর অর্ডার আপনার অ্যাকাউন্টেই থাকবে।"); return; }
+  const sheet = tlrSheetEl(), body = sheet.querySelector("#tlrOrdBody");
+  body.innerHTML = `<div style="text-align:center; padding:24px; color:var(--muted);">⏳ দর্জির তথ্য আনা হচ্ছে…</div>`;
+  sheet.style.display = "flex";
+  let t = null;
+  try{ const ts = await db.collection("tailors").doc(d.tailorId).get(); t = ts.exists ? ts.data() : null; }catch(e){}
+  if(!t || t.status === "blocked"){ body.innerHTML = `<div style="text-align:center; padding:24px;">এই সেলাই ঘর এখন অর্ডার নিচ্ছে না।</div>`; return; }
+  if(t.isOpen === false){ body.innerHTML = `<div style="text-align:center; padding:24px;">🔴 ${escapeHtml(t.name||"সেলাই ঘর")} এখন বন্ধ — পরে আবার চেষ্টা করুন।</div>`; return; }
+  if(!t.storeLocation || t.storeLocation.lat == null){ body.innerHTML = `<div style="text-align:center; padding:24px;">📍 ${escapeHtml(t.name||"সেলাই ঘর")} এখনো দোকানের লোকেশন দেননি, তাই রাইডার পাঠানো যাচ্ছে না। পরে আবার দেখুন।</div>`; return; }
+  __tlrOrd = { design: d, tailor: t, loc: null };
+
+  const needs = tlrNeeds(d.category);
+  const ms = tlrMeasures();
+  const msOpts = ms.map(m=>{
+    const ok = needs.every(n=> tlrFilled(m[n]) >= 3);
+    const info = needs.length ? needs.map(n=> (n === "kameez" ? "জামা " : "পায়জামা ") + tlrFilled(m[n]) + "টা মাপ").join(", ") : "";
+    return `<option value="${escapeHtml(m.id)}"${ok ? "" : " disabled"}>${escapeHtml(m.label||"মাপ")}${info ? " — " + info : ""}${ok ? "" : " (মাপ অসম্পূর্ণ)"}</option>`;
+  }).join("");
+  const needTxt = needs.length ? needs.map(n=> n === "kameez" ? "👗 জামার" : "👖 পায়জামার").join(" আর ") + " মাপ" : "মাপ (ঐচ্ছিক)";
+  let phone = ""; try{ phone = localStorage.getItem("hbTlrPhone") || ""; }catch(e){}
+  let addr = ""; try{ addr = localStorage.getItem("hbTlrAddr") || ""; }catch(e){}
+
+  body.innerHTML = `
+    <div style="display:flex; gap:12px; align-items:flex-start;">
+      <img src="${escapeHtml(d.img)}" alt="" style="width:92px; aspect-ratio:3/4; object-fit:cover; border-radius:12px; flex-shrink:0;">
+      <div style="min-width:0;">
+        <div style="font-weight:800; font-size:15px;">${escapeHtml(d.title)}</div>
+        <div style="font-size:12px; color:var(--muted); margin-top:2px;">🧵 ${escapeHtml(t.name||"")}${t.area ? " · " + escapeHtml(t.area) : ""}</div>
+        <div style="font-size:12px; color:var(--muted);">${TLR_CAT[d.category]||""}${d.days ? " · " + escapeHtml(String(d.days)) + " দিনে তৈরি" : ""}</div>
+        <div style="font-weight:800; color:#f472b6; font-size:15px; margin-top:4px;">৳ ${escapeHtml(String(d.price))} <span style="font-size:11px; color:var(--muted); font-weight:600;">প্রতিটার মজুরি</span></div>
+      </div>
+    </div>
+    ${d.note ? `<div style="font-size:12px; color:var(--muted); margin-top:8px;">📝 ${escapeHtml(d.note)}</div>` : ""}
+
+    <label style="${TLR_LBL}">📏 কার মাপে বানাবেন? — ${needTxt}</label>
+    ${ms.length
+      ? `<select id="tlrOrdMeasure" style="${TLR_IN}">${needs.length ? "" : `<option value="">মাপ ছাড়া (দর্জির সাথে কথা বলে নেব)</option>`}${msOpts}</select>`
+      : `<div style="font-size:12.5px; color:#fbbf24; padding:10px; border:1px dashed #fbbf24; border-radius:10px;">এখনো কোনো মাপ সেভ করা নেই।</div>`}
+    <button type="button" id="tlrOrdAddMeasure" style="margin-top:6px; border:0; background:transparent; color:var(--amber); font-weight:800; font-family:inherit; font-size:12.5px; cursor:pointer; padding:4px 0;">➕ নতুন মাপ যোগ করুন / মাপ ঠিক করুন</button>
+
+    <div style="display:grid; grid-template-columns:1fr 1.4fr; gap:8px;">
+      <div><label style="${TLR_LBL}">কয়টা বানাবেন</label><input id="tlrOrdQty" type="number" inputmode="numeric" min="1" max="20" value="1" style="${TLR_IN}"></div>
+      <div><label style="${TLR_LBL}">📱 আপনার মোবাইল</label><input id="tlrOrdPhone" type="tel" inputmode="tel" maxlength="20" value="${escapeHtml(phone)}" placeholder="01XXXXXXXXX" style="${TLR_IN}"></div>
+    </div>
+    <label style="${TLR_LBL}">🏠 কাপড় কোথা থেকে নেবে / কোথায় ফেরত দেবে</label>
+    <input id="tlrOrdAddr" maxlength="150" value="${escapeHtml(addr)}" placeholder="বাড়ি/রাস্তা/মহল্লা — রাইডার যেন খুঁজে পান" style="${TLR_IN}">
+    <button type="button" id="tlrOrdLocBtn" style="width:100%; margin-top:8px; padding:12px; border-radius:10px; border:1.5px solid #38bdf8; background:rgba(56,189,248,0.1); color:#7dd3fc; font-weight:800; font-family:inherit; font-size:13.5px; cursor:pointer;">📍 আমার এখনকার লোকেশন দিন (জরুরি)</button>
+    <div id="tlrOrdLocTxt" style="font-size:11.5px; color:var(--muted); margin-top:4px;">বাড়িতে থেকে চাপুন — রাইডার এই জায়গাতেই আসবেন।</div>
+    <label style="${TLR_LBL}">📝 দর্জিকে কিছু বলবেন? (ঐচ্ছিক)</label>
+    <input id="tlrOrdNote" maxlength="200" placeholder="যেমন: হাতা একটু ঢিলা, লেস লাগাবেন" style="${TLR_IN}">
+
+    <div id="tlrOrdBill" style="margin-top:12px; background:rgba(190,24,93,0.12); border:1px solid rgba(244,114,182,0.35); border-radius:12px; padding:12px; font-size:13.5px;"></div>
+    <button type="button" id="tlrOrdSubmit" style="width:100%; margin-top:12px; padding:14px; border:0; border-radius:12px; background:#be185d; color:#fff; font-weight:800; font-size:16px; font-family:inherit; cursor:pointer;">🧵 অর্ডার পাঠান</button>
+    <div id="tlrOrdErr" style="display:none; margin-top:8px; padding:10px; border-radius:10px; background:rgba(248,113,113,0.15); color:#fca5a5; font-size:12.5px;"></div>
+    <div style="font-size:11.5px; color:var(--muted); text-align:center; margin-top:8px;">💵 টাকা দেবেন পোশাক হাতে পেয়ে — রাইডারকে নগদ।</div>`;
+
+  const bill = ()=>{
+    const qty = Math.max(1, Math.min(20, Math.round(Number(body.querySelector("#tlrOrdQty").value) || 1)));
+    const stitch = Number(d.price) * qty;
+    const loc = __tlrOrd.loc;
+    const km = loc ? tlrKm(loc, t.storeLocation) : null;
+    const leg = tlrLegCharge(km);
+    body.querySelector("#tlrOrdBill").innerHTML = `
+      <div style="font-weight:800; margin-bottom:6px;">🧾 বিল</div>
+      <div style="display:flex; justify-content:space-between;"><span>সেলাইয়ের মজুরি (৳${escapeHtml(String(d.price))} × ${qty})</span><b>৳ ${stitch}</b></div>
+      <div style="display:flex; justify-content:space-between; margin-top:3px;"><span>🛵 কাপড় আনা + ফেরত দেওয়া${km != null ? ` (${km.toFixed(1)} কিমি)` : ""}</span><b>${loc ? "৳ " + (leg*2) : "লোকেশন দিলে দেখাবে"}</b></div>
+      <div style="display:flex; justify-content:space-between; margin-top:6px; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.2); font-size:15px;"><span><b>মোট</b></span><b style="color:#f472b6;">${loc ? "৳ " + (stitch + leg*2) : "—"}</b></div>
+      ${loc ? `<div style="font-size:11px; color:var(--muted); margin-top:4px;">ডেলিভারি চার্জ দূরত্ব দেখে নিজে থেকে হিসাব হয়।</div>` : ""}`;
+  };
+  bill();
+  body.querySelector("#tlrOrdQty").addEventListener("input", bill);
+  body.querySelector("#tlrOrdAddMeasure").onclick = ()=>{ sheet.style.display = "none"; showScreen("screenTailorMeasure"); tlrRender(); };
+  body.querySelector("#tlrOrdLocBtn").onclick = ()=>{
+    const btn = body.querySelector("#tlrOrdLocBtn"), txt = body.querySelector("#tlrOrdLocTxt");
+    if(!navigator.geolocation){ txt.textContent = "এই ফোনে লোকেশন পাওয়া যায় না।"; return; }
+    btn.disabled = true; btn.textContent = "⏳ লোকেশন নেওয়া হচ্ছে…";
+    navigator.geolocation.getCurrentPosition((p)=>{
+      __tlrOrd.loc = { lat: p.coords.latitude, lng: p.coords.longitude };
+      btn.disabled = false; btn.textContent = "✅ লোকেশন নেওয়া হয়েছে (আবার নিতে চাপুন)";
+      btn.style.borderColor = "#4ade80"; btn.style.color = "#86efac"; btn.style.background = "rgba(74,222,128,0.1)";
+      txt.textContent = "দর্জির দোকান থেকে " + tlrKm(__tlrOrd.loc, t.storeLocation).toFixed(1) + " কিমি";
+      bill();
+    }, ()=>{
+      btn.disabled = false; btn.textContent = "📍 আমার এখনকার লোকেশন দিন (জরুরি)";
+      txt.textContent = "⚠️ লোকেশন পাওয়া যায়নি — ফোনের Location চালু করে অনুমতি দিন।";
+    }, { enableHighAccuracy:true, timeout:20000 });
+  };
+  body.querySelector("#tlrOrdSubmit").onclick = tlrSubmitOrder;
+}
+
+async function tlrSubmitOrder(){
+  const sheet = tlrSheetEl(), body = sheet.querySelector("#tlrOrdBody");
+  const err = (m)=>{ const e = body.querySelector("#tlrOrdErr"); e.style.display = "block"; e.textContent = m; e.scrollIntoView({ behavior:"smooth", block:"nearest" }); };
+  const { design:d, tailor:t, loc } = __tlrOrd || {};
+  if(!d) return;
+  const needs = tlrNeeds(d.category);
+  const sel = body.querySelector("#tlrOrdMeasure");
+  const m = sel && sel.value ? tlrMeasures().find(x=> x.id === sel.value) : null;
+  if(needs.length && !m){ err("📏 একটা মাপ বেছে নিন — না থাকলে \"➕ নতুন মাপ যোগ করুন\" চাপুন।"); return; }
+  const qty = Math.round(Number(body.querySelector("#tlrOrdQty").value));
+  if(!(qty >= 1 && qty <= 20)){ err("কয়টা বানাবেন — ১ থেকে ২০-এর মধ্যে লিখুন।"); return; }
+  const phone = body.querySelector("#tlrOrdPhone").value.trim();
+  if(!/^[0-9+\-\s]{8,20}$/.test(phone)){ err("📱 সঠিক মোবাইল নম্বর লিখুন — রাইডার কল করবেন।"); return; }
+  const addr = body.querySelector("#tlrOrdAddr").value.trim();
+  if(addr.length < 4){ err("🏠 ঠিকানা লিখুন — রাইডার যেন খুঁজে পান।"); return; }
+  if(!loc){ err("📍 \"আমার এখনকার লোকেশন দিন\" চাপুন — রাইডার এই জায়গাতেই আসবেন।"); return; }
+  try{ localStorage.setItem("hbTlrPhone", phone); localStorage.setItem("hbTlrAddr", addr); }catch(e){}
+
+  const measure = m ? { label: m.label || "মাপ", note: m.note || "" } : null;
+  if(m){ (needs.length ? needs : ["kameez","pajama"]).forEach(n=>{ if(tlrFilled(m[n])) measure[n] = m[n]; }); }
+  const rec = {
+    customerUid: currentCustomer.uid, customerName: (currentCustomer.name || "গ্রাহক").slice(0,60),
+    customerPhone: phone, customerAddress: addr.slice(0,150), customerLoc: { lat: loc.lat, lng: loc.lng },
+    tailorId: d.tailorId, tailorName: t.name || d.tailorName || "",
+    designId: d.id, designTitle: d.title || "", category: d.category || "other", price: d.price, days: d.days || null,
+    qty, measure, note: body.querySelector("#tlrOrdNote").value.trim().slice(0,200),
+    status: "placed", createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  const btn = body.querySelector("#tlrOrdSubmit"); btn.disabled = true; btn.textContent = "⏳ পাঠানো হচ্ছে…";
+  try{
+    await db.collection("tailorOrders").add(rec);
+    sheet.style.display = "none";
+    alert("✅ অর্ডার গেছে! দর্জি গ্রহণ করলেই রাইডার আপনার কাপড় নিতে আসবেন। অবস্থা দেখুন সেলাই ঘরের উপরে \"🧵 আমার সেলাই অর্ডার\"-এ।");
+    tlrMyOrdersStart();
+    try{ $("tlrMyOrders").scrollIntoView({ behavior:"smooth", block:"start" }); }catch(e){}
+  }catch(e){
+    btn.disabled = false; btn.textContent = "🧵 অর্ডার পাঠান";
+    err(e && e.code === "permission-denied"
+      ? "অর্ডার পাঠানোর অনুমতি পাওয়া যায়নি — ডিজাইনটা হয়তো বদলেছে। পাতা রিফ্রেশ করে আবার চেষ্টা করুন।"
+      : "পাঠানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।");
+  }
+}
+
+/* 🧵 আমার সেলাই অর্ডার — সেলাই ঘরের উপরে, শুধু লগইন থাকলে */
+let __tlrMyUnsub = null, __tlrMyUid = null;
+function tlrMyOrdersStart(){
+  const box = $("tlrMyOrders"); if(!box) return;
+  if(!currentCustomer){ if(__tlrMyUnsub){ __tlrMyUnsub(); __tlrMyUnsub = null; __tlrMyUid = null; } box.innerHTML = ""; return; }
+  if(__tlrMyUnsub && __tlrMyUid === currentCustomer.uid) return;
+  if(__tlrMyUnsub) __tlrMyUnsub();
+  __tlrMyUid = currentCustomer.uid;
+  __tlrMyUnsub = db.collection("tailorOrders").where("customerUid","==",currentCustomer.uid).onSnapshot((qs)=>{
+    const ms = (x)=> (x && x.toMillis ? x.toMillis() : Date.now());
+    const all = qs.docs.map(x=> ({ id:x.id, ...x.data() })).sort((a,b)=> ms(b.createdAt) - ms(a.createdAt));
+    const weekAgo = Date.now() - 7*24*3600*1000;
+    const list = all.filter(o=> !["delivered","declined","cancelled"].includes(o.status) || ms(o.createdAt) > weekAgo).slice(0, 10);
+    tlrMyOrdersRender(list);
+  }, ()=>{ box.innerHTML = ""; });
+}
+function tlrMyOrdersRender(list){
+  const box = $("tlrMyOrders"); if(!box) return;
+  if(!list.length){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="card" style="padding:12px; border:1px solid rgba(244,114,182,0.4);">
+    <div style="font-weight:800; font-size:14px; margin-bottom:4px;">🧵 আমার সেলাই অর্ডার</div>
+    ${list.map(o=>{
+      const s = TLR_STATUS[o.status] || ["•", o.status, "#fff"];
+      const idx = TLR_STEPS.indexOf(o.status);
+      const waiting = o.dispatch && o.dispatch.state === "waiting_for_rider" && (o.status === "accepted" || o.status === "ready");
+      const bar = idx >= 0 ? `<div style="display:flex; gap:3px; margin-top:7px;">${TLR_STEPS.map((_,i)=> `<div style="flex:1; height:4px; border-radius:2px; background:${i <= idx ? s[2] : "rgba(255,255,255,0.12)"};"></div>`).join("")}</div>` : "";
+      const rider = (o.status === "collecting" || o.status === "returning") && o.riderName
+        ? `<div style="font-size:12px; margin-top:5px;">🛵 ${escapeHtml(o.riderName)}${o.riderPhone ? ` · <a href="tel:${escapeHtml(o.riderPhone)}" style="color:var(--amber); text-decoration:none;">📞 কল</a>` : ""}</div>` : "";
+      return `<div style="padding:10px 0; border-top:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; gap:8px;">
+          <div style="font-weight:800; font-size:13.5px;">${escapeHtml(o.designTitle||"ডিজাইন")} × ${escapeHtml(String(o.qty||1))}</div>
+          ${o.orderCode ? `<span style="font-size:11px; color:var(--amber); font-weight:800;">🧾 ${escapeHtml(o.orderCode)}</span>` : ""}
+        </div>
+        <div style="font-size:11.5px; color:var(--muted);">🧵 ${escapeHtml(o.tailorName||"")}${o.measure ? " · 📏 " + escapeHtml(o.measure.label||"") : ""}${o.total != null ? " · মোট ৳" + escapeHtml(String(o.total)) : ""}</div>
+        <div style="font-size:12.5px; font-weight:800; color:${s[2]}; margin-top:4px;">${s[0]} ${s[1]}</div>
+        ${waiting ? `<div style="font-size:11.5px; color:#fbbf24;">এখন রাইডার ব্যস্ত — দর্জি আবার খুঁজবেন।</div>` : ""}
+        ${o.status === "declined" && o.tailorNote ? `<div style="font-size:11.5px; color:var(--muted);">দর্জি বলেছেন: ${escapeHtml(o.tailorNote)}</div>` : ""}
+        ${rider}${bar}
+        ${o.status === "placed" ? `<button type="button" data-tlr-cancel="${escapeHtml(o.id)}" style="margin-top:7px; border:1px solid rgba(248,113,113,0.5); background:transparent; color:#fca5a5; border-radius:9px; padding:6px 12px; font-family:inherit; font-size:12px; font-weight:800; cursor:pointer;">✕ বাতিল করুন</button>` : ""}
+      </div>`;
+    }).join("")}
+  </div>`;
+  box.querySelectorAll("[data-tlr-cancel]").forEach(b=> b.onclick = async ()=>{
+    if(!confirm("অর্ডারটা বাতিল করবেন?")) return;
+    try{ await db.collection("tailorOrders").doc(b.dataset.tlrCancel).update({ status:"cancelled", cancelledAt: firebase.firestore.FieldValue.serverTimestamp() }); }
+    catch(e){ alert("বাতিল করা যায়নি — দর্জি হয়তো এর মধ্যেই গ্রহণ করেছেন।"); }
+  });
+}
+
 $("tlrAddBtn") && $("tlrAddBtn").addEventListener("click", ()=> tlrOpenEditor(null));
 $("tlrCancelBtn") && $("tlrCancelBtn").addEventListener("click", ()=>{ $("tlrEditor").style.display = "none"; });
 $("tlrSaveBtn") && $("tlrSaveBtn").addEventListener("click", tlrSave);
@@ -11440,7 +11679,7 @@ function hbCloseCart(){
 (function hbHandleShortcut(){
   let which = null;
   try{ which = new URLSearchParams(location.search).get("screen"); }catch(e){ return; }
-  if(which !== "cart" && which !== "orders" && which !== "tmbookings") return;
+  if(which !== "cart" && which !== "orders" && which !== "tmbookings" && which !== "tailor") return;
 
   const go = function(){
     // ঠিকানাটা পরিষ্কার করে দেওয়া হচ্ছে, নাহলে পরে রিফ্রেশ করলে
@@ -11448,6 +11687,10 @@ function hbCloseCart(){
     try{ history.replaceState(null, "", location.pathname); }catch(e){}
     if(which === "cart" && typeof hbOpenCart === "function") hbOpenCart();
     else if(which === "orders" && typeof hbOpenOrderTracking === "function") hbOpenOrderTracking();
+    else if(which === "tailor"){
+      // 🧵 সেলাই অর্ডারের নোটিফিকেশন → সরাসরি সেলাই ঘর (উপরে "আমার সেলাই অর্ডার")
+      showScreen("screenTailor"); tlrAreaInit(); tlrRenderFeed(); tlrMyOrdersStart();
+    }
     else if(which === "tmbookings"){
       // 🎫 চালক বুকিং গ্রহণ/বাতিল করলে যাত্রীর নোটিফিকেশন → সরাসরি Transport Media-র "আমার বুকিং"
       const f = document.getElementById("hbTransportFrame");

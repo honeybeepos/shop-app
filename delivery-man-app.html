@@ -289,6 +289,7 @@
 
     <!-- পাতা: হোম -->
     <div id="pageHome">
+      <div id="tailorJobsArea"></div>
       <div id="jobsArea"></div>
 
       <div class="card">
@@ -353,13 +354,13 @@
 <!-- ══════════ নতুন অর্ডারের অফার ══════════ -->
 <div id="offerOverlay">
   <div class="ring">📦</div>
-  <div style="font-size:18px; font-weight:800; margin-bottom:2px;">ডেলিভারি করতে ইচ্ছুক?</div>
+  <div style="font-size:18px; font-weight:800; margin-bottom:2px;" id="offerHead">ডেলিভারি করতে ইচ্ছুক?</div>
   <div class="timerBig" id="offerTimer">৪০</div>
   <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">সেকেন্ডের মধ্যে সাড়া দিন — না চাইলে পরের জনের কাছে যাবে</div>
   <div class="offerBox">
     <div class="offerRow"><span class="k">🧾</span><span>ইনভয়েস নম্বর: <b id="offerCode" style="font-size:17px; letter-spacing:3px; color:var(--amber);">—</b></span></div>
-    <div class="offerRow"><span class="k" id="offerPickupIcon">🏪</span><span><b>দোকানের লোকেশন:</b> <span id="offerPickup">—</span> <small id="offerPickupAddr" style="color:var(--muted);"></small> <a id="offerPickupMap" target="_blank" rel="noopener" style="color:var(--amber); font-weight:800; display:none;">🗺️ ম্যাপ</a></span></div>
-    <div class="offerRow"><span class="k">👤</span><span><b>কাস্টমারের লোকেশন:</b> <span id="offerDrop">—</span> <a id="offerDropMap" target="_blank" rel="noopener" style="color:var(--amber); font-weight:800; display:none;">🗺️ ম্যাপ</a></span></div>
+    <div class="offerRow"><span class="k" id="offerPickupIcon">🏪</span><span><b id="offerFromLbl">দোকানের লোকেশন:</b> <span id="offerPickup">—</span> <small id="offerPickupAddr" style="color:var(--muted);"></small> <a id="offerPickupMap" target="_blank" rel="noopener" style="color:var(--amber); font-weight:800; display:none;">🗺️ ম্যাপ</a></span></div>
+    <div class="offerRow"><span class="k">👤</span><span><b id="offerToLbl">কাস্টমারের লোকেশন:</b> <span id="offerDrop">—</span> <a id="offerDropMap" target="_blank" rel="noopener" style="color:var(--amber); font-weight:800; display:none;">🗺️ ম্যাপ</a></span></div>
     <div class="offerRow"><span class="k">📏</span><span id="offerDist">—</span></div>
     <div class="offerRow"><span class="k">💰</span><span>ডেলিভারি চার্জ: <b id="offerIncome">—</b></span></div>
   </div>
@@ -569,6 +570,7 @@ $("logoutBtn").addEventListener("click", async ()=>{
   if(isOnline) await setDuty(false);
   if(offersUnsub) offersUnsub();
   if(jobsUnsub) jobsUnsub();
+  tlJobsStop();
   await auth.signOut();
   location.reload();
 });
@@ -593,6 +595,7 @@ function startApp(){
 
   listenForOffers();
   listenForJobs();
+  tlJobsStart(RIDER.uid, "tailorJobsArea"); // 🧵 সেলাই ঘরের কাপড় আনা/ফেরত
   loadTodayStats();
   refreshPushUi();
   riderPushSilentRefresh();
@@ -672,6 +675,11 @@ function showOffer(offerId, o){
 
   // আইকনটা লেখার সাথে জুড়লে পাশের স্থির আইকনটার সাথে দুইটা পাশাপাশি পড়ত
   $("offerPickupIcon").textContent = o.pickupIsRestaurant ? "🍽️" : "🏪";
+  { const L = tlOfferLabels(o); // 🧵 সেলাইয়ের অফার হলে লেখা বদলায়
+    $("offerHead").textContent = L ? L.head : "ডেলিভারি করতে ইচ্ছুক?";
+    $("offerFromLbl").textContent = L ? L.from : "দোকানের লোকেশন:";
+    $("offerToLbl").textContent = L ? L.to : "কাস্টমারের লোকেশন:";
+    if(L) $("offerPickupIcon").textContent = L.icon; }
   $("offerPickup").textContent = o.pickupName || (o.pickupIsRestaurant ? "রেস্টুরেন্ট" : "দোকান");
   $("offerCode").textContent = o.orderCode || "—";
   $("offerPickupAddr").textContent = o.pickupAddress || "";
@@ -709,6 +717,76 @@ async function respondToOffer(offerId, status){
 }
 $("offerAcceptBtn").addEventListener("click", ()=> currentOfferId && respondToOffer(currentOfferId, "accepted"));
 $("offerSkipBtn").addEventListener("click", ()=> currentOfferId && respondToOffer(currentOfferId, "skipped"));
+
+/* ════════ 🧵 সেলাই ঘরের কাজ (tailorOrders) — অক্টোবর ২০২৬ ════════
+   দুই রকম যাত্রা: (ক) গ্রাহকের কাপড় → দর্জি, (খ) তৈরি পোশাক → গ্রাহক।
+   অফার আসে বাকি ডেলিভারির মতোই (deliveryOffers, ৪০ সেকেন্ড); গ্রহণ করলে
+   এখানে কাজটা দেখায়। ফেরতের সময় রাইডার গ্রাহকের কাছ থেকে মোট টাকা নেন। */
+let __tlJobsUnsub = null;
+function tlEsc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function tlJobsStop(){ if(__tlJobsUnsub){ __tlJobsUnsub(); __tlJobsUnsub = null; } }
+function tlJobsStart(uid, hostId){
+  tlJobsStop();
+  if(!uid) return;
+  __tlJobsUnsub = db.collection("tailorOrders").where("riderId","==",uid).onSnapshot((qs)=>{
+    const jobs = qs.docs.map(d=> ({ id:d.id, ...d.data() })).filter(o=> o.status === "collecting" || o.status === "returning");
+    tlJobsRender(jobs, hostId);
+  }, (e)=> console.warn("tailor jobs:", e && e.code));
+}
+function tlJobsRender(jobs, hostId){
+  const host = document.getElementById(hostId); if(!host) return;
+  if(!jobs.length){ host.innerHTML = ""; return; }
+  const btnCss = "width:100%; margin-top:10px; padding:12px; border:none; border-radius:10px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit;";
+  const lnk = "display:inline-block; margin:6px 12px 0 0; color:#f9a8d4; font-weight:800; font-size:13px; text-decoration:none;";
+  host.innerHTML = jobs.map(o=>{
+    const ret = o.status === "returning";
+    const cust = { icon:"👤", name:o.customerName || "গ্রাহক", phone:o.customerPhone, addr:o.customerAddress, loc:o.customerLoc };
+    const tl = { icon:"🧵", name:o.tailorName || "সেলাই ঘর", phone:o.tailorPhone, addr:o.tailorAddress, loc:o.tailorLoc };
+    const go = o.pickedUp ? (ret ? cust : tl) : (ret ? tl : cust);
+    const stage = !o.pickedUp
+      ? (ret ? "ধাপ ১ — দর্জির কাছ থেকে তৈরি পোশাক নিন" : "ধাপ ১ — গ্রাহকের কাছ থেকে কাপড় নিন")
+      : (ret ? "ধাপ ২ — গ্রাহককে পোশাক দিন, টাকা নিন" : "ধাপ ২ — দর্জিকে কাপড় দিন");
+    const map = go.loc && go.loc.lat != null ? `<a style="${lnk}" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${go.loc.lat},${go.loc.lng}">🧭 পথ দেখাও</a>` : "";
+    const call = go.phone ? `<a style="${lnk}" href="tel:${tlEsc(go.phone)}">📞 কল করুন</a>` : "";
+    const money = ret ? `<div style="margin-top:8px; padding:8px 10px; border-radius:9px; background:rgba(74,222,128,0.14); color:#86efac; font-weight:800; font-size:14px;">💵 গ্রাহকের কাছ থেকে নিন: ৳ ${tlEsc(o.total != null ? o.total : "—")}</div>` : "";
+    const act = !o.pickedUp
+      ? `<button type="button" data-tl-pick="${tlEsc(o.id)}" style="${btnCss} background:#f472b6; color:#3b0a24;">🛵 ${ret ? "পোশাক" : "কাপড়"} নিয়েছি — রওনা দিচ্ছি</button>`
+      : `<button type="button" data-tl-done="${tlEsc(o.id)}" data-ret="${ret ? 1 : 0}" style="${btnCss} background:#2fbf71; color:#0a2416;">✅ ${ret ? "গ্রাহককে দিয়েছি, টাকা নিয়েছি" : "দর্জিকে কাপড় দিয়েছি"}</button>`;
+    return `<div style="background:#2a0f1e; border:1px solid rgba(244,114,182,0.5); border-radius:14px; padding:12px; margin-bottom:10px; color:#fff;">
+      <div style="display:flex; justify-content:space-between; gap:8px; align-items:center;">
+        <b style="color:#f9a8d4; font-size:13px;">🧵 সেলাই ঘর · ${tlEsc(stage)}</b>
+        ${o.orderCode ? `<span style="font-size:11.5px; font-weight:800; color:#fde68a;">🧾 ${tlEsc(o.orderCode)}</span>` : ""}
+      </div>
+      <div style="font-size:15px; font-weight:800; margin-top:6px;">${go.icon} ${tlEsc(go.name)}</div>
+      ${go.addr ? `<div style="font-size:12.5px; color:#d4d4d4; margin-top:2px;">📍 ${tlEsc(go.addr)}</div>` : ""}
+      <div style="font-size:12px; color:#a8a8a8; margin-top:2px;">${tlEsc(o.designTitle || "পোশাক")} × ${tlEsc(o.qty || 1)} · আপনার চার্জ ৳${tlEsc(o.legCharge != null ? o.legCharge : "—")}</div>
+      ${money}
+      <div>${map}${call}</div>
+      ${act}
+    </div>`;
+  }).join("");
+  host.querySelectorAll("[data-tl-pick]").forEach(b=> b.onclick = async ()=>{
+    b.disabled = true;
+    try{ await db.collection("tailorOrders").doc(b.dataset.tlPick).update({ pickedUp:true, pickedUpAt: firebase.firestore.FieldValue.serverTimestamp() }); }
+    catch(e){ b.disabled = false; alert("হয়নি — আবার চাপুন।"); }
+  });
+  host.querySelectorAll("[data-tl-done]").forEach(b=> b.onclick = async ()=>{
+    const ret = b.dataset.ret === "1";
+    if(!confirm(ret ? "পোশাক গ্রাহকের হাতে দিয়েছেন আর টাকা নিয়েছেন?" : "কাপড় দর্জির হাতে দিয়েছেন?")) return;
+    b.disabled = true;
+    const upd = ret ? { status:"delivered", deliveredAt: firebase.firestore.FieldValue.serverTimestamp() }
+                    : { status:"stitching", stitchingAt: firebase.firestore.FieldValue.serverTimestamp() };
+    try{ await db.collection("tailorOrders").doc(b.dataset.tlDone).update(upd); }
+    catch(e){ b.disabled = false; alert("হয়নি — আবার চাপুন।"); }
+  });
+}
+// অফারের পাতায় লেখা — সেলাইয়ের অফার হলে "দোকান/কাস্টমার" না লিখে কোথা থেকে কোথায় তা লেখা
+function tlOfferLabels(o){
+  const t = o && o.jobKind === "tailor";
+  return t
+    ? { head: "🧵 সেলাইয়ের কাপড় নিতে ইচ্ছুক?", from: o.leg === "return" ? "কোথা থেকে নেবেন (দর্জি):" : "কোথা থেকে নেবেন (গ্রাহক):", to: o.leg === "return" ? "কোথায় দেবেন (গ্রাহক):" : "কোথায় দেবেন (দর্জি):", icon: o.leg === "return" ? "🧵" : "👤" }
+    : null;
+}
 
 /* ════════ 🛵 আমার চলতি ডেলিভারি (orderRequests) ════════
    এই ঘরটাই বাজার, দোকানের POS আর রেস্টুরেন্টের POS — তিনটাই পড়ে।
