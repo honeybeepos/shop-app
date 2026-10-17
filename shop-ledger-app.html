@@ -202,7 +202,7 @@
   .mini-btn.wa-mini{color:white; background:var(--whatsapp); border-color:#20ba5a;}
 
   .empty{ text-align:center; padding:30px 10px; color:#a89d87; font-size:13.5px; }
-  .toast{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:20px; font-size:13px; opacity:0; transition:all 0.25s ease; pointer-events:none; z-index:50; }
+  .toast{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--ink); color:var(--paper); padding:10px 18px; border-radius:20px; font-size:13px; opacity:0; transition:all 0.25s ease; pointer-events:none; z-index:100000; } /* সব পাতা/মোডালের উপরে যেন দেখা যায় */
   .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
   .tabs{
@@ -12851,7 +12851,11 @@ function ekaOpenPkgModal(id){
   document.getElementById('ekaPkgModalOverlay').classList.add('show');
 }
 document.getElementById('ekaNewPkgBtn').addEventListener('click', ()=>{
-  if(!ekaPkgSourceProducts().length){ toast('আগে 📦 প্রোডাক্ট ট্যাবে পণ্য যোগ করুন'); return; }
+  if(!ekaPkgSourceProducts().length){
+    document.getElementById('ekaPkgList').innerHTML = `<div style="text-align:center; color:#fbbf24; background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.3); border-radius:12px; padding:18px 12px; font-size:13px; line-height:1.6;">⚠️ এই ফোনের POS-এ এখনো কোনো প্রোডাক্ট নেই, তাই প্যাকেজ বানানো যাচ্ছে না।<br>আগে <b>📦 প্রোডাক্ট</b> ট্যাবে পণ্য যোগ করুন, তারপর এখানে এসে প্যাকেজ বানান।</div>`;
+    toast('আগে 📦 প্রোডাক্ট ট্যাবে পণ্য যোগ করুন');
+    return;
+  }
   ekaOpenPkgModal(null);
 });
 document.getElementById('ekaPkgModalClose').addEventListener('click', ()=> document.getElementById('ekaPkgModalOverlay').classList.remove('show'));
