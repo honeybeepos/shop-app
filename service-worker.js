@@ -9,7 +9,10 @@
 /* গুরুত্বপূর্ণ: প্রতিবার কোড আপডেট করে সার্ভারে দেওয়ার সময় এই ভার্সন নাম্বারটা
    বাড়িয়ে দিন (v2 → v3 → v4 ...)। এটা বাড়ালে পুরনো ক্যাশ মুছে ফেলা হয় এবং
    ইউজার নতুন ভার্সন পায়। */
-const CACHE_VERSION = "shop-app-v181";
+// 🔔 পুশ নোটিফিকেশন — এই ফাইলটা একা বসলেও (পুরনো পাতা থেকে) অ্যাপ বন্ধ অবস্থায় পুশ আসবে
+importScripts("sw-push.js");
+
+const CACHE_VERSION = "shop-app-v182";
 
 const APP_SHELL = [
   "login.html",
@@ -19,6 +22,7 @@ const APP_SHELL = [
   "honey-bee-track.html",
   "firebase-init.js",
   "hb-currency.js",
+  "sw-push.js",
   "hb-qr.js",
   "zatca-qr.js",
   "zatca-ledger.js",
