@@ -47,6 +47,34 @@
   #loginGate{position:fixed;inset:0;background:var(--paper);display:flex;align-items:center;justify-content:center;z-index:99;}
   .members{margin-top:8px;font-size:12.5px;}
   .member-row{display:flex;justify-content:space-between;padding:5px 0;border-top:1px dashed var(--line);}
+
+  /* 🗂️ অক্টোবর ২০২৬ — সব কার্ড আর একটার নিচে একটা না রেখে আলাদা আলাদা অপশন (ট্যাব)।
+     উপরের ট্যাবে ক্লিক করলে শুধু সেই বিভাগটা দেখায়; "ওভারভিউ"-তে সবার হিসাব একসাথে। */
+  .tabs{position:sticky;top:52px;z-index:9;background:var(--paper);display:flex;gap:6px;overflow-x:auto;padding:10px 16px;border-bottom:1px solid var(--line);scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{flex:0 0 auto;padding:8px 13px;border-radius:20px;border:1px solid var(--line);background:var(--card);font-family:inherit;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;white-space:nowrap;}
+  .tab .n{display:inline-block;min-width:20px;margin-left:4px;padding:0 6px;border-radius:10px;background:#efe7d6;font-size:11px;font-family:'Space Mono',monospace;}
+  .tab.on{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .tab.on .n{background:rgba(255,255,255,0.2);color:#fff;}
+  .card[data-pane]{display:none;}
+  .card[data-pane].show{display:block;}
+
+  .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  @media (min-width:640px){ .tiles{grid-template-columns:repeat(4,1fr);} }
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;text-align:left;font-family:inherit;color:var(--ink);box-shadow:0 2px 0 var(--line);}
+  .tile:active{transform:translateY(1px);}
+  .tile-head{font-size:13px;font-weight:700;color:var(--teal);display:flex;justify-content:space-between;align-items:center;}
+  .tile-total{font-size:28px;font-weight:800;font-family:'Space Mono',monospace;margin:4px 0 2px;line-height:1.1;}
+  .tile-sub{font-size:11.5px;color:#8a7f6c;}
+  .tile-bar{height:5px;border-radius:3px;background:#efe7d6;overflow:hidden;margin-top:8px;}
+  .tile-bar i{display:block;height:100%;background:var(--paid);}
+
+  .strip{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;}
+  .strip .s{flex:1;min-width:76px;background:#f6f1e7;border:1px solid var(--line);border-radius:9px;padding:7px 9px;}
+  .strip .s small{display:block;font-size:10.5px;color:#8a7f6c;}
+  .strip .s b{font-size:17px;font-family:'Space Mono',monospace;}
+  .strip .s.ok b{color:var(--paid);} .strip .s.bad b{color:var(--due);} .strip .s.warn b{color:var(--copper);}
+  .sum-row{display:flex;justify-content:space-between;padding:7px 0;border-top:1px dashed var(--line);font-size:13px;}
 </style>
 <script src="bd-locations.js"></script>
 </head>
@@ -59,9 +87,35 @@
   <button id="logoutBtn">লগআউট</button>
 </header>
 
+<nav class="tabs" id="paneTabs">
+  <button class="tab" data-go="overview">📊 ওভারভিউ</button>
+  <button class="tab" data-go="riders">🛵 রাইডার <span class="n" data-n="riders">0</span></button>
+  <button class="tab" data-go="agents">🧑‍💼 এজেন্ট <span class="n" data-n="agents">0</span></button>
+  <button class="tab" data-go="shops">🏪 দোকান <span class="n" data-n="shops">0</span></button>
+  <button class="tab" data-go="restaurants">🍽️ রেস্টুরেন্ট <span class="n" data-n="restaurants">0</span></button>
+  <button class="tab" data-go="tailors">🧵 সেলাই ঘর <span class="n" data-n="tailors">0</span></button>
+  <button class="tab" data-go="drivers">🚑 ড্রাইভার <span class="n" data-n="drivers">0</span></button>
+  <button class="tab" data-go="customers">👥 কাস্টমার <span class="n" data-n="customers">0</span></button>
+  <button class="tab" data-go="markets">🏙️ বাজার</button>
+  <button class="tab" data-go="reports">🚩 রিপোর্ট</button>
+  <button class="tab" data-go="announce">📢 ঘোষণা</button>
+</nav>
+
 <div class="wrap">
 
-  <div class="card">
+  <!-- 📊 ওভারভিউ — প্রতিটা বিভাগে মোট কত জন, কত জন সক্রিয়। টাইলে ক্লিক করলে সেই বিভাগ খোলে। -->
+  <div class="card" data-pane="overview">
+    <h2>📊 এক নজরে সব হিসাব</h2>
+    <p style="font-size:11.5px; color:#8a7f6c; margin:0 0 10px;">সবুজ দাগ = মোটের মধ্যে কত জন সক্রিয় (ব্লক করা নয়)। যেকোনো ঘরে ক্লিক করলে সেই তালিকা খুলবে।</p>
+    <div class="tiles" id="overviewTiles"></div>
+  </div>
+
+  <div class="card" data-pane="overview">
+    <h2>🧮 মোট ইউজার</h2>
+    <div id="overviewSummary" style="font-size:13px;">লোড হচ্ছে...</div>
+  </div>
+
+  <div class="card" data-pane="announce">
     <h2>📢 সব দোকানে ঘোষণা / আপডেট পাঠান</h2>
     <textarea id="announceText" rows="3" placeholder="যেমন: নতুন ফিচার যোগ হয়েছে — অ্যাপ রিফ্রেশ করুন"></textarea>
     <div class="row">
@@ -70,7 +124,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" data-pane="markets">
     <h2>🏙️ বাজার ম্যানেজমেন্ট (<span id="marketCount">0</span>)</h2>
     <label style="display:block; font-size:12px; color:#8a7f6c; margin-bottom:4px;">জেলা</label>
     <select id="newMarketDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
@@ -87,7 +141,7 @@
     <div id="marketList" style="margin-top:12px;">লোড হচ্ছে...</div>
   </div>
 
-  <div class="card">
+  <div class="card" data-pane="markets">
     <h2>➕ উপজেলা/থানা তালিকায় যোগ করুন</h2>
     <p style="font-size:12px; color:#8a7f6c; margin:0 0 8px;">উপরের তালিকায় কোনো উপজেলা/থানা মিসিং থাকলে এখান থেকে যোগ করে নিন (শুধু এই ব্রাউজারেই সেভ থাকবে)।</p>
     <select id="addUpazilaDistrict"><option value="">-- জেলা নির্বাচন করুন --</option></select>
@@ -95,8 +149,9 @@
     <button class="btn secondary" id="addUpazilaBtn">➕ যোগ করুন</button>
   </div>
 
-  <div class="card">
+  <div class="card" data-pane="agents">
     <h2>🧑‍💼 এজেন্ট ম্যানেজমেন্ট (<span id="agentCount">0</span>)</h2>
+    <div class="strip" id="strip-agents"></div>
     <input type="text" id="newAgentName" placeholder="এজেন্টের নাম">
     <input type="email" id="newAgentEmail" placeholder="ইমেইল (লগইনের জন্য)">
     <input type="text" id="newAgentPass" placeholder="পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)">
@@ -107,39 +162,58 @@
     <div id="agentList" style="margin-top:12px;">লোড হচ্ছে...</div>
   </div>
 
-  <div class="card">
+  <div class="card" data-pane="shops">
     <h2>🏪 সব দোকান (<span id="shopCount">0</span>)</h2>
+    <div class="strip" id="strip-shops"></div>
     <div id="shopList">লোড হচ্ছে...</div>
   </div>
 
-  <div class="card">
+  <div class="card" data-pane="restaurants">
     <h2>🍽️ সব রেস্টুরেন্ট (<span id="restoCount">0</span>)</h2>
+    <div class="strip" id="strip-restaurants"></div>
     <p style="font-size:11.5px; color:#8a7f6c; margin:0 0 10px;">রেস্টুরেন্টগুলো নিজেরাই নিবন্ধন করে। “Bazar-এ দেখান/লুকান” দিয়ে ঠিক করবেন কারা গ্রাহকের অ্যাপে দেখা যাবে।</p>
     <input id="restoSearch" placeholder="🔎 নাম, মোবাইল বা এলাকা দিয়ে খুঁজুন" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #e3dccd; border-radius:10px; margin-bottom:10px;">
     <div id="restoList">লোড হচ্ছে...</div>
   </div>
 
-  <div class="card">
+  <div class="card" data-pane="riders">
     <h2>🛵 সব রাইডার (<span id="riderCount">0</span>)</h2>
+    <div class="strip" id="strip-riders"></div>
     <div id="allRidersList">লোড হচ্ছে...</div>
   </div>
 
-  <div class="card">
+  <!-- 🧵 সেলাই ঘর — দর্জিরা login.html থেকে নিজেরাই নিবন্ধন করেন (tailors কালেকশন)। -->
+  <div class="card" data-pane="tailors">
+    <h2>🧵 সব সেলাই ঘর (<span id="tailorCount">0</span>)</h2>
+    <div class="strip" id="strip-tailors"></div>
+    <input id="tailorSearch" placeholder="🔎 নাম, মোবাইল বা এলাকা দিয়ে খুঁজুন" style="margin-bottom:10px;">
+    <div id="tailorList">লোড হচ্ছে...</div>
+  </div>
+
+  <!-- 👥 Bazar কাস্টমার — শুধু সংখ্যা গোনা হয় (count), প্রত্যেকের তথ্য পড়া হয় না, তাই খরচ নামমাত্র। -->
+  <div class="card" data-pane="customers">
+    <h2>👥 Bazar কাস্টমার</h2>
+    <div class="strip" id="strip-customers"></div>
+    <p id="customerNote" style="font-size:11.5px; color:#8a7f6c; margin:0;">"সক্রিয়" মানে গত ৩০ দিনে অন্তত একবার লগইন করেছেন। "এখন অনলাইন" দেখতে ওভারভিউ-এর লাইভ অ্যানালিটিক্স দেখুন।</p>
+  </div>
+
+  <div class="card" data-pane="drivers">
     <h2>🚑 সব ট্রান্সপোর্ট ড্রাইভার (<span id="driverCount">0</span>) <span id="pendingDriverBadge" style="display:none; background:var(--due); color:#fff; font-size:11px; padding:2px 8px; border-radius:20px; margin-left:6px;"></span></h2>
     <p style="font-size:11.5px; color:#8a7f6c; margin:0 0 10px;">ড্রাইভাররা নিজেরাই নিবন্ধন করে — এখানে সবাইকে দেখা যাবে, ভেরিফাই করার কাজ সংশ্লিষ্ট বাজারের এজেন্ট করবেন (Honey Bee Agent অ্যাপ থেকে)।</p>
+    <div class="strip" id="strip-drivers"></div>
     <div id="allDriversList">লোড হচ্ছে...</div>
   </div>
 
   <!-- 🚩 Transport Media — যাত্রীদের রিপোর্ট করা পোস্ট। এজেন্টও নিজের
        বাজারের রিপোর্ট Honey Bee Agent অ্যাপ থেকে দেখেন/হ্যান্ডেল করেন —
        এটা সুপারঅ্যাডমিনের জন্য সব বাজারের catch-all/escalation ভিউ। -->
-  <div class="card">
+  <div class="card" data-pane="reports">
     <h2>🚩 Transport Media রিপোর্ট (<span id="tmReportCount">0</span>) <span id="pendingTmReportBadge" style="display:none; background:var(--due); color:#fff; font-size:11px; padding:2px 8px; border-radius:20px; margin-left:6px;"></span></h2>
     <p style="font-size:11.5px; color:#8a7f6c; margin:0 0 10px;">যাত্রীরা কোনো পোস্ট রিপোর্ট করলে এখানে দেখা যাবে (সব বাজার একসাথে) — সংশ্লিষ্ট বাজারের এজেন্টও নিজের অ্যাপ থেকে একই রিপোর্ট দেখতে/হ্যান্ডেল করতে পারেন।</p>
     <div id="tmReportList">লোড হচ্ছে...</div>
   </div>
 
-  <div class="card">
+  <div class="card" data-pane="overview">
     <h2>📊 Honey Bee Bazar — লাইভ অ্যানালিটিক্স</h2>
     <p style="font-size:13px; margin:0 0 10px;">এই মুহূর্তে অ্যাপে ব্রাউজ করছে: <b id="liveUserCount" style="color:var(--paid); font-size:16px;">0</b> জন</p>
     <div id="recentSessionsList" style="font-size:12px; color:#5a5142;">লোড হচ্ছে...</div>
@@ -194,6 +268,10 @@ auth.onAuthStateChanged(async (user)=>{
     return;
   }
   document.getElementById("loginGate").style.display = "none";
+  showPane((location.hash || "").replace("#","") || "overview");
+  renderOverview();
+  startTailorsListener();
+  loadCustomerStats();
   loadShops();
   loadAnnouncement();
   loadMarkets();
@@ -204,6 +282,162 @@ auth.onAuthStateChanged(async (user)=>{
   startTmReportsListener();
   startAnalyticsListener();
 });
+
+/* ==================== 🗂️ ট্যাব (আলাদা আলাদা অপশন) ==================== */
+const PANES = ["overview","riders","agents","shops","restaurants","tailors","drivers","customers","markets","reports","announce"];
+function showPane(name){
+  if(!PANES.includes(name)) name = "overview";
+  document.querySelectorAll(".card[data-pane]").forEach(c => c.classList.toggle("show", c.dataset.pane === name));
+  document.querySelectorAll("#paneTabs .tab").forEach(t => {
+    const on = t.dataset.go === name;
+    t.classList.toggle("on", on);
+    if(on) t.scrollIntoView({ block:"nearest", inline:"center" });
+  });
+  if(location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll("#paneTabs .tab").forEach(t => t.addEventListener("click", ()=> showPane(t.dataset.go)));
+window.addEventListener("hashchange", ()=> showPane(location.hash.replace("#","")));
+
+/* ==================== 📊 হিসাব (মোট / সক্রিয় / ব্লকড) ====================
+   প্রতিটা তালিকা আগেই সব ডকুমেন্ট পড়ে, তাই গোনার জন্য বাড়তি কোনো read লাগে না —
+   তালিকা লোড হলেই setStats() দিয়ে এখানে সংখ্যাগুলো জমা হয়। */
+const STAT_META = {
+  riders:      { icon:"🛵", label:"রাইডার" },
+  agents:      { icon:"🧑‍💼", label:"এজেন্ট" },
+  shops:       { icon:"🏪", label:"দোকান" },
+  restaurants: { icon:"🍽️", label:"রেস্টুরেন্ট" },
+  tailors:     { icon:"🧵", label:"সেলাই ঘর" },
+  drivers:     { icon:"🚑", label:"ট্রান্সপোর্ট ড্রাইভার" },
+  customers:   { icon:"👥", label:"Bazar কাস্টমার" }
+};
+const STATS = {};
+const bnNum = (n)=> (n == null ? "—" : String(n).replace(/\d/g, d => "০১২৩৪৫৬৭৮৯"[d]));
+
+// cells: [{label, value, tone}] — প্রথমটা সবসময় "মোট", দ্বিতীয়টা "সক্রিয়"
+function setStats(key, cells){
+  STATS[key] = cells;
+  const strip = document.getElementById("strip-" + key);
+  if(strip) strip.innerHTML = cells.map(c =>
+    `<div class="s ${c.tone || ''}"><small>${c.label}</small><b>${bnNum(c.value)}</b></div>`).join("");
+  const n = document.querySelector(`#paneTabs [data-n="${key}"]`);
+  if(n) n.textContent = bnNum(cells[0].value);
+  renderOverview();
+}
+function countBy(docs, fn){ let n = 0; docs.forEach(d => { if(fn(d)) n++; }); return n; }
+
+function renderOverview(){
+  const tiles = document.getElementById("overviewTiles");
+  if(!tiles) return;
+  tiles.innerHTML = Object.keys(STAT_META).map(key => {
+    const m = STAT_META[key], c = STATS[key];
+    const total = c ? c[0].value : null, active = c ? c[1].value : null;
+    const pct = (total && active != null) ? Math.round(active * 100 / total) : 0;
+    const rest = c ? c.slice(2).filter(x => x.value).map(x => `${x.label} ${bnNum(x.value)}`).join(" · ") : "";
+    return `<button class="tile" data-tile="${key}">
+      <div class="tile-head"><span>${m.icon} ${m.label}</span><span>›</span></div>
+      <div class="tile-total">${c ? bnNum(total) : "…"}</div>
+      <div class="tile-sub">${c ? `${c[1].label}: <b style="color:var(--paid)">${bnNum(active)}</b>` : "লোড হচ্ছে"}</div>
+      ${rest ? `<div class="tile-sub" style="margin-top:2px">${rest}</div>` : ""}
+      <div class="tile-bar"><i style="width:${pct}%"></i></div>
+    </button>`;
+  }).join("");
+  tiles.querySelectorAll("[data-tile]").forEach(t => t.addEventListener("click", ()=> showPane(t.dataset.tile)));
+
+  // 🧮 মোট ইউজার — সব বিভাগ যোগ করে
+  const keys = Object.keys(STAT_META).filter(k => STATS[k] && typeof STATS[k][0].value === "number");
+  const sumT = keys.reduce((a,k)=> a + STATS[k][0].value, 0);
+  const sumA = keys.reduce((a,k)=> a + (STATS[k][1].value || 0), 0);
+  document.getElementById("overviewSummary").innerHTML =
+    keys.map(k => `<div class="sum-row"><span>${STAT_META[k].icon} ${STAT_META[k].label}</span><span>${bnNum(STATS[k][0].value)} জন · সক্রিয় ${bnNum(STATS[k][1].value)}</span></div>`).join("") +
+    `<div class="sum-row" style="font-weight:800; border-top:2px solid var(--line);"><span>সর্বমোট</span><span>${bnNum(sumT)} জন · সক্রিয় ${bnNum(sumA)}</span></div>`;
+}
+
+/* ==================== 🧵 সব সেলাই ঘর (Super Admin ভিউ) ==================== */
+let __tailorsAll = [];
+function startTailorsListener(){
+  db.collection("tailors").onSnapshot((snap)=>{
+    __tailorsAll = snap.docs.map(d => Object.assign({ id:d.id }, d.data()));
+    __tailorsAll.sort((a,b)=> String(a.name||"").localeCompare(String(b.name||""), "bn"));
+    document.getElementById("tailorCount").textContent = snap.size;
+    const blocked = countBy(__tailorsAll, t => t.status === "blocked");
+    setStats("tailors", [
+      { label:"মোট", value: snap.size },
+      { label:"সক্রিয়", value: snap.size - blocked, tone:"ok" },
+      { label:"খোলা", value: countBy(__tailorsAll, t => t.status !== "blocked" && t.isOpen !== false) },
+      { label:"ভেরিফাই বাকি", value: countBy(__tailorsAll, t => !t.isVerified), tone:"warn" },
+      { label:"ব্লকড", value: blocked, tone:"bad" }
+    ]);
+    renderTailors();
+  }, (e)=>{
+    document.getElementById("tailorList").innerHTML = "<p>তালিকা আনা যায়নি।</p>";
+    console.warn("tailors:", e && e.code);
+  });
+}
+function renderTailors(){
+  const q = (document.getElementById("tailorSearch").value || "").trim().toLowerCase();
+  const list = document.getElementById("tailorList");
+  const rows = __tailorsAll.filter(t => !q
+    || String(t.name||"").toLowerCase().includes(q)
+    || String(t.ownerName||"").toLowerCase().includes(q)
+    || String(t.phone||"").includes(q)
+    || String(t.area||"").toLowerCase().includes(q));
+  if(!rows.length){ list.innerHTML = q ? "<p>এই নামে কিছু পাওয়া যায়নি।</p>" : "<p>এখনো কোনো সেলাই ঘর নিবন্ধিত হয়নি।</p>"; return; }
+  const e = escapeHtmlAdmin;
+  list.innerHTML = rows.map(t => {
+    const blocked = t.status === "blocked";
+    return `<div class="shop">
+      <div class="shop-top">
+        <span class="shop-name">${e(t.name || "(নামহীন সেলাই ঘর)")} ${t.isVerified ? "🛡️" : ""}</span>
+        <span class="chip ${blocked ? "blocked" : "active"}">${blocked ? "ব্লকড" : "সক্রিয়"}</span>
+      </div>
+      <div class="meta">👤 ${e(t.ownerName || "—")} · 📱 ${e(t.phone || "—")} · 📍 ${e(t.area || "—")}</div>
+      <div class="meta">${t.isOpen === false ? "🔴 বন্ধ" : "🟢 খোলা"} · ডিজাইন: ${bnNum(t.designCount || 0)}টা · ${t.isVerified ? "🛡️ ভেরিফাইড" : "⏳ ভেরিফাই বাকি"}</div>
+      <div class="row">
+        ${t.isVerified
+          ? `<button class="btn ghost" data-tl-act="unverify" data-id="${e(t.id)}">↩️ ভেরিফাই তুলে নিন</button>`
+          : `<button class="btn unblock" data-tl-act="verify" data-id="${e(t.id)}">🛡️ ভেরিফাই করুন</button>`}
+        ${blocked
+          ? `<button class="btn unblock" data-tl-act="unblock" data-id="${e(t.id)}">✅ আনব্লক</button>`
+          : `<button class="btn block" data-tl-act="block" data-id="${e(t.id)}">⛔ ব্লক</button>`}
+      </div>
+    </div>`;
+  }).join("");
+  const patches = { verify:{ isVerified:true }, unverify:{ isVerified:false }, block:{ status:"blocked" }, unblock:{ status:"active" } };
+  list.querySelectorAll("[data-tl-act]").forEach(b => b.addEventListener("click", async ()=>{
+    b.disabled = true;
+    try{ await db.collection("tailors").doc(b.dataset.id).set(Object.assign({ updatedAt: fbNow() }, patches[b.dataset.tlAct]), { merge:true }); }
+    catch(err){ alert("বদলানো যায়নি: " + (err.message || err)); b.disabled = false; }
+  }));
+}
+document.getElementById("tailorSearch").addEventListener("input", renderTailors);
+
+/* ==================== 👥 Bazar কাস্টমার — শুধু গোনা ====================
+   count() প্রতি ১০০০ জনে মাত্র ১টা read খরচ করে — হাজার কাস্টমার হলেও প্যানেল খুলতে খরচ নেই।
+   firestore.rules-এ customers ঘরে সুপার-এডমিনকে পড়ার অনুমতি লাগে (নতুন যোগ করা হয়েছে)। */
+async function loadCustomerStats(){
+  const col = db.collection("customers");
+  if(typeof col.count !== "function"){
+    setStats("customers", [{ label:"মোট", value:null }, { label:"সক্রিয় (৩০ দিন)", value:null, tone:"ok" }]);
+    return;
+  }
+  try{
+    const since = firebase.firestore.Timestamp.fromMillis(Date.now() - 30*24*60*60*1000);
+    const [all, act] = await Promise.all([
+      col.count().get(),
+      col.where("lastLoginAt", ">=", since).count().get()
+    ]);
+    setStats("customers", [
+      { label:"মোট", value: all.data().count },
+      { label:"সক্রিয় (৩০ দিন)", value: act.data().count, tone:"ok" }
+    ]);
+  }catch(e){
+    console.warn("customer count:", e && e.code);
+    setStats("customers", [{ label:"মোট", value:null }, { label:"সক্রিয় (৩০ দিন)", value:null, tone:"ok" }]);
+    document.getElementById("customerNote").textContent =
+      "⚠️ কাস্টমারের সংখ্যা আনা যায়নি — নতুন firestore.rules ডিপ্লয় করা হয়েছে কিনা দেখুন।";
+  }
+}
 
 document.getElementById("logoutBtn").addEventListener("click", async ()=>{
   clearSession();
@@ -357,6 +591,13 @@ document.getElementById("addMarketBtn").addEventListener("click", async ()=>{
 async function loadAgents(){
   const snap = await db.collection("agents").orderBy("createdAt","desc").get();
   document.getElementById("agentCount").textContent = snap.size;
+  { const ab = countBy(snap.docs, d => d.data().status === "blocked");
+    setStats("agents", [
+      { label:"মোট", value: snap.size },
+      { label:"সক্রিয়", value: snap.size - ab, tone:"ok" },
+      { label:"বাজার আছে", value: new Set(snap.docs.map(d => d.data().marketId).filter(Boolean)).size },
+      { label:"ব্লকড", value: ab, tone:"bad" }
+    ]); }
 
   const list = document.getElementById("agentList");
   if(snap.empty){ list.innerHTML = "<p>এখনো কোনো এজেন্ট নিয়োগ করা হয়নি।</p>"; return; }
@@ -484,6 +725,13 @@ document.getElementById("addAgentBtn").addEventListener("click", async ()=>{
 async function loadShops(){
   const snap = await db.collection("shops").orderBy("createdAt","desc").get();
   document.getElementById("shopCount").textContent = snap.size;
+  { const sb = countBy(snap.docs, d => d.data().status === "blocked");
+    setStats("shops", [
+      { label:"মোট", value: snap.size },
+      { label:"সক্রিয়", value: snap.size - sb, tone:"ok" },
+      { label:"বাজার সেট নেই", value: countBy(snap.docs, d => !d.data().marketId), tone:"warn" },
+      { label:"ব্লকড", value: sb, tone:"bad" }
+    ]); }
   const list = document.getElementById("shopList");
   if(snap.empty){ list.innerHTML = "<p>এখনো কোনো দোকান নিবন্ধিত হয়নি।</p>"; return; }
   list.innerHTML = "";
@@ -749,6 +997,14 @@ function startRestaurantsListener(){
     __restoAll = snap.docs.map(function(d){ return Object.assign({ id:d.id }, d.data()); });
     __restoAll.sort(function(a,b){ return String(a.name||"").localeCompare(String(b.name||""), "bn"); });
     document.getElementById("restoCount").textContent = snap.size;
+    { const rb = countBy(__restoAll, r => r.status === "blocked");
+      setStats("restaurants", [
+        { label:"মোট", value: snap.size },
+        { label:"সক্রিয়", value: snap.size - rb, tone:"ok" },
+        { label:"খোলা", value: countBy(__restoAll, r => r.status !== "blocked" && r.isOpen !== false) },
+        { label:"Bazar-এ লুকানো", value: countBy(__restoAll, r => r.isActive === false), tone:"warn" },
+        { label:"ব্লকড", value: rb, tone:"bad" }
+      ]); }
     renderRestaurants();
   }, function(e){
     document.getElementById("restoList").innerHTML =
@@ -763,6 +1019,13 @@ document.getElementById("restoSearch") &&
 async function loadAllRiders(){
   const snap = await db.collection("riders").orderBy("createdAt","desc").get();
   document.getElementById("riderCount").textContent = snap.size;
+  { const xb = countBy(snap.docs, d => d.data().status === "blocked");
+    setStats("riders", [
+      { label:"মোট", value: snap.size },
+      { label:"সক্রিয়", value: snap.size - xb, tone:"ok" },
+      { label:"এখন অনলাইন", value: countBy(snap.docs, d => d.data().online && d.data().status !== "blocked") },
+      { label:"ব্লকড", value: xb, tone:"bad" }
+    ]); }
   const list = document.getElementById("allRidersList");
   if(snap.empty){ list.innerHTML = "<p>এখনো কোনো রাইডার নিবন্ধিত হয়নি।</p>"; return; }
 
@@ -807,6 +1070,14 @@ const VEHICLE_LABELS_ADMIN = {
 function startDriversListener(){
   db.collection("transportDrivers").orderBy("createdAt","desc").onSnapshot((snap)=>{
     document.getElementById("driverCount").textContent = snap.size;
+    { const db_ = countBy(snap.docs, d => d.data().status === "blocked");
+      setStats("drivers", [
+        { label:"মোট", value: snap.size },
+        { label:"সক্রিয়", value: snap.size - db_, tone:"ok" },
+        { label:"এখন অনলাইন", value: countBy(snap.docs, d => ["online","busy"].includes(d.data().driverStatus)) },
+        { label:"ভেরিফাই বাকি", value: countBy(snap.docs, d => !d.data().isVerified), tone:"warn" },
+        { label:"ব্লকড", value: db_, tone:"bad" }
+      ]); }
     const pendingCount = snap.docs.filter(d => !d.data().isVerified).length;
     const badge = document.getElementById("pendingDriverBadge");
     if(pendingCount > 0){

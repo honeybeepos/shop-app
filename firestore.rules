@@ -777,6 +777,8 @@ service cloud.firestore {
 
     match /customers/{uid} {
       allow read, write: if isSignedIn() && request.auth.uid == uid;
+      // 👥 সুপার-এডমিন প্যানেলে মোট/সক্রিয় কাস্টমারের সংখ্যা গোনার জন্য (শুধু পড়া)
+      allow read: if isSuperAdmin();
 
       // ✈️ Smart Flight Tracking — Phase 2 (Saved Flights + Notification)।
       // শুধু মালিক নিজে পড়তে/লিখতে পারবেন — Cloud Function (Admin SDK)
