@@ -960,11 +960,14 @@ $("wkSave").addEventListener("click", async ()=>{
     designId: d ? d.id : null, designTitle: title.slice(0,60), category: d ? d.category||null : null,
     qty, price, total: qty * price, advance: adv, dueDate: $("wkDue").value || null,
     measure: wkReadMeasure(), note: $("wkNote").value.trim().slice(0,200),
-    status: old ? old.status : "stitching", createdAt: old ? old.createdAt : Date.now(), updatedAt: Date.now()
+    status: old ? old.status : "stitching", createdAt: old ? old.createdAt : Date.now(), updatedAt: Date.now(),
+    claimCode: old && old.claimCode ? old.claimCode : newClaimCode()
   };
+  if(old && old.paidAtDelivery) rec.paidAtDelivery = old.paidAtDelivery;
   const btn = $("wkSave"); btn.disabled = true;
   try{
     await wkRef(id).set(rec);
+    syncClaim(Object.assign({ id }, rec));
     closeSheet("wkModal"); oTab = "shop"; go("orders"); renderOrders();
     toast(old ? "✅ বদলানো হলো" : "✅ অর্ডার সেভ হলো — রসিদ প্রিন্ট/শেয়ার করুন");
     if(!old) setTimeout(()=> printWalkin(id, false), 400);
@@ -988,7 +991,7 @@ function walkinCardHTML(w){
             : `<div class="info">⏳ রাইডারের তথ্য আসছে…</div>`;
   }
   return `<div class="ord">
-    <div class="hd"><span class="chip">🏪 ${esc(w.code||"")}</span><span class="muted">${bn(new Date(w.createdAt).toLocaleString("bn-BD",{ day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }))}</span></div>
+    <div class="hd"><span class="chip">🏪 ${esc(w.claimCode ? claimFmt(w.claimCode) : (w.code||""))}${claimedSet.has(w.id) ? " · 📱" : ""}</span><span class="muted">${bn(new Date(w.createdAt).toLocaleString("bn-BD",{ day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }))}</span></div>
     <div class="st" style="color:${s[2]}">${s[0]} ${s[1]}${w.dueDate && w.status === "stitching" ? ` <span class="muted">· দেওয়ার দিন ${bn(new Date(w.dueDate).toLocaleDateString("bn-BD",{ day:"numeric", month:"short" }))}</span>` : ""}</div>
     <div class="dz2" style="margin-top:8px">
       ${dz && dz.img ? `<img src="${esc(dz.img)}" alt="">` : `<div style="width:56px;height:72px;border-radius:10px;background:var(--pink);display:flex;align-items:center;justify-content:center;font-size:26px">🧵</div>`}
@@ -1034,6 +1037,7 @@ function renderWalkins(box){
     try{
       await db.collection("tailorOrders").doc(w.riderOrderId).update({ status:"cancelled", cancelledAt: firebase.firestore.FieldValue.serverTimestamp() });
       await wkRef(w.id).update({ status:"ready", riderOrderId: null, updatedAt: Date.now() });
+      syncClaim(Object.assign({}, w, { status:"ready" }));
       toast("↩️ বাতিল — গ্রাহক নিজে নেবেন");
     }catch(e){ b.disabled = false; toast("হয়নি — হয়তো এর মধ্যে রাইডার পাওয়া গেছে"); }
   });
@@ -1043,18 +1047,26 @@ function renderWalkins(box){
   box.querySelectorAll("[data-wedit]").forEach(b=> b.onclick = ()=> openWalkin(b.dataset.wedit));
   box.querySelectorAll("[data-wdel]").forEach(b=> b.onclick = async ()=>{
     if(!confirm("এই অর্ডারটা মুছে ফেলবেন?")) return;
-    try{ await wkRef(b.dataset.wdel).delete(); toast("🗑️ মুছে ফেলা হয়েছে"); }catch(e){ toast("মোছা যায়নি — ইন্টারনেট দেখুন"); }
+    const w = walkins.find(x=> x.id === b.dataset.wdel);
+    try{
+      await wkRef(b.dataset.wdel).delete();
+      if(w && w.claimCode) db.collection("walkinClaims").doc(w.claimCode).delete().catch(()=>{});
+      toast("🗑️ মুছে ফেলা হয়েছে");
+    }catch(e){ toast("মোছা যায়নি — ইন্টারনেট দেখুন"); }
   });
 }
 async function wkSetStatus(id, upd, msg){
-  try{ await wkRef(id).update({ ...upd, updatedAt: Date.now() }); toast(msg); }
+  try{
+    await wkRef(id).update({ ...upd, updatedAt: Date.now() }); toast(msg);
+    const w = walkins.find(x=> x.id === id); if(w) syncClaim(Object.assign({}, w, upd));
+  }
   catch(e){ toast("হয়নি — ইন্টারনেট দেখে আবার চাপুন"); }
 }
 
 /* 🧾 রসিদ — প্রিন্ট আর লেখা হিসেবে শেয়ার (WhatsApp/মেসেজে পাঠানো যায়) */
 // withMeasure = false → গ্রাহকের রসিদ (মাপ ছাড়া); true → দোকানের কপি (মাপসহ, কাটিংয়ের সময় লাগে)
-function printWalkin(id, withMeasure){
-  const w = walkins.find(x=> x.id === id); if(!w) return;
+async function printWalkin(id, withMeasure){
+  const w = await ensureClaim(walkins.find(x=> x.id === id)); if(!w) return;
   const d = T.data, m = w.measure || {};
   let mrows = "";
   ["kameez","pajama"].forEach(part=>{
@@ -1066,7 +1078,7 @@ function printWalkin(id, withMeasure){
   $("printArea").innerHTML = `
     <div style="text-align:center"><b style="font-size:18px">🧵 ${esc(d.name||"সেলাই ঘর")}</b><br>${esc([d.address, d.area].filter(Boolean).join(", "))}<br>📱 ${esc(d.phone||"")}</div>
     <hr><div style="text-align:center"><b>${withMeasure ? "📏 দোকানের কপি — মাপসহ" : "রসিদ / ইনভয়েস"}</b></div>
-    <div>রসিদ নং: <b>${esc(w.code)}</b> · ${bn(new Date(w.createdAt).toLocaleString("bn-BD"))}</div>
+    <div>রসিদ নং: <b style="font-size:16px;letter-spacing:1px">${esc(w.claimCode ? claimFmt(w.claimCode) : w.code)}</b> · ${bn(new Date(w.createdAt).toLocaleString("bn-BD"))}</div>
     <div>গ্রাহক: <b>${esc(w.customerName)}</b>${w.customerPhone ? " · " + esc(w.customerPhone) : ""}</div>
     ${w.customerAddress ? `<div>ঠিকানা: ${esc(w.customerAddress)}</div>` : ""}
     ${w.dueDate ? `<div>দেওয়ার দিন: <b>${bn(new Date(w.dueDate).toLocaleDateString("bn-BD"))}</b></div>` : ""}
@@ -1078,13 +1090,14 @@ function printWalkin(id, withMeasure){
       <tr><td>অগ্রিম</td><td style="text-align:right">${tk(w.advance||0)}</td></tr>
       <tr><td><b>${w.status === "delivered" ? "পরিশোধিত" : "বাকি"}</b></td><td style="text-align:right"><b>${w.status === "delivered" ? "✅" : tk(due)}</b></td></tr>
     </table>
+    ${!withMeasure && w.claimCode ? `<div style="border:1.5px dashed #000;border-radius:8px;padding:6px;margin-top:8px;text-align:center">📱 মোবাইলে অর্ডার আর মাপ দেখতে:<br>Honey Bee Bazar → সেলাই ঘর → "দোকানের রসিদ যোগ করুন"<br>রসিদ নং <b style="font-size:16px;letter-spacing:1px">${esc(claimFmt(w.claimCode))}</b> দিন</div>` : ""}
     <div style="text-align:center;margin-top:8px">${withMeasure ? "দোকানে রাখার কপি" : "রসিদটা যত্নে রাখুন — পোশাক নেওয়ার সময় দেখাবেন।"}<br>Honey Bee Bazar · সেলাই ঘর</div>`;
   window.print();
 }
 async function shareWalkin(id){
-  const w = walkins.find(x=> x.id === id); if(!w) return;
+  const w = await ensureClaim(walkins.find(x=> x.id === id)); if(!w) return;
   const d = T.data, due = Math.max(0, (w.total||0) - (w.advance||0) - (w.paidAtDelivery||0));
-  const txt = `🧵 ${d.name||"সেলাই ঘর"}\nরসিদ: ${w.code}\nগ্রাহক: ${w.customerName}\nডিজাইন: ${w.designTitle} × ${bn(w.qty)}\nমজুরি: ${tk(w.total)} · অগ্রিম: ${tk(w.advance||0)}\n${w.status === "delivered" ? "✅ পরিশোধিত" : "বাকি: " + tk(due)}${w.dueDate ? `\nদেওয়ার দিন: ${bn(new Date(w.dueDate).toLocaleDateString("bn-BD"))}` : ""}\n📱 ${d.phone||""}`;
+  const txt = `🧵 ${d.name||"সেলাই ঘর"}\nরসিদ নং: ${w.claimCode ? claimFmt(w.claimCode) : w.code}\nগ্রাহক: ${w.customerName}\nডিজাইন: ${w.designTitle} × ${bn(w.qty)}\nমজুরি: ${tk(w.total)} · অগ্রিম: ${tk(w.advance||0)}\n${w.status === "delivered" ? "✅ পরিশোধিত" : "বাকি: " + tk(due)}${w.dueDate ? `\nদেওয়ার দিন: ${bn(new Date(w.dueDate).toLocaleDateString("bn-BD"))}` : ""}\n📱 ${d.phone||""}${w.claimCode ? `\n\nমোবাইলে অর্ডার আর মাপ দেখতে Honey Bee Bazar → সেলাই ঘর → "দোকানের রসিদ যোগ করুন" → ${claimFmt(w.claimCode)}` : ""}`;
   try{
     if(navigator.share){ await navigator.share({ text: txt }); return; }
   }catch(e){ if(e && e.name === "AbortError") return; }
@@ -1135,6 +1148,7 @@ $("sendGo").addEventListener("click", async ()=>{
       status:"ready", createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     await wkRef(w.id).update({ status:"sending", riderOrderId: ref.id, customerAddress: addr.slice(0,120), customerPhone: phone.slice(0,15), updatedAt: Date.now() });
+    syncClaim(Object.assign({}, w, { status:"sending" }));
     closeSheet("sendModal"); toast("🛵 রাইডার খোঁজা হচ্ছে — পেলেই জানাব");
   }catch(e){ toast(e && e.code === "permission-denied" ? "পাঠানো যায়নি — সার্ভারের নিয়ম আপডেট (Deploy) হয়নি" : "পাঠানো যায়নি — ইন্টারনেট দেখে আবার চাপুন"); }
   btn.disabled = false;
@@ -1145,9 +1159,58 @@ function syncWalkinsFromOrders(){
   orders.filter(o=> o.source === "walkin" && o.walkinId).forEach(o=>{
     const w = walkins.find(x=> x.id === o.walkinId);
     if(!w || w.status !== "sending" || w.riderOrderId !== o.id) return;
-    if(o.status === "delivered") wkRef(w.id).update({ status:"delivered", deliveredAt: Date.now(), paidAtDelivery: sendDue(w), deliveryBy:"rider", updatedAt: Date.now() }).catch(()=>{});
-    else if(o.status === "cancelled") wkRef(w.id).update({ status:"ready", riderOrderId: null, updatedAt: Date.now() }).catch(()=>{});
+    if(o.status === "delivered"){ wkRef(w.id).update({ status:"delivered", deliveredAt: Date.now(), paidAtDelivery: sendDue(w), deliveryBy:"rider", updatedAt: Date.now() }).catch(()=>{}); syncClaim(Object.assign({}, w, { status:"delivered", paidAtDelivery: sendDue(w) })); }
+    else if(o.status === "cancelled"){ wkRef(w.id).update({ status:"ready", riderOrderId: null, updatedAt: Date.now() }).catch(()=>{}); syncClaim(Object.assign({}, w, { status:"ready" })); }
   });
+}
+
+/* ── 🔑 অনলাইন রসিদ নম্বর — গ্রাহক Bazar-এ এই নম্বর দিলে দোকানের অর্ডারটা তাঁর প্রোফাইলে যায় ──
+   walkinClaims/{৮ অক্ষরের কোড}: অর্ডারের একটা কপি (মাপসহ, ফোন নম্বর ছাড়া)। কোড অনুমান করা যায় না
+   (৩১^৮ ≈ ৮৫০ বিলিয়ন রকম)। একবার কেউ যুক্ত করলে অন্য কেউ আর খুলতে পারে না। দর্জি অবস্থা
+   বদলালে কপিও বদলায় — গ্রাহক লাইভ দেখেন। */
+const CLAIM_ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function newClaimCode(){
+  const a = new Uint32Array(8); (window.crypto || window.msCrypto).getRandomValues(a);
+  return Array.from(a, n=> CLAIM_ABC[n % CLAIM_ABC.length]).join("");
+}
+const claimFmt = (c)=> c ? c.slice(0,4) + "-" + c.slice(4) : "";
+function claimSnapshot(w){
+  const d = T.data;
+  return {
+    tailorId: T.uid, tailorName: d.name || "সেলাই ঘর", tailorPhone: d.phone || null,
+    tailorArea: [d.address, d.area].filter(Boolean).join(", ") || null,
+    walkinId: w.id, customerName: w.customerName || "", designTitle: w.designTitle || "", qty: w.qty || 1,
+    price: w.price || 0, total: w.total || 0, advance: w.advance || 0, paidAtDelivery: w.paidAtDelivery || 0,
+    dueDate: w.dueDate || null, status: w.status || "stitching", measure: w.measure || {}, note: w.note || "",
+    createdAt: w.createdAt || Date.now(), updatedAt: Date.now()
+  };
+}
+// কপি তৈরি/হালনাগাদ — claimedBy কখনো দর্জি বদলান না
+async function syncClaim(w){
+  if(!w || !w.claimCode) return;
+  const ref = db.collection("walkinClaims").doc(w.claimCode);
+  try{ await ref.set(claimSnapshot(w), { merge:true }); }
+  catch(e){ try{ await ref.set(Object.assign(claimSnapshot(w), { claimedBy: null })); }catch(e2){} }
+}
+// পুরনো অর্ডারে (কোড ছাড়া) প্রথমবার রসিদ প্রিন্ট/শেয়ারের সময় কোড বসে
+async function ensureClaim(w){
+  if(!w) return w;
+  if(w.claimCode) return w;
+  const code = newClaimCode();
+  try{
+    await db.collection("walkinClaims").doc(code).set(Object.assign(claimSnapshot(w), { claimedBy: null }));
+    await wkRef(w.id).update({ claimCode: code });
+    w.claimCode = code;
+  }catch(e){}
+  return w;
+}
+// কোন অর্ডার গ্রাহক নিজের অ্যাপে যুক্ত করেছেন — কার্ডে "📱" দেখানোর জন্য
+let claimedSet = new Set();
+function listenClaims(){
+  db.collection("walkinClaims").where("tailorId","==",T.uid).onSnapshot(qs=>{
+    claimedSet = new Set(qs.docs.filter(d=> d.data().claimedBy).map(d=> d.data().walkinId));
+    if(oTab === "shop") renderOrders();
+  }, ()=>{});
 }
 
 /* ── 🔔 পুশ — অ্যাপ বন্ধ থাকলেও নতুন অর্ডারে ফোন বাজবে ──
@@ -1191,7 +1254,7 @@ auth.onAuthStateChanged(async (user)=>{
     const t = await db.collection("tailors").doc(user.uid).get();
     if(!t.exists || t.data().status === "blocked"){ alert("আপনার সেলাই ঘরের অ্যাকাউন্ট বন্ধ আছে — এজেন্টের সাথে যোগাযোগ করুন।"); await auth.signOut(); location.href = "login.html"; return; }
     T = { uid: user.uid, data: t.data() };
-    renderHeader(); fillProfile(); listenDesigns(); listenOrders(); listenViews(); listenLedger(); listenWalkins(); pushInit();
+    renderHeader(); fillProfile(); listenDesigns(); listenOrders(); listenViews(); listenLedger(); listenWalkins(); listenClaims(); pushInit();
     $("gate").remove();
   }catch(e){
     $("gate").innerHTML = `<div style="font-size:36px">📶</div>খোলা যায়নি — ইন্টারনেট দেখে <button class="btn small" onclick="location.reload()">আবার চেষ্টা</button>`;

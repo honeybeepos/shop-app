@@ -302,6 +302,33 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    /* 🔑 দোকানের রসিদ → গ্রাহকের প্রোফাইল (tailor-app.html → honey-bee-bazar.html)
+       নথির আইডি = রসিদের ৮ অক্ষরের গোপন কোড। দর্জি বানান ও হালনাগাদ করেন (claimedBy বদলাতে
+       পারেন না)। লগইন করা গ্রাহক কোড জানলে একবারই নিজের নামে যুক্ত করতে পারেন — তারপর
+       শুধু তিনি আর দর্জি দেখতে পান। */
+    match /walkinClaims/{code} {
+      allow get: if isSignedIn() && (resource.data.claimedBy == null
+                    || resource.data.claimedBy == request.auth.uid
+                    || resource.data.tailorId == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.claimedBy == request.auth.uid
+                    || resource.data.tailorId == request.auth.uid);
+      allow create: if isSignedIn()
+        && code.size() == 8
+        && request.resource.data.tailorId == request.auth.uid
+        && request.resource.data.claimedBy == null
+        && exists(/databases/$(database)/documents/tailors/$(request.auth.uid));
+      allow update: if isSignedIn() && (
+        (resource.data.tailorId == request.auth.uid
+          && request.resource.data.tailorId == request.auth.uid
+          && request.resource.data.get('claimedBy', null) == resource.data.get('claimedBy', null)) ||
+        (resource.data.claimedBy == null
+          && request.auth.token.firebase.sign_in_provider != 'anonymous'
+          && request.resource.data.claimedBy == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['claimedBy', 'claimedAt', 'claimerName']))
+      );
+      allow delete: if isSignedIn() && resource.data.tailorId == request.auth.uid;
+    }
+
     /* 👀 কে কোন ডিজাইন দেখলেন — নথির আইডি "designId_গ্রাহকের uid", তাই একজন গ্রাহকের
        একটা ডিজাইনে একটাই নথি (বারবার দেখলে count বাড়ে)। লেখেন শুধু লগইন করা গ্রাহক
        নিজের নামে; পড়েন শুধু সেই ডিজাইনের দর্জি। */

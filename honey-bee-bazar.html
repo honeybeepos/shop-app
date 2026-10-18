@@ -1336,6 +1336,8 @@
   <div id="screenTailor" style="padding:20px 16px;">
     <button class="backBtn" id="backToHomeFromTailor">← হোমে ফিরে যান</button>
     <div id="tlrMyOrders"></div>
+    <!-- 🔑 দোকানে গিয়ে অর্ডার দিয়েছেন? দর্জির রসিদের নম্বর দিলে অর্ডার আর মাপ এখানে চলে আসে -->
+    <div id="tlrClaimBox"></div>
     <div class="card" style="padding:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <div style="font-weight:800; font-size:13.5px;">📍 এলাকার দর্জি খুঁজুন</div>
@@ -4045,6 +4047,7 @@ async function tlrSubmitOrder(){
 let __tlrMyUnsub = null, __tlrMyUid = null;
 function tlrMyOrdersStart(){
   const box = $("tlrMyOrders"); if(!box) return;
+  tlrClaimStart();
   if(!currentCustomer){ if(__tlrMyUnsub){ __tlrMyUnsub(); __tlrMyUnsub = null; __tlrMyUid = null; } box.innerHTML = ""; return; }
   if(__tlrMyUnsub && __tlrMyUid === currentCustomer.uid) return;
   if(__tlrMyUnsub) __tlrMyUnsub();
@@ -4088,6 +4091,118 @@ function tlrMyOrdersRender(list){
     try{ await db.collection("tailorOrders").doc(b.dataset.tlrCancel).update({ status:"cancelled", cancelledAt: firebase.firestore.FieldValue.serverTimestamp() }); }
     catch(e){ alert("বাতিল করা যায়নি — দর্জি হয়তো এর মধ্যেই গ্রহণ করেছেন।"); }
   });
+}
+
+/* ==================== 🔑 দোকানের রসিদ → আমার প্রোফাইল ====================
+   দর্জি দোকানে হাতে অর্ডার নিলে রসিদে একটা ৮ অক্ষরের নম্বর থাকে (যেমন K7QM-2XPA)।
+   গ্রাহক নম্বরটা দিলে walkinClaims/{কোড}-এ নিজের নাম বসে যায় — তারপর অর্ডার, মাপ আর
+   অবস্থা এখানে লাইভ দেখা যায়, আর চাইলে মাপটা নিজের মাপের খাতায় সেভ করা যায়। */
+const TLR_WK_STATUS = {
+  stitching: ["✂️", "সেলাই চলছে", "#f472b6"],
+  ready:     ["🎉", "তৈরি — দোকান থেকে নিন", "#4ade80"],
+  sending:   ["🛵", "রাইডার নিয়ে আসছেন", "#60a5fa"],
+  delivered: ["✅", "পেয়ে গেছেন", "#4ade80"],
+  cancelled: ["✕", "বাতিল", "#94a3b8"],
+};
+let __tlrClaimUnsub = null, __tlrClaimUid = null, __tlrClaims = [];
+function tlrClaimStart(){
+  const box = $("tlrClaimBox"); if(!box) return;
+  if(!currentCustomer){
+    if(__tlrClaimUnsub){ __tlrClaimUnsub(); __tlrClaimUnsub = null; __tlrClaimUid = null; }
+    __tlrClaims = []; tlrClaimRender(); return;
+  }
+  if(__tlrClaimUnsub && __tlrClaimUid === currentCustomer.uid){ tlrClaimRender(); return; }
+  if(__tlrClaimUnsub) __tlrClaimUnsub();
+  __tlrClaimUid = currentCustomer.uid;
+  __tlrClaimUnsub = db.collection("walkinClaims").where("claimedBy","==",currentCustomer.uid).onSnapshot((qs)=>{
+    __tlrClaims = qs.docs.map(x=> ({ code:x.id, ...x.data() })).sort((a,b)=> (b.createdAt||0) - (a.createdAt||0));
+    tlrClaimRender();
+  }, ()=>{ tlrClaimRender(); });
+  tlrClaimRender();
+}
+const tlrClaimFmt = (c)=> c ? c.slice(0,4) + "-" + c.slice(4) : "";
+function tlrClaimMeasureHTML(m){
+  if(!m) return "";
+  let h = "";
+  ["kameez","pajama"].forEach(part=>{
+    const v = m[part]; if(!v) return;
+    const rows = TLR_FIELDS[part].filter(([k])=> v[k] !== "" && v[k] != null).map(([k,label])=> `<div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dashed var(--border);"><span>${label}</span><b>${escapeHtml(String(v[k]))}"</b></div>`).join("");
+    if(rows) h += `<div style="font-weight:800; margin-top:6px;">${part === "kameez" ? "👗 জামা" : "👖 পায়জামা"}</div>${rows}`;
+  });
+  return h ? `<details style="margin-top:6px; font-size:12px;"><summary style="cursor:pointer; color:var(--amber); font-weight:800;">📏 দোকানে নেওয়া মাপ দেখুন</summary>${h}</details>` : "";
+}
+function tlrClaimRender(){
+  const box = $("tlrClaimBox"); if(!box) return;
+  const inputRow = `<div style="display:flex; gap:6px; margin-top:8px;">
+      <input id="tlrClaimInput" maxlength="9" autocapitalize="characters" autocomplete="off" placeholder="যেমন: K7QM-2XPA" style="flex:1; min-width:0; padding:11px 10px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:15px; letter-spacing:1px; text-transform:uppercase;">
+      <button type="button" id="tlrClaimBtn" style="flex-shrink:0; border:0; border-radius:10px; padding:0 14px; background:#be185d; color:#fff; font-weight:800; font-family:inherit; cursor:pointer;">যোগ করুন</button>
+    </div>
+    <div id="tlrClaimMsg" style="font-size:12px; margin-top:6px; display:none;"></div>`;
+  const list = __tlrClaims.map(c=>{
+    const s = TLR_WK_STATUS[c.status] || ["•", c.status, "#fff"];
+    const due = Math.max(0, (c.total||0) - (c.advance||0) - (c.paidAtDelivery||0));
+    return `<div style="padding:10px 0; border-top:1px solid var(--border);">
+      <div style="display:flex; justify-content:space-between; gap:8px;">
+        <div style="font-weight:800; font-size:13.5px;">${escapeHtml(c.designTitle||"অর্ডার")} × ${escapeHtml(String(c.qty||1))}</div>
+        <span style="font-size:11px; color:var(--amber); font-weight:800;">🏪 ${escapeHtml(tlrClaimFmt(c.code))}</span>
+      </div>
+      <div style="font-size:11.5px; color:var(--muted);">🧵 ${escapeHtml(c.tailorName||"")}${c.tailorArea ? " · " + escapeHtml(c.tailorArea) : ""}</div>
+      <div style="font-size:12.5px; font-weight:800; color:${s[2]}; margin-top:4px;">${s[0]} ${s[1]}${c.dueDate && c.status === "stitching" ? ` <span style="color:var(--muted); font-weight:600;">· দেওয়ার দিন ${escapeHtml(new Date(c.dueDate).toLocaleDateString("bn-BD",{ day:"numeric", month:"short" }))}</span>` : ""}</div>
+      <div style="font-size:12px; margin-top:3px;">মজুরি ৳${escapeHtml(String(c.total||0))} · অগ্রিম ৳${escapeHtml(String(c.advance||0))} · ${c.status === "delivered" ? "✅ পরিশোধিত" : `<b style="color:var(--amber);">বাকি ৳${due}</b>`}</div>
+      ${c.note ? `<div style="font-size:11.5px; color:var(--muted);">📝 ${escapeHtml(c.note)}</div>` : ""}
+      ${tlrClaimMeasureHTML(c.measure)}
+      <div style="display:flex; gap:6px; margin-top:7px; flex-wrap:wrap;">
+        ${c.tailorPhone ? `<a href="tel:${escapeHtml(c.tailorPhone)}" style="border:1px solid var(--border); border-radius:9px; padding:6px 10px; color:var(--amber); font-size:12px; font-weight:800; text-decoration:none;">📞 দর্জিকে কল</a>` : ""}
+        ${c.measure && (c.measure.kameez || c.measure.pajama) ? `<button type="button" data-tlr-savem="${escapeHtml(c.code)}" style="border:1px solid var(--border); border-radius:9px; padding:6px 10px; background:transparent; color:#f9a8d4; font-size:12px; font-weight:800; font-family:inherit; cursor:pointer;">💾 মাপ খাতায় রাখুন</button>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+  box.innerHTML = `<div class="card" style="padding:12px; border:1px solid rgba(190,24,93,0.45);">
+    <div style="font-weight:800; font-size:14px;">🧾 দোকানের রসিদ যোগ করুন</div>
+    <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">দর্জির দোকানে গিয়ে অর্ডার দিয়েছেন? রসিদের নম্বর লিখুন — অর্ডার, মাপ আর অবস্থা এখানে দেখবেন।</div>
+    ${currentCustomer ? inputRow : `<div style="font-size:12px; color:#fbbf24; margin-top:8px;">🔒 আগে ☰ Menu থেকে Google দিয়ে লগইন করুন।</div>`}
+    ${list}
+  </div>`;
+  const btn = $("tlrClaimBtn"); if(btn) btn.onclick = tlrClaimSubmit;
+  const inp = $("tlrClaimInput"); if(inp) inp.addEventListener("keydown", (e)=>{ if(e.key === "Enter") tlrClaimSubmit(); });
+  box.querySelectorAll("[data-tlr-savem]").forEach(b=> b.onclick = ()=> tlrClaimSaveMeasure(b.dataset.tlrSavem));
+}
+async function tlrClaimSubmit(){
+  const inp = $("tlrClaimInput"), msg = $("tlrClaimMsg"), btn = $("tlrClaimBtn");
+  const show = (t, ok)=>{ msg.style.display = "block"; msg.style.color = ok ? "#4ade80" : "#fca5a5"; msg.textContent = t; };
+  const code = (inp.value||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  if(code.length !== 8){ show("রসিদের নম্বরে ৮টা অক্ষর থাকে (যেমন K7QM-2XPA) — আবার দেখে লিখুন।"); return; }
+  if(!currentCustomer || !auth.currentUser || auth.currentUser.isAnonymous){ show("আগে Google দিয়ে লগইন করুন।"); return; }
+  if(__tlrClaims.some(c=> c.code === code)){ show("✅ এই রসিদটা আগেই যোগ করা আছে।", true); return; }
+  btn.disabled = true; btn.textContent = "⏳";
+  const ref = db.collection("walkinClaims").doc(code);
+  try{
+    const snap = await ref.get();
+    if(!snap.exists) throw { code:"not-found" };
+    const c = snap.data();
+    if(!confirm(`এই অর্ডারটা কি আপনার?\n\n🧵 ${c.tailorName||""}\n👤 ${c.customerName||""}\n${c.designTitle||""} × ${c.qty||1}`)){ btn.disabled = false; btn.textContent = "যোগ করুন"; return; }
+    await ref.update({ claimedBy: auth.currentUser.uid, claimedAt: firebase.firestore.FieldValue.serverTimestamp(), claimerName: String(currentCustomer.name || "গ্রাহক").slice(0,60) });
+    inp.value = "";
+    show("✅ যোগ হয়েছে! নিচে অর্ডারটা দেখুন।", true);
+    if(c.measure && (c.measure.kameez || c.measure.pajama) && confirm("দোকানে নেওয়া মাপটা আপনার মাপের খাতায় সেভ করবেন? পরের অর্ডারে কাজে লাগবে।")) tlrClaimSaveMeasure(code, c);
+  }catch(e){
+    show("এই নম্বরে কোনো রসিদ পাওয়া যায়নি, অথবা অন্য কেউ আগেই যোগ করেছেন। নম্বরটা আবার দেখে লিখুন।");
+  }
+  btn.disabled = false; btn.textContent = "যোগ করুন";
+}
+async function tlrClaimSaveMeasure(code, cData){
+  const c = cData || __tlrClaims.find(x=> x.code === code);
+  if(!c || !c.measure || !currentCustomer) return;
+  const label = prompt("কার মাপ? (নাম দিন)", (c.customerName || "আমি").slice(0,40));
+  if(label === null) return;
+  const clean = (o)=>{ const r = {}; Object.keys(o||{}).forEach(k=>{ const v = Number(o[k]); if(v > 0 && v <= 80) r[k] = Math.round(v*4)/4; }); return r; };
+  const rec = { id: "m" + Date.now().toString(36), label: (label.trim() || "আমি").slice(0,40),
+    kameez: clean(c.measure.kameez), pajama: clean(c.measure.pajama), note: ("দোকানে নেওয়া মাপ — " + (c.tailorName||"")).slice(0,120) };
+  try{
+    await tlrSaveArr(tlrMeasures().concat([rec]));
+    if(typeof tlrRender === "function") tlrRender();
+    alert("✅ মাপ খাতায় সেভ হয়েছে — \"" + rec.label + "\" নামে।");
+  }catch(e){ alert("সেভ হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
 }
 
 $("tlrAddBtn") && $("tlrAddBtn").addEventListener("click", ()=> tlrOpenEditor(null));
