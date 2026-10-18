@@ -967,7 +967,7 @@ $("wkSave").addEventListener("click", async ()=>{
     await wkRef(id).set(rec);
     closeSheet("wkModal"); oTab = "shop"; go("orders"); renderOrders();
     toast(old ? "✅ বদলানো হলো" : "✅ অর্ডার সেভ হলো — রসিদ প্রিন্ট/শেয়ার করুন");
-    if(!old) setTimeout(()=> printWalkin(id), 400);
+    if(!old) setTimeout(()=> printWalkin(id, false), 400);
   }catch(e){ toast("সেভ হয়নি — ইন্টারনেট দেখে আবার চাপুন"); }
   btn.disabled = false;
 });
@@ -1005,9 +1005,12 @@ function walkinCardHTML(w){
     </div>
     ${acts}
     <div class="btnrow">
-      <button class="btn small ghost" type="button" data-wprint="${esc(w.id)}" style="flex:1">🖨️ রসিদ</button>
+      <button class="btn small ghost" type="button" data-wprint="${esc(w.id)}" style="flex:1">🖨️ গ্রাহকের রসিদ</button>
+      <button class="btn small ghost" type="button" data-wmprint="${esc(w.id)}" style="flex:1">📏 মাপের কপি</button>
       <button class="btn small ghost" type="button" data-wshare="${esc(w.id)}" style="flex:1">📤 শেয়ার</button>
-      ${(w.status === "stitching" || w.status === "ready") ? `<button class="btn small ghost" type="button" data-wedit="${esc(w.id)}" style="flex:1">✏️</button><button class="btn small no" type="button" data-wdel="${esc(w.id)}">🗑️</button>` : ""}
+    </div>
+    <div class="btnrow" style="margin-top:6px">
+      ${(w.status === "stitching" || w.status === "ready") ? `<button class="btn small ghost" type="button" data-wedit="${esc(w.id)}" style="flex:1">✏️ বদলান</button><button class="btn small no" type="button" data-wdel="${esc(w.id)}">🗑️</button>` : ""}
     </div>
   </div>`;
 }
@@ -1034,7 +1037,8 @@ function renderWalkins(box){
       toast("↩️ বাতিল — গ্রাহক নিজে নেবেন");
     }catch(e){ b.disabled = false; toast("হয়নি — হয়তো এর মধ্যে রাইডার পাওয়া গেছে"); }
   });
-  box.querySelectorAll("[data-wprint]").forEach(b=> b.onclick = ()=> printWalkin(b.dataset.wprint));
+  box.querySelectorAll("[data-wprint]").forEach(b=> b.onclick = ()=> printWalkin(b.dataset.wprint, false));
+  box.querySelectorAll("[data-wmprint]").forEach(b=> b.onclick = ()=> printWalkin(b.dataset.wmprint, true));
   box.querySelectorAll("[data-wshare]").forEach(b=> b.onclick = ()=> shareWalkin(b.dataset.wshare));
   box.querySelectorAll("[data-wedit]").forEach(b=> b.onclick = ()=> openWalkin(b.dataset.wedit));
   box.querySelectorAll("[data-wdel]").forEach(b=> b.onclick = async ()=>{
@@ -1048,7 +1052,8 @@ async function wkSetStatus(id, upd, msg){
 }
 
 /* 🧾 রসিদ — প্রিন্ট আর লেখা হিসেবে শেয়ার (WhatsApp/মেসেজে পাঠানো যায়) */
-function printWalkin(id){
+// withMeasure = false → গ্রাহকের রসিদ (মাপ ছাড়া); true → দোকানের কপি (মাপসহ, কাটিংয়ের সময় লাগে)
+function printWalkin(id, withMeasure){
   const w = walkins.find(x=> x.id === id); if(!w) return;
   const d = T.data, m = w.measure || {};
   let mrows = "";
@@ -1060,20 +1065,20 @@ function printWalkin(id){
   const due = Math.max(0, (w.total||0) - (w.advance||0) - (w.paidAtDelivery||0));
   $("printArea").innerHTML = `
     <div style="text-align:center"><b style="font-size:18px">🧵 ${esc(d.name||"সেলাই ঘর")}</b><br>${esc([d.address, d.area].filter(Boolean).join(", "))}<br>📱 ${esc(d.phone||"")}</div>
-    <hr><div style="text-align:center"><b>রসিদ / ইনভয়েস</b></div>
+    <hr><div style="text-align:center"><b>${withMeasure ? "📏 দোকানের কপি — মাপসহ" : "রসিদ / ইনভয়েস"}</b></div>
     <div>রসিদ নং: <b>${esc(w.code)}</b> · ${bn(new Date(w.createdAt).toLocaleString("bn-BD"))}</div>
     <div>গ্রাহক: <b>${esc(w.customerName)}</b>${w.customerPhone ? " · " + esc(w.customerPhone) : ""}</div>
     ${w.customerAddress ? `<div>ঠিকানা: ${esc(w.customerAddress)}</div>` : ""}
     ${w.dueDate ? `<div>দেওয়ার দিন: <b>${bn(new Date(w.dueDate).toLocaleDateString("bn-BD"))}</b></div>` : ""}
     <hr><div>ডিজাইন: <b>${esc(w.designTitle)}</b> × ${bn(w.qty)}</div>
     ${w.note ? `<div>নোট: ${esc(w.note)}</div>` : ""}
-    ${mrows ? `<div style="margin-top:6px"><b>মাপ</b> (ইঞ্চি)</div><table>${mrows}</table>` : ""}
+    ${withMeasure && mrows ? `<div style="margin-top:6px"><b>মাপ</b> (ইঞ্চি)</div><table>${mrows}</table>` : ""}
     <hr><table>
       <tr><td>মজুরি (${tk(w.price)} × ${bn(w.qty)})</td><td style="text-align:right">${tk(w.total)}</td></tr>
       <tr><td>অগ্রিম</td><td style="text-align:right">${tk(w.advance||0)}</td></tr>
       <tr><td><b>${w.status === "delivered" ? "পরিশোধিত" : "বাকি"}</b></td><td style="text-align:right"><b>${w.status === "delivered" ? "✅" : tk(due)}</b></td></tr>
     </table>
-    <div style="text-align:center;margin-top:8px">রসিদটা যত্নে রাখুন — পোশাক নেওয়ার সময় দেখাবেন।<br>Honey Bee Bazar · সেলাই ঘর</div>`;
+    <div style="text-align:center;margin-top:8px">${withMeasure ? "দোকানে রাখার কপি" : "রসিদটা যত্নে রাখুন — পোশাক নেওয়ার সময় দেখাবেন।"}<br>Honey Bee Bazar · সেলাই ঘর</div>`;
   window.print();
 }
 async function shareWalkin(id){
