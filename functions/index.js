@@ -3409,7 +3409,7 @@ async function dispatchTailorLeg(orderId, o, excludeRiderIds) {
     deliveryCharge: legCharge,
     pickupLat: from ? from.lat : null, pickupLng: from ? from.lng : null,
     dropLat: to ? to.lat : null, dropLng: to ? to.lng : null,
-    dropAddress: leg === "pickup" ? `🧵 ${o.tailorName || "সেলাই ঘর"}${o.tailorAddress ? " — " + o.tailorAddress : ""}` : `👤 ${o.customerName || "গ্রাহক"}${o.customerAddress ? " — " + o.customerAddress : ""}`,
+    dropAddress: leg === "pickup" ? `🧵 ${o.tailorName || "সেলাই ঘর"}${o.tailorAddress ? " — " + o.tailorAddress : ""}` : `👤 ${o.customerName || "গ্রাহক"}${o.customerAddress ? " — " + o.customerAddress : ""}${o.source === "walkin" && o.customerPhone ? " · 📞 " + o.customerPhone : ""}`,
     distanceKm: r.km != null ? Math.round(r.km * 10) / 10 : null,
     createdAt: FieldValue.serverTimestamp(),
     expiresAt: Timestamp.fromMillis(Date.now() + OFFER_TIMEOUT_SECONDS * 1000),
@@ -3472,6 +3472,30 @@ exports.onTailorOrderWritten = onDocumentWritten("tailorOrders/{id}", async (eve
     .catch(() => false);
   const toTailor = (t, b) => pushToTailor(after.tailorId, { type: "tailor-order", title: t, body: b, tag: "tailor-" + id });
   try {
+    // 🏪 দোকানে আসা গ্রাহকের অর্ডার — দর্জি নিজে বানান (status: ready), শুধু ফেরত যাত্রা লাগে।
+    //    রাইডার নেবেন: বাকি মজুরি (dueAmount) + ডেলিভারি চার্জ। চার্জ দর্জি ঠিক করেন, সার্ভার ৪০-৩০০-এর মধ্যে রাখে।
+    if (!before && after.source === "walkin") {
+      const ts = await db.collection("tailors").doc(after.tailorId).get();
+      const t = ts.exists ? ts.data() : {};
+      const tLoc = t.storeLocation && t.storeLocation.lat != null ? { lat: t.storeLocation.lat, lng: t.storeLocation.lng } : null;
+      const asked = Math.round(Number(after.walkinCharge || 0));
+      const legCharge = Math.min(TAILOR_LEG_MAX, Math.max(TAILOR_LEG_MIN, asked || TAILOR_LEG_MIN));
+      const due = Math.max(0, Math.round(Number(after.dueAmount || 0)));
+      const orderCode = "S" + String(Math.floor(1000 + Math.random() * 9000));
+      const fields = {
+        orderCode, tailorLoc: tLoc, tailorName: t.name || "সেলাই ঘর",
+        tailorPhone: t.phone || null, tailorAddress: [t.address, t.area].filter(Boolean).join(", ") || null,
+        distanceKm: null, legCharge, deliveryCharge: legCharge, stitchTotal: due, total: due + legCharge,
+      };
+      await ref.set(fields, { merge: true });
+      if (!tLoc) {
+        await ref.set({ dispatch: { leg: "return", state: "waiting_for_rider", offered: [], offerId: null } }, { merge: true });
+        return;
+      }
+      await dispatchTailorLeg(id, Object.assign({}, after, fields), []);
+      return;
+    }
+
     // 🆕 নতুন অর্ডার — দর্জির লোকেশন/ঠিকানা আর চার্জ সার্ভার নিজে বসায়
     if (!before) {
       const ts = await db.collection("tailors").doc(after.tailorId).get();
@@ -3501,6 +3525,7 @@ exports.onTailorOrderWritten = onDocumentWritten("tailorOrders/{id}", async (eve
       } else if (st === "declined") {
         await toCust("❌ দর্জি এই অর্ডারটা নিতে পারছেন না", `${code}${after.tailorName || ""}${after.tailorNote ? " — " + after.tailorNote : ""}. অন্য দর্জি দেখুন।`);
       } else if (st === "cancelled") {
+        if (after.source === "walkin") return; // দর্জি নিজেই রাইডারে পাঠানো বাতিল করেছেন
         await toTailor("✕ গ্রাহক অর্ডার বাতিল করেছেন", `${code}${after.customerName || "গ্রাহক"} — ${after.designTitle || ""}`);
       } else if (st === "collecting") {
         await toCust("🛵 রাইডার আসছেন কাপড় নিতে", `${code}${after.riderName || "রাইডার"}${after.riderPhone ? " (" + after.riderPhone + ")" : ""} — কাপড় গুছিয়ে রাখুন।`);
