@@ -94,6 +94,26 @@
     #printArea{display:block;position:absolute;left:0;top:0;width:100%;padding:10px;color:#000;font-size:13px}
     #printArea table{width:100%;border-collapse:collapse} #printArea td{border-bottom:1px solid #ccc;padding:4px}
   }
+  .stat.tap{cursor:pointer;position:relative;transition:transform .12s} .stat.tap:active{transform:scale(.97)}
+  .stat .go{position:absolute;top:8px;right:10px;color:var(--muted);font-size:14px}
+  .stat.money b{font-size:20px}
+  .stat.exp{background:linear-gradient(135deg,#fff7ed,#fff);border-color:#fed7aa} .stat.exp b{color:var(--gold)}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0}
+  .row3 div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 6px;text-align:center}
+  .row3 small{display:block;font-size:11px;color:var(--muted)} .row3 b{font-size:15px}
+  .li{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px dashed var(--line)}
+  .li:last-child{border-bottom:0}
+  .li .ic{width:36px;height:36px;border-radius:10px;background:var(--pink);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden}
+  .li .ic img{width:100%;height:100%;object-fit:cover}
+  .li .tx{flex:1;min-width:0} .li .tx b{display:block;font-size:13.5px} .li .tx small{color:var(--muted);font-size:11.5px}
+  .li .am{font-weight:800;white-space:nowrap}
+  .xbtn{border:0;background:#fee2e2;color:var(--red);border-radius:8px;padding:5px 8px;font-size:12px;cursor:pointer;font-family:inherit}
+  .mnav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+  .mnav button{border:1px solid var(--line);background:#fff;border-radius:10px;width:40px;height:36px;font-size:18px;cursor:pointer;color:var(--plum)}
+  .mnav button:disabled{opacity:.35}
+  .catchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .catchips button{border:1px solid var(--line);background:#fff;border-radius:16px;padding:6px 10px;font-family:inherit;font-size:12.5px;cursor:pointer;color:var(--ink)}
+  .catchips button.on{background:var(--rose);color:#fff;border-color:var(--rose)}
   #gate{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--plum);font-weight:800}
 </style>
 </head>
@@ -115,14 +135,21 @@
     <div id="pushBanner"></div>
     <div id="newOrdBanner"></div>
     <div class="stats">
-      <div class="stat"><b id="stDesigns">০</b><span>✂️ আমার ডিজাইন</span></div>
-      <div class="stat"><b id="stPublished">০</b><span>👀 গ্রাহক দেখছেন</span></div>
+      <div class="stat tap" id="cardDesigns"><i class="go">›</i><b id="stDesigns">০</b><span>✂️ আমার ডিজাইন</span></div>
+      <div class="stat tap" id="cardViews"><i class="go">›</i><b id="stPublished">০</b><span>👀 গ্রাহক দেখছেন</span></div>
+    </div>
+    <!-- 📊 এই মাসের হিসাব + 💸 খরচ — মাস শেষ হলে নতুন মাস শূন্য থেকে শুরু, আগের মাস ইতিহাসে থাকে -->
+    <div class="stats">
+      <div class="stat tap money" id="cardPL"><i class="go">›</i><b id="stProfit">৳ ০</b><span id="stProfitLbl">📊 এই মাসের লাভ</span></div>
+      <div class="stat tap money exp" id="cardExp"><i class="go">＋</i><b id="stExpense">৳ ০</b><span>💸 খরচ লিখুন</span></div>
     </div>
     <button class="btn" type="button" id="homeAddBtn" style="font-size:16.5px;padding:16px">➕ নতুন ডিজাইন দিন</button>
+    <button class="btn ghost" type="button" id="homeShopBtn" style="font-size:15.5px;padding:14px;margin-top:10px">🏪 দোকানে আসা গ্রাহকের অর্ডার নিন</button>
     <div class="card" style="margin-top:12px">
       <h2>🧵 কীভাবে কাজ করবে</h2>
       <div class="muted" style="font-size:13.5px;line-height:1.75">
         ১. ডিজাইনের ছবি আর সেলাইয়ের মজুরি দিন — Honey Bee Bazar-এর "সেলাই ঘর"-এ আপনার এলাকার গ্রাহক দেখবেন।<br>
+        🏪 দোকানে কেউ সরাসরি এলে "দোকানে আসা গ্রাহকের অর্ডার নিন" চাপুন — মাপ, অগ্রিম লিখে রসিদ দিন।<br>
         ২. গ্রাহক নিজের মাপ দিয়ে অর্ডার দিলে ফোন বেজে উঠবে — "📦 অর্ডার"-এ মাপসহ রসিদ দেখবেন, গ্রহণ করুন।<br>
         ৩. রাইডার গ্রাহকের কাপড় এনে দেবেন। সেলাই শেষে "✅ সেলাই শেষ — ফেরত পাঠান" চাপুন, রাইডার নিয়ে যাবেন।<br>
         <b style="color:var(--plum)">বিল (মজুরি + ডেলিভারি) অ্যাপ নিজেই হিসাব করে।</b>
@@ -145,6 +172,7 @@
       <button type="button" data-ot="new" class="active">🆕 নতুন <b id="otNew"></b></button>
       <button type="button" data-ot="run">🧵 চলছে <b id="otRun"></b></button>
       <button type="button" data-ot="done">✅ শেষ</button>
+      <button type="button" data-ot="shop">🏪 দোকানে <b id="otShop"></b></button>
     </div>
     <div id="orderList"></div>
   </section>
@@ -206,6 +234,86 @@
     <button class="btn" type="button" id="dzSave" style="margin-top:12px">💾 ডিজাইন সেভ করুন</button>
   </div>
 </div>
+
+<!-- 🏪 দোকানে আসা গ্রাহকের অর্ডার (অফলাইন) -->
+<div class="modal" id="wkModal"><div class="sheet">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:17px" id="wkTitle">🏪 দোকানে অর্ডার নিন</b><button type="button" class="btn small ghost" data-close="wkModal">✕</button></div>
+  <div class="muted">গ্রাহক নিজে দোকানে এসে কাপড় দিলে এখানে লিখুন — রসিদ প্রিন্ট বা শেয়ার করা যাবে, আর আয় লাভের হিসাবে যোগ হবে।</div>
+  <label>গ্রাহকের নাম</label><input id="wkName" maxlength="60" placeholder="যেমন: রুমা আক্তার">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div><label>মোবাইল</label><input id="wkPhone" type="tel" inputmode="tel" maxlength="15" placeholder="01XXXXXXXXX"></div>
+    <div><label>কবে দেবেন</label><input id="wkDue" type="date"></div>
+  </div>
+  <label>ঠিকানা (ঐচ্ছিক — পরে রাইডারে পাঠাতে লাগবে)</label><input id="wkAddr" maxlength="120" placeholder="গ্রাম/মহল্লা, বাড়ি">
+  <label>ডিজাইন</label>
+  <select id="wkDesign"></select>
+  <input id="wkDesignTxt" maxlength="60" placeholder="ডিজাইনের নাম লিখুন" style="margin-top:6px;display:none">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+    <div><label>কয়টা</label><input id="wkQty" type="number" inputmode="numeric" min="1" max="50" value="1"></div>
+    <div><label>মজুরি/পিস</label><input id="wkPrice" type="number" inputmode="numeric" min="0" placeholder="৳"></div>
+    <div><label>অগ্রিম পেলেন</label><input id="wkAdv" type="number" inputmode="numeric" min="0" placeholder="৳ ০"></div>
+  </div>
+  <div id="wkSum" class="bill" style="margin-top:10px"></div>
+  <label>মাপ (ইঞ্চি) — যেটা লাগে শুধু সেটা লিখুন</label>
+  <div class="catchips" id="wkParts">
+    <button type="button" data-part="kameez" class="on">👗 জামা</button>
+    <button type="button" data-part="pajama">👖 পায়জামা</button>
+  </div>
+  <div id="wkMeasure"></div>
+  <label>নোট (ঐচ্ছিক)</label><textarea id="wkNote" maxlength="200" placeholder="যেমন: লাইনিং সহ, হাতায় লেস"></textarea>
+  <button class="btn" type="button" id="wkSave" style="margin-top:12px">💾 অর্ডার সেভ করে রসিদ বানান</button>
+</div></div>
+
+<!-- 🛵 দোকানের অর্ডার রাইডার দিয়ে পাঠান -->
+<div class="modal" id="sendModal"><div class="sheet">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:17px">🛵 রাইডার দিয়ে পাঠান</b><button type="button" class="btn small ghost" data-close="sendModal">✕</button></div>
+  <div class="muted" id="sendWho">—</div>
+  <label>গ্রাহকের ঠিকানা (রাইডার এটা দেখে যাবেন)</label><input id="sendAddr" maxlength="120" placeholder="গ্রাম/মহল্লা, বাড়ি, কাছের চিহ্ন">
+  <label>গ্রাহকের মোবাইল (রাইডার ফোন করবেন)</label><input id="sendPhone" type="tel" inputmode="tel" maxlength="15" placeholder="01XXXXXXXXX">
+  <label>ডেলিভারি চার্জ (৳ ৪০ থেকে ৩০০)</label>
+  <div class="catchips" id="sendChips"></div>
+  <input id="sendCharge" type="number" inputmode="numeric" min="40" max="300" value="40" style="margin-top:6px">
+  <div class="bill" id="sendSum" style="margin-top:10px"></div>
+  <div class="info">🛵 কাছের রাইডারদের একে একে ডাকা হবে। রাইডার গ্রাহকের কাছ থেকে নগদ নেবেন — বাকি মজুরি আপনার, চার্জ রাইডারের।</div>
+  <button class="btn" type="button" id="sendGo" style="margin-top:12px">🛵 রাইডার খুঁজুন</button>
+</div></div>
+
+<!-- 👀 কে কোন ডিজাইন দেখলেন -->
+<div class="modal" id="viewModal"><div class="sheet">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:17px">👀 গ্রাহক কী দেখছেন</b><button type="button" class="btn small ghost" data-close="viewModal">✕</button></div>
+  <div class="muted" style="margin-bottom:8px">Bazar-এ লগইন করা গ্রাহক আপনার ডিজাইনের ছবি বড় করলে বা অর্ডার খুললে এখানে নাম আসে।</div>
+  <div id="viewBody"></div>
+</div></div>
+
+<!-- 💸 খরচ লিখুন -->
+<div class="modal" id="expModal"><div class="sheet">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:17px">💸 খরচ লিখুন</b><button type="button" class="btn small ghost" data-close="expModal">✕</button></div>
+  <label>কিসের খরচ</label>
+  <div class="catchips" id="expCats"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div><label>টাকা (৳)</label><input id="expAmt" type="number" inputmode="numeric" min="1" placeholder="যেমন: 500"></div>
+    <div><label>তারিখ</label><input id="expDate" type="date"></div>
+  </div>
+  <label>নোট (ঐচ্ছিক)</label><input id="expNote" maxlength="80" placeholder="যেমন: ২ রিল সুতা, ১০টা বোতাম">
+  <button class="btn" type="button" id="expSave" style="margin-top:12px">💾 খরচ সেভ করুন</button>
+  <div class="card" style="margin-top:14px"><h2 id="expListTitle">এই মাসের খরচ</h2><div id="expList"></div></div>
+</div></div>
+
+<!-- 📊 লাভ-ক্ষতি ও ইতিহাস -->
+<div class="modal" id="plModal"><div class="sheet">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b style="font-size:17px">📊 লাভ-ক্ষতির হিসাব</b><button type="button" class="btn small ghost" data-close="plModal">✕</button></div>
+  <div class="mnav"><button type="button" id="plPrev">‹</button><b id="plMonthTxt" style="font-size:15px;color:var(--plum)">—</b><button type="button" id="plNext">›</button></div>
+  <div id="plBody"></div>
+  <div class="card" style="margin-top:12px">
+    <h2>📅 তারিখ দিয়ে পুরনো হিসাব</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label>শুরু</label><input type="date" id="plFrom"></div>
+      <div><label>শেষ</label><input type="date" id="plTo"></div>
+    </div>
+    <button class="btn ghost" type="button" id="plRangeBtn" style="margin-top:10px">🔎 হিসাব দেখুন</button>
+    <div id="plRangeBody" style="margin-top:10px"></div>
+  </div>
+</div></div>
 
 <div class="toast" id="toast"></div>
 <div id="printArea"></div>
@@ -276,7 +384,6 @@ $("openSw").addEventListener("click", async ()=>{
 /* ── ✂️ ডিজাইন ── */
 function renderDesigns(){
   $("stDesigns").textContent = bn(designs.length);
-  $("stPublished").textContent = bn(designs.filter(d=> d.published).length);
   const g = $("designGrid");
   if(!designs.length){ g.className = ""; g.innerHTML = `<div class="card empty"><div style="font-size:36px">✂️</div>এখনো কোনো ডিজাইন নেই।<br>"➕ নতুন" চেপে প্রথম ডিজাইনের ছবি দিন।</div>`; return; }
   g.className = "grid";
@@ -411,7 +518,7 @@ const OST = {
 };
 const OTAB = { new:["placed"], run:["accepted","collecting","stitching","ready","returning"], done:["delivered","declined","cancelled"] };
 let orders = [], oTab = "new", firstOrders = true;
-const ms = (x)=> (x && x.toMillis ? x.toMillis() : Date.now());
+const ms = (x)=> (typeof x === "number" ? x : (x && x.toMillis ? x.toMillis() : Date.now()));
 const tk = (n)=> "৳ " + bn(Math.round(Number(n)||0));
 function when(x){ try{ return bn(new Date(ms(x)).toLocaleString("bn-BD",{ day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })); }catch(e){ return ""; } }
 
@@ -431,6 +538,8 @@ function listenOrders(){
     firstOrders = false;
     orders = qs.docs.map(x=> ({ id:x.id, ...x.data() })).sort((a,b)=> ms(b.createdAt) - ms(a.createdAt));
     renderOrders();
+    syncWalkinsFromOrders();
+    if(typeof ledgerRenderHome === "function") ledgerRenderHome(); // শেষ হওয়া অর্ডার আয়ে যোগ হয়
   }, ()=> { $("orderList").innerHTML = `<div class="card empty">অর্ডার আনা যায়নি — ইন্টারনেট দেখুন।</div>`; });
 }
 
@@ -494,13 +603,17 @@ function orderCardHTML(o){
   </div>`;
 }
 function renderOrders(){
-  const cnt = (k)=> orders.filter(o=> OTAB[k].includes(o.status)).length;
+  const online = orders.filter(o=> o.source !== "walkin"); // দোকানের অর্ডারের রাইডার-যাত্রা "🏪 দোকানে" ট্যাবেই দেখায়
+  const cnt = (k)=> online.filter(o=> OTAB[k].includes(o.status)).length;
   const nNew = cnt("new"), nRun = cnt("run");
   $("otNew").textContent = nNew ? bn(nNew) : ""; $("otRun").textContent = nRun ? bn(nRun) : "";
   $("navBadge").textContent = nNew ? bn(nNew) : "";
   $("newOrdBanner").innerHTML = nNew ? `<div class="banner warn" style="cursor:pointer" onclick="go('orders')"><span style="font-size:22px">🧵</span><div style="flex:1"><b>${bn(nNew)}টা নতুন অর্ডার অপেক্ষা করছে</b><br>চাপ দিয়ে দেখুন আর গ্রহণ করুন।</div></div>` : "";
   document.querySelectorAll(".otabs button").forEach(b=> b.classList.toggle("active", b.dataset.ot === oTab));
-  const list = orders.filter(o=> OTAB[oTab].includes(o.status)).slice(0, oTab === "done" ? 40 : 100);
+  const nShop = (typeof walkins !== "undefined") ? walkins.filter(w=> ["stitching","ready","sending"].includes(w.status)).length : 0;
+  $("otShop").textContent = nShop ? bn(nShop) : "";
+  if(oTab === "shop"){ renderWalkins($("orderList")); return; }
+  const list = online.filter(o=> OTAB[oTab].includes(o.status)).slice(0, oTab === "done" ? 40 : 100);
   const box = $("orderList");
   if(!list.length){
     box.innerHTML = `<div class="card empty"><div style="font-size:34px">${oTab === "new" ? "📭" : oTab === "run" ? "🧵" : "📂"}</div>${oTab === "new" ? "এখন কোনো নতুন অর্ডার নেই।<br>গ্রাহক অর্ডার দিলেই ফোন বেজে উঠবে।" : oTab === "run" ? "এখন কোনো কাজ চলছে না।" : "এখনো কিছু শেষ হয়নি।"}</div>`;
@@ -556,6 +669,482 @@ function printOrder(id){
   window.print();
 }
 
+/* ── 🪟 শিট খোলা/বন্ধ ── */
+function openSheet(id){ $(id).style.display = "flex"; }
+function closeSheet(id){ $(id).style.display = "none"; }
+document.querySelectorAll("[data-close]").forEach(b=> b.addEventListener("click", ()=> closeSheet(b.dataset.close)));
+["viewModal","expModal","plModal","wkModal","sendModal"].forEach(id=> $(id).addEventListener("click", (e)=>{ if(e.target.id === id) closeSheet(id); }));
+
+/* ── ✂️ "আমার ডিজাইন" কার্ড → ডিজাইনের পাতা (সেখানে বদলানো/মোছা যায়) ── */
+$("cardDesigns").addEventListener("click", ()=> go("designs"));
+
+/* ── 👀 কে কোন ডিজাইন দেখলেন (tailorDesignViews) ── */
+let views = [];
+function listenViews(){
+  db.collection("tailorDesignViews").where("tailorId","==",T.uid).limit(500).onSnapshot(qs=>{
+    views = qs.docs.map(x=> ({ id:x.id, ...x.data() }));
+    $("stPublished").textContent = bn(new Set(views.map(v=> v.customerUid)).size);
+    if($("viewModal").style.display === "flex") renderViews();
+  }, ()=>{});
+}
+function renderViews(){
+  const box = $("viewBody");
+  const pub = designs.filter(d=> d.published);
+  if(!designs.length){ box.innerHTML = `<div class="card empty">এখনো কোনো ডিজাইন নেই।</div>`; return; }
+  const byDz = {};
+  views.forEach(v=>{ (byDz[v.designId] = byDz[v.designId] || []).push(v); });
+  const list = designs.slice().sort((a,b)=> (byDz[b.id]||[]).length - (byDz[a.id]||[]).length);
+  box.innerHTML = `<div class="row3"><div><small>👀 দেখেছেন</small><b>${bn(new Set(views.map(v=> v.customerUid)).size)} জন</b></div><div><small>📢 Bazar-এ আছে</small><b>${bn(pub.length)}টা</b></div><div><small>🧾 মোট অর্ডার</small><b>${bn(orders.filter(o=> !["declined","cancelled"].includes(o.status)).length)}টা</b></div></div>` +
+    list.map(d=>{
+      const vs = (byDz[d.id]||[]).sort((a,b)=> ms(b.lastAt) - ms(a.lastAt));
+      const nOrd = orders.filter(o=> o.designId === d.id && !["declined","cancelled"].includes(o.status)).length;
+      return `<div class="card" style="padding:12px">
+        <div class="li" style="border:0;padding:0 0 6px">
+          <div class="ic" style="width:48px;height:60px">${d.img ? `<img src="${esc(d.img)}" alt="">` : "🧵"}</div>
+          <div class="tx"><b>${esc(d.title)}</b><small>${d.published ? "👀 Bazar-এ দেখা যাচ্ছে" : "🙈 লুকানো"} · ৳ ${bn(d.price)}</small><br><small>👁 ${bn(vs.length)} জন দেখেছেন · 🧾 ${bn(nOrd)}টা অর্ডার</small></div>
+        </div>
+        ${vs.length ? vs.slice(0, 30).map(v=> `<div class="li" style="padding:6px 0"><div class="ic" style="width:28px;height:28px;font-size:14px">👤</div><div class="tx"><b style="font-size:13px">${esc(v.customerName||"গ্রাহক")}</b><small>${when(v.lastAt)}${(v.count||1) > 1 ? " · " + bn(v.count) + " বার দেখেছেন" : ""}</small></div></div>`).join("")
+          : `<div class="muted">এখনো কেউ দেখেননি।</div>`}
+      </div>`;
+    }).join("");
+}
+$("cardViews").addEventListener("click", ()=>{ renderViews(); openSheet("viewModal"); });
+
+/* ── 📊💸 খরচ আর লাভ-ক্ষতি ──
+   খরচ থাকে tailors/{uid}/private/ledger-YYYY-MM নথিতে (মাসে একটা নথি, নিজে ছাড়া কেউ পড়তে পারে না)।
+   আয় = যে অর্ডারের পোশাক গ্রাহক পেয়ে গেছেন, তার সেলাইয়ের মজুরি (ডেলিভারি চার্জ রাইডারের, আয়ে ধরা হয় না)। */
+const EXP_CATS = ["🧵 সুতা-বোতাম-লেস", "🧶 কাপড়/লাইনিং", "🏠 দোকান ভাড়া", "💡 বিদ্যুৎ বিল", "👷 কর্মচারীর বেতন", "🔧 মেশিন মেরামত", "🚌 যাতায়াত", "🍵 চা-নাস্তা", "📦 অন্যান্য"];
+let expCat = EXP_CATS[0], ledgerCur = { key:"", expenses:[] }, plMonth = null;
+const mKey = (d)=> d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+const mName = (key)=>{ const [y,m] = key.split("-").map(Number); return bn(new Date(y, m-1, 1).toLocaleString("bn-BD",{ month:"long" })) + " " + bn(y); };
+const ledgerRef = (key)=> db.collection("tailors").doc(T.uid).collection("private").doc("ledger-" + key);
+const dayStr = (t)=>{ const d = new Date(t); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+function incomeAt(o){ return ms(o.deliveredAt || o.readyAt || o.createdAt); }
+function incomeOf(o){ return o.stitchTotal != null ? Number(o.stitchTotal) : Number(o.price||0) * Number(o.qty||1); }
+function incomeOrders(fromT, toT){ return orders.filter(o=> o.source !== "walkin").concat(typeof walkinIncomeRows === "function" ? walkinIncomeRows() : []).filter(o=> o.status === "delivered" && incomeAt(o) >= fromT && incomeAt(o) <= toT); }
+function monthRange(key){ const [y,m] = key.split("-").map(Number); return [new Date(y, m-1, 1).getTime(), new Date(y, m, 1).getTime() - 1]; }
+
+function listenLedger(){
+  let key = mKey(new Date()), unsub = null;
+  const attach = ()=>{
+    if(unsub) unsub();
+    ledgerCur = { key, expenses:[] };
+    unsub = ledgerRef(key).onSnapshot(d=>{ ledgerCur = { key, expenses: (d.exists && d.data().expenses) || [] }; ledgerRenderHome(); if($("expModal").style.display === "flex") renderExpList(); }, ()=>{});
+  };
+  attach();
+  // 🗓️ মাস বদলালে (অ্যাপ খোলা থাকলেও) নতুন মাস শূন্য থেকে শুরু
+  setInterval(()=>{ const k = mKey(new Date()); if(k !== key){ key = k; attach(); } }, 60000);
+}
+function ledgerRenderHome(){
+  if(!ledgerCur.key) return;
+  const [a,b] = monthRange(ledgerCur.key);
+  const inc = incomeOrders(a,b).reduce((s,o)=> s + incomeOf(o), 0);
+  const exp = ledgerCur.expenses.reduce((s,x)=> s + (Number(x.amt)||0), 0);
+  const net = inc - exp;
+  $("stProfit").textContent = (net < 0 ? "− " : "") + tk(Math.abs(net));
+  $("stProfit").style.color = net < 0 ? "var(--red)" : "var(--green)";
+  $("stProfitLbl").textContent = net < 0 ? "📉 এই মাসে ক্ষতি" : "📊 এই মাসের লাভ";
+  $("stExpense").textContent = tk(exp);
+}
+
+/* 💸 খরচ */
+function renderExpCats(){
+  $("expCats").innerHTML = EXP_CATS.map(c=> `<button type="button" class="${c === expCat ? "on" : ""}">${c}</button>`).join("");
+  $("expCats").querySelectorAll("button").forEach(b=> b.onclick = ()=>{ expCat = b.textContent; renderExpCats(); });
+}
+function renderExpList(){
+  const list = ledgerCur.expenses.slice().sort((a,b)=> b.at - a.at);
+  const total = list.reduce((s,x)=> s + (Number(x.amt)||0), 0);
+  $("expListTitle").textContent = `${mName(ledgerCur.key)}-এর খরচ · মোট ${tk(total)}`;
+  $("expList").innerHTML = list.length ? list.map(x=> `<div class="li">
+      <div class="ic">${esc((x.cat||"📦").split(" ")[0])}</div>
+      <div class="tx"><b>${esc((x.cat||"").split(" ").slice(1).join(" ") || "খরচ")}</b><small>${bn(new Date(x.at).toLocaleDateString("bn-BD",{ day:"numeric", month:"short" }))}${x.note ? " · " + esc(x.note) : ""}</small></div>
+      <div class="am" style="color:var(--red)">${tk(x.amt)}</div>
+      <button class="xbtn" type="button" data-xdel="${esc(x.id)}">🗑️</button>
+    </div>`).join("") : `<div class="empty">এই মাসে এখনো কোনো খরচ লেখা হয়নি।</div>`;
+  $("expList").querySelectorAll("[data-xdel]").forEach(b=> b.onclick = ()=> delExpense(ledgerCur.key, b.dataset.xdel));
+}
+$("cardExp").addEventListener("click", ()=>{
+  $("expAmt").value = ""; $("expNote").value = ""; $("expDate").value = dayStr(Date.now()); $("expDate").max = dayStr(Date.now());
+  renderExpCats(); renderExpList(); openSheet("expModal");
+  setTimeout(()=> $("expAmt").focus(), 100);
+});
+$("expSave").addEventListener("click", async ()=>{
+  const amt = Math.round(Number($("expAmt").value)||0);
+  if(amt <= 0){ toast("টাকার পরিমাণ লিখুন"); return; }
+  if(amt > 10000000){ toast("টাকার পরিমাণ ঠিক আছে তো? আবার দেখুন"); return; }
+  const dv = $("expDate").value; const now = new Date();
+  const at = dv ? new Date(dv + "T" + String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0")).getTime() : Date.now();
+  const key = mKey(new Date(at));
+  const item = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), amt, cat: expCat, note: $("expNote").value.trim().slice(0,80), at };
+  const btn = $("expSave"); btn.disabled = true;
+  try{
+    await ledgerRef(key).set({ month: key, expenses: firebase.firestore.FieldValue.arrayUnion(item), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge:true });
+    toast(`✅ ${tk(amt)} খরচ লেখা হলো` + (key !== ledgerCur.key ? ` (${mName(key)})` : ""));
+    $("expAmt").value = ""; $("expNote").value = "";
+  }catch(e){ toast("সেভ হয়নি — ইন্টারনেট দেখে আবার চাপুন"); }
+  btn.disabled = false;
+});
+async function delExpense(key, id){
+  if(!confirm("এই খরচটা মুছে ফেলবেন?")) return;
+  try{
+    const d = await ledgerRef(key).get();
+    const list = ((d.exists && d.data().expenses) || []).filter(x=> x.id !== id);
+    await ledgerRef(key).set({ expenses: list, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge:true });
+    toast("🗑️ মুছে ফেলা হয়েছে");
+    if($("plModal").style.display === "flex") renderPL();
+  }catch(e){ toast("মোছা যায়নি — ইন্টারনেট দেখুন"); }
+}
+
+/* 📊 লাভ-ক্ষতি — মাস ধরে আগে-পরে যাওয়া যায় (ইতিহাস) */
+function plSummaryHTML(inc, exp, incList, expList, keyForDelete){
+  const net = inc - exp;
+  const byCat = {};
+  expList.forEach(x=> byCat[x.cat] = (byCat[x.cat]||0) + (Number(x.amt)||0));
+  return `<div class="row3">
+      <div><small>💰 আয় (মজুরি)</small><b style="color:var(--green)">${tk(inc)}</b></div>
+      <div><small>💸 খরচ</small><b style="color:var(--red)">${tk(exp)}</b></div>
+      <div style="background:${net < 0 ? "#fef2f2" : "#f0fdf4"}"><small>${net < 0 ? "📉 ক্ষতি" : "📈 লাভ"}</small><b style="color:${net < 0 ? "var(--red)" : "var(--green)"}">${tk(Math.abs(net))}</b></div>
+    </div>
+    ${Object.keys(byCat).length ? `<div class="card" style="padding:12px"><h2>💸 কোন খাতে কত খরচ</h2>${Object.keys(byCat).sort((a,b)=> byCat[b]-byCat[a]).map(c=> `<div class="li" style="padding:6px 0"><div class="ic" style="width:28px;height:28px;font-size:14px">${esc(c.split(" ")[0])}</div><div class="tx"><b style="font-size:13px">${esc(c.split(" ").slice(1).join(" "))}</b></div><div class="am" style="color:var(--red)">${tk(byCat[c])}</div></div>`).join("")}</div>` : ""}
+    <div class="card" style="padding:12px"><h2>💰 আয় — শেষ হওয়া অর্ডার (${bn(incList.length)}টা)</h2>${incList.length ? incList.sort((a,b)=> incomeAt(b) - incomeAt(a)).map(o=> `<div class="li" style="padding:6px 0"><div class="ic" style="width:28px;height:28px;font-size:14px">🧾</div><div class="tx"><b style="font-size:13px">${esc(o.designTitle||"অর্ডার")} × ${bn(o.qty||1)}</b><small>${esc(o.customerName||"")} · ${bn(new Date(incomeAt(o)).toLocaleDateString("bn-BD",{ day:"numeric", month:"short" }))}</small></div><div class="am" style="color:var(--green)">${tk(incomeOf(o))}</div></div>`).join("") : `<div class="muted">এই সময়ে কোনো অর্ডার শেষ হয়নি।</div>`}</div>
+    <div class="card" style="padding:12px"><h2>💸 সব খরচ (${bn(expList.length)}টা)</h2>${expList.length ? expList.slice().sort((a,b)=> b.at - a.at).map(x=> `<div class="li" style="padding:6px 0"><div class="ic" style="width:28px;height:28px;font-size:14px">${esc((x.cat||"📦").split(" ")[0])}</div><div class="tx"><b style="font-size:13px">${esc((x.cat||"").split(" ").slice(1).join(" "))}</b><small>${bn(new Date(x.at).toLocaleDateString("bn-BD",{ day:"numeric", month:"short" }))}${x.note ? " · " + esc(x.note) : ""}</small></div><div class="am" style="color:var(--red)">${tk(x.amt)}</div>${keyForDelete ? `<button class="xbtn" type="button" data-pdel="${esc(x.id)}">🗑️</button>` : ""}</div>`).join("") : `<div class="muted">কোনো খরচ লেখা নেই।</div>`}</div>`;
+}
+async function renderPL(){
+  $("plMonthTxt").textContent = mName(plMonth) + (plMonth === mKey(new Date()) ? " (চলতি)" : "");
+  $("plNext").disabled = plMonth >= mKey(new Date());
+  $("plBody").innerHTML = `<div class="empty">⏳ হিসাব আনা হচ্ছে…</div>`;
+  let expList = [];
+  try{ const d = await ledgerRef(plMonth).get(); expList = (d.exists && d.data().expenses) || []; }
+  catch(e){ $("plBody").innerHTML = `<div class="empty">📶 আনা যায়নি — ইন্টারনেট দেখুন</div>`; return; }
+  const [a,b] = monthRange(plMonth);
+  const incList = incomeOrders(a,b);
+  $("plBody").innerHTML = plSummaryHTML(incList.reduce((s,o)=> s + incomeOf(o), 0), expList.reduce((s,x)=> s + (Number(x.amt)||0), 0), incList, expList, plMonth);
+  $("plBody").querySelectorAll("[data-pdel]").forEach(btn=> btn.onclick = ()=> delExpense(plMonth, btn.dataset.pdel));
+}
+function shiftMonth(key, n){ const [y,m] = key.split("-").map(Number); return mKey(new Date(y, m-1+n, 1)); }
+$("plPrev").addEventListener("click", ()=>{ plMonth = shiftMonth(plMonth, -1); renderPL(); });
+$("plNext").addEventListener("click", ()=>{ plMonth = shiftMonth(plMonth, 1); renderPL(); });
+$("cardPL").addEventListener("click", ()=>{
+  plMonth = mKey(new Date());
+  const t = new Date(); $("plTo").value = dayStr(t.getTime()); $("plFrom").value = dayStr(new Date(t.getFullYear(), t.getMonth(), 1).getTime());
+  $("plRangeBody").innerHTML = "";
+  openSheet("plModal"); renderPL();
+});
+// 📅 যেকোনো দুই তারিখের মাঝের হিসাব — মাঝের সব মাসের খরচের নথি পড়ে মেলানো হয়
+$("plRangeBtn").addEventListener("click", async ()=>{
+  const f = $("plFrom").value, t = $("plTo").value, box = $("plRangeBody");
+  if(!f || !t){ toast("শুরু আর শেষের তারিখ দিন"); return; }
+  const fromT = new Date(f + "T00:00:00").getTime(), toT = new Date(t + "T23:59:59").getTime();
+  if(fromT > toT){ toast("শুরুর তারিখ শেষের আগে হতে হবে"); return; }
+  const keys = []; let k = mKey(new Date(fromT)); const last = mKey(new Date(toT));
+  while(k <= last && keys.length < 36){ keys.push(k); k = shiftMonth(k, 1); }
+  box.innerHTML = `<div class="empty">⏳ হিসাব আনা হচ্ছে…</div>`;
+  try{
+    const docs = await Promise.all(keys.map(x=> ledgerRef(x).get()));
+    const expList = docs.flatMap(d=> (d.exists && d.data().expenses) || []).filter(x=> x.at >= fromT && x.at <= toT);
+    const incList = incomeOrders(fromT, toT);
+    box.innerHTML = `<div class="muted" style="margin-bottom:4px">📅 ${bn(new Date(fromT).toLocaleDateString("bn-BD"))} থেকে ${bn(new Date(toT).toLocaleDateString("bn-BD"))}</div>` +
+      plSummaryHTML(incList.reduce((s,o)=> s + incomeOf(o), 0), expList.reduce((s,x)=> s + (Number(x.amt)||0), 0), incList, expList, null);
+  }catch(e){ box.innerHTML = `<div class="empty">📶 আনা যায়নি — ইন্টারনেট দেখুন</div>`; }
+});
+
+/* ── 🏪 দোকানে আসা গ্রাহকের অর্ডার (অফলাইন) ──
+   প্রতিটা অর্ডার একটা নিজের নথি: tailors/{uid}/private/walkin-<id> (শুধু দর্জি নিজে পড়তে-লিখতে পারেন)।
+   ধাপ: সেলাই চলছে → তৈরি → গ্রাহক নিয়ে গেছেন। গ্রাহক নিয়ে গেলে মজুরি এই মাসের আয়ে যোগ হয়। */
+const WST = {
+  stitching: ["✂️", "সেলাই চলছে", "#9d174d"],
+  ready:     ["🎉", "তৈরি — গ্রাহক নিতে আসবেন", "#15803d"],
+  sending:   ["🛵", "রাইডার দিয়ে গ্রাহকের কাছে পাঠানো হচ্ছে", "#0369a1"],
+  delivered: ["✅", "গ্রাহক নিয়ে গেছেন", "#15803d"],
+  cancelled: ["✕", "বাতিল", "#64748b"],
+};
+var walkins = [], wkParts = { kameez:true, pajama:false }, wkEditId = null;
+const wkRef = (id)=> db.collection("tailors").doc(T.uid).collection("private").doc("walkin-" + id);
+function listenWalkins(){
+  db.collection("tailors").doc(T.uid).collection("private").where("type","==","walkin").onSnapshot(qs=>{
+    walkins = qs.docs.map(x=> ({ id: x.id.replace(/^walkin-/,""), ...x.data() })).sort((a,b)=> (b.createdAt||0) - (a.createdAt||0));
+    renderOrders();
+    if(typeof ledgerRenderHome === "function") ledgerRenderHome();
+  }, ()=>{});
+}
+// 💰 লাভের হিসাবে গোনার জন্য — অনলাইন অর্ডারের মতো একই গড়নে
+function walkinIncomeRows(){
+  return walkins.filter(w=> w.status === "delivered").map(w=> ({
+    status:"delivered", designTitle: w.designTitle, qty: w.qty, customerName: (w.customerName||"") + " (দোকানে)",
+    stitchTotal: w.total, deliveredAt: w.deliveredAt || w.createdAt, createdAt: w.createdAt
+  }));
+}
+
+function wkFillDesigns(sel){
+  $("wkDesign").innerHTML = designs.map(d=> `<option value="${esc(d.id)}" ${d.id === sel ? "selected" : ""}>${esc(d.title)} — ৳ ${bn(d.price)}</option>`).join("") + `<option value="__own" ${sel === "__own" ? "selected" : ""}>✍️ অন্য ডিজাইন (নিজে লিখুন)</option>`;
+}
+function wkMeasureHTML(m){
+  m = m || {};
+  return ["kameez","pajama"].filter(p=> wkParts[p]).map(part=> `<div class="mhd">${part === "kameez" ? "👗 জামার মাপ" : "👖 পায়জামার মাপ"}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 10px">` +
+    Object.keys(MLABEL[part]).map(k=> `<div><label style="margin:6px 0 2px;font-size:11.5px">${MLABEL[part][k]}</label><input data-m="${part}.${k}" type="number" inputmode="decimal" step="0.25" min="0" max="99" value="${m[part] && m[part][k] != null ? esc(m[part][k]) : ""}" style="padding:9px"></div>`).join("") +
+    `</div>`).join("");
+}
+function wkRenderParts(m){
+  $("wkParts").querySelectorAll("button").forEach(b=> b.classList.toggle("on", !!wkParts[b.dataset.part]));
+  // আগে লেখা মাপ হারিয়ে না যায় — নতুন করে আঁকার আগে পড়ে রাখা
+  const cur = m || wkReadMeasure();
+  $("wkMeasure").innerHTML = wkMeasureHTML(cur);
+}
+function wkReadMeasure(){
+  const m = {};
+  $("wkMeasure").querySelectorAll("[data-m]").forEach(i=>{
+    const [p,k] = i.dataset.m.split("."); const v = i.value.trim();
+    if(v !== ""){ (m[p] = m[p] || {})[k] = Number(v); }
+  });
+  return m;
+}
+$("wkParts").querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=>{
+  const p = b.dataset.part; wkParts[p] = !wkParts[p];
+  if(!wkParts.kameez && !wkParts.pajama) wkParts[p] = true;
+  wkRenderParts();
+}));
+function wkUpdateSum(){
+  const qty = Math.max(1, Math.round(Number($("wkQty").value)||1));
+  const price = Math.max(0, Math.round(Number($("wkPrice").value)||0));
+  const adv = Math.max(0, Math.round(Number($("wkAdv").value)||0));
+  const total = qty * price;
+  $("wkSum").innerHTML = `<div><span>মজুরি (${tk(price)} × ${bn(qty)})</span><b>${tk(total)}</b></div>
+    <div><span>অগ্রিম পেয়েছেন</span><b style="color:var(--green)">− ${tk(adv)}</b></div>
+    <div style="border-top:1px dashed var(--pink2);padding-top:5px;margin-top:5px;font-size:15px"><b>বাকি (নেওয়ার সময় দেবেন)</b><b style="color:var(--plum)">${tk(Math.max(0, total - adv))}</b></div>`;
+}
+["wkQty","wkPrice","wkAdv"].forEach(id=> $(id).addEventListener("input", wkUpdateSum));
+$("wkDesign").addEventListener("change", ()=>{
+  const own = $("wkDesign").value === "__own";
+  $("wkDesignTxt").style.display = own ? "block" : "none";
+  const d = designs.find(x=> x.id === $("wkDesign").value);
+  if(d) $("wkPrice").value = d.price;
+  wkUpdateSum();
+});
+function openWalkin(id){
+  wkEditId = id || null;
+  const w = id ? walkins.find(x=> x.id === id) : null;
+  $("wkTitle").textContent = w ? "✏️ দোকানের অর্ডার বদলান" : "🏪 দোকানে অর্ডার নিন";
+  $("wkName").value = w ? w.customerName||"" : ""; $("wkPhone").value = w ? w.customerPhone||"" : ""; $("wkAddr").value = w ? w.customerAddress||"" : "";
+  const due = new Date(); due.setDate(due.getDate() + 5);
+  $("wkDue").value = w && w.dueDate ? w.dueDate : dayStr(due.getTime());
+  wkFillDesigns(w ? (w.designId || "__own") : (designs[0] ? designs[0].id : "__own"));
+  $("wkDesignTxt").value = w && !w.designId ? w.designTitle||"" : "";
+  $("wkDesignTxt").style.display = $("wkDesign").value === "__own" ? "block" : "none";
+  const d0 = designs.find(x=> x.id === $("wkDesign").value);
+  $("wkQty").value = w ? w.qty : 1; $("wkPrice").value = w ? w.price : (d0 ? d0.price : ""); $("wkAdv").value = w ? (w.advance||"") : "";
+  $("wkNote").value = w ? w.note||"" : "";
+  wkParts = { kameez: !w || !!(w.measure && w.measure.kameez) || !(w.measure && w.measure.pajama), pajama: !!(w && w.measure && w.measure.pajama) };
+  wkRenderParts(w ? w.measure : {});
+  wkUpdateSum(); openSheet("wkModal");
+}
+$("wkSave").addEventListener("click", async ()=>{
+  const name = $("wkName").value.trim();
+  if(!name){ toast("গ্রাহকের নাম লিখুন"); return; }
+  const phone = $("wkPhone").value.replace(/[^\d+]/g,"");
+  if(phone && phone.replace(/\D/g,"").length < 10){ toast("মোবাইল নম্বর ঠিক আছে তো?"); return; }
+  const dzId = $("wkDesign").value, d = designs.find(x=> x.id === dzId);
+  const title = d ? d.title : $("wkDesignTxt").value.trim();
+  if(!title){ toast("ডিজাইনের নাম লিখুন"); return; }
+  const qty = Math.max(1, Math.round(Number($("wkQty").value)||1));
+  const price = Math.round(Number($("wkPrice").value)||0);
+  if(price <= 0){ toast("মজুরি লিখুন"); return; }
+  const adv = Math.max(0, Math.round(Number($("wkAdv").value)||0));
+  if(adv > qty * price){ toast("অগ্রিম মোট মজুরির চেয়ে বেশি হয়ে গেছে"); return; }
+  const old = wkEditId ? walkins.find(x=> x.id === wkEditId) : null;
+  const id = old ? old.id : Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+  const rec = {
+    type:"walkin", code: old ? old.code : "দো-" + bn(String(Date.now()).slice(-5)),
+    customerName: name.slice(0,60), customerPhone: phone.slice(0,15), customerAddress: $("wkAddr").value.trim().slice(0,120),
+    designId: d ? d.id : null, designTitle: title.slice(0,60), category: d ? d.category||null : null,
+    qty, price, total: qty * price, advance: adv, dueDate: $("wkDue").value || null,
+    measure: wkReadMeasure(), note: $("wkNote").value.trim().slice(0,200),
+    status: old ? old.status : "stitching", createdAt: old ? old.createdAt : Date.now(), updatedAt: Date.now()
+  };
+  const btn = $("wkSave"); btn.disabled = true;
+  try{
+    await wkRef(id).set(rec);
+    closeSheet("wkModal"); oTab = "shop"; go("orders"); renderOrders();
+    toast(old ? "✅ বদলানো হলো" : "✅ অর্ডার সেভ হলো — রসিদ প্রিন্ট/শেয়ার করুন");
+    if(!old) setTimeout(()=> printWalkin(id), 400);
+  }catch(e){ toast("সেভ হয়নি — ইন্টারনেট দেখে আবার চাপুন"); }
+  btn.disabled = false;
+});
+
+function walkinCardHTML(w){
+  const s = WST[w.status] || ["•", w.status, "#333"];
+  const dz = w.designId ? designs.find(x=> x.id === w.designId) : null;
+  const due = Math.max(0, (w.total||0) - (w.advance||0) - (w.paidAtDelivery||0));
+  let acts = "";
+  if(w.status === "stitching") acts = `<button class="btn ok" type="button" data-wready="${esc(w.id)}" style="margin-top:10px">✅ সেলাই শেষ — তৈরি</button>`;
+  if(w.status === "ready") acts = `<button class="btn ok" type="button" data-wdone="${esc(w.id)}" style="margin-top:10px">🤝 গ্রাহক নিয়ে গেছেন${due ? " · বাকি " + tk(due) + " পেলাম" : ""}</button>
+    <button class="btn" type="button" data-wsend="${esc(w.id)}" style="margin-top:8px;background:#0369a1">🛵 রাইডার দিয়ে পাঠান</button>`;
+  if(w.status === "sending"){
+    const ro = orders.find(o=> o.id === w.riderOrderId);
+    const waiting = ro && ro.dispatch && ro.dispatch.state === "waiting_for_rider";
+    acts = ro ? riderHTML(ro) + `<div class="muted" style="margin-top:6px">🧾 ${esc(ro.orderCode||"")} · রাইডার নেবেন ${ro.total != null ? tk(ro.total) : "…"} (বাকি ${tk(ro.stitchTotal||0)} + চার্জ ${tk(ro.deliveryCharge||0)})</div>`
+              + (waiting ? `<button class="btn small no" type="button" data-wunsend="${esc(w.id)}" style="margin-top:8px;width:100%">↩️ রাইডার লাগবে না — গ্রাহক নিজে নেবেন</button>` : "")
+            : `<div class="info">⏳ রাইডারের তথ্য আসছে…</div>`;
+  }
+  return `<div class="ord">
+    <div class="hd"><span class="chip">🏪 ${esc(w.code||"")}</span><span class="muted">${bn(new Date(w.createdAt).toLocaleString("bn-BD",{ day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }))}</span></div>
+    <div class="st" style="color:${s[2]}">${s[0]} ${s[1]}${w.dueDate && w.status === "stitching" ? ` <span class="muted">· দেওয়ার দিন ${bn(new Date(w.dueDate).toLocaleDateString("bn-BD",{ day:"numeric", month:"short" }))}</span>` : ""}</div>
+    <div class="dz2" style="margin-top:8px">
+      ${dz && dz.img ? `<img src="${esc(dz.img)}" alt="">` : `<div style="width:56px;height:72px;border-radius:10px;background:var(--pink);display:flex;align-items:center;justify-content:center;font-size:26px">🧵</div>`}
+      <div><div style="font-weight:800">${esc(w.designTitle)} × ${bn(w.qty)}</div>
+        <div class="muted">👤 ${esc(w.customerName)}</div>
+        ${w.customerPhone ? `<a href="tel:${esc(w.customerPhone)}" style="color:var(--rose);font-weight:800;font-size:13px;text-decoration:none">📞 ${esc(w.customerPhone)}</a>` : ""}</div>
+    </div>
+    ${w.note ? `<div class="info warn">📝 ${esc(w.note)}</div>` : ""}
+    ${(w.measure && (w.measure.kameez || w.measure.pajama)) ? measureHTML({ label:"দোকানে নেওয়া", ...w.measure }) : ""}
+    <div class="bill">
+      <div><span>মজুরি (${tk(w.price)} × ${bn(w.qty)})</span><b>${tk(w.total)}</b></div>
+      <div><span>অগ্রিম</span><b style="color:var(--green)">${tk(w.advance||0)}</b></div>
+      <div style="border-top:1px dashed var(--pink2);padding-top:5px;margin-top:5px"><b>${w.status === "delivered" ? "পুরো টাকা পেয়েছেন" : "বাকি"}</b><b style="color:var(--plum)">${w.status === "delivered" ? "✅" : tk(due)}</b></div>
+    </div>
+    ${acts}
+    <div class="btnrow">
+      <button class="btn small ghost" type="button" data-wprint="${esc(w.id)}" style="flex:1">🖨️ রসিদ</button>
+      <button class="btn small ghost" type="button" data-wshare="${esc(w.id)}" style="flex:1">📤 শেয়ার</button>
+      ${(w.status === "stitching" || w.status === "ready") ? `<button class="btn small ghost" type="button" data-wedit="${esc(w.id)}" style="flex:1">✏️</button><button class="btn small no" type="button" data-wdel="${esc(w.id)}">🗑️</button>` : ""}
+    </div>
+  </div>`;
+}
+function renderWalkins(box){
+  const list = walkins.filter(w=> w.status !== "cancelled").slice(0, 100);
+  box.innerHTML = `<button class="btn" type="button" onclick="openWalkin()" style="margin-bottom:12px">➕ দোকানে নতুন অর্ডার নিন</button>` +
+    (list.length ? list.map(walkinCardHTML).join("") : `<div class="card empty"><div style="font-size:34px">🏪</div>দোকানে আসা গ্রাহকের কোনো অর্ডার এখনো লেখা হয়নি।</div>`);
+  box.querySelectorAll("[data-wready]").forEach(b=> b.onclick = ()=> wkSetStatus(b.dataset.wready, { status:"ready", readyAt: Date.now() }, "🎉 তৈরি — গ্রাহককে ফোন করে জানান"));
+  box.querySelectorAll("[data-wdone]").forEach(b=> b.onclick = ()=>{
+    const w = walkins.find(x=> x.id === b.dataset.wdone); if(!w) return;
+    const due = Math.max(0, (w.total||0) - (w.advance||0));
+    if(!confirm(`গ্রাহক পোশাক নিয়ে গেছেন${due ? ` আর বাকি ${tk(due)} দিয়েছেন` : ""}?`)) return;
+    wkSetStatus(w.id, { status:"delivered", deliveredAt: Date.now(), paidAtDelivery: due }, "✅ হয়ে গেল — মজুরি এ মাসের আয়ে যোগ হলো");
+  });
+  box.querySelectorAll("[data-wsend]").forEach(b=> b.onclick = ()=> openSend(b.dataset.wsend));
+  box.querySelectorAll("[data-retry]").forEach(b=> b.onclick = ()=> setStatus(b.dataset.retry, { retryAt: firebase.firestore.FieldValue.serverTimestamp() }, "🔁 আবার রাইডার খোঁজা হচ্ছে", b));
+  box.querySelectorAll("[data-wunsend]").forEach(b=> b.onclick = async ()=>{
+    const w = walkins.find(x=> x.id === b.dataset.wunsend); if(!w) return;
+    if(!confirm("রাইডারে পাঠানো বাতিল করবেন? অর্ডারটা আবার \"তৈরি\" অবস্থায় ফিরবে।")) return;
+    b.disabled = true;
+    try{
+      await db.collection("tailorOrders").doc(w.riderOrderId).update({ status:"cancelled", cancelledAt: firebase.firestore.FieldValue.serverTimestamp() });
+      await wkRef(w.id).update({ status:"ready", riderOrderId: null, updatedAt: Date.now() });
+      toast("↩️ বাতিল — গ্রাহক নিজে নেবেন");
+    }catch(e){ b.disabled = false; toast("হয়নি — হয়তো এর মধ্যে রাইডার পাওয়া গেছে"); }
+  });
+  box.querySelectorAll("[data-wprint]").forEach(b=> b.onclick = ()=> printWalkin(b.dataset.wprint));
+  box.querySelectorAll("[data-wshare]").forEach(b=> b.onclick = ()=> shareWalkin(b.dataset.wshare));
+  box.querySelectorAll("[data-wedit]").forEach(b=> b.onclick = ()=> openWalkin(b.dataset.wedit));
+  box.querySelectorAll("[data-wdel]").forEach(b=> b.onclick = async ()=>{
+    if(!confirm("এই অর্ডারটা মুছে ফেলবেন?")) return;
+    try{ await wkRef(b.dataset.wdel).delete(); toast("🗑️ মুছে ফেলা হয়েছে"); }catch(e){ toast("মোছা যায়নি — ইন্টারনেট দেখুন"); }
+  });
+}
+async function wkSetStatus(id, upd, msg){
+  try{ await wkRef(id).update({ ...upd, updatedAt: Date.now() }); toast(msg); }
+  catch(e){ toast("হয়নি — ইন্টারনেট দেখে আবার চাপুন"); }
+}
+
+/* 🧾 রসিদ — প্রিন্ট আর লেখা হিসেবে শেয়ার (WhatsApp/মেসেজে পাঠানো যায়) */
+function printWalkin(id){
+  const w = walkins.find(x=> x.id === id); if(!w) return;
+  const d = T.data, m = w.measure || {};
+  let mrows = "";
+  ["kameez","pajama"].forEach(part=>{
+    const v = m[part]; if(!v) return;
+    const r = Object.keys(MLABEL[part]).filter(k=> v[k] !== "" && v[k] != null).map(k=> `<tr><td>${MLABEL[part][k]}</td><td style="text-align:right">${bn(v[k])}"</td></tr>`).join("");
+    if(r) mrows += `<tr><td colspan="2"><b>${part === "kameez" ? "জামা" : "পায়জামা"}</b></td></tr>` + r;
+  });
+  const due = Math.max(0, (w.total||0) - (w.advance||0) - (w.paidAtDelivery||0));
+  $("printArea").innerHTML = `
+    <div style="text-align:center"><b style="font-size:18px">🧵 ${esc(d.name||"সেলাই ঘর")}</b><br>${esc([d.address, d.area].filter(Boolean).join(", "))}<br>📱 ${esc(d.phone||"")}</div>
+    <hr><div style="text-align:center"><b>রসিদ / ইনভয়েস</b></div>
+    <div>রসিদ নং: <b>${esc(w.code)}</b> · ${bn(new Date(w.createdAt).toLocaleString("bn-BD"))}</div>
+    <div>গ্রাহক: <b>${esc(w.customerName)}</b>${w.customerPhone ? " · " + esc(w.customerPhone) : ""}</div>
+    ${w.customerAddress ? `<div>ঠিকানা: ${esc(w.customerAddress)}</div>` : ""}
+    ${w.dueDate ? `<div>দেওয়ার দিন: <b>${bn(new Date(w.dueDate).toLocaleDateString("bn-BD"))}</b></div>` : ""}
+    <hr><div>ডিজাইন: <b>${esc(w.designTitle)}</b> × ${bn(w.qty)}</div>
+    ${w.note ? `<div>নোট: ${esc(w.note)}</div>` : ""}
+    ${mrows ? `<div style="margin-top:6px"><b>মাপ</b> (ইঞ্চি)</div><table>${mrows}</table>` : ""}
+    <hr><table>
+      <tr><td>মজুরি (${tk(w.price)} × ${bn(w.qty)})</td><td style="text-align:right">${tk(w.total)}</td></tr>
+      <tr><td>অগ্রিম</td><td style="text-align:right">${tk(w.advance||0)}</td></tr>
+      <tr><td><b>${w.status === "delivered" ? "পরিশোধিত" : "বাকি"}</b></td><td style="text-align:right"><b>${w.status === "delivered" ? "✅" : tk(due)}</b></td></tr>
+    </table>
+    <div style="text-align:center;margin-top:8px">রসিদটা যত্নে রাখুন — পোশাক নেওয়ার সময় দেখাবেন।<br>Honey Bee Bazar · সেলাই ঘর</div>`;
+  window.print();
+}
+async function shareWalkin(id){
+  const w = walkins.find(x=> x.id === id); if(!w) return;
+  const d = T.data, due = Math.max(0, (w.total||0) - (w.advance||0) - (w.paidAtDelivery||0));
+  const txt = `🧵 ${d.name||"সেলাই ঘর"}\nরসিদ: ${w.code}\nগ্রাহক: ${w.customerName}\nডিজাইন: ${w.designTitle} × ${bn(w.qty)}\nমজুরি: ${tk(w.total)} · অগ্রিম: ${tk(w.advance||0)}\n${w.status === "delivered" ? "✅ পরিশোধিত" : "বাকি: " + tk(due)}${w.dueDate ? `\nদেওয়ার দিন: ${bn(new Date(w.dueDate).toLocaleDateString("bn-BD"))}` : ""}\n📱 ${d.phone||""}`;
+  try{
+    if(navigator.share){ await navigator.share({ text: txt }); return; }
+  }catch(e){ if(e && e.name === "AbortError") return; }
+  const ph = (w.customerPhone||"").replace(/\D/g,"");
+  const wa = ph ? (ph.startsWith("0") ? "88" + ph : ph) : "";
+  window.open("https://wa.me/" + wa + "?text=" + encodeURIComponent(txt), "_blank");
+}
+$("homeShopBtn") && $("homeShopBtn").addEventListener("click", ()=> openWalkin());
+
+/* 🛵 দোকানের অর্ডার রাইডারে — একটা tailorOrders নথি বানানো হয় (source: walkin, status: ready);
+   সার্ভার চার্জ বসিয়ে কাছের রাইডার খোঁজে। পৌঁছে গেলে নিচের সিঙ্ক দোকানের অর্ডারটাও "নিয়ে গেছেন" করে দেয়। */
+let sendId = null;
+const SEND_CHARGES = [40, 60, 80, 100, 150];
+function sendDue(w){ return Math.max(0, (w.total||0) - (w.advance||0)); }
+function sendUpdateSum(){
+  const w = walkins.find(x=> x.id === sendId); if(!w) return;
+  const ch = Math.round(Number($("sendCharge").value)||0);
+  $("sendChips").querySelectorAll("button").forEach(b=> b.classList.toggle("on", Number(b.dataset.c) === ch));
+  $("sendSum").innerHTML = `<div><span>বাকি মজুরি (আপনার)</span><b>${tk(sendDue(w))}</b></div>
+    <div><span>🛵 ডেলিভারি চার্জ (রাইডারের)</span><b>${tk(ch)}</b></div>
+    <div style="border-top:1px dashed var(--pink2);padding-top:5px;margin-top:5px;font-size:15px"><b>গ্রাহক রাইডারকে দেবেন</b><b style="color:var(--plum)">${tk(sendDue(w) + ch)}</b></div>`;
+}
+function openSend(id){
+  const w = walkins.find(x=> x.id === id); if(!w) return;
+  if(!(T.data.storeLocation && T.data.storeLocation.lat != null)){ alert("আগে দোকানের লোকেশন সেট করুন (👤 প্রোফাইল → 📍) — রাইডার এটা দেখে পোশাক নিতে আসবেন।"); go("profile"); return; }
+  sendId = id;
+  $("sendWho").textContent = `🧾 ${w.code} · ${w.customerName} — ${w.designTitle} × ${bn(w.qty)}`;
+  $("sendAddr").value = w.customerAddress || ""; $("sendPhone").value = w.customerPhone || ""; $("sendCharge").value = 40;
+  $("sendChips").innerHTML = SEND_CHARGES.map(c=> `<button type="button" data-c="${c}">${tk(c)}</button>`).join("");
+  $("sendChips").querySelectorAll("button").forEach(b=> b.onclick = ()=>{ $("sendCharge").value = b.dataset.c; sendUpdateSum(); });
+  sendUpdateSum(); openSheet("sendModal");
+}
+$("sendCharge").addEventListener("input", sendUpdateSum);
+$("sendGo").addEventListener("click", async ()=>{
+  const w = walkins.find(x=> x.id === sendId); if(!w) return;
+  const addr = $("sendAddr").value.trim(), phone = $("sendPhone").value.replace(/[^\d+]/g,"");
+  const ch = Math.round(Number($("sendCharge").value)||0);
+  if(!addr){ toast("গ্রাহকের ঠিকানা লিখুন"); return; }
+  if(phone.replace(/\D/g,"").length < 10){ toast("গ্রাহকের মোবাইল নম্বর দিন — রাইডার ফোন করবেন"); return; }
+  if(ch < 40 || ch > 300){ toast("চার্জ ৪০ থেকে ৩০০ টাকার মধ্যে দিন"); return; }
+  const btn = $("sendGo"); btn.disabled = true;
+  try{
+    const ref = await db.collection("tailorOrders").add({
+      source:"walkin", walkinId: w.id, tailorId: T.uid, tailorName: T.data.name || "সেলাই ঘর", customerUid: null,
+      customerName: w.customerName, customerPhone: phone.slice(0,15), customerAddress: addr.slice(0,120),
+      designId: w.designId || null, designTitle: w.designTitle, qty: Math.min(50, Math.max(1, Math.round(w.qty||1))),
+      price: w.price, dueAmount: sendDue(w), walkinCharge: ch,
+      status:"ready", createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    await wkRef(w.id).update({ status:"sending", riderOrderId: ref.id, customerAddress: addr.slice(0,120), customerPhone: phone.slice(0,15), updatedAt: Date.now() });
+    closeSheet("sendModal"); toast("🛵 রাইডার খোঁজা হচ্ছে — পেলেই জানাব");
+  }catch(e){ toast(e && e.code === "permission-denied" ? "পাঠানো যায়নি — সার্ভারের নিয়ম আপডেট (Deploy) হয়নি" : "পাঠানো যায়নি — ইন্টারনেট দেখে আবার চাপুন"); }
+  btn.disabled = false;
+});
+// 🔄 রাইডারের অর্ডার শেষ বা বাতিল হলে দোকানের অর্ডারও সেই মতো বদলায়
+function syncWalkinsFromOrders(){
+  if(typeof walkins === "undefined") return;
+  orders.filter(o=> o.source === "walkin" && o.walkinId).forEach(o=>{
+    const w = walkins.find(x=> x.id === o.walkinId);
+    if(!w || w.status !== "sending" || w.riderOrderId !== o.id) return;
+    if(o.status === "delivered") wkRef(w.id).update({ status:"delivered", deliveredAt: Date.now(), paidAtDelivery: sendDue(w), deliveryBy:"rider", updatedAt: Date.now() }).catch(()=>{});
+    else if(o.status === "cancelled") wkRef(w.id).update({ status:"ready", riderOrderId: null, updatedAt: Date.now() }).catch(()=>{});
+  });
+}
+
 /* ── 🔔 পুশ — অ্যাপ বন্ধ থাকলেও নতুন অর্ডারে ফোন বাজবে ──
    টোকেন tailors/{uid}/private/push-এ (দোকানের নথি সবাই পড়তে পারে, তাই আলাদা)। */
 const TL_VAPID = "BCEdpLGNUIBG2IW9lTVGcaM7qbFrbaEnGg9N1CYGNCojCVUIruqqcWP4cdX3YietIJ1kWe1ZUulbCQpvSQXAIKg";
@@ -597,7 +1186,7 @@ auth.onAuthStateChanged(async (user)=>{
     const t = await db.collection("tailors").doc(user.uid).get();
     if(!t.exists || t.data().status === "blocked"){ alert("আপনার সেলাই ঘরের অ্যাকাউন্ট বন্ধ আছে — এজেন্টের সাথে যোগাযোগ করুন।"); await auth.signOut(); location.href = "login.html"; return; }
     T = { uid: user.uid, data: t.data() };
-    renderHeader(); fillProfile(); listenDesigns(); listenOrders(); pushInit();
+    renderHeader(); fillProfile(); listenDesigns(); listenOrders(); listenViews(); listenLedger(); listenWalkins(); pushInit();
     $("gate").remove();
   }catch(e){
     $("gate").innerHTML = `<div style="font-size:36px">📶</div>খোলা যায়নি — ইন্টারনেট দেখে <button class="btn small" onclick="location.reload()">আবার চেষ্টা</button>`;

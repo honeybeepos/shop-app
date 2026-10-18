@@ -232,7 +232,23 @@ service cloud.firestore {
          resource.data.tailorId == request.auth.uid ||
          resource.data.riderId == request.auth.uid);
 
-      allow create: if isSignedIn()
+      allow create: if (
+        // 🏪 দোকানে আসা গ্রাহক — দর্জি নিজে তৈরি পোশাক রাইডারে পাঠান (শুধু ফেরত যাত্রা)।
+        //    চার্জ/কোড/মোট সার্ভার বসায়; দর্জি শুধু বাকি টাকা আর চাওয়া চার্জ লেখেন।
+        isSignedIn()
+        && request.resource.data.source == 'walkin'
+        && request.resource.data.tailorId == request.auth.uid
+        && exists(/databases/$(database)/documents/tailors/$(request.auth.uid))
+        && request.resource.data.status == 'ready'
+        && request.resource.data.customerUid == null
+        && request.resource.data.qty is int
+        && request.resource.data.qty >= 1 && request.resource.data.qty <= 50
+        && request.resource.data.dueAmount is number && request.resource.data.dueAmount >= 0 && request.resource.data.dueAmount <= 1000000
+        && request.resource.data.walkinCharge is number && request.resource.data.walkinCharge >= 0 && request.resource.data.walkinCharge <= 300
+        && request.resource.data.customerAddress is string && request.resource.data.customerAddress.size() > 0
+        && !request.resource.data.keys().hasAny(['riderId', 'orderCode', 'legCharge', 'deliveryCharge',
+             'stitchTotal', 'total', 'dispatch', 'tailorLoc', 'pickedUp', 'retryAt'])
+      ) || (isSignedIn()
         && request.auth.token.firebase.sign_in_provider != 'anonymous'
         && request.resource.data.customerUid == request.auth.uid
         && request.resource.data.status == 'placed'
@@ -243,7 +259,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/tailorDesigns/$(request.resource.data.designId)).data.tailorId == request.resource.data.tailorId
         && get(/databases/$(database)/documents/tailorDesigns/$(request.resource.data.designId)).data.price == request.resource.data.price
         && !request.resource.data.keys().hasAny(['riderId', 'orderCode', 'legCharge', 'deliveryCharge',
-             'stitchTotal', 'total', 'dispatch', 'tailorLoc', 'pickedUp', 'retryAt']);
+             'stitchTotal', 'total', 'dispatch', 'tailorLoc', 'pickedUp', 'retryAt']));
 
       allow update: if isSignedIn() && (
         isSuperAdmin() ||
@@ -262,7 +278,13 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'readyAt'])) ||
           (resource.data.status in ['accepted', 'ready']
             && resource.data.get('dispatch', {}).get('state', '') == 'waiting_for_rider'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['retryAt']))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['retryAt'])) ||
+          // 🏪 দোকানের অর্ডারে রাইডার পাওয়া না গেলে দর্জি পাঠানো বাতিল করতে পারেন (গ্রাহক নিজে নেবেন)
+          (resource.data.get('source', '') == 'walkin'
+            && resource.data.status == 'ready'
+            && resource.data.get('dispatch', {}).get('state', '') == 'waiting_for_rider'
+            && request.resource.data.status == 'cancelled'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt']))
         )) ||
         // 🛵 এই যাত্রার রাইডার
         (resource.data.riderId == request.auth.uid && (
@@ -278,6 +300,22 @@ service cloud.firestore {
         ))
       );
       allow delete: if isSuperAdmin();
+    }
+
+    /* 👀 কে কোন ডিজাইন দেখলেন — নথির আইডি "designId_গ্রাহকের uid", তাই একজন গ্রাহকের
+       একটা ডিজাইনে একটাই নথি (বারবার দেখলে count বাড়ে)। লেখেন শুধু লগইন করা গ্রাহক
+       নিজের নামে; পড়েন শুধু সেই ডিজাইনের দর্জি। */
+    match /tailorDesignViews/{viewId} {
+      allow read: if isSignedIn() && resource.data.tailorId == request.auth.uid;
+      allow create, update: if isSignedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && request.resource.data.customerUid == request.auth.uid
+        && viewId == request.resource.data.designId + '_' + request.auth.uid
+        && request.resource.data.keys().hasOnly(['designId', 'tailorId', 'customerUid', 'customerName', 'lastAt', 'count'])
+        && request.resource.data.customerName is string && request.resource.data.customerName.size() <= 60
+        && exists(/databases/$(database)/documents/tailorDesigns/$(request.resource.data.designId))
+        && get(/databases/$(database)/documents/tailorDesigns/$(request.resource.data.designId)).data.tailorId == request.resource.data.tailorId;
+      allow delete: if false;
     }
 
     // ডিজাইন — ছবি data-URL হিসেবে নথির ভেতরেই (১০০ KB ছবি ≈ ১৩৭ KB লেখা)
