@@ -105,7 +105,7 @@
   table.t th{ text-align:left; font-weight:600; color:var(--ink-3); background:var(--paper); padding:8px 10px; border-bottom:1px solid var(--line); }
   table.t td{ padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
   table.t tr:last-child td{ border-bottom:0; }
-  table.t td.r, table.t th.r{ text-align:right; }
+  table.t td.r, table.t th.r{ text-align:right; white-space:nowrap; }
   .bad{ color:var(--red); font-weight:700; }
   .empty{ color:var(--muted); text-align:center; padding:18px 8px; font-size:14px; }
 
@@ -167,6 +167,24 @@
   .done{ width:100%; margin-top:10px; padding:14px; font-size:17px; }
   .keys{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
   .keys span{ font-size:12.5px; color:var(--ink-3); background:var(--paper); border:1px solid var(--line); border-radius:7px; padding:4px 9px; }
+
+  /* ── ক্রয় ── */
+  .pHead{ display:grid; grid-template-columns:2fr 1fr 1fr; gap:12px; }
+  .pLines td{ padding:6px 5px; }
+  .pLines .in{ padding:7px 8px; }
+  .pLines td.nm{ min-width:200px; }
+  .pLines [data-f="batch"]{ width:110px; } .pLines [data-f="exp"]{ width:150px; }
+  .pLines [data-f="n"]{ width:80px; } .pLines [data-f="unit"]{ width:88px; } .pLines [data-f="rate"]{ width:110px; }
+  .pLines td:nth-child(7){ min-width:96px; white-space:nowrap; }
+  .pick{ position:relative; }
+  .pick .drop{ position:absolute; left:0; right:0; top:100%; z-index:30; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 24px rgba(20,24,32,.12); max-height:240px; overflow:auto; }
+  .pick .drop div{ padding:8px 10px; cursor:pointer; font-size:14px; }
+  .pick .drop div:hover, .pick .drop div.kb{ background:var(--honey-soft); }
+  .pick .drop small{ color:var(--muted); }
+  .pSum{ display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:16px; margin-top:12px; align-items:start; }
+  .pSum .totals input{ width:130px; }
+  .hist .row{ display:flex; justify-content:space-between; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line); }
+  .hist .row:last-child{ border-bottom:0; }
 
   /* ── ওষুধের তালিকা ── */
   .toolbar{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
@@ -239,6 +257,17 @@
     .unitSeg button{ padding:6px 10px; }
     /* ওষুধের তালিকার টেবিল মোবাইলে পাশে স্ক্রল হয়, পাতা নয় */
     #medsBox{ overflow-x:auto; }
+    .pHead{ grid-template-columns:1fr 1fr; }
+    .pHead > :first-child{ grid-column:1 / -1; }
+    .pSum{ grid-template-columns:1fr; }
+    /* ক্রয়ের প্রতিটা লাইন মোবাইলে একটা কার্ড */
+    .pLines thead{ display:none; }
+    .pLines, .pLines tbody{ display:block; }
+    .pLines tr{ display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:12px 0; border-bottom:1px solid var(--line); }
+    .pLines td{ padding:0 !important; border:0 !important; }
+    .pLines td.nm{ grid-column:1 / -1; min-width:0; }
+    .pLines [data-f]{ width:100% !important; }
+    .pLines td[data-l]::before{ content:attr(data-l); display:block; font-size:12px; color:var(--muted); }
     #medsBox table.t{ min-width:560px; }
     .pay button{ min-width:0; }
     /* মোবাইলে কার্ট নিচে আটকে থাকা "মোট + বিক্রি" বার */
@@ -387,9 +416,9 @@ const MENU = [
   { key:"dash",      ic:"🏠", label:"ড্যাশবোর্ড" },
   { key:"pos",       ic:"🛒", label:"বিক্রয় (POS)" },
   { key:"meds",      ic:"💊", label:"ওষুধের তালিকা" },
-  { key:"purchase",  ic:"📥", label:"ক্রয়", soon:true },
+  { key:"purchase",  ic:"📥", label:"ক্রয়" },
   { key:"stock",     ic:"📦", label:"স্টক ব্যবস্থাপনা", soon:true },
-  { key:"suppliers", ic:"🚚", label:"সরবরাহকারী", soon:true },
+  { key:"suppliers", ic:"🚚", label:"সরবরাহকারী" },
   { key:"customers", ic:"👥", label:"গ্রাহক", soon:true },
   { key:"reports",   ic:"📊", label:"রিপোর্ট", soon:true, admin:true },
   { key:"branches",  ic:"🏬", label:"শাখা ব্যবস্থাপনা", soon:true, admin:true },
@@ -424,7 +453,7 @@ function go(k){
   try{ history.replaceState(null, "", "#" + k); }catch(e){}
   renderNav();
   window.scrollTo(0, 0);
-  const P = { dash: pageDash, pos: pagePos, meds: pageMeds, alerts: pageAlerts, users: pageUsers }[k];
+  const P = { dash: pageDash, pos: pagePos, meds: pageMeds, alerts: pageAlerts, users: pageUsers, purchase: pagePurchase, suppliers: pageSuppliers }[k];
   if(P) P(); else pageSoon(k);
   refreshBell();
 }
@@ -925,8 +954,336 @@ function saveMed(old){
   closeModal();
   toast(old ? "✅ বদলানো হয়েছে" : "✅ ওষুধ যোগ হয়েছে");
   pushNow();
-  if(CUR_PAGE === "meds") renderMeds(); else if(CUR_PAGE === "pos"){ renderMedList(); }
+  if(CUR_PAGE === "meds") renderMeds(); else if(CUR_PAGE === "pos"){ renderMedList(); } else if(CUR_PAGE === "purchase"){ renderPurLines(); }
   refreshBell();
+}
+
+
+/* =====================================================================
+   📥 ক্রয় (Purchase) — সরবরাহকারীর কাছ থেকে ওষুধ কেনা
+   স্টক বাড়ে (ব্যাচ ও মেয়াদসহ), পিসের কেনা দাম নতুন দামে বদলায়, আর
+   সরবরাহকারীর হিসাব সাধারণ POS-এর একই খাতায় যায়:
+     shop-suppliers      { id, name, phone, note, due }
+     shop-supplier-txns  { id, supplierId, type:'purchase'|'payment', amount, note, date }
+   তাই সাধারণ POS-এর "সাপ্লায়ার" পাতায় বাকি ঠিকঠাক মিলে থাকে।
+   ===================================================================== */
+const PDRAFT_KEY = "hb-pharma-purchase-draft";
+const PHIST_KEY = "hb-pharma-purchases";
+let PUR = null;   // { supplierId, invNo, date, discount, paid, lines:[{pid, batch, exp, n, unit, rate}] }
+
+function blankPurchase(){ return { supplierId:"", invNo:"", date: todayStr(), discount:0, paid:"", lines:[ { pid:"", batch:"", exp:"", n:"", unit:"box", rate:"" } ] }; }
+const loadSuppliers = ()=> readJSON("shop-suppliers", []);
+function purLine(l, prods){
+  const p = prods.find(x=> x.id === l.pid);
+  if(!p) return null;
+  const u = unitsOf(p).find(x=> x.key === l.unit) || unitsOf(p)[0];
+  const n = Math.max(0, Number(l.n) || 0), rate = Math.max(0, Number(l.rate) || 0);
+  return { p, u, n, rate, pieces: n * u.n, total: r2(n * rate) };
+}
+function purTotals(){
+  const prods = loadProducts();
+  const lines = PUR.lines.map(l=> purLine(l, prods));
+  const sub = r2(lines.reduce((s,l)=> s + (l ? l.total : 0), 0));
+  const disc = Math.min(sub, Math.max(0, Number(PUR.discount) || 0));
+  const net = r2(sub - disc);
+  const paid = PUR.paid === "" ? net : Math.min(net, Math.max(0, Number(PUR.paid) || 0));
+  return { lines, sub, disc, net, paid, due: r2(net - paid) };
+}
+
+function pagePurchase(){
+  if(!PUR) PUR = readJSON(PDRAFT_KEY, null) || blankPurchase();
+  const sups = loadSuppliers();
+  $("page").innerHTML = `
+    <div class="pageHead"><h1>ক্রয় (Purchase)</h1><button class="btn ghost" type="button" id="pNewSup">➕ নতুন সরবরাহকারী</button></div>
+    <div class="panel">
+      <div class="pHead">
+        <div><label class="f">সরবরাহকারী *</label><select class="in" id="pSup"><option value="">— বেছে নিন —</option>${sups.map(s=> `<option value="${esc(s.id)}"${s.id === PUR.supplierId ? " selected" : ""}>${esc(s.name)}${Number(s.due) > 0 ? " (বাকি " + esc(money(s.due)) + ")" : ""}</option>`).join("")}</select></div>
+        <div><label class="f">ইনভয়েস নং</label><input class="in" id="pInv" value="${esc(PUR.invNo)}" placeholder="যেমন: SQ-2026-0895"></div>
+        <div><label class="f">তারিখ</label><input class="in" id="pDate" type="date" value="${esc(PUR.date)}"></div>
+      </div>
+      <div style="overflow:visible; margin-top:14px">
+        <table class="t pLines"><thead><tr><th>ওষুধের নাম</th><th>ব্যাচ</th><th>মেয়াদ</th><th>পরিমাণ</th><th>একক</th><th>ক্রয়দর (প্রতি একক)</th><th class="r">মোট</th><th></th></tr></thead><tbody id="pBody"></tbody></table>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px">
+        <button class="btn ghost" type="button" id="pAddLine">➕ নতুন আইটেম যোগ করুন</button>
+        <button class="btn ghost" type="button" id="pNewMed">💊 তালিকায় নেই এমন ওষুধ</button>
+      </div>
+      <div class="pSum">
+        <div class="hint" id="pHint"></div>
+        <div class="totals" id="pTotals"></div>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:14px">
+        <button class="btn ghost" type="button" id="pClear">🗑️ খালি করুন</button>
+        <button class="btn ghost" type="button" id="pDraft">💾 সংরক্ষণ (Draft)</button>
+        <button class="btn green" type="button" id="pDone" style="min-width:180px">✅ ক্রয় সম্পন্ন</button>
+      </div>
+    </div>
+    <div class="panel hist" style="margin-top:16px"><h2>সাম্প্রতিক ক্রয়</h2><div id="pHist"></div></div>`;
+
+  $("pSup").onchange = ()=>{ PUR.supplierId = $("pSup").value; };
+  $("pInv").oninput = ()=>{ PUR.invNo = $("pInv").value; };
+  $("pDate").onchange = ()=>{ PUR.date = $("pDate").value; };
+  $("pAddLine").onclick = ()=>{ PUR.lines.push({ pid:"", batch:"", exp:"", n:"", unit:"box", rate:"" }); renderPurLines(PUR.lines.length - 1); };
+  $("pNewMed").onclick = ()=> openMedForm(null);
+  $("pNewSup").onclick = openSupplierForm;
+  $("pDraft").onclick = ()=>{ localStorage.setItem(PDRAFT_KEY, JSON.stringify(PUR)); toast("💾 সংরক্ষণ হয়েছে — পরে এখান থেকেই শেষ করতে পারবেন"); pushNow(); };
+  $("pClear").onclick = ()=>{ if(!confirm("এই ক্রয়ের সব লাইন মুছে খালি করবেন?")) return; PUR = blankPurchase(); localStorage.removeItem(PDRAFT_KEY); pagePurchase(); };
+  $("pDone").onclick = completePurchase;
+  renderPurLines(); renderPurHistory();
+}
+
+function renderPurLines(focusIdx){
+  const prods = loadProducts();
+  $("pBody").innerHTML = PUR.lines.map((l, i)=>{
+    const p = prods.find(x=> x.id === l.pid);
+    const units = p ? unitsOf(p) : [{ key:"box", label:"বক্স" }, { key:"strip", label:"পাতা" }, { key:"pc", label:"পিস" }];
+    if(p && !units.some(u=> u.key === l.unit)) l.unit = units[units.length - 1].key;
+    const L = purLine(l, prods);
+    return `<tr>
+      <td class="nm" data-l="ওষুধের নাম"><div class="pick"><input class="in" data-pq="${i}" value="${esc(p ? p.name : "")}" placeholder="নাম লিখে খুঁজুন…" autocomplete="off"><div class="drop" data-pd="${i}" hidden></div></div>${p ? `<div class="hint">স্টক: ${esc(stockText(p))}${packOf(p).perBox > 1 ? " · ১ বক্স = " + bn(packOf(p).perBox) + " পিস" : ""}</div>` : ""}</td>
+      <td data-l="ব্যাচ"><input class="in" data-f="batch" data-i="${i}" value="${esc(l.batch)}" placeholder="P5001"></td>
+      <td data-l="মেয়াদ"><input class="in" data-f="exp" data-i="${i}" type="date" value="${esc(l.exp)}"></td>
+      <td data-l="পরিমাণ"><input class="in num" data-f="n" data-i="${i}" inputmode="numeric" value="${esc(l.n)}" placeholder="০"></td>
+      <td data-l="একক"><select class="in" data-f="unit" data-i="${i}">${units.slice().reverse().map(u=> `<option value="${u.key}"${u.key === l.unit ? " selected" : ""}>${u.label}</option>`).join("")}</select></td>
+      <td data-l="ক্রয়দর (প্রতি একক)"><input class="in num" data-f="rate" data-i="${i}" inputmode="decimal" value="${esc(l.rate)}" placeholder="০"></td>
+      <td class="r num" data-l="মোট"><b>${L ? money(L.total) : "—"}</b>${L && L.pieces ? `<div class="hint">${bn(L.pieces)} পিস</div>` : ""}</td>
+      <td><button class="x" type="button" data-pdel="${i}" aria-label="লাইন মুছুন">✕</button></td>
+    </tr>`;
+  }).join("");
+
+  $("pBody").querySelectorAll("[data-f]").forEach(el=>{
+    const ev = el.tagName === "SELECT" || el.type === "date" ? "change" : "input";
+    el.addEventListener(ev, ()=>{
+      const l = PUR.lines[+el.dataset.i]; l[el.dataset.f] = el.value;
+      if(el.dataset.f === "unit"){ prefillRate(l); renderPurLines(); } else renderPurTotals();
+    });
+  });
+  $("pBody").querySelectorAll("[data-pdel]").forEach(b=> b.onclick = ()=>{
+    PUR.lines.splice(+b.dataset.pdel, 1);
+    if(!PUR.lines.length) PUR.lines.push({ pid:"", batch:"", exp:"", n:"", unit:"box", rate:"" });
+    renderPurLines();
+  });
+  $("pBody").querySelectorAll("[data-pq]").forEach(inp=> wirePicker(inp));
+  if(focusIdx != null){ const f = $("pBody").querySelector(`[data-pq="${focusIdx}"]`); if(f) f.focus(); }
+  renderPurTotals();
+}
+// পুরনো কেনা দাম আগে থেকে বসানো — বদলাতে চাইলে বদলানো যায়
+function prefillRate(l){
+  const p = loadProducts().find(x=> x.id === l.pid); if(!p) return;
+  const u = unitsOf(p).find(x=> x.key === l.unit); if(!u) return;
+  if(Number(p.buy) > 0) l.rate = String(r2(Number(p.buy) * u.n));
+}
+function wirePicker(inp){
+  const i = +inp.dataset.pq, drop = document.querySelector(`[data-pd="${i}"]`);
+  let kb = 0, hits = [];
+  const draw = ()=>{
+    const q = inp.value.trim();
+    hits = loadProducts().filter(p=> medMatches(p, q)).slice(0, 30);
+    drop.hidden = !hits.length || document.activeElement !== inp;
+    drop.innerHTML = hits.map((p, k)=> `<div class="${k === kb ? "kb" : ""}" data-pick="${esc(p.id)}"><b>${esc(p.name)}</b> <small>${esc(p.genericName || "")} · স্টক ${esc(stockText(p))}</small></div>`).join("");
+    drop.querySelectorAll("[data-pick]").forEach(d=> d.onmousedown = (e)=>{ e.preventDefault(); choose(d.dataset.pick); });
+  };
+  const choose = (pid)=>{
+    const l = PUR.lines[i]; l.pid = pid;
+    const p = loadProducts().find(x=> x.id === pid);
+    const units = unitsOf(p); l.unit = units[units.length - 1].key; // সাধারণত বক্সে কেনা হয়
+    prefillRate(l);
+    renderPurLines();
+    const q = $("pBody").querySelector(`[data-f="batch"][data-i="${i}"]`); if(q) q.focus();
+  };
+  inp.addEventListener("focus", ()=>{ kb = 0; draw(); });
+  inp.addEventListener("input", ()=>{ kb = 0; draw(); });
+  inp.addEventListener("blur", ()=> setTimeout(()=>{ drop.hidden = true; }, 120));
+  inp.addEventListener("keydown", (e)=>{
+    if(e.key === "ArrowDown"){ e.preventDefault(); kb = Math.min(hits.length - 1, kb + 1); draw(); }
+    else if(e.key === "ArrowUp"){ e.preventDefault(); kb = Math.max(0, kb - 1); draw(); }
+    else if(e.key === "Enter"){ e.preventDefault(); if(hits[kb]) choose(hits[kb].id); }
+  });
+}
+function renderPurTotals(){
+  const T = purTotals();
+  // লাইনের "মোট" ঘরগুলো হালনাগাদ (পুরো টেবিল না এঁকে — টাইপ করার সময় কার্সর যেন না হারায়)
+  [...$("pBody").children].forEach((tr, i)=>{ const L = T.lines[i]; const td = tr.children[6]; if(td) td.innerHTML = `<b>${L ? money(L.total) : "—"}</b>${L && L.pieces ? `<div class="hint">${bn(L.pieces)} পিস</div>` : ""}`; });
+  $("pTotals").innerHTML = `
+    <div><span>মোট</span><span class="num">${money(T.sub)}</span></div>
+    <div><span>ডিসকাউন্ট</span><input class="num" id="pDisc" inputmode="decimal" value="${PUR.discount || ""}" placeholder="০"></div>
+    <div class="grand"><span>নেট মোট</span><span class="num">${money(T.net)}</span></div>
+    <div><span>এখন পরিশোধ</span><input class="num" id="pPaid" inputmode="decimal" value="${esc(PUR.paid)}" placeholder="${esc(String(T.net))}"></div>
+    <div><span>সরবরাহকারীর কাছে বাকি</span><span class="num ${T.due > 0 ? "bad" : ""}">${money(T.due)}</span></div>`;
+  $("pDisc").onchange = ()=>{ PUR.discount = Math.max(0, Number($("pDisc").value) || 0); renderPurTotals(); };
+  $("pPaid").onchange = ()=>{ PUR.paid = $("pPaid").value.trim(); renderPurTotals(); };
+  const ok = T.lines.filter(Boolean).length;
+  $("pHint").innerHTML = `${ok ? bn(ok) + "টি ওষুধ" : "লাইনে ওষুধের নাম লিখে বেছে নিন"} · পরিমাণ যে এককে কিনছেন (সাধারণত বক্স), ক্রয়দরও সেই এককের দাম।<br>"এখন পরিশোধ" খালি রাখলে পুরো টাকা পরিশোধ ধরা হবে। কম দিলে বাকিটা সরবরাহকারীর বাকিতে যোগ হবে।`;
+}
+
+function completePurchase(){
+  const T = purTotals();
+  const sup = loadSuppliers().find(s=> s.id === PUR.supplierId);
+  if(!sup){ toast("সরবরাহকারী বেছে নিন"); $("pSup").focus(); return; }
+  const lines = T.lines.map((L, i)=> L ? Object.assign({ raw: PUR.lines[i] }, L) : null).filter(L=> L && L.n > 0);
+  if(!lines.length){ toast("অন্তত একটা ওষুধের পরিমাণ লিখুন"); return; }
+  const bad = lines.find(L=> !(L.rate > 0));
+  if(bad){ toast("⚠️ " + bad.p.name + " — ক্রয়দর লিখুন"); return; }
+  if(!confirm(`${sup.name}-এর কাছ থেকে ${bn(lines.length)}টি ওষুধ, মোট ${money(T.net)}।\nপরিশোধ ${money(T.paid)}${T.due > 0 ? ", বাকি " + money(T.due) : ""}।\n\nস্টকে যোগ করবেন?`)) return;
+
+  const prods = loadProducts();
+  const touched = [];
+  lines.forEach(L=>{
+    const p = prods.find(x=> x.id === L.p.id); if(!p) return;
+    p.qty = (Number(p.qty) || 0) + L.pieces;
+    p.batches = p.batches || [];
+    p.batches.push({ batchNo: (L.raw.batch || "").trim(), expiryDate: L.raw.exp || "", qty: L.pieces, addedAt: Date.now(), supplierId: sup.id, invoiceNo: PUR.invNo || "" });
+    // নতুন কেনা দাম — পিস ও বক্সের হিসাবে
+    p.buy = r2(L.rate / L.u.n * 10000) / 10000;
+    p.pharma = Object.assign({}, p.pharma || {}, { boxBuy: r2(p.buy * packOf(p).perBox) });
+    if(!p.productType || p.productType === "standard") p.productType = "batch";
+    if(!touched.includes(p)) touched.push(p);
+  });
+  saveProducts(prods);
+  syncBazarStock(touched);
+
+  // সরবরাহকারীর হিসাব — সাধারণ POS-এর একই নিয়মে
+  const sups = loadSuppliers(); const s = sups.find(x=> x.id === sup.id);
+  s.due = r2(Math.max(0, (Number(s.due) || 0) + T.due));
+  localStorage.setItem("shop-suppliers", JSON.stringify(sups));
+  const txns = readJSON("shop-supplier-txns", []);
+  const when = PUR.date && PUR.date !== todayStr() ? new Date(PUR.date + "T12:00:00").toISOString() : new Date().toISOString();
+  const note = "💊 ফার্মেসি ক্রয়" + (PUR.invNo ? " · ইনভয়েস " + PUR.invNo : "") + " · " + lines.length + "টি ওষুধ";
+  txns.push({ id: uid(), supplierId: s.id, type: "purchase", amount: T.net, note, date: when });
+  if(T.paid > 0) txns.push({ id: uid(), supplierId: s.id, type: "payment", amount: T.paid, note: T.due > 0 ? "আংশিক পরিশোধ (ক্রয়ের সময়)" : "ক্রয়ের সাথে সাথে পরিশোধ", date: when });
+  localStorage.setItem("shop-supplier-txns", JSON.stringify(txns));
+
+  // সাম্প্রতিক ক্রয়ের তালিকা (শেষ ১০০টা)
+  const hist = readJSON(PHIST_KEY, []);
+  hist.unshift({ id: uid(), supplierId: s.id, supplierName: s.name, invNo: PUR.invNo || "", date: when, net: T.net, paid: T.paid, due: T.due, by: (SESSION && SESSION.name) || "",
+    items: lines.map(L=> ({ name: L.p.name, n: L.n, unit: L.u.label, rate: L.rate, batch: L.raw.batch || "", exp: L.raw.exp || "" })) });
+  localStorage.setItem(PHIST_KEY, JSON.stringify(hist.slice(0, 100)));
+
+  localStorage.removeItem(PDRAFT_KEY);
+  PUR = blankPurchase();
+  pushNow();
+  toast("✅ ক্রয় সম্পন্ন — স্টকে যোগ হয়েছে");
+  pagePurchase(); refreshBell();
+}
+
+function renderPurHistory(){
+  const hist = readJSON(PHIST_KEY, []);
+  if(!hist.length){ $("pHist").innerHTML = `<div class="empty">এখনো কোনো ক্রয় হয়নি।</div>`; return; }
+  $("pHist").innerHTML = hist.slice(0, 15).map(h=> `<div class="row">
+    <div><b>${esc(h.supplierName)}</b>${h.invNo ? ` <span class="chip">${esc(h.invNo)}</span>` : ""}<div class="hint">${fmtDate(h.date)} · ${bn(h.items.length)}টি ওষুধ${h.by ? " · " + esc(h.by) : ""}</div>
+      <div class="hint">${h.items.slice(0, 4).map(it=> esc(it.name) + " " + bn(it.n) + " " + esc(it.unit)).join(", ")}${h.items.length > 4 ? " …" : ""}</div></div>
+    <div style="text-align:right; white-space:nowrap"><b class="num">${money(h.net)}</b>${h.due > 0 ? `<div class="hint bad">বাকি ${money(h.due)}</div>` : `<div class="hint">পরিশোধিত</div>`}</div>
+  </div>`).join("");
+}
+
+function openSupplierForm(){
+  openModal(`<div class="head"><h3>➕ নতুন সরবরাহকারী</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <label class="f">নাম *</label><input class="in" id="sName" placeholder="যেমন: Square Pharmaceuticals">
+    <div class="row2"><div><label class="f">মোবাইল</label><input class="in" id="sPhone" inputmode="tel"></div><div><label class="f">পুরনো বাকি (থাকলে)</label><input class="in num" id="sDue" inputmode="decimal" placeholder="০"></div></div>
+    <label class="f">নোট</label><input class="in" id="sNote" placeholder="যেমন: প্রতিনিধি রহিম ভাই, সোমবার আসেন">
+    <div class="foot"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="sSave">💾 সেভ করুন</button></div>`);
+  $("sSave").onclick = ()=>{
+    const name = $("sName").value.trim(); if(!name){ toast("নাম লিখুন"); return; }
+    const due = Math.max(0, Number($("sDue").value) || 0);
+    const sups = loadSuppliers();
+    const s = { id: uid(), name, phone: $("sPhone").value.trim(), note: $("sNote").value.trim(), due };
+    sups.push(s); localStorage.setItem("shop-suppliers", JSON.stringify(sups));
+    if(due > 0){ const t = readJSON("shop-supplier-txns", []); t.push({ id: uid(), supplierId: s.id, type: "purchase", amount: due, note: "পুরাতন বাকি (হিসাব যোগ করার সময় শুরুতে যোগ করা হয়েছে)", date: new Date().toISOString() }); localStorage.setItem("shop-supplier-txns", JSON.stringify(t)); }
+    closeModal(); pushNow(); toast("✅ সরবরাহকারী যোগ হয়েছে");
+    if(PUR) PUR.supplierId = s.id;
+    if(CUR_PAGE === "purchase") pagePurchase(); else if(CUR_PAGE === "suppliers") pageSuppliers();
+  };
+}
+
+
+/* =====================================================================
+   🚚 সরবরাহকারী — বাকি, লেনদেনের খাতা, বাকি পরিশোধ
+   সাধারণ POS-এর একই খাতা (shop-suppliers / shop-supplier-txns)।
+   বাকি পরিশোধ সাধারণ POS-এর মতোই খরচের খাতাতেও ("সাপ্লায়ার পেমেন্ট") যায়।
+   ===================================================================== */
+let SUP_Q = "";
+function pageSuppliers(){
+  const sups = loadSuppliers();
+  const totalDue = sups.reduce((a,s)=> a + Math.max(0, Number(s.due) || 0), 0);
+  $("page").innerHTML = `
+    <div class="pageHead"><h1>সরবরাহকারী</h1><button class="btn" type="button" id="supAdd">➕ নতুন সরবরাহকারী</button></div>
+    ${isAdmin() ? `<div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr)); max-width:640px">
+      <div class="stat b"><div class="ic">🚚</div><div><div class="lbl">মোট সরবরাহকারী</div><div class="val num">${bn(sups.length)}</div></div></div>
+      <div class="stat r"><div class="ic">💸</div><div><div class="lbl">মোট বাকি (আমাদের দেনা)</div><div class="val num">${money(totalDue)}</div></div></div>
+    </div>` : ""}
+    <div class="toolbar"><input class="in" id="supQ" placeholder="🔍 নাম বা মোবাইল দিয়ে খুঁজুন" value="${esc(SUP_Q)}"></div>
+    <div class="panel" style="padding:6px 8px" id="supBox"></div>`;
+  $("supAdd").onclick = openSupplierForm;
+  $("supQ").oninput = ()=>{ SUP_Q = $("supQ").value.trim(); renderSuppliers(); };
+  renderSuppliers();
+}
+function renderSuppliers(){
+  const q = SUP_Q.toLowerCase();
+  const list = loadSuppliers().filter(s=> !q || String(s.name || "").toLowerCase().includes(q) || String(s.phone || "").includes(q))
+    .sort((a,b)=> (Number(b.due) || 0) - (Number(a.due) || 0));
+  if(!list.length){ $("supBox").innerHTML = `<div class="empty">${q ? "এই নামে কেউ নেই।" : "এখনো কোনো সরবরাহকারী নেই। \"➕ নতুন সরবরাহকারী\" চেপে যোগ করুন।"}</div>`; return; }
+  const hist = readJSON(PHIST_KEY, []);
+  $("supBox").innerHTML = `<table class="t"><thead><tr><th>নাম</th><th>মোবাইল</th><th class="r">শেষ ক্রয়</th>${isAdmin() ? '<th class="r">বাকি</th>' : ""}</tr></thead><tbody>
+    ${list.map(s=>{ const last = hist.find(h=> h.supplierId === s.id); return `<tr data-sup="${esc(s.id)}" style="cursor:pointer">
+      <td><b>${esc(s.name)}</b>${s.note ? `<div class="hint">${esc(s.note)}</div>` : ""}</td>
+      <td>${s.phone ? `<a href="tel:${esc(s.phone)}" onclick="event.stopPropagation()">${esc(s.phone)}</a>` : "—"}</td>
+      <td class="r">${last ? fmtDate(last.date) : "—"}</td>
+      ${isAdmin() ? `<td class="r num ${Number(s.due) > 0 ? "bad" : ""}">${money(s.due || 0)}</td>` : ""}
+    </tr>`; }).join("")}</tbody></table>`;
+  $("supBox").querySelectorAll("[data-sup]").forEach(tr=> tr.onclick = ()=> openSupplierLedger(tr.dataset.sup));
+}
+function openSupplierLedger(id){
+  const s = loadSuppliers().find(x=> x.id === id); if(!s) return;
+  const txns = readJSON("shop-supplier-txns", []).filter(t=> t.supplierId === id).sort((a,b)=> String(a.date).localeCompare(String(b.date)));
+  // খাতায় লেখা নেই এমন পুরনো বাকি থাকলে (যেমন আগে হাতে বসানো) শুরুতে "আগের বাকি" সারি —
+  // যাতে শেষ স্থিতি সবসময় বর্তমান বাকির সাথে মেলে
+  const net = txns.reduce((a,t)=> a + (t.type === "purchase" ? 1 : -1) * (Number(t.amount) || 0), 0);
+  const opening = r2((Number(s.due) || 0) - net);
+  let bal = opening;
+  const rows = txns.map(t=>{ bal += (t.type === "purchase" ? 1 : -1) * (Number(t.amount) || 0); return { t, bal: r2(bal) }; });
+  if(Math.abs(opening) >= 0.01) rows.unshift({ t: { date: txns.length ? txns[0].date : new Date().toISOString(), note: "আগের বাকি", type: opening > 0 ? "purchase" : "payment", amount: Math.abs(opening) }, bal: opening });
+  rows.reverse();
+  const admin = isAdmin();
+  openModal(`<div class="head"><h3>🚚 ${esc(s.name)}</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="hint">${s.phone ? "📱 " + esc(s.phone) : ""}${s.note ? " · " + esc(s.note) : ""}</div>
+    ${admin ? `<div class="calc" style="display:flex; justify-content:space-between; align-items:center"><span>বর্তমান বাকি (আমাদের দেনা)</span><b class="num ${Number(s.due) > 0 ? "bad" : ""}" style="font-size:20px">${money(s.due || 0)}</b></div>
+    <h3 style="font-size:16px; margin:16px 0 6px">লেনদেনের খাতা</h3>
+    ${rows.length ? `<table class="t"><thead><tr><th>তারিখ</th><th>বিবরণ</th><th class="r">ক্রয়</th><th class="r">পরিশোধ</th><th class="r">স্থিতি</th></tr></thead><tbody>
+      ${rows.map(({t, bal})=> `<tr><td>${fmtDate(t.date)}</td><td>${esc(t.note || (t.type === "purchase" ? "ক্রয়" : "পরিশোধ"))}</td><td class="r num">${t.type === "purchase" ? money(t.amount) : ""}</td><td class="r num">${t.type === "payment" ? money(t.amount) : ""}</td><td class="r num">${money(bal)}</td></tr>`).join("")}
+    </tbody></table>` : `<div class="empty">এখনো কোনো লেনদেন নেই।</div>`}` : `<div class="empty">টাকার হিসাব শুধু এডমিন দেখতে পারেন।</div>`}
+    <div class="foot">
+      <button class="btn ghost" type="button" id="supBuy">📥 এর কাছ থেকে ক্রয়</button>
+      ${admin && Number(s.due) > 0 ? `<button class="btn green" type="button" id="supPay">💵 বাকি পরিশোধ</button>` : ""}
+    </div>`);
+  $("supBuy").onclick = ()=>{ closeModal(); PUR = PUR || readJSON(PDRAFT_KEY, null) || blankPurchase(); PUR.supplierId = id; go("purchase"); };
+  if($("supPay")) $("supPay").onclick = ()=> openSupplierPay(id);
+}
+function openSupplierPay(id){
+  const s = loadSuppliers().find(x=> x.id === id); if(!s) return;
+  const due = Number(s.due) || 0;
+  openModal(`<div class="head"><h3>💵 ${esc(s.name)} — বাকি পরিশোধ</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="calc">বর্তমান বাকি: <b>${money(due)}</b></div>
+    <div class="row2"><div><label class="f">কত টাকা দিচ্ছেন *</label><input class="in num" id="spAmt" inputmode="decimal" value="${due}"></div>
+      <div><label class="f">কীভাবে</label><select class="in" id="spVia"><option value="cash">নগদ</option><option value="bank">ব্যাংক / বিকাশ</option></select></div></div>
+    <label class="f">নোট</label><input class="in" id="spNote" placeholder="যেমন: প্রতিনিধির হাতে দেওয়া">
+    <div class="foot"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn green" type="button" id="spSave">✅ পরিশোধ করুন</button></div>`);
+  $("spSave").onclick = ()=>{
+    const amt = r2(Number($("spAmt").value) || 0);
+    if(!(amt > 0)){ toast("টাকার পরিমাণ লিখুন"); return; }
+    if(amt > due){ toast("বাকির চেয়ে বেশি দেওয়া যাবে না"); return; }
+    const sups = loadSuppliers(); const x = sups.find(y=> y.id === id);
+    x.due = r2(Math.max(0, (Number(x.due) || 0) - amt));
+    localStorage.setItem("shop-suppliers", JSON.stringify(sups));
+    const note = ($("spNote").value.trim() || "বাকি পরিশোধ") + ($("spVia").value === "bank" ? " (ব্যাংক/বিকাশ)" : "");
+    const txns = readJSON("shop-supplier-txns", []); txns.push({ id: uid(), supplierId: id, type: "payment", amount: amt, note, date: new Date().toISOString() });
+    localStorage.setItem("shop-supplier-txns", JSON.stringify(txns));
+    // সাধারণ POS-এর মতোই খরচের খাতায় — কোন খাতে কত টাকা গেল সেটা মনিটরিংয়ে দেখা যায়
+    const ex = readJSON("shop-expenses", []); ex.push({ id: uid(), category: "সাপ্লায়ার পেমেন্ট", person: x.name, amount: amt, note, date: new Date().toISOString() });
+    localStorage.setItem("shop-expenses", JSON.stringify(ex));
+    pushNow(); toast("✅ " + money(amt) + " পরিশোধ হয়েছে");
+    openSupplierLedger(id);
+    if(CUR_PAGE === "suppliers") pageSuppliers();
+  };
 }
 
 /* =====================================================================
@@ -1031,7 +1388,7 @@ auth.onAuthStateChanged(async (user)=>{
   netLabel();
   $("gate").remove(); $("app").hidden = false; $("bnav").hidden = false;
   const start = (location.hash || "").replace("#", "");
-  go(["dash","pos","meds","alerts"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
+  go(["dash","pos","meds","alerts","purchase","suppliers"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
 });
 </script>
 </body>
