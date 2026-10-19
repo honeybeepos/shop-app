@@ -81,6 +81,14 @@
   table.ms td{padding:5px 6px;border-bottom:1px dashed var(--line)}
   table.ms td:last-child{text-align:right;font-weight:800;color:var(--plum);white-space:nowrap}
   .mhd{font-weight:800;font-size:12.5px;margin-top:10px;color:var(--plum)}
+  /* 📏 মাপ ড্রপডাউন — চাপ দিলে খোলে/বন্ধ হয় */
+  details.mdrop{margin-top:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  details.mdrop > summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;background:#fdf2f8}
+  details.mdrop > summary::-webkit-details-marker{display:none}
+  details.mdrop > summary .mhd{margin:0}
+  details.mdrop > summary .chev{display:inline-block;font-size:11px;color:var(--plum);transition:transform .2s}
+  details.mdrop[open] > summary .chev{transform:rotate(180deg)}
+  details.mdrop .mbody{padding:2px 11px 10px}
   .bill{background:#fffafc;border:1px solid var(--pink2);border-radius:12px;padding:10px;margin-top:10px;font-size:13.5px}
   .bill div{display:flex;justify-content:space-between;margin:2px 0}
   .btnrow{display:flex;gap:8px;margin-top:10px}
@@ -584,16 +592,26 @@ function listenOrders(){
   }, ()=> { $("orderList").innerHTML = `<div class="card empty">অর্ডার আনা যায়নি — ইন্টারনেট দেখুন।</div>`; });
 }
 
-function measureHTML(m){
+/* 📏 মাপ এখন ড্রপডাউন — "📏 মাপ — …" চাপলে খোলে। অর্ডারের তালিকা লাইভ আপডেট হলেও
+   যেটা খোলা ছিল সেটা খোলাই থাকে (openMeasures-এ মনে রাখা হয়)। */
+const openMeasures = new Set();
+document.addEventListener("toggle", (e)=>{
+  const d = e.target;
+  if(!d || !d.classList || !d.classList.contains("mdrop") || !d.dataset.mkey) return;
+  if(d.open) openMeasures.add(d.dataset.mkey); else openMeasures.delete(d.dataset.mkey);
+}, true);
+function measureHTML(m, key){
   if(!m) return `<div class="info warn">📏 গ্রাহক মাপ দেননি — ফোন করে জেনে নিন।</div>`;
-  let h = `<div class="mhd">📏 মাপ — ${esc(m.label||"")} <span class="muted">(ইঞ্চি)</span></div>`;
+  const k = String(key || m.label || "m");
+  const n = ["kameez","pajama"].reduce((a,part)=> a + (m[part] ? Object.keys(MLABEL[part]).filter(x=> m[part][x] !== "" && m[part][x] != null).length : 0), 0);
+  let h = `<details class="mdrop" data-mkey="${esc(k)}"${openMeasures.has(k) ? " open" : ""}><summary><span class="mhd">📏 মাপ — ${esc(m.label||"")} <span class="muted">(ইঞ্চি)</span></span><span class="muted" style="font-size:11.5px;white-space:nowrap">${bn(n)}টা মাপ <span class="chev">▼</span></span></summary><div class="mbody">`;
   ["kameez","pajama"].forEach(part=>{
     const vals = m[part]; if(!vals) return;
     const rows = Object.keys(MLABEL[part]).filter(k=> vals[k] !== "" && vals[k] != null).map(k=> `<tr><td>${MLABEL[part][k]}</td><td>${bn(vals[k])}</td></tr>`).join("");
     if(rows) h += `<div class="muted" style="margin-top:6px;font-weight:800">${part === "kameez" ? "👗 জামা" : "👖 পায়জামা"}</div><table class="ms">${rows}</table>`;
   });
   if(m.note) h += `<div class="muted" style="margin-top:4px">📝 মাপের নোট: ${esc(m.note)}</div>`;
-  return h;
+  return h + `</div></details>`;
 }
 function billHTML(o){
   const stitch = o.stitchTotal != null ? o.stitchTotal : Number(o.price||0) * Number(o.qty||1);
@@ -635,7 +653,7 @@ function orderCardHTML(o){
         ${showContact && o.customerPhone ? `<a href="tel:${esc(o.customerPhone)}" style="color:var(--rose);font-weight:800;font-size:13px;text-decoration:none">📞 ${esc(o.customerPhone)}</a>` : ""}</div>
     </div>
     ${o.note ? `<div class="info warn">📝 গ্রাহক বলেছেন: ${esc(o.note)}</div>` : ""}
-    ${measureHTML(o.measure)}
+    ${measureHTML(o.measure, o.id)}
     ${billHTML(o)}
     ${riderHTML(o)}
     ${o.status === "declined" && o.tailorNote ? `<div class="muted" style="margin-top:6px">কারণ: ${esc(o.tailorNote)}</div>` : ""}
@@ -1041,7 +1059,7 @@ function walkinCardHTML(w){
         ${w.customerPhone ? `<a href="tel:${esc(w.customerPhone)}" style="color:var(--rose);font-weight:800;font-size:13px;text-decoration:none">📞 ${esc(w.customerPhone)}</a>` : ""}</div>
     </div>
     ${w.note ? `<div class="info warn">📝 ${esc(w.note)}</div>` : ""}
-    ${(w.measure && (w.measure.kameez || w.measure.pajama)) ? measureHTML({ label:"দোকানে নেওয়া", ...w.measure }) : ""}
+    ${(w.measure && (w.measure.kameez || w.measure.pajama)) ? measureHTML({ label:"দোকানে নেওয়া", ...w.measure }, "wk-" + w.id) : ""}
     <div class="bill">
       <div><span>মজুরি (${tk(w.price)} × ${bn(w.qty)})</span><b>${tk(w.total)}</b></div>
       <div><span>অগ্রিম</span><b style="color:var(--green)">${tk(w.advance||0)}</b></div>
