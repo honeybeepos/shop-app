@@ -3305,6 +3305,21 @@ let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], a
    পেজ (লগইন ছাড়াই) খুলে যায়। hbOpenPublicProductPage() ফাংশনটা নিচে (hoisted) ডিফাইন করা। */
 (function hbDetectPublicProductDeepLink(){
   const params = new URLSearchParams(location.search);
+  /* ✅ নতুন লিংক — honeybeebazar.com/?d=… (ডিজাইন) আর /?s=…&p=… (প্রোডাক্ট)।
+     /d/… বা /p/… লিংক GitHub-এ "404 (পাতা নেই)" হিসেবে খোলে, তাই Facebook সেটাকে
+     নষ্ট লিংক ভেবে কমেন্টে চাপার-যোগ্য লিংক বানায় না। ?d=/?p= লিংক আসল পাতা (200) হিসেবে
+     খোলে। পুরনো /d/ আর /p/ লিংকও নিচে আগের মতোই কাজ করে। */
+  const qd = params.get('d'), qs_ = params.get('s'), qp = params.get('p');
+  if(qd && /^[A-Za-z0-9_-]{6,40}$/.test(qd)){
+    const go = ()=> tlrOpenSharedDesign(qd);
+    if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', go); } else go();
+    return;
+  }
+  if(qs_ && qp){
+    const go = ()=> hbOpenPublicProductPage(qs_, qp);
+    if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', go); } else go();
+    return;
+  }
   const targetPath = params.get('hbRedirect') || (/^\/(p|d)\//.test(location.pathname) ? location.pathname : null);
   if(!targetPath) return;
   // 🧵 /d/{designId} — দর্জির শেয়ার করা ডিজাইন
@@ -10609,6 +10624,11 @@ function hbShareLink(title, text, url){
   }
   prompt("এই লিংকটা কপি করে শেয়ার করুন:", full);
 }
+// 🔗 শেয়ারের লিংক — সবসময় আসল ডোমেইনে, আর এমন ঠিকানায় যেটা সরাসরি খোলে (Facebook লিংক চেনে)
+const HB_SITE = "https://honeybeebazar.com";
+function hbProductShareUrl(shopId, productId){ return `${HB_SITE}/?s=${encodeURIComponent(shopId)}&p=${encodeURIComponent(productId)}`; }
+function hbDesignShareUrl(designId){ return `${HB_SITE}/?d=${encodeURIComponent(designId)}`; }
+
 // 📤 কার্ডের শেয়ার বাটন — data-* থেকে তথ্য নেয় (নাম/দোকানের নামে ' বা " থাকলেও ভাঙে না)
 const HB_SHARE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>';
 function hbShareChip(o, extraClass){
@@ -10621,12 +10641,12 @@ window.hbShareFromChip = function(ev, btn){
   if(d.shKind === "design"){
     hbShareLink(d.shName || "ডিজাইন",
       `🧵 ${d.shName || "ডিজাইন"} — ৳${d.shPrice} মজুরি\n✂️ ${d.shShop || "সেলাই ঘর"} (Honey Bee Bazar)\nনিজের কাপড়ে সেলাই করিয়ে নিন`,
-      `${location.origin}/d/${encodeURIComponent(d.shId)}`);
+      hbDesignShareUrl(d.shId));
     return;
   }
   hbShareLink(d.shName || "প্রোডাক্ট",
     `🐝 ${d.shName || "প্রোডাক্ট"} — ${HB_CUR}${d.shPrice}\n🏪 ${d.shShop || "দোকান"} (Honey Bee Bazar)`,
-    `${location.origin}/p/${encodeURIComponent(d.shShopid)}/${encodeURIComponent(d.shId)}`);
+    hbProductShareUrl(d.shShopid, d.shId));
 };
 
 // 🏪 দোকানের পাতার প্রোডাক্ট — বাজারের প্রোডাক্টের মতোই /p/{shopId}/{productId} লিংক
@@ -10637,7 +10657,7 @@ window.hbShareShopProduct = function(productId){
   const om = hbGetOfferMeta(p);
   hbShareLink(p.name || "প্রোডাক্ট",
     `🐝 ${p.name || "প্রোডাক্ট"} — ${HB_CUR}${om.finalPrice}\n🏪 ${shopName} (Honey Bee Bazar)`,
-    `${location.origin}/p/${encodeURIComponent(currentShopId)}/${encodeURIComponent(productId)}`);
+    hbProductShareUrl(currentShopId, productId));
 };
 
 window.hbShareProduct = function(key){
@@ -10645,7 +10665,7 @@ window.hbShareProduct = function(key){
   if(!reg || !reg.shopId || !reg.productId) return;
   const productName = reg.productName || "প্রোডাক্ট";
   const shopName = reg.shopName || "দোকান";
-  const shareUrl = `${location.origin}/p/${reg.shopId}/${reg.productId}`;
+  const shareUrl = hbProductShareUrl(reg.shopId, reg.productId);
   const shareText = `🐝 ${productName} — ${shopName} (Honey Bee Bazar): ${shareUrl}`;
   if(navigator.share){
     navigator.share({ title: productName, text: shareText, url: shareUrl }).catch(()=>{});

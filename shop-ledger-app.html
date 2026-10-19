@@ -13370,7 +13370,8 @@ function bccProductPublicLink(productId){
   // getSession() কল করে লোকালি বের করতে হয়
   const session = (typeof getSession === 'function') ? getSession() : null;
   const shopId = (session && session.shopId) ? session.shopId : '';
-  return 'https://honeybeebazar.com/p/' + encodeURIComponent(shopId) + '/' + encodeURIComponent(productId);
+  // ✅ /?s=…&p=… — আসল পাতা হিসেবে খোলে (পুরনো /p/… লিংক GitHub-এ 404 দিত, Facebook সেটাকে লিংক ধরত না)
+  return 'https://honeybeebazar.com/?s=' + encodeURIComponent(shopId) + '&p=' + encodeURIComponent(productId);
 }
 
 function bccCheckMarginWarning(){

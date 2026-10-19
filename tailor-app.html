@@ -407,7 +407,8 @@ function renderDesigns(){
 function shareDesign(id){
   const d = designs.find(x=> x.id === id); if(!d) return;
   if(!d.published){ alert("ডিজাইনটা এখন লুকানো আছে — শেয়ার করার আগে \"✏️ বদলান\" থেকে \"গ্রাহককে দেখান\" চালু করুন।"); return; }
-  const url = location.origin + "/d/" + encodeURIComponent(id);
+  // ✅ /?d= লিংক — আসল পাতা হিসেবে খোলে, তাই Facebook কমেন্টেও চাপার-যোগ্য লিংক হয়
+  const url = "https://honeybeebazar.com/?d=" + encodeURIComponent(id);
   const shop = (T.data && T.data.name) || "সেলাই ঘর";
   const text = `🧵 ${d.title}\n৳ ${d.price} মজুরি${d.days ? " · " + d.days + " দিনে তৈরি" : ""}\n✂️ ${shop}${T.data && T.data.area ? " (" + T.data.area + ")" : ""}\nনিজের কাপড়ে অর্ডার দিন — Honey Bee Bazar`;
   const full = text + "\n👉 " + url;
