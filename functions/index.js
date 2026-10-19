@@ -2351,6 +2351,37 @@ exports.cleanupOldHistory = onSchedule("every 24 hours", async () => {
   await Promise.all(oldPickups.docs.map((doc) => doc.ref.delete()));
   totalDeleted += oldPickups.size;
 
+  // ৪-৭. 👀 "গ্রাহক কী দেখছেন"-এর হিসাব — ৭ দিনের বেশি পুরনো হলে মুছে যায়
+  //   সুপার-এডমিন: activeSessions (lastHeartbeat)
+  //   POS: shopVisits, productViews (timestamp)
+  //   সেলাই ঘর: tailorDesignViews (lastAt — শেষবার দেখার সময়; ৭ দিনে আর না দেখলে মোছে)
+  //   একটা মাত্র ফিল্ডে "<" খোঁজা, তাই আলাদা index লাগে না। একবারে ৪০০টা করে মোছে,
+  //   অনেক জমে থাকলে প্রতিদিন কিছু কিছু করে শেষ হবে (একদিনে সর্বোচ্চ ~৮০০০টা প্রতি ঘর)।
+  const VIEW_LOGS = [
+    ["activeSessions", "lastHeartbeat"],
+    ["shopVisits", "timestamp"],
+    ["productViews", "timestamp"],
+    ["tailorDesignViews", "lastAt"],
+  ];
+  for (const [col, field] of VIEW_LOGS) {
+    let removed = 0;
+    try {
+      for (let round = 0; round < 20; round++) {
+        const snap = await db.collection(col).where(field, "<", sevenDaysAgo).limit(400).get();
+        if (snap.empty) break;
+        const batch = db.batch();
+        snap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+        removed += snap.size;
+        if (snap.size < 400) break;
+      }
+    } catch (e) {
+      console.error(`👀 ${col} পরিষ্কার করা যায়নি:`, e.message || e);
+    }
+    if (removed) console.log(`👀 ${col}: ৭ দিনের পুরনো ${removed}টা মুছে ফেলা হয়েছে`);
+    totalDeleted += removed;
+  }
+
   console.log(`🗑️ ৭ দিনের পুরনো ${totalDeleted}টা হিস্ট্রি রেকর্ড মুছে ফেলা হয়েছে`);
 });
 
