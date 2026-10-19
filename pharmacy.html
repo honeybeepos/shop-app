@@ -165,6 +165,10 @@
   .pay button{ flex:1; min-width:110px; border:1px solid var(--line); background:var(--blue-soft); color:var(--blue); border-radius:var(--r-sm); padding:10px; font-weight:700; }
   .pay button.on{ background:var(--blue); color:#fff; border-color:var(--blue); }
   .done{ width:100%; margin-top:10px; padding:14px; font-size:17px; }
+  .custRow{ margin-top:12px; }
+  .custChip{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:var(--honey-soft); border-radius:var(--r-sm); padding:8px 10px; font-size:14px; }
+  .pay button.due{ background:var(--honey-soft); color:var(--honey-deep); }
+  .pay button.due.on{ background:var(--honey-deep); color:#fff; border-color:var(--honey-deep); }
   .keys{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
   .keys span{ font-size:12.5px; color:var(--ink-3); background:var(--paper); border:1px solid var(--line); border-radius:7px; padding:4px 9px; }
 
@@ -361,6 +365,25 @@ function loadEntries(){
   return del.length ? all.filter(e=> !del.includes(e.id)) : all;
 }
 
+/* 👥 গ্রাহক ও বাকি — সাধারণ POS-এর একই নিয়ম:
+   গ্রাহক চেনা হয় মোবাইল থাকলে মোবাইলে, না থাকলে নামে; বাকি = প্রতিটা বিক্রির (price − paid) যোগফল। */
+const custKey = (name, phone)=> (phone ? phone : "") + "|" + (name || "");
+function loadCustomers(){
+  const del = readJSON("phone-shop-deleted-customer-keys", []);
+  return readJSON("phone-shop-customers", []).filter(c=> c && c.name && !del.includes(custKey(c.name, c.phone)));
+}
+const sameCust = (e, name, phone)=> phone ? e.phone === phone : e.name === name;
+function custDue(name, phone, entries){
+  return r2((entries || loadEntries()).filter(e=> sameCust(e, name, phone)).reduce((a,e)=> a + Math.max((Number(e.price) || 0) - (Number(e.paid) || 0), 0), 0));
+}
+function ensureCustomer(name, phone){
+  if(!name || name === "ওয়াক-ইন কাস্টমার") return;
+  const list = readJSON("phone-shop-customers", []);
+  if(list.some(c=> phone ? c.phone === phone : (c.name === name && !c.phone))) return;
+  list.push({ name, phone: phone || "" });
+  localStorage.setItem("phone-shop-customers", JSON.stringify(list));
+}
+
 /* ওষুধের একক — সব হিসাব পিসে, বক্স/পাতা শুধু গুণ করে */
 function packOf(p){
   const pps = Math.max(1, Number(p.piecesPerStrip) || 1);
@@ -419,7 +442,7 @@ const MENU = [
   { key:"purchase",  ic:"📥", label:"ক্রয়" },
   { key:"stock",     ic:"📦", label:"স্টক ব্যবস্থাপনা", soon:true },
   { key:"suppliers", ic:"🚚", label:"সরবরাহকারী" },
-  { key:"customers", ic:"👥", label:"গ্রাহক", soon:true },
+  { key:"customers", ic:"👥", label:"গ্রাহক" },
   { key:"reports",   ic:"📊", label:"রিপোর্ট", soon:true, admin:true },
   { key:"branches",  ic:"🏬", label:"শাখা ব্যবস্থাপনা", soon:true, admin:true },
   { key:"users",     ic:"🧑‍⚕️", label:"ব্যবহারকারী", admin:true },
@@ -453,7 +476,7 @@ function go(k){
   try{ history.replaceState(null, "", "#" + k); }catch(e){}
   renderNav();
   window.scrollTo(0, 0);
-  const P = { dash: pageDash, pos: pagePos, meds: pageMeds, alerts: pageAlerts, users: pageUsers, purchase: pagePurchase, suppliers: pageSuppliers }[k];
+  const P = { dash: pageDash, pos: pagePos, meds: pageMeds, alerts: pageAlerts, users: pageUsers, purchase: pagePurchase, suppliers: pageSuppliers, customers: pageCustomers }[k];
   if(P) P(); else pageSoon(k);
   refreshBell();
 }
@@ -497,6 +520,7 @@ function pageDash(){
   }
   const mx = Math.max(1, ...days.map(d=> d.v));
   const admin = isAdmin();
+  const dueInfo = dueSummary(entries);
 
   $("page").innerHTML = `
     <div class="pageHead"><h1>ড্যাশবোর্ড</h1><div class="date">আজকের তারিখ: ${bn(new Date().toLocaleDateString("bn-BD", { day:"numeric", month:"long", year:"numeric", weekday:"long" }))}</div></div>
@@ -505,7 +529,8 @@ function pageDash(){
       <div class="stat b"><div class="ic">📦</div><div><div class="lbl">মোট স্টক ভ্যালু (কেনা দামে)</div><div class="val num">${money(stockVal)}</div><div class="sub">${bn(prods.length)}টি আইটেম</div></div></div>`
       : `<div class="stat b"><div class="ic">💊</div><div><div class="lbl">মোট ওষুধ</div><div class="val num">${bn(prods.length)}</div><div class="sub">তালিকায় আছে</div></div></div>`}
       <div class="stat o" data-go="alerts" style="cursor:pointer"><div class="ic">⏳</div><div><div class="lbl">মেয়াদোত্তীর্ণ সতর্কতা</div><div class="val num">${bn(expiring.length)}</div><div class="sub">পরবর্তী ৩০ দিনে</div></div></div>
-      <div class="stat r" data-go="alerts" style="cursor:pointer"><div class="ic">📉</div><div><div class="lbl">কম স্টক</div><div class="val num">${bn(low.length)}</div><div class="sub">ন্যূনতমের নিচে</div></div></div>
+      ${admin ? `<div class="stat r" data-go="customers" style="cursor:pointer"><div class="ic">📒</div><div><div class="lbl">বাকি আদায়যোগ্য</div><div class="val num">${money(dueInfo.total)}</div><div class="sub">${bn(dueInfo.count)} জন গ্রাহক</div></div></div>`
+      : `<div class="stat r" data-go="alerts" style="cursor:pointer"><div class="ic">📉</div><div><div class="lbl">কম স্টক</div><div class="val num">${bn(low.length)}</div><div class="sub">ন্যূনতমের নিচে</div></div></div>`}
     </div>
     ${admin ? `<div class="panel" style="margin-bottom:16px">
       <h2>গত ৭ দিনের বিক্রয়</h2>
@@ -551,7 +576,8 @@ $("bellBtn").addEventListener("click", ()=> go("alerts"));
    🛒 বিক্রয় (POS)
    ===================================================================== */
 let CART = [];          // { pid, unit, n }  n = কত একক (পিস/পাতা/বক্স)
-let PAY = "cash";       // cash | card | mobile
+let PAY = "cash";       // cash | card | mobile | due
+let CUST = null;        // { name, phone } — বাছা গ্রাহক (না থাকলে ওয়াক-ইন)
 let DISCOUNT = 0;
 let KB = 0;             // কিবোর্ডে বাছা ওষুধের ক্রম
 let POS_Q = "";
@@ -671,10 +697,15 @@ function renderCart(){
       <div><span>ডিসকাউন্ট</span><input class="num" id="discIn" inputmode="decimal" value="${DISCOUNT || ""}" placeholder="০"></div>
       <div class="grand"><span>পরিশোধ</span><span class="num">${money(T.net)}</span></div>
     </div>
+    <div class="custRow">
+      ${CUST ? `<div class="custChip"><span>👤 <b>${esc(CUST.name)}</b>${CUST.phone ? " · " + esc(CUST.phone) : ""}${isAdmin() && custDue(CUST.name, CUST.phone) > 0 ? ` · <span class="bad">আগের বাকি ${money(custDue(CUST.name, CUST.phone))}</span>` : ""}</span><button class="x" type="button" id="custClear" aria-label="গ্রাহক সরান">✕</button></div>`
+             : `<button class="btn ghost" type="button" id="custPick" style="width:100%">👤 গ্রাহক বাছুন (F5) — না বাছলে ওয়াক-ইন</button>`}
+    </div>
     <div class="pay">
       <button type="button" data-pay="cash" class="${PAY === "cash" ? "on" : ""}">💵 নগদ (F1)</button>
       <button type="button" data-pay="card" class="${PAY === "card" ? "on" : ""}">💳 কার্ড (F2)</button>
       <button type="button" data-pay="mobile" class="${PAY === "mobile" ? "on" : ""}">📱 বিকাশ/নগদ (F3)</button>
+      <button type="button" data-pay="due" class="${PAY === "due" ? "on due" : "due"}">📒 বাকি (F6)</button>
     </div>
     <button class="btn green done" type="button" id="doneBtn">✅ বিক্রি সম্পন্ন (F4)</button>
     ${keysHtml()}`;
@@ -688,7 +719,9 @@ function renderCart(){
   box.querySelectorAll("[data-q]").forEach(b=> b.onclick = ()=>{ const [i, d] = b.dataset.q.split(":"); setQty(+i, CART[+i].n + Number(d)); });
   box.querySelectorAll("[data-qi]").forEach(inp=> inp.onchange = ()=> setQty(+inp.dataset.qi, Math.floor(Number(inp.value) || 0)));
   box.querySelectorAll("[data-del]").forEach(b=> b.onclick = ()=>{ CART.splice(+b.dataset.del, 1); renderMedList(); renderCart(); });
-  box.querySelectorAll("[data-pay]").forEach(b=> b.onclick = ()=>{ PAY = b.dataset.pay; renderCart(); });
+  box.querySelectorAll("[data-pay]").forEach(b=> b.onclick = ()=>{ PAY = b.dataset.pay; renderCart(); if(PAY === "due" && !CUST) openCustomerPicker(); });
+  if($("custPick")) $("custPick").onclick = ()=> openCustomerPicker();
+  if($("custClear")) $("custClear").onclick = ()=>{ CUST = null; if(PAY === "due") PAY = "cash"; renderCart(); };
   $("discIn").onchange = ()=>{ DISCOUNT = Math.max(0, Number($("discIn").value) || 0); renderCart(); };
   $("doneBtn").onclick = completeSale;
   const bar = $("cartBar");
@@ -697,7 +730,40 @@ function renderCart(){
   bar.innerHTML = `<div><small style="opacity:.75">${bn(T.lines.length)}টি আইটেম</small><br><b class="num">${money(T.net)}</b></div><button class="btn" type="button" id="barGo">কার্ট দেখুন</button>`;
   $("barGo").onclick = ()=> $("cartPanel").scrollIntoView({ behavior:"smooth", block:"start" });
 }
-function keysHtml(){ return `<div class="keys"><span>F1 নগদ</span><span>F2 কার্ড</span><span>F3 মোবাইল ব্যাংকিং</span><span>F4 বিক্রি সম্পন্ন</span><span>F8 কার্ট খালি</span></div>`; }
+function keysHtml(){ return `<div class="keys"><span>F1 নগদ</span><span>F2 কার্ড</span><span>F3 মোবাইল ব্যাংকিং</span><span>F4 বিক্রি সম্পন্ন</span><span>F5 গ্রাহক</span><span>F6 বাকি</span><span>F8 কার্ট খালি</span></div>`; }
+
+/* 👤 গ্রাহক বাছাই — নাম বা মোবাইল লিখে খোঁজা; না পেলে নতুন গ্রাহক হিসেবে যোগ */
+function openCustomerPicker(onPick){
+  openModal(`<div class="head"><h3>👤 গ্রাহক বাছুন</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <input class="in" id="cpQ" placeholder="নাম বা মোবাইল লিখুন…" autocomplete="off">
+    <div id="cpList" style="margin-top:8px; max-height:46vh; overflow:auto"></div>
+    <div class="row2" id="cpNew" style="margin-top:10px">
+      <div><label class="f">নতুন গ্রাহকের নাম</label><input class="in" id="cpName"></div>
+      <div><label class="f">মোবাইল</label><input class="in" id="cpPhone" inputmode="tel"></div>
+    </div>
+    <div class="foot"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="cpAdd">➕ নতুন গ্রাহক নিয়ে এগোন</button></div>`);
+  const entries = loadEntries();
+  const draw = ()=>{
+    const q = $("cpQ").value.trim().toLowerCase();
+    const list = loadCustomers().filter(c=> !q || c.name.toLowerCase().includes(q) || String(c.phone || "").includes(q)).slice(0, 40);
+    $("cpList").innerHTML = list.length ? list.map((c, i)=>{ const d = custDue(c.name, c.phone, entries); return `<div class="med" data-cp="${i}"><div class="pill">👤</div><div><div class="nm">${esc(c.name)}</div><div class="gn">${esc(c.phone || "মোবাইল নেই")}</div></div>${isAdmin() && d > 0 ? `<div class="pr"><b class="bad num">${money(d)}</b><small>বাকি</small></div>` : ""}</div>`; }).join("")
+      : `<div class="empty">${q ? "এই নামে কেউ নেই — নিচে নতুন গ্রাহক হিসেবে যোগ করুন।" : "এখনো কোনো গ্রাহক নেই।"}</div>`;
+    $("cpList").querySelectorAll("[data-cp]").forEach(el=> el.onclick = ()=>{ const c = list[+el.dataset.cp]; pick({ name: c.name, phone: c.phone || "" }); });
+    if(q && !$("cpName").value && !/^[0-9+\s-]+$/.test(q)) $("cpName").placeholder = $("cpQ").value.trim();
+    if(q && /^[0-9+\s-]+$/.test(q)) $("cpPhone").placeholder = $("cpQ").value.trim();
+  };
+  const pick = (c)=>{ closeModal(); if(onPick) onPick(c); else { CUST = c; renderCart(); } };
+  $("cpQ").oninput = draw; draw();
+  $("cpAdd").onclick = ()=>{
+    const q = $("cpQ").value.trim();
+    const name = $("cpName").value.trim() || (!/^[0-9+\s-]+$/.test(q) ? q : "");
+    const phone = $("cpPhone").value.trim() || (/^[0-9+\s-]+$/.test(q) ? q : "");
+    if(!name){ toast("গ্রাহকের নাম লিখুন"); $("cpName").focus(); return; }
+    if(phone && !/^[0-9+\-\s]{6,20}$/.test(phone)){ toast("মোবাইল নম্বর ঠিক নেই"); return; }
+    ensureCustomer(name, phone); pushNow();
+    pick({ name, phone });
+  };
+}
 function setQty(i, n){
   const c = CART[i]; if(!c) return;
   if(n < 1){ CART.splice(i, 1); renderMedList(); renderCart(); return; }
@@ -708,8 +774,9 @@ function setQty(i, n){
 }
 document.addEventListener("keydown", (e)=>{
   if(CUR_PAGE !== "pos" || document.querySelector(".modal")) return;
-  const map = { F1:"cash", F2:"card", F3:"mobile" };
-  if(map[e.key]){ e.preventDefault(); PAY = map[e.key]; renderCart(); }
+  const map = { F1:"cash", F2:"card", F3:"mobile", F6:"due" };
+  if(map[e.key]){ e.preventDefault(); PAY = map[e.key]; renderCart(); if(PAY === "due" && !CUST) openCustomerPicker(); }
+  else if(e.key === "F5"){ e.preventDefault(); openCustomerPicker(); }
   else if(e.key === "F4"){ e.preventDefault(); if(CART.length) completeSale(); }
   else if(e.key === "F8"){ e.preventDefault(); if(CART.length && confirm("কার্ট খালি করবেন?")){ CART = []; DISCOUNT = 0; renderMedList(); renderCart(); } }
 });
@@ -736,13 +803,16 @@ async function completeSale(){
     const need = T.lines.filter(x=> x.p.id === l.p.id).reduce((s,x)=> s + x.pieces, 0);
     if(!p || (Number(p.qty) || 0) < need){ toast("⚠️ " + l.p.name + " — স্টকে নেই, কার্ট দেখে নিন"); renderMedList(); return; }
   }
+  if(PAY === "due" && !CUST){ toast("বাকিতে বিক্রি করতে আগে গ্রাহক বাছুন"); openCustomerPicker(); return; }
   SELLING = true;
   const all = readJSON("phone-shop-entries", []);
   const billId = uid();
   const invoiceNo = nextInvoiceNo(all);
   const when = new Date().toISOString();
-  const paymentMethod = PAY === "cash" ? "cash" : "bank"; // সাধারণ POS শুধু cash/bank চেনে
-  const payLabel = { cash:"নগদ", card:"কার্ড", mobile:"মোবাইল ব্যাংকিং" }[PAY];
+  const isDue = PAY === "due";
+  const paymentMethod = isDue ? null : (PAY === "cash" ? "cash" : "bank"); // সাধারণ POS শুধু cash/bank চেনে
+  const payLabel = { cash:"নগদ", card:"কার্ড", mobile:"মোবাইল ব্যাংকিং", due:"বাকি" }[PAY];
+  const cName = CUST ? CUST.name : "ওয়াক-ইন কাস্টমার", cPhone = CUST ? (CUST.phone || "") : "";
   // ডিসকাউন্ট প্রতিটা লাইনে দামের অনুপাতে ভাগ — যাতে লাভের হিসাব ঠিক থাকে
   let discLeft = T.disc;
   const newEntries = T.lines.map((l, i)=>{
@@ -751,11 +821,11 @@ async function completeSale(){
     const price = r2(l.total - share);
     const unitCost = Number(l.p.buy) || 0;
     return {
-      id: uid(), name: "ওয়াক-ইন কাস্টমার", phone: "",
+      id: uid(), name: cName, phone: cPhone,
       item: l.p.name + (l.u.key === "pc" ? "" : " (" + bn(l.pieces / l.u.n) + " " + l.u.label + ")"),
       productId: l.p.id, qty: l.pieces, unitPrice: r2(price / l.pieces), unitCost,
-      cost: r2(unitCost * l.pieces), price, paid: price, paymentMethod, payVia: PAY,
-      note: "💊 " + bn(l.pieces / l.u.n) + " " + l.u.label + " = " + bn(l.pieces) + " পিস", status: "নগদ-বিক্রি",
+      cost: r2(unitCost * l.pieces), price, paid: isDue ? 0 : price, paymentMethod, payVia: PAY,
+      note: "💊 " + bn(l.pieces / l.u.n) + " " + l.u.label + " = " + bn(l.pieces) + " পিস", status: isDue ? "বাকি" : "নগদ-বিক্রি",
       billId, invoiceNo, date: when, soldBy: (SESSION && SESSION.name) || "এডমিন", source: "pharmacy"
     };
   });
@@ -776,8 +846,9 @@ async function completeSale(){
     localStorage.setItem("phone-shop-entries", JSON.stringify(newEntries.concat(all)));
     saveProducts(prods);
     syncBazarStock(touched);
+    if(CUST) ensureCustomer(CUST.name, CUST.phone);
     showReceipt(newEntries, T, payLabel);
-    CART = []; DISCOUNT = 0; POS_Q = "";
+    CART = []; DISCOUNT = 0; POS_Q = ""; CUST = null; PAY = "cash";
     if(CUR_PAGE === "pos") pagePos();
     refreshBell();
     pushNow();
@@ -806,12 +877,13 @@ function showReceipt(entries, T, payLabel){
   const e0 = entries[0];
   const html = `<div class="receipt">
     <div class="c"><b style="font-size:16px">${esc(shop)}</b>${sub ? `<br>${esc(sub)}` : ""}</div>
-    <hr><div>রসিদ: <b>${esc(e0.invoiceNo)}</b><br>${bn(new Date(e0.date).toLocaleString("bn-BD"))}<br>বিক্রেতা: ${esc(e0.soldBy)}</div><hr>
+    <hr><div>রসিদ: <b>${esc(e0.invoiceNo)}</b><br>${bn(new Date(e0.date).toLocaleString("bn-BD"))}<br>বিক্রেতা: ${esc(e0.soldBy)}${e0.name !== "ওয়াক-ইন কাস্টমার" ? `<br>গ্রাহক: ${esc(e0.name)}${e0.phone ? " (" + esc(e0.phone) + ")" : ""}` : ""}</div><hr>
     <table>${T.lines.map(l=> `<tr><td>${esc(l.p.name)}<br><small>${bn(l.pieces / l.u.n)} ${esc(l.u.label)} × ${esc(money(l.unitPrice))}</small></td><td style="text-align:right">${esc(money(l.total))}</td></tr>`).join("")}</table>
     <hr><table>
       <tr><td>মোট</td><td style="text-align:right">${esc(money(T.sub))}</td></tr>
       ${T.disc ? `<tr><td>ডিসকাউন্ট</td><td style="text-align:right">− ${esc(money(T.disc))}</td></tr>` : ""}
-      <tr><td><b>পরিশোধ (${esc(payLabel)})</b></td><td style="text-align:right"><b>${esc(money(T.net))}</b></td></tr>
+      <tr><td><b>${e0.status === "বাকি" ? "বাকিতে বিক্রি" : "পরিশোধ (" + esc(payLabel) + ")"}</b></td><td style="text-align:right"><b>${esc(money(T.net))}</b></td></tr>
+      ${e0.status === "বাকি" ? `<tr><td>মোট বাকি এখন</td><td style="text-align:right">${esc(money(custDue(e0.name, e0.phone)))}</td></tr>` : ""}
     </table><hr><div class="c">ধন্যবাদ — আবার আসবেন</div></div>`;
   openModal(`<div class="head"><h3>✅ বিক্রি সম্পন্ন</h3></div>${html}
     <div class="foot"><button class="btn ghost" type="button" data-close>নতুন বিক্রি</button><button class="btn" type="button" id="printBtn">🖨️ রসিদ প্রিন্ট</button></div>`);
@@ -1286,6 +1358,111 @@ function openSupplierPay(id){
   };
 }
 
+
+/* =====================================================================
+   👥 গ্রাহক — বাকি ও আদায়
+   বাকি আদায় সাধারণ POS-এর মতোই: টাকা সবচেয়ে পুরনো বাকি থেকে কাটে (paid বাড়ে),
+   একটা "Deposit Received" জমার লাইন যোগ হয় (নগদ/ব্যাংকের হিসাবের জন্য),
+   আর bcc-due-log-এ আদায়ের খতিয়ান থাকে।
+   ===================================================================== */
+function dueSummary(entries){
+  const map = {};
+  entries.forEach(e=>{
+    const d = Math.max((Number(e.price) || 0) - (Number(e.paid) || 0), 0); if(d <= 0) return;
+    const k = e.phone ? "p:" + e.phone : "n:" + e.name;
+    map[k] = (map[k] || 0) + d;
+  });
+  const vals = Object.values(map);
+  return { total: r2(vals.reduce((a,b)=> a + b, 0)), count: vals.length, map };
+}
+let CUST_Q = "", CUST_ONLY_DUE = false;
+function pageCustomers(){
+  const entries = loadEntries();
+  const sum = dueSummary(entries);
+  $("page").innerHTML = `
+    <div class="pageHead"><h1>গ্রাহক</h1><button class="btn" type="button" id="cAdd">➕ নতুন গ্রাহক</button></div>
+    ${isAdmin() ? `<div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr)); max-width:640px">
+      <div class="stat b"><div class="ic">👥</div><div><div class="lbl">মোট গ্রাহক</div><div class="val num">${bn(loadCustomers().length)}</div></div></div>
+      <div class="stat r"><div class="ic">📒</div><div><div class="lbl">বাকি আদায়যোগ্য</div><div class="val num">${money(sum.total)}</div><div class="sub">${bn(sum.count)} জনের কাছে</div></div></div>
+    </div>` : ""}
+    <div class="toolbar"><input class="in" id="cQ" placeholder="🔍 নাম বা মোবাইল দিয়ে খুঁজুন" value="${esc(CUST_Q)}">
+      ${isAdmin() ? `<label style="display:flex; align-items:center; gap:6px; font-size:14px"><input type="checkbox" id="cDue"${CUST_ONLY_DUE ? " checked" : ""}> শুধু যাদের বাকি আছে</label>` : ""}</div>
+    <div class="panel" style="padding:6px 8px" id="cBox"></div>`;
+  $("cAdd").onclick = ()=> openCustomerPicker((c)=>{ toast("✅ " + c.name + " যোগ হয়েছে"); pageCustomers(); });
+  $("cQ").oninput = ()=>{ CUST_Q = $("cQ").value.trim(); renderCustomers(); };
+  if($("cDue")) $("cDue").onchange = ()=>{ CUST_ONLY_DUE = $("cDue").checked; renderCustomers(); };
+  renderCustomers();
+}
+function renderCustomers(){
+  const entries = loadEntries();
+  const q = CUST_Q.toLowerCase();
+  const lastBuy = {};
+  entries.forEach(e=>{ const k = e.phone ? "p:" + e.phone : "n:" + e.name; if(!lastBuy[k] || String(e.date) > String(lastBuy[k])) lastBuy[k] = e.date; });
+  const sum = dueSummary(entries);
+  let list = loadCustomers().map(c=> ({ c, k: c.phone ? "p:" + c.phone : "n:" + c.name }))
+    .map(x=> Object.assign(x, { due: isAdmin() ? r2(sum.map[x.k] || 0) : 0, last: lastBuy[x.k] }))
+    .filter(x=> (!q || x.c.name.toLowerCase().includes(q) || String(x.c.phone || "").includes(q)) && (!CUST_ONLY_DUE || x.due > 0))
+    .sort((a,b)=> b.due - a.due || String(b.last || "").localeCompare(String(a.last || "")));
+  if(!list.length){ $("cBox").innerHTML = `<div class="empty">${q || CUST_ONLY_DUE ? "এমন কোনো গ্রাহক নেই।" : "এখনো কোনো গ্রাহক নেই। বিক্রির সময় \"👤 গ্রাহক বাছুন\" দিয়েও যোগ করা যায়।"}</div>`; return; }
+  $("cBox").innerHTML = `<table class="t"><thead><tr><th>নাম</th><th>মোবাইল</th><th class="r">শেষ কেনা</th>${isAdmin() ? '<th class="r">বাকি</th>' : ""}</tr></thead><tbody>
+    ${list.slice(0, 300).map((x, i)=> `<tr data-ci="${i}" style="cursor:pointer"><td><b>${esc(x.c.name)}</b></td><td>${x.c.phone ? `<a href="tel:${esc(x.c.phone)}" onclick="event.stopPropagation()">${esc(x.c.phone)}</a>` : "—"}</td><td class="r">${x.last ? fmtDate(x.last) : "—"}</td>${isAdmin() ? `<td class="r num ${x.due > 0 ? "bad" : ""}">${money(x.due)}</td>` : ""}</tr>`).join("")}
+  </tbody></table>`;
+  $("cBox").querySelectorAll("[data-ci]").forEach(tr=> tr.onclick = ()=>{ const c = list[+tr.dataset.ci].c; openCustomerLedger(c.name, c.phone || ""); });
+}
+function openCustomerLedger(name, phone){
+  const entries = loadEntries().filter(e=> sameCust(e, name, phone)).sort((a,b)=> String(b.date).localeCompare(String(a.date)));
+  const due = custDue(name, phone);
+  const admin = isAdmin();
+  const dueItems = entries.filter(e=> Math.max((Number(e.price) || 0) - (Number(e.paid) || 0), 0) > 0);
+  const deposits = entries.filter(e=> Number(e.depositAmount) > 0);
+  const buys = entries.filter(e=> !(Number(e.depositAmount) > 0) && e.item !== "Deposit Received");
+  openModal(`<div class="head"><h3>👤 ${esc(name)}</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="hint">${phone ? `📱 <a href="tel:${esc(phone)}">${esc(phone)}</a>` : "মোবাইল নেই"} · মোট ${bn(new Set(buys.map(e=> e.billId || e.invoiceNo || e.id)).size)} বার কেনা</div>
+    ${admin ? `<div class="calc" style="display:flex; justify-content:space-between; align-items:center"><span>বর্তমান বাকি</span><b class="num ${due > 0 ? "bad" : ""}" style="font-size:20px">${money(due)}</b></div>
+    ${dueItems.length ? `<h3 style="font-size:16px; margin:14px 0 6px">যেগুলোর বাকি আছে</h3><table class="t"><thead><tr><th>তারিখ</th><th>ওষুধ</th><th class="r">বাকি</th></tr></thead><tbody>${dueItems.map(e=> `<tr><td>${fmtDate(e.date)}</td><td>${esc(e.item)}</td><td class="r num">${money(Math.max((Number(e.price) || 0) - (Number(e.paid) || 0), 0))}</td></tr>`).join("")}</tbody></table>` : ""}
+    ${deposits.length ? `<h3 style="font-size:16px; margin:14px 0 6px">আদায়</h3><table class="t"><tbody>${deposits.slice(0, 10).map(e=> `<tr><td>${fmtDate(e.date)}</td><td>${e.paymentMethod === "bank" ? "ব্যাংক/বিকাশ" : "নগদ"}</td><td class="r num">${money(e.depositAmount)}</td></tr>`).join("")}</tbody></table>` : ""}` : ""}
+    <h3 style="font-size:16px; margin:14px 0 6px">সাম্প্রতিক কেনা</h3>
+    ${buys.length ? `<table class="t"><tbody>${buys.slice(0, 12).map(e=> `<tr><td>${fmtDate(e.date)}</td><td>${esc(e.item)}</td><td class="r num">${money(e.price)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">এখনো কিছু কেনেননি।</div>`}
+    <div class="foot">
+      <button class="btn ghost" type="button" id="clSell">🛒 এঁকে বিক্রি করুন</button>
+      ${admin && due > 0 ? `<button class="btn green" type="button" id="clPay">💵 বাকি আদায়</button>` : ""}
+    </div>`);
+  $("clSell").onclick = ()=>{ closeModal(); CUST = { name, phone }; go("pos"); };
+  if($("clPay")) $("clPay").onclick = ()=> openDueCollect(name, phone);
+}
+function openDueCollect(name, phone){
+  const due = custDue(name, phone);
+  openModal(`<div class="head"><h3>💵 ${esc(name)} — বাকি আদায়</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="calc">বর্তমান বাকি: <b>${money(due)}</b></div>
+    <div class="row2"><div><label class="f">কত টাকা নিচ্ছেন *</label><input class="in num" id="dcAmt" inputmode="decimal" value="${due}"></div>
+      <div><label class="f">কীভাবে</label><select class="in" id="dcVia"><option value="cash">নগদ</option><option value="bank">ব্যাংক / বিকাশ / নগদ অ্যাপ</option></select></div></div>
+    <div class="hint" id="dcHint"></div>
+    <div class="foot"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn green" type="button" id="dcSave">✅ আদায় করুন</button></div>`);
+  const hint = ()=>{ const a = Number($("dcAmt").value) || 0; $("dcHint").textContent = a > due ? "বাকি শোধ — গ্রাহককে ফেরত দিন " + money(a - due) : (a > 0 ? "নতুন বাকি থাকবে " + money(due - a) : ""); };
+  $("dcAmt").oninput = hint; hint();
+  $("dcSave").onclick = ()=>{
+    const amt = r2(Number($("dcAmt").value) || 0);
+    if(!(amt > 0)){ toast("টাকার পরিমাণ লিখুন"); return; }
+    const take = Math.min(amt, due);
+    const all = readJSON("phone-shop-entries", []);
+    const del = readJSON("phone-shop-deleted-entry-ids", []);
+    let left = take;
+    all.filter(e=> !del.includes(e.id) && sameCust(e, name, phone) && Math.max((Number(e.price) || 0) - (Number(e.paid) || 0), 0) > 0)
+      .sort((a,b)=> new Date(a.date) - new Date(b.date))
+      .forEach(e=>{ if(left <= 0) return; const d = Math.max((Number(e.price) || 0) - (Number(e.paid) || 0), 0); const ap = Math.min(d, left); e.paid = r2((Number(e.paid) || 0) + ap); left = r2(left - ap); });
+    const method = $("dcVia").value;
+    all.unshift({ id: uid(), name, item: "Deposit Received", phone, cost: 0, price: 0, paid: 0, depositAmount: take, paymentMethod: method,
+      note: CUR() + " " + take + " deposited (ফার্মেসি)", status: "নগদ", invoiceNo: nextInvoiceNo(all), date: new Date().toISOString(), soldBy: (SESSION && SESSION.name) || "এডমিন", source: "pharmacy" });
+    localStorage.setItem("phone-shop-entries", JSON.stringify(all));
+    const log = readJSON("bcc-due-log", []); log.unshift({ date: new Date().toISOString(), name, amount: take });
+    localStorage.setItem("bcc-due-log", JSON.stringify(log.slice(0, 500)));
+    pushNow();
+    toast("✅ " + money(take) + " আদায় হয়েছে" + (amt > due ? " · ফেরত " + money(amt - due) : ""));
+    openCustomerLedger(name, phone);
+    if(CUR_PAGE === "customers") pageCustomers();
+  };
+}
+
 /* =====================================================================
    🧑‍⚕️ ব্যবহারকারী (স্টাফ) — সাধারণ POS-এর একই সাব-ইউজার
    ===================================================================== */
@@ -1388,7 +1565,7 @@ auth.onAuthStateChanged(async (user)=>{
   netLabel();
   $("gate").remove(); $("app").hidden = false; $("bnav").hidden = false;
   const start = (location.hash || "").replace("#", "");
-  go(["dash","pos","meds","alerts","purchase","suppliers"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
+  go(["dash","pos","meds","alerts","purchase","suppliers","customers"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
 });
 </script>
 </body>
