@@ -3309,13 +3309,18 @@ let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], a
      /d/… বা /p/… লিংক GitHub-এ "404 (পাতা নেই)" হিসেবে খোলে, তাই Facebook সেটাকে
      নষ্ট লিংক ভেবে কমেন্টে চাপার-যোগ্য লিংক বানায় না। ?d=/?p= লিংক আসল পাতা (200) হিসেবে
      খোলে। পুরনো /d/ আর /p/ লিংকও নিচে আগের মতোই কাজ করে। */
+  // 🔄 শেয়ার-লিংক একবার খোলার পর ঠিকানা থেকে সরিয়ে দেওয়া হয় — নাহলে প্রতিবার
+  //    রিফ্রেশ করলে একই ডিজাইন/প্রোডাক্ট আবার লাফিয়ে উঠত
+  const clean = ()=>{ try{ history.replaceState(null, '', '/honey-bee-bazar.html'); }catch(e){} };
   const qd = params.get('d'), qs_ = params.get('s'), qp = params.get('p');
   if(qd && /^[A-Za-z0-9_-]{6,40}$/.test(qd)){
+    clean();
     const go = ()=> tlrOpenSharedDesign(qd);
     if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', go); } else go();
     return;
   }
   if(qs_ && qp){
+    clean();
     const go = ()=> hbOpenPublicProductPage(qs_, qp);
     if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', go); } else go();
     return;
@@ -3326,7 +3331,7 @@ let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], a
   const dm = targetPath.match(/\/d\/([A-Za-z0-9_-]{6,40})/);
   if(dm){
     const designId = dm[1];
-    try{ history.replaceState(null, '', '/d/' + designId); }catch(e){}
+    clean();
     const openD = ()=> tlrOpenSharedDesign(designId);
     if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', openD); } else openD();
     return;
@@ -3334,7 +3339,7 @@ let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], a
   const m = targetPath.match(/\/p\/([^\/?#]+)\/([^\/?#]+)/);
   if(!m) return;
   const shopId = decodeURIComponent(m[1]), productId = decodeURIComponent(m[2]);
-  try{ history.replaceState(null, '', '/p/' + shopId + '/' + productId); }catch(e){}
+  clean();
   const openIt = ()=> hbOpenPublicProductPage(shopId, productId);
   if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', openIt); }
   else openIt();
@@ -3960,7 +3965,7 @@ function tlrLogView(designId){
 /* 🔗 দর্জির শেয়ার করা লিংক (/d/{designId}) খুললে — সেলাই ঘর পাতা খুলে ডিজাইনটা
    একটা শিটে দেখায় (ছবি, বিবরণ, মজুরি, YouTube/Facebook), সেখান থেকেই অর্ডার। */
 async function tlrOpenSharedDesign(designId){
-  try{ showScreen("screenTailor"); }catch(e){}
+  try{ showScreen("screenTailor"); tlrAreaInit(); tlrRenderFeed(); }catch(e){}
   const sheet = tlrSheetEl(), body = sheet.querySelector("#tlrOrdBody");
   body.innerHTML = `<div style="text-align:center; padding:24px; color:var(--muted);">⏳ ডিজাইন আনা হচ্ছে…</div>`;
   sheet.style.display = "flex";
