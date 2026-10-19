@@ -3300,8 +3300,17 @@ let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], a
    পেজ (লগইন ছাড়াই) খুলে যায়। hbOpenPublicProductPage() ফাংশনটা নিচে (hoisted) ডিফাইন করা। */
 (function hbDetectPublicProductDeepLink(){
   const params = new URLSearchParams(location.search);
-  const targetPath = params.get('hbRedirect') || (/^\/p\//.test(location.pathname) ? location.pathname : null);
+  const targetPath = params.get('hbRedirect') || (/^\/(p|d)\//.test(location.pathname) ? location.pathname : null);
   if(!targetPath) return;
+  // 🧵 /d/{designId} — দর্জির শেয়ার করা ডিজাইন
+  const dm = targetPath.match(/\/d\/([A-Za-z0-9_-]{6,40})/);
+  if(dm){
+    const designId = dm[1];
+    try{ history.replaceState(null, '', '/d/' + designId); }catch(e){}
+    const openD = ()=> tlrOpenSharedDesign(designId);
+    if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', openD); } else openD();
+    return;
+  }
   const m = targetPath.match(/\/p\/([^\/?#]+)\/([^\/?#]+)/);
   if(!m) return;
   const shopId = decodeURIComponent(m[1]), productId = decodeURIComponent(m[2]);
@@ -3927,6 +3936,35 @@ function tlrLogView(designId){
     }, { merge: true }).catch(()=>{});
   }catch(e){}
 }
+/* 🔗 দর্জির শেয়ার করা লিংক (/d/{designId}) খুললে — সেলাই ঘর পাতা খুলে ডিজাইনটা
+   একটা শিটে দেখায় (ছবি, বিবরণ, মজুরি, YouTube/Facebook), সেখান থেকেই অর্ডার। */
+async function tlrOpenSharedDesign(designId){
+  try{ showScreen("screenTailor"); }catch(e){}
+  const sheet = tlrSheetEl(), body = sheet.querySelector("#tlrOrdBody");
+  body.innerHTML = `<div style="text-align:center; padding:24px; color:var(--muted);">⏳ ডিজাইন আনা হচ্ছে…</div>`;
+  sheet.style.display = "flex";
+  let d = (__tlrDesigns||[]).find(x=> x.id === designId);
+  if(!d){
+    try{ const ds = await db.collection("tailorDesigns").doc(designId).get(); if(ds.exists) d = { id: ds.id, ...ds.data() }; }catch(e){}
+  }
+  if(!d || d.status !== "active" || !d.published || !d.img){
+    body.innerHTML = `<div style="text-align:center; padding:24px;">✂️ এই ডিজাইনটা এখন আর দেখা যাচ্ছে না।<br><span style="color:var(--muted); font-size:12.5px;">নিচে সেলাই ঘরের অন্য ডিজাইন দেখুন।</span></div>`;
+    return;
+  }
+  if(!__tlrDesigns) __tlrDesigns = [];
+  if(!__tlrDesigns.some(x=> x.id === d.id)) __tlrDesigns.push(d); // অর্ডার শিট এখান থেকেই ডিজাইন খোঁজে
+  tlrLogView(d.id);
+  body.innerHTML = `
+    <img src="${escapeHtml(d.img)}" alt="" onclick="if(typeof hbOpenImageZoom==='function') hbOpenImageZoom(this.src)" style="width:100%; max-height:58vh; object-fit:contain; border-radius:14px; background:#2a1d0c; cursor:zoom-in; display:block;">
+    <div style="font-weight:800; font-size:16px; margin-top:10px;">${escapeHtml(d.title||"ডিজাইন")}</div>
+    <div style="font-size:12.5px; color:var(--muted); margin-top:2px;">🧵 ${escapeHtml(d.tailorName||"")}${d.upazila ? " · " + escapeHtml(d.upazila) : ""}${d.days ? " · " + escapeHtml(String(d.days)) + " দিনে তৈরি" : ""}</div>
+    <div style="font-weight:800; color:#f472b6; font-size:17px; margin:6px 0 8px;">৳ ${escapeHtml(String(d.price))} <span style="font-size:11px; color:var(--muted); font-weight:600;">প্রতিটার মজুরি</span></div>
+    ${d.note ? `<div style="font-size:13px; color:var(--muted); line-height:1.6; white-space:pre-wrap; margin-bottom:10px;">📝 ${escapeHtml(d.note)}</div>` : ""}
+    ${hbSocialIcons(d, true)}
+    <button type="button" id="tlrSharedOrderBtn" style="width:100%; border:0; border-radius:12px; padding:13px 0; background:#be185d; color:#fff; font-weight:800; font-family:inherit; font-size:14.5px; cursor:pointer;">🧵 এই ডিজাইনে অর্ডার দিন</button>`;
+  body.querySelector("#tlrSharedOrderBtn").addEventListener("click", ()=> tlrOpenOrder(d.id));
+}
+
 async function tlrOpenOrder(designId){
   const d = (__tlrDesigns||[]).find(x=> x.id === designId);
   if(!d) return;
@@ -10552,6 +10590,29 @@ async function hbInitLikeComment(key, shopId, productId, productName, shopName){
 // hbDetectPublicProductDeepLink()-এ যেটা হ্যান্ডল হয়) কপি/শেয়ার করে, যাতে
 // যে কেউ লিংকে ক্লিক করলে সরাসরি লগইন ছাড়াই এই প্রোডাক্টের পেজ খুলে যায়
 // — hbShareShop()-এর ঠিক একই প্যাটার্ন (নেটিভ শেয়ার শিট, না থাকলে ক্লিপবোর্ড কপি)
+/* 📤 সাধারণ শেয়ার — মোবাইলে নেটিভ শেয়ার শিট (WhatsApp/Facebook/Messenger…),
+   না থাকলে লিংক কপি, তাও না হলে কপি করার বক্স */
+function hbShareLink(title, text, url){
+  const full = text + "\n👉 " + url;
+  if(navigator.share){ navigator.share({ title, text, url }).catch(()=>{}); return; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(full).then(()=> alert("লিংক কপি হয়েছে — এখন WhatsApp/Facebook-এ পেস্ট করে শেয়ার করুন।"))
+      .catch(()=> prompt("এই লিংকটা কপি করে শেয়ার করুন:", full));
+    return;
+  }
+  prompt("এই লিংকটা কপি করে শেয়ার করুন:", full);
+}
+// 🏪 দোকানের পাতার প্রোডাক্ট — বাজারের প্রোডাক্টের মতোই /p/{shopId}/{productId} লিংক
+window.hbShareShopProduct = function(productId){
+  const p = (__hbCurrentProductsList || []).find(x=> x && x.id === productId);
+  if(!p || !currentShopId) return;
+  const shopName = (($("currentShopName") && $("currentShopName").textContent) || "দোকান").replace(/\s*🔴.*$/, "");
+  const om = hbGetOfferMeta(p);
+  hbShareLink(p.name || "প্রোডাক্ট",
+    `🐝 ${p.name || "প্রোডাক্ট"} — ${HB_CUR}${om.finalPrice}\n🏪 ${shopName} (Honey Bee Bazar)`,
+    `${location.origin}/p/${encodeURIComponent(currentShopId)}/${encodeURIComponent(productId)}`);
+};
+
 window.hbShareProduct = function(key){
   const reg = __hbLcRegistry[key];
   if(!reg || !reg.shopId || !reg.productId) return;
@@ -11771,6 +11832,7 @@ window.hbOpenProductDetail = function(productId){
       <div class="pDetailImgWrap" id="pdimg-${p.id}">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</div>
       <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:8px;">
         <div style="flex:1; font-size:17px; font-weight:800;">${om.highlight ? '<span style="color:#fbbf24;">⭐</span> ' : ''}${escapeHtml(p.name||"প্রোডাক্ট")}</div>
+        <span class="pCardFav" style="position:static;" onclick="hbShareShopProduct('${p.id}')" title="শেয়ার করুন">↗️</span>
         <span class="pCardFav" style="position:static;" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
       </div>
       <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">

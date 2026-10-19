@@ -397,10 +397,26 @@ function renderDesigns(){
         <div class="muted" style="font-size:11.5px">${CAT[d.category]||""}${d.days ? " · "+bn(d.days)+" দিনে" : ""}</div>
         <div class="p">৳ ${bn(d.price)}</div>
         <span class="tag ${d.published ? "pub" : "hid"}">${d.published ? "👀 গ্রাহক দেখছেন" : "🙈 লুকানো"}</span>
-        <div class="acts"><button type="button" data-ed="${esc(d.id)}">✏️ বদলান</button><button type="button" data-del="${esc(d.id)}" style="color:var(--red)">🗑️</button></div>
+        <div class="acts"><button type="button" data-ed="${esc(d.id)}">✏️ বদলান</button><button type="button" data-sh="${esc(d.id)}" title="শেয়ার করুন">📤</button><button type="button" data-del="${esc(d.id)}" style="color:var(--red)">🗑️</button></div>
       </div></div>`).join("");
   g.querySelectorAll("[data-ed]").forEach(b=> b.onclick = ()=> openEditor(b.dataset.ed));
   g.querySelectorAll("[data-del]").forEach(b=> b.onclick = ()=> delDesign(b.dataset.del));
+  g.querySelectorAll("[data-sh]").forEach(b=> b.onclick = ()=> shareDesign(b.dataset.sh));
+}
+/* 📤 ডিজাইন শেয়ার — লিংকে চাপ দিলে Honey Bee Bazar-এ সরাসরি এই ডিজাইন খোলে, সেখান থেকে গ্রাহক অর্ডার দেন */
+function shareDesign(id){
+  const d = designs.find(x=> x.id === id); if(!d) return;
+  if(!d.published){ alert("ডিজাইনটা এখন লুকানো আছে — শেয়ার করার আগে \"✏️ বদলান\" থেকে \"গ্রাহককে দেখান\" চালু করুন।"); return; }
+  const url = location.origin + "/d/" + encodeURIComponent(id);
+  const shop = (T.data && T.data.name) || "সেলাই ঘর";
+  const text = `🧵 ${d.title}\n৳ ${d.price} মজুরি${d.days ? " · " + d.days + " দিনে তৈরি" : ""}\n✂️ ${shop}${T.data && T.data.area ? " (" + T.data.area + ")" : ""}\nনিজের কাপড়ে অর্ডার দিন — Honey Bee Bazar`;
+  const full = text + "\n👉 " + url;
+  if(navigator.share){ navigator.share({ title: d.title, text, url }).catch(()=>{}); return; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(full).then(()=> toast("✅ লিংক কপি হয়েছে — WhatsApp/Facebook-এ পেস্ট করুন")).catch(()=> prompt("এই লিংকটা কপি করুন:", full));
+    return;
+  }
+  prompt("এই লিংকটা কপি করুন:", full);
 }
 function listenDesigns(){
   db.collection("tailorDesigns").where("tailorId","==",T.uid).onSnapshot(qs=>{
