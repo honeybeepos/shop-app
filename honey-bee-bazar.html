@@ -193,6 +193,19 @@
   .pCardOfferBadge{ background:#dc2626; color:#fff; font-size:9.5px; font-weight:800; padding:3px 8px; border-radius:8px; }
   .pCardHighlightBadge{ background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; font-size:9.5px; font-weight:800; padding:3px 7px; border-radius:8px; }
   .pCardBody{ padding:10px 11px 12px; }
+  /* 🔽 টাইটেলে চাপ দিলে কার্ড বড় হয় (পুরো সারি জুড়ে) আর বিবরণ ড্রপডাউনের মতো খোলে; আবার চাপলে বন্ধ */
+  .hbXTitle{ cursor:pointer; }
+  .hbXClamp{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .hbXChev{ display:inline-block; font-size:10px; margin-left:4px; opacity:.75; transition:transform .2s ease; }
+  .hbXDesc{ display:none; font-size:12.5px; line-height:1.65; color:var(--muted); white-space:pre-wrap; word-break:break-word; margin:6px 0; padding:9px 11px; border-radius:10px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.09); }
+  .hbXCard.hbXOpen{ grid-column:1 / -1; }
+  .mfHRow .pCard.hbXCard.hbXOpen{ flex-basis:280px; }
+  .hbXOpen .hbXDesc{ display:block; animation:hbXDrop .22s ease both; }
+  .hbXOpen .hbXClamp, .hbXOpen .pCardName{ display:block; -webkit-line-clamp:unset; min-height:0; overflow:visible; }
+  .hbXOpen .hbXChev{ transform:rotate(180deg); }
+  .hbXOpen .pCardImgWrap{ aspect-ratio:4/3; }
+  .hbXOpen img.hbXImg{ aspect-ratio:auto !important; max-height:70vh; object-fit:contain !important; }
+  @keyframes hbXDrop{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
   .hbSocialRow{ display:flex; gap:6px; margin:3px 0 4px; }
   .hbSocialBtn{ display:inline-flex; align-items:center; justify-content:center; width:30px; height:26px; border-radius:7px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14); text-decoration:none; }
   .hbSocialBtn svg{ width:20px; height:16px; display:block; }
@@ -3828,10 +3841,11 @@ async function tlrRenderFeed(){
     return;
   }
   box.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">` + list.map(d=> `
-    <div class="card" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0;">
-      <img src="${escapeHtml(d.img)}" data-tlr-zoom="${escapeHtml(d.img)}" data-tlr-did="${escapeHtml(d.id)}" alt="" loading="lazy" style="width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:#fce7f3; cursor:zoom-in;">
+    <div class="card hbXCard" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0;">
+      <img class="hbXImg" src="${escapeHtml(d.img)}" data-tlr-zoom="${escapeHtml(d.img)}" data-tlr-did="${escapeHtml(d.id)}" alt="" loading="lazy" style="width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:#fce7f3; cursor:zoom-in;">
       <div style="padding:8px 9px 10px; display:flex; flex-direction:column; gap:3px; flex:1;">
-        <div style="font-weight:800; font-size:13px; line-height:1.3;">${escapeHtml(d.title)}</div>
+        <div class="hbXTitle hbXClamp" onclick="hbToggleCard(this, event)" style="font-weight:800; font-size:13px; line-height:1.3;">${escapeHtml(d.title)}${hbChev(d.note)}</div>
+        ${hbDescBlock(d.note)}
         <div style="font-size:11px; color:var(--muted);">${TLR_CAT[d.category]||""}${d.days ? " · "+escapeHtml(String(d.days))+" দিনে" : ""}</div>
         <div style="font-size:11px; color:var(--muted);">🧵 ${escapeHtml(d.tailorName||"")}${d.upazila ? " · "+escapeHtml(d.upazila) : ""}</div>
         <div style="font-weight:800; color:#f472b6; font-size:14px;">৳ ${escapeHtml(String(d.price))} <span style="font-size:10.5px; font-weight:600; color:var(--muted);">মজুরি</span></div>
@@ -8958,6 +8972,20 @@ function hbSafeSocialUrl(raw, kind){
 }
 const HB_YT_SVG = '<svg viewBox="0 0 28 20" aria-hidden="true"><rect width="28" height="20" rx="5" fill="#ff0000"/><path d="M11 5.5v9l8-4.5z" fill="#fff"/></svg>';
 const HB_FB_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#1877f2"/><path d="M13.4 19.5v-6.2h2.1l.3-2.5h-2.4V9.3c0-.7.2-1.2 1.2-1.2h1.3V5.9c-.2 0-1-.1-1.9-.1-1.9 0-3.2 1.2-3.2 3.3v1.8H8.7v2.5h2.1v6.2z" fill="#fff"/></svg>';
+// 🔽 কার্ড বড়/ছোট করা — টাইটেলে চাপ দিলে
+function hbToggleCard(el, ev){
+  if(ev) ev.stopPropagation();
+  const c = el.closest(".hbXCard"); if(!c) return;
+  const open = c.classList.toggle("hbXOpen");
+  if(open) setTimeout(()=> c.scrollIntoView({ behavior:"smooth", block:"nearest", inline:"nearest" }), 60);
+}
+// বিবরণের ড্রপডাউন অংশ (খালি থাকলে কিছুই না)
+function hbDescBlock(text){
+  const t = String(text || "").trim();
+  return t ? `<div class="hbXDesc">📝 ${escapeHtml(t)}</div>` : "";
+}
+function hbChev(text){ return String(text || "").trim() ? '<span class="hbXChev">▼</span>' : ""; }
+
 // big = true → বিস্তারিত পাতায় লেখাসহ বড় বাটন; false → কার্ডে ছোট আইকন
 function hbSocialIcons(item, big){
   const yt = hbSafeSocialUrl(item && item.ytUrl, "yt"), fb = hbSafeSocialUrl(item && item.fbUrl, "fb");
@@ -10054,7 +10082,7 @@ function mfCardHTML(p, idx){
     ? `event.stopPropagation(); hbOpenMarketProductDetail('${p.__shopId}','${p.id}')`
     : `event.stopPropagation(); mfAddToCartAnimated(this,'${p.id}','${safeName}',${om.finalPrice},'${p.__shopId}','${safeShopName}')`;
   return `
-    <div class="pCard mfCard ${om.highlight ? 'mfGlow' : ''}" style="animation-delay:${Math.min(idx,12)*0.08}s;">
+    <div class="pCard mfCard hbXCard ${om.highlight ? 'mfGlow' : ''}" style="animation-delay:${Math.min(idx,12)*0.08}s;">
       <div class="mfHookChain"><span class="mfHookRing"></span><span class="mfHookRing mfHookRingBottom"></span></div>
       <div class="pCardImgWrap" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">
         <span class="pCardImgInner">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</span>
@@ -10068,7 +10096,8 @@ function mfCardHTML(p, idx){
         <button class="mfCartBtn" ${(outOfStock || shopClosed) ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''} onclick="${cartBtnClick}">${isVariant ? "👕" : "🛒"}</button>
       </div>
       <div class="pCardBody">
-        <div class="pCardName" onclick="hbOpenMarketProductDetail('${p.__shopId}','${p.id}')">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
+        <div class="pCardName hbXTitle" onclick="hbToggleCard(this, event)">${escapeHtml(p.name || "প্রোডাক্ট")}${hbChev(p.description)}</div>
+        ${hbDescBlock(p.description)}
         <span class="mfShopTag">🏪 ${escapeHtml(p.__shopName||"দোকান")}</span>
         ${p.__shopArea ? `<div class="mfCardArea">📍 ${escapeHtml(p.__shopArea)}</div>` : ""}
         <div class="pCardPriceRow">
@@ -11679,7 +11708,7 @@ function renderProducts(products){
     // আগে ডিটেইল পেজে গিয়ে রং/সাইজ বেছে নিতে হবে
     const isVariant = p.productType === "variant" && p.variants && p.variants.length;
     return `
-      <div class="pCard">
+      <div class="pCard hbXCard">
         <div class="pCardImgWrap" id="pimg-${p.id}" onclick="hbOpenProductDetail('${p.id}')">
           <span class="pCardImgInner" id="pimgInner-${p.id}">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="" onerror="this.parentElement.textContent='${guessCategoryIcon(p.name)}'">` : guessCategoryIcon(p.name)}</span>
           <div class="pCardBadges">
@@ -11690,7 +11719,8 @@ function renderProducts(products){
           <span class="pCardFav" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
         </div>
         <div class="pCardBody">
-          <div class="pCardName" onclick="hbOpenProductDetail('${p.id}')">${escapeHtml(p.name || "প্রোডাক্ট")}</div>
+          <div class="pCardName hbXTitle" onclick="hbToggleCard(this, event)">${escapeHtml(p.name || "প্রোডাক্ট")}${hbChev(p.description)}</div>
+          ${hbDescBlock(p.description)}
           <div class="pCardPriceRow">
             <span class="pCardPrice">${HB_CUR}${om.finalPrice}</span>
             ${om.hasDiscount ? `<span class="pCardOldPrice">${HB_CUR}${p.price}</span>` : ""}

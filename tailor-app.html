@@ -229,7 +229,7 @@
       <div><label>সেলাইয়ের মজুরি (৳)</label><input id="dzPrice" type="number" inputmode="numeric" min="0" max="100000" placeholder="যেমন: 450"></div>
       <div><label>কত দিনে দেবেন</label><input id="dzDays" type="number" inputmode="numeric" min="1" max="60" placeholder="যেমন: 5"></div>
     </div>
-    <label>বিবরণ (ঐচ্ছিক)</label><textarea id="dzNote" maxlength="300" placeholder="যেমন: লাইনিং সহ, হাতায় লেস"></textarea>
+    <label>বিবরণ (ঐচ্ছিক)</label><textarea id="dzNote" maxlength="1000" placeholder="যেমন: লাইনিং সহ, হাতায় লেস — গ্রাহক ডিজাইনের নামে চাপ দিলে এই বিবরণ দেখবেন"></textarea>
     <label>▶️ YouTube ভিডিওর লিংক (ঐচ্ছিক)</label><input id="dzYt" type="url" inputmode="url" maxlength="300" placeholder="https://youtu.be/...">
     <label>📘 Facebook ভিডিও/পোস্টের লিংক (ঐচ্ছিক)</label><input id="dzFb" type="url" inputmode="url" maxlength="300" placeholder="https://www.facebook.com/...">
     <div class="muted" style="margin:-2px 0 8px">লিংক দিলে গ্রাহক ডিজাইনের কার্ডে YouTube/Facebook আইকন দেখবেন — চাপ দিলে আপনার ভিডিও খুলবে।</div>
@@ -452,7 +452,7 @@ $("dzSave").addEventListener("click", async ()=>{
   if(fbUrl === false){ alert("Facebook লিংকটা ঠিক নেই — Facebook-এ পোস্টের 'Share' → 'Copy link' করে এখানে বসান।"); return; }
   const d = T.data, btn = $("dzSave"); btn.disabled = true; btn.textContent = "সেভ হচ্ছে…";
   const rec = { tailorId: T.uid, tailorName: d.name || "", district: d.district || null, upazila: d.upazila || null, marketId: d.marketId || null,
-    title: title.slice(0,60), category: $("dzCat").value, price, days, note: $("dzNote").value.trim().slice(0,300),
+    title: title.slice(0,60), category: $("dzCat").value, price, days, note: $("dzNote").value.trim().slice(0,1000),
     ytUrl, fbUrl,
     img: editImg, published: $("dzPub").checked, status: "active", updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
   try{

@@ -5250,7 +5250,7 @@ window.hbLoadLib = function(name){
         <label>🔥 অফার/ডিসকাউন্ট মূল্য (ঐচ্ছিক — Bazar-এ "Special Offer" ব্যাজ দেখাবে)</label>
         <input type="number" id="bccPOfferPrice" placeholder="যেমনঃ 950 (বিক্রয় মূল্যের চেয়ে কম হতে হবে)">
         <label>📷 Product Image (Optional)</label><input type="file" id="bccPImage" accept="image/*">
-        <label>📝 Description (Optional)</label><input id="bccPNote" placeholder="নোট...">
+        <label>📝 Description (Optional — Bazar-এ প্রোডাক্টের নামে চাপ দিলে গ্রাহক দেখবেন)</label><textarea id="bccPNote" rows="3" maxlength="1000" placeholder="যেমন: সাইজ, কাপড়, কীভাবে ব্যবহার করবেন…" style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
         <label>▶️ YouTube ভিডিওর লিংক (ঐচ্ছিক)</label><input id="bccPYt" type="url" inputmode="url" maxlength="300" placeholder="https://youtu.be/...">
         <label>📘 Facebook ভিডিও/পোস্টের লিংক (ঐচ্ছিক)</label><input id="bccPFb" type="url" inputmode="url" maxlength="300" placeholder="https://www.facebook.com/...">
         <div style="font-size:11.5px; color:#6b7280; margin:-4px 0 8px;">লিংক দিলে Bazar-এ প্রোডাক্টের কার্ডে YouTube/Facebook আইকন দেখাবে — গ্রাহক চাপ দিলে আপনার ভিডিও খুলবে।</div>
@@ -11850,7 +11850,7 @@ async function bccSyncProductToBazar(p){
       packageItems: p.productType === 'package' && p.packageItems ? p.packageItems.map(it=> ({ name: it.name, qty: Number(it.qty)||1 })) : null,
       description: p.productType === 'package' && p.packageItems
         ? ('📦 এই প্যাকেজে আছে: ' + p.packageItems.map(it=> it.name + ' ×' + it.qty).join(', ') + (p.note ? '\n🗒️ ' + p.note : ''))
-        : null,
+        : (p.note ? String(p.note).slice(0, 1000) : null), // 📝 সাধারণ প্রোডাক্টের Description — Bazar কার্ডে টাইটেল চাপলে দেখায়
       updatedAt: fbNow()
     });
     bccPendingQueueRemove('bcc-pending-bazar-sync', p.id);
