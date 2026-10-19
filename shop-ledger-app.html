@@ -5251,6 +5251,9 @@ window.hbLoadLib = function(name){
         <input type="number" id="bccPOfferPrice" placeholder="যেমনঃ 950 (বিক্রয় মূল্যের চেয়ে কম হতে হবে)">
         <label>📷 Product Image (Optional)</label><input type="file" id="bccPImage" accept="image/*">
         <label>📝 Description (Optional)</label><input id="bccPNote" placeholder="নোট...">
+        <label>▶️ YouTube ভিডিওর লিংক (ঐচ্ছিক)</label><input id="bccPYt" type="url" inputmode="url" maxlength="300" placeholder="https://youtu.be/...">
+        <label>📘 Facebook ভিডিও/পোস্টের লিংক (ঐচ্ছিক)</label><input id="bccPFb" type="url" inputmode="url" maxlength="300" placeholder="https://www.facebook.com/...">
+        <div style="font-size:11.5px; color:#6b7280; margin:-4px 0 8px;">লিংক দিলে Bazar-এ প্রোডাক্টের কার্ডে YouTube/Facebook আইকন দেখাবে — গ্রাহক চাপ দিলে আপনার ভিডিও খুলবে।</div>
 
         <div style="background:#f3f4f6; border-radius:10px; padding:12px; margin:14px 0;">
           <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -11796,6 +11799,22 @@ function bccPendingQueueGet(key){ try{ return JSON.parse(localStorage.getItem(ke
 function bccPendingQueueAdd(key, id){ const q = bccPendingQueueGet(key); if(!q.includes(id)){ q.push(id); localStorage.setItem(key, JSON.stringify(q)); } }
 function bccPendingQueueRemove(key, id){ const q = bccPendingQueueGet(key).filter(x=>x!==id); localStorage.setItem(key, JSON.stringify(q)); }
 
+/* ▶️📘 YouTube / Facebook লিংক যাচাই — খালি হলে null, ভুল হলে false, ঠিক হলে https লিংক।
+   শুধু youtube.com/youtu.be আর facebook.com/fb.watch মানা হয়, যাতে অন্য (ক্ষতিকর) সাইটের লিংক Bazar-এ না যায়। */
+function bccCleanSocialUrl(raw, kind){
+  let v = String(raw || '').trim();
+  if(!v) return null;
+  const m = v.match(/https?:\/\/\S+/i); if(m) v = m[0];
+  if(!/^https?:\/\//i.test(v)) v = 'https://' + v;
+  let u; try{ u = new URL(v); }catch(e){ return false; }
+  const h = u.hostname.toLowerCase().replace(/^(www|m|mobile|web)\./, '');
+  const ok = kind === 'yt' ? ['youtube.com','youtu.be','music.youtube.com'].includes(h)
+                           : ['facebook.com','fb.watch','fb.com'].includes(h);
+  if(!ok) return false;
+  u.protocol = 'https:';
+  return u.toString().slice(0, 300);
+}
+
 async function bccSyncProductToBazar(p){
   try{
     const session = (typeof getSession === 'function') ? getSession() : null;
@@ -11811,6 +11830,8 @@ async function bccSyncProductToBazar(p){
       catId: p.catId || null,
       subId: p.subId || null,
       subSubId: p.subSubId || null,
+      ytUrl: p.ytUrl || null, // ▶️ Bazar কার্ডে YouTube আইকন
+      fbUrl: p.fbUrl || null, // 📘 Bazar কার্ডে Facebook আইকন
       imageUrl: p.imageUrl || null, // 🖼️ Step 5 — Storage-এ আপলোড করা ছবি থাকলে Bazar-এও দেখা যাবে
       // 👕 প্রোডাক্টের ধরন ও কালার/সাইজ ভ্যারিয়েন্ট — এখনই Bazar-এ কালার/সাইজ সিলেকশন UI
       // বানানো না হলেও, ডেটাটা আগে থেকেই সিঙ্ক করে রাখা হচ্ছে যাতে ভবিষ্যতে Bazar-এর
@@ -13283,6 +13304,8 @@ function bccOpenProductModal(editId){
   document.getElementById('bccPMin').value = p ? p.min : '';
   document.getElementById('bccPOfferPrice').value = p ? (p.offerPrice||'') : '';
   document.getElementById('bccPNote').value = p ? (p.note||'') : '';
+  document.getElementById('bccPYt').value = p && p.ytUrl ? p.ytUrl : '';
+  document.getElementById('bccPFb').value = p && p.fbUrl ? p.fbUrl : '';
   document.getElementById('bccPImage').value = '';
   bccPendingImage = p ? (p.image||'') : '';
   bccPendingImageIsNew = false; // 🖼️ Step 5 — মোডাল খোলার সময় রিসেট, নতুন ছবি select না করলে এটা false-ই থাকবে
@@ -13982,6 +14005,10 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
   const enteredSell = Number(document.getElementById('bccPSell').value)||0;
   const enteredOfferPrice = Number(document.getElementById('bccPOfferPrice').value) || 0;
   const enteredPublished = hbBazarAllowed() && document.getElementById('bccPPublished').checked;
+  const enteredYt = bccCleanSocialUrl(document.getElementById('bccPYt').value, 'yt');
+  const enteredFb = bccCleanSocialUrl(document.getElementById('bccPFb').value, 'fb');
+  if(enteredYt === false){ alert("YouTube লিংকটা ঠিক নেই — YouTube অ্যাপে 'Share' → 'Copy link' করে এখানে বসান।"); return; }
+  if(enteredFb === false){ alert("Facebook লিংকটা ঠিক নেই — Facebook-এ পোস্টের 'Share' → 'Copy link' করে এখানে বসান।"); return; }
   const enteredUnit = bccIsWeightMode() ? (document.getElementById('bccPUnit').value || 'pcs') : 'pcs';
   const enteredGeneric = document.getElementById('bccPGeneric').value.trim();
   const enteredRack = document.getElementById('bccPRack').value.trim();
@@ -14092,6 +14119,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
     }
     const enteredNote = document.getElementById('bccPNote').value.trim();
     if(enteredNote) dup.note = enteredNote;
+    dup.ytUrl = enteredYt; dup.fbUrl = enteredFb;
     bccSaveProducts(prods);
     if(dup.published) bccSyncProductToBazar(dup); else bccUnpublishFromBazar(dup.id);
     document.getElementById('bccProductModalOverlay').classList.remove('show');
@@ -14137,6 +14165,8 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
     imageId: imageIntegrationResult ? imageIntegrationResult.imageId : (existingProduct ? (existingProduct.imageId || null) : null),
     imageUrl: imageIntegrationResult ? imageIntegrationResult.imageUrl : (existingProduct ? (existingProduct.imageUrl || null) : null),
     note: document.getElementById('bccPNote').value.trim(),
+    ytUrl: enteredYt,   // ▶️ YouTube লিংক (না থাকলে null)
+    fbUrl: enteredFb,   // 📘 Facebook লিংক (না থাকলে null)
   };
   // 🛍️ সাধারণ এডিট ফর্মে সেভ করলেও একাদশী/প্যাকেজের তথ্য যেন হারিয়ে না যায়
   if(existingProduct){

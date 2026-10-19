@@ -230,6 +230,9 @@
       <div><label>কত দিনে দেবেন</label><input id="dzDays" type="number" inputmode="numeric" min="1" max="60" placeholder="যেমন: 5"></div>
     </div>
     <label>বিবরণ (ঐচ্ছিক)</label><textarea id="dzNote" maxlength="300" placeholder="যেমন: লাইনিং সহ, হাতায় লেস"></textarea>
+    <label>▶️ YouTube ভিডিওর লিংক (ঐচ্ছিক)</label><input id="dzYt" type="url" inputmode="url" maxlength="300" placeholder="https://youtu.be/...">
+    <label>📘 Facebook ভিডিও/পোস্টের লিংক (ঐচ্ছিক)</label><input id="dzFb" type="url" inputmode="url" maxlength="300" placeholder="https://www.facebook.com/...">
+    <div class="muted" style="margin:-2px 0 8px">লিংক দিলে গ্রাহক ডিজাইনের কার্ডে YouTube/Facebook আইকন দেখবেন — চাপ দিলে আপনার ভিডিও খুলবে।</div>
     <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink)"><input type="checkbox" id="dzPub" checked style="width:auto"> গ্রাহককে দেখান (Bazar-এ)</label>
     <button class="btn" type="button" id="dzSave" style="margin-top:12px">💾 ডিজাইন সেভ করুন</button>
   </div>
@@ -413,7 +416,8 @@ function openEditor(id){
   $("dzTitle").textContent = d ? "✏️ ডিজাইন বদলান" : "➕ নতুন ডিজাইন";
   $("dzName").value = d ? d.title : ""; $("dzCat").value = d ? d.category : "kameez";
   $("dzPrice").value = d ? d.price : ""; $("dzDays").value = d && d.days ? d.days : "";
-  $("dzNote").value = d ? (d.note||"") : ""; $("dzPub").checked = d ? !!d.published : true;
+  $("dzNote").value = d ? (d.note||"") : "";
+  $("dzYt").value = d && d.ytUrl ? d.ytUrl : ""; $("dzFb").value = d && d.fbUrl ? d.fbUrl : ""; $("dzPub").checked = d ? !!d.published : true;
   showPhoto(editImg ? { url: editImg, kb: dataUrlBytes(editImg)/1024 } : null);
   $("dzModal").style.display = "flex";
 }
@@ -443,9 +447,13 @@ $("dzSave").addEventListener("click", async ()=>{
   if(!title){ alert("ডিজাইনের একটা নাম দিন।"); return; }
   if(!(price > 0)){ alert("সেলাইয়ের মজুরি (টাকা) লিখুন।"); return; }
   if(dataUrlBytes(editImg) > 100*1024){ alert("ছবিটা ১০০ KB-র বেশি — অন্য ছবি দিন।"); return; }
+  const ytUrl = cleanSocialUrl($("dzYt").value, "yt"), fbUrl = cleanSocialUrl($("dzFb").value, "fb");
+  if(ytUrl === false){ alert("YouTube লিংকটা ঠিক নেই — YouTube অ্যাপে 'Share' → 'Copy link' করে এখানে বসান।"); return; }
+  if(fbUrl === false){ alert("Facebook লিংকটা ঠিক নেই — Facebook-এ পোস্টের 'Share' → 'Copy link' করে এখানে বসান।"); return; }
   const d = T.data, btn = $("dzSave"); btn.disabled = true; btn.textContent = "সেভ হচ্ছে…";
   const rec = { tailorId: T.uid, tailorName: d.name || "", district: d.district || null, upazila: d.upazila || null, marketId: d.marketId || null,
     title: title.slice(0,60), category: $("dzCat").value, price, days, note: $("dzNote").value.trim().slice(0,300),
+    ytUrl, fbUrl,
     img: editImg, published: $("dzPub").checked, status: "active", updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
   try{
     if(editId) await db.collection("tailorDesigns").doc(editId).update(rec);
@@ -455,6 +463,22 @@ $("dzSave").addEventListener("click", async ()=>{
   }catch(e){ alert("সেভ করা যায়নি — " + (e.code === "permission-denied" ? "অনুমতি নেই (নতুন নিয়ম এখনো চালু হয়নি)" : "ইন্টারনেট দেখে আবার চেষ্টা করুন")); }
   btn.disabled = false; btn.textContent = "💾 ডিজাইন সেভ করুন";
 });
+/* ▶️📘 YouTube / Facebook লিংক যাচাই — খালি হলে null, ভুল হলে false, ঠিক হলে https লিংক।
+   শুধু youtube.com/youtu.be আর facebook.com/fb.watch মানা হয়, যাতে কেউ অন্য (ক্ষতিকর) সাইটের লিংক বসাতে না পারে। */
+function cleanSocialUrl(raw, kind){
+  let v = String(raw || "").trim();
+  if(!v) return null;
+  const m = v.match(/https?:\/\/\S+/i); if(m) v = m[0];          // শেয়ার করা লেখার ভেতর থেকে শুধু লিংকটা
+  if(!/^https?:\/\//i.test(v)) v = "https://" + v;
+  let u; try{ u = new URL(v); }catch(e){ return false; }
+  const h = u.hostname.toLowerCase().replace(/^(www|m|mobile|web)\./, "");
+  const ok = kind === "yt" ? ["youtube.com","youtu.be","music.youtube.com"].includes(h)
+                           : ["facebook.com","fb.watch","fb.com"].includes(h);
+  if(!ok) return false;
+  u.protocol = "https:";
+  return u.toString().slice(0, 300);
+}
+
 async function delDesign(id){
   const d = designs.find(x=> x.id === id); if(!d) return;
   if(!confirm(`"${d.title}" ডিজাইনটা মুছে ফেলবেন?`)) return;
