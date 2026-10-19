@@ -379,6 +379,11 @@
 
   .mfShopTag{ font-size:9.5px; font-weight:700; color:var(--muted); margin-bottom:2px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .mfCardArea{ font-size:9px; color:var(--muted); display:flex; align-items:center; gap:3px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* 📤 প্রতিটা কার্ডে শেয়ার বাটন — বন্ধুকে WhatsApp/Facebook-এ পাঠানোর জন্য, সহজে চোখে পড়ে */
+  .hbShareChip{ position:absolute; bottom:8px; left:8px; z-index:2; display:inline-flex; align-items:center; gap:4px; padding:5px 9px 5px 7px; border:0; border-radius:20px; background:rgba(0,0,0,0.58); backdrop-filter:blur(4px); color:#fff; font-family:inherit; font-size:11px; font-weight:700; cursor:pointer; }
+  .hbShareChip svg{ width:13px; height:13px; display:block; }
+  .hbShareChip:active{ transform:scale(0.93); }
+  .hbShareChip.top{ top:8px; right:8px; bottom:auto; left:auto; }
   .mfCartBtn{
     position:absolute; bottom:8px; right:8px; width:32px; height:32px; border-radius:50%; border:none;
     background:linear-gradient(135deg, var(--amber), var(--gold)); color:#1a1206; font-size:15px;
@@ -3850,7 +3855,8 @@ async function tlrRenderFeed(){
     return;
   }
   box.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">` + list.map(d=> `
-    <div class="card hbXCard" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0;">
+    <div class="card hbXCard" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0; position:relative;">
+      ${hbShareChip({ kind:"design", id:d.id, name:d.title, price:d.price, shop:d.tailorName }, "top")}
       <img class="hbXImg" src="${escapeHtml(d.img)}" data-tlr-zoom="${escapeHtml(d.img)}" data-tlr-did="${escapeHtml(d.id)}" alt="" loading="lazy" style="width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:#fce7f3; cursor:zoom-in;">
       <div style="padding:8px 9px 10px; display:flex; flex-direction:column; gap:3px; flex:1;">
         <div class="hbXTitle hbXClamp" onclick="hbToggleCard(this, event)" style="font-weight:800; font-size:13px; line-height:1.3;">${escapeHtml(d.title)}${hbChev(d.note)}</div>
@@ -10131,6 +10137,7 @@ function mfCardHTML(p, idx){
           ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
         </div>
         <span class="pCardFav" onclick="mfToggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
+        ${hbShareChip({ kind:"product", id:p.id, shopid:p.__shopId, name:p.name, price:om.finalPrice, shop:p.__shopName })}
         <button class="mfCartBtn" ${(outOfStock || shopClosed) ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''} onclick="${cartBtnClick}">${isVariant ? "👕" : "🛒"}</button>
       </div>
       <div class="pCardBody">
@@ -10602,6 +10609,26 @@ function hbShareLink(title, text, url){
   }
   prompt("এই লিংকটা কপি করে শেয়ার করুন:", full);
 }
+// 📤 কার্ডের শেয়ার বাটন — data-* থেকে তথ্য নেয় (নাম/দোকানের নামে ' বা " থাকলেও ভাঙে না)
+const HB_SHARE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>';
+function hbShareChip(o, extraClass){
+  const attrs = Object.keys(o).map(k=> `data-sh-${k}="${escapeHtml(o[k] == null ? "" : String(o[k]))}"`).join(" ");
+  return `<button type="button" class="hbShareChip ${extraClass||""}" ${attrs} onclick="hbShareFromChip(event,this)">${HB_SHARE_SVG}শেয়ার</button>`;
+}
+window.hbShareFromChip = function(ev, btn){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const d = btn.dataset;
+  if(d.shKind === "design"){
+    hbShareLink(d.shName || "ডিজাইন",
+      `🧵 ${d.shName || "ডিজাইন"} — ৳${d.shPrice} মজুরি\n✂️ ${d.shShop || "সেলাই ঘর"} (Honey Bee Bazar)\nনিজের কাপড়ে সেলাই করিয়ে নিন`,
+      `${location.origin}/d/${encodeURIComponent(d.shId)}`);
+    return;
+  }
+  hbShareLink(d.shName || "প্রোডাক্ট",
+    `🐝 ${d.shName || "প্রোডাক্ট"} — ${HB_CUR}${d.shPrice}\n🏪 ${d.shShop || "দোকান"} (Honey Bee Bazar)`,
+    `${location.origin}/p/${encodeURIComponent(d.shShopid)}/${encodeURIComponent(d.shId)}`);
+};
+
 // 🏪 দোকানের পাতার প্রোডাক্ট — বাজারের প্রোডাক্টের মতোই /p/{shopId}/{productId} লিংক
 window.hbShareShopProduct = function(productId){
   const p = (__hbCurrentProductsList || []).find(x=> x && x.id === productId);
@@ -11778,6 +11805,7 @@ function renderProducts(products){
             ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
           </div>
           <span class="pCardFav" onclick="toggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
+          ${hbShareChip({ kind:"product", id:p.id, shopid:currentShopId, name:p.name, price:om.finalPrice, shop:(($("currentShopName")&&$("currentShopName").textContent)||"").replace(/\s*🔴.*$/, "") })}
         </div>
         <div class="pCardBody">
           <div class="pCardName hbXTitle" onclick="hbToggleCard(this, event)">${escapeHtml(p.name || "প্রোডাক্ট")}${hbChev(p.description)}</div>
