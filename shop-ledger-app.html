@@ -1037,6 +1037,7 @@ window.hbLoadLib = function(name){
   <div class="left"><span id="cloudSyncDot"></span><span id="cloudShopLabel"></span><span id="cloudNetLabel" style="margin-left:6px;font-weight:700;"></span></div>
   <div class="left">
     <button id="subUserBtn" style="display:none;">+ সাব-ইউজার</button>
+    <button id="pharmaModeBtn" style="display:none;" title="ফার্মেসি মোড চালু করুন">💊 ফার্মেসি মোড</button>
     <button id="shopSettingsBtn" title="সেটিং" style="padding:6px 10px; font-size:15px;">⚙️</button>
     <button id="ordBellBtn" title="Bazar অর্ডার" style="position:relative; padding:6px 10px; font-size:15px;">
       🔔<span id="ordBellBadge" style="display:none; position:absolute; top:-4px; right:-2px; background:#e0433c; color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:9px; line-height:16px; text-align:center; padding:0 3px; font-family:inherit;">0</span>
@@ -23555,6 +23556,30 @@ auth.onAuthStateChanged(async (user)=>{
     ]);
   }catch(e){
     console.error("Initial cloud pull failed:", e);
+  }
+
+  /* 💊 ফার্মেসি মোড — এডমিন চালু করলে ("hb-pharmacy-mode" = "1", দোকানের সব ফোনে
+     সিঙ্ক হয়) POS খুললেই pharmacy.html খোলে। একই খাতা, তাই কিছু হারায় না।
+     ফার্মেসি পাতার "সাধারণ POS-এ খুলুন" লিংকে ?stay=1 থাকে — তখন ফেরত পাঠানো হয় না। */
+  if(localStorage.getItem("hb-pharmacy-mode") === "1" && !/[?&]stay=1/.test(location.search)){
+    location.replace("pharmacy.html");
+    return;
+  }
+  if(session.role === "admin"){
+    const pmBtn = document.getElementById("pharmaModeBtn");
+    if(pmBtn){
+      pmBtn.style.display = "inline-block";
+      if(localStorage.getItem("hb-pharmacy-mode") === "1") pmBtn.textContent = "💊 ফার্মেসি মোডে যান";
+      pmBtn.addEventListener("click", async ()=>{
+        if(localStorage.getItem("hb-pharmacy-mode") !== "1"){
+          if(!confirm("💊 ফার্মেসি মোড চালু করবেন?\n\n• ওষুধ বক্স/পাতা/পিস হিসাবে বিক্রি করা যাবে\n• দোকানের সব ফোনে (স্টাফসহ) ফার্মেসি মোড খুলবে\n• আপনার আগের প্রোডাক্ট, বিক্রি, বাকি — সব আগের মতোই থাকবে\n\nযেকোনো সময় \"সাধারণ POS-এ ফিরুন\" চেপে বন্ধ করা যায়।")) return;
+          localStorage.setItem("hb-pharmacy-mode", "1");
+          pmBtn.disabled = true; pmBtn.textContent = "⏳ চালু হচ্ছে…";
+          try{ await Promise.race([pushLocalStorageToCloud(), new Promise(r=> setTimeout(r, 8000))]); }catch(e){}
+        }
+        location.href = "pharmacy.html";
+      });
+    }
   }
 
   // ক্লাউড থেকে ডেটা আসার পরে দোকানের নাম/সাব-টাইটেলও আবার লোড করা হচ্ছে — নাহলে নতুন

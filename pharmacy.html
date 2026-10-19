@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1E2430">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>Honey Bee ফার্মেসি</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  💊 Honey Bee ফার্মেসি মোড
+  ─────────────────────────────────────────────────────────────
+  সাধারণ POS (shop-ledger-app.html) আর এই পাতা একই খাতা ব্যবহার করে —
+  প্রোডাক্ট (bcc-products), বিক্রি (phone-shop-entries), ক্যাটাগরি সব একই।
+  firebase-init.js-এর সিঙ্ক ইঞ্জিন localStorage ↔ Firestore মিলিয়ে রাখে,
+  তাই এখানে বিক্রি করলে সাধারণ POS-এর হিসাবেও দেখা যায়, আর মোড বদলালে কিছু হারায় না।
+
+  ওষুধের হিসাব সবসময় "পিস"-এ রাখা হয় (p.qty, p.buy, p.sell = ১ পিসের),
+  আর বক্স/পাতা শুধু দেখানো ও বিক্রির সময় গুণ করে বের করা হয় —
+  ঠিক সাধারণ POS যেভাবে স্টক কমায় (bccAdjustStockForSale), তার সাথে মিল রেখে।
+
+  মোড চালু/বন্ধ: localStorage "hb-pharmacy-mode" = "1" (দোকানের সব ফোনে সিঙ্ক হয়)।
+  শুধু এডমিন বদলাতে পারেন; সাব-ইউজার (স্টাফ) বিক্রি ও স্টকের কাজ করতে পারেন,
+  টাকার হিসাব (মোট বিক্রি, স্টকের দাম) দেখেন না — সাধারণ POS-এর নিয়মের মতোই।
+-->
+<style>
+  :root{
+    --honey:#F4B400; --honey-deep:#D99A00; --honey-soft:#FFF4D1;
+    --ink:#1E2430; --ink-2:#2A3140; --ink-3:#5B6474; --muted:#8A93A3;
+    --paper:#F5F6F8; --card:#FFFFFF; --line:#E6E8EC;
+    --green:#1F9D55; --green-soft:#E3F5EA; --red:#E5484D; --red-soft:#FDECEC; --blue:#2F6FED; --blue-soft:#E8F0FE;
+    --r-lg:16px; --r-md:12px; --r-sm:9px;
+    --nav-h:62px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; overflow-x:hidden; }
+  body{ background:var(--paper); color:var(--ink); font-family:'Hind Siliguri', system-ui, sans-serif; font-size:15px; line-height:1.5; -webkit-tap-highlight-color:transparent; }
+  button,input,select,textarea{ font-family:inherit; font-size:inherit; color:inherit; }
+  button{ cursor:pointer; }
+  :focus-visible{ outline:3px solid var(--honey); outline-offset:2px; }
+  .num{ font-variant-numeric:tabular-nums; }
+  [hidden]{ display:none !important; }
+
+  /* ── লোডিং পর্দা ── */
+  #gate{ position:fixed; inset:0; z-index:200; background:var(--honey-soft); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+  #gate .bee{ font-size:52px; }
+  #gate b{ font-size:22px; }
+  #gate span{ color:var(--ink-3); }
+
+  /* ── কাঠামো: ডেস্কটপে বাঁয়ে মেনু, মোবাইলে নিচে ── */
+  .app{ display:grid; grid-template-columns:240px 1fr; min-height:100vh; }
+  .side{ background:var(--ink); color:#C9CFDA; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; padding:18px 12px; }
+  .brand{ display:flex; align-items:center; gap:10px; padding:4px 8px 18px; }
+  .brand .logo{ width:40px; height:40px; border-radius:12px; background:var(--honey); display:grid; place-items:center; font-size:22px; }
+  .brand b{ display:block; color:#fff; font-size:17px; line-height:1.15; }
+  .brand small{ color:var(--honey); font-size:12px; }
+  .nav{ display:flex; flex-direction:column; gap:2px; flex:1; overflow:auto; }
+  .nav button{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; background:none; border:0; color:inherit; padding:10px 12px; border-radius:10px; font-size:15px; }
+  .nav button .ic{ width:22px; text-align:center; font-size:17px; }
+  .nav button:hover{ background:var(--ink-2); color:#fff; }
+  .nav button.on{ background:var(--honey); color:var(--ink); font-weight:700; }
+  .nav .soon{ margin-left:auto; font-size:11px; color:var(--muted); }
+  .nav button.on .soon{ color:var(--ink-2); }
+  .side .modeBtn{ margin-top:10px; background:var(--ink-2); border:1px solid #3A4254; color:#fff; padding:10px 12px; border-radius:10px; text-align:left; font-size:14px; }
+
+  .main{ min-width:0; display:flex; flex-direction:column; }
+  .top{ position:sticky; top:0; z-index:20; background:var(--card); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; padding:10px 22px; }
+  .top .shop{ font-weight:700; padding:7px 12px; border:1px solid var(--line); border-radius:var(--r-sm); white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
+  .top .search{ flex:1; max-width:520px; position:relative; }
+  .top .search input{ width:100%; padding:9px 12px 9px 36px; border:1px solid var(--line); border-radius:var(--r-sm); background:var(--paper); }
+  .top .search::before{ content:"🔍"; position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:14px; opacity:.6; }
+  .top .bell{ position:relative; background:none; border:0; font-size:20px; padding:6px; }
+  .top .bell i{ position:absolute; top:0; right:0; background:var(--red); color:#fff; font-style:normal; font-size:11px; min-width:17px; height:17px; border-radius:9px; display:grid; place-items:center; padding:0 4px; }
+  .top .me{ display:flex; align-items:center; gap:8px; margin-left:auto; }
+  .top .me .av{ width:34px; height:34px; border-radius:50%; background:var(--honey-soft); display:grid; place-items:center; }
+  .top .me b{ display:block; font-size:14px; line-height:1.2; }
+  .top .me small{ color:var(--muted); font-size:12px; }
+  .top .menuBtn{ display:none; background:none; border:0; font-size:22px; padding:4px; }
+  .sync{ font-size:12px; color:var(--muted); white-space:nowrap; }
+
+  .page{ padding:22px; max-width:1320px; width:100%; }
+  .page h1{ font-size:26px; margin:0 0 4px; line-height:1.2; }
+  .pageHead{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+  .pageHead .date{ color:var(--ink-3); font-size:14px; }
+
+  /* ── কার্ড ও টেবিল ── */
+  .panel{ background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg); padding:16px 18px; }
+  .panel h2{ font-size:17px; margin:0 0 12px; }
+  .panel h2.warn{ color:var(--red); }
+  .stats{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:16px; }
+  .stat{ background:var(--card); border:1px solid var(--line); border-radius:var(--r-lg); padding:16px; display:flex; gap:12px; align-items:flex-start; }
+  .stat .ic{ width:44px; height:44px; border-radius:12px; display:grid; place-items:center; font-size:21px; flex-shrink:0; }
+  .stat .lbl{ color:var(--ink-3); font-size:14px; }
+  .stat .val{ font-size:26px; font-weight:700; line-height:1.15; }
+  .stat .sub{ color:var(--muted); font-size:13px; }
+  .stat.g .ic{ background:var(--green-soft); } .stat.g .val{ color:var(--green); }
+  .stat.b .ic{ background:var(--blue-soft); } .stat.b .val{ color:var(--blue); }
+  .stat.o .ic{ background:var(--honey-soft); } .stat.o .val{ color:var(--honey-deep); }
+  .stat.r .ic{ background:var(--red-soft); } .stat.r .val{ color:var(--red); }
+  .grid2{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; margin-bottom:16px; }
+  table.t{ width:100%; border-collapse:collapse; font-size:14px; }
+  table.t th{ text-align:left; font-weight:600; color:var(--ink-3); background:var(--paper); padding:8px 10px; border-bottom:1px solid var(--line); }
+  table.t td{ padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  table.t tr:last-child td{ border-bottom:0; }
+  table.t td.r, table.t th.r{ text-align:right; }
+  .bad{ color:var(--red); font-weight:700; }
+  .empty{ color:var(--muted); text-align:center; padding:18px 8px; font-size:14px; }
+
+  /* ৭ দিনের বিক্রির কলাম */
+  .bars{ display:flex; align-items:flex-end; gap:12px; height:190px; padding:8px 4px 0; border-bottom:1px solid var(--line); }
+  .bars .col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:4px; }
+  .bars .col i{ display:block; width:100%; max-width:40px; background:var(--honey); border-radius:6px 6px 0 0; min-height:2px; }
+  .bars .col.today i{ background:var(--honey-deep); }
+  .bars .col small{ font-size:11px; color:var(--ink-3); }
+  .barsLbl{ display:flex; gap:12px; padding:6px 4px 0; }
+  .barsLbl span{ flex:1; text-align:center; font-size:12px; color:var(--ink-3); }
+
+  /* ── বোতাম, ফর্ম ── */
+  .btn{ border:0; border-radius:var(--r-sm); padding:10px 16px; font-weight:700; background:var(--honey); color:var(--ink); }
+  .btn.ghost{ background:var(--card); border:1px solid var(--line); font-weight:600; }
+  .btn.green{ background:var(--green); color:#fff; }
+  .btn.red{ background:var(--red-soft); color:var(--red); }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+  label.f{ display:block; font-size:13.5px; color:var(--ink-3); font-weight:600; margin:10px 0 4px; }
+  .in{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:var(--r-sm); background:#fff; }
+  .in:focus{ border-color:var(--honey); outline:none; box-shadow:0 0 0 3px var(--honey-soft); }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .hint{ font-size:12.5px; color:var(--muted); margin-top:4px; }
+  .calc{ background:var(--honey-soft); border-radius:var(--r-md); padding:10px 12px; font-size:14px; margin-top:10px; line-height:1.7; }
+  .calc b{ color:var(--ink); }
+
+  /* ── বিক্রয় (POS) ── */
+  .pos{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:14px; align-items:start; }
+  .medList{ max-height:calc(100vh - 230px); overflow:auto; }
+  .med{ display:flex; align-items:center; gap:10px; padding:10px 8px; border-bottom:1px solid var(--line); cursor:pointer; border-radius:8px; }
+  .med:hover, .med.kb{ background:var(--honey-soft); }
+  .med .pill{ width:38px; height:38px; border-radius:10px; background:var(--blue-soft); display:grid; place-items:center; font-size:18px; flex-shrink:0; }
+  .med .nm{ font-weight:700; line-height:1.25; }
+  .med .gn{ font-size:12.5px; color:var(--muted); }
+  .med .st{ font-size:12.5px; color:var(--ink-3); }
+  .med .st.low{ color:var(--red); font-weight:600; }
+  .med .pr{ margin-left:auto; text-align:right; white-space:nowrap; }
+  .med .pr b{ display:block; }
+  .med .pr small{ color:var(--muted); font-size:12px; }
+  .med .add{ width:34px; height:34px; border-radius:9px; border:0; background:var(--honey); font-size:20px; font-weight:700; flex-shrink:0; }
+  .med.out{ opacity:.45; cursor:not-allowed; }
+
+  .cart table.t td{ padding:8px 6px; }
+  .unitSeg{ display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .unitSeg button{ border:0; background:#fff; padding:4px 9px; font-size:13px; }
+  .unitSeg button.on{ background:var(--ink); color:#fff; font-weight:600; }
+  .qty{ display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .qty button{ border:0; background:var(--paper); width:30px; height:30px; font-size:17px; font-weight:700; }
+  .qty input{ width:44px; border:0; text-align:center; height:30px; }
+  .x{ border:0; background:none; color:var(--red); font-size:18px; padding:2px 6px; }
+  .totals{ margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
+  .totals div{ display:flex; justify-content:space-between; align-items:center; padding:3px 0; font-size:15px; }
+  .totals .grand{ font-size:21px; font-weight:700; }
+  .totals input{ width:110px; text-align:right; padding:5px 8px; border:1px solid var(--line); border-radius:8px; }
+  .pay{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .pay button{ flex:1; min-width:110px; border:1px solid var(--line); background:var(--blue-soft); color:var(--blue); border-radius:var(--r-sm); padding:10px; font-weight:700; }
+  .pay button.on{ background:var(--blue); color:#fff; border-color:var(--blue); }
+  .done{ width:100%; margin-top:10px; padding:14px; font-size:17px; }
+  .keys{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .keys span{ font-size:12.5px; color:var(--ink-3); background:var(--paper); border:1px solid var(--line); border-radius:7px; padding:4px 9px; }
+
+  /* ── ওষুধের তালিকা ── */
+  .toolbar{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .toolbar .in{ flex:1; min-width:200px; }
+  .chip{ display:inline-block; font-size:12px; padding:2px 8px; border-radius:20px; background:var(--paper); color:var(--ink-3); }
+  .chip.red{ background:var(--red-soft); color:var(--red); }
+  .chip.org{ background:var(--honey-soft); color:var(--honey-deep); }
+
+  /* ── মোডাল ── */
+  .modal{ position:fixed; inset:0; z-index:100; background:rgba(20,24,32,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .modal .box{ background:var(--card); border-radius:var(--r-lg); width:100%; max-width:640px; max-height:92vh; overflow:auto; padding:18px 20px; }
+  .modal .head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .modal .head h3{ margin:0; font-size:19px; }
+  .modal .foot{ display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }
+  .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:24px; z-index:300; font-size:14px; max-width:92vw; text-align:center; }
+
+  /* রসিদ */
+  .receipt{ font-size:13px; max-width:320px; margin:0 auto; }
+  .receipt .c{ text-align:center; }
+  .receipt table{ width:100%; border-collapse:collapse; }
+  .receipt td{ padding:3px 0; vertical-align:top; }
+  .receipt hr{ border:0; border-top:1px dashed #999; margin:8px 0; }
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{ position:absolute; left:0; top:0; width:100%; }
+  }
+
+  /* ── আসছে পাতা ── */
+  .soonBox{ text-align:center; padding:40px 20px; }
+  .soonBox .big{ font-size:44px; }
+
+  /* ── মোবাইল ── */
+  .bnav{ display:none; }
+  @media (max-width: 1100px){
+    .stats{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+  }
+  @media (max-width: 900px){
+    .app{ grid-template-columns:1fr; }
+    .side{ position:fixed; left:0; top:0; bottom:0; width:260px; z-index:60; transform:translateX(-100%); transition:transform .22s ease; }
+    .side.open{ transform:none; box-shadow:0 0 0 100vmax rgba(20,24,32,.45); }
+    .top{ padding:10px 14px; background:var(--honey); border-bottom:0; }
+    .top .menuBtn{ display:block; }
+    .top .shop{ background:rgba(255,255,255,.55); border:0; max-width:140px; }
+    .top .search{ display:none; }
+    .top .me small, .top .me b{ display:none; }
+    .sync{ display:none; }
+    .page{ padding:14px 14px calc(var(--nav-h) + 20px); }
+    .page h1{ font-size:22px; }
+    .stats{ gap:10px; }
+    .stat{ padding:12px; flex-direction:column; gap:6px; }
+    .stat .ic{ width:36px; height:36px; font-size:18px; }
+    .stat .val{ font-size:21px; }
+    .grid2{ grid-template-columns:1fr; }
+    .pos{ grid-template-columns:1fr; }
+    .medList{ max-height:none; }
+    .row3{ grid-template-columns:1fr 1fr; }
+    .bnav{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:50; background:var(--card); border-top:1px solid var(--line); height:calc(var(--nav-h) + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom); }
+    .bnav button{ flex:1; border:0; background:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:12px; color:var(--ink-3); }
+    .bnav button .ic{ font-size:20px; }
+    .bnav button.on{ color:var(--ink); font-weight:700; }
+    .bnav button.on .ic{ background:var(--honey-soft); border-radius:12px; padding:0 12px; }
+    .keys{ display:none; }
+    /* মোবাইলে কার্ট টেবিল নয় — প্রতিটা ওষুধ একটা সারি: নাম উপরে, নিচে একক · পরিমাণ · মোট · ✕ */
+    .cart table.t thead{ display:none; }
+    .cart table.t, .cart table.t tbody{ display:block; }
+    .cart table.t tr{ display:grid; grid-template-columns:auto auto 1fr auto; gap:6px 8px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
+    .cart table.t td{ padding:0; border:0; }
+    .cart table.t td:first-child{ grid-column:1 / -1; }
+    .unitSeg button{ padding:6px 10px; }
+    /* ওষুধের তালিকার টেবিল মোবাইলে পাশে স্ক্রল হয়, পাতা নয় */
+    #medsBox{ overflow-x:auto; }
+    #medsBox table.t{ min-width:560px; }
+    .pay button{ min-width:0; }
+    /* মোবাইলে কার্ট নিচে আটকে থাকা "মোট + বিক্রি" বার */
+    .cartBar{ position:fixed; left:0; right:0; bottom:calc(var(--nav-h) + env(safe-area-inset-bottom)); z-index:40; background:var(--ink); color:#fff; display:flex; align-items:center; gap:12px; padding:10px 14px; }
+    .cartBar b{ font-size:18px; }
+    /* কার্ট-বার থাকলে পাতার নিচে বাড়তি জায়গা — নইলে "বিক্রি সম্পন্ন" বোতাম ঢাকা পড়ত */
+    body.hasCart .page{ padding-bottom:calc(var(--nav-h) + 92px + env(safe-area-inset-bottom)); }
+    .cartBar .btn{ margin-left:auto; }
+    .modal{ align-items:flex-end; padding:0; }
+    .modal .box{ border-radius:20px 20px 0 0; max-height:94vh; }
+  }
+  @media (min-width: 901px){ .cartBar{ display:none !important; } }
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
+</style>
+</head>
+<body>
+
+<div id="gate"><div class="bee">🐝</div><b>Honey Bee ফার্মেসি</b><span id="gateMsg">খাতা খোলা হচ্ছে…</span></div>
+
+<div class="app" id="app" hidden>
+  <aside class="side" id="side">
+    <div class="brand"><div class="logo">🐝</div><div><b>Honey Bee</b><small>Pharmacy Management</small></div></div>
+    <nav class="nav" id="nav"></nav>
+    <button class="modeBtn" id="modeBtn" type="button">↩️ সাধারণ POS-এ ফিরুন</button>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <button class="menuBtn" id="menuBtn" type="button" aria-label="মেনু">☰</button>
+      <div class="shop" id="shopName">—</div>
+      <div class="search"><input id="topSearch" placeholder="ওষুধ, বারকোড বা জেনেরিক নাম লিখুন…" autocomplete="off"></div>
+      <span class="sync" id="syncTxt">🟢 অনলাইন</span>
+      <button class="bell" id="bellBtn" type="button" title="মেয়াদ ও কম স্টকের সতর্কতা">🔔<i id="bellN" hidden>0</i></button>
+      <div class="me"><div class="av">👤</div><div><b id="meName">—</b><small id="meRole">—</small></div></div>
+    </header>
+    <main class="page" id="page"></main>
+  </div>
+</div>
+
+<nav class="bnav" id="bnav" hidden></nav>
+<div id="modalRoot"></div>
+<div id="printArea" style="position:fixed; left:-9999px; top:0;"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-init.js"></script>
+<script>
+/* =====================================================================
+   ছোট হেল্পার
+   ===================================================================== */
+const $ = (id)=> document.getElementById(id);
+const esc = (s)=> String(s == null ? "" : s).replace(/[&<>"']/g, c=> ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const BN = "০১২৩৪৫৬৭৮৯";
+const bn = (v)=> String(v).replace(/[0-9]/g, d=> BN[d]);
+const r2 = (n)=> Math.round((Number(n) || 0) * 100) / 100;
+const CUR = ()=> localStorage.getItem("shop-currency-symbol") || "৳";
+function money(n){
+  const v = r2(n);
+  const s = Number.isInteger(v) ? v.toLocaleString("en-IN") : v.toLocaleString("en-IN", { minimumFractionDigits:2, maximumFractionDigits:2 });
+  return CUR() + " " + bn(s);
+}
+function toast(msg, ms){
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(()=> t.remove(), ms || 2400);
+}
+const readJSON = (k, d)=>{ try{ const v = JSON.parse(localStorage.getItem(k) || "null"); return v == null ? d : v; }catch(e){ return d; } };
+const todayStr = ()=>{ const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+const uid = ()=> Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+let SESSION = null;
+const isAdmin = ()=> SESSION && SESSION.role === "admin";
+
+/* =====================================================================
+   খাতা — সাধারণ POS-এর একই localStorage কী
+   ===================================================================== */
+function loadProducts(){
+  const del = readJSON("bcc-deleted-product-ids", []);
+  const all = readJSON("bcc-products", []);
+  return del.length ? all.filter(p=> !del.includes(p.id)) : all;
+}
+// মোছা প্রোডাক্টগুলোও রেখে সেভ করা হয় (সাধারণ POS-এর মতোই — মোছার তালিকা আলাদা থাকে)
+function saveProducts(list){
+  const del = readJSON("bcc-deleted-product-ids", []);
+  const hidden = del.length ? readJSON("bcc-products", []).filter(p=> del.includes(p.id) && !list.some(x=> x.id === p.id)) : [];
+  localStorage.setItem("bcc-products", JSON.stringify(list.concat(hidden)));
+}
+function loadEntries(){
+  const del = readJSON("phone-shop-deleted-entry-ids", []);
+  const all = readJSON("phone-shop-entries", []);
+  return del.length ? all.filter(e=> !del.includes(e.id)) : all;
+}
+
+/* ওষুধের একক — সব হিসাব পিসে, বক্স/পাতা শুধু গুণ করে */
+function packOf(p){
+  const pps = Math.max(1, Number(p.piecesPerStrip) || 1);
+  const spb = Math.max(1, Number(p.stripsPerBox) || 1);
+  return { pps, spb, perBox: pps * spb };
+}
+function unitsOf(p){
+  const k = packOf(p);
+  const u = [{ key:"pc", label:"পিস", n:1 }];
+  if(k.pps > 1) u.push({ key:"strip", label:"পাতা", n:k.pps });
+  if(k.perBox > k.pps || (k.pps === 1 && k.spb > 1)) u.push({ key:"box", label:"বক্স", n:k.perBox });
+  return u;
+}
+function stockText(p, qty){
+  const q = Math.max(0, Math.floor(qty == null ? Number(p.qty) || 0 : qty));
+  const k = packOf(p);
+  if(k.perBox <= 1) return bn(q) + " পিস";
+  const parts = [];
+  let rest = q;
+  const boxes = Math.floor(rest / k.perBox); rest -= boxes * k.perBox;
+  if(boxes) parts.push(bn(boxes) + " বক্স");
+  if(k.pps > 1){ const st = Math.floor(rest / k.pps); rest -= st * k.pps; if(st) parts.push(bn(st) + " পাতা"); }
+  if(rest || !parts.length) parts.push(bn(rest) + " পিস");
+  return parts.join(" ");
+}
+const pcPrice = (p)=> Number(p.offerPrice) > 0 && Number(p.offerPrice) < Number(p.sell) ? Number(p.offerPrice) : Number(p.sell) || 0;
+const isLow = (p)=> (Number(p.qty) || 0) <= (Number(p.min) || 0) && (Number(p.min) || 0) > 0;
+function nearestExpiry(p){
+  const t0 = new Date(todayStr()).getTime();
+  let best = null;
+  (p.batches || []).forEach(b=>{
+    if(!b || !b.expiryDate || !(Number(b.qty) > 0)) return;
+    const days = Math.round((new Date(b.expiryDate).getTime() - t0) / 86400000);
+    if(!best || days < best.days) best = { days, date: b.expiryDate, batchNo: b.batchNo || "", qty: Number(b.qty) || 0 };
+  });
+  return best;
+}
+const fmtDate = (s)=>{ if(!s) return "—"; const d = new Date(s); if(isNaN(d)) return esc(s); return bn(d.toLocaleDateString("bn-BD", { day:"numeric", month:"short", year:"numeric" })); };
+
+// 💊 "ওষুধ" ক্যাটাগরি — না থাকলে একবার বানানো হয় (সাধারণ POS-এর ক্যাটাগরি তালিকাতেই)
+const MED_CAT_ID = "cat-medicine";
+function ensureMedCategory(){
+  const cats = readJSON("bcc-categories", []);
+  if(cats.some(c=> c && c.id === MED_CAT_ID)) return;
+  cats.push({ id: MED_CAT_ID, name: "💊 ওষুধ", subs: [] });
+  localStorage.setItem("bcc-categories", JSON.stringify(cats));
+}
+
+/* =====================================================================
+   মেনু
+   ===================================================================== */
+const MENU = [
+  { key:"dash",      ic:"🏠", label:"ড্যাশবোর্ড" },
+  { key:"pos",       ic:"🛒", label:"বিক্রয় (POS)" },
+  { key:"meds",      ic:"💊", label:"ওষুধের তালিকা" },
+  { key:"purchase",  ic:"📥", label:"ক্রয়", soon:true },
+  { key:"stock",     ic:"📦", label:"স্টক ব্যবস্থাপনা", soon:true },
+  { key:"suppliers", ic:"🚚", label:"সরবরাহকারী", soon:true },
+  { key:"customers", ic:"👥", label:"গ্রাহক", soon:true },
+  { key:"reports",   ic:"📊", label:"রিপোর্ট", soon:true, admin:true },
+  { key:"branches",  ic:"🏬", label:"শাখা ব্যবস্থাপনা", soon:true, admin:true },
+  { key:"users",     ic:"🧑‍⚕️", label:"ব্যবহারকারী", admin:true },
+  { key:"accounts",  ic:"📒", label:"হিসাব (Accounts)", soon:true, admin:true },
+  { key:"settings",  ic:"⚙️", label:"সেটিংস", soon:true, admin:true },
+];
+const BNAV = [
+  { key:"dash", ic:"🏠", label:"হোম" }, { key:"pos", ic:"🛒", label:"বিক্রয়" },
+  { key:"meds", ic:"💊", label:"ওষুধ" }, { key:"alerts", ic:"⏳", label:"সতর্কতা" },
+  { key:"more", ic:"☰", label:"আরও" },
+];
+let CUR_PAGE = "dash";
+function renderNav(){
+  const items = MENU.filter(m=> !m.admin || isAdmin());
+  $("nav").innerHTML = items.map(m=> `<button type="button" data-go="${m.key}" class="${m.key === CUR_PAGE ? "on" : ""}"><span class="ic">${m.ic}</span>${esc(m.label)}${m.soon ? '<span class="soon">শীঘ্রই</span>' : ""}</button>`).join("");
+  $("bnav").innerHTML = BNAV.map(m=> `<button type="button" data-go="${m.key}" class="${m.key === CUR_PAGE ? "on" : ""}"><span class="ic">${m.ic}</span>${m.label}</button>`).join("");
+}
+document.addEventListener("click", (e)=>{
+  const b = e.target.closest("[data-go]"); if(!b) return;
+  const k = b.dataset.go;
+  if(k === "more"){ $("side").classList.add("open"); return; }
+  $("side").classList.remove("open");
+  go(k);
+});
+$("menuBtn").addEventListener("click", ()=> $("side").classList.toggle("open"));
+$("side").addEventListener("click", (e)=>{ if(e.target === $("side")) $("side").classList.remove("open"); });
+
+function go(k){
+  CUR_PAGE = k;
+  document.body.classList.remove("hasCart");
+  try{ history.replaceState(null, "", "#" + k); }catch(e){}
+  renderNav();
+  window.scrollTo(0, 0);
+  const P = { dash: pageDash, pos: pagePos, meds: pageMeds, alerts: pageAlerts, users: pageUsers }[k];
+  if(P) P(); else pageSoon(k);
+  refreshBell();
+}
+
+/* =====================================================================
+   🏠 ড্যাশবোর্ড
+   ===================================================================== */
+function salesByDay(entries){
+  const map = {};
+  entries.forEach(e=>{
+    if(!e || !e.date) return;
+    const d = String(e.date).slice(0, 10);
+    // date ISO (UTC) — দোকানের স্থানীয় তারিখ বের করতে Date দিয়ে পড়া
+    const dt = new Date(e.date); const k = isNaN(dt) ? d : dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,"0") + "-" + String(dt.getDate()).padStart(2,"0");
+    map[k] = map[k] || { total:0, bills:new Set() };
+    map[k].total += Number(e.price) || 0;
+    map[k].bills.add(e.billId || e.invoiceNo || e.id);
+  });
+  return map;
+}
+function pageDash(){
+  const prods = loadProducts();
+  const entries = loadEntries();
+  const byDay = salesByDay(entries);
+  const today = byDay[todayStr()] || { total:0, bills:new Set() };
+  const stockVal = prods.reduce((s,p)=> s + (Number(p.buy) || 0) * Math.max(0, Number(p.qty) || 0), 0);
+  const expiring = [];
+  prods.forEach(p=> (p.batches || []).forEach(b=>{
+    if(!b || !b.expiryDate || !(Number(b.qty) > 0)) return;
+    const days = Math.round((new Date(b.expiryDate).getTime() - new Date(todayStr()).getTime()) / 86400000);
+    if(days <= 30) expiring.push({ p, b, days });
+  }));
+  expiring.sort((a,b)=> a.days - b.days);
+  const low = prods.filter(isLow).sort((a,b)=> (a.qty||0) - (b.qty||0));
+
+  const days = [];
+  for(let i = 6; i >= 0; i--){
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const k = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+    days.push({ k, label: bn(d.getDate()) + " " + d.toLocaleDateString("bn-BD", { month:"short" }), v: (byDay[k] || { total:0 }).total, today: i === 0 });
+  }
+  const mx = Math.max(1, ...days.map(d=> d.v));
+  const admin = isAdmin();
+
+  $("page").innerHTML = `
+    <div class="pageHead"><h1>ড্যাশবোর্ড</h1><div class="date">আজকের তারিখ: ${bn(new Date().toLocaleDateString("bn-BD", { day:"numeric", month:"long", year:"numeric", weekday:"long" }))}</div></div>
+    <div class="stats">
+      ${admin ? `<div class="stat g"><div class="ic">🧾</div><div><div class="lbl">আজকের বিক্রয়</div><div class="val num">${money(today.total)}</div><div class="sub">${bn(today.bills.size)}টি ইনভয়েস</div></div></div>
+      <div class="stat b"><div class="ic">📦</div><div><div class="lbl">মোট স্টক ভ্যালু (কেনা দামে)</div><div class="val num">${money(stockVal)}</div><div class="sub">${bn(prods.length)}টি আইটেম</div></div></div>`
+      : `<div class="stat b"><div class="ic">💊</div><div><div class="lbl">মোট ওষুধ</div><div class="val num">${bn(prods.length)}</div><div class="sub">তালিকায় আছে</div></div></div>`}
+      <div class="stat o" data-go="alerts" style="cursor:pointer"><div class="ic">⏳</div><div><div class="lbl">মেয়াদোত্তীর্ণ সতর্কতা</div><div class="val num">${bn(expiring.length)}</div><div class="sub">পরবর্তী ৩০ দিনে</div></div></div>
+      <div class="stat r" data-go="alerts" style="cursor:pointer"><div class="ic">📉</div><div><div class="lbl">কম স্টক</div><div class="val num">${bn(low.length)}</div><div class="sub">ন্যূনতমের নিচে</div></div></div>
+    </div>
+    ${admin ? `<div class="panel" style="margin-bottom:16px">
+      <h2>গত ৭ দিনের বিক্রয়</h2>
+      <div class="bars">${days.map(d=> `<div class="col${d.today ? " today" : ""}" title="${esc(d.label)}: ${esc(money(d.v))}"><small class="num">${d.v ? bn(Math.round(d.v)) : ""}</small><i style="height:${Math.max(1, d.v / mx * 100)}%"></i></div>`).join("")}</div>
+      <div class="barsLbl">${days.map(d=> `<span>${esc(d.label)}</span>`).join("")}</div>
+    </div>` : ""}
+    <div class="grid2">
+      <div class="panel"><h2 class="warn">মেয়াদোত্তীর্ণ ওষুধ (পরবর্তী ৩০ দিন)</h2>${expiryTable(expiring.slice(0, 8))}</div>
+      <div class="panel"><h2 class="warn">কম স্টক (সতর্কতা)</h2>${lowTable(low.slice(0, 8))}</div>
+    </div>`;
+}
+function expiryTable(list){
+  if(!list.length) return `<div class="empty">৩০ দিনের মধ্যে কোনো ওষুধের মেয়াদ শেষ হচ্ছে না।</div>`;
+  return `<table class="t"><thead><tr><th>নাম</th><th>ব্যাচ</th><th>মেয়াদ</th><th class="r">পরিমাণ</th></tr></thead><tbody>${list.map(x=> `<tr><td>${esc(x.p.name)}</td><td>${esc(x.b.batchNo || "—")}</td><td class="${x.days < 0 ? "bad" : ""}">${fmtDate(x.b.expiryDate)}${x.days < 0 ? " (শেষ)" : ""}</td><td class="r num">${esc(stockText(x.p, x.b.qty))}</td></tr>`).join("")}</tbody></table>`;
+}
+function lowTable(list){
+  if(!list.length) return `<div class="empty">কোনো ওষুধ ন্যূনতম স্টকের নিচে নেই। "ন্যূনতম স্টক" দিলে এখানে সতর্ক করা হবে।</div>`;
+  return `<table class="t"><thead><tr><th>নাম</th><th class="r">বর্তমান স্টক</th><th class="r">ন্যূনতম</th></tr></thead><tbody>${list.map(p=> `<tr><td>${esc(p.name)}</td><td class="r bad num">${esc(stockText(p))}</td><td class="r num">${esc(stockText(p, p.min))}</td></tr>`).join("")}</tbody></table>`;
+}
+function pageAlerts(){
+  const prods = loadProducts();
+  const expiring = [];
+  prods.forEach(p=> (p.batches || []).forEach(b=>{
+    if(!b || !b.expiryDate || !(Number(b.qty) > 0)) return;
+    const days = Math.round((new Date(b.expiryDate).getTime() - new Date(todayStr()).getTime()) / 86400000);
+    if(days <= 90) expiring.push({ p, b, days });
+  }));
+  expiring.sort((a,b)=> a.days - b.days);
+  const low = prods.filter(isLow);
+  $("page").innerHTML = `<div class="pageHead"><h1>সতর্কতা</h1></div>
+    <div class="panel" style="margin-bottom:14px"><h2 class="warn">মেয়াদ শেষ হচ্ছে (৯০ দিনের মধ্যে)</h2>${expiryTable(expiring)}</div>
+    <div class="panel"><h2 class="warn">কম স্টক</h2>${lowTable(low)}</div>`;
+}
+function refreshBell(){
+  const prods = loadProducts();
+  let n = prods.filter(isLow).length;
+  prods.forEach(p=>{ const e = nearestExpiry(p); if(e && e.days <= 30) n++; });
+  $("bellN").hidden = !n; $("bellN").textContent = bn(n);
+}
+$("bellBtn").addEventListener("click", ()=> go("alerts"));
+
+/* =====================================================================
+   🛒 বিক্রয় (POS)
+   ===================================================================== */
+let CART = [];          // { pid, unit, n }  n = কত একক (পিস/পাতা/বক্স)
+let PAY = "cash";       // cash | card | mobile
+let DISCOUNT = 0;
+let KB = 0;             // কিবোর্ডে বাছা ওষুধের ক্রম
+let POS_Q = "";
+
+function medMatches(p, q){
+  if(!q) return true;
+  q = q.toLowerCase();
+  return String(p.name || "").toLowerCase().includes(q) || String(p.genericName || "").toLowerCase().includes(q)
+      || String(p.code || "").toLowerCase() === q || String((p.pharma && p.pharma.company) || "").toLowerCase().includes(q);
+}
+function cartPieces(pid, skipIdx){
+  return CART.reduce((s, c, i)=>{
+    if(c.pid !== pid || i === skipIdx) return s;
+    const p = loadProducts().find(x=> x.id === pid); if(!p) return s;
+    const u = unitsOf(p).find(x=> x.key === c.unit) || { n:1 };
+    return s + u.n * c.n;
+  }, 0);
+}
+function lineOf(c, prods){
+  const p = prods.find(x=> x.id === c.pid); if(!p) return null;
+  const u = unitsOf(p).find(x=> x.key === c.unit) || unitsOf(p)[0];
+  const pieces = u.n * c.n;
+  const unitPrice = r2(pcPrice(p) * u.n);
+  return { p, u, pieces, unitPrice, total: r2(unitPrice * c.n) };
+}
+function cartTotals(){
+  const prods = loadProducts();
+  const lines = CART.map(c=> lineOf(c, prods)).filter(Boolean);
+  const sub = r2(lines.reduce((s,l)=> s + l.total, 0));
+  const disc = Math.min(sub, Math.max(0, Number(DISCOUNT) || 0));
+  return { lines, sub, disc, net: r2(sub - disc) };
+}
+
+function pagePos(){
+  $("page").innerHTML = `
+    <div class="pageHead"><h1>বিক্রয় (POS)</h1></div>
+    <div class="pos">
+      <div class="panel">
+        <input class="in" id="posQ" placeholder="🔍 নাম, জেনেরিক বা বারকোড লিখুন…" autocomplete="off" value="${esc(POS_Q)}">
+        <div class="medList" id="medList" style="margin-top:8px"></div>
+      </div>
+      <div class="panel cart" id="cartPanel"></div>
+    </div>
+    <div class="cartBar" id="cartBar" hidden></div>`;
+  const q = $("posQ");
+  q.addEventListener("input", ()=>{ POS_Q = q.value.trim(); KB = 0; renderMedList(); });
+  q.addEventListener("keydown", (e)=>{
+    const rows = [...document.querySelectorAll("#medList .med:not(.out)")];
+    if(e.key === "ArrowDown"){ e.preventDefault(); KB = Math.min(rows.length - 1, KB + 1); renderMedList(); }
+    else if(e.key === "ArrowUp"){ e.preventDefault(); KB = Math.max(0, KB - 1); renderMedList(); }
+    else if(e.key === "Enter"){ e.preventDefault(); const r = rows[KB]; if(r) addToCart(r.dataset.pid); }
+  });
+  if(window.innerWidth > 900) q.focus();
+  renderMedList(); renderCart();
+}
+function renderMedList(){
+  const box = $("medList"); if(!box) return;
+  const prods = loadProducts().filter(p=> medMatches(p, POS_Q))
+    .sort((a,b)=> String(a.name || "").localeCompare(String(b.name || ""), "en"));
+  if(!prods.length){
+    box.innerHTML = `<div class="empty">${POS_Q ? "এই নামে কোনো ওষুধ নেই।" : "এখনো কোনো ওষুধ যোগ করা হয়নি।"}<br><button class="btn" type="button" data-go="meds" style="margin-top:10px">➕ ওষুধ যোগ করুন</button></div>`;
+    return;
+  }
+  let i = -1;
+  box.innerHTML = prods.slice(0, 200).map(p=>{
+    const left = (Number(p.qty) || 0) - cartPieces(p.id);
+    const out = left <= 0;
+    if(!out) i++;
+    const k = packOf(p);
+    return `<div class="med${out ? " out" : ""}${!out && i === KB ? " kb" : ""}" data-pid="${esc(p.id)}">
+      <div class="pill">💊</div>
+      <div style="min-width:0">
+        <div class="nm">${esc(p.name)}</div>
+        ${p.genericName ? `<div class="gn">${esc(p.genericName)}</div>` : ""}
+        <div class="st${isLow(p) || out ? " low" : ""}">${out ? "স্টক নেই" : "স্টক: " + esc(stockText(p, left))}</div>
+      </div>
+      <div class="pr"><b class="num">${money(pcPrice(p))}</b><small>প্রতি পিস${k.pps > 1 ? " · পাতা " + money(pcPrice(p) * k.pps) : ""}</small></div>
+      <button class="add" type="button" ${out ? "disabled" : ""} aria-label="কার্টে যোগ করুন">+</button>
+    </div>`;
+  }).join("");
+  box.querySelectorAll(".med:not(.out)").forEach(el=> el.addEventListener("click", ()=> addToCart(el.dataset.pid)));
+}
+function addToCart(pid){
+  const p = loadProducts().find(x=> x.id === pid); if(!p) return;
+  const units = unitsOf(p);
+  // ট্যাবলেট সাধারণত পাতায় বিক্রি হয় — পাতা থাকলে সেটাই আগে বাছা থাকে
+  const def = units.find(u=> u.key === "strip") || units[0];
+  const free = (Number(p.qty) || 0) - cartPieces(pid);
+  const unit = free >= def.n ? def : units[0];
+  if(free < unit.n){ toast("স্টক নেই"); return; }
+  const same = CART.findIndex(c=> c.pid === pid && c.unit === unit.key);
+  if(same > -1) CART[same].n += 1; else CART.push({ pid, unit: unit.key, n: 1 });
+  renderMedList(); renderCart();
+}
+function renderCart(){
+  const box = $("cartPanel"); if(!box) return;
+  const T = cartTotals();
+  if(!T.lines.length){
+    box.innerHTML = `<h2>কার্ট</h2><div class="empty">বাম পাশের তালিকা থেকে ওষুধে চাপ দিন।<br>কিবোর্ডে: নাম লিখে ↑ ↓ দিয়ে বাছুন, Enter চাপুন।</div>${keysHtml()}`;
+    $("cartBar").hidden = true;
+    document.body.classList.remove("hasCart");
+    return;
+  }
+  box.innerHTML = `
+    <h2>কার্ট (${bn(T.lines.length)})</h2>
+    <table class="t"><thead><tr><th>নাম</th><th>একক</th><th>পরিমাণ</th><th class="r">মোট</th><th></th></tr></thead><tbody>
+    ${T.lines.map((l, i)=> `<tr>
+      <td><b>${esc(l.p.name)}</b><div class="hint">${money(l.unitPrice)} / ${esc(l.u.label)}</div></td>
+      <td>${l.p && unitsOf(l.p).length > 1 ? `<span class="unitSeg">${unitsOf(l.p).map(u=> `<button type="button" class="${u.key === l.u.key ? "on" : ""}" data-unit="${i}:${u.key}">${u.label}</button>`).join("")}</span>` : esc(l.u.label)}</td>
+      <td><span class="qty"><button type="button" data-q="${i}:-1" aria-label="কমান">−</button><input class="num" inputmode="numeric" data-qi="${i}" value="${CART[i].n}"><button type="button" data-q="${i}:1" aria-label="বাড়ান">+</button></span></td>
+      <td class="r num">${money(l.total)}</td>
+      <td><button class="x" type="button" data-del="${i}" aria-label="সরান">✕</button></td>
+    </tr>`).join("")}
+    </tbody></table>
+    <div class="totals">
+      <div><span>মোট</span><span class="num">${money(T.sub)}</span></div>
+      <div><span>ডিসকাউন্ট</span><input class="num" id="discIn" inputmode="decimal" value="${DISCOUNT || ""}" placeholder="০"></div>
+      <div class="grand"><span>পরিশোধ</span><span class="num">${money(T.net)}</span></div>
+    </div>
+    <div class="pay">
+      <button type="button" data-pay="cash" class="${PAY === "cash" ? "on" : ""}">💵 নগদ (F1)</button>
+      <button type="button" data-pay="card" class="${PAY === "card" ? "on" : ""}">💳 কার্ড (F2)</button>
+      <button type="button" data-pay="mobile" class="${PAY === "mobile" ? "on" : ""}">📱 বিকাশ/নগদ (F3)</button>
+    </div>
+    <button class="btn green done" type="button" id="doneBtn">✅ বিক্রি সম্পন্ন (F4)</button>
+    ${keysHtml()}`;
+  box.querySelectorAll("[data-unit]").forEach(b=> b.onclick = ()=>{
+    const [i, key] = b.dataset.unit.split(":"); const c = CART[+i];
+    const p = loadProducts().find(x=> x.id === c.pid); const u = unitsOf(p).find(x=> x.key === key);
+    const free = (Number(p.qty) || 0) - cartPieces(c.pid, +i);
+    if(u.n * c.n > free){ c.n = Math.floor(free / u.n); if(c.n < 1){ toast("এত " + u.label + " স্টকে নেই"); return; } }
+    c.unit = key; renderMedList(); renderCart();
+  });
+  box.querySelectorAll("[data-q]").forEach(b=> b.onclick = ()=>{ const [i, d] = b.dataset.q.split(":"); setQty(+i, CART[+i].n + Number(d)); });
+  box.querySelectorAll("[data-qi]").forEach(inp=> inp.onchange = ()=> setQty(+inp.dataset.qi, Math.floor(Number(inp.value) || 0)));
+  box.querySelectorAll("[data-del]").forEach(b=> b.onclick = ()=>{ CART.splice(+b.dataset.del, 1); renderMedList(); renderCart(); });
+  box.querySelectorAll("[data-pay]").forEach(b=> b.onclick = ()=>{ PAY = b.dataset.pay; renderCart(); });
+  $("discIn").onchange = ()=>{ DISCOUNT = Math.max(0, Number($("discIn").value) || 0); renderCart(); };
+  $("doneBtn").onclick = completeSale;
+  const bar = $("cartBar");
+  bar.hidden = false;
+  document.body.classList.add("hasCart");
+  bar.innerHTML = `<div><small style="opacity:.75">${bn(T.lines.length)}টি আইটেম</small><br><b class="num">${money(T.net)}</b></div><button class="btn" type="button" id="barGo">কার্ট দেখুন</button>`;
+  $("barGo").onclick = ()=> $("cartPanel").scrollIntoView({ behavior:"smooth", block:"start" });
+}
+function keysHtml(){ return `<div class="keys"><span>F1 নগদ</span><span>F2 কার্ড</span><span>F3 মোবাইল ব্যাংকিং</span><span>F4 বিক্রি সম্পন্ন</span><span>F8 কার্ট খালি</span></div>`; }
+function setQty(i, n){
+  const c = CART[i]; if(!c) return;
+  if(n < 1){ CART.splice(i, 1); renderMedList(); renderCart(); return; }
+  const p = loadProducts().find(x=> x.id === c.pid); const u = unitsOf(p).find(x=> x.key === c.unit) || { n:1, label:"পিস" };
+  const free = (Number(p.qty) || 0) - cartPieces(c.pid, i);
+  if(u.n * n > free){ n = Math.floor(free / u.n); toast("স্টকে আছে " + stockText(p, free)); if(n < 1) return; }
+  c.n = n; renderMedList(); renderCart();
+}
+document.addEventListener("keydown", (e)=>{
+  if(CUR_PAGE !== "pos" || document.querySelector(".modal")) return;
+  const map = { F1:"cash", F2:"card", F3:"mobile" };
+  if(map[e.key]){ e.preventDefault(); PAY = map[e.key]; renderCart(); }
+  else if(e.key === "F4"){ e.preventDefault(); if(CART.length) completeSale(); }
+  else if(e.key === "F8"){ e.preventDefault(); if(CART.length && confirm("কার্ট খালি করবেন?")){ CART = []; DISCOUNT = 0; renderMedList(); renderCart(); } }
+});
+
+/* সাধারণ POS-এর একই ইনভয়েস নম্বরের ধারা (INV-000123) */
+function nextInvoiceNo(entries){
+  let maxN = 0;
+  entries.forEach(e=>{ if(!e.invoiceNo) return; const n = parseInt(String(e.invoiceNo).replace(/[^0-9]/g, ""), 10); if(!isNaN(n) && n > maxN) maxN = n; });
+  const stored = parseInt(localStorage.getItem("shop-invoice-counter"), 10);
+  if(!isNaN(stored) && stored > maxN) maxN = stored;
+  localStorage.setItem("shop-invoice-counter", String(maxN + 1));
+  return "INV-" + String(maxN + 1).padStart(6, "0");
+}
+
+let SELLING = false;
+async function completeSale(){
+  if(SELLING) return;
+  const T = cartTotals();
+  if(!T.lines.length) return;
+  // শেষবার স্টক মিলিয়ে নেওয়া — অন্য স্টাফ এর মধ্যে বিক্রি করে থাকতে পারেন
+  const prods = loadProducts();
+  for(const l of T.lines){
+    const p = prods.find(x=> x.id === l.p.id);
+    const need = T.lines.filter(x=> x.p.id === l.p.id).reduce((s,x)=> s + x.pieces, 0);
+    if(!p || (Number(p.qty) || 0) < need){ toast("⚠️ " + l.p.name + " — স্টকে নেই, কার্ট দেখে নিন"); renderMedList(); return; }
+  }
+  SELLING = true;
+  const all = readJSON("phone-shop-entries", []);
+  const billId = uid();
+  const invoiceNo = nextInvoiceNo(all);
+  const when = new Date().toISOString();
+  const paymentMethod = PAY === "cash" ? "cash" : "bank"; // সাধারণ POS শুধু cash/bank চেনে
+  const payLabel = { cash:"নগদ", card:"কার্ড", mobile:"মোবাইল ব্যাংকিং" }[PAY];
+  // ডিসকাউন্ট প্রতিটা লাইনে দামের অনুপাতে ভাগ — যাতে লাভের হিসাব ঠিক থাকে
+  let discLeft = T.disc;
+  const newEntries = T.lines.map((l, i)=>{
+    const share = i === T.lines.length - 1 ? discLeft : r2(T.disc * (l.total / (T.sub || 1)));
+    discLeft = r2(discLeft - share);
+    const price = r2(l.total - share);
+    const unitCost = Number(l.p.buy) || 0;
+    return {
+      id: uid(), name: "ওয়াক-ইন কাস্টমার", phone: "",
+      item: l.p.name + (l.u.key === "pc" ? "" : " (" + bn(l.pieces / l.u.n) + " " + l.u.label + ")"),
+      productId: l.p.id, qty: l.pieces, unitPrice: r2(price / l.pieces), unitCost,
+      cost: r2(unitCost * l.pieces), price, paid: price, paymentMethod, payVia: PAY,
+      note: "💊 " + bn(l.pieces / l.u.n) + " " + l.u.label + " = " + bn(l.pieces) + " পিস", status: "নগদ-বিক্রি",
+      billId, invoiceNo, date: when, soldBy: (SESSION && SESSION.name) || "এডমিন", source: "pharmacy"
+    };
+  });
+
+  // স্টক কমানো — আগে যেটার মেয়াদ আগে শেষ হবে সেই ব্যাচ থেকে (FEFO)
+  const touched = [];
+  T.lines.forEach(l=>{
+    const p = prods.find(x=> x.id === l.p.id); if(!p) return;
+    p.qty = Math.max(0, (Number(p.qty) || 0) - l.pieces);
+    let left = l.pieces;
+    (p.batches || []).filter(b=> b && Number(b.qty) > 0)
+      .sort((a,b)=> String(a.expiryDate || "9999").localeCompare(String(b.expiryDate || "9999")))
+      .forEach(b=>{ if(left <= 0) return; const take = Math.min(left, Number(b.qty) || 0); b.qty = (Number(b.qty) || 0) - take; left -= take; });
+    if(!touched.includes(p)) touched.push(p);
+  });
+
+  try{
+    localStorage.setItem("phone-shop-entries", JSON.stringify(newEntries.concat(all)));
+    saveProducts(prods);
+    syncBazarStock(touched);
+    showReceipt(newEntries, T, payLabel);
+    CART = []; DISCOUNT = 0; POS_Q = "";
+    if(CUR_PAGE === "pos") pagePos();
+    refreshBell();
+    pushNow();
+  }catch(e){
+    toast("সেভ করা যায়নি — আবার চেষ্টা করুন");
+  }
+  SELLING = false;
+}
+
+/* Bazar-এ প্রকাশিত ওষুধের স্টক মিলিয়ে রাখা — শেষ হলে Bazar থেকে সরে যায় (সাধারণ POS-এর মতোই) */
+function syncBazarStock(list){
+  if(!SESSION || !SESSION.shopId || typeof db === "undefined") return;
+  let changed = false;
+  list.forEach(p=>{
+    if(!p.published) return;
+    const ref = db.collection("shops").doc(SESSION.shopId).collection("publicStock").doc(p.id);
+    if((Number(p.qty) || 0) <= 0){ p.published = false; changed = true; ref.delete().catch(()=>{}); }
+    else ref.set({ stockQty: Number(p.qty) || 0, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge:true }).catch(()=>{});
+  });
+  if(changed){ const all = loadProducts(); list.forEach(p=>{ const x = all.find(y=> y.id === p.id); if(x) x.published = p.published; }); saveProducts(all); }
+}
+
+function showReceipt(entries, T, payLabel){
+  const shop = localStorage.getItem("shop-title") || (SESSION && SESSION.shopName) || "ফার্মেসি";
+  const sub = localStorage.getItem("shop-subtitle") || "";
+  const e0 = entries[0];
+  const html = `<div class="receipt">
+    <div class="c"><b style="font-size:16px">${esc(shop)}</b>${sub ? `<br>${esc(sub)}` : ""}</div>
+    <hr><div>রসিদ: <b>${esc(e0.invoiceNo)}</b><br>${bn(new Date(e0.date).toLocaleString("bn-BD"))}<br>বিক্রেতা: ${esc(e0.soldBy)}</div><hr>
+    <table>${T.lines.map(l=> `<tr><td>${esc(l.p.name)}<br><small>${bn(l.pieces / l.u.n)} ${esc(l.u.label)} × ${esc(money(l.unitPrice))}</small></td><td style="text-align:right">${esc(money(l.total))}</td></tr>`).join("")}</table>
+    <hr><table>
+      <tr><td>মোট</td><td style="text-align:right">${esc(money(T.sub))}</td></tr>
+      ${T.disc ? `<tr><td>ডিসকাউন্ট</td><td style="text-align:right">− ${esc(money(T.disc))}</td></tr>` : ""}
+      <tr><td><b>পরিশোধ (${esc(payLabel)})</b></td><td style="text-align:right"><b>${esc(money(T.net))}</b></td></tr>
+    </table><hr><div class="c">ধন্যবাদ — আবার আসবেন</div></div>`;
+  openModal(`<div class="head"><h3>✅ বিক্রি সম্পন্ন</h3></div>${html}
+    <div class="foot"><button class="btn ghost" type="button" data-close>নতুন বিক্রি</button><button class="btn" type="button" id="printBtn">🖨️ রসিদ প্রিন্ট</button></div>`);
+  $("printBtn").onclick = ()=>{ $("printArea").innerHTML = html; window.print(); };
+}
+
+/* =====================================================================
+   💊 ওষুধের তালিকা + যোগ/বদল
+   ===================================================================== */
+let MEDS_Q = "";
+const FORMS = ["ট্যাবলেট", "ক্যাপসুল", "সিরাপ", "সাসপেনশন", "ইনজেকশন", "ড্রপ", "ক্রিম/মলম", "ইনহেলার", "অন্যান্য"];
+function pageMeds(){
+  $("page").innerHTML = `
+    <div class="pageHead"><h1>ওষুধের তালিকা</h1><button class="btn" type="button" id="addMed">➕ নতুন ওষুধ</button></div>
+    <div class="toolbar"><input class="in" id="medsQ" placeholder="🔍 নাম, জেনেরিক বা কোম্পানি দিয়ে খুঁজুন" value="${esc(MEDS_Q)}"></div>
+    <div class="panel" style="padding:6px 8px" id="medsBox"></div>`;
+  $("addMed").onclick = ()=> openMedForm(null);
+  $("medsQ").addEventListener("input", ()=>{ MEDS_Q = $("medsQ").value.trim(); renderMeds(); });
+  renderMeds();
+}
+function renderMeds(){
+  const list = loadProducts().filter(p=> medMatches(p, MEDS_Q)).sort((a,b)=> String(a.name || "").localeCompare(String(b.name || ""), "en"));
+  if(!list.length){ $("medsBox").innerHTML = `<div class="empty">${MEDS_Q ? "এই নামে কিছু পাওয়া যায়নি।" : "এখনো কোনো ওষুধ নেই। \"➕ নতুন ওষুধ\" চেপে প্রথমটা যোগ করুন।"}</div>`; return; }
+  const admin = isAdmin();
+  $("medsBox").innerHTML = `<table class="t"><thead><tr><th>নাম</th><th>জেনেরিক / কোম্পানি</th><th class="r">স্টক</th><th class="r">দাম (পিস)</th><th>মেয়াদ</th>${admin ? '<th class="r">কেনা দাম</th>' : ""}</tr></thead><tbody>
+  ${list.map(p=>{
+    const ex = nearestExpiry(p);
+    return `<tr data-edit="${esc(p.id)}" style="cursor:pointer">
+      <td><b>${esc(p.name)}</b>${p.rackLocation ? `<div class="hint">📍 ${esc(p.rackLocation)}</div>` : ""}</td>
+      <td>${esc(p.genericName || "—")}<div class="hint">${esc((p.pharma && p.pharma.company) || "")}</div></td>
+      <td class="r num ${isLow(p) || !(p.qty > 0) ? "bad" : ""}">${esc(stockText(p))}</td>
+      <td class="r num">${money(pcPrice(p))}</td>
+      <td>${ex ? `<span class="chip ${ex.days < 0 ? "red" : ex.days <= 30 ? "org" : ""}">${fmtDate(ex.date)}</span>` : "—"}</td>
+      ${admin ? `<td class="r num">${money(p.buy || 0)}</td>` : ""}
+    </tr>`;
+  }).join("")}</tbody></table>`;
+  $("medsBox").querySelectorAll("[data-edit]").forEach(tr=> tr.onclick = ()=> openMedForm(tr.dataset.edit));
+}
+
+function openMedForm(id){
+  const p = id ? loadProducts().find(x=> x.id === id) : null;
+  const ph = (p && p.pharma) || {};
+  const k = p ? packOf(p) : { pps:10, spb:10, perBox:100 };
+  const boxBuy = ph.boxBuy != null ? ph.boxBuy : (p ? r2((Number(p.buy) || 0) * k.perBox) : "");
+  const boxMrp = ph.boxMrp != null ? ph.boxMrp : (p ? r2((Number(p.sell) || 0) * k.perBox) : "");
+  const batches = (p && p.batches || []).filter(b=> b && Number(b.qty) > 0);
+  openModal(`
+    <div class="head"><h3>${p ? "✏️ ওষুধ বদলান" : "➕ নতুন ওষুধ"}</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="row2">
+      <div><label class="f">ওষুধের নাম ও শক্তি *</label><input class="in" id="fName" value="${esc(p ? p.name : "")}" placeholder="যেমন: Napa 500mg"></div>
+      <div><label class="f">জেনেরিক নাম</label><input class="in" id="fGen" value="${esc(p ? p.genericName || "" : "")}" placeholder="যেমন: Paracetamol"></div>
+    </div>
+    <div class="row3">
+      <div><label class="f">কোম্পানি</label><input class="in" id="fCo" value="${esc(ph.company || "")}" placeholder="যেমন: Beximco"></div>
+      <div><label class="f">ধরন</label><select class="in" id="fForm">${FORMS.map(f=> `<option${(ph.form || "ট্যাবলেট") === f ? " selected" : ""}>${f}</option>`).join("")}</select></div>
+      <div><label class="f">র‍্যাক / তাক</label><input class="in" id="fRack" value="${esc(p ? p.rackLocation || "" : "")}" placeholder="যেমন: A-2"></div>
+    </div>
+    <div class="row3">
+      <div><label class="f">১ পাতায় কত পিস</label><input class="in num" id="fPps" inputmode="numeric" value="${k.pps}"></div>
+      <div><label class="f">১ বক্সে কত পাতা</label><input class="in num" id="fSpb" inputmode="numeric" value="${k.spb}"></div>
+      <div><label class="f">বারকোড (ঐচ্ছিক)</label><input class="in" id="fCode" value="${esc(p ? p.code || "" : "")}"></div>
+    </div>
+    <div class="hint">সিরাপ, ইনজেকশন বা আলাদা বোতলে দুটো ঘরেই ১ লিখুন — তখন পিস = বোতল।</div>
+    <div class="row2">
+      <div><label class="f">১ বক্সের কেনা দাম *</label><input class="in num" id="fBoxBuy" inputmode="decimal" value="${boxBuy}"></div>
+      <div><label class="f">১ বক্সের বিক্রি দাম (MRP) *</label><input class="in num" id="fBoxMrp" inputmode="decimal" value="${boxMrp}"></div>
+    </div>
+    <div class="calc" id="fCalc"></div>
+
+    <h3 style="font-size:16px; margin:18px 0 0">${p ? "নতুন স্টক যোগ করুন (ঐচ্ছিক)" : "শুরুর স্টক"}</h3>
+    ${p ? `<div class="hint">এখন আছে: <b>${esc(stockText(p))}</b></div>` : ""}
+    <div class="row3">
+      <div><label class="f">কত বক্স</label><input class="in num" id="fAddBox" inputmode="numeric" placeholder="০"></div>
+      <div><label class="f">খুচরা পিস</label><input class="in num" id="fAddPc" inputmode="numeric" placeholder="০"></div>
+      <div><label class="f">ন্যূনতম স্টক (পিস)</label><input class="in num" id="fMin" inputmode="numeric" value="${p ? Number(p.min) || "" : ""}" placeholder="যেমন: ৫০"></div>
+    </div>
+    <div class="row2">
+      <div><label class="f">ব্যাচ নম্বর</label><input class="in" id="fBatch" placeholder="যেমন: BN-2026-08"></div>
+      <div><label class="f">মেয়াদ শেষের তারিখ</label><input class="in" id="fExp" type="date"></div>
+    </div>
+    ${batches.length ? `<h3 style="font-size:16px; margin:18px 0 6px">ব্যাচ তালিকা</h3><table class="t"><thead><tr><th>ব্যাচ</th><th>মেয়াদ</th><th class="r">স্টক</th></tr></thead><tbody>${batches.map(b=> `<tr><td>${esc(b.batchNo || "—")}</td><td>${fmtDate(b.expiryDate)}</td><td class="r num">${esc(stockText(p, b.qty))}</td></tr>`).join("")}</tbody></table>` : ""}
+    <div class="foot">
+      ${p && isAdmin() ? `<button class="btn red" type="button" id="fDel" style="margin-right:auto">🗑️ মুছুন</button>` : ""}
+      <button class="btn ghost" type="button" data-close>বাতিল</button>
+      <button class="btn" type="button" id="fSave">💾 সেভ করুন</button>
+    </div>`);
+
+  const calc = ()=>{
+    const pps = Math.max(1, Math.floor(Number($("fPps").value) || 1)), spb = Math.max(1, Math.floor(Number($("fSpb").value) || 1));
+    const per = pps * spb, bb = Number($("fBoxBuy").value) || 0, bm = Number($("fBoxMrp").value) || 0;
+    const add = (Math.floor(Number($("fAddBox").value) || 0)) * per + Math.floor(Number($("fAddPc").value) || 0);
+    $("fCalc").innerHTML = `১ বক্স = <b>${bn(per)} পিস</b>${pps > 1 ? ` (${bn(spb)} পাতা × ${bn(pps)} পিস)` : ""}<br>
+      প্রতি পিস: কেনা <b>${money(bb / per)}</b> · বিক্রি <b>${money(bm / per)}</b>${pps > 1 ? `<br>প্রতি পাতা বিক্রি: <b>${money(bm / per * pps)}</b>` : ""}
+      ${bm && bb ? `<br>লাভ প্রতি বক্স: <b>${money(bm - bb)}</b>` : ""}${add ? `<br>যোগ হবে: <b>${bn(add)} পিস</b>` : ""}`;
+  };
+  ["fPps","fSpb","fBoxBuy","fBoxMrp","fAddBox","fAddPc"].forEach(x=> $(x).addEventListener("input", calc));
+  calc();
+  $("fSave").onclick = ()=> saveMed(p);
+  if($("fDel")) $("fDel").onclick = ()=>{
+    if(!confirm(`"${p.name}" তালিকা থেকে মুছে ফেলবেন?`)) return;
+    const del = readJSON("bcc-deleted-product-ids", []); if(!del.includes(p.id)) del.push(p.id);
+    localStorage.setItem("bcc-deleted-product-ids", JSON.stringify(del));
+    if(p.published && SESSION && SESSION.shopId) db.collection("shops").doc(SESSION.shopId).collection("publicStock").doc(p.id).delete().catch(()=>{});
+    closeModal(); toast("🗑️ মুছে ফেলা হয়েছে"); pushNow(); renderMeds();
+  };
+}
+function saveMed(old){
+  const name = $("fName").value.trim();
+  if(!name){ toast("ওষুধের নাম লিখুন"); return; }
+  const pps = Math.max(1, Math.floor(Number($("fPps").value) || 1)), spb = Math.max(1, Math.floor(Number($("fSpb").value) || 1));
+  const per = pps * spb;
+  const boxBuy = Number($("fBoxBuy").value) || 0, boxMrp = Number($("fBoxMrp").value) || 0;
+  if(!(boxMrp > 0)){ toast("বক্সের বিক্রি দাম (MRP) লিখুন"); return; }
+  if(boxBuy > boxMrp && !confirm("কেনা দাম বিক্রি দামের চেয়ে বেশি — তবুও সেভ করবেন?")) return;
+  const add = Math.floor(Number($("fAddBox").value) || 0) * per + Math.floor(Number($("fAddPc").value) || 0);
+  if(add < 0){ toast("স্টক ঋণাত্মক হতে পারে না"); return; }
+  const exp = $("fExp").value, batchNo = $("fBatch").value.trim();
+  const list = loadProducts();
+  if(!old && list.some(x=> String(x.name || "").trim().toLowerCase() === name.toLowerCase())){
+    toast("এই নামে ওষুধ আগে থেকেই আছে — তালিকা থেকে খুলে স্টক যোগ করুন"); return;
+  }
+  ensureMedCategory();
+  const p = old ? list.find(x=> x.id === old.id) : { id: uid(), catId: MED_CAT_ID, subId: "", subSubId: "", unit: "pcs", productType: "batch", variants: [], batches: [], qty: 0, published: false, image: null, imageId: null, imageUrl: null, note: "" };
+  Object.assign(p, {
+    name, genericName: $("fGen").value.trim() || null, rackLocation: $("fRack").value.trim() || null,
+    code: $("fCode").value.trim(), piecesPerStrip: pps, stripsPerBox: spb,
+    buy: r2(boxBuy / per * 10000) / 10000, sell: r2(boxMrp / per * 10000) / 10000,
+    min: Math.max(0, Math.floor(Number($("fMin").value) || 0)),
+    pharma: { company: $("fCo").value.trim() || null, form: $("fForm").value, boxBuy, boxMrp },
+  });
+  if(!p.productType || p.productType === "standard") p.productType = "batch";
+  if(add > 0){
+    p.qty = (Number(p.qty) || 0) + add;
+    p.batches = p.batches || [];
+    p.batches.push({ batchNo, expiryDate: exp || "", qty: add, addedAt: Date.now() });
+  }
+  if(!old) list.push(p);
+  saveProducts(list);
+  if(p.published) syncBazarStock([p]);
+  closeModal();
+  toast(old ? "✅ বদলানো হয়েছে" : "✅ ওষুধ যোগ হয়েছে");
+  pushNow();
+  if(CUR_PAGE === "meds") renderMeds(); else if(CUR_PAGE === "pos"){ renderMedList(); }
+  refreshBell();
+}
+
+/* =====================================================================
+   🧑‍⚕️ ব্যবহারকারী (স্টাফ) — সাধারণ POS-এর একই সাব-ইউজার
+   ===================================================================== */
+async function pageUsers(){
+  $("page").innerHTML = `<div class="pageHead"><h1>ব্যবহারকারী</h1></div><div class="panel" id="usersBox"><div class="empty">লোড হচ্ছে…</div></div>`;
+  const entries = loadEntries();
+  const t = todayStr();
+  const todayBy = {};
+  entries.forEach(e=>{ const d = new Date(e.date); if(isNaN(d)) return; const k = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); if(k !== t) return; todayBy[e.soldBy || "এডমিন"] = (todayBy[e.soldBy || "এডমিন"] || 0) + (Number(e.price) || 0); });
+  let members = [];
+  try{ const qs = await db.collection("shops").doc(SESSION.shopId).collection("members").get(); members = qs.docs.map(d=> d.data()); }catch(e){}
+  const rows = [{ name: SESSION.name || "এডমিন", role: "admin", email: "" }].concat(members.filter(m=> m.role === "subuser"));
+  $("usersBox").innerHTML = `<table class="t"><thead><tr><th>নাম</th><th>ভূমিকা</th><th class="r">আজকের বিক্রি</th></tr></thead><tbody>
+    ${rows.map(m=> `<tr><td><b>${esc(m.name)}</b>${m.email ? `<div class="hint">${esc(m.email)}</div>` : ""}</td><td>${m.role === "admin" ? "এডমিন" : "স্টাফ"}</td><td class="r num">${money(todayBy[m.name] || 0)}</td></tr>`).join("")}
+  </tbody></table>
+  <p class="hint" style="margin-top:12px">স্টাফরা নিজের ইমেইল-পাসওয়ার্ডে লগইন করে বিক্রি ও স্টকের কাজ করতে পারেন — টাকার হিসাব দেখতে পারেন না। প্রতিটা বিক্রিতে কে বিক্রি করলেন সেটা রসিদে থাকে।<br>নতুন স্টাফ যোগ করতে: সাধারণ POS → উপরে "+ সাব-ইউজার"।</p>`;
+}
+
+/* =====================================================================
+   শীঘ্রই আসছে
+   ===================================================================== */
+function pageSoon(k){
+  const m = MENU.find(x=> x.key === k) || { ic:"🛠️", label:"এই অংশ" };
+  $("page").innerHTML = `<div class="panel soonBox"><div class="big">${m.ic}</div><h1>${esc(m.label)}</h1>
+    <p style="color:var(--ink-3); max-width:420px; margin:8px auto 16px">ফার্মেসি মোডে এই পাতা পরের ধাপে আসছে। ততক্ষণ সাধারণ POS-এ এই কাজটা আগের মতোই করা যায় — একই খাতা, তাই হিসাব মিলে থাকবে।</p>
+    <a class="btn ghost" href="shop-ledger-app.html?stay=1" style="text-decoration:none; display:inline-block">সাধারণ POS-এ খুলুন</a></div>`;
+}
+
+/* =====================================================================
+   মোডাল
+   ===================================================================== */
+function openModal(inner){
+  $("modalRoot").innerHTML = `<div class="modal" role="dialog" aria-modal="true"><div class="box">${inner}</div></div>`;
+  const m = $("modalRoot").firstElementChild;
+  m.addEventListener("click", (e)=>{ if(e.target === m || e.target.closest("[data-close]")) closeModal(); });
+  const f = m.querySelector("input, select, button"); if(f && window.innerWidth > 900) f.focus();
+}
+function closeModal(){ $("modalRoot").innerHTML = ""; }
+document.addEventListener("keydown", (e)=>{ if(e.key === "Escape" && $("modalRoot").innerHTML) closeModal(); });
+
+/* =====================================================================
+   উপরের খোঁজা — যেকোনো পাতা থেকে বিক্রির পর্দায় নিয়ে যায়
+   ===================================================================== */
+$("topSearch").addEventListener("keydown", (e)=>{
+  if(e.key !== "Enter") return;
+  POS_Q = $("topSearch").value.trim(); $("topSearch").value = "";
+  go("pos");
+});
+
+/* =====================================================================
+   মোড বদল — শুধু এডমিন
+   ===================================================================== */
+$("modeBtn").addEventListener("click", async ()=>{
+  if(!isAdmin()){ location.href = "shop-ledger-app.html?stay=1"; return; }
+  if(!confirm("ফার্মেসি মোড বন্ধ করে সাধারণ POS-এ ফিরবেন?\n\nদোকানের সব ফোনে সাধারণ POS খুলবে। ওষুধ, বিক্রি, স্টক — কিছুই মুছবে না।")) return;
+  localStorage.setItem("hb-pharmacy-mode", "0");
+  await pushNow(true);
+  location.href = "shop-ledger-app.html";
+});
+
+/* =====================================================================
+   সিঙ্ক
+   ===================================================================== */
+async function pushNow(wait){
+  try{
+    const p = pushLocalStorageToCloud();
+    if(wait) await Promise.race([p, new Promise(r=> setTimeout(r, 8000))]);
+  }catch(e){}
+}
+function netLabel(){ $("syncTxt").textContent = navigator.onLine ? "🟢 অনলাইন" : "🔴 অফলাইন — ফোনে সেভ হচ্ছে"; }
+window.addEventListener("online", ()=>{ netLabel(); pushNow(); });
+window.addEventListener("offline", netLabel);
+
+/* =====================================================================
+   শুরু
+   ===================================================================== */
+auth.onAuthStateChanged(async (user)=>{
+  const s = getSession();
+  if(!user || !s || !s.shopId || (s.role !== "admin" && s.role !== "subuser")){ location.replace(s && !s.shopId ? "shop-ledger-app.html" : "login.html"); return; }
+  SESSION = s;
+  $("gateMsg").textContent = "ক্লাউড থেকে খাতা মেলানো হচ্ছে…";
+  try{ await Promise.race([pullCloudToLocalStorage(s.shopId), new Promise((_, rej)=> setTimeout(()=> rej(new Error("timeout")), 12000))]); }catch(e){}
+  try{
+    const sd = await db.collection("shops").doc(s.shopId).get();
+    const info = sd.exists ? sd.data() : {};
+    if(info.status === "blocked"){ $("gateMsg").textContent = "🔒 একাউন্ট ব্লক করা আছে — এডমিনের সাথে যোগাযোগ করুন।"; return; }
+    if(info.currencySymbol) localStorage.setItem("shop-currency-symbol", info.currencySymbol);
+  }catch(e){}
+  enableAutoSync(s.shopId);
+  watchAppDataChanges(s.shopId, ()=>{
+    // অন্য ফোনে (স্টাফ) বিক্রি/স্টক বদলালে এখানেও সাথে সাথে দেখা যায়
+    if(localStorage.getItem("hb-pharmacy-mode") === "0" && !isAdmin()){ location.replace("shop-ledger-app.html"); return; }
+    if(!document.querySelector(".modal")) go(CUR_PAGE); else refreshBell();
+  });
+
+  $("shopName").textContent = localStorage.getItem("shop-title") || s.shopName || "ফার্মেসি";
+  $("meName").textContent = s.name || "—";
+  $("meRole").textContent = isAdmin() ? "এডমিন" : "স্টাফ";
+  if(!isAdmin()) $("modeBtn").textContent = "↩️ সাধারণ POS দেখুন";
+  netLabel();
+  $("gate").remove(); $("app").hidden = false; $("bnav").hidden = false;
+  const start = (location.hash || "").replace("#", "");
+  go(["dash","pos","meds","alerts"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
+});
+</script>
+</body>
+</html>
