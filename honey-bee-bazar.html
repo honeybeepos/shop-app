@@ -1359,7 +1359,7 @@
        মাপের খাতা আলাদা ড্যাশবোর্ডে (উপরের টাইটেল বারে চাপ দিলে খোলে)। -->
   <div id="screenTailor" style="padding:20px 16px;">
     <button class="backBtn" id="backToHomeFromTailor">← হোমে ফিরে যান</button>
-    <div id="tlrMyOrders"></div>
+    <!-- 🧵 "আমার সেলাই অর্ডার" এখন Cart → 🚚 Order Tracking-এ, দোকানের অর্ডারের সাথে একই জায়গায় -->
     <!-- 🔑 দোকানে গিয়ে অর্ডার দিয়েছেন? দর্জির রসিদের নম্বর দিলে অর্ডার আর মাপ এখানে চলে আসে -->
     <div id="tlrClaimBox"></div>
     <div class="card" style="padding:12px;">
@@ -3177,6 +3177,8 @@
     <span id="hbCartOrdersFilterClear" style="display:none; margin-left:auto; font-size:11px; color:var(--amber); cursor:pointer;">সব দেখুন ✕</span>
     <span id="hbOrdersClearDone" style="display:none; margin-left:auto; font-size:11.5px; color:#f87171; cursor:pointer; padding:4px 9px; border:1px solid rgba(248,113,113,0.4); border-radius:8px;">🧹 শেষ হওয়াগুলো মুছে ফেলুন</span>
   </div>
+  <!-- 🧵 সেলাইয়ের অর্ডার — দোকানের অর্ডারের মতোই এখানে ট্র্যাক হয় (দর্জি গ্রহণ → রাইডার কাপড় নেন → সেলাই → ফেরত) -->
+  <div id="tlrMyOrders" style="margin-bottom:8px;"></div>
   <div id="hbCartOrdersList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
 </div>
 
@@ -4118,9 +4120,8 @@ async function tlrSubmitOrder(){
   try{
     await db.collection("tailorOrders").add(rec);
     sheet.style.display = "none";
-    alert("✅ অর্ডার গেছে! দর্জি গ্রহণ করলেই রাইডার আপনার কাপড় নিতে আসবেন। অবস্থা দেখুন সেলাই ঘরের উপরে \"🧵 আমার সেলাই অর্ডার\"-এ।");
-    tlrMyOrdersStart();
-    try{ $("tlrMyOrders").scrollIntoView({ behavior:"smooth", block:"start" }); }catch(e){}
+    alert("✅ অর্ডার গেছে! দর্জি গ্রহণ করলেই রাইডার আপনার কাপড় নিতে আসবেন।\n\nঅবস্থা দেখুন Cart → 🚚 Order Tracking-এ।");
+    tlrOpenTracking();
   }catch(e){
     btn.disabled = false; btn.textContent = "🧵 অর্ডার পাঠান";
     err(e && e.code === "permission-denied"
@@ -4129,7 +4130,15 @@ async function tlrSubmitOrder(){
   }
 }
 
-/* 🧵 আমার সেলাই অর্ডার — সেলাই ঘরের উপরে, শুধু লগইন থাকলে */
+/* 🚚 সেলাইয়ের অর্ডার দেখাতে সরাসরি Cart → Order Tracking খোলা (দোকানের অর্ডারের মতোই) */
+function tlrOpenTracking(){
+  try{ if(typeof hbOpenCart === "function") hbOpenCart(); }catch(e){}
+  try{ if(typeof hbOpenOrderTracking === "function") hbOpenOrderTracking(); }catch(e){}
+  tlrMyOrdersStart();
+  setTimeout(()=>{ try{ $("tlrMyOrders").scrollIntoView({ behavior:"smooth", block:"start" }); }catch(e){} }, 400);
+}
+
+/* 🧵 আমার সেলাই অর্ডার — Cart → Order Tracking-এ, শুধু লগইন থাকলে */
 let __tlrMyUnsub = null, __tlrMyUid = null;
 function tlrMyOrdersStart(){
   const box = $("tlrMyOrders"); if(!box) return;
@@ -4148,6 +4157,8 @@ function tlrMyOrdersStart(){
 }
 function tlrMyOrdersRender(list){
   const box = $("tlrMyOrders"); if(!box) return;
+  // দোকানের অর্ডারের তালিকাও একবার মিলিয়ে নেওয়া ("কোনো অর্ডার নেই" লেখা ঠিক রাখতে)
+  setTimeout(()=>{ try{ if(__hbOrdersUnsub) hbOrdersRender(); }catch(e){} }, 0);
   if(!list.length){ box.innerHTML = ""; return; }
   box.innerHTML = `<div class="card" style="padding:12px; border:1px solid rgba(244,114,182,0.4);">
     <div style="font-weight:800; font-size:14px; margin-bottom:4px;">🧵 আমার সেলাই অর্ডার</div>
@@ -12390,7 +12401,8 @@ function hbCloseCart(){
     else if(which === "orders" && typeof hbOpenOrderTracking === "function") hbOpenOrderTracking();
     else if(which === "tailor"){
       // 🧵 সেলাই অর্ডারের নোটিফিকেশন → সরাসরি সেলাই ঘর (উপরে "আমার সেলাই অর্ডার")
-      showScreen("screenTailor"); tlrAreaInit(); tlrRenderFeed(); tlrMyOrdersStart();
+      // এখন সেলাইয়ের অর্ডারও দোকানের অর্ডারের মতো Order Tracking-এ — নোটিফিকেশন চাপলে সেখানেই যায়
+      showScreen("screenTailor"); tlrAreaInit(); tlrRenderFeed(); tlrOpenTracking();
     }
     else if(which === "tmbookings"){
       // 🎫 চালক বুকিং গ্রহণ/বাতিল করলে যাত্রীর নোটিফিকেশন → সরাসরি Transport Media-র "আমার বুকিং"
@@ -12408,7 +12420,7 @@ function hbOpenOrderTracking(){
   $("hbCartScreen").style.display = "none"; // Cart-এর ওপর থেকে খোলা, তাই সেটা লুকানো
   $("hbOrderTrackingScreen").style.display = "block";
   history.pushState({ hbScreen: "orderTrackingOpen" }, "", location.href);
-  if(currentCustomer) hbOrdersListen();
+  if(currentCustomer){ hbOrdersListen(); if(typeof tlrMyOrdersStart === "function") tlrMyOrdersStart(); }
   else{
     $("hbCartOrdersList").innerHTML = '<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">অর্ডার দেখতে ☰ Menu থেকে লগইন করুন।</div>';
     $("hbCartTrackMini").style.display = "none";
@@ -12569,7 +12581,9 @@ function hbOrdersRender(){
   if(__hbOrdersFilter) orders = orders.filter(o=> (o.status||"pending") === __hbOrdersFilter);
 
   if(orders.length === 0){
-    listEl.innerHTML = `<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">${__hbOrdersFilter ? "এই স্ট্যাটাসে কোনো অর্ডার নেই।" : "এখনো কোনো অর্ডার নেই।"}</div>`;
+    // 🧵 উপরে সেলাইয়ের অর্ডার থাকলে "এখনো কোনো অর্ডার নেই" লেখাটা ভুল বোঝাত
+    const hasTlr = !__hbOrdersFilter && $("tlrMyOrders") && $("tlrMyOrders").innerHTML.trim();
+    listEl.innerHTML = hasTlr ? "" : `<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px;">${__hbOrdersFilter ? "এই স্ট্যাটাসে কোনো অর্ডার নেই।" : "এখনো কোনো অর্ডার নেই।"}</div>`;
     return;
   }
   listEl.innerHTML = orders.map(o=>{
