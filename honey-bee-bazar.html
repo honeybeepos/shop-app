@@ -6889,7 +6889,7 @@ async function phLoadPinRec(uid){
   return __phPinRec;
 }
 function phPinInput(id){
-  return `<input id="${id}" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"
+  return `<input id="${id}" type="password" inputmode="numeric" maxlength="4" autocomplete="off"
     style="width:170px; text-align:center; font-size:28px; letter-spacing:14px; padding:12px 8px; border-radius:14px; border:1.5px solid var(--amber); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit;">`;
 }
 function phGateMsg(t){ const m = document.getElementById("phGateMsg"); if(m){ m.textContent = t || ""; } }
@@ -6927,41 +6927,35 @@ async function phApplyGate(){
   if(!phIsOpen()) return;
   if(!rec) phShowSetPin(); else phShowEnterPin();
 }
+// বাংলা সংখ্যা (০-৯) লিখলেও ইংরেজি সংখ্যায় বদলে নেওয়া হয়
+function phDigits(v){ return String(v || "").replace(/[০-৯]/g, d=> "০১২৩৪৫৬৭৮৯".indexOf(d)).replace(/\D/g, ""); }
 function phShowSetPin(){
   __phNewPin = "";
-  phShowGate("নিজের PIN বানান", "৪ সংখ্যার একটা PIN দিন — প্রতিবার ফার্মেসী খুলতে এটা লাগবে।<br>এমন সংখ্যা দিন যা অন্য কেউ আন্দাজ করতে পারবে না।",
-    phPinInput("phPin1") + `<br><button type="button" id="phPinNext" style="${PH_BTN}">পরের ধাপ →</button>`);
-  const i = document.getElementById("phPin1"); i.focus();
-  const next = ()=>{
-    const v = i.value.trim();
-    if(!/^\d{4}$/.test(v)){ phGateMsg("ঠিক ৪টা সংখ্যা দিন"); return; }
-    if(/^(\d)\1{3}$/.test(v) || v === "1234" || v === "4321"){ phGateMsg("এটা খুব সহজ — অন্য সংখ্যা দিন"); return; }
-    __phNewPin = v; phShowConfirmPin();
-  };
-  document.getElementById("phPinNext").onclick = next;
-  i.onkeydown = e=>{ if(e.key === "Enter") next(); };
-}
-function phShowConfirmPin(){
-  phShowGate("PIN আবার দিন", "নিশ্চিত হতে একই PIN আরেকবার লিখুন।",
-    phPinInput("phPin2") + `<br><button type="button" id="phPinSave" style="${PH_BTN}">✅ PIN সেভ করুন</button><br><button type="button" id="phPinBack" style="${PH_LINK}">← আবার শুরু করুন</button>`);
-  const i = document.getElementById("phPin2"); i.focus();
+  phShowGate("নিজের PIN বানান", "যেকোনো ৪ সংখ্যার PIN দিন — প্রতিবার ফার্মেসী খুলতে এটা লাগবে।",
+    `<div style="font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:6px;">নতুন PIN</div>` + phPinInput("phPin1") +
+    `<div style="font-size:12.5px; font-weight:700; color:var(--muted); margin:14px 0 6px;">আবার একই PIN দিন</div>` + phPinInput("phPin2") +
+    `<br><button type="button" id="phPinSave" style="${PH_BTN}">✅ সেভ করুন</button>`);
+  const i1 = document.getElementById("phPin1"), i2 = document.getElementById("phPin2");
+  i1.focus();
+  i1.addEventListener("input", ()=>{ if(phDigits(i1.value).length >= 4) i2.focus(); });
   const save = async ()=>{
     const user = phRealUser(); if(!user) return phApplyGate();
-    if(i.value.trim() !== __phNewPin){ phGateMsg("দুইবারের PIN মেলেনি"); i.value = ""; return; }
+    const v1 = phDigits(i1.value), v2 = phDigits(i2.value);
+    if(v1.length !== 4){ phGateMsg("নতুন PIN-এর ঘরে ঠিক ৪টা সংখ্যা দিন"); i1.focus(); return; }
+    if(v2.length !== 4){ phGateMsg("দ্বিতীয় ঘরেও একই ৪টা সংখ্যা দিন"); i2.focus(); return; }
+    if(v1 !== v2){ phGateMsg("দুই ঘরের PIN মেলেনি — আবার দিন"); i2.value = ""; i2.focus(); return; }
     const btn = document.getElementById("phPinSave"); btn.disabled = true; btn.textContent = "সেভ হচ্ছে...";
     try{
       const salt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
-      const hash = await phPinHash(__phNewPin, salt);
-      const rec = { salt, hash, v:1, setAt: firebase.firestore.FieldValue.serverTimestamp() };
-      await db.collection("customers").doc(user.uid).set({ pharmaPin: rec }, { merge:true });
+      const hash = await phPinHash(v1, salt);
+      await db.collection("customers").doc(user.uid).set({ pharmaPin: { salt, hash, v:1, setAt: firebase.firestore.FieldValue.serverTimestamp() } }, { merge:true });
       __phPinUid = user.uid; __phPinRec = { salt, hash, v:1 };
-      __phNewPin = ""; __phUnlockedUid = user.uid; __phFails = 0;
+      __phUnlockedUid = user.uid; __phFails = 0;
       phApplyGate();
-    }catch(e){ console.error(e); btn.disabled = false; btn.textContent = "✅ PIN সেভ করুন"; phGateMsg("সেভ হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন"); }
+    }catch(e){ console.error(e); btn.disabled = false; btn.textContent = "✅ সেভ করুন"; phGateMsg("সেভ হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন"); }
   };
   document.getElementById("phPinSave").onclick = save;
-  document.getElementById("phPinBack").onclick = phShowSetPin;
-  i.onkeydown = e=>{ if(e.key === "Enter") save(); };
+  i2.onkeydown = e=>{ if(e.key === "Enter") save(); };
 }
 function phShowEnterPin(){
   phShowGate("PIN দিন", "ফার্মেসী খুলতে আপনার ৪ সংখ্যার PIN লিখুন।",
@@ -6971,8 +6965,8 @@ function phShowEnterPin(){
     const user = phRealUser(); if(!user) return phApplyGate();
     const wait = Math.ceil((__phWaitUntil - Date.now()) / 1000);
     if(wait > 0){ phGateMsg(`অনেকবার ভুল হয়েছে — ${String(wait).replace(/\d/g, d=> "০১২৩৪৫৬৭৮৯"[d])} সেকেন্ড পর চেষ্টা করুন`); return; }
-    const v = i.value.trim();
-    if(!/^\d{4}$/.test(v)){ phGateMsg("ঠিক ৪টা সংখ্যা দিন"); return; }
+    const v = phDigits(i.value);
+    if(v.length !== 4){ phGateMsg("ঠিক ৪টা সংখ্যা দিন"); return; }
     const btn = document.getElementById("phPinGo"); btn.disabled = true;
     let ok = false;
     try{ ok = (await phPinHash(v, __phPinRec.salt)) === __phPinRec.hash; }catch(e){ console.error(e); }
