@@ -2825,6 +2825,18 @@
        নাম লিখে খোঁজা যায়, ফার্মেসি বেছে দেখা যায়, Cart-এ তুলে অর্ডার করা যায়। -->
   <div id="screenMedicalEquipment">
     <button class="backBtn" id="backToJibonToriFromMedEq">← জীবন তরী-তে ফিরে যান</button>
+
+    <!-- 🔒 গোপনীয়তার দরজা — Google লগইন + ৪ সংখ্যার PIN। এখানে ব্যক্তিগত/গোপনীয়
+         পণ্য থাকবে, তাই ফোন অন্য কারো হাতে গেলেও যেন ভেতরে দেখা না যায়। -->
+    <div id="phGate" class="card" style="display:none; text-align:center; padding:26px 18px;">
+      <div style="font-size:40px;">🔒</div>
+      <div id="phGateTitle" style="font-size:17px; font-weight:800; margin-top:6px;"></div>
+      <div id="phGateSub" style="font-size:12.5px; color:var(--muted); margin-top:6px; line-height:1.7;"></div>
+      <div id="phGateBody" style="margin-top:16px;"></div>
+      <div style="font-size:11.5px; color:var(--muted); margin-top:16px; line-height:1.7; background:rgba(255,255,255,0.04); border-radius:10px; padding:10px;">🛡️ আপনার কেনাকাটা গোপন থাকে — ডেলিভারিম্যান জানেন না প্যাকেটে কী আছে। শুধু আপনি আর যে ফার্মেসি প্যাক করবে, তারা জানবে।</div>
+    </div>
+
+    <div id="phBody">
     <div class="card" style="text-align:center; padding:16px;">
       <div style="font-size:30px; margin-bottom:4px;">💊</div>
       <div style="font-size:16px; font-weight:800;">ফার্মেসী</div>
@@ -2845,6 +2857,8 @@
     <div id="phShopChips" style="display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;"></div>
     <div id="phGrid" class="pGrid"><div class="loadingMsg">লোড হচ্ছে...</div></div>
     <div style="font-size:11px; color:var(--muted); margin-top:14px; line-height:1.6;">⚠️ প্রেসক্রিপশনের ওষুধ ডাক্তারের পরামর্শ ছাড়া খাবেন না। অর্ডারের আগে ফার্মেসির সাথে কথা বলে নিন।</div>
+    <button type="button" id="phLockBtn" style="margin-top:14px; width:100%; padding:11px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,0.04); color:var(--muted); font-family:inherit; font-weight:700; font-size:12.5px; cursor:pointer;">🔒 এখনই লক করুন</button>
+    </div>
   </div>
 
   <!-- 🛒 অর্ডার ফ্লো — Rent (৩ ধাপ) / Buy — মডাল -->
@@ -3403,6 +3417,7 @@ let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], a
 /* ---------- 🔐 Google দিয়ে লগইন — কাস্টমারের অর্ডার/পছন্দ UID-এর সাথে বাঁধা ---------- */
 function renderAuthArea(){
   try{ if(typeof sfiApplyGate === "function") setTimeout(sfiApplyGate, 0); }catch(e){}
+  try{ if(typeof phAuthChanged === "function") setTimeout(phAuthChanged, 0); }catch(e){} // 💊 ফার্মেসীর লগইন/PIN দরজা
   try{ if(typeof bloodRenderMyRequests === "function") setTimeout(bloodRenderMyRequests, 0); }catch(e){}
   try{ const tm = document.getElementById("screenTailor"); if(tm && tm.classList.contains("active") && typeof tlrMyOrdersStart === "function") setTimeout(tlrMyOrdersStart, 0); }catch(e){}
   try{ const ts = document.getElementById("screenTailorMeasure"); if(ts && ts.classList.contains("active") && typeof tlrRender === "function") setTimeout(tlrRender, 0); }catch(e){} // 🩸 লগইন হলেই নিজের রক্তের অনুরোধ // 🔒 লগইন/লগআউটে ফ্লাইট পাতাও সাথে সাথে খোলে/বন্ধ হয়
@@ -3569,6 +3584,7 @@ let __hbNavigatingViaPopstate = false;
 function showScreen(id){
   ["screenTailor","screenTailorMeasure","screenRestaurant","screenRestaurantMenu","screenNotebook","screenHome","screenSmartWatch","screenSmartWatchMenu","screenPanchang","screenPrayer","screenSmartCalculator","screenCalcBasic","screenCalcScientific","screenCalcWeight","screenCalcBusiness","screenCalcMoney","screenCalcUnit","screenCalcConstruction","screenCalcUtility","screenCalcDatetime","screenCalcKids","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenMarketCategories","screenMarketSubcategories","screenMarketProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders","screenEkadashiSpecial"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
+  if(id !== "screenMedicalEquipment" && typeof phLock === "function") phLock(); // 🔒 ফার্মেসী থেকে বের হলেই আবার লক
   if(id === "screenTransportMedia"){
     // 🚕 যাত্রী অ্যাপ প্রথমবার খুললে তবেই লোড হয় (আগে থেকে লোড করে খরচ/সময় নষ্ট না)
     const __tf = document.getElementById("hbTransportFrame");
@@ -3752,7 +3768,7 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
       initAmbulanceScreen();
     }else if(svc === "medicalequipment"){
       showScreen("screenMedicalEquipment");
-      phInit(); // 💊 ফার্মেসী (আগের মেডিকেল ইকুইপমেন্ট সরানো হয়েছে)
+      phOpen(); // 💊 ফার্মেসী (আগের মেডিকেল ইকুইপমেন্ট সরানো হয়েছে) — আগে লগইন + PIN
     }else{
       alert("এই সার্ভিসটা শীঘ্রই আসছে — এখনো প্রস্তুত হয়নি।");
     }
@@ -6840,6 +6856,153 @@ function hbEkaProductMatches(name, groupKey){
 /* =====================================================================
    💊 ফার্মেসী — এলাকার ফার্মেসিগুলোর ওষুধ (publicStock, catId "cat-medicine")
    ===================================================================== */
+/* ---------- 🔒 ফার্মেসী দরজা: Google লগইন + PIN ----------
+   PIN কখনো সরাসরি সেভ হয় না — লবণ (salt) মিশিয়ে PBKDF2 দিয়ে বানানো হ্যাশ
+   customers/{uid}.pharmaPin-এ থাকে। খোলা অবস্থা শুধু এই পাতার মেমোরিতে —
+   পাতা ছাড়লে, ৫ মিনিট অন্য অ্যাপে থাকলে বা রিফ্রেশ করলে আবার PIN লাগে।
+   ৫ বার ভুল দিলে ৩০ সেকেন্ড অপেক্ষা। PIN ভুলে গেলে Google দিয়ে আবার যাচাই
+   করে নতুন PIN। */
+let __phUnlockedUid = null, __phPinRec = undefined, __phPinUid = null, __phFails = 0, __phWaitUntil = 0, __phHiddenAt = 0, __phNewPin = "";
+function phIsOpen(){ const el = document.getElementById("screenMedicalEquipment"); return !!(el && el.classList.contains("active")); }
+function phLock(){
+  if(!__phUnlockedUid) return;
+  __phUnlockedUid = null;
+  const g = document.getElementById("phGrid"); if(g) g.innerHTML = "";
+  if(phIsOpen()) phApplyGate();
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(document.hidden){ __phHiddenAt = Date.now(); }
+  else if(__phHiddenAt && Date.now() - __phHiddenAt > 5 * 60 * 1000){ phLock(); }
+});
+function phRealUser(){ const u = auth.currentUser; return (u && !u.isAnonymous && currentCustomer) ? u : null; }
+async function phPinHash(pin, saltB64){
+  const enc = new TextEncoder();
+  const salt = Uint8Array.from(atob(saltB64), c=> c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("raw", enc.encode(String(pin)), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", hash:"SHA-256", salt, iterations:150000 }, key, 256);
+  return btoa(String.fromCharCode(...new Uint8Array(bits)));
+}
+async function phLoadPinRec(uid){
+  if(__phPinUid === uid && __phPinRec !== undefined) return __phPinRec;
+  const d = await db.collection("customers").doc(uid).get();
+  __phPinUid = uid; __phPinRec = (d.exists && d.data().pharmaPin && d.data().pharmaPin.hash) ? d.data().pharmaPin : null;
+  return __phPinRec;
+}
+function phPinInput(id){
+  return `<input id="${id}" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"
+    style="width:170px; text-align:center; font-size:28px; letter-spacing:14px; padding:12px 8px; border-radius:14px; border:1.5px solid var(--amber); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit;">`;
+}
+function phGateMsg(t){ const m = document.getElementById("phGateMsg"); if(m){ m.textContent = t || ""; } }
+function phShowGate(title, sub, body){
+  document.getElementById("phGate").style.display = "block";
+  document.getElementById("phBody").style.display = "none";
+  document.getElementById("phGateTitle").textContent = title;
+  document.getElementById("phGateSub").innerHTML = sub;
+  document.getElementById("phGateBody").innerHTML = body + `<div id="phGateMsg" style="min-height:20px; margin-top:10px; font-size:12.5px; font-weight:700; color:#fca5a5;"></div>`;
+}
+const PH_BTN = "margin-top:12px; width:100%; max-width:300px; padding:13px; border:0; border-radius:12px; background:linear-gradient(135deg,var(--amber),var(--gold)); color:var(--bg1); font-family:inherit; font-weight:800; font-size:14px; cursor:pointer;";
+const PH_LINK = "margin-top:10px; border:0; background:transparent; color:var(--amber); font-family:inherit; font-weight:700; font-size:12.5px; cursor:pointer;";
+async function phApplyGate(){
+  const user = phRealUser();
+  if(!user){
+    __phUnlockedUid = null;
+    phShowGate("ফার্মেসী — লগইন করুন", "আপনার কেনাকাটা গোপন রাখতে এখানে Google দিয়ে লগইন করতে হয়।<br>লগইনের পর নিজের একটা ৪ সংখ্যার PIN বানাবেন।",
+      `<button type="button" id="phGoogleBtn" style="${PH_BTN}">🔐 Google দিয়ে লগইন</button>`);
+    document.getElementById("phGoogleBtn").onclick = async ()=>{
+      try{ await auth.signInWithPopup(googleProvider); }
+      catch(e){ if(e && e.code === "auth/popup-blocked") auth.signInWithRedirect(googleProvider); else if(e && e.code !== "auth/popup-closed-by-user") phGateMsg("লগইন হয়নি — আবার চেষ্টা করুন"); }
+    };
+    return;
+  }
+  if(__phUnlockedUid === user.uid){
+    document.getElementById("phGate").style.display = "none";
+    document.getElementById("phBody").style.display = "block";
+    phInit();
+    return;
+  }
+  phShowGate("একটু অপেক্ষা...", "", "");
+  let rec;
+  try{ rec = await phLoadPinRec(user.uid); }
+  catch(e){ phShowGate("📶 সংযোগ নেই", "ইন্টারনেট চালু করে আবার খুলুন।", ""); return; }
+  if(!phIsOpen()) return;
+  if(!rec) phShowSetPin(); else phShowEnterPin();
+}
+function phShowSetPin(){
+  __phNewPin = "";
+  phShowGate("নিজের PIN বানান", "৪ সংখ্যার একটা PIN দিন — প্রতিবার ফার্মেসী খুলতে এটা লাগবে।<br>এমন সংখ্যা দিন যা অন্য কেউ আন্দাজ করতে পারবে না।",
+    phPinInput("phPin1") + `<br><button type="button" id="phPinNext" style="${PH_BTN}">পরের ধাপ →</button>`);
+  const i = document.getElementById("phPin1"); i.focus();
+  const next = ()=>{
+    const v = i.value.trim();
+    if(!/^\d{4}$/.test(v)){ phGateMsg("ঠিক ৪টা সংখ্যা দিন"); return; }
+    if(/^(\d)\1{3}$/.test(v) || v === "1234" || v === "4321"){ phGateMsg("এটা খুব সহজ — অন্য সংখ্যা দিন"); return; }
+    __phNewPin = v; phShowConfirmPin();
+  };
+  document.getElementById("phPinNext").onclick = next;
+  i.onkeydown = e=>{ if(e.key === "Enter") next(); };
+}
+function phShowConfirmPin(){
+  phShowGate("PIN আবার দিন", "নিশ্চিত হতে একই PIN আরেকবার লিখুন।",
+    phPinInput("phPin2") + `<br><button type="button" id="phPinSave" style="${PH_BTN}">✅ PIN সেভ করুন</button><br><button type="button" id="phPinBack" style="${PH_LINK}">← আবার শুরু করুন</button>`);
+  const i = document.getElementById("phPin2"); i.focus();
+  const save = async ()=>{
+    const user = phRealUser(); if(!user) return phApplyGate();
+    if(i.value.trim() !== __phNewPin){ phGateMsg("দুইবারের PIN মেলেনি"); i.value = ""; return; }
+    const btn = document.getElementById("phPinSave"); btn.disabled = true; btn.textContent = "সেভ হচ্ছে...";
+    try{
+      const salt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+      const hash = await phPinHash(__phNewPin, salt);
+      const rec = { salt, hash, v:1, setAt: firebase.firestore.FieldValue.serverTimestamp() };
+      await db.collection("customers").doc(user.uid).set({ pharmaPin: rec }, { merge:true });
+      __phPinUid = user.uid; __phPinRec = { salt, hash, v:1 };
+      __phNewPin = ""; __phUnlockedUid = user.uid; __phFails = 0;
+      phApplyGate();
+    }catch(e){ console.error(e); btn.disabled = false; btn.textContent = "✅ PIN সেভ করুন"; phGateMsg("সেভ হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন"); }
+  };
+  document.getElementById("phPinSave").onclick = save;
+  document.getElementById("phPinBack").onclick = phShowSetPin;
+  i.onkeydown = e=>{ if(e.key === "Enter") save(); };
+}
+function phShowEnterPin(){
+  phShowGate("PIN দিন", "ফার্মেসী খুলতে আপনার ৪ সংখ্যার PIN লিখুন।",
+    phPinInput("phPinIn") + `<br><button type="button" id="phPinGo" style="${PH_BTN}">🔓 খুলুন</button><br><button type="button" id="phPinForgot" style="${PH_LINK}">PIN ভুলে গেছেন?</button>`);
+  const i = document.getElementById("phPinIn"); i.focus();
+  const go = async ()=>{
+    const user = phRealUser(); if(!user) return phApplyGate();
+    const wait = Math.ceil((__phWaitUntil - Date.now()) / 1000);
+    if(wait > 0){ phGateMsg(`অনেকবার ভুল হয়েছে — ${String(wait).replace(/\d/g, d=> "০১২৩৪৫৬৭৮৯"[d])} সেকেন্ড পর চেষ্টা করুন`); return; }
+    const v = i.value.trim();
+    if(!/^\d{4}$/.test(v)){ phGateMsg("ঠিক ৪টা সংখ্যা দিন"); return; }
+    const btn = document.getElementById("phPinGo"); btn.disabled = true;
+    let ok = false;
+    try{ ok = (await phPinHash(v, __phPinRec.salt)) === __phPinRec.hash; }catch(e){ console.error(e); }
+    btn.disabled = false;
+    if(ok){ __phFails = 0; __phUnlockedUid = user.uid; phApplyGate(); return; }
+    __phFails++; i.value = "";
+    if(__phFails >= 5){ __phFails = 0; __phWaitUntil = Date.now() + 30000; phGateMsg("৫ বার ভুল — ৩০ সেকেন্ড পর আবার চেষ্টা করুন"); }
+    else phGateMsg(`PIN ভুল — আর ${String(5 - __phFails).replace(/\d/g, d=> "০১২৩৪৫৬৭৮৯"[d])} বার চেষ্টা করা যাবে`);
+  };
+  document.getElementById("phPinGo").onclick = go;
+  i.onkeydown = e=>{ if(e.key === "Enter") go(); };
+  document.getElementById("phPinForgot").onclick = async ()=>{
+    const user = phRealUser(); if(!user) return phApplyGate();
+    if(!confirm("Google দিয়ে আবার যাচাই করলে পুরনো PIN মুছে নতুন PIN বানাতে পারবেন। এগোবেন?")) return;
+    try{
+      await user.reauthenticateWithPopup(googleProvider);
+      await db.collection("customers").doc(user.uid).set({ pharmaPin: firebase.firestore.FieldValue.delete() }, { merge:true });
+      __phPinRec = null; __phPinUid = user.uid;
+      phShowSetPin();
+    }catch(e){ if(e && e.code !== "auth/popup-closed-by-user" && e.code !== "auth/cancelled-popup-request") phGateMsg("যাচাই হয়নি — আবার চেষ্টা করুন"); }
+  };
+}
+function phOpen(){ phApplyGate(); }
+function phAuthChanged(){
+  const u = phRealUser();
+  if(!u || u.uid !== __phUnlockedUid){ __phUnlockedUid = null; }
+  if(!u){ __phPinRec = undefined; __phPinUid = null; }
+  if(phIsOpen()) phApplyGate();
+}
+
 const PH_MED_CAT = "cat-medicine";
 let phArea = { d:"", u:"" };
 try{ const a = JSON.parse(localStorage.getItem("hbPhArea")||"null") || JSON.parse(localStorage.getItem("hbEkaArea")||"null") || JSON.parse(localStorage.getItem("hbTlrArea")||"null"); if(a && a.d) phArea = { d:a.d, u:a.u||"" }; }catch(e){}
@@ -6866,6 +7029,7 @@ function phInit(){
     document.getElementById("phUpz").addEventListener("change", e=> phAreaSet(phArea.d, e.target.value));
     document.getElementById("phAreaClear").addEventListener("click", ()=> phAreaSet("", ""));
     document.getElementById("phSearch").addEventListener("input", phRender);
+    document.getElementById("phLockBtn").addEventListener("click", phLock);
     document.getElementById("phShopChips").addEventListener("click", e=>{
       const b = e.target.closest("[data-phshop]"); if(!b) return;
       __phShop = b.getAttribute("data-phshop"); phRender();
