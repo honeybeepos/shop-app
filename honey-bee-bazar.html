@@ -12281,6 +12281,110 @@ window.toggleFavoriteProduct = async function(ev, productId){
    ⚠️ অর্ডার-স্ট্যাটাস (preparing/shipped/delivered) এখনো দোকানদার POS
    থেকে বদলাতে পারেন না — তাই বাস্তবে সব অর্ডার সবসময় "পেন্ডিং" দেখাবে,
    যতক্ষণ না POS-সাইড স্ট্যাটাস-আপডেট প্যানেল বানানো হয়। */
+/* =====================================================================
+   🔒 গোপনীয় অর্ডার — নাম ঢাকা, ধাপে ধাপে প্রশ্ন, শেষে আশ্বাস
+   ===================================================================== */
+const HB_PACK_LABELS = [
+  { k:"personal",  t:"🧴 ব্যক্তিগত পণ্য" },
+  { k:"cosmetics", t:"💄 প্রসাধনী" },
+  { k:"household", t:"🏠 গৃহস্থালি সামগ্রী" },
+  { k:"code",      t:"🔢 শুধু অর্ডার নম্বর" }
+];
+function hbPackLabelText(k){ const x = HB_PACK_LABELS.find(l=> l.k === k); return x ? x.t : "🔢 শুধু অর্ডার নম্বর"; }
+// ফার্মেসী PIN দিয়ে খোলা থাকলে আসল নাম, নাহলে ঢাকা
+function hbPrivName(name, isPriv){
+  if(!isPriv) return name;
+  return (typeof __phUnlockedUid !== "undefined" && __phUnlockedUid) ? ("🔒 " + name) : "🔒 গোপনীয় পণ্য";
+}
+function hbToastLite(msg){
+  const t = document.createElement("div");
+  t.textContent = msg;
+  t.style.cssText = "position:fixed; left:50%; bottom:96px; transform:translateX(-50%); white-space:nowrap; background:#be185d; color:#fff; padding:10px 18px; border-radius:22px; font-size:13px; font-weight:700; z-index:99999; box-shadow:0 6px 18px rgba(0,0,0,.4);";
+  document.body.appendChild(t); setTimeout(()=> t.remove(), 2200);
+}
+function hbPrivModal(){
+  let ov = document.getElementById("hbPrivOverlay");
+  if(!ov){
+    ov = document.createElement("div"); ov.id = "hbPrivOverlay";
+    ov.style.cssText = "position:fixed; inset:0; z-index:10050; background:rgba(0,0,0,.78); display:flex; align-items:center; justify-content:center; padding:16px;";
+    document.body.appendChild(ov);
+  }
+  ov.style.display = "flex";
+  return ov;
+}
+const HB_PRIV_OPT = "display:block; width:100%; text-align:left; margin-top:10px; padding:14px 16px; border-radius:14px; border:1.5px solid var(--border); background:rgba(255,255,255,0.05); color:#fff8e8; font-family:inherit; font-size:14.5px; font-weight:700; cursor:pointer;";
+// ফেরত দেয় { self, label, mode } — বাতিল করলে null
+function hbPrivWizard(items){
+  return new Promise(resolve=>{
+    const ov = hbPrivModal();
+    const shopCount = new Set(items.map(it=> it.shopId)).size;
+    const ans = { self:null, label:null, mode:null };
+    let step = 1;
+    const close = (v)=>{ ov.style.display = "none"; ov.innerHTML = ""; resolve(v); };
+    const box = (title, sub, body)=> `
+      <div style="width:100%; max-width:420px; background:#1a1206; border:1px solid rgba(236,72,153,.45); border-radius:20px; padding:20px 18px 18px; color:#fff8e8; max-height:92vh; overflow:auto;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:11.5px; font-weight:800; color:#f9a8d4;">🔒 গোপনীয় অর্ডার · ধাপ ${["১","২","৩"][step-1]}/৩</span>
+          <span id="hbPrivX" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
+        </div>
+        <div style="font-size:17px; font-weight:800; margin-top:10px;">${title}</div>
+        ${sub ? `<div style="font-size:12.5px; color:var(--muted); margin-top:6px; line-height:1.7;">${sub}</div>` : ""}
+        <div>${body}</div>
+        ${step > 1 ? `<button type="button" id="hbPrivBack" style="margin-top:14px; border:0; background:transparent; color:var(--amber); font-family:inherit; font-weight:700; font-size:13px; cursor:pointer;">← আগের ধাপ</button>` : ""}
+      </div>`;
+    const wire = ()=>{
+      ov.querySelector("#hbPrivX").onclick = ()=> close(null);
+      const b = ov.querySelector("#hbPrivBack"); if(b) b.onclick = ()=>{ step--; render(); };
+      ov.querySelectorAll("[data-pv]").forEach(btn=> btn.onclick = ()=>{
+        const [key, val] = btn.getAttribute("data-pv").split(":");
+        if(key === "mode" && btn.hasAttribute("disabled")) return;
+        ans[key] = key === "self" ? (val === "1") : val;
+        if(step < 3){ step++; render(); } else close(ans);
+      });
+    };
+    const render = ()=>{
+      if(step === 1){
+        ov.innerHTML = box("এটা কি আপনি নিজের হাতে নিতে চান?", "যে-ই নিক, প্যাকেট সিল করা থাকবে — বাইরে থেকে কেউ বুঝবে না ভেতরে কী আছে।",
+          `<button type="button" data-pv="self:1" style="${HB_PRIV_OPT}">🙋 হ্যাঁ, আমি নিজে নেব</button>
+           <button type="button" data-pv="self:0" style="${HB_PRIV_OPT}">👥 না, অন্য কেউ নেবে</button>`);
+      }else if(step === 2){
+        ov.innerHTML = box("প্যাকেটে কোন নাম লেখা থাকবে?", "আসল পণ্যের নাম প্যাকেটের বাইরে কোথাও লেখা থাকবে না। আপনি যেটা বাছবেন, শুধু সেটাই থাকবে।",
+          HB_PACK_LABELS.map(l=> `<button type="button" data-pv="label:${l.k}" style="${HB_PRIV_OPT}">${l.t}</button>`).join(""));
+      }else{
+        const pickOk = shopCount === 1;
+        ov.innerHTML = box("কোথা থেকে নেবেন?", "",
+          `<button type="button" data-pv="mode:delivery" style="${HB_PRIV_OPT}">🏠 বাসায় ডেলিভারি<br><small style="font-weight:400; color:var(--muted);">রাইডার শুধু সিল করা প্যাকেট আর অর্ডার নম্বর পাবেন</small></button>
+           <button type="button" data-pv="mode:pickup" ${pickOk ? "" : "disabled"} style="${HB_PRIV_OPT}${pickOk ? "" : " opacity:.45; cursor:not-allowed;"}">🏪 দোকান থেকে নিজে তুলে নেব<br><small style="font-weight:400; color:var(--muted);">${pickOk ? "দোকানে গিয়ে শুধু অর্ডার নম্বর বলবেন — আর কিছু বলতে হবে না · ডেলিভারি চার্জ লাগবে না" : "Cart-এ একাধিক দোকানের পণ্য আছে — দোকান থেকে তুলতে হলে এক দোকানের পণ্য আলাদা অর্ডার করুন"}</small></button>`);
+      }
+      wire();
+    };
+    render();
+  });
+}
+function hbPrivDonePopup(code, ans){
+  return new Promise(resolve=>{
+    const ov = hbPrivModal();
+    ov.innerHTML = `
+      <div style="width:100%; max-width:420px; background:#1a1206; border:1px solid rgba(74,222,128,.45); border-radius:20px; padding:22px 18px; color:#fff8e8; text-align:center;">
+        <div style="font-size:44px;">🛡️</div>
+        <div style="font-size:18px; font-weight:800; margin-top:6px;">নিশ্চিন্ত থাকুন</div>
+        <div style="font-size:13.5px; line-height:1.8; margin-top:10px; color:#fde68a;">
+          ডেলিভারিম্যান জানবেন না প্যাকেটে কী আছে।<br>
+          শুধু আপনি আর যে ফার্মেসি প্যাক করবে, তারা জানবে।<br>
+          প্যাকেট সাধারণ ব্যাগে সিল করা থাকবে।
+        </div>
+        <div style="margin-top:14px; padding:12px; border-radius:12px; background:rgba(255,255,255,0.06); font-size:13px; line-height:1.9;">
+          🧾 অর্ডার নম্বর: <b style="color:var(--amber); font-size:16px;">${escapeHtml(code)}</b><br>
+          📦 প্যাকেটে লেখা থাকবে: <b>${escapeHtml(hbPackLabelText(ans.label))}</b><br>
+          ${ans.mode === "pickup" ? "🏪 দোকানে গিয়ে শুধু এই অর্ডার নম্বর বলবেন" : "🏠 বাসায় ডেলিভারি"}
+        </div>
+        <div style="font-size:11.5px; color:var(--muted); margin-top:10px;">⏱️ প্রায় ১ মিনিটের মধ্যে চাইলে বাতিল করতে পারবেন, তারপর দোকানে যাবে।</div>
+        <button type="button" id="hbPrivOk" style="margin-top:16px; width:100%; padding:13px; border:0; border-radius:12px; background:#16a34a; color:#fff; font-family:inherit; font-weight:800; font-size:14.5px; cursor:pointer;">ঠিক আছে</button>
+      </div>`;
+    ov.querySelector("#hbPrivOk").onclick = ()=>{ ov.style.display = "none"; ov.innerHTML = ""; resolve(); };
+  });
+}
+
 const HB_CART_KEY = "hb_cart_v2";
 
 function hbCartGet(){
@@ -12318,10 +12422,15 @@ window.addToCart = function(productId, productName, price, shopOverride, variant
   const existing = items.find(it=> it.productId === productId && it.shopId === shopId
     && (it.variantColor||null) === variantColor && (it.variantSize||null) === variantSize);
   if(existing) existing.qty += 1;
-  else items.push({ shopId, shopName, productId, productName, price: Number(price)||0, qty: 1, variantColor, variantSize });
+  else{
+    // 🔒 গোপনীয় পণ্য কিনা — কার্টে আর অর্ডারে নাম ঢেকে রাখতে আর অর্ডারের সময় গোপনীয়তার প্রশ্নগুলো করতে
+    const __src = (typeof marketFeedProducts !== "undefined" && Array.isArray(marketFeedProducts)) ? marketFeedProducts.find(x=> x.id === productId && x.__shopId === shopId) : null;
+    items.push({ shopId, shopName, productId, productName, price: Number(price)||0, qty: 1, variantColor, variantSize, isPrivate: !!(__src && __src.private) });
+  }
   hbCartSet(items);
   const variantSuffix = variantColor ? ` (${variantColor}/${variantSize})` : "";
-  if(!shopOverride) alert(`✅ "${productName}"${variantSuffix} Cart-এ যোগ হয়েছে।`); // Assistant নিজে চ্যাটে কনফার্ম করে, তাই alert ডুপ্লিকেট করা হয় না
+  if(!shopOverride) alert(`✅ "${productName}"${variantSuffix} Cart-এ যোগ হয়েছে।`);
+  else if(items.some(it=> it.productId === productId && it.shopId === shopId && it.isPrivate) && typeof hbToastLite === "function") hbToastLite("🔒 গোপনীয়ভাবে Cart-এ যোগ হয়েছে"); // Assistant নিজে চ্যাটে কনফার্ম করে, তাই alert ডুপ্লিকেট করা হয় না
 };
 
 function hbCartQtyChange(shopId, productId, delta, variantColor, variantSize){
@@ -12365,7 +12474,7 @@ function hbCartRenderItems(){
       return `
         <div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
           <div style="flex:1; min-width:0;">
-            <div style="font-size:13px; font-weight:700;">${escapeHtml(it.productName)}${variantLabel}</div>
+            <div style="font-size:13px; font-weight:700;">${escapeHtml(hbPrivName(it.productName, it.isPrivate))}${variantLabel}</div>
             <div style="font-size:11.5px; color:var(--muted);">${HB_CUR}${it.price} × ${it.qty} = ${HB_CUR}${lineTotal}</div>
           </div>
           <button class="hbCartQtyBtn" data-shop="${shopId}" data-pid="${it.productId}" data-color="${it.variantColor||''}" data-size="${it.variantSize||''}" data-delta="-1" style="width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; cursor:pointer; font-family:inherit;">−</button>
@@ -12400,16 +12509,28 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
   const items = hbCartGet();
   if(items.length === 0) return;
 
-  const deliveryAddress = $("hbCartAddressInput").value.trim();
+  // 🔒 কার্টে গোপনীয় পণ্য থাকলে আগে ধাপে ধাপে কয়েকটা প্রশ্ন (নিজে নেবেন কিনা,
+  //    প্যাকেটে কী লেখা থাকবে, কোথা থেকে নেবেন)
+  let __priv = null;
+  if(items.some(it=> it.isPrivate)){
+    __priv = await hbPrivWizard(items);
+    if(!__priv) return;
+  }
+  const __pickup = !!(__priv && __priv.mode === "pickup");
+
+  const deliveryAddress = __pickup ? "🏪 দোকান থেকে নিজে তুলে নেবেন" : $("hbCartAddressInput").value.trim();
   const deliveryPhone = $("hbCartPhoneInput").value.trim();
   if(!deliveryAddress){ alert("ডেলিভারি ঠিকানা লিখুন — রাইডার এই ঠিকানা দেখেই ডেলিভারি করবেন।"); return; }
   if(!deliveryPhone){ alert("যোগাযোগ নম্বর লিখুন।"); return; }
 
-  // 🚚 ডেলিভারি চার্জ — লোকেশন আর সার্ভারের হিসাব ছাড়া অর্ডার না
+  // 🚚 ডেলিভারি চার্জ — লোকেশন আর সার্ভারের হিসাব ছাড়া অর্ডার না (দোকান থেকে নিজে নিলে লাগে না)
+  let __quote = { ok:true, totalCharge:0 };
+  if(!__pickup){
   if(!__hbDeliveryGpsCoords){ alert("📍 ম্যাপে আপনার লোকেশন দিন — \"এখানেই আছি\" বা \"ম্যাপে পিন দিন\" চাপুন।\n\nরাইডার এই লোকেশন ধরেই আসবেন, আর ডেলিভারি চার্জও এখান থেকে মাপা হয়।"); return; }
-  const __quote = await hbCartEnsureQuote();
+  __quote = await hbCartEnsureQuote();
   if(!__quote){ alert("ডেলিভারি চার্জ জানা যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); return; }
   if(!__quote.ok){ alert(hbQuoteProblemText(__quote)); return; }
+  }
 
   // 🔴 কার্টে একাধিক দোকানের প্রোডাক্ট থাকতে পারে — যেই দোকান(গুলো) এখন বন্ধ
   // (শপকিপারের হেডার সুইচ), সেগুলোর প্রোডাক্ট অর্ডার হতে দেওয়া হবে না
@@ -12442,8 +12563,14 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
       price: it.price || 0,
       customerUid: currentCustomer.uid, customerName: currentCustomer.name || "কাস্টমার",
       deliveryAddress, deliveryPhone,
-      deliveryLat: __hbDeliveryGpsCoords ? __hbDeliveryGpsCoords.lat : null,
-      deliveryLng: __hbDeliveryGpsCoords ? __hbDeliveryGpsCoords.lng : null,
+      deliveryLat: (!__pickup && __hbDeliveryGpsCoords) ? __hbDeliveryGpsCoords.lat : null,
+      deliveryLng: (!__pickup && __hbDeliveryGpsCoords) ? __hbDeliveryGpsCoords.lng : null,
+      // 🔒 গোপনীয় অর্ডার — দোকান প্যাকেটে কী লিখবে, কে নেবে, ডেলিভারি না নিজে তুলবে
+      isPrivate: !!it.isPrivate,
+      privateOrder: !!__priv,
+      packLabel: __priv ? __priv.label : null,
+      selfReceive: __priv ? __priv.self : null,
+      deliveryMode: __pickup ? "pickup" : "delivery",
       // 🚚 ক্রেতাকে যে চার্জ দেখানো হয়েছিল — শুধু মিলিয়ে দেখার জন্য।
       //    আসল চার্জ সার্ভার নিজে হিসাব করে সিল করে (releaseHeldOrders)।
       clientDeliveryCharge: __quote.totalCharge,
@@ -12461,7 +12588,8 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
     $("hbCartAddressInput").value = ""; $("hbCartPhoneInput").value = "";
     // 📍 লোকেশন মনে থাকে (পরের অর্ডারে আবার লাগবে না) — শুধু হিসাব মুছে দেওয়া
     __hbQuote = null; __hbQuoteKey = null;
-    alert("✅ অর্ডার নেওয়া হয়েছে!\n\n🧾 অর্ডার নম্বর: " + __orderCode + "\n\n⏱️ প্রায় ১ মিনিট সময় আছে — এর মধ্যে চাইলে বাতিল করতে পারবেন বা আরও কিছু যোগ করতে পারবেন। তারপর দোকানে চলে যাবে।");
+    if(__priv) await hbPrivDonePopup(__orderCode, __priv);
+    else alert("✅ অর্ডার নেওয়া হয়েছে!\n\n🧾 অর্ডার নম্বর: " + __orderCode + "\n\n⏱️ প্রায় ১ মিনিট সময় আছে — এর মধ্যে চাইলে বাতিল করতে পারবেন বা আরও কিছু যোগ করতে পারবেন। তারপর দোকানে চলে যাবে।");
     // 📦 অর্ডার যেন কখনো "হারিয়ে" না যায় — কনফার্মের সাথে সাথেই সরাসরি
     // Order Tracking-এ নিয়ে যাওয়া হচ্ছে, যাতে "আমার অর্ডারসমূহ"-তে
     // 🕐 পেন্ডিং হিসেবে অর্ডারটা তখনই চোখে পড়ে (আগের কোনো ফিল্টার সাফ করে দিয়ে)
@@ -12862,7 +12990,7 @@ function hbTrackMiniRender(){
   cardEl.innerHTML = `
     <div class="card" style="padding:14px; cursor:pointer;" id="hbTrackMiniClickable">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <div style="font-weight:800; font-size:13.5px;">📦 ${escapeHtml(latest.productName||"অর্ডার")}</div>
+        <div style="font-weight:800; font-size:13.5px;">📦 ${escapeHtml(hbPrivName(latest.productName||"অর্ডার", latest.isPrivate))}</div>
         <span style="font-size:11px; font-weight:800; color:var(--amber);">${HB_STATUS_STEPS[stepIndex] ? hbStepLabel(HB_STATUS_STEPS[stepIndex], latest) : ""}</span>
       </div>
       <div style="display:flex; align-items:center; gap:2px;">${dots}</div>
@@ -12924,7 +13052,7 @@ function hbOrdersRender(){
     return `
       <div class="hbOrderCard" data-oid="${o.id}" style="display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px; background:var(--card); border:1px solid var(--border); border-radius:12px; cursor:pointer;">
         <div style="flex:1; min-width:0;">
-          <div style="font-weight:700; font-size:13px;">${escapeHtml(o.productName||"প্রোডাক্ট")}</div>
+          <div style="font-weight:700; font-size:13px;">${escapeHtml(hbPrivName(o.productName||"প্রোডাক্ট", o.isPrivate))}</div>
           <div style="font-size:11px; color:var(--muted);">${o.orderCode ? '🧾 <b style="color:var(--amber);">' + escapeHtml(o.orderCode) + '</b> · ' : ''}পরিমাণ: ${o.qty||1} · ${time}</div>
         </div>
         <span style="font-size:11px; font-weight:800; flex-shrink:0;">${HB_STATUS_LABEL[status]||status}</span>
@@ -13033,9 +13161,9 @@ function hbOpenTracker(order){
   const time = order.createdAt ? order.createdAt.toDate().toLocaleString('bn-BD', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : "";
   $("hbTrackerOrderDetails").innerHTML = `
     <div style="display:flex; align-items:center; gap:12px;">
-      <div style="width:52px; height:52px; border-radius:12px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0;">${guessCategoryIcon(order.productName)}</div>
+      <div style="width:52px; height:52px; border-radius:12px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0;">${order.isPrivate ? "🔒" : guessCategoryIcon(order.productName)}</div>
       <div style="flex:1; min-width:0;">
-        <div style="font-weight:800; font-size:14.5px;">${escapeHtml(order.productName||"প্রোডাক্ট")}</div>
+        <div style="font-weight:800; font-size:14.5px;">${escapeHtml(hbPrivName(order.productName||"প্রোডাক্ট", order.isPrivate))}</div>
         <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">পরিমাণ: ${order.qty||1}${time ? " · " + time : ""}</div>
       </div>
       <span style="font-size:11px; font-weight:800; flex-shrink:0;">${HB_STATUS_LABEL[status]||status}</span>
