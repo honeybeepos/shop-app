@@ -742,6 +742,46 @@
     position:fixed; inset:0; z-index:800; background:var(--bg1);
     overflow-y:auto; padding:16px; max-width:none;
   }
+
+  /* 🖥️ কম্পিউটার লেআউট — চওড়া স্ক্রিনে (১০২৪px+) মোবাইলের সরু কলামের বদলে
+     চওড়া পেজ, বাম পাশে নেভিগেশন রেল, বেশি কলামের গ্রিড, মাঝখানে পপআপ।
+     মোবাইলে কিছুই বদলায় না। */
+  @media (min-width:1024px){
+    body{ padding-bottom:0; padding-left:92px; }
+    .wrap{ max-width:1180px; padding:24px 28px 50px; }
+
+    .footerNav{
+      top:0; bottom:0; right:auto; width:92px; flex-direction:column; justify-content:center; gap:6px;
+      border-top:0; border-right:1px solid var(--border); padding:16px 0;
+    }
+    .footerNavItem{ flex:0 0 auto; padding:12px 4px; margin:0 8px; border-radius:14px; transition:background .15s; }
+    .footerNavItem:hover{ background:rgba(255,183,3,0.08); color:#fff8e8; }
+    .footerNavItem.active{ background:rgba(255,183,3,0.14); }
+    .footerNavItem .ic{ font-size:24px; }
+    .footerNavItem .lbl{ font-size:11px; }
+    #hbCartBadge{ right:14px !important; top:6px !important; }
+
+    .serviceCardGrid{ grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:16px; }
+    .serviceCardGrid.homeSvcGrid{ grid-template-columns:repeat(4, 1fr); gap:18px; }
+    .pGrid, .hbDesGrid{ grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)) !important; gap:16px !important; }
+    .pCard{ cursor:pointer; }
+    .pCard:hover, .serviceCard:hover{ transform:translateY(-3px); border-color:var(--amber); }
+    .hbXOpen{ grid-column:span 2; }
+
+    /* নিচ থেকে ওঠা শিট → কম্পিউটারে মাঝখানে পপআপ */
+    .menuOverlay, .mfSheetOverlay:not(#mfMenuSheet),
+    div[style*="position:fixed"][style*="align-items:flex-end"]{ align-items:center !important; }
+    .menuPanel, .mfSheetOverlay:not(#mfMenuSheet) .mfSheetBox,
+    div[style*="position:fixed"][style*="align-items:flex-end"] > div{
+      border-radius:20px !important; border:1px solid var(--border) !important;
+    }
+
+    /* ফুল-স্ক্রিন পাতা (Cart, অর্ডার ট্র্যাকিং ইত্যাদি) — লেখা মাঝখানে, অতিরিক্ত চওড়া না */
+    #hbCartScreen, #hbOrderTrackingScreen, #tripHistoryScreen{
+      padding-left:max(24px, calc(50% - 460px)) !important; padding-right:max(24px, calc(50% - 460px)) !important;
+    }
+    #hbEkaCartBar{ left:50% !important; right:auto !important; width:520px; transform:translateX(-50%); }
+  }
 </style>
 <script src="bd-locations.js"></script>
 <script src="hb-currency.js"></script>
@@ -3876,7 +3916,7 @@ async function tlrRenderFeed(){
       : "✂️ এখনো কোনো দর্জি ডিজাইন পোস্ট করেননি।<br>দর্জিরা পোস্ট দিলে এখানে দেখা যাবে — ছবি দেখে পছন্দের ডিজাইনে অর্ডার দিতে পারবেন।");
     return;
   }
-  box.innerHTML = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">` + list.map(d=> `
+  box.innerHTML = `<div class="hbDesGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">` + list.map(d=> `
     <div class="card hbXCard" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0; position:relative;">
       ${hbShareChip({ kind:"design", id:d.id, name:d.title, price:d.price, shop:d.tailorName }, "top")}
       <img class="hbXImg" src="${escapeHtml(d.img)}" data-tlr-zoom="${escapeHtml(d.img)}" data-tlr-did="${escapeHtml(d.id)}" alt="" loading="lazy" style="width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:#fce7f3; cursor:zoom-in;">
