@@ -7003,10 +7003,13 @@ function phAuthChanged(){
   if(phIsOpen()) phApplyGate();
 }
 
+/* 🔒 গোপনীয় পণ্য (private:true) বাজারের সাধারণ কোনো তালিকা, খোঁজ, দোকানের পাতা
+   বা শেয়ার-লিংকে দেখায় না — শুধু ফার্মেসী পাতায়, Google লগইন + PIN দেওয়ার পর। */
+function hbPubDocs(qs){ return qs.docs.filter(d=> !(d.data() || {}).private); }
 const PH_MED_CAT = "cat-medicine";
 let phArea = { d:"", u:"" };
 try{ const a = JSON.parse(localStorage.getItem("hbPhArea")||"null") || JSON.parse(localStorage.getItem("hbEkaArea")||"null") || JSON.parse(localStorage.getItem("hbTlrArea")||"null"); if(a && a.d) phArea = { d:a.d, u:a.u||"" }; }catch(e){}
-let __phReady = false, __phSeq = 0, __phItems = [], __phShop = "";
+let __phReady = false, __phSeq = 0, __phItems = [], __phShop = "", __phKind = "";
 function phEsc(v){ return String(v == null ? "" : v).replace(/[&<>"']/g, c=> ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function phAreaFill(){
   const dS = document.getElementById("phDist"), uS = document.getElementById("phUpz");
@@ -7031,6 +7034,7 @@ function phInit(){
     document.getElementById("phSearch").addEventListener("input", phRender);
     document.getElementById("phLockBtn").addEventListener("click", phLock);
     document.getElementById("phShopChips").addEventListener("click", e=>{
+      const k = e.target.closest("[data-phkind]"); if(k){ __phKind = k.getAttribute("data-phkind"); phRender(); return; }
       const b = e.target.closest("[data-phshop]"); if(!b) return;
       __phShop = b.getAttribute("data-phshop"); phRender();
     });
@@ -7068,9 +7072,13 @@ async function phLoad(){
   grid.innerHTML = "<div class='loadingMsg'>ওষুধ লোড হচ্ছে...</div>";
   const per = await Promise.all(shops.map(async shop=>{
     try{
-      const qs = await db.collection("shops").doc(shop.id).collection("publicStock").where("catId","==",PH_MED_CAT).get();
+      // ওষুধ (cat-medicine) + যেকোনো দোকানের গোপনীয় পণ্য (private:true) — দুটো একসাথে
+      const ref = db.collection("shops").doc(shop.id).collection("publicStock");
+      const [medQs, privQs] = await Promise.all([ ref.where("catId","==",PH_MED_CAT).get(), ref.where("private","==",true).get() ]);
+      const seenIds = new Set(), docs = [];
+      [...medQs.docs, ...privQs.docs].forEach(d=>{ if(!seenIds.has(d.id)){ seenIds.add(d.id); docs.push(d); } });
       const cur = shop.currencySymbol || (shop.currencyCode && typeof window.hbGetCurrencySymbol === "function" ? window.hbGetCurrencySymbol(shop.currencyCode) : null) || "৳";
-      return qs.docs.map(d=> ({ ...d.data(), id:d.id, __shopId:shop.id, __shopName:shop.name || shop.shopName || "ফার্মেসি",
+      return docs.map(d=> ({ ...d.data(), id:d.id, __shopId:shop.id, __shopName:shop.name || shop.shopName || "ফার্মেসি",
         __shopArea: shop.upazila || shop.district || "", __shopIsOpen: shop.isShopOpen !== false, __cur:cur }))
         .filter(p=> (Number(p.stockQty) || 0) > 0);
     }catch(e){ console.warn("pharmacy stock load failed", shop.id, e); return []; }
@@ -7091,9 +7099,13 @@ function phRender(){
   __phItems.forEach(p=>{ if(!seen.has(p.__shopId)){ seen.add(p.__shopId); shops.push({ id:p.__shopId, name:p.__shopName, open:p.__shopIsOpen }); } });
   if(__phShop && !seen.has(__phShop)) __phShop = "";
   const chip = (id, label, on)=> `<button type="button" data-phshop="${phEsc(id)}" style="flex-shrink:0; border:1px solid ${on ? "var(--amber)" : "var(--border)"}; background:${on ? "var(--amber)" : "rgba(255,255,255,0.05)"}; color:${on ? "var(--bg1)" : "#fff8e8"}; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">${label}</button>`;
-  chips.innerHTML = shops.length > 1 ? chip("", "সব ফার্মেসি", !__phShop) + shops.map(s=> chip(s.id, "🏥 " + phEsc(s.name) + (s.open ? "" : " (বন্ধ)"), __phShop === s.id)).join("") : "";
+  const hasPriv = __phItems.some(p=> p.private);
+  const kindChip = (k, label)=> `<button type="button" data-phkind="${k}" style="flex-shrink:0; border:1px solid ${__phKind === k ? "#ec4899" : "var(--border)"}; background:${__phKind === k ? "#ec4899" : "rgba(255,255,255,0.05)"}; color:#fff8e8; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">${label}</button>`;
+  chips.innerHTML = (hasPriv ? kindChip("", "সব") + kindChip("med", "💊 ওষুধ") + kindChip("priv", "🔒 ব্যক্তিগত যত্ন") + (shops.length > 1 ? `<span style="flex-shrink:0; width:1px; background:var(--border); margin:0 4px;"></span>` : "") : "")
+    + (shops.length > 1 ? chip("", "সব ফার্মেসি", !__phShop) + shops.map(s=> chip(s.id, "🏥 " + phEsc(s.name) + (s.open ? "" : " (বন্ধ)"), __phShop === s.id)).join("") : "");
   const q = (document.getElementById("phSearch").value || "").trim().toLowerCase();
   const list = __phItems.filter(p=> (!__phShop || p.__shopId === __phShop) &&
+    (__phKind !== "priv" || p.private) && (__phKind !== "med" || p.catId === PH_MED_CAT) &&
     (!q || String(p.name||"").toLowerCase().includes(q) || String(p.genericName||"").toLowerCase().includes(q) || String(p.description||"").toLowerCase().includes(q) || String(p.barcode||"").toLowerCase().includes(q)));
   if(!__phItems.length){
     grid.innerHTML = "<div class='mfEmpty'>💊 এই এলাকায় এখনো কোনো ফার্মেসি Bazar-এ ওষুধ দেয়নি।<br>পাশের থানা বেছে দেখুন।</div>";
@@ -7177,7 +7189,7 @@ async function hbEkaLoadProducts(){
         const cur = shop.currencySymbol
           || (shop.currencyCode && typeof window.hbGetCurrencySymbol === "function" ? window.hbGetCurrencySymbol(shop.currencyCode) : null)
           || "৳";
-        return qs.docs.map((d)=> ({
+        return hbPubDocs(qs).map((d)=> ({
           ...d.data(), id: d.id,
           __shopId: shop.id, __shopName: shop.name || shop.shopName || "দোকান",
           __shopArea: shop.upazila || shop.district || "", __shopIsOpen: shop.isShopOpen !== false, __cur: cur,
@@ -9439,7 +9451,7 @@ async function searchProducts(query, options = {}){
       const qs = await db.collection("shops").doc(shopId).collection("publicStock").get();
       const shop = allShops.find(s=> s.id === shopId);
       const shopName = shop ? (shop.name || shop.shopName) : "দোকান";
-      qs.docs.forEach(doc=>{
+      hbPubDocs(qs).forEach(doc=>{
         const p = doc.data();
         const nameNorm = hbNormalizeText(p.name);
         const descNorm = hbNormalizeText(p.description);
@@ -10145,7 +10157,7 @@ async function loadMarketFeedProducts(){
         const cur = shop.currencySymbol
           || (shop.currencyCode && typeof window.hbGetCurrencySymbol === 'function' ? window.hbGetCurrencySymbol(shop.currencyCode) : null)
           || '৳';
-        return qs.docs.map(d=> ({
+        return hbPubDocs(qs).map(d=> ({
           ...d.data(), id: d.id,
           __shopId: shop.id,
           __shopName: shop.name || shop.shopName || "দোকান",
@@ -10335,7 +10347,7 @@ async function mfLoadAllBdProducts(){
         const cur = shop.currencySymbol
           || (shop.currencyCode && typeof window.hbGetCurrencySymbol === 'function' ? window.hbGetCurrencySymbol(shop.currencyCode) : null)
           || '৳';
-        return qs.docs.map(d=> ({
+        return hbPubDocs(qs).map(d=> ({
           ...d.data(), id: d.id,
           __shopId: shop.id,
           __shopName: shop.name || shop.shopName || "দোকান",
@@ -10488,7 +10500,7 @@ function mfCardHTML(p, idx){
           ${om.hasOffer ? `<span class="pCardOfferBadge">${om.hasDiscount ? '🔥 অফার' : om.badgeText}</span>` : ''}
         </div>
         <span class="pCardFav" onclick="mfToggleFavoriteProduct(event,'${p.id}')">${isFav ? "❤️" : "🤍"}</span>
-        ${hbShareChip({ kind:"product", id:p.id, shopid:p.__shopId, name:p.name, price:om.finalPrice, shop:p.__shopName })}
+        ${p.private ? `<span style="position:absolute; left:8px; bottom:8px; background:rgba(236,72,153,.9); color:#fff; font-size:10.5px; font-weight:800; padding:4px 9px; border-radius:12px;">🔒 গোপনীয়</span>` : hbShareChip({ kind:"product", id:p.id, shopid:p.__shopId, name:p.name, price:om.finalPrice, shop:p.__shopName })}
         <button class="mfCartBtn" ${(outOfStock || shopClosed) ? 'disabled style="opacity:.45; cursor:not-allowed;"' : ''} onclick="${cartBtnClick}">${isVariant ? "👕" : "🛒"}</button>
       </div>
       <div class="pCardBody">
@@ -10658,7 +10670,7 @@ async function hbOpenPublicProductPage(shopId, productId){
     ]);
     __hbPubShopName = shopDoc.exists ? (shopDoc.data().shopName || 'Honey Bee দোকান') : 'Honey Bee দোকান';
     __hbPubShopIsOpen = shopDoc.exists ? (shopDoc.data().isShopOpen !== false) : true;
-    __hbPubProduct = prodDoc.exists ? prodDoc.data() : null;
+    __hbPubProduct = (prodDoc.exists && !prodDoc.data().private) ? prodDoc.data() : null; // 🔒 গোপনীয় পণ্য শেয়ার-লিংকে খোলে না
   }catch(e){
     console.error('public product load failed:', e);
     __hbPubProduct = null;
@@ -11747,7 +11759,7 @@ async function hbFetchShopProductsForCatFallback(shopId){
   let products = [];
   try{
     const qs = await db.collection("shops").doc(shopId).collection("publicStock").get();
-    products = qs.docs.map(d=> d.data());
+    products = hbPubDocs(qs).map(d=> d.data());
   }catch(e){ console.warn("category-fallback প্রোডাক্ট লোড ব্যর্থ:", e); }
   window.__catFallbackProductsCache = { shopId, products };
   return products;
@@ -11942,7 +11954,7 @@ async function mcLoadMarketCategories(marketId){
         const cur = shop.currencySymbol
           || (shop.currencyCode && typeof window.hbGetCurrencySymbol === 'function' ? window.hbGetCurrencySymbol(shop.currencyCode) : null)
           || '৳';
-        stockQs.docs.forEach(d=>{
+        hbPubDocs(stockQs).forEach(d=>{
           const p = { ...d.data(), id:d.id };
           const cat = p.catId ? catById[p.catId] : null;
           const sub = (cat && p.subId) ? (cat.subs||[]).find(s=> s.id===p.subId) : null;
@@ -12097,7 +12109,7 @@ async function loadProducts(shopId){
       $("productsList").innerHTML = '<div class="emptyMsg">এই দোকান এখনো কোনো প্রোডাক্ট/স্টক তালিকা প্রকাশ করেনি।</div>';
       return;
     }
-    let products = qs.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let products = hbPubDocs(qs).map(doc => ({ id: doc.id, ...doc.data() }));
     if(currentSubSubId) products = products.filter(p=> p.subSubId === currentSubSubId);
     else if(currentSubId) products = products.filter(p=> p.subId === currentSubId);
     else if(currentCatId) products = products.filter(p=> p.catId === currentCatId);

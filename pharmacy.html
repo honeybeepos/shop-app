@@ -992,6 +992,7 @@ function publishMedToBazar(p){
     ytUrl: null, fbUrl: null, imageUrl: p.imageUrl || null, unit: "pcs", productType: "standard", variants: null,
     highlight: false, offerLive: false, offerType: null, offerNote: null, ekadashi: false, ekaGroup: null, packageItems: null,
     genericName: p.genericName || null,
+    private: !!p.isPrivate,
     description: bits.length ? bits.join("\n") : null,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   }).catch(e=> console.warn("Bazar publish failed", e));
@@ -1100,6 +1101,10 @@ function openMedForm(id){
       <input type="checkbox" id="fPub" style="width:20px; height:20px; accent-color:#F4B400" ${p && p.published ? "checked" : ""}>
       <span>🛒 Honey Bee Bazar-এ দেখান<br><small style="font-weight:400; color:var(--muted)">গ্রাহকরা Bazar-এর "জীবন তরী → ফার্মেসী"-তে এই ওষুধ খুঁজে অর্ডার করতে পারবেন। স্টক শেষ হলে আপনাআপনি সরে যাবে।</small></span>
     </label>
+    <label style="display:flex; align-items:center; gap:10px; margin-top:10px; padding:11px 12px; border:1px solid #F9A8D4; background:#FDF2F8; border-radius:12px; cursor:pointer; font-size:14px; font-weight:600; color:#831843">
+      <input type="checkbox" id="fPriv" style="width:20px; height:20px; accent-color:#DB2777" ${p && p.isPrivate ? "checked" : ""}>
+      <span>🔒 গোপনীয় পণ্য<br><small style="font-weight:400; color:#9D174D">প্যাড, কনডম, প্রেগন্যান্সি টেস্টের মতো ব্যক্তিগত পণ্যে টিক দিন। Bazar-এর সাধারণ তালিকায় দেখাবে না, শুধু ফার্মেসী পাতায় গ্রাহকের লগইন আর PIN দেওয়ার পর।</small></span>
+    </label>
     ${batches.length ? `<h3 style="font-size:16px; margin:18px 0 6px">ব্যাচ তালিকা</h3><table class="t"><thead><tr><th>ব্যাচ</th><th>মেয়াদ</th><th class="r">স্টক</th></tr></thead><tbody>${batches.map(b=> `<tr><td>${esc(b.batchNo || "—")}</td><td>${fmtDate(b.expiryDate)}</td><td class="r num">${esc(stockText(p, b.qty))}</td></tr>`).join("")}</tbody></table>` : ""}
     <div class="foot">
       ${p && isAdmin() ? `<button class="btn red" type="button" id="fDel" style="margin-right:auto">🗑️ মুছুন</button>` : ""}
@@ -1162,6 +1167,7 @@ function saveMed(old){
     p.batches.push({ batchNo, expiryDate: exp || "", qty: add, addedAt: Date.now() });
   }
   if(!old) list.push(p);
+  p.isPrivate = !!($("fPriv") && $("fPriv").checked);
   const wantPub = !!($("fPub") && $("fPub").checked), wasPub = !!p.published;
   p.published = wantPub && (Number(p.qty) || 0) > 0;
   saveProducts(list);

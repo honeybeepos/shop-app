@@ -5255,6 +5255,10 @@ window.hbLoadLib = function(name){
         <label>📝 Description (Optional — Bazar-এ প্রোডাক্টের নামে চাপ দিলে গ্রাহক দেখবেন)</label><textarea id="bccPNote" rows="3" maxlength="1000" placeholder="যেমন: সাইজ, কাপড়, কীভাবে ব্যবহার করবেন…" style="width:100%; box-sizing:border-box; font-family:inherit; resize:vertical;"></textarea>
         <label>▶️ YouTube ভিডিওর লিংক (ঐচ্ছিক)</label><input id="bccPYt" type="url" inputmode="url" maxlength="300" placeholder="https://youtu.be/...">
         <label>📘 Facebook ভিডিও/পোস্টের লিংক (ঐচ্ছিক)</label><input id="bccPFb" type="url" inputmode="url" maxlength="300" placeholder="https://www.facebook.com/...">
+        <label style="display:flex; align-items:flex-start; gap:10px; margin:10px 0; padding:10px 12px; border:1px solid #f9a8d4; background:#fdf2f8; border-radius:10px; cursor:pointer; color:#831843;">
+          <input type="checkbox" id="bccPPrivate" style="width:20px; height:20px; flex-shrink:0; margin-top:2px; accent-color:#db2777;">
+          <span>🔒 গোপনীয় পণ্য<br><small style="font-weight:400; color:#9d174d;">প্যাড, কনডম, প্রেগন্যান্সি টেস্টের মতো ব্যক্তিগত পণ্যে টিক দিন। Bazar-এর সাধারণ তালিকায় দেখাবে না — শুধু "জীবন তরী → ফার্মেসী"-তে, গ্রাহকের লগইন আর PIN দেওয়ার পর।</small></span>
+        </label>
         <div style="font-size:11.5px; color:#6b7280; margin:-4px 0 8px;">লিংক দিলে Bazar-এ প্রোডাক্টের কার্ডে YouTube/Facebook আইকন দেখাবে — গ্রাহক চাপ দিলে আপনার ভিডিও খুলবে।</div>
 
         <div style="background:#f3f4f6; border-radius:10px; padding:12px; margin:14px 0;">
@@ -11834,6 +11838,7 @@ async function bccSyncProductToBazar(p){
       subSubId: p.subSubId || null,
       ytUrl: p.ytUrl || null, // ▶️ Bazar কার্ডে YouTube আইকন
       fbUrl: p.fbUrl || null, // 📘 Bazar কার্ডে Facebook আইকন
+      private: !!p.isPrivate, // 🔒 গোপনীয় পণ্য — Bazar-এর সাধারণ তালিকায় লুকানো, শুধু ফার্মেসী পাতায় (লগইন + PIN)
       imageUrl: p.imageUrl || null, // 🖼️ Step 5 — Storage-এ আপলোড করা ছবি থাকলে Bazar-এও দেখা যাবে
       // 👕 প্রোডাক্টের ধরন ও কালার/সাইজ ভ্যারিয়েন্ট — এখনই Bazar-এ কালার/সাইজ সিলেকশন UI
       // বানানো না হলেও, ডেটাটা আগে থেকেই সিঙ্ক করে রাখা হচ্ছে যাতে ভবিষ্যতে Bazar-এর
@@ -13308,6 +13313,7 @@ function bccOpenProductModal(editId){
   document.getElementById('bccPNote').value = p ? (p.note||'') : '';
   document.getElementById('bccPYt').value = p && p.ytUrl ? p.ytUrl : '';
   document.getElementById('bccPFb').value = p && p.fbUrl ? p.fbUrl : '';
+  document.getElementById('bccPPrivate').checked = !!(p && p.isPrivate);
   document.getElementById('bccPImage').value = '';
   bccPendingImage = p ? (p.image||'') : '';
   bccPendingImageIsNew = false; // 🖼️ Step 5 — মোডাল খোলার সময় রিসেট, নতুন ছবি select না করলে এটা false-ই থাকবে
@@ -14122,7 +14128,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
     }
     const enteredNote = document.getElementById('bccPNote').value.trim();
     if(enteredNote) dup.note = enteredNote;
-    dup.ytUrl = enteredYt; dup.fbUrl = enteredFb;
+    dup.ytUrl = enteredYt; dup.fbUrl = enteredFb; dup.isPrivate = document.getElementById('bccPPrivate').checked;
     bccSaveProducts(prods);
     if(dup.published) bccSyncProductToBazar(dup); else bccUnpublishFromBazar(dup.id);
     document.getElementById('bccProductModalOverlay').classList.remove('show');
@@ -14170,6 +14176,7 @@ document.getElementById('bccSaveProductBtn').addEventListener('click', async ()=
     note: document.getElementById('bccPNote').value.trim(),
     ytUrl: enteredYt,   // ▶️ YouTube লিংক (না থাকলে null)
     fbUrl: enteredFb,   // 📘 Facebook লিংক (না থাকলে null)
+    isPrivate: document.getElementById('bccPPrivate').checked, // 🔒 গোপনীয় পণ্য — Bazar-এ শুধু ফার্মেসী পাতায় (লগইন + PIN)
   };
   // 🛍️ সাধারণ এডিট ফর্মে সেভ করলেও একাদশী/প্যাকেজের তথ্য যেন হারিয়ে না যায়
   if(existingProduct){
@@ -23841,6 +23848,30 @@ auth.onAuthStateChanged(async (user)=>{
     .dash-stat-card::before{ display:none; }
     .dash-stat-card.c1{ background:#7C3AED !important; }
     .dash-stat-card.c2{ background:#0284C7 !important; }
+
+    /* ── সেল পাতা: পরিষ্কার ফর্ম ──
+       লেখা বড় ও গাঢ়, ঘরগুলোর মাঝে জায়গা, ঘরের সীমানা স্পষ্ট, আর
+       "কী করতে চান" / "ধরন" বোতামগুলো একটা ট্যাব-বারের মতো একসাথে */
+    #tab-add > .panel{ padding:22px 24px 24px !important; gap:0 26px !important; }
+    #tab-add > .panel > h2{ font-size:18px !important; padding-bottom:14px; margin-bottom:18px !important; border-bottom:1px solid var(--dsLine); }
+    #tab-add .row{ gap:14px; margin-bottom:16px; }
+    #tab-add label{ font-size:13px !important; font-weight:700 !important; color:#374151 !important; margin-bottom:7px; }
+    #tab-add input, #tab-add select{ height:44px; padding:10px 13px !important; font-size:15px !important; border:1px solid #CBD5E1 !important; border-radius:10px !important; box-shadow:0 1px 2px rgba(16,24,40,.04); }
+    #tab-add textarea{ padding:10px 13px !important; font-size:15px !important; border:1px solid #CBD5E1 !important; border-radius:10px !important; }
+    #tab-add input:hover, #tab-add select:hover{ border-color:#94A3B8 !important; }
+    #tab-add .status-group{ background:#F1F5F9; border:1px solid var(--dsLine); border-radius:12px; padding:4px; gap:4px; flex-wrap:nowrap; }
+    #tab-add .status-chip{ background:transparent !important; border:0 !important; border-radius:9px !important; padding:10px 6px !important; font-size:14px !important; font-weight:700 !important; color:#475569 !important; min-width:0; transform:none !important; box-shadow:none !important; }
+    #tab-add .status-chip:hover{ background:#fff !important; color:#111827 !important; }
+    #tab-add .status-chip.active{ box-shadow:0 1px 4px rgba(0,0,0,.18) !important; }
+    #tab-add .pin-desc, #tab-add .old-cust-hint{ background:#FFFBEB; border:1px solid #FDE68A; color:#92400E !important; border-radius:10px; padding:9px 12px; font-size:13px; margin:0 0 16px; }
+    #tab-add .btn{ min-height:48px; height:auto; font-size:16px !important; font-weight:800; border-radius:11px !important; margin:6px 0 14px !important; box-shadow:none !important; border:0 !important; }
+    #tab-add .btn.addItemBtn{ background:#fff !important; color:#92400E !important; border:2px dashed #F4B400 !important; }
+    #tab-add .btn.addItemBtn:hover{ background:#FFFBEB !important; }
+    #quickSellBtn, #extraSaleBtn, #addBtn, #addCustomerOnlyBtn{ background:#16A34A !important; color:#fff !important; }
+    #quickSellBtn:hover, #extraSaleBtn:hover, #addBtn:hover, #addCustomerOnlyBtn:hover{ background:#15803D !important; }
+    #tab-add .row > div[style*="flex:0 0 100px"]{ flex:0 0 128px !important; }
+    #deskBillCol{ padding:18px !important; }
+    #deskBillCol .deskBillHead{ font-size:16px !important; }
 
     /* Business Management-এর ভেতরের পাতাগুলো (পুরো পর্দার) সাইডবারের ডান পাশে খোলে */
     [id^="program-"]{ left:248px !important; }
