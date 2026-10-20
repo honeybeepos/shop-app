@@ -339,6 +339,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="firebase-init.js"></script>
 <script>
 /* =====================================================================
@@ -684,7 +685,7 @@ function renderMedList(){
     if(!out) i++;
     const k = packOf(p);
     return `<div class="med${out ? " out" : ""}${!out && i === KB ? " kb" : ""}" data-pid="${esc(p.id)}">
-      <div class="pill">💊</div>
+      <div class="pill">${p.imageUrl ? `<img src="${esc(p.imageUrl)}" alt="" loading="lazy" style="width:100%; height:100%; object-fit:cover; border-radius:10px">` : "💊"}</div>
       <div style="min-width:0">
         <div class="nm">${esc(p.name)}</div>
         ${p.genericName ? `<div class="gn">${esc(p.genericName)}</div>` : ""}
@@ -1045,7 +1046,7 @@ function renderMeds(){
   ${list.map(p=>{
     const ex = nearestExpiry(p);
     return `<tr data-edit="${esc(p.id)}" style="cursor:pointer">
-      <td><b>${esc(p.name)}</b>${p.rackLocation ? `<div class="hint">📍 ${esc(p.rackLocation)}</div>` : ""}</td>
+      <td><div style="display:flex; align-items:center; gap:10px">${p.imageUrl ? `<img src="${esc(p.imageUrl)}" alt="" loading="lazy" style="width:36px; height:36px; border-radius:8px; object-fit:cover; flex-shrink:0">` : ""}<div><b>${esc(p.name)}</b>${p.rackLocation ? `<div class="hint">📍 ${esc(p.rackLocation)}</div>` : ""}</div></div></td>
       <td>${esc(p.genericName || "—")}<div class="hint">${esc((p.pharma && p.pharma.company) || "")}</div></td>
       <td class="r num ${isLow(p) || !(p.qty > 0) ? "bad" : ""}">${esc(stockText(p))}</td>
       <td class="r num">${money(pcPrice(p))}</td>
@@ -1054,6 +1055,66 @@ function renderMeds(){
     </tr>`;
   }).join("")}</tbody></table>`;
   $("medsBox").querySelectorAll("[data-edit]").forEach(tr=> tr.onclick = ()=> openMedForm(tr.dataset.edit));
+}
+
+/* 📷 ওষুধের ছবি — সাধারণ POS-এর একই ব্যবস্থা: WebP-এ ছোট করা (≤২০০KB),
+   SHA-256 দিয়ে একই ছবি দ্বিতীয়বার আপলোড না করা, product-images/{hash}.webp,
+   imageIndex-এ হিসাব (কয়টা পণ্যে ব্যবহার হচ্ছে)। */
+let PH_IMG = null;
+const PH_IMG_MAX = 200 * 1024;
+function phLoadImg(file){
+  return new Promise((res, rej)=>{ const im = new Image(), u = URL.createObjectURL(file);
+    im.onload = ()=>{ URL.revokeObjectURL(u); res(im); }; im.onerror = ()=>{ URL.revokeObjectURL(u); rej(new Error("ছবি খোলা যায়নি")); }; im.src = u; });
+}
+function phToWebp(img, w, h, q){
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d"); x.imageSmoothingQuality = "high"; x.fillStyle = "#fff"; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h);
+  return new Promise(r=> c.toBlob(b=> r(b), "image/webp", q));
+}
+async function phProcessImage(file){
+  if(!file.type || !file.type.startsWith("image/")) throw new Error("শুধু ছবি দেওয়া যাবে");
+  const img = await phLoadImg(file);
+  let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const sc = Math.min(1, 1000 / Math.max(w, h)); w = Math.round(w * sc); h = Math.round(h * sc);
+  let blob = null;
+  for(const q of [0.82, 0.7, 0.55, 0.42]){ blob = await phToWebp(img, w, h, q); if(blob && blob.size <= PH_IMG_MAX) break; }
+  for(let i = 0; blob && blob.size > PH_IMG_MAX && i < 3; i++){ w = Math.round(w * 0.8); h = Math.round(h * 0.8); blob = await phToWebp(img, w, h, 0.42); }
+  if(!blob || blob.type !== "image/webp") throw new Error("এই ব্রাউজারে ছবি তৈরি করা যায়নি");
+  if(blob.size > PH_IMG_MAX) throw new Error("ছবিটা অনেক বড় — অন্য ছবি দিন");
+  const dataUrl = await new Promise(r=>{ const fr = new FileReader(); fr.onload = ()=> r(fr.result); fr.readAsDataURL(blob); });
+  return { blob, dataUrl, sizeBytes: blob.size };
+}
+async function phUploadImage(pi){
+  if(typeof storage === "undefined" || !storage) throw new Error("ছবি রাখার সার্ভার লোড হয়নি — পাতা রিফ্রেশ করুন");
+  if(!SESSION || !SESSION.shopId) throw new Error("আবার লগইন করুন");
+  const buf = await pi.blob.arrayBuffer();
+  const sha = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", buf))).map(b=> b.toString(16).padStart(2, "0")).join("");
+  const path = `product-images/${sha}.webp`;
+  const idx = db.collection("imageIndex").doc(sha);
+  const have = await idx.get();
+  if(have.exists){ const d = have.data(); return { imageId: d.imageId || sha, imageUrl: d.imageUrl }; }
+  const ref = storage.ref(path);
+  let url;
+  try{ url = await ref.getDownloadURL(); }
+  catch(e){
+    if(e.code !== "storage/object-not-found") throw e;
+    await ref.put(pi.blob, { contentType: "image/webp" });
+    url = await ref.getDownloadURL();
+  }
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  await idx.set({ imageId: sha, sha256: sha, storagePath: path, imageUrl: url, sizeBytes: pi.sizeBytes, format: "webp",
+    referenceCount: 0, cleanupStatus: "ORPHAN", orphanedAt: now, uploaderShopId: SESSION.shopId, createdAt: now, updatedAt: now });
+  return { imageId: sha, imageUrl: url };
+}
+function phImageRef(imageId, delta){
+  if(!imageId || typeof db === "undefined") return;
+  db.runTransaction(async tx=>{
+    const ref = db.collection("imageIndex").doc(imageId); const d = await tx.get(ref);
+    if(!d.exists) return;
+    const n = Math.max(0, (d.data().referenceCount || 0) + delta);
+    tx.update(ref, n > 0 ? { referenceCount: n, cleanupStatus: "ACTIVE", orphanedAt: null, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }
+                         : { referenceCount: n, cleanupStatus: "ORPHAN", orphanedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }).catch(e=> console.warn("imageIndex ref update failed", e));
 }
 
 function openMedForm(id){
@@ -1065,6 +1126,13 @@ function openMedForm(id){
   const batches = (p && p.batches || []).filter(b=> b && Number(b.qty) > 0);
   openModal(`
     <div class="head"><h3>${p ? "✏️ ওষুধ বদলান" : "➕ নতুন ওষুধ"}</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div style="display:flex; align-items:center; gap:14px; margin:4px 0 6px">
+      <div id="fImgPrev" style="width:76px; height:76px; border-radius:14px; border:1.5px dashed #CBD5E1; background:#F8FAFC; display:grid; place-items:center; font-size:30px; overflow:hidden; flex-shrink:0">${p && p.imageUrl ? `<img src="${esc(p.imageUrl)}" alt="" style="width:100%; height:100%; object-fit:cover">` : "📷"}</div>
+      <div style="flex:1; min-width:0">
+        <label class="btn ghost" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; margin:0">📷 ${p && p.imageUrl ? "ছবি বদলান" : "ছবি দিন"}<input type="file" id="fImg" accept="image/*" style="display:none"></label>
+        <div class="hint" id="fImgHint">ক্যামেরা দিয়ে তুলুন বা গ্যালারি থেকে বাছুন — ছবি Bazar-এও দেখাবে (ঐচ্ছিক)</div>
+      </div>
+    </div>
     <div class="row2">
       <div><label class="f">ওষুধের নাম ও শক্তি *</label><input class="in" id="fName" value="${esc(p ? p.name : "")}" placeholder="যেমন: Napa 500mg"></div>
       <div><label class="f">জেনেরিক নাম</label><input class="in" id="fGen" value="${esc(p ? p.genericName || "" : "")}" placeholder="যেমন: Paracetamol"></div>
@@ -1127,12 +1195,24 @@ function openMedForm(id){
     openCamScanner((code)=>{ openMedForm(id); Object.keys(keep).forEach(k=>{ if($(k)) $(k).value = keep[k]; }); $("fCode").value = code; $("fBoxMrp").dispatchEvent(new Event("input")); });
   };
   calc();
+  PH_IMG = null;
+  $("fImg").onchange = async (e)=>{
+    const file = e.target.files && e.target.files[0]; if(!file) return;
+    $("fImgHint").textContent = "⏳ ছবি ছোট করা হচ্ছে...";
+    try{
+      const r = await phProcessImage(file);
+      PH_IMG = r;
+      $("fImgPrev").innerHTML = `<img src="${r.dataUrl}" alt="" style="width:100%; height:100%; object-fit:cover">`;
+      $("fImgHint").textContent = `✅ ছবি তৈরি (${Math.round(r.sizeBytes / 1024)}KB) — সেভ করলে আপলোড হবে`;
+    }catch(err){ PH_IMG = null; $("fImgHint").textContent = "❌ " + (err.message || "ছবি নেওয়া যায়নি"); }
+  };
   $("fSave").onclick = ()=> saveMed(p);
   if($("fDel")) $("fDel").onclick = ()=>{
     if(!confirm(`"${p.name}" তালিকা থেকে মুছে ফেলবেন?`)) return;
     const del = readJSON("bcc-deleted-product-ids", []); if(!del.includes(p.id)) del.push(p.id);
     localStorage.setItem("bcc-deleted-product-ids", JSON.stringify(del));
     if(p.published && SESSION && SESSION.shopId) db.collection("shops").doc(SESSION.shopId).collection("publicStock").doc(p.id).delete().catch(()=>{});
+    if(p.imageId) phImageRef(p.imageId, -1);
     closeModal(); toast("🗑️ মুছে ফেলা হয়েছে"); pushNow(); renderMeds();
   };
 }
@@ -1151,6 +1231,18 @@ function saveMed(old){
   if(!old && list.some(x=> String(x.name || "").trim().toLowerCase() === name.toLowerCase())){
     toast("এই নামে ওষুধ আগে থেকেই আছে — তালিকা থেকে খুলে স্টক যোগ করুন"); return;
   }
+  // 📷 নতুন ছবি থাকলে আগে আপলোড — ব্যর্থ হলে ওষুধ সেভ হয় না (ভাঙা ছবির লিংক যেন না থাকে)
+  if(PH_IMG && !PH_IMG.uploaded){
+    const btn = $("fSave"); const txt = btn.textContent;
+    btn.disabled = true; btn.textContent = "⏳ ছবি আপলোড হচ্ছে...";
+    phUploadImage(PH_IMG).then(r=>{
+      PH_IMG.uploaded = r; btn.disabled = false; btn.textContent = txt; saveMed(old);
+    }).catch(err=>{
+      btn.disabled = false; btn.textContent = txt;
+      toast("❌ ছবি আপলোড হয়নি: " + (err.message || err));
+    });
+    return;
+  }
   ensureMedCategory();
   const p = old ? list.find(x=> x.id === old.id) : { id: uid(), catId: MED_CAT_ID, subId: "", subSubId: "", unit: "pcs", productType: "batch", variants: [], batches: [], qty: 0, published: false, image: null, imageId: null, imageUrl: null, note: "" };
   Object.assign(p, {
@@ -1161,6 +1253,12 @@ function saveMed(old){
     pharma: { company: $("fCo").value.trim() || null, form: $("fForm").value, boxBuy, boxMrp },
   });
   if(!p.productType || p.productType === "standard") p.productType = "batch";
+  if(PH_IMG && PH_IMG.uploaded){
+    const prevId = p.imageId;
+    p.imageId = PH_IMG.uploaded.imageId; p.imageUrl = PH_IMG.uploaded.imageUrl;
+    if(prevId !== p.imageId){ phImageRef(p.imageId, +1); if(prevId) phImageRef(prevId, -1); }
+    PH_IMG = null;
+  }
   if(add > 0){
     p.qty = (Number(p.qty) || 0) + add;
     p.batches = p.batches || [];
