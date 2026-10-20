@@ -3199,6 +3199,7 @@
         <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>পণ্যের মূল্য</span><span id="hbCartItemsTotalTxt">৳ 0</span></div>
         <div id="hbCartDeliveryRows"></div>
         <div id="hbCartDeliveryMsg" style="font-size:11.5px; line-height:1.5; margin-top:4px;"></div>
+        <div id="hbCartPrivNote" style="display:none; font-size:11.5px; line-height:1.6; margin-top:6px; padding:8px 10px; border-radius:9px; background:rgba(236,72,153,0.12); color:#fbcfe8;">🔒 Cart-এ গোপনীয় পণ্য আছে — "অর্ডার নিশ্চিত করুন" চাপলে কয়েকটা প্রশ্ন আসবে। দোকান থেকে নিজে তুলে নিলে ঠিকানা আর ডেলিভারি চার্জ লাগবে না।</div>
       </div>
       <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; color:var(--amber); margin-bottom:14px;"><span>সর্বমোট</span><span id="hbCartTotalTxt">৳ 0</span></div>
       <button id="hbCartCheckoutBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
@@ -11168,7 +11169,7 @@ function hbBindImageZoomTap(wrapEl, url){
 window.hbOpenMarketProductDetail = function(shopId, productId){
   const p = marketFeedProducts.find(x=> x.id === productId && x.__shopId === shopId);
   if(!p) return;
-  if(typeof hbStartProductViewTimer === 'function') hbStartProductViewTimer(shopId, productId, p.name);
+  if(!p.private && typeof hbStartProductViewTimer === 'function') hbStartProductViewTimer(shopId, productId, p.name); // 🔒 গোপনীয় পণ্য দেখা লগ হয় না
   __hbDetailSelectedVariant = { color: null, size: null }; // নতুন প্রোডাক্ট খোলার সময় আগের সিলেকশন রিসেট
   const isVariant = p.productType === "variant" && p.variants && p.variants.length;
   const render = ()=>{
@@ -12190,7 +12191,7 @@ function renderProducts(products){
 window.hbOpenProductDetail = function(productId){
   const p = __hbCurrentProductsList.find(x=> x.id === productId);
   if(!p) return;
-  if(typeof hbStartProductViewTimer === 'function') hbStartProductViewTimer(currentShopId, productId, p.name);
+  if(!p.private && typeof hbStartProductViewTimer === 'function') hbStartProductViewTimer(currentShopId, productId, p.name);
   __hbDetailSelectedVariant = { color: null, size: null }; // নতুন প্রোডাক্ট খোলার সময় আগের সিলেকশন রিসেট
   const isVariant = p.productType === "variant" && p.variants && p.variants.length;
   const render = ()=>{
@@ -12447,6 +12448,7 @@ function hbCartRemove(shopId, productId, variantColor, variantSize){
 }
 
 function hbCartRenderItems(){
+  try{ const __pn = document.getElementById("hbCartPrivNote"); if(__pn) __pn.style.display = hbCartGet().some(it=> it.isPrivate) ? "block" : "none"; }catch(e){}
   const items = hbCartGet();
   const listEl = $("hbCartItemsList");
   if(items.length === 0){
@@ -12546,11 +12548,18 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
   // এই রসিদের সব পণ্যের জন্য একটাই নম্বর
   const __orderCode = hbMakeOrderCode();
   try{
-    await Promise.all(items.map(it=> db.collection("orderRequests").add({
-      shopId: it.shopId, productId: it.productId, productName: it.productName,
+    /* 🔒 গোপনীয় পণ্যের আসল নাম/আইডি মূল অর্ডারে থাকে না — রাইডার আর
+       সুপার-অ্যাডমিন মূল অর্ডারটা পড়তে পারেন। আসলটা থাকে
+       orderRequests/{id}/secret/item-এ, যেটা শুধু গ্রাহক আর সেই দোকান খুলতে পারে। */
+    const __madeIds = [];
+    try{
+    await Promise.all(items.map(async it=>{ const __ref = await db.collection("orderRequests").add({
+      shopId: it.shopId,
+      productId: it.isPrivate ? null : it.productId,
+      productName: it.isPrivate ? "🔒 গোপনীয় পণ্য" : it.productName,
       // 👕 কালার/সাইজ ভ্যারিয়েন্ট প্রোডাক্ট অর্ডার হলে দোকানদার যেন ঠিক কোন
       // রং/সাইজ পাঠাতে হবে সেটা জানতে পারেন
-      variantColor: it.variantColor || null, variantSize: it.variantSize || null,
+      variantColor: it.isPrivate ? null : (it.variantColor || null), variantSize: it.isPrivate ? null : (it.variantSize || null),
       // 💰 প্রতি-ইউনিট দাম — hbSubmitGuestOrder()-এর (প্রোডাক্ট লিংক থেকে গেস্ট
       // অর্ডার) সাথে ফিল্ড মিলিয়ে রাখা হলো, যাতে ভবিষ্যতে অর্ডার-ভ্যালু
       // দেখানো/রিপোর্টিং যোগ হলে দুই ধরনের অর্ডারেই কাজ করে
@@ -12576,7 +12585,22 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
       qty: it.qty, status: "holding",
       releaseAt: firebase.firestore.Timestamp.fromMillis(Date.now() + HB_HOLD_MS),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    })));
+    });
+      __madeIds.push(__ref.id);
+      if(it.isPrivate){
+        await __ref.collection("secret").doc("item").set({
+          productName: it.productName, productId: it.productId,
+          variantColor: it.variantColor || null, variantSize: it.variantSize || null,
+          customerUid: currentCustomer.uid, shopId: it.shopId,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    }));
+    }catch(__e){
+      // আধা-লেখা অর্ডার রেখে দেওয়া হবে না — দোকানে যেন নামহীন অর্ডার না যায়
+      await Promise.all(__madeIds.map(id=> db.collection("orderRequests").doc(id).delete().catch(()=>{})));
+      throw __e;
+    }
     hbCartSet([]);
     hbCartRenderItems();
     $("hbCartAddressInput").value = ""; $("hbCartPhoneInput").value = "";
@@ -13068,6 +13092,7 @@ function hbOrdersRender(){
       if(!confirm("এই অর্ডারটি বাতিল করবেন?")) return;
       btn.disabled = true; btn.textContent = "...";
       try{
+        await db.collection("orderRequests").doc(btn.dataset.oid).collection("secret").doc("item").delete().catch(()=>{}); // 🔒 গোপনীয় পণ্যের আসল নামও মুছে যায়
         await db.collection("orderRequests").doc(btn.dataset.oid).delete();
       }catch(err){
         btn.disabled = false; btn.textContent = "বাতিল";

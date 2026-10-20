@@ -753,6 +753,19 @@ service cloud.firestore {
         (isSuperAdmin() ||
          (myShopId() != null && resource.data.shopId == myShopId()) ||
          resource.data.assignedRiderId == request.auth.uid);
+
+      // 🔒 গোপনীয় অর্ডারের আসল পণ্যের নাম/আইডি — শুধু অর্ডারকারী গ্রাহক আর
+      // সেই দোকান। রাইডার আর সুপার-অ্যাডমিনও এটা পড়তে পারেন না।
+      match /secret/{docId} {
+        allow create: if isSignedIn() &&
+          get(/databases/$(database)/documents/orderRequests/$(orderId)).data.customerUid == request.auth.uid &&
+          request.resource.data.customerUid == request.auth.uid;
+        allow read: if isSignedIn() &&
+          (resource.data.customerUid == request.auth.uid ||
+           (myShopId() != null && resource.data.shopId == myShopId()));
+        allow delete: if isSignedIn() && resource.data.customerUid == request.auth.uid;
+        allow update: if false;
+      }
     }
 
     // 🔧 Bazar কাস্টমার শপ ভিজিট / প্রোডাক্ট ডিটেইল দেখার সময় লগ করে (honey-bee-bazar.html,

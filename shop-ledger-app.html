@@ -7525,6 +7525,15 @@ function ordRenderBellList(){
     area.innerHTML = '<div class="hbEmpty">এখন কোনো নতুন অর্ডার নেই</div>';
     return;
   }
+  if(__ordPendingOrders.some(o=> o.isPrivate && !o.__secretOk)){
+    area.innerHTML = '<div class="hbEmpty">লোড হচ্ছে...</div>';
+    ordResolvePrivate(__ordPendingOrders).then(()=> ordRenderBellListNow());
+    return;
+  }
+  ordRenderBellListNow();
+}
+function ordRenderBellListNow(){
+  const area = document.getElementById('ordBellListArea');
   const allProducts = (typeof bccLoadProducts === 'function') ? bccLoadProducts() : [];
   const groups = ordGroupByCustomer(__ordPendingOrders);
   area.innerHTML = groups.map(g=> ordBuildPendingGroupHtml(g, allProducts)).join('');
@@ -7610,6 +7619,42 @@ function ordListen(){
    কার্ডে/রসিদে গ্রুপ করা হয় — নতুন কোনো Firestore ফিল্ড/ইনডেক্স লাগেনি, তাই
    এটা "প্রস্তুত হচ্ছে"-তে একই কাস্টমারের নতুন অর্ডার এলে এমনিতেই আগের রসিদে
    জুড়ে যায় (আলাদা করে কোনো "মার্জ" লজিক লাগেনি — গ্রুপিংটাই সেই কাজ করে)। */
+/* 🔒 গোপনীয় অর্ডার — মূল অর্ডারে নাম থাকে "🔒 গোপনীয় পণ্য"; আসল নাম/আইডি
+   orderRequests/{id}/secret/item থেকে (শুধু এই দোকান আর গ্রাহক পড়তে পারে)
+   এনে তালিকায় বসানো হয়। একবার আনলে মনে রাখা হয়। */
+const __ordSecretCache = {};
+async function ordResolvePrivate(list){
+  const need = (list || []).filter(o=> o && o.isPrivate && !o.__secretOk);
+  await Promise.all(need.map(async o=>{
+    try{
+      let sec = __ordSecretCache[o.id];
+      if(!sec){
+        const d = await db.collection('orderRequests').doc(o.id).collection('secret').doc('item').get();
+        if(!d.exists) return;
+        sec = __ordSecretCache[o.id] = d.data();
+      }
+      o.productName = '🔒 ' + (sec.productName || 'গোপনীয় পণ্য');
+      o.productId = sec.productId || null;
+      o.variantColor = sec.variantColor || null; o.variantSize = sec.variantSize || null;
+      o.__secretOk = true;
+    }catch(e){ console.warn('secret item load failed', o.id, e); }
+  }));
+  return list;
+}
+const ORD_PACK_LABELS = { personal:'🧴 ব্যক্তিগত পণ্য', cosmetics:'💄 প্রসাধনী', household:'🏠 গৃহস্থালি সামগ্রী', code:'🔢 শুধু অর্ডার নম্বর' };
+function ordPrivateBannerHtml(g){
+  const priv = g.items.find(o=> o.privateOrder);
+  if(!priv) return '';
+  const label = ORD_PACK_LABELS[priv.packLabel] || ORD_PACK_LABELS.code;
+  const pickup = g.items.some(o=> o.deliveryMode === 'pickup');
+  return `<div style="margin:8px 0 6px; padding:10px 12px; border-radius:10px; background:rgba(236,72,153,0.14); border:1px solid rgba(236,72,153,0.5); color:#fbcfe8; font-size:12.5px; line-height:1.7;">
+    <b>🔒 গোপনীয় অর্ডার</b> — সাধারণ ব্যাগে সিল করে দিন, বাইরে পণ্যের নাম লিখবেন না।<br>
+    📦 প্যাকেটে লিখুন: <b style="color:#fff;">${escapeAttr(label)}</b>${g.orderCode ? ` · 🧾 <b style="color:#fff;">${escapeAttr(g.orderCode)}</b>` : ''}
+    ${pickup ? `<br>🏪 <b style="color:#fff;">গ্রাহক নিজে দোকান থেকে নেবেন</b> — অর্ডার নম্বর মিলিয়ে হাতে দিন। গ্রহণের সময় "নিজে/অন্য মাধ্যমে" বাছুন, রাইডার লাগবে না।` : ''}
+    ${priv.selfReceive === false ? `<br>👥 অন্য কেউ নিতে আসতে পারেন — শুধু অর্ডার নম্বর মিলিয়ে দেবেন, ভেতরে কী আছে বলবেন না।` : ''}
+  </div>`;
+}
+
 function ordGroupByCustomer(orders){
   const map = {};
   const keys = [];
@@ -7621,7 +7666,7 @@ function ordGroupByCustomer(orders){
         // 🧾 গ্রাহক ফোনে যে নম্বরটা বলবেন — এক রসিদের সব পণ্যে একই
         orderCode: o.orderCode || null,
         deliveryPhone: o.deliveryPhone, deliveryAddress: o.deliveryAddress,
-        deliveryLat: o.deliveryLat, deliveryLng: o.deliveryLng, items: []
+        deliveryLat: o.deliveryLat, deliveryLng: o.deliveryLng, deliveryMode: o.deliveryMode || 'delivery', items: []
       };
       keys.push(key);
     }
@@ -7676,6 +7721,7 @@ function ordBuildPendingGroupHtml(g, allProducts){
   return `
     <div class="ordGroupCard">
       ${ordGroupHeadHtml(g, '👤')}
+      ${ordPrivateBannerHtml(g)}
       <div class="ordGroupItems">${itemsHtml}</div>
       <button class="ordGroupAcceptBtn" data-gkey="${escapeAttr(g.key)}">✅ সব গ্রহণ করুন (${g.items.length}টা)</button>
     </div>`;
@@ -7738,7 +7784,7 @@ function ordBuildPreparingGroupHtml(g, allProducts){
       : `<div class="ordAddOnBatch"><div class="ordAddOnBadge">🔁 আবার অর্ডার করেছেন — নতুন যোগ হলো</div>${rows}</div>`;
   });
 
-  const dispatchHtml = g.items.map(o=> ordDispatchBlockHtml(o)).join('');
+  const dispatchHtml = ordPrivateBannerHtml(g) + g.items.map(o=> ordDispatchBlockHtml(o)).join('');
   const allPackaged = g.items.every(o=> o.packagingDone === true);
   const packagingBtn = allPackaged
     ? `<div class="ordPackagingDoneBtn done">✅ প্যাকেজিং শেষ — পাঠানোর অপেক্ষায়</div>`
@@ -8139,6 +8185,7 @@ async function ordHideOrders(ids){
 }
 
 async function ordRender(orders){
+  await ordResolvePrivate(orders); // 🔒 গোপনীয় পণ্যের আসল নাম শুধু এই দোকানে দেখানো
   const listEl = document.getElementById('ordList');
   if(orders.length === 0){
     listEl.innerHTML = '<div class="ordEmpty">এই ধাপে কোনো অর্ডার নেই।</div>';
@@ -8180,7 +8227,8 @@ async function ordRecordDeliveredSale(orderId){
     if(retailEntries.some(e=> e.onlineOrderId === orderId)) return;
     const doc = await db.collection('orderRequests').doc(orderId).get();
     if(!doc.exists) return;
-    const o = doc.data();
+    const o = { id: orderId, ...doc.data() };
+    if(o.isPrivate){ await ordResolvePrivate([o]); if(o.productName) o.productName = o.productName.replace(/^🔒 /, ''); }
     const prods = (typeof bccLoadProducts === 'function') ? bccLoadProducts() : [];
     const prod = o.productId ? prods.find(p=> p.id === o.productId) : null;
     const qty = Number(o.qty)||1;
