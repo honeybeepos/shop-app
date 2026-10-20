@@ -2637,8 +2637,8 @@
         <div class="lbl">অ্যাম্বুলেন্স</div>
       </div>
       <div class="serviceCard" data-svc="medicalequipment">
-        <div class="ic">🩼</div>
-        <div class="lbl">মেডিকেল ইকুইপমেন্ট</div>
+        <div class="ic">💊</div>
+        <div class="lbl">ফার্মেসী</div>
       </div>
     </div>
   </div>
@@ -2819,31 +2819,32 @@
   </div>
 
   <!-- 🩼 মেডিকেল ইকুইপমেন্ট — ক্যাটাগরি → তালিকা → ভাড়া/ক্রয় ফ্লো -->
+  <!-- 💊 ফার্মেসী (অক্টোবর ২০২৬) — আগের "মেডিকেল ইকুইপমেন্ট"-এর জায়গায়।
+       আপনার এলাকার যেসব দোকান Honey Bee POS-এর ফার্মেসি মোডে ওষুধ Bazar-এ
+       দিয়েছে (ক্যাটাগরি cat-medicine), তাদের ওষুধ এখানে একসাথে দেখায় —
+       নাম লিখে খোঁজা যায়, ফার্মেসি বেছে দেখা যায়, Cart-এ তুলে অর্ডার করা যায়। -->
   <div id="screenMedicalEquipment">
     <button class="backBtn" id="backToJibonToriFromMedEq">← জীবন তরী-তে ফিরে যান</button>
-
-    <!-- Panel A: ক্যাটাগরি গ্রিড -->
-    <div id="medEqCategoryPanel">
-      <div class="card" style="text-align:center; padding:16px;">
-        <div style="font-size:28px; margin-bottom:4px;">🩼</div>
-        <div style="font-size:15px; font-weight:800;">মেডিকেল ইকুইপমেন্ট</div>
-        <div style="font-size:11.5px; color:var(--muted); margin-top:4px;">ভাড়া নিন অথবা কিনুন</div>
-      </div>
-      <button id="medEqMyOrdersBtn" style="width:100%; padding:11px; margin-top:10px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,0.05); color:var(--muted); font-weight:700; font-size:12.5px; cursor:pointer; font-family:inherit;">📦 আমার অর্ডারসমূহ</button>
-      <div class="serviceCardGrid" id="medEqCategoryGrid" style="margin-top:14px;"></div>
+    <div class="card" style="text-align:center; padding:16px;">
+      <div style="font-size:30px; margin-bottom:4px;">💊</div>
+      <div style="font-size:16px; font-weight:800;">ফার্মেসী</div>
+      <div style="font-size:11.5px; color:var(--muted); margin-top:4px;">আপনার এলাকার ফার্মেসি থেকে ওষুধ খুঁজুন ও অর্ডার করুন</div>
     </div>
-
-    <!-- Panel B: নির্দিষ্ট ক্যাটাগরির ইকুইপমেন্ট তালিকা -->
-    <div id="medEqListPanel" style="display:none;">
-      <button id="medEqBackToCategories" style="background:transparent; border:1px solid var(--border); color:var(--muted); padding:8px 14px; border-radius:9px; font-size:12px; cursor:pointer; font-family:inherit; margin-bottom:12px;">← সব ক্যাটাগরি</button>
-      <div id="medEqListTitle" style="font-size:15px; font-weight:800; margin-bottom:10px;"></div>
-      <div style="display:flex; gap:8px; margin-bottom:14px;">
-        <select id="medEqDistrictFilter" style="flex:1; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px;">
-          <option value="">সব জেলা</option>
-        </select>
+    <div class="card" style="padding:12px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:800; font-size:13.5px;">📍 আপনার এলাকা</div>
+        <button type="button" id="phAreaClear" style="display:none; border:0; background:transparent; color:var(--amber); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✕ মুছুন</button>
       </div>
-      <div id="medEqList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+        <select id="phDist" aria-label="জেলা" style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">জেলা</option></select>
+        <select id="phUpz" aria-label="থানা" style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">থানা</option></select>
+      </div>
+      <div id="phAreaNote" style="font-size:11px; color:var(--muted); margin-top:7px;"></div>
     </div>
+    <input id="phSearch" class="searchBox" type="search" placeholder="🔍 ওষুধ বা জেনেরিক নাম লিখুন — যেমন Napa, Paracetamol" autocomplete="off" style="margin-bottom:10px;">
+    <div id="phShopChips" style="display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;"></div>
+    <div id="phGrid" class="pGrid"><div class="loadingMsg">লোড হচ্ছে...</div></div>
+    <div style="font-size:11px; color:var(--muted); margin-top:14px; line-height:1.6;">⚠️ প্রেসক্রিপশনের ওষুধ ডাক্তারের পরামর্শ ছাড়া খাবেন না। অর্ডারের আগে ফার্মেসির সাথে কথা বলে নিন।</div>
   </div>
 
   <!-- 🛒 অর্ডার ফ্লো — Rent (৩ ধাপ) / Buy — মডাল -->
@@ -3751,7 +3752,7 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
       initAmbulanceScreen();
     }else if(svc === "medicalequipment"){
       showScreen("screenMedicalEquipment");
-      initMedEqScreen();
+      phInit(); // 💊 ফার্মেসী (আগের মেডিকেল ইকুইপমেন্ট সরানো হয়েছে)
     }else{
       alert("এই সার্ভিসটা শীঘ্রই আসছে — এখনো প্রস্তুত হয়নি।");
     }
@@ -6836,6 +6837,109 @@ function hbEkaProductMatches(name, groupKey){
 /* 📍 একাদশী পাতার এলাকা — জেলা + থানা। থানা বাছলে সেই থানার সব সক্রিয় দোকান থেকে পণ্য আসে
    (শুধু একটা ফিল্ডে কোয়েরি, তাই নতুন ইনডেক্স লাগে না; বাকিটা ফোনে ছাঁকা হয়)।
    থানা না বাছলে আগের মতো কাস্টমারের বাছা বাজারের দোকানগুলো দেখায়। */
+/* =====================================================================
+   💊 ফার্মেসী — এলাকার ফার্মেসিগুলোর ওষুধ (publicStock, catId "cat-medicine")
+   ===================================================================== */
+const PH_MED_CAT = "cat-medicine";
+let phArea = { d:"", u:"" };
+try{ const a = JSON.parse(localStorage.getItem("hbPhArea")||"null") || JSON.parse(localStorage.getItem("hbEkaArea")||"null") || JSON.parse(localStorage.getItem("hbTlrArea")||"null"); if(a && a.d) phArea = { d:a.d, u:a.u||"" }; }catch(e){}
+let __phReady = false, __phSeq = 0, __phItems = [], __phShop = "";
+function phEsc(v){ return String(v == null ? "" : v).replace(/[&<>"']/g, c=> ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function phAreaFill(){
+  const dS = document.getElementById("phDist"), uS = document.getElementById("phUpz");
+  if(!dS || !uS || typeof getAllDistricts !== "function") return;
+  dS.innerHTML = '<option value="">জেলা</option>' + getAllDistricts().map(d=>`<option value="${phEsc(d)}"${d===phArea.d?" selected":""}>${phEsc(d)}</option>`).join("");
+  uS.disabled = !phArea.d;
+  uS.innerHTML = '<option value="">থানা</option>' + (phArea.d ? getUpazilasForDistrict(phArea.d).map(u=>`<option value="${phEsc(u)}"${u===phArea.u?" selected":""}>${phEsc(u)}</option>`).join("") : "");
+  document.getElementById("phAreaClear").style.display = phArea.d ? "" : "none";
+}
+function phAreaSet(d, u){
+  phArea = { d:d||"", u:u||"" };
+  try{ localStorage.setItem("hbPhArea", JSON.stringify(phArea)); }catch(e){}
+  __phShop = "";
+  phAreaFill(); phLoad();
+}
+function phInit(){
+  if(!__phReady){
+    __phReady = true;
+    document.getElementById("phDist").addEventListener("change", e=> phAreaSet(e.target.value, ""));
+    document.getElementById("phUpz").addEventListener("change", e=> phAreaSet(phArea.d, e.target.value));
+    document.getElementById("phAreaClear").addEventListener("click", ()=> phAreaSet("", ""));
+    document.getElementById("phSearch").addEventListener("input", phRender);
+    document.getElementById("phShopChips").addEventListener("click", e=>{
+      const b = e.target.closest("[data-phshop]"); if(!b) return;
+      __phShop = b.getAttribute("data-phshop"); phRender();
+    });
+  }
+  phAreaFill(); phLoad();
+}
+async function phLoad(){
+  const grid = document.getElementById("phGrid"), note = document.getElementById("phAreaNote");
+  if(!grid) return;
+  const seq = ++__phSeq;
+  let shops = [];
+  if(phArea.u){
+    grid.innerHTML = "<div class='loadingMsg'>এলাকার ফার্মেসি খোঁজা হচ্ছে...</div>";
+    try{
+      const qs = await db.collection("shops").where("upazila","==",phArea.u).limit(150).get();
+      if(seq !== __phSeq) return;
+      shops = qs.docs.map(d=> ({ id:d.id, ...d.data() }))
+        .filter(sh=> sh.status === "active" && sh.marketId && (!phArea.d || sh.district === phArea.d) && (!sh.countryCode || sh.countryCode === "BD"));
+    }catch(e){ console.error(e); grid.innerHTML = "<div class='mfEmpty'>📶 দোকানের তালিকা আনা যায়নি — ইন্টারনেট দেখে আবার খুলুন।</div>"; return; }
+  }else if(phArea.d){
+    __phItems = []; if(note) note.textContent = "";
+    document.getElementById("phShopChips").innerHTML = "";
+    grid.innerHTML = "<div class='mfEmpty'>এবার থানা বেছে নিন — সেই থানার সব ফার্মেসির ওষুধ দেখাবে।</div>";
+    return;
+  }else{
+    shops = (typeof allShops !== "undefined" && allShops) ? allShops : [];
+  }
+  if(!shops.length){
+    __phItems = []; if(note) note.textContent = "";
+    document.getElementById("phShopChips").innerHTML = "";
+    grid.innerHTML = phArea.u ? "<div class='mfEmpty'>এই থানায় এখনো কোনো সক্রিয় দোকান নেই।<br>পাশের থানা বেছে দেখুন।</div>"
+                              : "<div class='mfEmpty'>উপরে আপনার জেলা আর থানা বেছে নিন।</div>";
+    return;
+  }
+  grid.innerHTML = "<div class='loadingMsg'>ওষুধ লোড হচ্ছে...</div>";
+  const per = await Promise.all(shops.map(async shop=>{
+    try{
+      const qs = await db.collection("shops").doc(shop.id).collection("publicStock").where("catId","==",PH_MED_CAT).get();
+      const cur = shop.currencySymbol || (shop.currencyCode && typeof window.hbGetCurrencySymbol === "function" ? window.hbGetCurrencySymbol(shop.currencyCode) : null) || "৳";
+      return qs.docs.map(d=> ({ ...d.data(), id:d.id, __shopId:shop.id, __shopName:shop.name || shop.shopName || "ফার্মেসি",
+        __shopArea: shop.upazila || shop.district || "", __shopIsOpen: shop.isShopOpen !== false, __cur:cur }))
+        .filter(p=> (Number(p.stockQty) || 0) > 0);
+    }catch(e){ console.warn("pharmacy stock load failed", shop.id, e); return []; }
+  }));
+  if(seq !== __phSeq) return;
+  __phItems = per.flat().sort((a,b)=> (b.__shopIsOpen?1:0) - (a.__shopIsOpen?1:0) || String(a.name||"").localeCompare(String(b.name||"")));
+  if(Array.isArray(marketFeedProducts)){
+    __phItems.forEach(p=>{ if(!marketFeedProducts.some(x=> x.id === p.id && x.__shopId === p.__shopId)) marketFeedProducts.push(p); });
+  }
+  const nShops = new Set(__phItems.map(p=> p.__shopId)).size;
+  if(note) note.textContent = __phItems.length ? `🏥 ${nShops}টা ফার্মেসি · ${__phItems.length}টা ওষুধ` : "";
+  phRender();
+}
+function phRender(){
+  const grid = document.getElementById("phGrid"), chips = document.getElementById("phShopChips");
+  if(!grid) return;
+  const shops = []; const seen = new Set();
+  __phItems.forEach(p=>{ if(!seen.has(p.__shopId)){ seen.add(p.__shopId); shops.push({ id:p.__shopId, name:p.__shopName, open:p.__shopIsOpen }); } });
+  if(__phShop && !seen.has(__phShop)) __phShop = "";
+  const chip = (id, label, on)=> `<button type="button" data-phshop="${phEsc(id)}" style="flex-shrink:0; border:1px solid ${on ? "var(--amber)" : "var(--border)"}; background:${on ? "var(--amber)" : "rgba(255,255,255,0.05)"}; color:${on ? "var(--bg1)" : "#fff8e8"}; font-family:inherit; font-weight:800; font-size:11.5px; padding:7px 14px; border-radius:20px; cursor:pointer;">${label}</button>`;
+  chips.innerHTML = shops.length > 1 ? chip("", "সব ফার্মেসি", !__phShop) + shops.map(s=> chip(s.id, "🏥 " + phEsc(s.name) + (s.open ? "" : " (বন্ধ)"), __phShop === s.id)).join("") : "";
+  const q = (document.getElementById("phSearch").value || "").trim().toLowerCase();
+  const list = __phItems.filter(p=> (!__phShop || p.__shopId === __phShop) &&
+    (!q || String(p.name||"").toLowerCase().includes(q) || String(p.genericName||"").toLowerCase().includes(q) || String(p.description||"").toLowerCase().includes(q) || String(p.barcode||"").toLowerCase().includes(q)));
+  if(!__phItems.length){
+    grid.innerHTML = "<div class='mfEmpty'>💊 এই এলাকায় এখনো কোনো ফার্মেসি Bazar-এ ওষুধ দেয়নি।<br>পাশের থানা বেছে দেখুন।</div>";
+  }else if(!list.length){
+    grid.innerHTML = "<div class='mfEmpty'>এই নামে কোনো ওষুধ পাওয়া যায়নি।</div>";
+  }else{
+    grid.innerHTML = list.map((p, i)=> mfCardHTML(p, i)).join("");
+  }
+}
+
 let hbEkaArea = { d:"", u:"" };
 try{ const a = JSON.parse(localStorage.getItem("hbEkaArea")||"null"); if(a) hbEkaArea = Object.assign(hbEkaArea, a); }catch(e){}
 if(!hbEkaArea.d){ try{ const t = JSON.parse(localStorage.getItem("hbTlrArea")||"null"); if(t && t.d){ hbEkaArea = { d:t.d, u:t.u||"" }; } }catch(e){} }

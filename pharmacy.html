@@ -974,6 +974,33 @@ function syncBazarStock(list){
   if(changed){ const all = loadProducts(); list.forEach(p=>{ const x = all.find(y=> y.id === p.id); if(x) x.published = p.published; }); saveProducts(all); }
 }
 
+/* 🛒 ওষুধ Bazar-এ প্রকাশ — সাধারণ POS-এর পণ্য প্রকাশের মতোই একই জায়গায়
+   (shops/{shopId}/publicStock), ক্যাটাগরি cat-medicine। দাম প্রতি পিসের MRP;
+   কেনা দাম কখনো যায় না। */
+function bazarAllowed(){ return (localStorage.getItem("shop-country-code") || "BD") === "BD"; }
+function publishMedToBazar(p){
+  if(!SESSION || !SESSION.shopId || typeof db === "undefined" || !bazarAllowed()) return;
+  const ph = p.pharma || {}, k = packOf(p);
+  const bits = [];
+  if(p.genericName) bits.push("জেনেরিক: " + p.genericName);
+  if(ph.company) bits.push("কোম্পানি: " + ph.company);
+  if(ph.form) bits.push("ধরন: " + ph.form);
+  if(k.pps > 1) bits.push("১ পাতা = " + k.pps + " পিস · প্রতি পাতা ৳" + r2((Number(p.sell) || 0) * k.pps));
+  db.collection("shops").doc(SESSION.shopId).collection("publicStock").doc(p.id).set({
+    name: p.name, price: r2(Number(p.sell) || 0), offerPrice: null, stockQty: Number(p.qty) || 0,
+    barcode: p.code || null, catId: MED_CAT_ID, subId: null, subSubId: null,
+    ytUrl: null, fbUrl: null, imageUrl: p.imageUrl || null, unit: "pcs", productType: "standard", variants: null,
+    highlight: false, offerLive: false, offerType: null, offerNote: null, ekadashi: false, ekaGroup: null, packageItems: null,
+    genericName: p.genericName || null,
+    description: bits.length ? bits.join("\n") : null,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(e=> console.warn("Bazar publish failed", e));
+}
+function unpublishMedFromBazar(id){
+  if(!SESSION || !SESSION.shopId || typeof db === "undefined") return;
+  db.collection("shops").doc(SESSION.shopId).collection("publicStock").doc(id).delete().catch(()=>{});
+}
+
 function showReceipt(entries, T, payLabel, got){
   const shop = localStorage.getItem("shop-title") || (SESSION && SESSION.shopName) || "ফার্মেসি";
   const sub = localStorage.getItem("shop-subtitle") || "";
@@ -1069,6 +1096,10 @@ function openMedForm(id){
       <div><label class="f">ব্যাচ নম্বর</label><input class="in" id="fBatch" placeholder="যেমন: BN-2026-08"></div>
       <div><label class="f">মেয়াদ শেষের তারিখ</label><input class="in" id="fExp" type="date"></div>
     </div>
+    <label style="display:flex; align-items:center; gap:10px; margin-top:16px; padding:11px 12px; border:1px solid var(--line, #E5E7EB); border-radius:12px; cursor:pointer; font-size:14px; font-weight:600">
+      <input type="checkbox" id="fPub" style="width:20px; height:20px; accent-color:#F4B400" ${p && p.published ? "checked" : ""}>
+      <span>🛒 Honey Bee Bazar-এ দেখান<br><small style="font-weight:400; color:var(--muted)">গ্রাহকরা Bazar-এর "জীবন তরী → ফার্মেসী"-তে এই ওষুধ খুঁজে অর্ডার করতে পারবেন। স্টক শেষ হলে আপনাআপনি সরে যাবে।</small></span>
+    </label>
     ${batches.length ? `<h3 style="font-size:16px; margin:18px 0 6px">ব্যাচ তালিকা</h3><table class="t"><thead><tr><th>ব্যাচ</th><th>মেয়াদ</th><th class="r">স্টক</th></tr></thead><tbody>${batches.map(b=> `<tr><td>${esc(b.batchNo || "—")}</td><td>${fmtDate(b.expiryDate)}</td><td class="r num">${esc(stockText(p, b.qty))}</td></tr>`).join("")}</tbody></table>` : ""}
     <div class="foot">
       ${p && isAdmin() ? `<button class="btn red" type="button" id="fDel" style="margin-right:auto">🗑️ মুছুন</button>` : ""}
@@ -1131,10 +1162,16 @@ function saveMed(old){
     p.batches.push({ batchNo, expiryDate: exp || "", qty: add, addedAt: Date.now() });
   }
   if(!old) list.push(p);
+  const wantPub = !!($("fPub") && $("fPub").checked), wasPub = !!p.published;
+  p.published = wantPub && (Number(p.qty) || 0) > 0;
   saveProducts(list);
-  if(p.published) syncBazarStock([p]);
+  let pubNote = "";
+  if(p.published) publishMedToBazar(p);
+  else if(wasPub) unpublishMedFromBazar(p.id);
+  if(wantPub && !p.published) pubNote = " — স্টক না থাকায় Bazar-এ দেখানো হয়নি";
+  if(wantPub && !bazarAllowed()){ p.published = false; saveProducts(list); pubNote = " — Bazar শুধু বাংলাদেশের দোকানের জন্য"; }
   closeModal();
-  toast(old ? "✅ বদলানো হয়েছে" : "✅ ওষুধ যোগ হয়েছে");
+  toast((old ? "✅ বদলানো হয়েছে" : "✅ ওষুধ যোগ হয়েছে") + pubNote);
   pushNow();
   if(CUR_PAGE === "meds") renderMeds(); else if(CUR_PAGE === "pos"){ renderMedList(); } else if(CUR_PAGE === "purchase"){ renderPurLines(); } else if(CUR_PAGE === "stock"){ pageStock(); }
   refreshBell();
