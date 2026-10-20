@@ -190,6 +190,22 @@
   .hist .row{ display:flex; justify-content:space-between; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line); }
   .hist .row:last-child{ border-bottom:0; }
 
+  /* ── স্টক ব্যবস্থাপনা ── */
+  .tabs{ display:flex; gap:6px; overflow-x:auto; margin-bottom:14px; padding-bottom:2px; }
+  .tabs button{ flex:0 0 auto; border:1px solid var(--line); background:var(--card); border-radius:20px; padding:7px 14px; font-weight:600; font-size:14px; }
+  .tabs button.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  .stForm{ max-width:640px; }
+  .neg{ color:var(--red); font-weight:700; } .gain{ color:var(--green); font-weight:700; }
+
+  /* ── রিপোর্ট ── */
+  .range{ display:flex; gap:8px; flex-wrap:wrap; align-items:end; margin-bottom:14px; }
+  .range .in{ width:auto; }
+  .rList button{ display:flex; width:100%; align-items:center; gap:10px; background:none; border:0; border-bottom:1px solid var(--line); padding:12px 4px; text-align:left; font-size:15px; }
+  .rList button:last-child{ border-bottom:0; }
+  .rList button::after{ content:"›"; margin-left:auto; color:var(--muted); font-size:20px; }
+  .rList button.on{ background:var(--honey-soft); border-radius:8px; }
+  .rGrid{ display:grid; grid-template-columns:280px minmax(0,1fr); gap:14px; align-items:start; }
+
   /* ── ওষুধের তালিকা ── */
   .toolbar{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
   .toolbar .in{ flex:1; min-width:200px; }
@@ -212,8 +228,10 @@
   .receipt td{ padding:3px 0; vertical-align:top; }
   .receipt hr{ border:0; border-top:1px dashed #999; margin:8px 0; }
   @media print{
-    body *{ visibility:hidden; }
-    #printArea, #printArea *{ visibility:visible; }
+    body.printReport .side, body.printReport .top, body.printReport .bnav, body.printReport .range, body.printReport .rList, body.printReport .noPrint{ display:none !important; }
+    body.printReport .app{ display:block; } body.printReport .page{ padding:0; }
+    body:not(.printReport) *{ visibility:hidden; }
+    body:not(.printReport) #printArea, body:not(.printReport) #printArea *{ visibility:visible; }
     #printArea{ position:absolute; left:0; top:0; width:100%; }
   }
 
@@ -243,6 +261,9 @@
     .stat .ic{ width:36px; height:36px; font-size:18px; }
     .stat .val{ font-size:21px; }
     .grid2{ grid-template-columns:1fr; }
+    .stats{ grid-template-columns:repeat(2, minmax(0,1fr)) !important; max-width:none !important; }
+    .rGrid{ grid-template-columns:1fr; }
+    .range .in{ flex:1; min-width:130px; }
     .pos{ grid-template-columns:1fr; }
     .medList{ max-height:none; }
     .row3{ grid-template-columns:1fr 1fr; }
@@ -345,6 +366,13 @@ const uid = ()=> Date.now().toString(36) + Math.random().toString(36).slice(2, 7
 let SESSION = null;
 const isAdmin = ()=> SESSION && SESSION.role === "admin";
 
+/* ⚙️ ফার্মেসির সেটিংস — দোকানের সব ফোনে সিঙ্ক হয় (hb-pharma-settings) */
+const SET_DEFAULT = { address:"", phone:"", license:"", footer:"ধন্যবাদ — আবার আসবেন", paper:"80", defUnit:"strip",
+  staffDiscount:true, staffDue:true, staffWriteOff:false, staffPurchase:true };
+const SET = ()=> Object.assign({}, SET_DEFAULT, readJSON("hb-pharma-settings", {}));
+// স্টাফ কোনো কাজ করতে পারবেন কিনা (এডমিন সবসময় পারেন)
+const can = (k)=> isAdmin() || !!SET()[k];
+
 /* =====================================================================
    খাতা — সাধারণ POS-এর একই localStorage কী
    ===================================================================== */
@@ -440,14 +468,14 @@ const MENU = [
   { key:"pos",       ic:"🛒", label:"বিক্রয় (POS)" },
   { key:"meds",      ic:"💊", label:"ওষুধের তালিকা" },
   { key:"purchase",  ic:"📥", label:"ক্রয়" },
-  { key:"stock",     ic:"📦", label:"স্টক ব্যবস্থাপনা", soon:true },
+  { key:"stock",     ic:"📦", label:"স্টক ব্যবস্থাপনা" },
   { key:"suppliers", ic:"🚚", label:"সরবরাহকারী" },
   { key:"customers", ic:"👥", label:"গ্রাহক" },
-  { key:"reports",   ic:"📊", label:"রিপোর্ট", soon:true, admin:true },
+  { key:"reports",   ic:"📊", label:"রিপোর্ট", admin:true },
   { key:"branches",  ic:"🏬", label:"শাখা ব্যবস্থাপনা", soon:true, admin:true },
   { key:"users",     ic:"🧑‍⚕️", label:"ব্যবহারকারী", admin:true },
-  { key:"accounts",  ic:"📒", label:"হিসাব (Accounts)", soon:true, admin:true },
-  { key:"settings",  ic:"⚙️", label:"সেটিংস", soon:true, admin:true },
+  { key:"accounts",  ic:"📒", label:"হিসাব (Accounts)", admin:true },
+  { key:"settings",  ic:"⚙️", label:"সেটিংস", admin:true },
 ];
 const BNAV = [
   { key:"dash", ic:"🏠", label:"হোম" }, { key:"pos", ic:"🛒", label:"বিক্রয়" },
@@ -476,7 +504,7 @@ function go(k){
   try{ history.replaceState(null, "", "#" + k); }catch(e){}
   renderNav();
   window.scrollTo(0, 0);
-  const P = { dash: pageDash, pos: pagePos, meds: pageMeds, alerts: pageAlerts, users: pageUsers, purchase: pagePurchase, suppliers: pageSuppliers, customers: pageCustomers }[k];
+  const P = { dash: pageDash, pos: pagePos, meds: pageMeds, alerts: pageAlerts, users: pageUsers, purchase: pagePurchase, suppliers: pageSuppliers, customers: pageCustomers, stock: pageStock, reports: pageReports, accounts: pageAccounts, settings: pageSettings }[k];
   if(P) P(); else pageSoon(k);
   refreshBell();
 }
@@ -664,7 +692,8 @@ function addToCart(pid){
   const p = loadProducts().find(x=> x.id === pid); if(!p) return;
   const units = unitsOf(p);
   // ট্যাবলেট সাধারণত পাতায় বিক্রি হয় — পাতা থাকলে সেটাই আগে বাছা থাকে
-  const def = units.find(u=> u.key === "strip") || units[0];
+  const pref = SET().defUnit;
+  const def = units.find(u=> u.key === pref) || units.find(u=> u.key === "strip") || units[0];
   const free = (Number(p.qty) || 0) - cartPieces(pid);
   const unit = free >= def.n ? def : units[0];
   if(free < unit.n){ toast("স্টক নেই"); return; }
@@ -694,7 +723,7 @@ function renderCart(){
     </tbody></table>
     <div class="totals">
       <div><span>মোট</span><span class="num">${money(T.sub)}</span></div>
-      <div><span>ডিসকাউন্ট</span><input class="num" id="discIn" inputmode="decimal" value="${DISCOUNT || ""}" placeholder="০"></div>
+      ${can("staffDiscount") ? `<div><span>ডিসকাউন্ট</span><input class="num" id="discIn" inputmode="decimal" value="${DISCOUNT || ""}" placeholder="০"></div>` : ""}
       <div class="grand"><span>পরিশোধ</span><span class="num">${money(T.net)}</span></div>
     </div>
     <div class="custRow">
@@ -705,7 +734,7 @@ function renderCart(){
       <button type="button" data-pay="cash" class="${PAY === "cash" ? "on" : ""}">💵 নগদ (F1)</button>
       <button type="button" data-pay="card" class="${PAY === "card" ? "on" : ""}">💳 কার্ড (F2)</button>
       <button type="button" data-pay="mobile" class="${PAY === "mobile" ? "on" : ""}">📱 বিকাশ/নগদ (F3)</button>
-      <button type="button" data-pay="due" class="${PAY === "due" ? "on due" : "due"}">📒 বাকি (F6)</button>
+      ${can("staffDue") ? `<button type="button" data-pay="due" class="${PAY === "due" ? "on due" : "due"}">📒 বাকি (F6)</button>` : ""}
     </div>
     <button class="btn green done" type="button" id="doneBtn">✅ বিক্রি সম্পন্ন (F4)</button>
     ${keysHtml()}`;
@@ -722,7 +751,7 @@ function renderCart(){
   box.querySelectorAll("[data-pay]").forEach(b=> b.onclick = ()=>{ PAY = b.dataset.pay; renderCart(); if(PAY === "due" && !CUST) openCustomerPicker(); });
   if($("custPick")) $("custPick").onclick = ()=> openCustomerPicker();
   if($("custClear")) $("custClear").onclick = ()=>{ CUST = null; if(PAY === "due") PAY = "cash"; renderCart(); };
-  $("discIn").onchange = ()=>{ DISCOUNT = Math.max(0, Number($("discIn").value) || 0); renderCart(); };
+  if($("discIn")) $("discIn").onchange = ()=>{ DISCOUNT = Math.max(0, Number($("discIn").value) || 0); renderCart(); };
   $("doneBtn").onclick = completeSale;
   const bar = $("cartBar");
   bar.hidden = false;
@@ -730,7 +759,7 @@ function renderCart(){
   bar.innerHTML = `<div><small style="opacity:.75">${bn(T.lines.length)}টি আইটেম</small><br><b class="num">${money(T.net)}</b></div><button class="btn" type="button" id="barGo">কার্ট দেখুন</button>`;
   $("barGo").onclick = ()=> $("cartPanel").scrollIntoView({ behavior:"smooth", block:"start" });
 }
-function keysHtml(){ return `<div class="keys"><span>F1 নগদ</span><span>F2 কার্ড</span><span>F3 মোবাইল ব্যাংকিং</span><span>F4 বিক্রি সম্পন্ন</span><span>F5 গ্রাহক</span><span>F6 বাকি</span><span>F8 কার্ট খালি</span></div>`; }
+function keysHtml(){ return `<div class="keys"><span>F1 নগদ</span><span>F2 কার্ড</span><span>F3 মোবাইল ব্যাংকিং</span><span>F4 বিক্রি সম্পন্ন</span><span>F5 গ্রাহক</span>${can("staffDue") ? "<span>F6 বাকি</span>" : ""}<span>F8 কার্ট খালি</span></div>`; }
 
 /* 👤 গ্রাহক বাছাই — নাম বা মোবাইল লিখে খোঁজা; না পেলে নতুন গ্রাহক হিসেবে যোগ */
 function openCustomerPicker(onPick){
@@ -775,6 +804,7 @@ function setQty(i, n){
 document.addEventListener("keydown", (e)=>{
   if(CUR_PAGE !== "pos" || document.querySelector(".modal")) return;
   const map = { F1:"cash", F2:"card", F3:"mobile", F6:"due" };
+  if(e.key === "F6" && !can("staffDue")) return;
   if(map[e.key]){ e.preventDefault(); PAY = map[e.key]; renderCart(); if(PAY === "due" && !CUST) openCustomerPicker(); }
   else if(e.key === "F5"){ e.preventDefault(); openCustomerPicker(); }
   else if(e.key === "F4"){ e.preventDefault(); if(CART.length) completeSale(); }
@@ -794,6 +824,7 @@ function nextInvoiceNo(entries){
 let SELLING = false;
 async function completeSale(){
   if(SELLING) return;
+  if(!can("staffDiscount")) DISCOUNT = 0;
   const T = cartTotals();
   if(!T.lines.length) return;
   // শেষবার স্টক মিলিয়ে নেওয়া — অন্য স্টাফ এর মধ্যে বিক্রি করে থাকতে পারেন
@@ -803,6 +834,8 @@ async function completeSale(){
     const need = T.lines.filter(x=> x.p.id === l.p.id).reduce((s,x)=> s + x.pieces, 0);
     if(!p || (Number(p.qty) || 0) < need){ toast("⚠️ " + l.p.name + " — স্টকে নেই, কার্ট দেখে নিন"); renderMedList(); return; }
   }
+  if(PAY === "due" && !can("staffDue")){ PAY = "cash"; toast("বাকিতে বিক্রির অনুমতি নেই"); renderCart(); return; }
+  if(!can("staffDiscount")) DISCOUNT = 0;
   if(PAY === "due" && !CUST){ toast("বাকিতে বিক্রি করতে আগে গ্রাহক বাছুন"); openCustomerPicker(); return; }
   SELLING = true;
   const all = readJSON("phone-shop-entries", []);
@@ -874,9 +907,10 @@ function syncBazarStock(list){
 function showReceipt(entries, T, payLabel){
   const shop = localStorage.getItem("shop-title") || (SESSION && SESSION.shopName) || "ফার্মেসি";
   const sub = localStorage.getItem("shop-subtitle") || "";
+  const st = SET();
   const e0 = entries[0];
-  const html = `<div class="receipt">
-    <div class="c"><b style="font-size:16px">${esc(shop)}</b>${sub ? `<br>${esc(sub)}` : ""}</div>
+  const html = `<div class="receipt" style="max-width:${st.paper === "58" ? "220px" : st.paper === "a4" ? "640px" : "320px"}">
+    <div class="c"><b style="font-size:16px">${esc(shop)}</b>${sub ? `<br>${esc(sub)}` : ""}${st.address ? `<br>${esc(st.address)}` : ""}${st.phone ? `<br>📞 ${esc(st.phone)}` : ""}${st.license ? `<br>ড্রাগ লাইসেন্স: ${esc(st.license)}` : ""}</div>
     <hr><div>রসিদ: <b>${esc(e0.invoiceNo)}</b><br>${bn(new Date(e0.date).toLocaleString("bn-BD"))}<br>বিক্রেতা: ${esc(e0.soldBy)}${e0.name !== "ওয়াক-ইন কাস্টমার" ? `<br>গ্রাহক: ${esc(e0.name)}${e0.phone ? " (" + esc(e0.phone) + ")" : ""}` : ""}</div><hr>
     <table>${T.lines.map(l=> `<tr><td>${esc(l.p.name)}<br><small>${bn(l.pieces / l.u.n)} ${esc(l.u.label)} × ${esc(money(l.unitPrice))}</small></td><td style="text-align:right">${esc(money(l.total))}</td></tr>`).join("")}</table>
     <hr><table>
@@ -884,7 +918,7 @@ function showReceipt(entries, T, payLabel){
       ${T.disc ? `<tr><td>ডিসকাউন্ট</td><td style="text-align:right">− ${esc(money(T.disc))}</td></tr>` : ""}
       <tr><td><b>${e0.status === "বাকি" ? "বাকিতে বিক্রি" : "পরিশোধ (" + esc(payLabel) + ")"}</b></td><td style="text-align:right"><b>${esc(money(T.net))}</b></td></tr>
       ${e0.status === "বাকি" ? `<tr><td>মোট বাকি এখন</td><td style="text-align:right">${esc(money(custDue(e0.name, e0.phone)))}</td></tr>` : ""}
-    </table><hr><div class="c">ধন্যবাদ — আবার আসবেন</div></div>`;
+    </table><hr><div class="c">${esc(st.footer || "")}</div></div>`;
   openModal(`<div class="head"><h3>✅ বিক্রি সম্পন্ন</h3></div>${html}
     <div class="foot"><button class="btn ghost" type="button" data-close>নতুন বিক্রি</button><button class="btn" type="button" id="printBtn">🖨️ রসিদ প্রিন্ট</button></div>`);
   $("printBtn").onclick = ()=>{ $("printArea").innerHTML = html; window.print(); };
@@ -1026,7 +1060,7 @@ function saveMed(old){
   closeModal();
   toast(old ? "✅ বদলানো হয়েছে" : "✅ ওষুধ যোগ হয়েছে");
   pushNow();
-  if(CUR_PAGE === "meds") renderMeds(); else if(CUR_PAGE === "pos"){ renderMedList(); } else if(CUR_PAGE === "purchase"){ renderPurLines(); }
+  if(CUR_PAGE === "meds") renderMeds(); else if(CUR_PAGE === "pos"){ renderMedList(); } else if(CUR_PAGE === "purchase"){ renderPurLines(); } else if(CUR_PAGE === "stock"){ pageStock(); }
   refreshBell();
 }
 
@@ -1063,6 +1097,7 @@ function purTotals(){
 }
 
 function pagePurchase(){
+  if(!can("staffPurchase")){ $("page").innerHTML = `<div class="panel soonBox"><div class="big">🔒</div><h1>ক্রয়</h1><p style="color:var(--ink-3)">এই দোকানে ক্রয় শুধু এডমিন করতে পারেন।</p></div>`; return; }
   if(!PUR) PUR = readJSON(PDRAFT_KEY, null) || blankPurchase();
   const sups = loadSuppliers();
   $("page").innerHTML = `
@@ -1181,9 +1216,11 @@ function renderPurTotals(){
     <div><span>ডিসকাউন্ট</span><input class="num" id="pDisc" inputmode="decimal" value="${PUR.discount || ""}" placeholder="০"></div>
     <div class="grand"><span>নেট মোট</span><span class="num">${money(T.net)}</span></div>
     <div><span>এখন পরিশোধ</span><input class="num" id="pPaid" inputmode="decimal" value="${esc(PUR.paid)}" placeholder="${esc(String(T.net))}"></div>
+    <div><span>কীভাবে</span><select id="pVia" style="width:130px; padding:5px 8px; border:1px solid var(--line); border-radius:8px"><option value="cash"${PUR.via !== "bank" ? " selected" : ""}>নগদ</option><option value="bank"${PUR.via === "bank" ? " selected" : ""}>ব্যাংক/বিকাশ</option></select></div>
     <div><span>সরবরাহকারীর কাছে বাকি</span><span class="num ${T.due > 0 ? "bad" : ""}">${money(T.due)}</span></div>`;
   $("pDisc").onchange = ()=>{ PUR.discount = Math.max(0, Number($("pDisc").value) || 0); renderPurTotals(); };
   $("pPaid").onchange = ()=>{ PUR.paid = $("pPaid").value.trim(); renderPurTotals(); };
+  $("pVia").onchange = ()=>{ PUR.via = $("pVia").value; };
   const ok = T.lines.filter(Boolean).length;
   $("pHint").innerHTML = `${ok ? bn(ok) + "টি ওষুধ" : "লাইনে ওষুধের নাম লিখে বেছে নিন"} · পরিমাণ যে এককে কিনছেন (সাধারণত বক্স), ক্রয়দরও সেই এককের দাম।<br>"এখন পরিশোধ" খালি রাখলে পুরো টাকা পরিশোধ ধরা হবে। কম দিলে বাকিটা সরবরাহকারীর বাকিতে যোগ হবে।`;
 }
@@ -1224,6 +1261,8 @@ function completePurchase(){
   txns.push({ id: uid(), supplierId: s.id, type: "purchase", amount: T.net, note, date: when });
   if(T.paid > 0) txns.push({ id: uid(), supplierId: s.id, type: "payment", amount: T.paid, note: T.due > 0 ? "আংশিক পরিশোধ (ক্রয়ের সময়)" : "ক্রয়ের সাথে সাথে পরিশোধ", date: when });
   localStorage.setItem("shop-supplier-txns", JSON.stringify(txns));
+  // ক্রয়ের সময় দেওয়া টাকা নগদ/ব্যাংক থেকে বের হলো — খরচের খাতায় (রিপোর্টের "ব্যয়"-এ গোনা হয় না)
+  if(T.paid > 0){ const ex = readJSON("shop-expenses", []); ex.push({ id: uid(), category: "সাপ্লায়ার পেমেন্ট", person: s.name, amount: T.paid, method: PUR.via === "bank" ? "bank" : "cash", note: "ক্রয়ের সময় পরিশোধ" + (PUR.invNo ? " · " + PUR.invNo : ""), date: when }); localStorage.setItem("shop-expenses", JSON.stringify(ex)); }
 
   // সাম্প্রতিক ক্রয়ের তালিকা (শেষ ১০০টা)
   const hist = readJSON(PHIST_KEY, []);
@@ -1350,7 +1389,7 @@ function openSupplierPay(id){
     const txns = readJSON("shop-supplier-txns", []); txns.push({ id: uid(), supplierId: id, type: "payment", amount: amt, note, date: new Date().toISOString() });
     localStorage.setItem("shop-supplier-txns", JSON.stringify(txns));
     // সাধারণ POS-এর মতোই খরচের খাতায় — কোন খাতে কত টাকা গেল সেটা মনিটরিংয়ে দেখা যায়
-    const ex = readJSON("shop-expenses", []); ex.push({ id: uid(), category: "সাপ্লায়ার পেমেন্ট", person: x.name, amount: amt, note, date: new Date().toISOString() });
+    const ex = readJSON("shop-expenses", []); ex.push({ id: uid(), category: "সাপ্লায়ার পেমেন্ট", person: x.name, amount: amt, method: $("spVia").value, note, date: new Date().toISOString() });
     localStorage.setItem("shop-expenses", JSON.stringify(ex));
     pushNow(); toast("✅ " + money(amt) + " পরিশোধ হয়েছে");
     openSupplierLedger(id);
@@ -1463,6 +1502,629 @@ function openDueCollect(name, phone){
   };
 }
 
+
+/* =====================================================================
+   📦 স্টক ব্যবস্থাপনা
+   • স্টক      — সব ওষুধ, কতটা আছে, কেনা দামে মূল্য (এডমিন), ছাঁকনি
+   • গণনা      — তাকে গুনে যা পাওয়া গেল সেটা বসালে পার্থক্য ঠিক হয়
+   • নষ্ট/মেয়াদ — ভাঙা/নষ্ট বা মেয়াদ শেষ ওষুধ বাদ (ব্যাচ ধরে)
+   • ফেরত      — কোম্পানিকে ফেরত; সরবরাহকারীর বাকি থেকে টাকা কমে
+   • খতিয়ান    — কে কবে কী বদলালেন (শেষ ৩০০টা, hb-pharma-stock-log)
+   সব বদল পিসে হয়, ব্যাচ বাছা থাকলে সেই ব্যাচ থেকে, না থাকলে আগে মেয়াদ শেষ হওয়াটা থেকে।
+   ===================================================================== */
+const SLOG_KEY = "hb-pharma-stock-log";
+let STOCK_TAB = "list", STOCK_FILTER = "all", STOCK_Q = "";
+
+function stockLog(rec){
+  const log = readJSON(SLOG_KEY, []);
+  log.unshift(Object.assign({ id: uid(), date: new Date().toISOString(), by: (SESSION && SESSION.name) || "" }, rec));
+  localStorage.setItem(SLOG_KEY, JSON.stringify(log.slice(0, 300)));
+}
+// ব্যাচ থেকে কমানো — batchIdx দিলে সেই ব্যাচ, না দিলে আগে মেয়াদ শেষ হওয়াটা থেকে
+function takeFromBatches(p, pieces, batchIdx){
+  let left = pieces;
+  const bs = p.batches || [];
+  if(batchIdx != null && bs[batchIdx]){ const t = Math.min(left, Number(bs[batchIdx].qty) || 0); bs[batchIdx].qty = (Number(bs[batchIdx].qty) || 0) - t; left -= t; }
+  bs.filter(b=> b && Number(b.qty) > 0).sort((a,b)=> String(a.expiryDate || "9999").localeCompare(String(b.expiryDate || "9999")))
+    .forEach(b=>{ if(left <= 0) return; const t = Math.min(left, Number(b.qty) || 0); b.qty = (Number(b.qty) || 0) - t; left -= t; });
+}
+// একটা খোঁজার ঘর + তালিকা, যেকোনো জায়গায় ওষুধ বাছার জন্য
+function medPicker(inp, drop, onChoose){
+  let kb = 0, hits = [];
+  const draw = ()=>{
+    hits = loadProducts().filter(p=> medMatches(p, inp.value.trim())).slice(0, 30);
+    drop.hidden = !hits.length || document.activeElement !== inp;
+    drop.innerHTML = hits.map((p, k)=> `<div class="${k === kb ? "kb" : ""}" data-pick="${esc(p.id)}"><b>${esc(p.name)}</b> <small>${esc(p.genericName || "")} · স্টক ${esc(stockText(p))}</small></div>`).join("");
+    drop.querySelectorAll("[data-pick]").forEach(d=> d.onmousedown = (e)=>{ e.preventDefault(); pick(d.dataset.pick); });
+  };
+  const pick = (id)=>{ const p = loadProducts().find(x=> x.id === id); if(!p) return; inp.value = p.name; drop.hidden = true; onChoose(p); };
+  inp.addEventListener("focus", ()=>{ kb = 0; draw(); });
+  inp.addEventListener("input", ()=>{ kb = 0; draw(); });
+  inp.addEventListener("blur", ()=> setTimeout(()=>{ drop.hidden = true; }, 120));
+  inp.addEventListener("keydown", (e)=>{
+    if(e.key === "ArrowDown"){ e.preventDefault(); kb = Math.min(hits.length - 1, kb + 1); draw(); }
+    else if(e.key === "ArrowUp"){ e.preventDefault(); kb = Math.max(0, kb - 1); draw(); }
+    else if(e.key === "Enter"){ e.preventDefault(); if(hits[kb]) pick(hits[kb].id); }
+  });
+}
+const piecesFrom = (p, box, pc)=> Math.max(0, Math.floor(Number(box) || 0)) * packOf(p).perBox + Math.max(0, Math.floor(Number(pc) || 0));
+
+function pageStock(){
+  const tabs = [["list","📦 স্টক"],["count","🔢 গণনা ও সমন্বয়"],["damage","🗑️ নষ্ট / মেয়াদোত্তীর্ণ"],["return","↩️ কোম্পানিকে ফেরত"],["log","📜 খতিয়ান"]]
+    .filter(([k])=> can("staffWriteOff") || !["count","damage","return"].includes(k));
+  if(!tabs.some(t=> t[0] === STOCK_TAB)) STOCK_TAB = "list";
+  $("page").innerHTML = `<div class="pageHead"><h1>স্টক ব্যবস্থাপনা</h1></div>
+    <div class="tabs">${tabs.map(([k,l])=> `<button type="button" data-st="${k}" class="${k === STOCK_TAB ? "on" : ""}">${l}</button>`).join("")}</div>
+    <div id="stBody"></div>`;
+  document.querySelectorAll("[data-st]").forEach(b=> b.onclick = ()=>{ STOCK_TAB = b.dataset.st; pageStock(); });
+  ({ list: stockList, count: stockCount, damage: stockDamage, return: stockReturn, log: stockLogView })[STOCK_TAB]();
+}
+
+function stockList(){
+  const prods = loadProducts();
+  const t0 = new Date(todayStr()).getTime();
+  const expiredPieces = (p)=> (p.batches || []).filter(b=> b && Number(b.qty) > 0 && b.expiryDate && new Date(b.expiryDate).getTime() < t0).reduce((a,b)=> a + Number(b.qty), 0);
+  const counts = { all: prods.length, low: prods.filter(isLow).length, out: prods.filter(p=> !(Number(p.qty) > 0)).length, exp: prods.filter(p=> expiredPieces(p) > 0).length };
+  const val = prods.reduce((a,p)=> a + (Number(p.buy) || 0) * Math.max(0, Number(p.qty) || 0), 0);
+  const sale = prods.reduce((a,p)=> a + pcPrice(p) * Math.max(0, Number(p.qty) || 0), 0);
+  $("stBody").innerHTML = `
+    ${isAdmin() ? `<div class="stats" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      <div class="stat b"><div class="ic">📦</div><div><div class="lbl">স্টকের মূল্য (কেনা দামে)</div><div class="val num">${money(val)}</div></div></div>
+      <div class="stat g"><div class="ic">💰</div><div><div class="lbl">বিক্রি দামে</div><div class="val num">${money(sale)}</div><div class="sub">সম্ভাব্য লাভ ${money(sale - val)}</div></div></div>
+      <div class="stat o"><div class="ic">💊</div><div><div class="lbl">মোট ওষুধ</div><div class="val num">${bn(prods.length)}</div></div></div>
+    </div>` : ""}
+    <div class="toolbar"><input class="in" id="stQ" placeholder="🔍 নাম, জেনেরিক বা কোম্পানি" value="${esc(STOCK_Q)}">
+      <div class="tabs" style="margin:0">${[["all","সব"],["low","কম স্টক"],["out","শেষ"],["exp","মেয়াদ শেষ"]].map(([k,l])=> `<button type="button" data-sf="${k}" class="${k === STOCK_FILTER ? "on" : ""}">${l} (${bn(counts[k])})</button>`).join("")}</div></div>
+    <div class="panel" style="padding:6px 8px; overflow-x:auto" id="stList"></div>`;
+  document.querySelectorAll("[data-sf]").forEach(b=> b.onclick = ()=>{ STOCK_FILTER = b.dataset.sf; stockList(); });
+  const draw = ()=>{
+    let list = prods.filter(p=> medMatches(p, STOCK_Q));
+    if(STOCK_FILTER === "low") list = list.filter(isLow);
+    else if(STOCK_FILTER === "out") list = list.filter(p=> !(Number(p.qty) > 0));
+    else if(STOCK_FILTER === "exp") list = list.filter(p=> expiredPieces(p) > 0);
+    list.sort((a,b)=> String(a.name || "").localeCompare(String(b.name || ""), "en"));
+    $("stList").innerHTML = list.length ? `<table class="t" style="min-width:560px"><thead><tr><th>নাম</th><th class="r">স্টক</th><th class="r">ন্যূনতম</th><th>নিকটতম মেয়াদ</th>${isAdmin() ? '<th class="r">মূল্য (কেনা)</th>' : ""}</tr></thead><tbody>
+      ${list.map(p=>{ const ex = nearestExpiry(p); const xp = expiredPieces(p); return `<tr data-edit="${esc(p.id)}" style="cursor:pointer">
+        <td><b>${esc(p.name)}</b>${p.rackLocation ? `<div class="hint">📍 ${esc(p.rackLocation)}</div>` : ""}${xp ? `<div class="hint bad">মেয়াদ শেষ: ${esc(stockText(p, xp))}</div>` : ""}</td>
+        <td class="r num ${isLow(p) || !(p.qty > 0) ? "bad" : ""}">${esc(stockText(p))}</td>
+        <td class="r num">${Number(p.min) > 0 ? esc(stockText(p, p.min)) : "—"}</td>
+        <td>${ex ? `<span class="chip ${ex.days < 0 ? "red" : ex.days <= 30 ? "org" : ""}">${fmtDate(ex.date)}</span>` : "—"}</td>
+        ${isAdmin() ? `<td class="r num">${money((Number(p.buy) || 0) * Math.max(0, Number(p.qty) || 0))}</td>` : ""}
+      </tr>`; }).join("")}</tbody></table>` : `<div class="empty">এই ছাঁকনিতে কোনো ওষুধ নেই।</div>`;
+    $("stList").querySelectorAll("[data-edit]").forEach(tr=> tr.onclick = ()=> openMedForm(tr.dataset.edit));
+  };
+  $("stQ").oninput = ()=>{ STOCK_Q = $("stQ").value.trim(); draw(); };
+  draw();
+}
+
+/* 🔢 গণনা — গুনে পাওয়া সংখ্যা বসালে পার্থক্য ঠিক হয় */
+function stockCount(){
+  let P = null;
+  $("stBody").innerHTML = `<div class="panel stForm">
+    <h2>তাকে গুনে যা পেলেন</h2>
+    <div class="hint">খাতায় এক রকম আর তাকে আরেক রকম হলে — গুনে আসল সংখ্যাটা বসান। পার্থক্যটা খতিয়ানে লেখা থাকবে।</div>
+    <label class="f">ওষুধ</label><div class="pick"><input class="in" id="scQ" placeholder="নাম লিখে খুঁজুন…" autocomplete="off"><div class="drop" id="scD" hidden></div></div>
+    <div id="scInfo"></div>
+    <div class="row2"><div><label class="f">গুনে পাওয়া বক্স</label><input class="in num" id="scBox" inputmode="numeric" placeholder="০"></div><div><label class="f">খুচরা পিস</label><input class="in num" id="scPc" inputmode="numeric" placeholder="০"></div></div>
+    <label class="f">কারণ</label><input class="in" id="scWhy" placeholder="যেমন: মাসিক গণনা, ভুল এন্ট্রি">
+    <div class="calc" id="scCalc" hidden></div>
+    <div class="foot"><button class="btn" type="button" id="scSave">💾 সমন্বয় করুন</button></div></div>`;
+  const calc = ()=>{
+    if(!P){ $("scCalc").hidden = true; return; }
+    const counted = piecesFrom(P, $("scBox").value, $("scPc").value);
+    const diff = counted - (Number(P.qty) || 0);
+    $("scCalc").hidden = false;
+    $("scCalc").innerHTML = `খাতায়: <b>${esc(stockText(P))}</b> · গুনে: <b>${esc(stockText(P, counted))}</b><br>পার্থক্য: <b class="${diff < 0 ? "neg" : diff > 0 ? "gain" : ""}">${diff > 0 ? "+" : diff < 0 ? "−" : ""}${esc(stockText(P, Math.abs(diff)))}</b>${isAdmin() && diff ? ` (${money(Math.abs(diff) * (Number(P.buy) || 0))})` : ""}`;
+  };
+  medPicker($("scQ"), $("scD"), (p)=>{ P = p; $("scInfo").innerHTML = `<div class="hint">খাতায় আছে: <b>${esc(stockText(p))}</b>${packOf(p).perBox > 1 ? " · ১ বক্স = " + bn(packOf(p).perBox) + " পিস" : ""}</div>`; $("scBox").focus(); calc(); });
+  ["scBox","scPc"].forEach(x=> $(x).oninput = calc);
+  $("scSave").onclick = ()=>{
+    if(!P){ toast("ওষুধ বাছুন"); return; }
+    if($("scBox").value === "" && $("scPc").value === ""){ toast("গুনে পাওয়া সংখ্যা লিখুন"); return; }
+    const prods = loadProducts(); const p = prods.find(x=> x.id === P.id);
+    const counted = piecesFrom(p, $("scBox").value, $("scPc").value);
+    const diff = counted - (Number(p.qty) || 0);
+    if(!diff){ toast("খাতা আর গণনা মিলে আছে — কিছু বদলাতে হবে না"); return; }
+    if(!confirm(`${p.name}: ${diff > 0 ? "+" : "−"}${stockText(p, Math.abs(diff))}\nস্টক হবে ${stockText(p, counted)}। ঠিক আছে?`)) return;
+    if(diff < 0) takeFromBatches(p, -diff);
+    p.qty = counted;
+    saveProducts(prods); syncBazarStock([p]);
+    stockLog({ type:"adjust", pid:p.id, name:p.name, pieces: diff, value: r2(diff * (Number(p.buy) || 0)), reason: $("scWhy").value.trim() || "গণনা" });
+    pushNow(); toast("✅ স্টক ঠিক করা হয়েছে"); stockCount(); refreshBell();
+  };
+}
+
+/* 🗑️ নষ্ট / মেয়াদোত্তীর্ণ — ব্যাচ ধরে বাদ */
+function stockDamage(){
+  let P = null;
+  const t0 = new Date(todayStr()).getTime();
+  const expired = [];
+  loadProducts().forEach(p=> (p.batches || []).forEach((b, i)=>{ if(b && Number(b.qty) > 0 && b.expiryDate && new Date(b.expiryDate).getTime() < t0) expired.push({ p, b, i }); }));
+  $("stBody").innerHTML = `
+    ${expired.length ? `<div class="panel" style="margin-bottom:14px"><h2 class="warn">মেয়াদ শেষ হয়ে গেছে — তাক থেকে সরান</h2>
+      <table class="t"><thead><tr><th>নাম</th><th>ব্যাচ</th><th>মেয়াদ</th><th class="r">পরিমাণ</th><th></th></tr></thead><tbody>
+      ${expired.map((x, k)=> `<tr><td>${esc(x.p.name)}</td><td>${esc(x.b.batchNo || "—")}</td><td class="bad">${fmtDate(x.b.expiryDate)}</td><td class="r num">${esc(stockText(x.p, x.b.qty))}</td><td class="r"><button class="btn red" type="button" data-wo="${k}">বাদ দিন</button></td></tr>`).join("")}
+      </tbody></table></div>` : ""}
+    <div class="panel stForm"><h2>নষ্ট / ভাঙা / হারানো ওষুধ বাদ দিন</h2>
+      <label class="f">ওষুধ</label><div class="pick"><input class="in" id="sdQ" placeholder="নাম লিখে খুঁজুন…" autocomplete="off"><div class="drop" id="sdD" hidden></div></div>
+      <label class="f">ব্যাচ</label><select class="in" id="sdBatch"><option value="">আগে মেয়াদ শেষ হওয়াটা থেকে</option></select>
+      <div class="row2"><div><label class="f">বক্স</label><input class="in num" id="sdBox" inputmode="numeric" placeholder="০"></div><div><label class="f">পিস</label><input class="in num" id="sdPc" inputmode="numeric" placeholder="০"></div></div>
+      <label class="f">কারণ</label><select class="in" id="sdWhy"><option>নষ্ট / ভাঙা</option><option>মেয়াদ শেষ</option><option>হারানো</option><option>নমুনা / ফ্রি দেওয়া</option><option>অন্যান্য</option></select>
+      <div class="calc" id="sdCalc" hidden></div>
+      <div class="foot"><button class="btn red" type="button" id="sdSave">🗑️ স্টক থেকে বাদ দিন</button></div></div>`;
+  $("stBody").querySelectorAll("[data-wo]").forEach(b=> b.onclick = ()=>{
+    const x = expired[+b.dataset.wo];
+    if(!confirm(`${x.p.name} — ব্যাচ ${x.b.batchNo || "—"}, ${stockText(x.p, x.b.qty)} স্টক থেকে বাদ দেবেন?`)) return;
+    writeOff(x.p.id, Number(x.b.qty), x.i, "মেয়াদ শেষ");
+    stockDamage();
+  });
+  const calc = ()=>{
+    if(!P){ $("sdCalc").hidden = true; return; }
+    const n = piecesFrom(P, $("sdBox").value, $("sdPc").value);
+    $("sdCalc").hidden = !n;
+    $("sdCalc").innerHTML = `বাদ যাবে: <b class="neg">${esc(stockText(P, n))}</b>${isAdmin() ? ` · ক্ষতি ${money(n * (Number(P.buy) || 0))}` : ""}<br>বাকি থাকবে: <b>${esc(stockText(P, Math.max(0, (Number(P.qty) || 0) - n)))}</b>`;
+  };
+  medPicker($("sdQ"), $("sdD"), (p)=>{
+    P = p;
+    $("sdBatch").innerHTML = `<option value="">আগে মেয়াদ শেষ হওয়াটা থেকে</option>` + (p.batches || []).map((b, i)=> b && Number(b.qty) > 0 ? `<option value="${i}">${esc(b.batchNo || "ব্যাচ নম্বর নেই")} · ${b.expiryDate ? fmtDate(b.expiryDate) : "মেয়াদ নেই"} · ${esc(stockText(p, b.qty))}</option>` : "").join("");
+    $("sdBox").focus(); calc();
+  });
+  ["sdBox","sdPc"].forEach(x=> $(x).oninput = calc);
+  $("sdSave").onclick = ()=>{
+    if(!P){ toast("ওষুধ বাছুন"); return; }
+    const n = piecesFrom(P, $("sdBox").value, $("sdPc").value);
+    if(!n){ toast("কতটা বাদ দেবেন লিখুন"); return; }
+    if(n > (Number(P.qty) || 0)){ toast("স্টকে এতটা নেই"); return; }
+    if(!confirm(`${P.name}: ${stockText(P, n)} স্টক থেকে বাদ দেবেন?`)) return;
+    writeOff(P.id, n, $("sdBatch").value === "" ? null : +$("sdBatch").value, $("sdWhy").value);
+    stockDamage();
+  };
+}
+function writeOff(pid, pieces, batchIdx, why){
+  const prods = loadProducts(); const p = prods.find(x=> x.id === pid); if(!p) return;
+  pieces = Math.min(pieces, Number(p.qty) || 0);
+  takeFromBatches(p, pieces, batchIdx);
+  p.qty = Math.max(0, (Number(p.qty) || 0) - pieces);
+  saveProducts(prods); syncBazarStock([p]);
+  stockLog({ type:"damage", pid, name:p.name, pieces: -pieces, value: -r2(pieces * (Number(p.buy) || 0)), reason: why });
+  pushNow(); toast("🗑️ বাদ দেওয়া হয়েছে"); refreshBell();
+}
+
+/* ↩️ কোম্পানিকে ফেরত — স্টক কমে, সরবরাহকারীর বাকি থেকে টাকা কমে */
+function stockReturn(){
+  let P = null;
+  const sups = loadSuppliers();
+  $("stBody").innerHTML = `<div class="panel stForm"><h2>কোম্পানি / সরবরাহকারীকে ফেরত</h2>
+    <div class="hint">মেয়াদ শেষ হওয়ার আগে বা ভুল ওষুধ এলে ফেরত দিন। ফেরতের দাম সরবরাহকারীর বাকি থেকে কমে যাবে।</div>
+    <label class="f">সরবরাহকারী *</label><select class="in" id="srSup"><option value="">— বেছে নিন —</option>${sups.map(s=> `<option value="${esc(s.id)}">${esc(s.name)}${isAdmin() && Number(s.due) > 0 ? " (বাকি " + esc(money(s.due)) + ")" : ""}</option>`).join("")}</select>
+    <label class="f">ওষুধ</label><div class="pick"><input class="in" id="srQ" placeholder="নাম লিখে খুঁজুন…" autocomplete="off"><div class="drop" id="srD" hidden></div></div>
+    <label class="f">ব্যাচ</label><select class="in" id="srBatch"><option value="">আগে মেয়াদ শেষ হওয়াটা থেকে</option></select>
+    <div class="row3"><div><label class="f">বক্স</label><input class="in num" id="srBox" inputmode="numeric" placeholder="০"></div><div><label class="f">পিস</label><input class="in num" id="srPc" inputmode="numeric" placeholder="০"></div>
+      <div><label class="f">ফেরতের মোট দাম</label><input class="in num" id="srVal" inputmode="decimal" placeholder="০"></div></div>
+    <div class="calc" id="srCalc" hidden></div>
+    <div class="foot"><button class="btn" type="button" id="srSave">↩️ ফেরত দিন</button></div></div>`;
+  let valTouched = false;
+  $("srVal").oninput = ()=>{ valTouched = true; calc(); };
+  const calc = ()=>{
+    if(!P){ $("srCalc").hidden = true; return; }
+    const n = piecesFrom(P, $("srBox").value, $("srPc").value);
+    if(!valTouched) $("srVal").value = n ? r2(n * (Number(P.buy) || 0)) : "";
+    $("srCalc").hidden = !n;
+    $("srCalc").innerHTML = `ফেরত যাবে: <b>${esc(stockText(P, n))}</b> · বাকি থেকে কমবে: <b>${money(Number($("srVal").value) || 0)}</b>`;
+  };
+  medPicker($("srQ"), $("srD"), (p)=>{
+    P = p; valTouched = false;
+    $("srBatch").innerHTML = `<option value="">আগে মেয়াদ শেষ হওয়াটা থেকে</option>` + (p.batches || []).map((b, i)=> b && Number(b.qty) > 0 ? `<option value="${i}">${esc(b.batchNo || "ব্যাচ নম্বর নেই")} · ${b.expiryDate ? fmtDate(b.expiryDate) : "মেয়াদ নেই"} · ${esc(stockText(p, b.qty))}</option>` : "").join("");
+    $("srBox").focus(); calc();
+  });
+  ["srBox","srPc"].forEach(x=> $(x).oninput = calc);
+  $("srSave").onclick = ()=>{
+    const sid = $("srSup").value; if(!sid){ toast("সরবরাহকারী বাছুন"); return; }
+    if(!P){ toast("ওষুধ বাছুন"); return; }
+    const n = piecesFrom(P, $("srBox").value, $("srPc").value);
+    if(!n){ toast("কতটা ফেরত দেবেন লিখুন"); return; }
+    if(n > (Number(P.qty) || 0)){ toast("স্টকে এতটা নেই"); return; }
+    const val = r2(Math.max(0, Number($("srVal").value) || 0));
+    const sList = loadSuppliers(); const s = sList.find(x=> x.id === sid);
+    if(!confirm(`${s.name}-কে ${P.name} ${stockText(P, n)} ফেরত, দাম ${money(val)}।\nঠিক আছে?`)) return;
+    const prods = loadProducts(); const p = prods.find(x=> x.id === P.id);
+    takeFromBatches(p, n, $("srBatch").value === "" ? null : +$("srBatch").value);
+    p.qty = Math.max(0, (Number(p.qty) || 0) - n);
+    saveProducts(prods); syncBazarStock([p]);
+    if(val > 0){
+      // সাধারণ POS-এ "ফেরত" ধরন নেই — বাকি কমানোর লেনদেন "payment" হিসেবে লেখা, নোটে ফেরত
+      s.due = r2(Math.max(0, (Number(s.due) || 0) - val));
+      localStorage.setItem("shop-suppliers", JSON.stringify(sList));
+      const tx = readJSON("shop-supplier-txns", []); tx.push({ id: uid(), supplierId: s.id, type: "payment", amount: val, note: "↩️ ওষুধ ফেরত: " + p.name + " " + stockText(p, n), date: new Date().toISOString() });
+      localStorage.setItem("shop-supplier-txns", JSON.stringify(tx));
+    }
+    stockLog({ type:"return", pid:p.id, name:p.name, pieces: -n, value: -val, reason: "ফেরত → " + s.name });
+    pushNow(); toast("✅ ফেরত হয়েছে"); stockReturn(); refreshBell();
+  };
+}
+
+function stockLogView(){
+  const log = readJSON(SLOG_KEY, []);
+  const T = { adjust:"🔢 গণনা", damage:"🗑️ বাদ", return:"↩️ ফেরত" };
+  $("stBody").innerHTML = `<div class="panel" style="overflow-x:auto">${log.length ? `<table class="t" style="min-width:560px"><thead><tr><th>তারিখ</th><th>ধরন</th><th>ওষুধ</th><th class="r">পরিমাণ</th>${isAdmin() ? '<th class="r">মূল্য</th>' : ""}<th>কারণ / কে</th></tr></thead><tbody>
+    ${log.map(r=>{ const p = loadProducts().find(x=> x.id === r.pid) || {}; return `<tr><td>${fmtDate(r.date)}</td><td>${T[r.type] || esc(r.type)}</td><td>${esc(r.name)}</td><td class="r num ${r.pieces < 0 ? "neg" : "gain"}">${r.pieces > 0 ? "+" : "−"}${esc(stockText(p, Math.abs(r.pieces)))}</td>${isAdmin() ? `<td class="r num">${money(Math.abs(r.value || 0))}</td>` : ""}<td>${esc(r.reason || "")}<div class="hint">${esc(r.by || "")}</div></td></tr>`; }).join("")}
+  </tbody></table>` : `<div class="empty">এখনো কোনো স্টক বদল হয়নি।</div>`}</div>`;
+}
+
+
+/* =====================================================================
+   📊 রিপোর্ট — শুধু এডমিন
+   সাধারণ POS-এর একই নিয়মে: বিক্রি = নগদ-বিক্রি/বাকি/বদলি লাইনের দাম,
+   লাভ = দাম − কেনা দাম, ফেরত আলাদা, ক্রয় = সরবরাহকারীর "purchase" লেনদেন।
+   পুরো দোকানের খাতা থেকে (সাধারণ POS-এর বিক্রিও এখানে আসে)।
+   ===================================================================== */
+const SALE_ST = ["বাকি", "নগদ-বিক্রি", "বদলি"];
+let REP = { from: null, to: null, view: "daily" };
+const dkey = (d)=> d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+function repRange(){
+  if(!REP.from){ const d = new Date(); REP.from = dkey(new Date(d.getFullYear(), d.getMonth(), 1)); REP.to = dkey(d); }
+  return { f: new Date(REP.from + "T00:00:00").getTime(), t: new Date(REP.to + "T23:59:59.999").getTime() };
+}
+const inRange = (iso, R)=>{ const x = new Date(iso).getTime(); return !isNaN(x) && x >= R.f && x <= R.t; };
+
+function repData(){
+  const R = repRange();
+  const all = loadEntries().filter(e=> inRange(e.date, R));
+  const sales = all.filter(e=> SALE_ST.includes(e.status) && !(Number(e.depositAmount) > 0));
+  const returns = all.filter(e=> e.status === "ফেরত");
+  const deposits = all.filter(e=> Number(e.depositAmount) > 0);
+  const exp = readJSON("shop-expenses", []).filter(x=> inRange(x.date, R));
+  const delExp = readJSON("shop-deleted-expense-ids", []);
+  const expenses = exp.filter(x=> !delExp.includes(x.id) && x.category !== "সাপ্লায়ার পেমেন্ট");
+  const sTx = readJSON("shop-supplier-txns", []).filter(t=> inRange(t.date, R));
+  const purchases = sTx.filter(t=> t.type === "purchase" && !/পুরাতন বাকি/.test(t.note || ""));
+  const sum = (arr, f)=> r2(arr.reduce((a,x)=> a + (Number(f(x)) || 0), 0));
+  return {
+    R, sales, returns, deposits, expenses, purchases, sTx,
+    totalSales: sum(sales, e=> e.price), cost: sum(sales, e=> e.cost),
+    profit: sum(sales, e=> (Number(e.price) || 0) - (Number(e.cost) || 0)),
+    returnVal: sum(returns, e=> e.returnValue), expense: sum(expenses, x=> x.amount),
+    purchase: sum(purchases, t=> t.amount), depositIn: sum(deposits, e=> e.depositAmount),
+    newDue: sum(sales, e=> Math.max((Number(e.price) || 0) - (Number(e.paid) || 0), 0)),
+    bills: new Set(sales.map(e=> e.billId || e.invoiceNo || e.id)).size,
+  };
+}
+
+function pageReports(){
+  if(!isAdmin()){ go("dash"); return; }
+  const D = repData();
+  const views = [["daily","🗓️ দৈনিক বিক্রয় রিপোর্ট"],["meds","💊 ওষুধভিত্তিক বিক্রয়"],["staff","🧑‍⚕️ স্টাফভিত্তিক বিক্রয়"],["profit","💰 লাভ-ক্ষতি"],["stock","📦 স্টক রিপোর্ট"],["expiry","⏳ মেয়াদোত্তীর্ণ রিপোর্ট"],["customers","👥 গ্রাহক রিপোর্ট"],["suppliers","🚚 সরবরাহকারী রিপোর্ট"]];
+  const d0 = new Date();
+  const chips = [["আজ", dkey(d0), dkey(d0)], ["৭ দিন", dkey(new Date(Date.now() - 6*864e5)), dkey(d0)], ["এই মাস", dkey(new Date(d0.getFullYear(), d0.getMonth(), 1)), dkey(d0)], ["গত মাস", dkey(new Date(d0.getFullYear(), d0.getMonth() - 1, 1)), dkey(new Date(d0.getFullYear(), d0.getMonth(), 0))]];
+  $("page").innerHTML = `
+    <div class="pageHead"><h1>রিপোর্ট</h1><button class="btn ghost noPrint" type="button" id="rPrint">🖨️ প্রিন্ট</button></div>
+    <div class="range">
+      <div><label class="f">শুরু</label><input class="in" type="date" id="rFrom" value="${REP.from}"></div>
+      <div><label class="f">শেষ</label><input class="in" type="date" id="rTo" value="${REP.to}"></div>
+      <div class="tabs" style="margin:0">${chips.map(c=> `<button type="button" data-rc="${c[1]}|${c[2]}" class="${REP.from === c[1] && REP.to === c[2] ? "on" : ""}">${c[0]}</button>`).join("")}</div>
+    </div>
+    <div class="stats">
+      <div class="stat g"><div class="ic">🧾</div><div><div class="lbl">মোট বিক্রয়</div><div class="val num">${money(D.totalSales)}</div><div class="sub">${bn(D.bills)}টি ইনভয়েস</div></div></div>
+      <div class="stat b"><div class="ic">📥</div><div><div class="lbl">মোট ক্রয়</div><div class="val num">${money(D.purchase)}</div><div class="sub">${bn(D.purchases.length)}টি ক্রয়</div></div></div>
+      <div class="stat o"><div class="ic">💰</div><div><div class="lbl">মোট লাভ</div><div class="val num">${money(D.profit)}</div><div class="sub">বিক্রি − কেনা দাম</div></div></div>
+      <div class="stat r"><div class="ic">💸</div><div><div class="lbl">মোট ব্যয়</div><div class="val num">${money(D.expense)}</div><div class="sub">খরচের খাতা (সরবরাহকারীর টাকা বাদে)</div></div></div>
+    </div>
+    <div class="rGrid">
+      <div class="panel rList">${views.map(([k,l])=> `<button type="button" data-rv="${k}" class="${k === REP.view ? "on" : ""}">${l}</button>`).join("")}</div>
+      <div class="panel" id="rBody" style="overflow-x:auto"></div>
+    </div>`;
+  const setR = (f, t)=>{ if(f && t && f <= t){ REP.from = f; REP.to = t; pageReports(); } else toast("তারিখ ঠিক নেই"); };
+  $("rFrom").onchange = ()=> setR($("rFrom").value, $("rTo").value);
+  $("rTo").onchange = ()=> setR($("rFrom").value, $("rTo").value);
+  document.querySelectorAll("[data-rc]").forEach(b=> b.onclick = ()=>{ const [f,t] = b.dataset.rc.split("|"); setR(f, t); });
+  document.querySelectorAll("[data-rv]").forEach(b=> b.onclick = ()=>{ REP.view = b.dataset.rv; pageReports(); if(window.innerWidth <= 900) $("rBody").scrollIntoView({ behavior:"smooth" }); });
+  $("rPrint").onclick = ()=>{ document.body.classList.add("printReport"); window.print(); setTimeout(()=> document.body.classList.remove("printReport"), 500); };
+  ({ daily: repDaily, meds: repMeds, staff: repStaff, profit: repProfit, stock: repStock, expiry: repExpiry, customers: repCustomers, suppliers: repSuppliers })[REP.view](D);
+}
+const rangeTitle = ()=> `<div class="hint" style="margin:-6px 0 10px">${fmtDate(REP.from)} — ${fmtDate(REP.to)}</div>`;
+function tbl(head, rows, foot){
+  if(!rows.length) return `<div class="empty">এই সময়ে কিছু নেই।</div>`;
+  return `<table class="t" style="min-width:520px"><thead><tr>${head.map(h=> `<th class="${h[1] || ""}">${h[0]}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody>${foot ? `<tfoot><tr style="font-weight:700">${foot.map((f,i)=> `<td class="${head[i][1] || ""}">${f}</td>`).join("")}</tr></tfoot>` : ""}</table>`;
+}
+
+function repDaily(D){
+  const by = {};
+  D.sales.forEach(e=>{ const k = dkey(new Date(e.date)); const o = by[k] = by[k] || { bills:new Set(), sale:0, profit:0, cash:0, bank:0, due:0 };
+    o.bills.add(e.billId || e.invoiceNo || e.id); o.sale += Number(e.price) || 0; o.profit += (Number(e.price) || 0) - (Number(e.cost) || 0);
+    const due = Math.max((Number(e.price) || 0) - (Number(e.paid) || 0), 0); o.due += due;
+    if(e.paymentMethod === "bank") o.bank += (Number(e.price) || 0) - due; else o.cash += (Number(e.price) || 0) - due; });
+  const keys = Object.keys(by).sort().reverse();
+  $("rBody").innerHTML = `<h2>🗓️ দৈনিক বিক্রয়</h2>${rangeTitle()}` + tbl(
+    [["তারিখ"],["ইনভয়েস","r"],["বিক্রয়","r"],["নগদ","r"],["ব্যাংক/বিকাশ","r"],["বাকি","r"],["লাভ","r"]],
+    keys.map(k=>{ const o = by[k]; return `<tr><td>${fmtDate(k)}</td><td class="r num">${bn(o.bills.size)}</td><td class="r num">${money(o.sale)}</td><td class="r num">${money(o.cash)}</td><td class="r num">${money(o.bank)}</td><td class="r num">${money(o.due)}</td><td class="r num">${money(o.profit)}</td></tr>`; }),
+    ["মোট", bn(D.bills), money(D.totalSales), money(keys.reduce((a,k)=> a + by[k].cash, 0)), money(keys.reduce((a,k)=> a + by[k].bank, 0)), money(D.newDue), money(D.profit)]);
+}
+function repMeds(D){
+  const prods = loadProducts(); const by = {};
+  D.sales.forEach(e=>{ const k = e.productId || e.item; const o = by[k] = by[k] || { name: (prods.find(p=> p.id === e.productId) || {}).name || String(e.item || "").replace(/\s*\(.*\)$/, ""), pid: e.productId, q:0, sale:0, profit:0 };
+    o.q += Number(e.qty) || 0; o.sale += Number(e.price) || 0; o.profit += (Number(e.price) || 0) - (Number(e.cost) || 0); });
+  const rows = Object.values(by).sort((a,b)=> b.sale - a.sale);
+  $("rBody").innerHTML = `<h2>💊 ওষুধভিত্তিক বিক্রয়</h2>${rangeTitle()}` + tbl(
+    [["#"],["ওষুধ"],["পরিমাণ","r"],["বিক্রয়","r"],["লাভ","r"],["লাভের হার","r"]],
+    rows.map((o, i)=>{ const p = prods.find(x=> x.id === o.pid) || {}; return `<tr><td>${bn(i+1)}</td><td>${esc(o.name)}</td><td class="r num">${esc(stockText(p, o.q))}</td><td class="r num">${money(o.sale)}</td><td class="r num">${money(o.profit)}</td><td class="r num">${o.sale ? bn(Math.round(o.profit / o.sale * 100)) + "%" : "—"}</td></tr>`; }),
+    ["", "মোট", "", money(D.totalSales), money(D.profit), D.totalSales ? bn(Math.round(D.profit / D.totalSales * 100)) + "%" : ""]);
+}
+function repStaff(D){
+  const by = {};
+  D.sales.forEach(e=>{ const k = e.soldBy || "এডমিন"; const o = by[k] = by[k] || { bills:new Set(), sale:0, profit:0 }; o.bills.add(e.billId || e.invoiceNo || e.id); o.sale += Number(e.price) || 0; o.profit += (Number(e.price) || 0) - (Number(e.cost) || 0); });
+  const rows = Object.entries(by).sort((a,b)=> b[1].sale - a[1].sale);
+  $("rBody").innerHTML = `<h2>🧑‍⚕️ স্টাফভিত্তিক বিক্রয়</h2>${rangeTitle()}` + tbl(
+    [["নাম"],["ইনভয়েস","r"],["বিক্রয়","r"],["লাভ","r"]],
+    rows.map(([n,o])=> `<tr><td>${esc(n)}</td><td class="r num">${bn(o.bills.size)}</td><td class="r num">${money(o.sale)}</td><td class="r num">${money(o.profit)}</td></tr>`),
+    ["মোট", bn(D.bills), money(D.totalSales), money(D.profit)]);
+}
+function repProfit(D){
+  // স্টক থেকে বাদ (নষ্ট/মেয়াদ) — খতিয়ান থেকে
+  const lossLog = readJSON(SLOG_KEY, []).filter(r=> r.type === "damage" && inRange(r.date, D.R));
+  const loss = r2(lossLog.reduce((a,r)=> a + Math.abs(Number(r.value) || 0), 0));
+  const net = r2(D.profit - D.returnVal - D.expense - loss);
+  const line = (l, v, cls)=> `<div style="display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line)"><span>${l}</span><b class="num ${cls || ""}">${v}</b></div>`;
+  $("rBody").innerHTML = `<h2>💰 লাভ-ক্ষতি</h2>${rangeTitle()}<div style="max-width:520px">
+    ${line("মোট বিক্রয়", money(D.totalSales))}
+    ${line("− বিক্রিত ওষুধের কেনা দাম", money(D.cost))}
+    ${line("= মোট লাভ (গ্রস)", money(D.profit), "gain")}
+    ${line("− বিক্রি ফেরত", money(D.returnVal))}
+    ${line("− খরচ (ভাড়া, বেতন, বিল…)", money(D.expense))}
+    ${line("− নষ্ট / মেয়াদ শেষে বাদ", money(loss))}
+    <div style="display:flex; justify-content:space-between; padding:12px 0; font-size:20px"><b>নিট ${net >= 0 ? "লাভ" : "ক্ষতি"}</b><b class="num ${net >= 0 ? "gain" : "neg"}">${money(Math.abs(net))}</b></div>
+    <div class="hint">এই সময়ে বাকি আদায় হয়েছে ${money(D.depositIn)} · নতুন বাকি পড়েছে ${money(D.newDue)}</div></div>`;
+}
+function repStock(){
+  const prods = loadProducts().slice().sort((a,b)=> String(a.name || "").localeCompare(String(b.name || ""), "en"));
+  const val = r2(prods.reduce((a,p)=> a + (Number(p.buy) || 0) * Math.max(0, Number(p.qty) || 0), 0));
+  $("rBody").innerHTML = `<h2>📦 স্টক রিপোর্ট</h2><div class="hint" style="margin:-6px 0 10px">আজকের অবস্থা</div>` + tbl(
+    [["ওষুধ"],["জেনেরিক"],["স্টক","r"],["কেনা দাম (পিস)","r"],["মূল্য","r"]],
+    prods.map(p=> `<tr><td>${esc(p.name)}</td><td>${esc(p.genericName || "—")}</td><td class="r num ${isLow(p) ? "bad" : ""}">${esc(stockText(p))}</td><td class="r num">${money(p.buy || 0)}</td><td class="r num">${money((Number(p.buy) || 0) * Math.max(0, Number(p.qty) || 0))}</td></tr>`),
+    ["মোট", "", "", "", money(val)]);
+}
+function repExpiry(){
+  const t0 = new Date(todayStr()).getTime(); const rows = [];
+  loadProducts().forEach(p=> (p.batches || []).forEach(b=>{ if(!b || !(Number(b.qty) > 0) || !b.expiryDate) return; const days = Math.round((new Date(b.expiryDate).getTime() - t0) / 864e5); if(days <= 90) rows.push({ p, b, days }); }));
+  rows.sort((a,b)=> a.days - b.days);
+  const val = r2(rows.reduce((a,x)=> a + (Number(x.p.buy) || 0) * Number(x.b.qty), 0));
+  $("rBody").innerHTML = `<h2>⏳ মেয়াদোত্তীর্ণ রিপোর্ট</h2><div class="hint" style="margin:-6px 0 10px">মেয়াদ শেষ বা ৯০ দিনের মধ্যে শেষ হবে</div>` + tbl(
+    [["ওষুধ"],["ব্যাচ"],["মেয়াদ"],["বাকি দিন","r"],["পরিমাণ","r"],["মূল্য (কেনা)","r"]],
+    rows.map(x=> `<tr><td>${esc(x.p.name)}</td><td>${esc(x.b.batchNo || "—")}</td><td>${fmtDate(x.b.expiryDate)}</td><td class="r num ${x.days < 0 ? "bad" : x.days <= 30 ? "bad" : ""}">${x.days < 0 ? "শেষ" : bn(x.days)}</td><td class="r num">${esc(stockText(x.p, x.b.qty))}</td><td class="r num">${money((Number(x.p.buy) || 0) * Number(x.b.qty))}</td></tr>`),
+    ["মোট", "", "", "", "", money(val)]);
+}
+function repCustomers(D){
+  const by = {};
+  D.sales.forEach(e=>{ if(!e.name || e.name === "ওয়াক-ইন কাস্টমার" || e.name === "Unknown Customer") return; const k = e.phone ? "p:" + e.phone : "n:" + e.name; const o = by[k] = by[k] || { name:e.name, phone:e.phone, bills:new Set(), sale:0 }; o.bills.add(e.billId || e.invoiceNo || e.id); o.sale += Number(e.price) || 0; });
+  const dues = dueSummary(loadEntries()).map;
+  const rows = Object.entries(by).sort((a,b)=> b[1].sale - a[1].sale);
+  $("rBody").innerHTML = `<h2>👥 গ্রাহক রিপোর্ট</h2>${rangeTitle()}` + tbl(
+    [["গ্রাহক"],["কেনা","r"],["বিক্রয়","r"],["বর্তমান বাকি","r"]],
+    rows.map(([k,o])=> `<tr><td>${esc(o.name)}${o.phone ? `<div class="hint">${esc(o.phone)}</div>` : ""}</td><td class="r num">${bn(o.bills.size)} বার</td><td class="r num">${money(o.sale)}</td><td class="r num ${dues[k] > 0 ? "bad" : ""}">${money(dues[k] || 0)}</td></tr>`));
+}
+function repSuppliers(D){
+  const sups = loadSuppliers();
+  const rows = sups.map(s=>{ const tx = D.sTx.filter(t=> t.supplierId === s.id); return { s, buy: r2(tx.filter(t=> t.type === "purchase" && !/পুরাতন বাকি/.test(t.note || "")).reduce((a,t)=> a + Number(t.amount || 0), 0)), paid: r2(tx.filter(t=> t.type === "payment").reduce((a,t)=> a + Number(t.amount || 0), 0)) }; })
+    .filter(x=> x.buy || x.paid || Number(x.s.due) > 0).sort((a,b)=> b.buy - a.buy);
+  $("rBody").innerHTML = `<h2>🚚 সরবরাহকারী রিপোর্ট</h2>${rangeTitle()}` + tbl(
+    [["সরবরাহকারী"],["ক্রয়","r"],["পরিশোধ/ফেরত","r"],["বর্তমান বাকি","r"]],
+    rows.map(x=> `<tr><td>${esc(x.s.name)}</td><td class="r num">${money(x.buy)}</td><td class="r num">${money(x.paid)}</td><td class="r num ${Number(x.s.due) > 0 ? "bad" : ""}">${money(x.s.due || 0)}</td></tr>`),
+    ["মোট", money(rows.reduce((a,x)=> a + x.buy, 0)), money(rows.reduce((a,x)=> a + x.paid, 0)), money(rows.reduce((a,x)=> a + (Number(x.s.due) || 0), 0))]);
+}
+
+
+/* =====================================================================
+   📒 হিসাব (Accounts) — শুধু এডমিন
+   নগদ/ব্যাংকের হিসাব সাধারণ POS-এর opsCalcCashBankBalance()-এর হুবহু নিয়মে:
+   শুরুর টাকা + বিক্রিতে পাওয়া (paid) + বাকি আদায় (status "নগদ") ± নগদ↔ব্যাংক বদল
+   + হাতে যোগ করা টাকা − খরচ (ফেরত না হওয়া) − ফেরতে নগদ দেওয়া
+   ===================================================================== */
+const EXP_CATS = ["দোকান ভাড়া","বিদ্যুৎ বিল","পরিবহন","মেরামত/রক্ষণাবেক্ষণ","স্টাফ বেতন","স্টাফ অন্যান্য টাকা","সাপ্লায়ার পেমেন্ট","অন্যান্য"];
+const CLOSE_KEY = "hb-pharma-closings";
+function activeExpenses(){ const del = readJSON("shop-deleted-expense-ids", []); return readJSON("shop-expenses", []).filter(x=> x && !x.refunded && !del.includes(x.id)); }
+function cashBank(){
+  let cash = Number(localStorage.getItem("ops-opening-cash")) || 0, bank = Number(localStorage.getItem("ops-opening-bank")) || 0;
+  loadEntries().forEach(e=>{
+    const pm = e.paymentMethod || "cash";
+    if(SALE_ST.includes(e.status)){ if(pm === "cash") cash += Number(e.paid) || 0; else bank += Number(e.paid) || 0; }
+    if(e.status === "নগদ"){ const a = Number(e.depositAmount) || 0; if(pm === "cash") cash += a; else bank += a; }
+    if(e.status === "ফেরত" && e.cashBack === "yes") cash -= Number(e.returnValue) || 0;
+  });
+  readJSON("cash-bank-transfers", []).forEach(t=>{ const a = Number(t.amount) || 0; if(t.from === "bank" && t.to === "cash"){ bank -= a; cash += a; } else if(t.from === "cash" && t.to === "bank"){ cash -= a; bank += a; } });
+  activeExpenses().forEach(x=>{ const a = Number(x.amount) || 0; if((x.method || "cash") === "bank") bank -= a; else cash -= a; });
+  readJSON("shop-cash-adjustments", []).forEach(a=>{ const v = Number(a.amount) || 0; if((a.method || "cash") === "bank") bank += v; else cash += v; });
+  return { cash: r2(cash), bank: r2(bank) };
+}
+// আজকের নগদ/ব্যাংক আসা-যাওয়া
+function todayFlows(){
+  const t = todayStr(); const isT = (iso)=> dkey(new Date(iso)) === t;
+  const f = { cashIn:0, bankIn:0, cashOut:0, bankOut:0, sales:0, deposits:0, expenses:0 };
+  loadEntries().forEach(e=>{ if(!isT(e.date)) return; const pm = e.paymentMethod || "cash";
+    if(SALE_ST.includes(e.status)){ const v = Number(e.paid) || 0; f.sales += v; if(pm === "cash") f.cashIn += v; else f.bankIn += v; }
+    if(e.status === "নগদ"){ const v = Number(e.depositAmount) || 0; f.deposits += v; if(pm === "cash") f.cashIn += v; else f.bankIn += v; }
+    if(e.status === "ফেরত" && e.cashBack === "yes") f.cashOut += Number(e.returnValue) || 0; });
+  activeExpenses().forEach(x=>{ if(!isT(x.date)) return; const v = Number(x.amount) || 0; f.expenses += v; if((x.method || "cash") === "bank") f.bankOut += v; else f.cashOut += v; });
+  readJSON("shop-cash-adjustments", []).forEach(a=>{ if(!isT(a.date)) return; const v = Number(a.amount) || 0; const bank = (a.method || "cash") === "bank";
+    if(v >= 0){ if(bank) f.bankIn += v; else f.cashIn += v; } else { if(bank) f.bankOut += -v; else f.cashOut += -v; } });
+  return f;
+}
+
+function pageAccounts(){
+  if(!isAdmin()){ go("dash"); return; }
+  const B = cashBank(), F = todayFlows();
+  const moves = [];
+  activeExpenses().forEach(x=> moves.push({ d:x.date, ic:"💸", t:(x.category || "খরচ") + (x.person ? " · " + x.person : ""), n:x.note, v:-(Number(x.amount) || 0), m:x.method || "cash" }));
+  readJSON("shop-cash-adjustments", []).forEach(a=> moves.push({ d:a.date, ic: Number(a.amount) < 0 ? "➖" : "➕", t: Number(a.amount) < 0 ? "নগদ কম (সমন্বয়)" : "টাকা যোগ", n:a.note, v:Number(a.amount) || 0, m:a.method || "cash" }));
+  readJSON("cash-bank-transfers", []).forEach(t=> moves.push({ d:t.date, ic:"🔁", t: t.from === "bank" ? "ব্যাংক → নগদ" : "নগদ → ব্যাংক", n:t.by || "", v:Number(t.amount) || 0, m:"transfer" }));
+  moves.sort((a,b)=> String(b.d).localeCompare(String(a.d)));
+  const closes = readJSON(CLOSE_KEY, []);
+  $("page").innerHTML = `
+    <div class="pageHead"><h1>হিসাব (Accounts)</h1></div>
+    <div class="stats" style="grid-template-columns:repeat(2,minmax(0,1fr)); max-width:760px">
+      <div class="stat g"><div class="ic">💵</div><div><div class="lbl">হাতে নগদ</div><div class="val num">${money(B.cash)}</div><div class="sub">আজ এসেছে ${money(F.cashIn)} · গেছে ${money(F.cashOut)}</div></div></div>
+      <div class="stat b"><div class="ic">🏦</div><div><div class="lbl">ব্যাংক / বিকাশ</div><div class="val num">${money(B.bank)}</div><div class="sub">আজ এসেছে ${money(F.bankIn)} · গেছে ${money(F.bankOut)}</div></div></div>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px">
+      <button class="btn" type="button" id="aExp">💸 খরচ লিখুন</button>
+      <button class="btn ghost" type="button" id="aClose">🔒 দিন শেষের হিসাব</button>
+      <button class="btn ghost" type="button" id="aMove">🔁 নগদ ↔ ব্যাংক</button>
+      <button class="btn ghost" type="button" id="aAdd">➕ টাকা যোগ</button>
+      <button class="btn ghost" type="button" id="aOpen">⚙️ শুরুর টাকা</button>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h2>আজকের হিসাব</h2>
+        ${[["বিক্রিতে পাওয়া", F.sales], ["বাকি আদায়", F.deposits], ["খরচ", -F.expenses]].map(([l,v])=> `<div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line)"><span>${l}</span><b class="num ${v < 0 ? "neg" : ""}">${v < 0 ? "− " : ""}${money(Math.abs(v))}</b></div>`).join("")}
+        <h2 style="margin-top:18px">শেষ কয়েকটা দিন শেষের হিসাব</h2>
+        ${closes.length ? `<table class="t"><tbody>${closes.slice(0, 7).map(c=> `<tr><td>${fmtDate(c.date)}<div class="hint">${esc(c.by || "")}</div></td><td class="r num">গুনে ${money(c.counted)}</td><td class="r num ${Math.abs(c.diff) >= 0.01 ? (c.diff < 0 ? "neg" : "gain") : ""}">${Math.abs(c.diff) < 0.01 ? "মিলেছে ✓" : (c.diff > 0 ? "+" : "−") + money(Math.abs(c.diff))}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">এখনো দিন শেষের হিসাব করা হয়নি।</div>`}
+      </div>
+      <div class="panel" style="overflow-x:auto"><h2>সাম্প্রতিক খরচ ও টাকা নড়াচড়া</h2>
+        ${moves.length ? `<table class="t"><tbody>${moves.slice(0, 25).map(m=> `<tr><td>${fmtDate(m.d)}</td><td>${m.ic} ${esc(m.t)}${m.n ? `<div class="hint">${esc(m.n)}</div>` : ""}</td><td class="r"><span class="chip">${m.m === "bank" ? "ব্যাংক" : m.m === "transfer" ? "বদল" : "নগদ"}</span></td><td class="r num ${m.v < 0 ? "neg" : ""}">${m.v < 0 ? "− " : ""}${money(Math.abs(m.v))}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">এখনো কিছু নেই।</div>`}
+      </div>
+    </div>`;
+  $("aExp").onclick = openExpenseForm;
+  $("aClose").onclick = openDayClose;
+  $("aMove").onclick = openTransfer;
+  $("aAdd").onclick = openAddMoney;
+  $("aOpen").onclick = openOpening;
+}
+const viaSel = (id)=> `<select class="in" id="${id}"><option value="cash">💵 নগদ</option><option value="bank">🏦 ব্যাংক / বিকাশ</option></select>`;
+function openExpenseForm(){
+  openModal(`<div class="head"><h3>💸 খরচ লিখুন</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="row2"><div><label class="f">খাত</label><select class="in" id="exCat">${EXP_CATS.filter(c=> c !== "সাপ্লায়ার পেমেন্ট").map(c=> `<option>${c}</option>`).join("")}</select></div><div><label class="f">কত টাকা *</label><input class="in num" id="exAmt" inputmode="decimal"></div></div>
+    <div class="row2"><div><label class="f">কীভাবে</label>${viaSel("exVia")}</div><div><label class="f">কাকে (ঐচ্ছিক)</label><input class="in" id="exWho"></div></div>
+    <label class="f">কী বাবদ *</label><input class="in" id="exNote" placeholder="যেমন: অক্টোবরের দোকান ভাড়া">
+    <div class="hint">সরবরাহকারীর টাকা দিতে "সরবরাহকারী" পাতা ব্যবহার করুন — তাহলে তাঁর বাকিও কমবে।</div>
+    <div class="foot"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="exSave">💾 সেভ করুন</button></div>`);
+  $("exSave").onclick = ()=>{
+    const amt = r2(Number($("exAmt").value) || 0), note = $("exNote").value.trim(), via = $("exVia").value;
+    if(!(amt > 0)){ toast("টাকার পরিমাণ লিখুন"); return; }
+    if(!note){ toast("কী বাবদ খরচ লিখুন"); return; }
+    const B = cashBank(); const have = via === "bank" ? B.bank : B.cash;
+    if(amt > have && !confirm(`${via === "bank" ? "ব্যাংকে" : "হাতে"} আছে ${money(have)} — খরচ তার চেয়ে বেশি। তবুও লিখবেন?`)) return;
+    const ex = readJSON("shop-expenses", []); ex.push({ id: uid(), category: $("exCat").value, person: $("exWho").value.trim(), amount: amt, method: via, note, date: new Date().toISOString(), by: (SESSION && SESSION.name) || "" });
+    localStorage.setItem("shop-expenses", JSON.stringify(ex));
+    closeModal(); pushNow(); toast("✅ খরচ লেখা হয়েছে"); pageAccounts();
+  };
+}
+function openTransfer(){
+  const B = cashBank();
+  openModal(`<div class="head"><h3>🔁 নগদ ↔ ব্যাংক</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="calc">হাতে নগদ <b>${money(B.cash)}</b> · ব্যাংকে <b>${money(B.bank)}</b></div>
+    <div class="row2"><div><label class="f">কোন দিকে</label><select class="in" id="trDir"><option value="bank>cash">🏦 ব্যাংক থেকে → 💵 নগদে (তোলা)</option><option value="cash>bank">💵 নগদ থেকে → 🏦 ব্যাংকে (জমা)</option></select></div><div><label class="f">কত টাকা *</label><input class="in num" id="trAmt" inputmode="decimal"></div></div>
+    <div class="foot"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="trSave">✅ সরান</button></div>`);
+  $("trSave").onclick = ()=>{
+    const amt = r2(Number($("trAmt").value) || 0); const [from, to] = $("trDir").value.split(">");
+    if(!(amt > 0)){ toast("টাকার পরিমাণ লিখুন"); return; }
+    if(amt > (from === "bank" ? B.bank : B.cash)){ toast("এত টাকা নেই — আছে " + money(from === "bank" ? B.bank : B.cash)); return; }
+    const t = readJSON("cash-bank-transfers", []); t.push({ id: uid(), from, to, amount: amt, date: new Date().toISOString(), by: (SESSION && SESSION.name) || "" });
+    localStorage.setItem("cash-bank-transfers", JSON.stringify(t));
+    closeModal(); pushNow(); toast("✅ সরানো হয়েছে"); pageAccounts();
+  };
+}
+function openAddMoney(){
+  openModal(`<div class="head"><h3>➕ টাকা যোগ</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="hint">বিক্রি ছাড়া অন্যভাবে আসা টাকা — যেমন মালিক নিজের পকেট থেকে দিলেন, ধার আনলেন।</div>
+    <div class="row2"><div><label class="f">কোথায়</label>${viaSel("adVia")}</div><div><label class="f">কত টাকা *</label><input class="in num" id="adAmt" inputmode="decimal"></div></div>
+    <label class="f">কোথা থেকে এলো *</label><input class="in" id="adNote" placeholder="যেমন: মালিকের কাছ থেকে">
+    <div class="foot"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="adSave">✅ যোগ করুন</button></div>`);
+  $("adSave").onclick = ()=>{
+    const amt = r2(Number($("adAmt").value) || 0), note = $("adNote").value.trim();
+    if(!(amt > 0)){ toast("টাকার পরিমাণ লিখুন"); return; }
+    if(!note){ toast("টাকা কোথা থেকে এলো লিখুন"); return; }
+    const a = readJSON("shop-cash-adjustments", []); a.push({ id: uid(), amount: amt, method: $("adVia").value, note, date: new Date().toISOString(), by: (SESSION && SESSION.name) || "" });
+    localStorage.setItem("shop-cash-adjustments", JSON.stringify(a));
+    closeModal(); pushNow(); toast("✅ যোগ হয়েছে"); pageAccounts();
+  };
+}
+function openOpening(){
+  openModal(`<div class="head"><h3>⚙️ শুরুর টাকা</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="hint">অ্যাপ চালু করার দিন হাতে আর ব্যাংকে যা ছিল। সাধারণ POS-এর একই ঘর — একবার ঠিক করলেই হয়।</div>
+    <div class="row2"><div><label class="f">হাতে নগদ</label><input class="in num" id="opCash" inputmode="decimal" value="${Number(localStorage.getItem("ops-opening-cash")) || 0}"></div><div><label class="f">ব্যাংক / বিকাশ</label><input class="in num" id="opBank" inputmode="decimal" value="${Number(localStorage.getItem("ops-opening-bank")) || 0}"></div></div>
+    <div class="foot"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="opSave">💾 সেভ করুন</button></div>`);
+  $("opSave").onclick = ()=>{
+    localStorage.setItem("ops-opening-cash", String(r2(Number($("opCash").value) || 0)));
+    localStorage.setItem("ops-opening-bank", String(r2(Number($("opBank").value) || 0)));
+    closeModal(); pushNow(); toast("✅ সেভ হয়েছে"); pageAccounts();
+  };
+}
+/* 🔒 দিন শেষের হিসাব — ক্যাশ ড্রয়ার গুনে মেলানো */
+function openDayClose(){
+  const B = cashBank(), F = todayFlows();
+  openModal(`<div class="head"><h3>🔒 দিন শেষের হিসাব</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="calc">আজ নগদ এসেছে <b>${money(F.cashIn)}</b>, গেছে <b>${money(F.cashOut)}</b><br>খাতা অনুযায়ী হাতে থাকার কথা: <b style="font-size:18px">${money(B.cash)}</b></div>
+    <label class="f">ড্রয়ার গুনে পেলেন *</label><input class="in num" id="dcCount" inputmode="decimal" placeholder="যেমন: ${esc(String(Math.round(B.cash)))}">
+    <div class="calc" id="dcDiff" hidden></div>
+    <label class="f">নোট</label><input class="in" id="dcNote" placeholder="যেমন: ২০ টাকার খুচরা কম">
+    <label style="display:flex; gap:8px; align-items:center; margin-top:10px; font-size:14px"><input type="checkbox" id="dcFix"> পার্থক্যটা খাতায় মিলিয়ে নিন (গুনে যা পেলেন সেটাই হাতে নগদ ধরা হবে)</label>
+    <div class="foot"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn green" type="button" id="dcSave">🔒 হিসাব বন্ধ করুন</button></div>`);
+  $("dcCount").oninput = ()=>{
+    const v = $("dcCount").value; if(v === ""){ $("dcDiff").hidden = true; return; }
+    const d = r2(Number(v) - B.cash); $("dcDiff").hidden = false;
+    $("dcDiff").innerHTML = Math.abs(d) < 0.01 ? "✅ পুরোপুরি মিলেছে" : `পার্থক্য: <b class="${d < 0 ? "neg" : "gain"}">${d > 0 ? "বেশি " : "কম "}${money(Math.abs(d))}</b>`;
+  };
+  $("dcSave").onclick = ()=>{
+    if($("dcCount").value === ""){ toast("গুনে কত পেলেন লিখুন"); return; }
+    const counted = r2(Number($("dcCount").value) || 0), diff = r2(counted - B.cash), note = $("dcNote").value.trim();
+    const cl = readJSON(CLOSE_KEY, []); cl.unshift({ id: uid(), date: new Date().toISOString(), expected: B.cash, counted, diff, note, by: (SESSION && SESSION.name) || "", cashIn: F.cashIn, cashOut: F.cashOut });
+    localStorage.setItem(CLOSE_KEY, JSON.stringify(cl.slice(0, 120)));
+    if($("dcFix").checked && Math.abs(diff) >= 0.01){
+      const a = readJSON("shop-cash-adjustments", []); a.push({ id: uid(), amount: diff, method: "cash", note: "দিন শেষের হিসাবে পার্থক্য" + (note ? " · " + note : ""), date: new Date().toISOString(), by: (SESSION && SESSION.name) || "" });
+      localStorage.setItem("shop-cash-adjustments", JSON.stringify(a));
+    }
+    closeModal(); pushNow(); toast(Math.abs(diff) < 0.01 ? "✅ হিসাব মিলেছে" : "🔒 হিসাব বন্ধ — পার্থক্য " + money(Math.abs(diff))); pageAccounts();
+  };
+}
+
+
+/* =====================================================================
+   ⚙️ সেটিংস — শুধু এডমিন
+   দোকানের নাম/উপনাম সাধারণ POS-এর একই ঘর (shop-title / shop-subtitle)।
+   বাকিগুলো hb-pharma-settings-এ — দোকানের সব ফোনে সিঙ্ক হয়।
+   ===================================================================== */
+function pageSettings(){
+  if(!isAdmin()){ go("dash"); return; }
+  const st = SET();
+  const tg = (id, on, label, hint)=> `<label style="display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line); cursor:pointer"><input type="checkbox" id="${id}"${on ? " checked" : ""} style="width:20px; height:20px; margin-top:2px"><span><b style="font-weight:600">${label}</b>${hint ? `<div class="hint">${hint}</div>` : ""}</span></label>`;
+  $("page").innerHTML = `<div class="pageHead"><h1>সেটিংস</h1></div>
+    <div class="grid2">
+      <div class="panel"><h2>🏪 দোকান ও রসিদ</h2>
+        <label class="f">দোকানের নাম</label><input class="in" id="sTitle" value="${esc(localStorage.getItem("shop-title") || (SESSION && SESSION.shopName) || "")}">
+        <label class="f">উপনাম / স্লোগান</label><input class="in" id="sSub" value="${esc(localStorage.getItem("shop-subtitle") || "")}" placeholder="যেমন: বিশ্বস্ত ওষুধের দোকান">
+        <label class="f">ঠিকানা</label><input class="in" id="sAddr" value="${esc(st.address)}" placeholder="যেমন: বাজার রোড, শাহরাস্তি, চাঁদপুর">
+        <div class="row2"><div><label class="f">ফোন</label><input class="in" id="sPhone" inputmode="tel" value="${esc(st.phone)}"></div>
+          <div><label class="f">ড্রাগ লাইসেন্স নম্বর</label><input class="in" id="sLic" value="${esc(st.license)}" placeholder="DL-…"></div></div>
+        <label class="f">রসিদের নিচের লেখা</label><input class="in" id="sFoot" value="${esc(st.footer)}">
+        <label class="f">রসিদের কাগজ</label><select class="in" id="sPaper"><option value="58"${st.paper === "58" ? " selected" : ""}>৫৮ মিমি (ছোট থার্মাল)</option><option value="80"${st.paper === "80" ? " selected" : ""}>৮০ মিমি (থার্মাল)</option><option value="a4"${st.paper === "a4" ? " selected" : ""}>A4 কাগজ</option></select>
+      </div>
+      <div class="panel"><h2>🛒 বিক্রি</h2>
+        <label class="f">ওষুধ যোগ করলে শুরুতে কোন এককে বসবে</label>
+        <select class="in" id="sUnit"><option value="strip"${st.defUnit === "strip" ? " selected" : ""}>পাতা (ট্যাবলেট/ক্যাপসুল সাধারণত)</option><option value="pc"${st.defUnit === "pc" ? " selected" : ""}>পিস</option><option value="box"${st.defUnit === "box" ? " selected" : ""}>বক্স</option></select>
+        <div class="hint">কার্টে গিয়ে প্রতিটা ওষুধের একক যেকোনো সময় বদলানো যায়।</div>
+        <h2 style="margin-top:20px">🧑‍⚕️ স্টাফ কী কী করতে পারবেন</h2>
+        <div class="hint" style="margin-bottom:4px">এডমিন সবসময় সব পারেন। টাকার হিসাব, রিপোর্ট আর সেটিংস স্টাফ কখনো দেখেন না।</div>
+        ${tg("pDisc", st.staffDiscount, "ডিসকাউন্ট দেওয়া", "বন্ধ থাকলে স্টাফের বিক্রিতে ডিসকাউন্টের ঘর থাকবে না")}
+        ${tg("pDue", st.staffDue, "বাকিতে বিক্রি")}
+        ${tg("pPur", st.staffPurchase, "ক্রয় (সরবরাহকারীর কাছ থেকে মাল তোলা)")}
+        ${tg("pWo", st.staffWriteOff, "স্টক গণনা, নষ্ট বাদ আর কোম্পানিকে ফেরত", "বন্ধ থাকলে স্টাফ শুধু স্টক দেখতে পারবেন")}
+      </div>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px"><button class="btn" type="button" id="sSave" style="min-width:160px">💾 সেভ করুন</button></div>
+    <div class="panel" style="margin-top:16px"><h2>💊 ফার্মেসি মোড</h2>
+      <p style="margin:0 0 10px; color:var(--ink-3)">বন্ধ করলে দোকানের সব ফোনে সাধারণ POS খুলবে। ওষুধ, বিক্রি, বাকি, হিসাব — কিছুই মুছবে না; আবার চালু করলে সব আগের মতো পাবেন।</p>
+      <button class="btn red" type="button" id="sOff">↩️ ফার্মেসি মোড বন্ধ করুন</button></div>`;
+  $("sSave").onclick = ()=>{
+    const title = $("sTitle").value.trim();
+    if(title) localStorage.setItem("shop-title", title);
+    localStorage.setItem("shop-subtitle", $("sSub").value.trim());
+    localStorage.setItem("hb-pharma-settings", JSON.stringify({
+      address: $("sAddr").value.trim(), phone: $("sPhone").value.trim(), license: $("sLic").value.trim(), footer: $("sFoot").value.trim(),
+      paper: $("sPaper").value, defUnit: $("sUnit").value,
+      staffDiscount: $("pDisc").checked, staffDue: $("pDue").checked, staffPurchase: $("pPur").checked, staffWriteOff: $("pWo").checked }));
+    $("shopName").textContent = title || $("shopName").textContent;
+    pushNow(); toast("✅ সেটিংস সেভ হয়েছে");
+  };
+  $("sOff").onclick = ()=> $("modeBtn").click();
+}
+
 /* =====================================================================
    🧑‍⚕️ ব্যবহারকারী (স্টাফ) — সাধারণ POS-এর একই সাব-ইউজার
    ===================================================================== */
@@ -1565,7 +2227,7 @@ auth.onAuthStateChanged(async (user)=>{
   netLabel();
   $("gate").remove(); $("app").hidden = false; $("bnav").hidden = false;
   const start = (location.hash || "").replace("#", "");
-  go(["dash","pos","meds","alerts","purchase","suppliers","customers"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
+  go(["dash","pos","meds","alerts","purchase","suppliers","customers","stock"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
 });
 </script>
 </body>
