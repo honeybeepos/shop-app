@@ -606,6 +606,7 @@ $("bellBtn").addEventListener("click", ()=> go("alerts"));
 let CART = [];          // { pid, unit, n }  n = কত একক (পিস/পাতা/বক্স)
 let PAY = "cash";       // cash | card | mobile | due
 let CUST = null;        // { name, phone } — বাছা গ্রাহক (না থাকলে ওয়াক-ইন)
+let RECV = "";          // গ্রাহক কত টাকা দিলেন (খালি = ঠিক যত দাম তত)
 let DISCOUNT = 0;
 let KB = 0;             // কিবোর্ডে বাছা ওষুধের ক্রম
 let POS_Q = "";
@@ -644,7 +645,8 @@ function pagePos(){
     <div class="pageHead"><h1>বিক্রয় (POS)</h1></div>
     <div class="pos">
       <div class="panel">
-        <input class="in" id="posQ" placeholder="🔍 নাম, জেনেরিক বা বারকোড লিখুন…" autocomplete="off" value="${esc(POS_Q)}">
+        <div style="display:flex; gap:8px"><input class="in" id="posQ" placeholder="🔍 নাম, জেনেরিক বা বারকোড লিখুন…" autocomplete="off" value="${esc(POS_Q)}">
+          <button class="btn ghost" type="button" id="camBtn" title="ক্যামেরা দিয়ে বারকোড স্ক্যান" style="flex-shrink:0; font-size:18px; padding:8px 12px">📷</button></div>
         <div class="medList" id="medList" style="margin-top:8px"></div>
       </div>
       <div class="panel cart" id="cartPanel"></div>
@@ -656,8 +658,14 @@ function pagePos(){
     const rows = [...document.querySelectorAll("#medList .med:not(.out)")];
     if(e.key === "ArrowDown"){ e.preventDefault(); KB = Math.min(rows.length - 1, KB + 1); renderMedList(); }
     else if(e.key === "ArrowUp"){ e.preventDefault(); KB = Math.max(0, KB - 1); renderMedList(); }
-    else if(e.key === "Enter"){ e.preventDefault(); const r = rows[KB]; if(r) addToCart(r.dataset.pid); }
+    else if(e.key === "Enter"){
+      e.preventDefault();
+      // USB/ব্লুটুথ স্ক্যানার বা ক্যামেরা: বারকোড হুবহু মিললে সরাসরি কার্টে
+      if(addByBarcode(q.value.trim())) return;
+      const r = rows[KB]; if(r) addToCart(r.dataset.pid);
+    }
   });
+  $("camBtn").onclick = ()=> openCamScanner((code)=>{ if(!addByBarcode(code)){ POS_Q = code; $("posQ").value = code; renderMedList(); toast("এই বারকোডে কোনো ওষুধ নেই — " + code); } });
   if(window.innerWidth > 900) q.focus();
   renderMedList(); renderCart();
 }
@@ -701,6 +709,38 @@ function addToCart(pid){
   if(same > -1) CART[same].n += 1; else CART.push({ pid, unit: unit.key, n: 1 });
   renderMedList(); renderCart();
 }
+function addByBarcode(code){
+  if(!code) return false;
+  const p = loadProducts().find(x=> x.code && String(x.code).trim().toLowerCase() === code.toLowerCase());
+  if(!p) return false;
+  addToCart(p.id);
+  POS_Q = ""; if($("posQ")) $("posQ").value = ""; renderMedList();
+  return true;
+}
+
+/* 📷 ক্যামেরা দিয়ে বারকোড — সাধারণ POS-এর একই লাইব্রেরি (html5-qrcode), দরকারের সময় লোড হয় */
+let CAM = null;
+function loadScript(src){ return new Promise((ok, bad)=>{ const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = bad; document.head.appendChild(s); }); }
+async function openCamScanner(onCode){
+  openModal(`<div class="head"><h3>📷 বারকোড স্ক্যান করুন</h3><button class="x" type="button" id="camClose" aria-label="বন্ধ">✕</button></div>
+    <div id="camRegion" style="width:100%; min-height:240px; background:#000; border-radius:12px; overflow:hidden"></div>
+    <div class="hint" id="camMsg" style="text-align:center; margin-top:8px">স্ক্যানার প্রস্তুত হচ্ছে…</div>`);
+  const stop = ()=>{ const c = CAM; CAM = null; if(c) c.stop().then(()=> c.clear()).catch(()=>{}); };
+  $("camClose").onclick = ()=>{ stop(); closeModal(); };
+  try{ if(typeof Html5Qrcode === "undefined") await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"); }catch(e){}
+  if(typeof Html5Qrcode === "undefined"){ $("camMsg").textContent = "⚠️ স্ক্যানার লোড হয়নি — ইন্টারনেট দেখুন"; return; }
+  try{
+    const F = Html5QrcodeSupportedFormats;
+    CAM = new Html5Qrcode("camRegion", { formatsToSupport: [F.EAN_13, F.EAN_8, F.CODE_128, F.UPC_A, F.UPC_E, F.CODE_39, F.ITF, F.CODABAR, F.QR_CODE], verbose: false });
+    $("camMsg").textContent = "ক্যামেরার অনুমতি দিন, বারকোডটা ফ্রেমের ভেতরে ধরুন";
+    await CAM.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 140 } }, (text)=>{
+      stop(); closeModal();
+      try{ if(navigator.vibrate) navigator.vibrate(80); }catch(e){}
+      onCode(String(text).trim());
+    }, ()=>{});
+  }catch(e){ $("camMsg").textContent = "⚠️ ক্যামেরা চালু হয়নি — ব্রাউজারে ক্যামেরার অনুমতি দিয়েছেন কিনা দেখুন"; }
+}
+
 function renderCart(){
   const box = $("cartPanel"); if(!box) return;
   const T = cartTotals();
@@ -724,7 +764,9 @@ function renderCart(){
     <div class="totals">
       <div><span>মোট</span><span class="num">${money(T.sub)}</span></div>
       ${can("staffDiscount") ? `<div><span>ডিসকাউন্ট</span><input class="num" id="discIn" inputmode="decimal" value="${DISCOUNT || ""}" placeholder="০"></div>` : ""}
-      <div class="grand"><span>পরিশোধ</span><span class="num">${money(T.net)}</span></div>
+      <div class="grand"><span>মোট বিল</span><span class="num">${money(T.net)}</span></div>
+      ${PAY !== "due" ? `<div><span>গ্রাহক দিলেন</span><input class="num" id="recvIn" inputmode="decimal" value="${esc(RECV)}" placeholder="${esc(String(T.net))}"></div>
+      <div id="chgRow" style="display:block">${changeHtml(T.net)}</div>` : ""}
     </div>
     <div class="custRow">
       ${CUST ? `<div class="custChip"><span>👤 <b>${esc(CUST.name)}</b>${CUST.phone ? " · " + esc(CUST.phone) : ""}${isAdmin() && custDue(CUST.name, CUST.phone) > 0 ? ` · <span class="bad">আগের বাকি ${money(custDue(CUST.name, CUST.phone))}</span>` : ""}</span><button class="x" type="button" id="custClear" aria-label="গ্রাহক সরান">✕</button></div>`
@@ -752,12 +794,25 @@ function renderCart(){
   if($("custPick")) $("custPick").onclick = ()=> openCustomerPicker();
   if($("custClear")) $("custClear").onclick = ()=>{ CUST = null; if(PAY === "due") PAY = "cash"; renderCart(); };
   if($("discIn")) $("discIn").onchange = ()=>{ DISCOUNT = Math.max(0, Number($("discIn").value) || 0); renderCart(); };
+  if($("recvIn")){
+    $("recvIn").oninput = ()=>{ RECV = $("recvIn").value.trim(); $("chgRow").innerHTML = changeHtml(cartTotals().net); };
+    $("recvIn").onkeydown = (e)=>{ if(e.key === "Enter"){ e.preventDefault(); completeSale(); } };
+  }
   $("doneBtn").onclick = completeSale;
   const bar = $("cartBar");
   bar.hidden = false;
   document.body.classList.add("hasCart");
   bar.innerHTML = `<div><small style="opacity:.75">${bn(T.lines.length)}টি আইটেম</small><br><b class="num">${money(T.net)}</b></div><button class="btn" type="button" id="barGo">কার্ট দেখুন</button>`;
   $("barGo").onclick = ()=> $("cartPanel").scrollIntoView({ behavior:"smooth", block:"start" });
+}
+// ফেরত বা বাকির হিসাব — "গ্রাহক দিলেন" ঘরের নিচে
+function changeHtml(net){
+  if(RECV === "") return "";
+  const got = r2(Number(RECV) || 0);
+  if(got >= net) return `<div style="display:flex; justify-content:space-between; align-items:center; background:var(--green-soft); border-radius:10px; padding:10px 12px; margin-top:6px"><b>ফেরত দিন</b><b class="num" style="font-size:22px; color:var(--green)">${money(got - net)}</b></div>`;
+  const short = r2(net - got);
+  return `<div style="display:block; background:var(--honey-soft); border-radius:10px; padding:10px 12px; margin-top:6px"><div style="display:flex; justify-content:space-between"><b>কম দিলেন</b><b class="num neg">${money(short)}</b></div>
+    <div class="hint" style="display:block">${!can("staffDue") ? "বাকিতে বিক্রির অনুমতি নেই — পুরো টাকা নিন।" : CUST ? "বিক্রি করলে " + money(short) + " " + esc(CUST.name) + "-এর বাকিতে যোগ হবে।" : "বাকি রাখতে নিচে 👤 গ্রাহক বাছুন।"}</div></div>`;
 }
 function keysHtml(){ return `<div class="keys"><span>F1 নগদ</span><span>F2 কার্ড</span><span>F3 মোবাইল ব্যাংকিং</span><span>F4 বিক্রি সম্পন্ন</span><span>F5 গ্রাহক</span>${can("staffDue") ? "<span>F6 বাকি</span>" : ""}<span>F8 কার্ট খালি</span></div>`; }
 
@@ -837,13 +892,25 @@ async function completeSale(){
   if(PAY === "due" && !can("staffDue")){ PAY = "cash"; toast("বাকিতে বিক্রির অনুমতি নেই"); renderCart(); return; }
   if(!can("staffDiscount")) DISCOUNT = 0;
   if(PAY === "due" && !CUST){ toast("বাকিতে বিক্রি করতে আগে গ্রাহক বাছুন"); openCustomerPicker(); return; }
+  // গ্রাহক কম দিলে বাকিটা বাকি — গ্রাহক বাছা আর বাকির অনুমতি দুটোই লাগবে
+  let partialPaid = null;
+  if(PAY !== "due" && RECV !== ""){
+    const got = r2(Number(RECV) || 0);
+    if(got < T.net){
+      if(!can("staffDue")){ toast("পুরো টাকা নিন — বাকিতে বিক্রির অনুমতি নেই"); return; }
+      if(!CUST){ toast("বাকি রাখতে আগে গ্রাহক বাছুন"); openCustomerPicker(); return; }
+      if(!confirm(`${CUST.name} দিলেন ${money(got)}।\n${money(r2(T.net - got))} বাকি থাকবে। ঠিক আছে?`)) return;
+      partialPaid = got;
+    }
+  }
   SELLING = true;
   const all = readJSON("phone-shop-entries", []);
   const billId = uid();
   const invoiceNo = nextInvoiceNo(all);
   const when = new Date().toISOString();
-  const isDue = PAY === "due";
-  const paymentMethod = isDue ? null : (PAY === "cash" ? "cash" : "bank"); // সাধারণ POS শুধু cash/bank চেনে
+  const isDue = PAY === "due" || partialPaid !== null;
+  let paidLeft = partialPaid !== null ? partialPaid : 0;
+  const paymentMethod = PAY === "due" ? null : (PAY === "cash" ? "cash" : "bank"); // সাধারণ POS শুধু cash/bank চেনে
   const payLabel = { cash:"নগদ", card:"কার্ড", mobile:"মোবাইল ব্যাংকিং", due:"বাকি" }[PAY];
   const cName = CUST ? CUST.name : "ওয়াক-ইন কাস্টমার", cPhone = CUST ? (CUST.phone || "") : "";
   // ডিসকাউন্ট প্রতিটা লাইনে দামের অনুপাতে ভাগ — যাতে লাভের হিসাব ঠিক থাকে
@@ -853,11 +920,14 @@ async function completeSale(){
     discLeft = r2(discLeft - share);
     const price = r2(l.total - share);
     const unitCost = Number(l.p.buy) || 0;
+    // আংশিক পরিশোধ হলে দেওয়া টাকা লাইনে লাইনে ভাগ (শেষ লাইনে যা বাকি থাকে)
+    let paid = isDue ? 0 : price;
+    if(partialPaid !== null){ paid = i === T.lines.length - 1 ? paidLeft : Math.min(paidLeft, r2(partialPaid * (price / (T.net || 1)))); paidLeft = r2(paidLeft - paid); }
     return {
       id: uid(), name: cName, phone: cPhone,
       item: l.p.name + (l.u.key === "pc" ? "" : " (" + bn(l.pieces / l.u.n) + " " + l.u.label + ")"),
       productId: l.p.id, qty: l.pieces, unitPrice: r2(price / l.pieces), unitCost,
-      cost: r2(unitCost * l.pieces), price, paid: isDue ? 0 : price, paymentMethod, payVia: PAY,
+      cost: r2(unitCost * l.pieces), price, paid, paymentMethod, payVia: PAY,
       note: "💊 " + bn(l.pieces / l.u.n) + " " + l.u.label + " = " + bn(l.pieces) + " পিস", status: isDue ? "বাকি" : "নগদ-বিক্রি",
       billId, invoiceNo, date: when, soldBy: (SESSION && SESSION.name) || "এডমিন", source: "pharmacy"
     };
@@ -880,8 +950,8 @@ async function completeSale(){
     saveProducts(prods);
     syncBazarStock(touched);
     if(CUST) ensureCustomer(CUST.name, CUST.phone);
-    showReceipt(newEntries, T, payLabel);
-    CART = []; DISCOUNT = 0; POS_Q = ""; CUST = null; PAY = "cash";
+    showReceipt(newEntries, T, payLabel, RECV === "" ? null : r2(Number(RECV) || 0));
+    CART = []; DISCOUNT = 0; POS_Q = ""; CUST = null; PAY = "cash"; RECV = "";
     if(CUR_PAGE === "pos") pagePos();
     refreshBell();
     pushNow();
@@ -904,7 +974,7 @@ function syncBazarStock(list){
   if(changed){ const all = loadProducts(); list.forEach(p=>{ const x = all.find(y=> y.id === p.id); if(x) x.published = p.published; }); saveProducts(all); }
 }
 
-function showReceipt(entries, T, payLabel){
+function showReceipt(entries, T, payLabel, got){
   const shop = localStorage.getItem("shop-title") || (SESSION && SESSION.shopName) || "ফার্মেসি";
   const sub = localStorage.getItem("shop-subtitle") || "";
   const st = SET();
@@ -914,10 +984,11 @@ function showReceipt(entries, T, payLabel){
     <hr><div>রসিদ: <b>${esc(e0.invoiceNo)}</b><br>${bn(new Date(e0.date).toLocaleString("bn-BD"))}<br>বিক্রেতা: ${esc(e0.soldBy)}${e0.name !== "ওয়াক-ইন কাস্টমার" ? `<br>গ্রাহক: ${esc(e0.name)}${e0.phone ? " (" + esc(e0.phone) + ")" : ""}` : ""}</div><hr>
     <table>${T.lines.map(l=> `<tr><td>${esc(l.p.name)}<br><small>${bn(l.pieces / l.u.n)} ${esc(l.u.label)} × ${esc(money(l.unitPrice))}</small></td><td style="text-align:right">${esc(money(l.total))}</td></tr>`).join("")}</table>
     <hr><table>
-      <tr><td>মোট</td><td style="text-align:right">${esc(money(T.sub))}</td></tr>
-      ${T.disc ? `<tr><td>ডিসকাউন্ট</td><td style="text-align:right">− ${esc(money(T.disc))}</td></tr>` : ""}
-      <tr><td><b>${e0.status === "বাকি" ? "বাকিতে বিক্রি" : "পরিশোধ (" + esc(payLabel) + ")"}</b></td><td style="text-align:right"><b>${esc(money(T.net))}</b></td></tr>
-      ${e0.status === "বাকি" ? `<tr><td>মোট বাকি এখন</td><td style="text-align:right">${esc(money(custDue(e0.name, e0.phone)))}</td></tr>` : ""}
+      ${T.disc ? `<tr><td>মোট</td><td style="text-align:right">${esc(money(T.sub))}</td></tr><tr><td>ডিসকাউন্ট</td><td style="text-align:right">− ${esc(money(T.disc))}</td></tr>` : ""}
+      <tr><td><b>মোট বিল</b></td><td style="text-align:right"><b>${esc(money(T.net))}</b></td></tr>
+      ${got != null && got > 0 ? `<tr><td>দিলেন (${esc(payLabel)})</td><td style="text-align:right">${esc(money(got))}</td></tr>` : ""}
+      ${got != null && got > T.net ? `<tr><td><b>ফেরত</b></td><td style="text-align:right"><b>${esc(money(got - T.net))}</b></td></tr>` : ""}
+      ${e0.status === "বাকি" ? `<tr><td>এই বিলে বাকি</td><td style="text-align:right">${esc(money(T.net - (got != null && got < T.net ? got : 0)))}</td></tr><tr><td>মোট বাকি এখন</td><td style="text-align:right">${esc(money(custDue(e0.name, e0.phone)))}</td></tr>` : ""}
     </table><hr><div class="c">${esc(st.footer || "")}</div></div>`;
   openModal(`<div class="head"><h3>✅ বিক্রি সম্পন্ন</h3></div>${html}
     <div class="foot"><button class="btn ghost" type="button" data-close>নতুন বিক্রি</button><button class="btn" type="button" id="printBtn">🖨️ রসিদ প্রিন্ট</button></div>`);
@@ -978,7 +1049,7 @@ function openMedForm(id){
     <div class="row3">
       <div><label class="f">১ পাতায় কত পিস</label><input class="in num" id="fPps" inputmode="numeric" value="${k.pps}"></div>
       <div><label class="f">১ বক্সে কত পাতা</label><input class="in num" id="fSpb" inputmode="numeric" value="${k.spb}"></div>
-      <div><label class="f">বারকোড (ঐচ্ছিক)</label><input class="in" id="fCode" value="${esc(p ? p.code || "" : "")}"></div>
+      <div><label class="f">বারকোড (ঐচ্ছিক)</label><div style="display:flex; gap:6px"><input class="in" id="fCode" value="${esc(p ? p.code || "" : "")}"><button class="btn ghost" type="button" id="fCam" title="ক্যামেরা দিয়ে স্ক্যান" style="flex-shrink:0; padding:8px 10px">📷</button></div></div>
     </div>
     <div class="hint">সিরাপ, ইনজেকশন বা আলাদা বোতলে দুটো ঘরেই ১ লিখুন — তখন পিস = বোতল।</div>
     <div class="row2">
@@ -1014,6 +1085,11 @@ function openMedForm(id){
       ${bm && bb ? `<br>লাভ প্রতি বক্স: <b>${money(bm - bb)}</b>` : ""}${add ? `<br>যোগ হবে: <b>${bn(add)} পিস</b>` : ""}`;
   };
   ["fPps","fSpb","fBoxBuy","fBoxMrp","fAddBox","fAddPc"].forEach(x=> $(x).addEventListener("input", calc));
+  // ক্যামেরা মোডাল ফর্মটা ঢেকে দেয় — তাই আগে ফর্মের লেখা মনে রেখে, স্ক্যানের পর ফর্ম আবার খুলে কোড বসানো হয়
+  $("fCam").onclick = ()=>{
+    const keep = {}; $("modalRoot").querySelectorAll("input, select").forEach(el=>{ if(el.id) keep[el.id] = el.value; });
+    openCamScanner((code)=>{ openMedForm(id); Object.keys(keep).forEach(k=>{ if($(k)) $(k).value = keep[k]; }); $("fCode").value = code; $("fBoxMrp").dispatchEvent(new Event("input")); });
+  };
   calc();
   $("fSave").onclick = ()=> saveMed(p);
   if($("fDel")) $("fDel").onclick = ()=>{
