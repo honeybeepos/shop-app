@@ -781,6 +781,13 @@
       padding-left:max(24px, calc(50% - 460px)) !important; padding-right:max(24px, calc(50% - 460px)) !important;
     }
     #hbEkaCartBar{ left:50% !important; right:auto !important; width:520px; transform:translateX(-50%); }
+
+    /* বাম পাশের মেনু সব পাতায় থাকবে (Smart Watch, একাদশী, ক্যালকুলেটর, নামাজ,
+       পঞ্জিকা, Messenger, Transport Media) — যেকোনো জায়গা থেকে এক ক্লিকে Home */
+    .footerNav{ display:flex !important; }
+    #screenHoneyMessenger.active{ left:92px; }
+    #screenTransportMedia > div:first-child{ left:92px !important; }
+    #hbTransportFrame{ left:92px !important; width:calc(100% - 92px) !important; }
   }
 </style>
 <script src="bd-locations.js"></script>
@@ -3145,6 +3152,11 @@
 </div>
 
 <div id="hbCartScreen" style="display:none; position:fixed; inset:0; z-index:850; background:var(--bg1); overflow-y:auto; padding:14px 16px 100px;">
+  <!-- ← ফিরে যান — কম্পিউটারে ফোনের ব্যাক বাটন নেই, তাই এখান থেকেই Home-এ ফেরা -->
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+    <span id="hbCartBackBtn" onclick="if(history.state && history.state.hbScreen==='cartOpen'){ history.back(); setTimeout(function(){ if(document.getElementById('hbCartScreen').style.display==='block') hbCloseCart(); }, 350); } else { hbCloseCart(); }" style="font-size:22px; cursor:pointer; color:var(--muted); padding:2px 8px 2px 0;" title="ফিরে যান">←</span>
+    <div style="font-weight:800; font-size:16px;">🛒 Cart</div>
+  </div>
 
   <button id="hbOrderTrackingOpenBtn" style="width:100%; display:flex; align-items:center; gap:10px; padding:14px 16px; border:1px solid var(--border); border-radius:14px; background:var(--card); color:#fff8e8; cursor:pointer; font-family:inherit; margin-bottom:16px;">
     <span style="font-size:20px;">🚚</span>
