@@ -23919,6 +23919,23 @@ auth.onAuthStateChanged(async (user)=>{
     #quickSellBtn:hover, #extraSaleBtn:hover, #addBtn:hover, #addCustomerOnlyBtn:hover{ background:#15803D !important; }
     #tab-add .row > div[style*="flex:0 0 100px"]{ flex:0 0 128px !important; }
     #deskBillCol{ padding:18px !important; }
+    /* উপরের সাদা বারের খালি জায়গায় "কী করতে চান"-এর বোতাম */
+    #hdrModeSlot{ flex:1; min-width:0; display:flex; align-items:center; justify-content:center; padding:0 10px; }
+    #hdrModeSlot .status-group{ width:100%; max-width:760px; margin:0; background:#F1F5F9; border:1px solid var(--dsLine); border-radius:12px; padding:4px; gap:4px; flex-wrap:nowrap; }
+    #hdrModeSlot .status-chip{ background:transparent !important; border:0 !important; border-radius:9px !important; padding:10px 8px !important; font-size:14px !important; font-weight:700 !important; color:#475569 !important; min-width:0; transform:none !important; box-shadow:none !important; white-space:nowrap; }
+    #hdrModeSlot .status-chip:hover{ background:#fff !important; color:#111827 !important; }
+    #hdrModeSlot .status-chip.active{ color:#fff !important; box-shadow:0 1px 4px rgba(0,0,0,.18) !important; }
+    #hdrModeSlot .status-chip.active[data-m="new"]{ background:#2563EB !important; }
+    #hdrModeSlot .status-chip.active[data-m="old"]{ background:#7C3AED !important; }
+    #hdrModeSlot .status-chip.active[data-m="addcust"]{ background:#059669 !important; }
+    #hdrModeSlot .status-chip.active[data-m="quick"]{ background:#EA580C !important; }
+    #hdrModeSlot .status-chip.active[data-m="extrasale"]{ background:#C026D3 !important; }
+    #tab-add .row.hbModeRowEmpty{ display:none; }
+    /* ডান পাশের বিলের নিচে মূল বোতাম — সবসময় চোখের সামনে */
+    #deskActionBox{ position:sticky; bottom:-18px; margin:14px -18px -18px; padding:14px 18px 18px; background:#F9FAFB; border-top:1px solid var(--dsLine); border-radius:0 0 14px 14px; }
+    #deskMainAction{ width:100%; min-height:52px; border:0; border-radius:12px; background:#16A34A; color:#fff; font-family:inherit; font-size:16.5px; font-weight:800; cursor:pointer; }
+    #deskMainAction:hover{ background:#15803D; }
+    #deskActionHint{ font-size:12px; color:var(--dsMuted); text-align:center; margin-top:6px; }
     #deskBillCol .deskBillHead{ font-size:16px !important; }
 
     /* Business Management-এর ভেতরের পাতাগুলো (পুরো পর্দার) সাইডবারের ডান পাশে খোলে */
@@ -23987,7 +24004,62 @@ auth.onAuthStateChanged(async (user)=>{
     side.querySelectorAll(".deskBizItem.on").forEach(x=> x.classList.remove("on"));
     if(biz) biz.classList.add("on");
   }
-  function start(){ place(); setTimeout(brand, 2500); setTimeout(brand, 8000); }
+  /* 🖥️ "কী করতে চান"-এর বোতাম উপরের বারে, আর মূল "সম্পূর্ণ হিসাব যোগ করুন"
+     ডান পাশের বিলের নিচে। আসল বোতামগুলোই সরানো/চাপা হয় — নতুন কোনো হিসাবের কোড নেই। */
+  let modeHome = null, actionTimer = null;
+  const ACTION_IDS = ["addBtn","quickSellBtn","extraSaleBtn","addCustomerOnlyBtn"];
+  function placeMode(){
+    const grp = document.getElementById("customerModeGroup");
+    const hdr = document.getElementById("posHeader");
+    if(!grp || !hdr) return;
+    if(mq.matches){
+      if(!modeHome){ modeHome = { parent: grp.parentNode, row: grp.closest(".row") }; }
+      let slot = document.getElementById("hdrModeSlot");
+      if(!slot){
+        slot = document.createElement("div"); slot.id = "hdrModeSlot";
+        const sw = document.getElementById("headerShopOpenWrap");
+        if(sw && sw.nextSibling) hdr.insertBefore(slot, sw.nextSibling); else hdr.appendChild(slot);
+        // অন্য পাতায় থেকে চাপলে সেল পাতায় নিয়ে যাওয়া
+        slot.addEventListener("click", ()=>{
+          const t = document.getElementById("tab-add");
+          if(t && !t.classList.contains("active")){ const b = document.querySelector('.tab-btn[data-tab="add"]'); if(b) b.click(); }
+        }, true);
+      }
+      slot.style.display = "";
+      if(grp.parentNode !== slot) slot.appendChild(grp);
+      if(modeHome.row) modeHome.row.classList.add("hbModeRowEmpty");
+    }else if(modeHome){
+      if(grp.parentNode !== modeHome.parent) modeHome.parent.appendChild(grp);
+      if(modeHome.row) modeHome.row.classList.remove("hbModeRowEmpty");
+      const slot = document.getElementById("hdrModeSlot"); if(slot) slot.style.display = "none";
+    }
+  }
+  function syncAction(){
+    const col = document.getElementById("deskBillCol");
+    if(!col) return;
+    let box = document.getElementById("deskActionBox");
+    if(!box){
+      box = document.createElement("div"); box.id = "deskActionBox";
+      box.innerHTML = '<button type="button" id="deskMainAction"></button><div id="deskActionHint">বাঁ পাশে সব ঠিক থাকলে এখানে চাপুন</div>';
+      col.appendChild(box);
+      box.querySelector("#deskMainAction").addEventListener("click", ()=>{
+        const t = ACTION_IDS.map(id=> document.getElementById(id)).find(b=> b && b.offsetParent !== null);
+        if(t) t.click();
+      });
+    }else if(box.parentNode !== col || box !== col.lastElementChild){ col.appendChild(box); }
+    const target = ACTION_IDS.map(id=> document.getElementById(id)).find(b=> b && b.offsetParent !== null);
+    box.style.display = target ? "" : "none";
+    if(target){ const btn = box.querySelector("#deskMainAction"); const t = target.textContent.trim(); if(btn.textContent !== t) btn.textContent = t; btn.disabled = !!target.disabled; }
+  }
+  function startDesk(){
+    placeMode();
+    clearInterval(actionTimer);
+    if(mq.matches) actionTimer = setInterval(syncAction, 400);
+    else { const b = document.getElementById("deskActionBox"); if(b) b.style.display = "none"; }
+  }
+  (mq.addEventListener ? mq.addEventListener("change", startDesk) : mq.addListener(startDesk));
+
+  function start(){ place(); startDesk(); setTimeout(brand, 2500); setTimeout(brand, 8000); }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
   (mq.addEventListener ? mq.addEventListener("change", place) : mq.addListener(place));
   window.hbDeskSideRefresh = brand;
