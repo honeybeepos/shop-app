@@ -316,7 +316,7 @@
   <aside class="side" id="side">
     <div class="brand"><div class="logo">🐝</div><div><b>Honey Bee</b><small>Pharmacy Management</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <button class="modeBtn" id="modeBtn" type="button">↩️ সাধারণ POS-এ ফিরুন</button>
+    <button class="modeBtn" id="modeBtn" type="button">🚪 লগআউট</button>
   </aside>
 
   <div class="main">
@@ -2327,9 +2327,12 @@ function pageSettings(){
       </div>
     </div>
     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px"><button class="btn" type="button" id="sSave" style="min-width:160px">💾 সেভ করুন</button></div>
-    <div class="panel" style="margin-top:16px"><h2>💊 ফার্মেসি মোড</h2>
-      <p style="margin:0 0 10px; color:var(--ink-3)">বন্ধ করলে দোকানের সব ফোনে সাধারণ POS খুলবে। ওষুধ, বিক্রি, বাকি, হিসাব — কিছুই মুছবে না; আবার চালু করলে সব আগের মতো পাবেন।</p>
-      <button class="btn red" type="button" id="sOff">↩️ ফার্মেসি মোড বন্ধ করুন</button></div>`;
+    <div class="panel" style="margin-top:16px"><h2>🚪 লগআউট</h2>
+      <p style="margin:0 0 10px; color:var(--ink-3)">এই ফোন থেকে বের হবেন। আপনার সব হিসাব সার্ভারে সেভ আছে — আবার লগইন করলে সব পাবেন।</p>
+      <button class="btn red" type="button" id="sOff">🚪 লগআউট</button></div>
+    ${SESSION && SESSION.shopType !== "pharmacy" && isAdmin() ? `<div class="panel" style="margin-top:16px"><h2>🏪 সাধারণ দোকানে ফিরুন</h2>
+      <p style="margin:0 0 10px; color:var(--ink-3)">এই দোকান ফার্মেসি হিসেবে নিবন্ধিত নয় — আগে "ফার্মেসি মোড" চালু করা হয়েছিল। বন্ধ করলে সব ফোনে আবার সাধারণ POS খুলবে, কোনো হিসাব মুছবে না।</p>
+      <button class="btn ghost" type="button" id="sBackPos">↩️ ফার্মেসি মোড বন্ধ করুন</button></div>` : ""}`;
   $("sSave").onclick = ()=>{
     const title = $("sTitle").value.trim();
     if(title) localStorage.setItem("shop-title", title);
@@ -2342,6 +2345,12 @@ function pageSettings(){
     pushNow(); toast("✅ সেটিংস সেভ হয়েছে");
   };
   $("sOff").onclick = ()=> $("modeBtn").click();
+  if($("sBackPos")) $("sBackPos").onclick = async ()=>{
+    if(!confirm("ফার্মেসি মোড বন্ধ করে সাধারণ POS-এ ফিরবেন?\n\nদোকানের সব ফোনে সাধারণ POS খুলবে। ওষুধ, বিক্রি, স্টক — কিছুই মুছবে না।")) return;
+    localStorage.setItem("hb-pharmacy-mode", "0");
+    await pushNow(true);
+    location.href = "shop-ledger-app.html";
+  };
 }
 
 /* =====================================================================
@@ -2575,12 +2584,16 @@ $("topSearch").addEventListener("keydown", (e)=>{
 /* =====================================================================
    মোড বদল — শুধু এডমিন
    ===================================================================== */
+/* 🚪 লগআউট — আগে এখানে "সাধারণ POS-এ ফিরুন" ছিল; ফার্মেসি এখন আলাদা নিবন্ধন, তাই লগআউট */
 $("modeBtn").addEventListener("click", async ()=>{
-  if(!isAdmin()){ location.href = "shop-ledger-app.html?stay=1"; return; }
-  if(!confirm("ফার্মেসি মোড বন্ধ করে সাধারণ POS-এ ফিরবেন?\n\nদোকানের সব ফোনে সাধারণ POS খুলবে। ওষুধ, বিক্রি, স্টক — কিছুই মুছবে না।")) return;
-  localStorage.setItem("hb-pharmacy-mode", "0");
+  if(!confirm("লগআউট করবেন?\n\nএই ফোন থেকে লোকাল ডেটা মুছে যাবে — সব হিসাব সার্ভারে সেভ আছে, আবার লগইন করলে পাবেন।")) return;
+  const btn = $("modeBtn"); btn.disabled = true; btn.textContent = "⏳ সেভ হচ্ছে…";
   await pushNow(true);
-  location.href = "shop-ledger-app.html";
+  try{ if(typeof disableAutoSync === "function") disableAutoSync(); }catch(e){}
+  try{ (typeof __origClear === "function" ? __origClear : Storage.prototype.clear).call(localStorage); }catch(e){}
+  try{ if(typeof clearSession === "function") clearSession(); }catch(e){}
+  try{ await auth.signOut(); }catch(e){}
+  location.href = "login.html";
 });
 
 /* =====================================================================
@@ -2624,7 +2637,6 @@ auth.onAuthStateChanged(async (user)=>{
   $("shopName").textContent = localStorage.getItem("shop-title") || s.shopName || "ফার্মেসি";
   $("meName").textContent = s.name || "—";
   $("meRole").textContent = isAdmin() ? "এডমিন" : "স্টাফ";
-  if(!isAdmin()) $("modeBtn").textContent = "↩️ সাধারণ POS দেখুন";
   netLabel();
   $("gate").remove(); $("app").hidden = false; $("bnav").hidden = false;
   const start = (location.hash || "").replace("#", "");
