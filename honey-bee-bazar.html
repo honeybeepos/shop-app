@@ -7289,7 +7289,16 @@ async function phLoad(){
     grid.innerHTML = "<div class='mfEmpty'>এবার থানা বেছে নিন — সেই থানার সব ফার্মেসির ওষুধ দেখাবে।</div>";
     return;
   }else{
-    shops = (typeof allShops !== "undefined" && allShops) ? allShops : [];
+    shops = (typeof allShops !== "undefined" && allShops && allShops.length) ? allShops : [];
+    // এলাকা বাছা নেই আর বাজারের তালিকাও এখনো লোড হয়নি — তখন সব সক্রিয় দোকান থেকে খোঁজা
+    if(!shops.length){
+      grid.innerHTML = "<div class='loadingMsg'>ফার্মেসি খোঁজা হচ্ছে...</div>";
+      try{
+        const qs = await db.collection("shops").where("status","==","active").limit(150).get();
+        if(seq !== __phSeq) return;
+        shops = qs.docs.map(d=> ({ id:d.id, ...d.data() })).filter(sh=> !sh.countryCode || sh.countryCode === "BD");
+      }catch(e){ console.warn("pharmacy: all-shops load failed", e); }
+    }
   }
   if(!shops.length){
     __phItems = []; if(note) note.textContent = "";
@@ -7318,7 +7327,7 @@ async function phLoad(){
     __phItems.forEach(p=>{ if(!marketFeedProducts.some(x=> x.id === p.id && x.__shopId === p.__shopId)) marketFeedProducts.push(p); });
   }
   const nShops = new Set(__phItems.map(p=> p.__shopId)).size;
-  if(note) note.textContent = __phItems.length ? `🏥 ${nShops}টা ফার্মেসি · ${__phItems.length}টা ওষুধ` : "";
+  if(note) note.textContent = __phItems.length ? `🏥 ${phBnNum(nShops)}টা ফার্মেসি · ${phBnNum(__phItems.length)}টা ওষুধ${phArea.u ? "" : " — জেলা/থানা বাছলে আপনার কাছের গুলো দেখাবে"}` : "";
   phRender();
 }
 function phRender(){
@@ -7337,7 +7346,8 @@ function phRender(){
     (__phKind !== "priv" || p.private) && (__phKind !== "med" || p.catId === PH_MED_CAT) &&
     (!q || String(p.name||"").toLowerCase().includes(q) || String(p.genericName||"").toLowerCase().includes(q) || String(p.description||"").toLowerCase().includes(q) || String(p.barcode||"").toLowerCase().includes(q)));
   if(!__phItems.length){
-    grid.innerHTML = "<div class='mfEmpty'>💊 এই এলাকায় এখনো কোনো ফার্মেসি Bazar-এ ওষুধ দেয়নি।<br>পাশের থানা বেছে দেখুন।</div>";
+    grid.innerHTML = phArea.u ? "<div class='mfEmpty'>💊 এই এলাকায় এখনো কোনো ফার্মেসি Bazar-এ ওষুধ দেয়নি।<br>পাশের থানা বেছে দেখুন।</div>"
+                              : "<div class='mfEmpty'>💊 এখনো কোনো ফার্মেসি Bazar-এ ওষুধ দেয়নি।<br><small>ফার্মেসি মালিক: ওষুধের ফর্মে \"🛒 Honey Bee Bazar-এ দেখান\" টিক দিলে এখানে আসবে।</small></div>";
   }else if(!list.length){
     grid.innerHTML = "<div class='mfEmpty'>এই নামে কোনো ওষুধ পাওয়া যায়নি।</div>";
   }else{
