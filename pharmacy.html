@@ -2348,7 +2348,8 @@ function pageSettings(){
    🧑‍⚕️ ব্যবহারকারী (স্টাফ) — সাধারণ POS-এর একই সাব-ইউজার
    ===================================================================== */
 async function pageUsers(){
-  $("page").innerHTML = `<div class="pageHead"><h1>ব্যবহারকারী</h1></div><div class="panel" id="usersBox"><div class="empty">লোড হচ্ছে…</div></div>`;
+  $("page").innerHTML = `<div class="pageHead"><h1>ব্যবহারকারী</h1>${isAdmin() ? `<button class="btn" type="button" id="addStaffBtn">➕ নতুন স্টাফ</button>` : ""}</div><div class="panel" id="usersBox"><div class="empty">লোড হচ্ছে…</div></div>`;
+  if($("addStaffBtn")) $("addStaffBtn").onclick = openAddStaff;
   const entries = loadEntries();
   const t = todayStr();
   const todayBy = {};
@@ -2359,7 +2360,43 @@ async function pageUsers(){
   $("usersBox").innerHTML = `<table class="t"><thead><tr><th>নাম</th><th>ভূমিকা</th><th class="r">আজকের বিক্রি</th></tr></thead><tbody>
     ${rows.map(m=> `<tr><td><b>${esc(m.name)}</b>${m.email ? `<div class="hint">${esc(m.email)}</div>` : ""}</td><td>${m.role === "admin" ? "এডমিন" : "স্টাফ"}</td><td class="r num">${money(todayBy[m.name] || 0)}</td></tr>`).join("")}
   </tbody></table>
-  <p class="hint" style="margin-top:12px">স্টাফরা নিজের ইমেইল-পাসওয়ার্ডে লগইন করে বিক্রি ও স্টকের কাজ করতে পারেন — টাকার হিসাব দেখতে পারেন না। প্রতিটা বিক্রিতে কে বিক্রি করলেন সেটা রসিদে থাকে।<br>নতুন স্টাফ যোগ করতে: সাধারণ POS → উপরে "+ সাব-ইউজার"।</p>`;
+  <p class="hint" style="margin-top:12px">স্টাফরা নিজের ইমেইল-পাসওয়ার্ডে <b>honeybeebazar.com/login.html</b> থেকে লগইন করলে সরাসরি এই ফার্মেসি অ্যাপে ঢোকেন। বিক্রি ও স্টকের কাজ করতে পারেন — টাকার হিসাব দেখতে পারেন না। প্রতিটা বিক্রিতে কে বিক্রি করলেন সেটা রসিদে থাকে।<br>স্টাফ কী কী করতে পারবেন (ডিসকাউন্ট, বাকি, ক্রয়, নষ্ট বাদ) — ⚙️ সেটিংস থেকে ঠিক করুন।</p>`;
+}
+/* ➕ নতুন স্টাফ — সাধারণ POS-এর "+ সাব-ইউজার"-এর একই ব্যবস্থা (আলাদা লগইন সেশনে
+   একাউন্ট বানানো হয়, তাই মালিক নিজে লগআউট হন না) */
+function openAddStaff(){
+  openModal(`<div class="head"><h3>➕ নতুন স্টাফ</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <label class="f">স্টাফের নাম *</label><input class="in" id="stName" maxlength="40" placeholder="যেমন: রাকিব">
+    <label class="f">ইমেইল * <span class="hint">(এটা দিয়েই লগইন করবেন)</span></label><input class="in" id="stEmail" type="email" autocomplete="off" placeholder="rakib@gmail.com">
+    <label class="f">পাসওয়ার্ড * <span class="hint">(কমপক্ষে ৬ অক্ষর)</span></label><input class="in" id="stPass" type="text" autocomplete="off" placeholder="যেমন: rakib123">
+    <div class="hint" id="stMsg" style="min-height:18px; margin-top:8px; color:var(--red)"></div>
+    <div class="foot"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="stSave">✅ স্টাফ তৈরি করুন</button></div>`);
+  $("stSave").onclick = async ()=>{
+    const name = $("stName").value.trim(), email = $("stEmail").value.trim().toLowerCase(), pass = $("stPass").value;
+    if(!name){ $("stMsg").textContent = "নাম দিন"; return; }
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ $("stMsg").textContent = "সঠিক ইমেইল দিন"; return; }
+    if(pass.length < 6){ $("stMsg").textContent = "পাসওয়ার্ড কমপক্ষে ৬ অক্ষর"; return; }
+    if(typeof secondaryAuth === "undefined"){ $("stMsg").textContent = "পাতা রিফ্রেশ করে আবার চেষ্টা করুন"; return; }
+    const btn = $("stSave"); btn.disabled = true; btn.textContent = "⏳ তৈরি হচ্ছে…";
+    try{
+      const cred = await secondaryAuth.createUserWithEmailAndPassword(email, pass);
+      const uid = cred.user.uid;
+      const now = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("users").doc(uid).set({ uid, shopId: SESSION.shopId, role: "subuser", name, email, createdAt: now });
+      await db.collection("shops").doc(SESSION.shopId).collection("members").doc(uid).set({ uid, name, role: "subuser", email, createdAt: now });
+      await secondaryAuth.signOut().catch(()=>{});
+      openModal(`<div class="head"><h3>✅ স্টাফ তৈরি হয়েছে</h3></div>
+        <div class="calc">স্টাফকে এই তথ্য দিন:<br>🌐 <b>honeybeebazar.com/login.html</b><br>📧 ইমেইল: <b>${esc(email)}</b><br>🔑 পাসওয়ার্ড: <b>${esc(pass)}</b></div>
+        <div class="hint" style="margin-top:8px">লগইন করলেই সরাসরি এই ফার্মেসি অ্যাপ খুলবে।</div>
+        <div class="foot"><button class="btn" type="button" data-close>ঠিক আছে</button></div>`);
+      if(CUR_PAGE === "users") setTimeout(pageUsers, 300);
+    }catch(e){
+      btn.disabled = false; btn.textContent = "✅ স্টাফ তৈরি করুন";
+      const c = e && e.code;
+      $("stMsg").textContent = c === "auth/email-already-in-use" ? "এই ইমেইলে আগেই একাউন্ট আছে — অন্য ইমেইল দিন"
+        : c === "auth/invalid-email" ? "ইমেইলটা ঠিক নেই" : c === "auth/weak-password" ? "পাসওয়ার্ড আরও শক্ত দিন" : ("তৈরি হয়নি: " + (e.message || e));
+    }
+  };
 }
 
 /* =====================================================================
