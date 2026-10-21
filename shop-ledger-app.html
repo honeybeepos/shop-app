@@ -23949,6 +23949,12 @@ auth.onAuthStateChanged(async (user)=>{
     #deskMainAction{ width:100%; min-height:52px; border:0; border-radius:12px; background:#16A34A; color:#fff; font-family:inherit; font-size:16.5px; font-weight:800; cursor:pointer; }
     #deskMainAction:hover{ background:#15803D; }
     #deskActionHint{ font-size:12px; color:var(--dsMuted); text-align:center; margin-top:6px; }
+    /* নিচের বোতামগুলো (হোল্ড, হোল্ড তালিকা, সম্পূর্ণ হিসাব) স্ক্রল করলেও পর্দার নিচে আটকে থাকে,
+       আর "আইটেমটি তালিকায় যোগ করুন" তার ঠিক উপরে */
+    #tab-add .hbStickyBar{ position:sticky; bottom:0; z-index:6; background:#fff; margin:0 -24px; padding:10px 24px 14px; border-top:1px solid var(--dsLine); box-shadow:0 -10px 18px -12px rgba(16,24,40,.25); }
+    #tab-add .hbStickyBar .holdCartRow{ margin-top:0; }
+    #tab-add .hbStickyBar .btn{ margin:8px 0 0 !important; }
+    #tab-add #qsAddItemBtn, #tab-add #esAddItemBtn, #tab-add #fAddItemBtn{ background:#fff !important; }
     #deskBillCol .deskBillHead{ font-size:16px !important; }
 
     /* Business Management-এর ভেতরের পাতাগুলো (পুরো পর্দার) সাইডবারের ডান পাশে খোলে */
@@ -24118,7 +24124,25 @@ auth.onAuthStateChanged(async (user)=>{
     setInterval(()=>{ if(document.activeElement !== qi && mq.matches) custRender(); }, 8000);
   }
 
-  function start(){ place(); custWire(); startDesk(); setTimeout(brand, 2500); setTimeout(brand, 8000); setTimeout(custRender, 3000); }
+  /* হোল্ডের সারি + মূল বোতাম একটা বাক্সে — কম্পিউটারে সেটা নিচে আটকে থাকে (ফোনে কিছু বদলায় না) */
+  function wrapBars(){
+    [["qsHoldBtn","quickSellBtn"],["esHoldBtn","extraSaleBtn"],["creditHoldBtn","addBtn"]].forEach(([holdId, mainId])=>{
+      const hold = document.getElementById(holdId), main = document.getElementById(mainId);
+      const row = hold && hold.closest(".holdCartRow");
+      if(!row || !main || row.parentNode.classList.contains("hbStickyBar")) return;
+      const bar = document.createElement("div"); bar.className = "hbStickyBar";
+      row.parentNode.insertBefore(bar, row);
+      bar.appendChild(row);
+      if(main.parentNode === bar.parentNode) bar.appendChild(main);
+    });
+    const measure = ()=>{
+      const b = Array.from(document.querySelectorAll("#tab-add .hbStickyBar")).find(x=> x.offsetParent !== null);
+      if(b) document.documentElement.style.setProperty("--hbBarH", (b.offsetHeight + 6) + "px");
+    };
+    setInterval(()=>{ if(mq.matches) measure(); }, 1000);
+  }
+
+  function start(){ place(); custWire(); wrapBars(); startDesk(); setTimeout(brand, 2500); setTimeout(brand, 8000); setTimeout(custRender, 3000); }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
   (mq.addEventListener ? mq.addEventListener("change", place) : mq.addListener(place));
   window.hbDeskSideRefresh = brand;
