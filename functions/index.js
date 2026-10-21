@@ -3178,6 +3178,35 @@ async function pushToSeller(shopId, payload) {
   return pushToShop(shopId, payload);
 }
 
+/* 📄 প্রেসক্রিপশনের খবর —
+   ১) গ্রাহকের ছবি আপলোড শেষ হলে (photoReady) → ফার্মেসির সব ফোনে
+   ২) ফার্মেসি দাম/নিয়ম পাঠালে বা "নিতে পারব না" বললে → গ্রাহকের ফোনে
+   নোটিফিকেশনে কখনো ওষুধের নাম থাকে না — লক-স্ক্রিনে কেউ দেখে ফেললেও কিছু বোঝা যাবে না। */
+exports.onPrescriptionNotify = onDocumentWritten("prescriptions/{rxId}", async (event) => {
+  try {
+    const after = event.data.after.exists ? event.data.after.data() : null;
+    if (!after) return;
+    const b = event.data.before.exists ? event.data.before.data() : {};
+    const rxId = event.params.rxId;
+    if (after.photoReady === true && b.photoReady !== true && after.status === "new" && after.shopId) {
+      await pushToShop(after.shopId, {
+        type: "shop-new-rx", tag: `rx-${rxId}`, link: `${APP_DOMAIN}/pharmacy.html#rx`,
+        title: "📄 নতুন প্রেসক্রিপশন এসেছে",
+        body: `${after.customerName || "একজন গ্রাহক"} প্রেসক্রিপশন পাঠিয়েছেন — দেখে ওষুধ, দাম আর নিয়ম লিখে দিন।`,
+      });
+    }
+    if (after.status !== b.status && after.customerUid && (after.status === "quoted" || after.status === "rejected")) {
+      const quoted = after.status === "quoted";
+      await sendOrderPushToCustomer(after.customerUid,
+        quoted ? "📄 প্রেসক্রিপশনের উত্তর এসেছে" : "📄 প্রেসক্রিপশন নিয়ে ফার্মেসির খবর",
+        quoted ? "ফার্মেসি ওষুধ, দাম আর খাওয়ার নিয়ম পাঠিয়েছে — দেখে নিন।" : "ফার্মেসি এই প্রেসক্রিপশন নিতে পারছে না — কারণ দেখে নিন।",
+        { type: "rx", orderId: `rx-${rxId}`, link: `${BAZAR_APP_URL}?screen=pharmacy` });
+    }
+  } catch (e) {
+    console.error("onPrescriptionNotify ব্যর্থ:", e);
+  }
+});
+
 exports.onOrderPushHub = onDocumentWritten("orderRequests/{orderId}", async (event) => {
   try {
     const after = event.data.after.exists ? event.data.after.data() : null;
