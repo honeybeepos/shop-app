@@ -2575,6 +2575,9 @@ auth.onAuthStateChanged(async (user)=>{
     if(info.currencySymbol) localStorage.setItem("shop-currency-symbol", info.currencySymbol);
   }catch(e){}
   enableAutoSync(s.shopId);
+  // 💊 ফার্মেসি হিসেবে নিবন্ধিত দোকানে মোড প্রথমবার নিজে থেকেই চালু হয় (সব ফোনে সিঙ্ক),
+  // যাতে কোনো ফোনে সাধারণ POS খুললেও সোজা এখানে চলে আসে
+  if(s.shopType === "pharmacy" && localStorage.getItem("hb-pharmacy-mode") === null) localStorage.setItem("hb-pharmacy-mode", "1");
   watchAppDataChanges(s.shopId, ()=>{
     // অন্য ফোনে (স্টাফ) বিক্রি/স্টক বদলালে এখানেও সাথে সাথে দেখা যায়
     if(localStorage.getItem("hb-pharmacy-mode") === "0" && !isAdmin()){ location.replace("shop-ledger-app.html"); return; }

@@ -23616,7 +23616,8 @@ auth.onAuthStateChanged(async (user)=>{
   /* 💊 ফার্মেসি মোড — এডমিন চালু করলে ("hb-pharmacy-mode" = "1", দোকানের সব ফোনে
      সিঙ্ক হয়) POS খুললেই pharmacy.html খোলে। একই খাতা, তাই কিছু হারায় না।
      ফার্মেসি পাতার "সাধারণ POS-এ খুলুন" লিংকে ?stay=1 থাকে — তখন ফেরত পাঠানো হয় না। */
-  if(localStorage.getItem("hb-pharmacy-mode") === "1" && !/[?&]stay=1/.test(location.search)){
+  const __hbSess = (typeof getSession === "function") ? (getSession() || {}) : {};
+  if((localStorage.getItem("hb-pharmacy-mode") === "1" || (__hbSess.shopType === "pharmacy" && localStorage.getItem("hb-pharmacy-mode") === null)) && !/[?&]stay=1/.test(location.search)){
     location.replace("pharmacy.html");
     return;
   }

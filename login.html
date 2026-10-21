@@ -73,6 +73,16 @@
   </div>
 
   <div class="panel" id="panel-signup">
+    <!-- 🏪/💊 দোকানের ধরন — ফার্মেসি বাছলে লগইনের পর সরাসরি ফার্মেসি অ্যাপ খোলে -->
+    <label>দোকানের ধরন</label>
+    <div id="suTypeRow" style="display:flex; gap:8px; margin-bottom:12px;">
+      <button type="button" class="suTypeBtn on" data-type="shop" style="flex:1; padding:12px 6px; border-radius:10px; border:2px solid #1f4a48; background:#1f4a48; color:#fff; font-family:inherit; font-weight:800; font-size:14px; cursor:pointer;">🏪 সাধারণ দোকান</button>
+      <button type="button" class="suTypeBtn" data-type="pharmacy" style="flex:1; padding:12px 6px; border-radius:10px; border:2px solid #d1d5db; background:#fff; color:#374151; font-family:inherit; font-weight:800; font-size:14px; cursor:pointer;">💊 ফার্মেসি</button>
+    </div>
+    <div id="suPharmaFields" style="display:none;">
+      <label>ড্রাগ লাইসেন্স নম্বর <span style="font-weight:400; color:#a89e8c;">(ঐচ্ছিক — পরে সেটিংসে দেওয়া যাবে)</span></label>
+      <input type="text" id="suDrugLicense" maxlength="60" placeholder="যেমন: DL-12345">
+    </div>
     <label>দোকানের নাম</label>
     <input type="text" id="suShopName" placeholder="যেমন: রহিম স্টোর">
     <label>আপনার নাম</label>
@@ -776,9 +786,11 @@ async function afterLoginRoute(uid){
   }
   saveSession({
     uid, role: userDoc.role, shopId: userDoc.shopId,
-    name: userDoc.name || "", email: userDoc.email || "", shopName: shop.shopName || ""
+    name: userDoc.name || "", email: userDoc.email || "", shopName: shop.shopName || "",
+    shopType: shop.shopType || "shop"
   });
-  window.location.href = "shop-ledger-app.html";
+  // 💊 ফার্মেসি হিসেবে নিবন্ধিত দোকান (মালিক আর সব সাব-ইউজার) সরাসরি ফার্মেসি অ্যাপে
+  window.location.href = shop.shopType === "pharmacy" ? "pharmacy.html" : "shop-ledger-app.html";
 }
 
 let __authFlowInProgress = false; // লগইন/সাইনআপ বাটন নিজে থেকে রুট করার সময় নিচের
@@ -889,6 +901,19 @@ document.getElementById("forgotLink").addEventListener("click", async (e)=>{
   }
 });
 
+let __suType = "shop";
+document.querySelectorAll(".suTypeBtn").forEach(b=> b.addEventListener("click", ()=>{
+  __suType = b.dataset.type;
+  document.querySelectorAll(".suTypeBtn").forEach(x=>{
+    const on = x === b;
+    x.style.background = on ? (x.dataset.type === "pharmacy" ? "#2563eb" : "#1f4a48") : "#fff";
+    x.style.borderColor = on ? (x.dataset.type === "pharmacy" ? "#2563eb" : "#1f4a48") : "#d1d5db";
+    x.style.color = on ? "#fff" : "#374151";
+  });
+  document.getElementById("suPharmaFields").style.display = __suType === "pharmacy" ? "block" : "none";
+  document.getElementById("suShopName").placeholder = __suType === "pharmacy" ? "যেমন: মা ফার্মেসি" : "যেমন: রহিম স্টোর";
+}));
+
 document.getElementById("signupBtn").addEventListener("click", async ()=>{
   const shopName = document.getElementById("suShopName").value.trim();
   const name = document.getElementById("suName").value.trim();
@@ -932,6 +957,10 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
     await db.collection("shops").doc(uid).set({
       shopId: uid, ownerUid: uid, shopName, ownerName: name, ownerEmail: email,
       status: "active",
+      // 💊 ফার্মেসি হিসেবে নিবন্ধন — কারো অনুমতি লাগে না, সাথে সাথেই চালু।
+      // ড্রাগ লাইসেন্স ঐচ্ছিক (যাচাই সরকারের কাজ); বাজারের এজেন্ট চাইলে পরে লক করতে পারেন।
+      shopType: __suType === "pharmacy" ? "pharmacy" : "shop",
+      drugLicense: __suType === "pharmacy" ? (document.getElementById("suDrugLicense").value.trim().slice(0, 60) || null) : null,
       district: district || null, upazila: upazila || null, marketId: marketId || null, assignedAgentId,
       onlineEnabled: !!marketId, // 🔌 বাজার ছাড়া নিবন্ধন করলে false — POS/অফলাইন-শুধু দোকান, Bazar-এ দেখা যাবে না
       country: countryName, countryCode, currencyCode, currencySymbol, // 🌍 আন্তর্জাতিক দোকান সাপোর্ট — country/currency
