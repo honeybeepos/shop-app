@@ -23622,13 +23622,16 @@ auth.onAuthStateChanged(async (user)=>{
     return;
   }
   if(session.role === "admin"){
-    const pmBtn = document.getElementById("pharmaModeBtn");
+    // 💊 সাধারণ দোকানে "ফার্মেসি মোড" বোতাম আর দেখায় না — ফার্মেসি এখন নিবন্ধনের সময়ই
+    //    আলাদা বাছা হয়। শুধু ফার্মেসি দোকান (বা আগে মোড চালু করা দোকান) "সাধারণ POS"
+    //    দেখতে এলে ফেরার জন্য বোতামটা থাকে।
+    const pmBtn = (localStorage.getItem("hb-pharmacy-mode") === "1" || __hbSess.shopType === "pharmacy") ? document.getElementById("pharmaModeBtn") : null;
     if(pmBtn){
       pmBtn.style.display = "inline-block";
-      if(localStorage.getItem("hb-pharmacy-mode") === "1") pmBtn.textContent = "💊 ফার্মেসি মোডে যান";
+      pmBtn.textContent = "💊 ফার্মেসিতে ফিরুন";
       pmBtn.addEventListener("click", async ()=>{
         if(localStorage.getItem("hb-pharmacy-mode") !== "1"){
-          if(!confirm("💊 ফার্মেসি মোড চালু করবেন?\n\n• ওষুধ বক্স/পাতা/পিস হিসাবে বিক্রি করা যাবে\n• দোকানের সব ফোনে (স্টাফসহ) ফার্মেসি মোড খুলবে\n• আপনার আগের প্রোডাক্ট, বিক্রি, বাকি — সব আগের মতোই থাকবে\n\nযেকোনো সময় \"সাধারণ POS-এ ফিরুন\" চেপে বন্ধ করা যায়।")) return;
+          if(false && !confirm("💊 ফার্মেসি মোড চালু করবেন?\n\n• ওষুধ বক্স/পাতা/পিস হিসাবে বিক্রি করা যাবে\n• দোকানের সব ফোনে (স্টাফসহ) ফার্মেসি মোড খুলবে\n• আপনার আগের প্রোডাক্ট, বিক্রি, বাকি — সব আগের মতোই থাকবে\n\nযেকোনো সময় \"সাধারণ POS-এ ফিরুন\" চেপে বন্ধ করা যায়।")) return;
           localStorage.setItem("hb-pharmacy-mode", "1");
           pmBtn.disabled = true; pmBtn.textContent = "⏳ চালু হচ্ছে…";
           try{ await Promise.race([pushLocalStorageToCloud(), new Promise(r=> setTimeout(r, 8000))]); }catch(e){}
