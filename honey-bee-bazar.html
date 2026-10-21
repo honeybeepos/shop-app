@@ -13104,7 +13104,7 @@ function hbCloseCart(){
 (function hbHandleShortcut(){
   let which = null;
   try{ which = new URLSearchParams(location.search).get("screen"); }catch(e){ return; }
-  if(which !== "cart" && which !== "orders" && which !== "tmbookings" && which !== "tailor") return;
+  if(which !== "cart" && which !== "orders" && which !== "tmbookings" && which !== "tailor" && which !== "pharmacy") return;
 
   const go = function(){
     // ঠিকানাটা পরিষ্কার করে দেওয়া হচ্ছে, নাহলে পরে রিফ্রেশ করলে
@@ -13116,6 +13116,10 @@ function hbCloseCart(){
       // 🧵 সেলাই অর্ডারের নোটিফিকেশন → সরাসরি সেলাই ঘর (উপরে "আমার সেলাই অর্ডার")
       // এখন সেলাইয়ের অর্ডারও দোকানের অর্ডারের মতো Order Tracking-এ — নোটিফিকেশন চাপলে সেখানেই যায়
       showScreen("screenTailor"); tlrAreaInit(); tlrRenderFeed(); tlrOpenTracking();
+    }
+    else if(which === "pharmacy"){
+      // 📄 প্রেসক্রিপশনের নোটিফিকেশন → সরাসরি ফার্মেসী (আগে লগইন + PIN)
+      showScreen("screenMedicalEquipment"); if(typeof phOpen === "function") phOpen();
     }
     else if(which === "tmbookings"){
       // 🎫 চালক বুকিং গ্রহণ/বাতিল করলে যাত্রীর নোটিফিকেশন → সরাসরি Transport Media-র "আমার বুকিং"
