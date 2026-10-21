@@ -2382,6 +2382,31 @@ exports.cleanupOldHistory = onSchedule("every 24 hours", async () => {
     totalDeleted += removed;
   }
 
+  // 📄 প্রেসক্রিপশন — expireAt (কোর্স শেষ + ৩ দিন, উত্তর না এলে ১০ দিন) পার হলে
+  //    Storage-এর ছবি আর Firestore-এর নথি (খাওয়ার নিয়মসহ) দুটোই মুছে ফেলা হয়
+  try {
+    let rxRemoved = 0;
+    const bucket = getStorage().bucket();
+    for (let round = 0; round < 10; round++) {
+      const snap = await db.collection("prescriptions").where("expireAt", "<", Timestamp.now()).limit(200).get();
+      if (snap.empty) break;
+      await Promise.all(snap.docs.map(async (d) => {
+        const path = d.data().photoPath;
+        if (path && /^prescriptions\//.test(path)) {
+          await bucket.file(path).delete().catch((e) => { if (e.code !== 404) console.warn("📄 ছবি মোছা যায়নি", path, e.message || e); });
+        }
+      }));
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      rxRemoved += snap.size;
+      if (snap.size < 200) break;
+    }
+    if (rxRemoved) console.log(`📄 মেয়াদ শেষ ${rxRemoved}টা প্রেসক্রিপশন (ছবি + নিয়ম) মুছে ফেলা হয়েছে`);
+  } catch (e) {
+    console.error("📄 প্রেসক্রিপশন পরিষ্কার করা যায়নি:", e.message || e);
+  }
+
   console.log(`🗑️ ৭ দিনের পুরনো ${totalDeleted}টা হিস্ট্রি রেকর্ড মুছে ফেলা হয়েছে`);
 });
 
