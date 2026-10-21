@@ -23819,6 +23819,19 @@ auth.onAuthStateChanged(async (user)=>{
     #deskSide #bizMgmtCard .label{ font-size:13.5px !important; font-family:'Noto Sans Bengali',sans-serif !important; }
     #deskSide #deskBizMenu{ background:none; border:0; padding:0; margin:4px 0 0; }
     #deskSide .deskBizItem{ padding:8px 10px; }
+    #deskSide .dsCust{ padding:0 2px; }
+    #deskSide #dsCustQ{ width:100%; box-sizing:border-box; padding:9px 11px !important; border-radius:10px !important; border:1px solid rgba(255,255,255,.12) !important; background:rgba(255,255,255,.07) !important; color:#fff !important; font-size:13px !important; height:auto; }
+    #deskSide #dsCustQ::placeholder{ color:#9CA3AF !important; }
+    #deskSide #dsCustQ:focus{ outline:2px solid var(--dsHoney) !important; }
+    #deskSide #dsCustList{ max-height:240px; overflow-y:auto; margin-top:6px; }
+    #deskSide .dsCi{ display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:9px; cursor:pointer; color:#D1D5DB; }
+    #deskSide .dsCi:hover{ background:rgba(255,255,255,.07); color:#fff; }
+    #deskSide .dsCi .av{ width:28px; height:28px; border-radius:50%; background:rgba(244,180,0,.18); color:var(--dsHoney); display:grid; place-items:center; font-size:12px; font-weight:800; flex-shrink:0; }
+    #deskSide .dsCi .tx{ flex:1; min-width:0; }
+    #deskSide .dsCi .n1{ font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #deskSide .dsCi .n2{ font-size:11px; color:#9CA3AF; }
+    #deskSide .dsCi .due{ font-size:11.5px; font-weight:800; color:#FCA5A5; white-space:nowrap; }
+    #deskSide .dsCiEmpty{ font-size:12px; color:#6B7280; padding:8px 10px; }
     #deskSide .deskBizItem .t2{ color:#6B7280; }
 
     /* ── উপরের সাদা বার ── */
@@ -23976,7 +23989,9 @@ auth.onAuthStateChanged(async (user)=>{
       if(!side){
         side = document.createElement("aside"); side.id = "deskSide";
         side.innerHTML = '<div class="dsBrand"><div class="dsLogo">🐝</div><div><div class="dsName">Honey Bee</div><div class="dsSub">POS · দোকানের হিসাব</div></div></div>'
-          + '<div class="dsLabel">মেনু</div><div class="dsNav"></div><div class="dsLabel">ব্যবসা</div><div class="dsBiz"></div>';
+          + '<div class="dsLabel">মেনু</div><div class="dsNav"></div>'
+          + '<div class="dsLabel">👥 কাস্টমার</div><div class="dsCust"><input type="search" id="dsCustQ" placeholder="🔍 নাম বা নাম্বার দিয়ে খুঁজুন" autocomplete="off"><div id="dsCustList"></div></div>'
+          + '<div class="dsLabel">ব্যবসা</div><div class="dsBiz"></div>';
         document.body.appendChild(side);
         side.addEventListener("click", onSideClick, true);
       }
@@ -24059,7 +24074,51 @@ auth.onAuthStateChanged(async (user)=>{
   }
   (mq.addEventListener ? mq.addEventListener("change", startDesk) : mq.addListener(startDesk));
 
-  function start(){ place(); startDesk(); setTimeout(brand, 2500); setTimeout(brand, 8000); }
+  /* 👥 সাইডবারের কাস্টমার তালিকা — চাপলে সেল ফর্মে সেই কাস্টমার বসে যায়
+     (কুইক/এক্সট্রা সেলে "কাস্টমার" ঘরে, নইলে "পুরাতন" কাস্টমার হিসেবে) */
+  const dsEsc = (v)=> String(v == null ? "" : v).replace(/[&<>"']/g, c=> ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  function custRender(){
+    const box = document.getElementById("dsCustList"), qi = document.getElementById("dsCustQ");
+    if(!box || typeof shopCustomers === "undefined") return;
+    const q = (qi.value || "").trim().toLowerCase();
+    let list = shopCustomers.filter(c=> c && c.name && (!q || c.name.toLowerCase().includes(q) || (c.phone && String(c.phone).includes(q))));
+    if(!q) list = list.slice().reverse();
+    list = list.slice(0, 30);
+    if(!list.length){ box.innerHTML = '<div class="dsCiEmpty">' + (q ? "কোনো কাস্টমার পাওয়া যায়নি" : "এখনো কোনো কাস্টমার নেই") + '</div>'; return; }
+    box.innerHTML = list.map(c=>{
+      let due = 0; try{ due = (typeof getCustomerTotalDue === "function") ? getCustomerTotalDue(c.name, c.phone || "") : 0; }catch(e){}
+      const ini = String(c.name).trim().charAt(0) || "?";
+      return '<div class="dsCi" data-n="' + dsEsc(c.name) + '" data-p="' + dsEsc(c.phone || "") + '">'
+        + '<div class="av">' + dsEsc(ini) + '</div><div class="tx"><div class="n1">' + dsEsc(c.name) + '</div><div class="n2">' + dsEsc(c.phone || "") + '</div></div>'
+        + (due > 0 ? '<div class="due">বাকি ' + dsEsc(fmt(due)) + '</div>' : '') + '</div>';
+    }).join("");
+  }
+  function custPick(name, phone){
+    const t = document.getElementById("tab-add");
+    if(t && !t.classList.contains("active")){ const b = document.querySelector('.tab-btn[data-tab="add"]'); if(b) b.click(); }
+    const act = document.querySelector('#customerModeGroup .status-chip.active');
+    const mode = act ? act.dataset.m : "new";
+    const cust = { name, phone };
+    if(mode === "quick" && typeof qsCustPicker !== "undefined") qsCustPicker.setSelected(cust);
+    else if(mode === "extrasale" && typeof esCustPicker !== "undefined") esCustPicker.setSelected(cust);
+    else {
+      const oldChip = document.querySelector('#customerModeGroup .status-chip[data-m="old"]');
+      if(oldChip && mode !== "old") oldChip.click();
+      if(typeof selectOldCustomer === "function") selectOldCustomer(name, phone);
+    }
+    if(typeof toast === "function") toast("👤 " + name + " বাছা হয়েছে");
+  }
+  function custWire(){
+    const qi = document.getElementById("dsCustQ"), box = document.getElementById("dsCustList");
+    if(!qi || qi.dataset.wired) return;
+    qi.dataset.wired = "1";
+    qi.addEventListener("input", custRender);
+    box.addEventListener("click", (e)=>{ const r = e.target.closest(".dsCi"); if(r) custPick(r.dataset.n, r.dataset.p); });
+    custRender();
+    setInterval(()=>{ if(document.activeElement !== qi && mq.matches) custRender(); }, 8000);
+  }
+
+  function start(){ place(); custWire(); startDesk(); setTimeout(brand, 2500); setTimeout(brand, 8000); setTimeout(custRender, 3000); }
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
   (mq.addEventListener ? mq.addEventListener("change", place) : mq.addListener(place));
   window.hbDeskSideRefresh = brand;
