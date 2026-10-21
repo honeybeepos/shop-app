@@ -27,6 +27,23 @@ service firebase.storage {
       allow delete: if false;
     }
 
+    // 📄 প্রেসক্রিপশনের ছবি — শুধু গ্রাহক নিজে আর যে ফার্মেসিতে পাঠানো হয়েছে।
+    // পাথ: prescriptions/{গ্রাহকের uid}/{prescription ডকুমেন্টের id}
+    match /prescriptions/{uid}/{rxId} {
+      allow read: if request.auth != null
+        && (request.auth.uid == uid
+            || (firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+                && firestore.exists(/databases/(default)/documents/prescriptions/$(rxId))
+                && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.shopId
+                   == firestore.get(/databases/(default)/documents/prescriptions/$(rxId)).data.shopId));
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size <= 400 * 1024
+        && request.resource.contentType == 'image/webp';
+      allow update: if false;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
     match /vehicle-images/{uid}/{photoSlot} {
 
       // গাড়ির ছবি Bazar/Public App-এ দেখা যাবে

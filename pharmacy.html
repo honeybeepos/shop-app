@@ -467,6 +467,7 @@ function ensureMedCategory(){
 const MENU = [
   { key:"dash",      ic:"🏠", label:"ড্যাশবোর্ড" },
   { key:"pos",       ic:"🛒", label:"বিক্রয় (POS)" },
+  { key:"rx",        ic:"📄", label:"প্রেসক্রিপশন" },
   { key:"meds",      ic:"💊", label:"ওষুধের তালিকা" },
   { key:"purchase",  ic:"📥", label:"ক্রয়" },
   { key:"stock",     ic:"📦", label:"স্টক ব্যবস্থাপনা" },
@@ -486,7 +487,8 @@ const BNAV = [
 let CUR_PAGE = "dash";
 function renderNav(){
   const items = MENU.filter(m=> !m.admin || isAdmin());
-  $("nav").innerHTML = items.map(m=> `<button type="button" data-go="${m.key}" class="${m.key === CUR_PAGE ? "on" : ""}"><span class="ic">${m.ic}</span>${esc(m.label)}${m.soon ? '<span class="soon">শীঘ্রই</span>' : ""}</button>`).join("");
+  const rxNew = (typeof RX_LIST !== "undefined") ? RX_LIST.filter(r=> r.status === "new").length : 0;
+  $("nav").innerHTML = items.map(m=> `<button type="button" data-go="${m.key}" class="${m.key === CUR_PAGE ? "on" : ""}"><span class="ic">${m.ic}</span>${esc(m.label)}${m.soon ? '<span class="soon">শীঘ্রই</span>' : ""}${m.key === "rx" && rxNew ? `<span class="soon" style="background:#DC2626; color:#fff">${bn(rxNew)}</span>` : ""}</button>`).join("");
   $("bnav").innerHTML = BNAV.map(m=> `<button type="button" data-go="${m.key}" class="${m.key === CUR_PAGE ? "on" : ""}"><span class="ic">${m.ic}</span>${m.label}</button>`).join("");
 }
 document.addEventListener("click", (e)=>{
@@ -505,7 +507,7 @@ function go(k){
   try{ history.replaceState(null, "", "#" + k); }catch(e){}
   renderNav();
   window.scrollTo(0, 0);
-  const P = { dash: pageDash, pos: pagePos, meds: pageMeds, alerts: pageAlerts, users: pageUsers, purchase: pagePurchase, suppliers: pageSuppliers, customers: pageCustomers, stock: pageStock, reports: pageReports, accounts: pageAccounts, settings: pageSettings }[k];
+  const P = { dash: pageDash, pos: pagePos, rx: pageRx, meds: pageMeds, alerts: pageAlerts, users: pageUsers, purchase: pagePurchase, suppliers: pageSuppliers, customers: pageCustomers, stock: pageStock, reports: pageReports, accounts: pageAccounts, settings: pageSettings }[k];
   if(P) P(); else pageSoon(k);
   refreshBell();
 }
@@ -2363,6 +2365,148 @@ async function pageUsers(){
 /* =====================================================================
    শীঘ্রই আসছে
    ===================================================================== */
+/* =====================================================================
+   📄 প্রেসক্রিপশন (দোকানের দিক)
+   গ্রাহক Bazar থেকে ছবি পাঠান → এখানে দেখে ওষুধ, দাম আর খাওয়ার নিয়ম
+   লিখে পাঠানো হয়। ছবি আর নিয়ম কোর্স শেষের ৩ দিন পর নিজে মুছে যায়।
+   ===================================================================== */
+let RX_LIST = [], RX_UNSUB = null, RX_FIRST = true, RX_TAB = "new";
+const RX_TABS = [["new","🆕 নতুন"],["quoted","💬 দাম পাঠানো"],["accepted","✅ অর্ডার হয়েছে"],["closed","বাতিল"]];
+const RX_FOOD = { after:"খাবারের পরে", before:"খাবারের আগে", any:"যেকোনো সময়" };
+function rxListen(){
+  if(RX_UNSUB || !SESSION || !SESSION.shopId || typeof db === "undefined") return;
+  RX_UNSUB = db.collection("prescriptions").where("shopId","==",SESSION.shopId).onSnapshot(qs=>{
+    RX_LIST = qs.docs.map(d=> ({ id:d.id, ...d.data() }))
+      .sort((a,b)=> (b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0) - (a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0));
+    if(!RX_FIRST) qs.docChanges().forEach(c=>{ if(c.type === "added" && c.doc.data().status === "new") toast("📄 নতুন প্রেসক্রিপশন এসেছে", 4000); });
+    RX_FIRST = false;
+    renderNav();
+    if(CUR_PAGE === "rx" && !document.querySelector(".modal")) pageRx();
+  }, err=> console.warn("prescriptions listen failed", err));
+}
+function rxWhen(r){ return r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().toLocaleString("bn-BD", { day:"numeric", month:"short", hour:"numeric", minute:"2-digit" }) : ""; }
+function pageRx(){
+  const inTab = r=> RX_TAB === "closed" ? ["rejected","cancelled"].includes(r.status) : r.status === RX_TAB;
+  const list = RX_LIST.filter(inTab);
+  const cnt = k=> RX_LIST.filter(r=> k === "closed" ? ["rejected","cancelled"].includes(r.status) : r.status === k).length;
+  $("page").innerHTML = `<div class="pageHead"><h1>📄 প্রেসক্রিপশন</h1><div class="date">গ্রাহক Bazar থেকে ছবি পাঠান — দেখে ওষুধ, দাম আর খাওয়ার নিয়ম লিখে পাঠান</div></div>
+    <div class="tabs">${RX_TABS.map(([k,l])=> `<button type="button" data-rxt="${k}" class="${k === RX_TAB ? "on" : ""}">${l} (${bn(cnt(k))})</button>`).join("")}</div>
+    <div class="panel" style="padding:8px">${list.length ? list.map(r=> `
+      <div data-rxo="${esc(r.id)}" style="display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid var(--line); cursor:pointer">
+        <div style="font-size:26px">📄</div>
+        <div style="flex:1; min-width:0">
+          <div style="font-weight:700">${esc(r.customerName || "গ্রাহক")} <span class="hint">· 📞 ${esc(r.phone || "")}</span></div>
+          <div class="hint">${esc(rxWhen(r))}${r.note ? " · " + esc(r.note) : ""}</div>
+        </div>
+        ${r.total ? `<b class="num">${money(r.total)}</b>` : ""}
+        <span class="chip ${r.status === "new" ? "org" : r.status === "rejected" || r.status === "cancelled" ? "red" : ""}">${{ new:"দেখুন", quoted:"গ্রাহকের অপেক্ষায়", accepted:"অর্ডার হয়েছে", rejected:"নিতে পারেননি", cancelled:"গ্রাহক বাতিল করেছেন" }[r.status] || ""}</span>
+      </div>`).join("") : `<div class="empty">এখানে কোনো প্রেসক্রিপশন নেই</div>`}</div>`;
+  document.querySelectorAll("[data-rxt]").forEach(b=> b.onclick = ()=>{ RX_TAB = b.dataset.rxt; pageRx(); });
+  document.querySelectorAll("[data-rxo]").forEach(b=> b.onclick = ()=> openRx(b.dataset.rxo));
+}
+function rxBlankLine(){ return { pid:null, name:"", qty:1, unitPrice:0, dose:{ m:1, n:0, e:1 }, food:"after", days:5, note:"" }; }
+function openRx(id){
+  const r = RX_LIST.find(x=> x.id === id); if(!r) return;
+  const editable = r.status === "new" || r.status === "quoted";
+  let lines = (r.items && r.items.length ? r.items : [rxBlankLine()]).map(x=> JSON.parse(JSON.stringify(x)));
+  openModal(`
+    <div class="head"><h3>📄 ${esc(r.customerName || "গ্রাহক")}</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="hint">📞 ${esc(r.phone || "")} · ${esc(rxWhen(r))}</div>
+    ${r.note ? `<div class="calc" style="margin-top:8px">💬 গ্রাহক বলেছেন: ${esc(r.note)}</div>` : ""}
+    <div id="rxPhoto" style="margin-top:10px; border:1px solid var(--line); border-radius:12px; overflow:hidden; text-align:center; min-height:60px; background:var(--paper)"><div class="empty">ছবি লোড হচ্ছে…</div></div>
+    <h3 style="font-size:16px; margin:16px 0 4px">💊 ওষুধ, দাম আর খাওয়ার নিয়ম</h3>
+    <div class="hint">তালিকা থেকে ওষুধ বাছলে দাম নিজে বসে যায়। সকাল/দুপুর/রাতে কয়টা — শুধু সংখ্যা লিখুন।</div>
+    <div id="rxLines"></div>
+    ${editable ? `<button class="btn ghost" type="button" id="rxAdd" style="margin-top:8px">➕ আরেকটা ওষুধ</button>` : ""}
+    <div class="calc" id="rxTot" style="margin-top:12px"></div>
+    ${editable ? `<label class="f">দোকানের নোট (ঐচ্ছিক)</label><input class="in" id="rxShopNote" maxlength="200" value="${esc(r.shopNote || "")}" placeholder="যেমন: Seclo নেই, একই ওষুধ Losectil দিলাম">` : (r.shopNote ? `<div class="hint">নোট: ${esc(r.shopNote)}</div>` : "")}
+    <div class="foot">
+      ${editable ? `<button class="btn red" type="button" id="rxReject" style="margin-right:auto">❌ নিতে পারব না</button>` : ""}
+      <button class="btn ghost" type="button" data-close>বন্ধ</button>
+      ${editable ? `<button class="btn green" type="button" id="rxSendQ">📤 গ্রাহককে পাঠান</button>` : ""}
+    </div>`);
+  if(r.photoReady && typeof storage !== "undefined" && storage){
+    storage.ref(r.photoPath).getDownloadURL().then(url=>{ const b = $("rxPhoto"); if(b) b.innerHTML = `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="প্রেসক্রিপশন" style="width:100%; display:block"></a>`; })
+      .catch(()=>{ const b = $("rxPhoto"); if(b) b.innerHTML = `<div class="empty">ছবি দেখানো যায়নি</div>`; });
+  }else{ $("rxPhoto").innerHTML = `<div class="empty">ছবি পাওয়া যায়নি</div>`; }
+
+  const tot = ()=> lines.reduce((a, l)=> a + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0);
+  const drawTot = ()=>{ $("rxTot").innerHTML = `মোট: <b class="num">${money(tot())}</b> · ${bn(lines.filter(l=> l.name.trim()).length)}টা ওষুধ`; };
+  const numIn = (k, v, w)=> `<input class="in num" data-k="${k}" inputmode="decimal" value="${esc(v)}" ${editable ? "" : "disabled"} style="width:${w}; padding:8px 6px; text-align:center">`;
+  const draw = ()=>{
+    $("rxLines").innerHTML = lines.map((l, i)=> `
+      <div data-li="${i}" style="border:1px solid var(--line); border-radius:12px; padding:10px; margin-top:10px">
+        <div style="display:flex; gap:8px; align-items:center">
+          <div class="pick" style="flex:1; position:relative"><input class="in" data-k="name" value="${esc(l.name)}" placeholder="ওষুধের নাম" autocomplete="off" ${editable ? "" : "disabled"}><div class="drop" hidden></div></div>
+          ${editable && lines.length > 1 ? `<button class="btn red" type="button" data-del="${i}" style="padding:8px 10px">✕</button>` : ""}
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-top:8px">
+          <div><div class="hint">কয় পিস</div>${numIn("qty", l.qty, "70px")}</div>
+          <div><div class="hint">দাম/পিস</div>${numIn("unitPrice", l.unitPrice, "80px")}</div>
+          <div><div class="hint">☀️ সকাল · 🌤️ দুপুর · 🌙 রাত</div><div style="display:flex; gap:4px; align-items:center">${numIn("m", l.dose.m, "44px")}+${numIn("n", l.dose.n, "44px")}+${numIn("e", l.dose.e, "44px")}</div></div>
+          <div><div class="hint">খাবার</div><select class="in" data-k="food" ${editable ? "" : "disabled"} style="padding:8px">${Object.entries(RX_FOOD).map(([k,t])=> `<option value="${k}"${l.food === k ? " selected" : ""}>${t}</option>`).join("")}</select></div>
+          <div><div class="hint">কত দিন</div>${numIn("days", l.days, "60px")}</div>
+          <div class="num" style="margin-left:auto; font-weight:700">${money((Number(l.qty) || 0) * (Number(l.unitPrice) || 0))}</div>
+        </div>
+        <input class="in" data-k="note" value="${esc(l.note || "")}" placeholder="নোট (ঐচ্ছিক) — যেমন: পানিতে গুলে খাবেন" ${editable ? "" : "disabled"} style="margin-top:8px">
+      </div>`).join("");
+    $("rxLines").querySelectorAll("[data-li]").forEach(row=>{
+      const i = Number(row.dataset.li);
+      row.querySelectorAll("[data-k]").forEach(inp=>{
+        inp.addEventListener("input", ()=>{
+          const k = inp.dataset.k, v = inp.value;
+          if(["m","n","e"].includes(k)) lines[i].dose[k] = Math.max(0, Number(String(v).replace(/[০-৯]/g, d=> "০১২৩৪৫৬৭৮৯".indexOf(d))) || 0);
+          else if(["qty","unitPrice","days"].includes(k)) lines[i][k] = Math.max(0, Number(String(v).replace(/[০-৯]/g, d=> "০১২৩৪৫৬৭৮৯".indexOf(d))) || 0);
+          else { lines[i][k] = v; if(k === "name") lines[i].pid = null; }
+          drawTot();
+        });
+        if(inp.tagName === "SELECT") inp.addEventListener("change", ()=>{ lines[i].food = inp.value; });
+      });
+      const nm = row.querySelector('[data-k="name"]');
+      if(editable) medPicker(nm, row.querySelector(".drop"), (p)=>{
+        lines[i].pid = p.id; lines[i].name = p.name; lines[i].unitPrice = r2(pcPrice(p));
+        const d = lines[i].dose; const perDay = (d.m || 0) + (d.n || 0) + (d.e || 0);
+        if(perDay && lines[i].days) lines[i].qty = perDay * lines[i].days;
+        draw();
+      });
+      const del = row.querySelector("[data-del]"); if(del) del.onclick = ()=>{ lines.splice(i, 1); draw(); };
+    });
+    drawTot();
+  };
+  draw();
+  if(!editable) return;
+  $("rxAdd").onclick = ()=>{ lines.push(rxBlankLine()); draw(); };
+  $("rxReject").onclick = async ()=>{
+    const why = prompt("কেন নিতে পারছেন না? (গ্রাহক দেখবেন)", "ওষুধ স্টকে নেই");
+    if(why === null) return;
+    try{
+      await db.collection("prescriptions").doc(r.id).update({ status:"rejected", shopNote: String(why).slice(0, 200),
+        quotedAt: firebase.firestore.FieldValue.serverTimestamp(), expireAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 3 * 86400000) });
+      closeModal(); toast("গ্রাহককে জানানো হয়েছে");
+    }catch(e){ toast("পাঠানো যায়নি — ইন্টারনেট দেখুন"); }
+  };
+  $("rxSendQ").onclick = async ()=>{
+    const items = lines.filter(l=> l.name.trim()).map(l=> ({
+      pid: l.pid || null, name: l.name.trim().slice(0, 80), qty: Math.max(1, Math.round(Number(l.qty) || 1)), unitPrice: r2(Number(l.unitPrice) || 0),
+      dose: { m: Number(l.dose.m) || 0, n: Number(l.dose.n) || 0, e: Number(l.dose.e) || 0 }, food: l.food || "any", days: Math.max(1, Math.round(Number(l.days) || 1)), note: (l.note || "").trim().slice(0, 120)
+    }));
+    if(!items.length){ toast("অন্তত একটা ওষুধ লিখুন"); return; }
+    if(items.some(it=> !(it.unitPrice > 0))){ toast("প্রতিটা ওষুধের দাম দিন"); return; }
+    const maxDays = Math.max(...items.map(it=> it.days));
+    const total = r2(items.reduce((a, it)=> a + it.qty * it.unitPrice, 0));
+    const btn = $("rxSendQ"); btn.disabled = true; btn.textContent = "⏳ পাঠানো হচ্ছে…";
+    try{
+      await db.collection("prescriptions").doc(r.id).update({
+        status:"quoted", items, total, shopNote: ($("rxShopNote").value || "").trim().slice(0, 200),
+        quotedAt: firebase.firestore.FieldValue.serverTimestamp(), quotedBy: SESSION.name || "",
+        // কোর্স শেষ + ৩ দিন — তারপর ছবি, নিয়ম সব মুছে যাবে
+        expireAt: firebase.firestore.Timestamp.fromMillis(Date.now() + (maxDays + 3) * 86400000)
+      });
+      closeModal(); toast("✅ গ্রাহককে দাম আর নিয়ম পাঠানো হয়েছে");
+    }catch(e){ btn.disabled = false; btn.textContent = "📤 গ্রাহককে পাঠান"; toast("পাঠানো যায়নি — ইন্টারনেট দেখুন"); }
+  };
+}
+
 function pageSoon(k){
   const m = MENU.find(x=> x.key === k) || { ic:"🛠️", label:"এই অংশ" };
   $("page").innerHTML = `<div class="panel soonBox"><div class="big">${m.ic}</div><h1>${esc(m.label)}</h1>
@@ -2444,7 +2588,8 @@ auth.onAuthStateChanged(async (user)=>{
   netLabel();
   $("gate").remove(); $("app").hidden = false; $("bnav").hidden = false;
   const start = (location.hash || "").replace("#", "");
-  go(["dash","pos","meds","alerts","purchase","suppliers","customers","stock"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
+  rxListen();
+  go(["dash","pos","rx","meds","alerts","purchase","suppliers","customers","stock"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
 });
 </script>
 </body>

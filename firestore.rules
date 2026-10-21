@@ -768,6 +768,33 @@ service cloud.firestore {
       }
     }
 
+    // 📄 প্রেসক্রিপশন — গ্রাহক Bazar থেকে ছবি পাঠান, ফার্মেসি ওষুধ/দাম/খাওয়ার
+    // নিয়ম লিখে পাঠায়। দেখতে পারেন শুধু সেই গ্রাহক আর সেই ফার্মেসি — রাইডার
+    // বা সুপার-অ্যাডমিন না। expireAt পার হলে Cloud Function মুছে দেয়।
+    match /prescriptions/{rxId} {
+      allow create: if isSignedIn() &&
+        request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+        request.resource.data.customerUid == request.auth.uid &&
+        request.resource.data.shopId is string &&
+        request.resource.data.status == 'new';
+      allow read: if isSignedIn() &&
+        (resource.data.customerUid == request.auth.uid ||
+         (myShopId() != null && resource.data.shopId == myShopId()));
+      // গ্রাহক: শুধু ছবি-প্রস্তুত, বাতিল বা "ঠিক আছে" — দাম/ওষুধ বদলাতে পারেন না
+      allow update: if isSignedIn() && (
+        (resource.data.customerUid == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoReady','status','acceptedAt','orderCode']) &&
+          (request.resource.data.status == resource.data.status ||
+           (request.resource.data.status == 'cancelled' && resource.data.status in ['new','quoted']) ||
+           (request.resource.data.status == 'accepted' && resource.data.status == 'quoted'))) ||
+        (myShopId() != null && resource.data.shopId == myShopId() &&
+          request.resource.data.customerUid == resource.data.customerUid &&
+          request.resource.data.shopId == resource.data.shopId &&
+          request.resource.data.status in ['new','quoted','rejected'])
+      );
+      allow delete: if isSignedIn() && resource.data.customerUid == request.auth.uid;
+    }
+
     // 🔧 Bazar কাস্টমার শপ ভিজিট / প্রোডাক্ট ডিটেইল দেখার সময় লগ করে (honey-bee-bazar.html,
     // hbLogShopVisit/hbLogProductView) — এগুলো শুধু create-only (কাস্টমার কখনো নিজের
     // পুরনো লগ read/update/delete করতে পারবে না), আর দোকান মালিক নিজের দোকানের

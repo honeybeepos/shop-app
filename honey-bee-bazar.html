@@ -22,6 +22,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <style>
   /* ==================== 🐝 Bee Flying Animation (ট্রান্সপোর্ট লাইভ ম্যাপে গাড়ির উপরে) ==================== */
   .beeCarWrap{ position:relative; width:34px; height:34px; }
@@ -2852,6 +2853,18 @@
         <select id="phUpz" aria-label="থানা" style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">থানা</option></select>
       </div>
       <div id="phAreaNote" style="font-size:11px; color:var(--muted); margin-top:7px;"></div>
+    </div>
+    <!-- 📄 প্রেসক্রিপশন — ছবি তুলে ফার্মেসিকে পাঠানো, ফার্মেসি দাম ও খাওয়ার নিয়ম লিখে পাঠায় -->
+    <div class="card" style="padding:14px; margin-bottom:12px; border-color:rgba(96,165,250,.45);">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="font-size:30px;">📄</div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:800; font-size:14.5px;">প্রেসক্রিপশন পাঠান</div>
+          <div style="font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.5;">ছবি তুলে পাঠালেই হবে — কিছু লিখতে হবে না। ফার্মেসি ওষুধ, দাম আর খাওয়ার নিয়ম লিখে পাঠাবে।</div>
+        </div>
+      </div>
+      <button type="button" id="phRxBtn" style="margin-top:12px; width:100%; padding:12px; border:0; border-radius:11px; background:#2563eb; color:#fff; font-family:inherit; font-weight:800; font-size:14px; cursor:pointer;">📷 প্রেসক্রিপশনের ছবি তুলুন</button>
+      <div id="phRxList" style="margin-top:4px;"></div>
     </div>
     <input id="phSearch" class="searchBox" type="search" placeholder="🔍 ওষুধ বা জেনেরিক নাম লিখুন — যেমন Napa, Paracetamol" autocomplete="off" style="margin-bottom:10px;">
     <div id="phShopChips" style="display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;"></div>
@@ -6868,6 +6881,7 @@ function phIsOpen(){ const el = document.getElementById("screenMedicalEquipment"
 function phLock(){
   if(!__phUnlockedUid) return;
   __phUnlockedUid = null;
+  if(typeof phRxStop === "function") phRxStop();
   const g = document.getElementById("phGrid"); if(g) g.innerHTML = "";
   if(phIsOpen()) phApplyGate();
 }
@@ -6994,13 +7008,231 @@ function phOpen(){ phApplyGate(); }
 function phAuthChanged(){
   const u = phRealUser();
   if(!u || u.uid !== __phUnlockedUid){ __phUnlockedUid = null; }
-  if(!u){ __phPinRec = undefined; __phPinUid = null; }
+  if(!u){ __phPinRec = undefined; __phPinUid = null; if(typeof phRxStop === "function") phRxStop(); }
   if(phIsOpen()) phApplyGate();
 }
 
 /* 🔒 গোপনীয় পণ্য (private:true) বাজারের সাধারণ কোনো তালিকা, খোঁজ, দোকানের পাতা
    বা শেয়ার-লিংকে দেখায় না — শুধু ফার্মেসী পাতায়, Google লগইন + PIN দেওয়ার পর। */
 function hbPubDocs(qs){ return qs.docs.filter(d=> !(d.data() || {}).private); }
+/* =====================================================================
+   📄 প্রেসক্রিপশন (গ্রাহকের দিক) — prescriptions/{id}
+   ছবি থাকে Storage-এ prescriptions/{uid}/{id} — শুধু গ্রাহক আর সেই ফার্মেসি দেখতে পারে।
+   কোর্স শেষ হওয়ার ৩ দিন পর (expireAt) সার্ভার নিজে সব মুছে দেয়।
+   ===================================================================== */
+let __phRxUnsub = null, __phRxDocs = [];
+const PH_RX_STATUS = {
+  new:      { t:"⏳ ফার্মেসি দেখছে",            c:"#fbbf24" },
+  quoted:   { t:"💬 ওষুধ ও দাম এসেছে",           c:"#60a5fa" },
+  accepted: { t:"✅ অর্ডার করা হয়েছে",          c:"#4ade80" },
+  rejected: { t:"❌ ফার্মেসি নিতে পারেনি",       c:"#f87171" },
+  cancelled:{ t:"🚫 বাতিল করেছেন",               c:"#9ca3af" }
+};
+function phRxStop(){ if(__phRxUnsub){ __phRxUnsub(); __phRxUnsub = null; } __phRxDocs = []; const el = document.getElementById("phRxList"); if(el) el.innerHTML = ""; }
+function phRxListen(){
+  const u = phRealUser(); if(!u || __phRxUnsub) return;
+  __phRxUnsub = db.collection("prescriptions").where("customerUid","==",u.uid).onSnapshot(qs=>{
+    __phRxDocs = qs.docs.map(d=> ({ id:d.id, ...d.data() }))
+      .sort((a,b)=> (b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0) - (a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0));
+    phRxRenderList();
+  }, err=> console.warn("prescriptions listen failed", err));
+}
+function phRxRenderList(){
+  const el = document.getElementById("phRxList"); if(!el) return;
+  if(!__phRxDocs.length){ el.innerHTML = ""; return; }
+  el.innerHTML = phDoseCardsHtml() + `<div style="font-size:12px; font-weight:800; color:var(--muted); margin:12px 0 6px;">আমার প্রেসক্রিপশন</div>` +
+    __phRxDocs.map(r=>{
+      const st = PH_RX_STATUS[r.status] || PH_RX_STATUS.new;
+      const when = r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().toLocaleDateString("bn-BD", { day:"numeric", month:"short" }) : "";
+      return `<div data-rx="${phEsc(r.id)}" style="display:flex; align-items:center; gap:10px; padding:10px 12px; margin-top:6px; border-radius:11px; background:rgba(255,255,255,0.05); border:1px solid var(--border); cursor:pointer;">
+        <div style="font-size:20px;">📄</div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:800; font-size:13px;">🏥 ${phEsc(r.shopName || "ফার্মেসি")}</div>
+          <div style="font-size:11px; color:var(--muted);">${phEsc(when)}${r.total ? ` · মোট ৳${phEsc(r.total)}` : ""}</div>
+        </div>
+        <span style="font-size:11px; font-weight:800; color:${st.c}; text-align:right;">${st.t}</span>
+      </div>`;
+    }).join("");
+  el.querySelectorAll("[data-rx]").forEach(row=> row.onclick = ()=> phRxOpenDetail(row.getAttribute("data-rx")));
+}
+// ছবি ছোট করা — লেখা পড়া যায় এমন মাপে (≤৩৫০KB, WebP)
+async function phRxProcessImage(file){
+  if(!file || !file.type || !file.type.startsWith("image/")) throw new Error("শুধু ছবি দেওয়া যাবে");
+  const img = await new Promise((res, rej)=>{ const im = new Image(), u = URL.createObjectURL(file); im.onload = ()=>{ URL.revokeObjectURL(u); res(im); }; im.onerror = ()=>{ URL.revokeObjectURL(u); rej(new Error("ছবি খোলা যায়নি")); }; im.src = u; });
+  let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const sc = Math.min(1, 1600 / Math.max(w, h)); w = Math.round(w * sc); h = Math.round(h * sc);
+  const draw = (w, h, q)=> new Promise(r=>{ const c = document.createElement("canvas"); c.width = w; c.height = h; const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h); c.toBlob(b=> r(b), "image/webp", q); });
+  let blob = null;
+  for(const q of [0.8, 0.68, 0.56, 0.45]){ blob = await draw(w, h, q); if(blob && blob.size <= 350 * 1024) break; }
+  for(let i = 0; blob && blob.size > 350 * 1024 && i < 3; i++){ w = Math.round(w * 0.82); h = Math.round(h * 0.82); blob = await draw(w, h, 0.45); }
+  if(!blob || blob.type !== "image/webp") throw new Error("এই ফোনে ছবি তৈরি করা যায়নি");
+  if(blob.size > 350 * 1024) throw new Error("ছবিটা অনেক বড় — আবার তুলুন");
+  return { blob, url: URL.createObjectURL(blob) };
+}
+function phRxOpenSend(){
+  const u = phRealUser(); if(!u) return phApplyGate();
+  const shops = []; const seen = new Set();
+  __phItems.forEach(p=>{ if(!seen.has(p.__shopId)){ seen.add(p.__shopId); shops.push({ id:p.__shopId, name:p.__shopName, open:p.__shopIsOpen }); } });
+  const ov = hbPrivModal();
+  const close = ()=>{ ov.style.display = "none"; ov.innerHTML = ""; };
+  const inp = "width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:14px; box-sizing:border-box;";
+  ov.innerHTML = `<div style="width:100%; max-width:440px; background:#1a1206; border:1px solid rgba(96,165,250,.5); border-radius:20px; padding:18px; color:#fff8e8; max-height:92vh; overflow:auto;">
+    <div style="display:flex; align-items:center;"><b style="font-size:16px;">📄 প্রেসক্রিপশন পাঠান</b><span id="rxX" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span></div>
+    ${shops.length ? `
+    <div style="font-size:12.5px; font-weight:700; color:var(--muted); margin:14px 0 6px;">১. কোন ফার্মেসিতে পাঠাবেন?</div>
+    <select id="rxShop" style="${inp}">${shops.map(sh=> `<option value="${phEsc(sh.id)}">🏥 ${phEsc(sh.name)}${sh.open ? "" : " (এখন বন্ধ)"}</option>`).join("")}</select>
+    <div style="font-size:12.5px; font-weight:700; color:var(--muted); margin:14px 0 6px;">২. প্রেসক্রিপশনের ছবি</div>
+    <label style="display:flex; align-items:center; justify-content:center; gap:8px; min-height:150px; border:2px dashed rgba(96,165,250,.6); border-radius:14px; cursor:pointer; overflow:hidden; background:rgba(96,165,250,.06);" id="rxPick">
+      <span id="rxPrev" style="font-size:14px; font-weight:700; color:#93c5fd; text-align:center; padding:10px;">📷 এখানে চাপুন — ক্যামেরা বা গ্যালারি</span>
+      <input type="file" id="rxFile" accept="image/*" style="display:none;">
+    </label>
+    <div style="font-size:11px; color:var(--muted); margin-top:5px;">পুরো কাগজটা যেন আলোতে আর সোজা করে আসে — ডাক্তারের লেখা পড়া যায় এমনভাবে।</div>
+    <div style="font-size:12.5px; font-weight:700; color:var(--muted); margin:14px 0 6px;">৩. যোগাযোগ নম্বর</div>
+    <input id="rxPhone" type="tel" placeholder="01XXXXXXXXX" style="${inp}">
+    <div style="font-size:12.5px; font-weight:700; color:var(--muted); margin:14px 0 6px;">কিছু বলার থাকলে (ঐচ্ছিক)</div>
+    <textarea id="rxNote" rows="2" maxlength="300" placeholder="যেমন: ৭ দিনের ওষুধ দিন" style="${inp} resize:vertical;"></textarea>
+    <div id="rxMsg" style="min-height:18px; margin-top:8px; font-size:12.5px; font-weight:700; color:#fca5a5;"></div>
+    <button type="button" id="rxSend" style="margin-top:6px; width:100%; padding:13px; border:0; border-radius:12px; background:#2563eb; color:#fff; font-family:inherit; font-weight:800; font-size:14.5px; cursor:pointer;">📤 পাঠান</button>
+    <div style="font-size:11px; color:var(--muted); margin-top:10px; line-height:1.6;">🔒 ছবিটা শুধু আপনি আর এই ফার্মেসি দেখতে পারবে। ওষুধের কোর্স শেষ হওয়ার ৩ দিন পর নিজে থেকে মুছে যাবে।</div>`
+    : `<div style="margin-top:14px; font-size:13.5px; line-height:1.8;">এই এলাকায় এখনো কোনো ফার্মেসি পাওয়া যায়নি।<br>উপরে জেলা আর থানা বেছে নিন — সেই এলাকার ফার্মেসি দেখা গেলে প্রেসক্রিপশন পাঠাতে পারবেন।</div>`}
+  </div>`;
+  ov.querySelector("#rxX").onclick = close;
+  if(!shops.length) return;
+  try{ const ph = document.getElementById("hbCartPhoneInput"); if(ph && ph.value) ov.querySelector("#rxPhone").value = ph.value; }catch(e){}
+  let picked = null;
+  const msg = t=> ov.querySelector("#rxMsg").textContent = t || "";
+  ov.querySelector("#rxFile").onchange = async e=>{
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    ov.querySelector("#rxPrev").textContent = "⏳ ছবি তৈরি হচ্ছে...";
+    try{
+      picked = await phRxProcessImage(f);
+      ov.querySelector("#rxPrev").outerHTML = `<img id="rxPrev" src="${picked.url}" alt="" style="width:100%; max-height:260px; object-fit:contain; display:block;">`;
+      msg("");
+    }catch(err){ picked = null; ov.querySelector("#rxPrev").textContent = "📷 আবার চাপুন"; msg("❌ " + err.message); }
+  };
+  ov.querySelector("#rxSend").onclick = async ()=>{
+    const user = phRealUser(); if(!user){ close(); return phApplyGate(); }
+    const shopId = ov.querySelector("#rxShop").value;
+    const sh = shops.find(x=> x.id === shopId);
+    const phone = ov.querySelector("#rxPhone").value.trim();
+    if(!picked){ msg("প্রেসক্রিপশনের ছবি দিন"); return; }
+    if(!/^\+?[0-9০-৯][0-9০-৯\s-]{8,}$/.test(phone)){ msg("সঠিক মোবাইল নম্বর দিন"); return; }
+    const btn = ov.querySelector("#rxSend"); btn.disabled = true; btn.textContent = "⏳ পাঠানো হচ্ছে...";
+    const ref = db.collection("prescriptions").doc();
+    const path = `prescriptions/${user.uid}/${ref.id}`;
+    try{
+      await ref.set({
+        customerUid: user.uid, customerName: (currentCustomer && currentCustomer.name) || "গ্রাহক",
+        shopId, shopName: sh ? sh.name : "ফার্মেসি", phone, note: ov.querySelector("#rxNote").value.trim().slice(0, 300),
+        photoPath: path, status: "new", items: [], total: 0,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        // উত্তর না এলেও ১০ দিন পর মুছে যাবে; ফার্মেসি নিয়ম লিখলে কোর্সের দিন ধরে নতুন তারিখ বসে
+        expireAt: firebase.firestore.Timestamp.fromMillis(Date.now() + 10 * 86400000)
+      });
+      await firebase.storage().ref(path).put(picked.blob, { contentType: "image/webp" });
+      await ref.update({ photoReady: true });
+      close();
+      hbToastLite("✅ প্রেসক্রিপশন পাঠানো হয়েছে");
+    }catch(err){
+      console.error(err);
+      ref.delete().catch(()=>{});
+      btn.disabled = false; btn.textContent = "📤 পাঠান";
+      msg("পাঠানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন");
+    }
+  };
+}
+function phRxOpenDetail(id){
+  const r = __phRxDocs.find(x=> x.id === id); if(!r) return;
+  const ov = hbPrivModal();
+  const close = ()=>{ ov.style.display = "none"; ov.innerHTML = ""; };
+  const st = PH_RX_STATUS[r.status] || PH_RX_STATUS.new;
+  ov.innerHTML = `<div style="width:100%; max-width:460px; background:#1a1206; border:1px solid var(--border); border-radius:20px; padding:18px; color:#fff8e8; max-height:92vh; overflow:auto;">
+    <div style="display:flex; align-items:center;"><b style="font-size:16px;">📄 ${phEsc(r.shopName || "ফার্মেসি")}</b><span id="rxX" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span></div>
+    <div style="margin-top:6px; font-size:13px; font-weight:800; color:${st.c};">${st.t}</div>
+    <div id="rxImg" style="margin-top:12px; min-height:60px; border-radius:12px; overflow:hidden; background:rgba(255,255,255,0.04); text-align:center; font-size:12px; color:var(--muted); padding:${r.photoReady ? "0" : "16px"};">${r.photoReady ? "ছবি লোড হচ্ছে..." : "ছবি পাওয়া যায়নি"}</div>
+    ${r.status === "new" ? `<div style="margin-top:12px; font-size:12.5px; color:var(--muted); line-height:1.7;">ফার্মেসি ছবি দেখে ওষুধ, দাম আর খাওয়ার নিয়ম লিখে পাঠাবে — তখন এখানে দেখাবে।</div>` : ""}
+    ${r.status === "rejected" && r.shopNote ? `<div style="margin-top:12px; font-size:13px;">ফার্মেসি বলেছে: ${phEsc(r.shopNote)}</div>` : ""}
+    <div id="rxQuote"></div>
+    ${r.status === "new" ? `<button type="button" id="rxCancel" style="margin-top:14px; width:100%; padding:11px; border:1px solid #f87171; border-radius:11px; background:transparent; color:#f87171; font-family:inherit; font-weight:800; cursor:pointer;">🚫 বাতিল করুন</button>` : ""}
+    <button type="button" id="rxDel" style="margin-top:10px; width:100%; padding:10px; border:0; border-radius:11px; background:rgba(255,255,255,0.05); color:var(--muted); font-family:inherit; font-weight:700; cursor:pointer;">🗑️ এখনই মুছে ফেলুন</button>
+  </div>`;
+  ov.querySelector("#rxX").onclick = close;
+  if(r.photoReady){
+    firebase.storage().ref(r.photoPath).getDownloadURL().then(url=>{
+      const box = ov.querySelector("#rxImg"); if(box) box.innerHTML = `<img src="${url}" alt="" style="width:100%; display:block;">`;
+    }).catch(()=>{ const box = ov.querySelector("#rxImg"); if(box){ box.style.padding = "16px"; box.textContent = "ছবি দেখানো যায়নি"; } });
+  }
+  if(typeof phRxRenderQuote === "function") phRxRenderQuote(r, ov.querySelector("#rxQuote"), close);
+  const c = ov.querySelector("#rxCancel");
+  if(c) c.onclick = async ()=>{ if(!confirm("প্রেসক্রিপশনটা বাতিল করবেন?")) return; await db.collection("prescriptions").doc(r.id).update({ status:"cancelled" }).catch(()=>{}); close(); };
+  ov.querySelector("#rxDel").onclick = async ()=>{
+    if(!confirm("প্রেসক্রিপশন, ছবি আর খাওয়ার নিয়ম — সব এখনই মুছে যাবে। মুছবেন?")) return;
+    try{ if(r.photoReady) await firebase.storage().ref(r.photoPath).delete(); }catch(e){}
+    await db.collection("prescriptions").doc(r.id).delete().catch(()=>{});
+    close(); hbToastLite("🗑️ মুছে ফেলা হয়েছে");
+  };
+}
+
+/* ---------- 📄 প্রেসক্রিপশন: ফার্মেসির দাম দেখা, "ঠিক আছে", খাওয়ার নিয়মের কার্ড ---------- */
+const PH_FOOD = { after:"খাবারের পরে", before:"খাবারের আগে", any:"যেকোনো সময়" };
+function phBnNum(n){ return String(n).replace(/\d/g, d=> "০১২৩৪৫৬৭৮৯"[d]); }
+function phDoseHtml(d){
+  d = d || {};
+  const slot = (ic, label, n)=> `<span style="display:inline-flex; flex-direction:column; align-items:center; min-width:46px; padding:5px 4px; border-radius:10px; background:${n ? "rgba(250,204,21,0.18)" : "rgba(255,255,255,0.04)"}; border:1px solid ${n ? "rgba(250,204,21,0.55)" : "var(--border)"}; opacity:${n ? 1 : 0.45};">
+      <span style="font-size:18px;">${ic}</span><span style="font-size:10px; color:var(--muted);">${label}</span><b style="font-size:13px;">${n ? phBnNum(n) : "—"}</b></span>`;
+  return `<span style="display:inline-flex; gap:5px;">${slot("☀️","সকাল",d.m)}${slot("🌤️","দুপুর",d.n)}${slot("🌙","রাত",d.e)}</span>`;
+}
+function phRxItemsHtml(r){
+  return (r.items || []).map(it=> `
+    <div style="padding:10px 0; border-bottom:1px solid var(--border);">
+      <div style="display:flex; justify-content:space-between; gap:8px;"><b style="font-size:14px;">💊 ${phEsc(it.name)}</b><span style="font-size:12.5px; white-space:nowrap;">${phBnNum(it.qty)} × ৳${phEsc(it.unitPrice)} = <b>৳${phEsc(Math.round(it.qty * it.unitPrice * 100) / 100)}</b></span></div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:8px;">${phDoseHtml(it.dose)}
+        <span style="font-size:12px; line-height:1.6;">🍽️ ${phEsc(PH_FOOD[it.food] || "")}<br>📅 ${phBnNum(it.days)} দিন</span></div>
+      ${it.note ? `<div style="font-size:12px; color:#fde68a; margin-top:6px;">📝 ${phEsc(it.note)}</div>` : ""}
+    </div>`).join("");
+}
+function phRxRenderQuote(r, el, close){
+  if(!el || !["quoted","accepted"].includes(r.status) || !(r.items && r.items.length)) return;
+  el.innerHTML = `<div style="margin-top:14px; font-weight:800; font-size:14px;">💊 ওষুধ, দাম আর খাওয়ার নিয়ম</div>
+    ${phRxItemsHtml(r)}
+    <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:15px; font-weight:800; color:var(--amber);"><span>মোট</span><span>৳${phEsc(r.total)}</span></div>
+    ${r.shopNote ? `<div style="margin-top:8px; font-size:12.5px; color:#fde68a;">🏥 ফার্মেসির নোট: ${phEsc(r.shopNote)}</div>` : ""}
+    <div style="font-size:11px; color:var(--muted); margin-top:8px; line-height:1.6;">এই নিয়ম আপনার প্রেসক্রিপশন দেখে ফার্মেসি লিখেছে। কোনো সন্দেহ হলে ডাক্তারকে জিজ্ঞেস করুন।</div>
+    ${r.status === "quoted" ? `<button type="button" id="rxAccept" style="margin-top:14px; width:100%; padding:13px; border:0; border-radius:12px; background:#16a34a; color:#fff; font-family:inherit; font-weight:800; font-size:14.5px; cursor:pointer;">✅ ঠিক আছে — Cart-এ নিন</button>` : ""}`;
+  const b = el.querySelector("#rxAccept");
+  if(b) b.onclick = async ()=>{
+    b.disabled = true; b.textContent = "⏳ একটু অপেক্ষা...";
+    try{
+      await db.collection("prescriptions").doc(r.id).update({ status:"accepted", acceptedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      const cart = hbCartGet();
+      r.items.forEach((it, i)=>{
+        const pid = it.pid || `rx:${r.id}:${i}`;
+        const ex = cart.find(c=> c.productId === pid && c.shopId === r.shopId);
+        if(ex) ex.qty = it.qty;
+        else cart.push({ shopId: r.shopId, shopName: r.shopName || "ফার্মেসি", productId: pid, productName: it.name, price: Number(it.unitPrice) || 0, qty: Number(it.qty) || 1, variantColor:null, variantSize:null, isPrivate:false, rxId: r.id });
+      });
+      hbCartSet(cart);
+      close();
+      hbToastLite("🛒 ওষুধগুলো Cart-এ আছে — ঠিকানা দিয়ে অর্ডার করুন");
+      if(typeof hbOpenCart === "function") hbOpenCart();
+    }catch(e){ console.error(e); b.disabled = false; b.textContent = "✅ ঠিক আছে — Cart-এ নিন"; alert("হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন"); }
+  };
+}
+// 💊 খাওয়ার নিয়মের কার্ড — "ঠিক আছে" চাপা প্রেসক্রিপশনগুলো, মুছে যাওয়া পর্যন্ত
+function phDoseCardsHtml(){
+  const act = __phRxDocs.filter(r=> r.status === "accepted" && r.items && r.items.length);
+  if(!act.length) return "";
+  return act.map(r=>{
+    const exp = r.expireAt && r.expireAt.toMillis ? r.expireAt.toMillis() : 0;
+    const left = exp ? Math.max(0, Math.ceil((exp - Date.now()) / 86400000)) : null;
+    return `<div style="margin-top:12px; padding:12px; border-radius:14px; background:rgba(74,222,128,0.08); border:1px solid rgba(74,222,128,0.4);">
+      <div style="display:flex; align-items:center; gap:8px;"><b style="font-size:14px;">💊 খাওয়ার নিয়ম</b><span style="font-size:11px; color:var(--muted);">· 🏥 ${phEsc(r.shopName || "")}</span></div>
+      ${phRxItemsHtml(r)}
+      ${left != null ? `<div style="font-size:11px; color:var(--muted); margin-top:8px;">🗑️ ${left <= 2 ? `<b style="color:#fbbf24;">${phBnNum(left)} দিন পর</b>` : phBnNum(left) + " দিন পর"} এই নিয়ম আর প্রেসক্রিপশনের ছবি নিজে থেকে মুছে যাবে${left <= 2 ? " — দরকার হলে ছবি ফোনে সেভ করে রাখুন" : ""}।</div>` : ""}
+    </div>`;
+  }).join("");
+}
+
 const PH_MED_CAT = "cat-medicine";
 let phArea = { d:"", u:"" };
 try{ const a = JSON.parse(localStorage.getItem("hbPhArea")||"null") || JSON.parse(localStorage.getItem("hbEkaArea")||"null") || JSON.parse(localStorage.getItem("hbTlrArea")||"null"); if(a && a.d) phArea = { d:a.d, u:a.u||"" }; }catch(e){}
@@ -7028,6 +7260,7 @@ function phInit(){
     document.getElementById("phAreaClear").addEventListener("click", ()=> phAreaSet("", ""));
     document.getElementById("phSearch").addEventListener("input", phRender);
     document.getElementById("phLockBtn").addEventListener("click", phLock);
+    document.getElementById("phRxBtn").addEventListener("click", phRxOpenSend);
     document.getElementById("phShopChips").addEventListener("click", e=>{
       const k = e.target.closest("[data-phkind]"); if(k){ __phKind = k.getAttribute("data-phkind"); phRender(); return; }
       const b = e.target.closest("[data-phshop]"); if(!b) return;
@@ -7035,6 +7268,7 @@ function phInit(){
     });
   }
   phAreaFill(); phLoad();
+  if(typeof phRxListen === "function") phRxListen();
 }
 async function phLoad(){
   const grid = document.getElementById("phGrid"), note = document.getElementById("phAreaNote");
@@ -12555,7 +12789,8 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
     try{
     await Promise.all(items.map(async it=>{ const __ref = await db.collection("orderRequests").add({
       shopId: it.shopId,
-      productId: it.isPrivate ? null : it.productId,
+      productId: (it.isPrivate || String(it.productId || "").startsWith("rx:")) ? null : it.productId,
+      prescriptionId: it.rxId || null, // 📄 প্রেসক্রিপশন থেকে এলে
       productName: it.isPrivate ? "🔒 গোপনীয় পণ্য" : it.productName,
       // 👕 কালার/সাইজ ভ্যারিয়েন্ট প্রোডাক্ট অর্ডার হলে দোকানদার যেন ঠিক কোন
       // রং/সাইজ পাঠাতে হবে সেটা জানতে পারেন
