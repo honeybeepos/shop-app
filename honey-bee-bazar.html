@@ -3196,6 +3196,16 @@
   <div id="hbCartItemsList"></div>
   <div id="hbCartSummary" style="display:none;">
     <div class="card" style="padding:16px;">
+      <!-- 🔒 গোপনীয় পণ্য থাকলে: বাসায় ডেলিভারি নাকি দোকান থেকে নিজে তোলা -->
+      <div id="hbCartModeRow" style="display:none; margin-bottom:14px;">
+        <label style="display:block; font-size:11.5px; color:var(--muted); margin-bottom:6px; font-weight:700;">🔒 কোথা থেকে নেবেন?</label>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="hbCartModeBtn" data-mode="delivery" style="flex:1; padding:11px 8px; border-radius:11px; font-family:inherit; font-size:12.5px; font-weight:800; cursor:pointer;">🏠 বাসায় ডেলিভারি</button>
+          <button type="button" class="hbCartModeBtn" data-mode="pickup" style="flex:1; padding:11px 8px; border-radius:11px; font-family:inherit; font-size:12.5px; font-weight:800; cursor:pointer;">🏪 দোকান থেকে নিজে তুলে নেব</button>
+        </div>
+        <div id="hbCartModeHint" style="font-size:11.5px; color:var(--muted); margin-top:7px; line-height:1.6;"></div>
+      </div>
+      <div id="hbCartDelivBox">
       <label style="display:block; font-size:11.5px; color:var(--muted); margin-bottom:6px; font-weight:700;">📍 ডেলিভারি ঠিকানা *</label>
       <textarea id="hbCartAddressInput" placeholder="বিস্তারিত ঠিকানা লিখুন (গ্রাম/এলাকা, ওয়ার্ড, উপজেলা)..." rows="2" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:6px; resize:vertical;"></textarea>
       <!-- 📍 ডেলিভারির লোকেশন — বাধ্যতামূলক (চার্জ এটা থেকেই মাপা হয়, রাইডারও এটা ধরে আসেন) -->
@@ -3205,6 +3215,7 @@
         <button type="button" id="hbCartGpsBtn" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;">📍 এখানেই আছি</button>
         <button type="button" id="hbCartPinBtn" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;">🗺️ ম্যাপে পিন দিন</button>
       </div>
+      </div>
       <label style="display:block; font-size:11.5px; color:var(--muted); margin-bottom:6px; font-weight:700;">📞 যোগাযোগ নম্বর *</label>
       <input type="tel" id="hbCartPhoneInput" placeholder="01XXXXXXXXX" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:14px;">
       <!-- 🧾 দামের হিসাব — ডেলিভারি চার্জ সার্ভার থেকে আসে (quoteDelivery) -->
@@ -3212,7 +3223,7 @@
         <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>পণ্যের মূল্য</span><span id="hbCartItemsTotalTxt">৳ 0</span></div>
         <div id="hbCartDeliveryRows"></div>
         <div id="hbCartDeliveryMsg" style="font-size:11.5px; line-height:1.5; margin-top:4px;"></div>
-        <div id="hbCartPrivNote" style="display:none; font-size:11.5px; line-height:1.6; margin-top:6px; padding:8px 10px; border-radius:9px; background:rgba(236,72,153,0.12); color:#fbcfe8;">🔒 Cart-এ গোপনীয় পণ্য আছে — "অর্ডার নিশ্চিত করুন" চাপলে কয়েকটা প্রশ্ন আসবে। দোকান থেকে নিজে তুলে নিলে ঠিকানা আর ডেলিভারি চার্জ লাগবে না।</div>
+        <div id="hbCartPrivNote" style="display:none; font-size:11.5px; line-height:1.6; margin-top:6px; padding:8px 10px; border-radius:9px; background:rgba(236,72,153,0.12); color:#fbcfe8;">🔒 Cart-এ গোপনীয় পণ্য আছে — "অর্ডার নিশ্চিত করুন" চাপলে জিজ্ঞেস করা হবে প্যাকেটে কী লেখা থাকবে।</div>
       </div>
       <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; color:var(--amber); margin-bottom:14px;"><span>সর্বমোট</span><span id="hbCartTotalTxt">৳ 0</span></div>
       <button id="hbCartCheckoutBtn" style="width:100%; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14.5px; cursor:pointer; font-family:inherit; background:#16a34a; color:#fff;">✅ অর্ডার নিশ্চিত করুন</button>
@@ -12553,51 +12564,24 @@ function hbPrivModal(){
 }
 const HB_PRIV_OPT = "display:block; width:100%; text-align:left; margin-top:10px; padding:14px 16px; border-radius:14px; border:1.5px solid var(--border); background:rgba(255,255,255,0.05); color:#fff8e8; font-family:inherit; font-size:14.5px; font-weight:700; cursor:pointer;";
 // ফেরত দেয় { self, label, mode } — বাতিল করলে null
-function hbPrivWizard(items){
+function hbPrivWizard(items, pickup){
+  // 🔒 শুধু একটা প্রশ্ন — প্যাকেটে কী লেখা থাকবে। (ডেলিভারি না নিজে তোলা — সেটা Cart-এই বাছা হয়)
   return new Promise(resolve=>{
     const ov = hbPrivModal();
-    const shopCount = new Set(items.map(it=> it.shopId)).size;
-    const ans = { self:null, label:null, mode:null };
-    let step = 1;
     const close = (v)=>{ ov.style.display = "none"; ov.innerHTML = ""; resolve(v); };
-    const box = (title, sub, body)=> `
+    ov.innerHTML = `
       <div style="width:100%; max-width:420px; background:#1a1206; border:1px solid rgba(236,72,153,.45); border-radius:20px; padding:20px 18px 18px; color:#fff8e8; max-height:92vh; overflow:auto;">
         <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:11.5px; font-weight:800; color:#f9a8d4;">🔒 গোপনীয় অর্ডার · ধাপ ${["১","২","৩"][step-1]}/৩</span>
+          <span style="font-size:11.5px; font-weight:800; color:#f9a8d4;">🔒 গোপনীয় অর্ডার</span>
           <span id="hbPrivX" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
         </div>
-        <div style="font-size:17px; font-weight:800; margin-top:10px;">${title}</div>
-        ${sub ? `<div style="font-size:12.5px; color:var(--muted); margin-top:6px; line-height:1.7;">${sub}</div>` : ""}
-        <div>${body}</div>
-        ${step > 1 ? `<button type="button" id="hbPrivBack" style="margin-top:14px; border:0; background:transparent; color:var(--amber); font-family:inherit; font-weight:700; font-size:13px; cursor:pointer;">← আগের ধাপ</button>` : ""}
+        <div style="font-size:17px; font-weight:800; margin-top:10px;">প্যাকেটে কোন নাম লেখা থাকবে?</div>
+        <div style="font-size:12.5px; color:var(--muted); margin-top:6px; line-height:1.7;">আসল পণ্যের নাম প্যাকেটের বাইরে কোথাও লেখা থাকবে না। আপনি যেটা বাছবেন, শুধু সেটাই থাকবে।</div>
+        <div>${HB_PACK_LABELS.map(l=> `<button type="button" data-pv="${l.k}" style="${HB_PRIV_OPT}">${l.t}</button>`).join("")}</div>
       </div>`;
-    const wire = ()=>{
-      ov.querySelector("#hbPrivX").onclick = ()=> close(null);
-      const b = ov.querySelector("#hbPrivBack"); if(b) b.onclick = ()=>{ step--; render(); };
-      ov.querySelectorAll("[data-pv]").forEach(btn=> btn.onclick = ()=>{
-        const [key, val] = btn.getAttribute("data-pv").split(":");
-        if(key === "mode" && btn.hasAttribute("disabled")) return;
-        ans[key] = key === "self" ? (val === "1") : val;
-        if(step < 3){ step++; render(); } else close(ans);
-      });
-    };
-    const render = ()=>{
-      if(step === 1){
-        ov.innerHTML = box("এটা কি আপনি নিজের হাতে নিতে চান?", "যে-ই নিক, প্যাকেট সিল করা থাকবে — বাইরে থেকে কেউ বুঝবে না ভেতরে কী আছে।",
-          `<button type="button" data-pv="self:1" style="${HB_PRIV_OPT}">🙋 হ্যাঁ, আমি নিজে নেব</button>
-           <button type="button" data-pv="self:0" style="${HB_PRIV_OPT}">👥 না, অন্য কেউ নেবে</button>`);
-      }else if(step === 2){
-        ov.innerHTML = box("প্যাকেটে কোন নাম লেখা থাকবে?", "আসল পণ্যের নাম প্যাকেটের বাইরে কোথাও লেখা থাকবে না। আপনি যেটা বাছবেন, শুধু সেটাই থাকবে।",
-          HB_PACK_LABELS.map(l=> `<button type="button" data-pv="label:${l.k}" style="${HB_PRIV_OPT}">${l.t}</button>`).join(""));
-      }else{
-        const pickOk = shopCount === 1;
-        ov.innerHTML = box("কোথা থেকে নেবেন?", "",
-          `<button type="button" data-pv="mode:delivery" style="${HB_PRIV_OPT}">🏠 বাসায় ডেলিভারি<br><small style="font-weight:400; color:var(--muted);">রাইডার শুধু সিল করা প্যাকেট আর অর্ডার নম্বর পাবেন</small></button>
-           <button type="button" data-pv="mode:pickup" ${pickOk ? "" : "disabled"} style="${HB_PRIV_OPT}${pickOk ? "" : " opacity:.45; cursor:not-allowed;"}">🏪 দোকান থেকে নিজে তুলে নেব<br><small style="font-weight:400; color:var(--muted);">${pickOk ? "দোকানে গিয়ে শুধু অর্ডার নম্বর বলবেন — আর কিছু বলতে হবে না · ডেলিভারি চার্জ লাগবে না" : "Cart-এ একাধিক দোকানের পণ্য আছে — দোকান থেকে তুলতে হলে এক দোকানের পণ্য আলাদা অর্ডার করুন"}</small></button>`);
-      }
-      wire();
-    };
-    render();
+    ov.querySelector("#hbPrivX").onclick = ()=> close(null);
+    ov.querySelectorAll("[data-pv]").forEach(btn=> btn.onclick = ()=>
+      close({ self:null, label: btn.getAttribute("data-pv"), mode: pickup ? "pickup" : "delivery" }));
   });
 }
 function hbPrivDonePopup(code, ans){
@@ -12608,7 +12592,7 @@ function hbPrivDonePopup(code, ans){
         <div style="font-size:44px;">🛡️</div>
         <div style="font-size:18px; font-weight:800; margin-top:6px;">নিশ্চিন্ত থাকুন</div>
         <div style="font-size:13.5px; line-height:1.8; margin-top:10px; color:#fde68a;">
-          ডেলিভারিম্যান জানবেন না প্যাকেটে কী আছে।<br>
+          ${ans.mode === "pickup" ? "আপনি নিজে তুলবেন — কোনো ডেলিভারিম্যান লাগবে না।" : "ডেলিভারিম্যান জানবেন না প্যাকেটে কী আছে।"}<br>
           শুধু আপনি আর যে ফার্মেসি প্যাক করবে, তারা জানবে।<br>
           প্যাকেট সাধারণ ব্যাগে সিল করা থাকবে।
         </div>
@@ -12691,6 +12675,39 @@ function hbCartRemove(shopId, productId, variantColor, variantSize){
   hbCartRenderItems();
 }
 
+var __hbCartPickup = false;
+function hbCartApplyMode(){
+  const items = hbCartGet();
+  const hasPriv = items.some(it=> it.isPrivate);
+  const oneShop = new Set(items.map(it=> it.shopId)).size === 1;
+  const row = document.getElementById("hbCartModeRow");
+  if(!row) return;
+  if(!hasPriv || !oneShop) __hbCartPickup = false;
+  row.style.display = hasPriv ? "block" : "none";
+  row.querySelectorAll(".hbCartModeBtn").forEach(b=>{
+    const on = (b.dataset.mode === "pickup") === __hbCartPickup;
+    const dis = b.dataset.mode === "pickup" && !oneShop;
+    b.style.border = on ? "2px solid #ec4899" : "1px solid var(--border)";
+    b.style.background = on ? "rgba(236,72,153,0.18)" : "rgba(255,255,255,0.05)";
+    b.style.color = "#fff8e8";
+    b.style.opacity = dis ? ".45" : "1";
+    b.disabled = dis;
+  });
+  const hint = document.getElementById("hbCartModeHint");
+  if(hint) hint.innerHTML = !oneShop
+    ? "Cart-এ একাধিক দোকানের পণ্য আছে — দোকান থেকে তুলতে হলে এক দোকানের পণ্য আলাদা অর্ডার করুন।"
+    : (__hbCartPickup ? "🏪 দোকানে গিয়ে শুধু অর্ডার নম্বর বলবেন — আর কিছু বলতে হবে না। ডেলিভারিম্যান লাগবে না, ডেলিভারি চার্জও না।"
+                      : "রাইডার শুধু সিল করা প্যাকেট আর অর্ডার নম্বর পাবেন।");
+  const box = document.getElementById("hbCartDelivBox");
+  if(box) box.style.display = __hbCartPickup ? "none" : "block";
+  hbCartShowTotals();
+}
+document.addEventListener("click", (ev)=>{
+  const b = ev.target.closest && ev.target.closest(".hbCartModeBtn");
+  if(!b || b.disabled) return;
+  __hbCartPickup = b.dataset.mode === "pickup";
+  hbCartApplyMode();
+});
 function hbCartRenderItems(){
   try{ const __pn = document.getElementById("hbCartPrivNote"); if(__pn) __pn.style.display = hbCartGet().some(it=> it.isPrivate) ? "block" : "none"; }catch(e){}
   const items = hbCartGet();
@@ -12732,7 +12749,7 @@ function hbCartRenderItems(){
 
   __hbCartItemsTotal = total;
   $("hbCartItemsTotalTxt").textContent = HB_CUR + ' ' + total;
-  hbCartShowTotals();
+  hbCartApplyMode();
   $("hbCartSummary").style.display = "block";
   hbCartRequestQuote();
 
@@ -12749,11 +12766,10 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
   const items = hbCartGet();
   if(items.length === 0) return;
 
-  // 🔒 কার্টে গোপনীয় পণ্য থাকলে আগে ধাপে ধাপে কয়েকটা প্রশ্ন (নিজে নেবেন কিনা,
-  //    প্যাকেটে কী লেখা থাকবে, কোথা থেকে নেবেন)
+  // 🔒 কার্টে গোপনীয় পণ্য থাকলে জিজ্ঞেস — প্যাকেটে কী লেখা থাকবে
   let __priv = null;
   if(items.some(it=> it.isPrivate)){
-    __priv = await hbPrivWizard(items);
+    __priv = await hbPrivWizard(items, __hbCartPickup && new Set(items.map(it=> it.shopId)).size === 1);
     if(!__priv) return;
   }
   const __pickup = !!(__priv && __priv.mode === "pickup");
@@ -13026,7 +13042,7 @@ async function hbCartEnsureQuote(){
   if(__hbQuotePromise && __hbQuotePromise.key === key) return __hbQuotePromise;
   const c = __hbDeliveryGpsCoords;
   const ids = [...new Set(hbCartGet().map(it=> it.shopId))];
-  $("hbCartDeliveryMsg").innerHTML = '<span style="color:var(--muted);">⏳ ডেলিভারি চার্জ হিসাব হচ্ছে...</span>';
+  if(!__hbCartPickup) $("hbCartDeliveryMsg").innerHTML = '<span style="color:var(--muted);">⏳ ডেলিভারি চার্জ হিসাব হচ্ছে...</span>';
   const p = (async ()=>{
     try{
       const res = await functionsInstance.httpsCallable("quoteDelivery")({ sourceIds: ids, lat: c.lat, lng: c.lng });
@@ -13037,6 +13053,7 @@ async function hbCartEnsureQuote(){
     }catch(e){
       console.warn("quoteDelivery failed:", e);
       __hbQuote = null; __hbQuoteKey = null;
+      if(__hbCartPickup){ hbCartShowTotals(); return null; }
       $("hbCartDeliveryRows").innerHTML = "";
       $("hbCartDeliveryMsg").innerHTML = '<span style="color:#f87171;">⚠️ ডেলিভারি চার্জ জানা যায়নি।</span> '
         + '<a href="#" id="hbQuoteRetry" style="color:var(--amber);">আবার চেষ্টা</a>';
@@ -13073,6 +13090,12 @@ function hbCartShowTotals(){
   const rowsEl = $("hbCartDeliveryRows"), msgEl = $("hbCartDeliveryMsg");
   const items = __hbCartItemsTotal;
   const q = (__hbQuote && __hbQuoteKey === hbCartQuoteKey()) ? __hbQuote : null;
+  if(__hbCartPickup){
+    rowsEl.innerHTML = '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>🏪 দোকান থেকে নিজে তুলবেন</span><span>ডেলিভারি চার্জ নেই</span></div>';
+    msgEl.innerHTML = "";
+    $("hbCartTotalTxt").textContent = HB_CUR + " " + items;
+    return;
+  }
   if(!__hbDeliveryGpsCoords){
     rowsEl.innerHTML = "";
     msgEl.innerHTML = '<span style="color:#fbbf24;">📍 লোকেশন দিলে ডেলিভারি চার্জ দেখাবে</span>';
