@@ -2327,6 +2327,9 @@ function pageSettings(){
       </div>
     </div>
     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px"><button class="btn" type="button" id="sSave" style="min-width:160px">💾 সেভ করুন</button></div>
+    <div class="panel" style="margin-top:16px"><h2>📍 দোকানের লোকেশন</h2>
+      <p style="margin:0 0 10px; color:var(--ink-3)">${__phHasLoc ? "✅ লোকেশন দেওয়া আছে। দোকান সরালে আবার দিন।" : "⚠️ লোকেশন দেওয়া নেই — Honey Bee Bazar থেকে ডেলিভারি অর্ডার আসবে না। দোকানের ভেতরে দাঁড়িয়ে চাপুন।"}</p>
+      <button class="btn${__phHasLoc ? " ghost" : ""}" type="button" id="sLoc">📍 ${__phHasLoc ? "লোকেশন আবার দিন" : "এখনই লোকেশন দিন"}</button></div>
     <div class="panel" style="margin-top:16px"><h2>🚪 লগআউট</h2>
       <p style="margin:0 0 10px; color:var(--ink-3)">এই ফোন থেকে বের হবেন। আপনার সব হিসাব সার্ভারে সেভ আছে — আবার লগইন করলে সব পাবেন।</p>
       <button class="btn red" type="button" id="sOff">🚪 লগআউট</button></div>
@@ -2342,9 +2345,12 @@ function pageSettings(){
       paper: $("sPaper").value, defUnit: $("sUnit").value,
       staffDiscount: $("pDisc").checked, staffDue: $("pDue").checked, staffPurchase: $("pPur").checked, staffWriteOff: $("pWo").checked }));
     $("shopName").textContent = title || $("shopName").textContent;
+    const __ph = $("sPhone").value.replace(/[০-৯]/g, d=> "০১২৩৪৫৬৭৮৯".indexOf(d)).replace(/[^0-9+]/g, "");
+    if(__ph.replace(/\D/g, "").length >= 8) db.collection("shops").doc(SESSION.shopId).set({ phone: __ph }, { merge: true }).catch(()=>{});
     pushNow(); toast("✅ সেটিংস সেভ হয়েছে");
   };
   $("sOff").onclick = ()=> $("modeBtn").click();
+  $("sLoc").onclick = ()=> phSetShopLocation($("sLoc"));
   if($("sBackPos")) $("sBackPos").onclick = async ()=>{
     if(!confirm("ফার্মেসি মোড বন্ধ করে সাধারণ POS-এ ফিরবেন?\n\nদোকানের সব ফোনে সাধারণ POS খুলবে। ওষুধ, বিক্রি, স্টক — কিছুই মুছবে না।")) return;
     localStorage.setItem("hb-pharmacy-mode", "0");
@@ -2610,6 +2616,125 @@ window.addEventListener("online", ()=>{ netLabel(); pushNow(); });
 window.addEventListener("offline", netLabel);
 
 /* =====================================================================
+   📍 দোকানের লোকেশন — POS-এর হুবহু একই কোড। না থাকলে Bazar-এ ডেলিভারি অর্ডার নেওয়া যায় না
+   (ডেলিভারি চার্জ এখান থেকেই মাপা হয়, রাইডারও এটা ধরে আসেন)।
+   ===================================================================== */
+const HB_LOC_MAX_ACCURACY_M = 100;
+const HB_LOC_GOOD_ACCURACY_M = 25;
+const HB_LOC_LISTEN_MS = 20000;
+
+function hbGetAccurateFix(onProgress){
+  return new Promise((resolve, reject)=>{
+    if(!navigator.geolocation) return reject(new Error("nosupport"));
+    let best = null, done = false, watchId = null, timer = null;
+    const finish = (err)=>{
+      if(done) return; done = true;
+      if(watchId !== null) navigator.geolocation.clearWatch(watchId);
+      clearTimeout(timer);
+      if(best) resolve(best); else reject(err || new Error("timeout"));
+    };
+    watchId = navigator.geolocation.watchPosition((p)=>{
+      if(!best || p.coords.accuracy < best.coords.accuracy) best = p;
+      if(onProgress) onProgress(Math.round(best.coords.accuracy));
+      if(best.coords.accuracy <= HB_LOC_GOOD_ACCURACY_M) finish();
+    }, (err)=>{ if(!best) finish(err); }, { enableHighAccuracy: true, maximumAge: 0, timeout: HB_LOC_LISTEN_MS });
+    timer = setTimeout(()=> finish(), HB_LOC_LISTEN_MS);
+  });
+}
+
+/* ছোট পর্দা: ম্যাপে পিন + তিনটা বাটন। ফেরত দেয় "save" | "retry" | "cancel" */
+function hbLocConfirm(lat, lng, acc, placeName){
+  return new Promise((resolve)=>{
+    const d = 0.0025;
+    const src = "https://www.openstreetmap.org/export/embed.html?bbox="
+      + (lng-d) + "%2C" + (lat-d) + "%2C" + (lng+d) + "%2C" + (lat+d) + "&layer=mapnik&marker=" + lat + "%2C" + lng;
+    const good = acc <= HB_LOC_MAX_ACCURACY_M;
+    const ov = document.createElement("div");
+    ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;";
+    ov.innerHTML =
+      '<div style="background:#1f1609;color:#fff8e8;border:1px solid rgba(255,209,102,.3);border-radius:16px;max-width:420px;width:100%;padding:16px;font-family:inherit;">'
+      + '<div style="font-weight:800;font-size:15px;margin-bottom:8px;">📍 ' + placeName + ' অবস্থান ঠিক আছে?</div>'
+      + '<iframe src="' + src + '" style="width:100%;height:230px;border:0;border-radius:10px;background:#333;"></iframe>'
+      + '<div style="font-size:12.5px;margin:10px 0;line-height:1.6;">'
+      + (good
+          ? '✅ নির্ভুলতা প্রায় <b>' + acc + ' মিটার</b>। লাল পিনটা ' + placeName + ' উপরে থাকলে সেভ করুন।'
+          : '⚠️ লোকেশন অস্পষ্ট — প্রায় <b>' + acc + ' মিটার</b> এদিক-ওদিক হতে পারে, তাই সেভ করা যাবে না।<br>দরজার কাছে বা খোলা জায়গায় গিয়ে আবার চেষ্টা করুন, ফোনের লোকেশন "High accuracy" রাখুন।')
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      + (good ? '<button data-a="save" style="flex:1;padding:12px;border:0;border-radius:10px;font-weight:800;background:#2fbf71;color:#fff;font-family:inherit;">✅ ঠিক আছে, সেভ করুন</button>' : '')
+      + '<button data-a="retry" style="flex:1;padding:12px;border:0;border-radius:10px;font-weight:700;background:#ffb703;color:#1a1206;font-family:inherit;">🔄 আবার নিন</button>'
+      + '<button data-a="cancel" style="padding:12px 14px;border:1px solid rgba(255,255,255,.25);border-radius:10px;background:transparent;color:#fff8e8;font-family:inherit;">বাতিল</button>'
+      + '</div></div>';
+    ov.addEventListener("click", (e)=>{
+      const a = e.target && e.target.getAttribute && e.target.getAttribute("data-a");
+      if(!a) return;
+      ov.remove(); resolve(a);
+    });
+    document.body.appendChild(ov);
+  });
+}
+
+/* পুরো কাজ: GPS নেওয়া → মিলিয়ে দেখা → সেভ। docRef = shops/{id} বা restaurants/{uid} */
+async function hbCaptureStoreLocation(docRef, uid, placeName, setBusyText){
+  while(true){
+    let pos;
+    try{
+      pos = await hbGetAccurateFix((acc)=> setBusyText && setBusyText("📍 খোঁজা হচ্ছে... (±" + acc + " মি)"));
+    }catch(err){
+      setBusyText && setBusyText(null);
+      alert(err && err.message === "nosupport" ? "এই ফোনে লোকেশন সাপোর্ট নেই।"
+        : "লোকেশন পাওয়া যায়নি — ফোনের Location চালু আছে কিনা আর এই সাইটকে অনুমতি দেওয়া আছে কিনা দেখুন।");
+      return null;
+    }
+    setBusyText && setBusyText(null);
+    const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = Math.round(pos.coords.accuracy);
+    const choice = await hbLocConfirm(lat, lng, acc, placeName);
+    if(choice === "cancel") return null;
+    if(choice === "retry") continue;
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+    const loc = { lat: lat, lng: lng, accuracyM: acc, updatedAt: now, updatedBy: uid };
+    const batch = db.batch();
+    batch.set(docRef, { storeLocation: loc }, { merge: true });
+    batch.set(docRef.collection("locationLog").doc(), { lat: lat, lng: lng, accuracyM: acc, by: uid, at: now });
+    await batch.commit();
+    return { lat: lat, lng: lng, accuracyM: acc };
+  }
+}
+
+/* উপরের লাল ব্যানার। loc না থাকলে দেখায়, থাকলে সরিয়ে দেয়। */
+function hbShowLocBanner(hasLoc, placeName, canSet, onClick){
+  let el = document.getElementById("hbLocBanner");
+  if(hasLoc){ if(el) el.remove(); return; }
+  if(!el){
+    el = document.createElement("div");
+    el.id = "hbLocBanner";
+    el.style.cssText = "position:sticky;top:0;z-index:9999;background:#b3261e;color:#fff;padding:10px 14px;font-size:13px;font-weight:700;line-height:1.5;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.35);";
+    document.body.insertBefore(el, document.body.firstChild);
+  }
+  el.innerHTML = '<span style="flex:1;">📍 ' + placeName + ' লোকেশন দেওয়া নেই — Honey Bee Bazar-এ ডেলিভারি অর্ডার আসবে না।'
+    + (canSet ? '' : '<br><span style="font-weight:400;">দোকানের মালিক (এডমিন) লগইন করে লোকেশন দিন।</span>') + '</span>'
+    + (canSet ? '<button type="button" style="flex-shrink:0;padding:9px 12px;border:0;border-radius:9px;background:#fff;color:#b3261e;font-weight:800;font-family:inherit;">এখনই দিন</button>' : '');
+  const b = el.querySelector("button");
+  if(b) b.onclick = onClick;
+}
+
+
+let __phHasLoc = null;
+async function phSetShopLocation(btn){
+  if(!isAdmin()){ alert("শুধু দোকানের মালিক (এডমিন) লোকেশন দিতে পারবেন।"); return; }
+  const orig = btn ? btn.textContent : "";
+  const setBusy = (t)=>{ if(btn){ btn.textContent = t || orig; btn.disabled = !!t; } const bb = document.querySelector("#hbLocBanner button"); if(bb){ bb.disabled = !!t; bb.textContent = t ? "⏳" : "এখনই দিন"; } };
+  try{
+    const loc = await hbCaptureStoreLocation(db.collection("shops").doc(SESSION.shopId), SESSION.uid || (auth.currentUser && auth.currentUser.uid), "দোকানের", setBusy);
+    if(!loc) return;
+    __phHasLoc = true;
+    hbShowLocBanner(true);
+    alert("✅ দোকানের লোকেশন সেভ হয়েছে (±" + loc.accuracyM + " মিটার)। এখন Bazar থেকে ডেলিভারি অর্ডার আসবে।");
+    if(CUR_PAGE === "settings") go("settings");
+  }catch(e){ setBusy(null); alert("সেভ করা যায়নি: " + (e.code || e.message)); }
+}
+
+/* =====================================================================
    শুরু
    ===================================================================== */
 auth.onAuthStateChanged(async (user)=>{
@@ -2624,6 +2749,10 @@ auth.onAuthStateChanged(async (user)=>{
     if(info.status === "blocked"){ $("gateMsg").textContent = "🔒 একাউন্ট ব্লক করা আছে — এডমিনের সাথে যোগাযোগ করুন।"; return; }
     if(info.currencySymbol) localStorage.setItem("shop-currency-symbol", info.currencySymbol);
     setTimeout(()=>{ try{ hbAskShopPhone(s.shopId, info, s.role); }catch(e){} }, 1500);
+    // 📍 লোকেশন না থাকলে উপরে লাল ব্যানার (শুধু Bazar-এ থাকা দোকানে)
+    __phHasLoc = !!(info.storeLocation && info.storeLocation.lat != null);
+    if(info.onlineEnabled !== false && (!info.countryCode || info.countryCode === "BD"))
+      hbShowLocBanner(__phHasLoc, "দোকানের", s.role === "admin", function(){ phSetShopLocation(this); });
   }catch(e){}
   enableAutoSync(s.shopId);
   // 💊 ফার্মেসি হিসেবে নিবন্ধিত দোকানে মোড প্রথমবার নিজে থেকেই চালু হয় (সব ফোনে সিঙ্ক),
