@@ -13548,6 +13548,27 @@ $("hbCartOrdersFilterClear").addEventListener("click", ()=>{
 let __hbTrackerRiderUnsub = null;
 let __hbTrackerMapObj = null, __hbTrackerShopMarker = null, __hbTrackerRiderMarker = null, __hbTrackerCustomerMarker = null, __hbTrackerRouteLine = null;
 
+/* 🧾 গ্রাহকের বিল — এই দোকানের এই রসিদের সব পণ্য + ডেলিভারি চার্জ = মোট (নিজে নিলে চার্জ ০) */
+function hbTrackerBillHtml(order){
+  const items = order.orderCode
+    ? __hbOrdersData.filter(x=> x.orderCode === order.orderCode && x.shopId === order.shopId && (x.status||"pending") !== "cancelled")
+    : [order];
+  if(!items.length) items.push(order);
+  const sub = items.reduce((s,o)=> s + (Number(o.price)||0) * (Number(o.qty)||1), 0);
+  const pickup = items.some(o=> o.deliveryMode === "pickup");
+  let del = 0, known = true;
+  if(!pickup){
+    const sealed = items.filter(o=> o.delivery && typeof o.delivery.charge === "number");
+    if(sealed.length) del = sealed.reduce((s,o)=> s + o.delivery.charge, 0);
+    else{ const c = items.map(o=> Number(o.clientDeliveryCharge)).filter(n=> n > 0); if(c.length) del = Math.max(...c); else known = false; }
+  }
+  const r = n=> Math.round(n * 100) / 100;
+  return `<div style="margin-top:10px; padding:10px 12px; border-radius:10px; background:rgba(255,255,255,0.04); font-size:12.5px; line-height:1.9;">
+    <div style="display:flex; justify-content:space-between;"><span>পণ্যের দাম${items.length > 1 ? " (" + items.length + "টা)" : ""}</span><span>${HB_CUR} ${r(sub)}</span></div>
+    <div style="display:flex; justify-content:space-between;"><span>${pickup ? "🏪 দোকান থেকে নেবেন — ডেলিভারি চার্জ" : "🚚 ডেলিভারি চার্জ"}</span><span>${known ? HB_CUR + " " + r(del) : "হিসাব হচ্ছে…"}</span></div>
+    <div style="display:flex; justify-content:space-between; font-weight:800; font-size:14px; color:var(--amber); border-top:1px dashed var(--border); margin-top:3px; padding-top:3px;"><span>মোট দিতে হবে</span><span>${HB_CUR} ${r(sub + del)}</span></div>
+  </div>`;
+}
 function hbOpenTracker(order){
   const status = order.status || "pending";
   // 🆔 Order ID — নিজস্ব কোনো ফরম্যাটেড আইডি সেভ করা হয় না, তাই Firestore
@@ -13565,6 +13586,7 @@ function hbOpenTracker(order){
       <span style="font-size:11px; font-weight:800; flex-shrink:0;">${HB_STATUS_LABEL[status]||status}</span>
     </div>
     ${order.orderCode ? `<div style="font-size:12px; margin-top:8px;">🧾 অর্ডার নম্বর: <b style="color:var(--amber);">${escapeHtml(order.orderCode)}</b></div>` : ""}
+    ${hbTrackerBillHtml(order)}
     ${hbShopContactHtml(order.shopId)}`;
 
   // 🚴 রাইডার ডিসপ্যাচ স্ট্যাটাস — "প্রস্তুত হচ্ছে" ধাপে থাকা অবস্থায় দোকানদার

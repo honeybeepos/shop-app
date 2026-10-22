@@ -1379,6 +1379,27 @@ function ooStart(){
 }
 
 /* একই গ্রাহকের সব খাবার এক রসিদে */
+
+/* 🧾 অর্ডারের বিল — পণ্যের দাম + ডেলিভারি চার্জ = মোট।
+   ডেলিভারি চার্জ সার্ভার সিল করে রাখে (delivery.charge — দলের প্রথম নথিতে, বাকিগুলোতে ০),
+   তাই যোগ করলে একবারই আসে। দোকান থেকে নিজে নিলে চার্জ ০। */
+function hbOrderBill(items){
+  items = items || [];
+  const sub = items.reduce((s,o)=> s + (Number(o.price) || 0) * (Number(o.qty) || 1), 0);
+  const pickup = items.some(o=> o.deliveryMode === "pickup");
+  let del = 0, known = true;
+  if(!pickup){
+    const sealed = items.filter(o=> o.delivery && typeof o.delivery.charge === "number");
+    if(sealed.length) del = sealed.reduce((s,o)=> s + o.delivery.charge, 0);
+    else{
+      const c = items.map(o=> Number(o.clientDeliveryCharge)).filter(n=> n > 0);
+      if(c.length) del = Math.max(...c); else known = false;
+    }
+  }
+  const r = n=> Math.round(n * 100) / 100;
+  return { sub: r(sub), del: r(del), known, pickup, grand: r(sub + del) };
+}
+
 function ooGroup(rows){
   const map = {}, keys = [];
   rows.forEach(function(o){
@@ -1501,6 +1522,10 @@ function ooRender(){
       + '<div style="font-weight:800">' + ooMoney(g.total) + '</div>'
       + '</div>'
       + '<div style="width:100%">' + lines + '</div>'
+      + (function(){ const b = hbOrderBill(g.items); return '<div style="width:100%;font-size:13px;line-height:1.8">'
+        + '<div style="display:flex;justify-content:space-between"><span>খাবারের দাম</span><span>' + ooMoney(b.sub) + '</span></div>'
+        + '<div style="display:flex;justify-content:space-between"><span>' + (b.pickup ? '🏪 নিজে নেবেন — ডেলিভারি চার্জ' : '🚚 ডেলিভারি চার্জ') + '</span><span>' + (b.known ? ooMoney(b.del) : 'হিসাব হচ্ছে…') + '</span></div>'
+        + '<div style="display:flex;justify-content:space-between;font-weight:800"><span>মোট (গ্রাহক দেবেন)</span><span>' + ooMoney(b.grand) + '</span></div></div>'; })()
       + '<div style="color:#64748b;font-size:12.5px;width:100%">'
       + (digits ? '<a href="tel:'+digits+'" style="color:#2563eb">📞 '+g.deliveryPhone+'</a>' : '')
       + (g.deliveryAddress ? '<br>📍 ' + g.deliveryAddress : '')
@@ -1548,8 +1573,9 @@ function ooPrintSlip(g){
   const w = window.open("", "_blank", "width=380,height=620");
   if(!w){ alert("ব্রাউজার নতুন উইন্ডো আটকে দিয়েছে — পপ-আপ অনুমতি দিয়ে আবার চেষ্টা করুন।"); return; }
   const rows = g.items.map(function(i){
-    return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed #999">'
-         + '<span>' + ooEsc(i.productName || "খাবার") + ' × ' + (i.qty || 1) + '</span></div>';
+    return '<div style="display:flex;justify-content:space-between;gap:6px;padding:4px 0;border-bottom:1px dashed #999">'
+         + '<span>' + ooEsc(i.productName || "খাবার") + ' × ' + (i.qty || 1) + '</span>'
+         + '<span style="white-space:nowrap">' + ooMoney((Number(i.price)||0) * (Number(i.qty)||1)) + '</span></div>';
   }).join("");
   const codeBox = g.orderCode
     ? '<div style="border:3px solid #000;border-radius:6px;padding:8px 4px;margin:8px 0;text-align:center">'
@@ -1571,7 +1597,10 @@ function ooPrintSlip(g){
     + (g.deliveryAddress ? '<div>ঠিকানা: ' + ooEsc(g.deliveryAddress) + '</div>' : '')
     + '<div>সময়: ' + ooEsc(new Date().toLocaleString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})) + '</div>'
     + '<div style="border-top:1px dashed #000;margin:8px 0"></div>' + rows
-    + '<div style="text-align:center;margin-top:10px;font-size:11px">মোট: ' + ooMoney(g.total) + '</div>'
+    + (function(){ const b = hbOrderBill(g.items); return '<div style="margin-top:6px">'
+      + '<div style="display:flex;justify-content:space-between"><span>খাবারের দাম</span><span>' + ooMoney(b.sub) + '</span></div>'
+      + '<div style="display:flex;justify-content:space-between"><span>' + (b.pickup ? 'ডেলিভারি (নিজে নেবেন)' : 'ডেলিভারি চার্জ') + '</span><span>' + (b.known ? ooMoney(b.del) : '—') + '</span></div>'
+      + '<div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;border-top:2px solid #000;margin-top:4px;padding-top:4px"><span>মোট</span><span>' + ooMoney(b.grand) + '</span></div></div>'; })()
     + foot + '</div>'
     + '<scr' + 'ipt>setTimeout(function(){window.print();},350);<\/scr' + 'ipt>'
     + '</body></html>');

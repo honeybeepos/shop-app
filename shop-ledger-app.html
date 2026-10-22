@@ -7665,6 +7665,35 @@ function ordPrivateBannerHtml(g){
   </div>`;
 }
 
+
+/* 🧾 অর্ডারের বিল — পণ্যের দাম + ডেলিভারি চার্জ = মোট।
+   ডেলিভারি চার্জ সার্ভার সিল করে রাখে (delivery.charge — দলের প্রথম নথিতে, বাকিগুলোতে ০),
+   তাই যোগ করলে একবারই আসে। দোকান থেকে নিজে নিলে চার্জ ০। */
+function hbOrderBill(items){
+  items = items || [];
+  const sub = items.reduce((s,o)=> s + (Number(o.price) || 0) * (Number(o.qty) || 1), 0);
+  const pickup = items.some(o=> o.deliveryMode === "pickup");
+  let del = 0, known = true;
+  if(!pickup){
+    const sealed = items.filter(o=> o.delivery && typeof o.delivery.charge === "number");
+    if(sealed.length) del = sealed.reduce((s,o)=> s + o.delivery.charge, 0);
+    else{
+      const c = items.map(o=> Number(o.clientDeliveryCharge)).filter(n=> n > 0);
+      if(c.length) del = Math.max(...c); else known = false;
+    }
+  }
+  const r = n=> Math.round(n * 100) / 100;
+  return { sub: r(sub), del: r(del), known, pickup, grand: r(sub + del) };
+}
+
+function ordBillHtml(g){
+  const b = hbOrderBill(g.items);
+  return `<div style="margin:8px 0 4px; padding:8px 10px; border-radius:9px; background:rgba(255,255,255,0.05); font-size:12px; line-height:1.8;">
+    <div style="display:flex; justify-content:space-between;"><span>পণ্যের দাম</span><span>${fmt(b.sub)}</span></div>
+    <div style="display:flex; justify-content:space-between;"><span>${b.pickup ? '🏪 দোকান থেকে নেবেন — ডেলিভারি চার্জ' : '🚚 ডেলিভারি চার্জ'}</span><span>${b.known ? fmt(b.del) : 'হিসাব হচ্ছে…'}</span></div>
+    <div style="display:flex; justify-content:space-between; font-weight:800; font-size:13.5px; color:#FFC107; border-top:1px dashed rgba(255,255,255,0.2); margin-top:3px; padding-top:3px;"><span>মোট (গ্রাহক দেবেন)</span><span>${fmt(b.grand)}</span></div>
+  </div>`;
+}
 function ordGroupByCustomer(orders){
   const map = {};
   const keys = [];
@@ -7733,6 +7762,7 @@ function ordBuildPendingGroupHtml(g, allProducts){
       ${ordGroupHeadHtml(g, '👤')}
       ${ordPrivateBannerHtml(g)}
       <div class="ordGroupItems">${itemsHtml}</div>
+      ${ordBillHtml(g)}
       <button class="ordGroupAcceptBtn" data-gkey="${escapeAttr(g.key)}">✅ সব গ্রহণ করুন (${g.items.length}টা)</button>
     </div>`;
 }
@@ -7821,6 +7851,7 @@ function ordBuildPreparingGroupHtml(g, allProducts){
     <div class="ordGroupCard ordReceiptCard">
       ${ordGroupHeadHtml(g, '🧾 রসিদ —')}
       <div class="ordGroupItems">${itemsHtml}</div>
+      ${ordBillHtml(g)}
       ${selfDeliveryTag}
       ${dispatchHtml}
       <!-- 🖨️ আগে শুধু অর্ডার গ্রহণের পপ-আপে ছাপা যেত। কিন্তু স্লিপটা
@@ -7988,10 +8019,22 @@ document.getElementById('ordAGConfirmBtn').addEventListener('click', async ()=>{
 function ordPrintReceipt(g){
   if(!g) return;
   const time = new Date().toLocaleString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-  const rows = g.items.map(o=> `
-    <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #999;">
+  // 🔒 গোপনীয় অর্ডারে স্লিপ প্যাকেটে লাগে — পণ্যের নাম লেখা হয় না, শুধু প্যাকেটের লেবেল
+  const __priv = g.items.find(o=> o.privateOrder);
+  const __bill = hbOrderBill(g.items);
+  const rows = __priv
+    ? `<div style="text-align:center; font-weight:800; font-size:14px; padding:4px 0;">${escapeAttr((ORD_PACK_LABELS[__priv.packLabel] || ORD_PACK_LABELS.code))}</div>`
+    : g.items.map(o=> `
+    <div style="display:flex; justify-content:space-between; gap:6px; padding:4px 0; border-bottom:1px dashed #999;">
       <span>${escapeAttr(o.productName||'প্রোডাক্ট')}${o.variantColor ? ` (${escapeAttr(o.variantColor)}/${escapeAttr(o.variantSize)})` : ''} × ${o.qty||1}</span>
+      <span style="white-space:nowrap;">${fmt((Number(o.price)||0) * (Number(o.qty)||1))}</span>
     </div>`).join('');
+  const billRows = `
+    <div style="margin-top:6px;">
+      <div style="display:flex; justify-content:space-between;"><span>পণ্যের দাম</span><span>${fmt(__bill.sub)}</span></div>
+      <div style="display:flex; justify-content:space-between;"><span>${__bill.pickup ? 'ডেলিভারি (দোকান থেকে নেবেন)' : 'ডেলিভারি চার্জ'}</span><span>${__bill.known ? fmt(__bill.del) : '—'}</span></div>
+      <div style="display:flex; justify-content:space-between; font-weight:800; font-size:15px; border-top:2px solid #000; margin-top:4px; padding-top:4px;"><span>মোট</span><span>${fmt(__bill.grand)}</span></div>
+    </div>`;
   document.getElementById('ordReceiptPrintArea').innerHTML = `
     <div style="width:280px; margin:0 auto; padding:10px; font-family:'Space Mono',monospace; font-size:12px; color:#000;">
       <div style="text-align:center; font-weight:800; margin-bottom:6px;">🧾 অর্ডার রসিদ</div>
@@ -8008,7 +8051,8 @@ function ordPrintReceipt(g){
       <div>সময়: ${time}</div>
       <div style="border-top:1px dashed #000; margin:8px 0;"></div>
       ${rows}
-      <div style="text-align:center; margin-top:10px; font-size:11px;">মোট আইটেম: ${g.items.length}টা</div>
+      ${billRows}
+      <div style="text-align:center; margin-top:8px; font-size:11px;">মোট আইটেম: ${g.items.length}টা</div>
       ${g.orderCode ? `
       <div style="border-top:1px dashed #000; margin-top:10px; padding-top:6px; text-align:center; font-size:10px;">
         🛵 রাইডার এই নম্বর বলে পার্সেল চাইবেন — মিলিয়ে দিন

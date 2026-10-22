@@ -2540,6 +2540,27 @@ function ordStockTxt(o, prods){
   const q = Number(p.qty) || 0, need = Number(o.qty) || 1;
   return q <= 0 ? `<span class="chip red">🔴 স্টকে নেই</span>` : q < need ? `<span class="chip org">⚠️ স্টকে মাত্র ${bn(q)}</span>` : `<span class="chip">🟢 স্টকে ${bn(q)}</span>`;
 }
+
+/* 🧾 অর্ডারের বিল — পণ্যের দাম + ডেলিভারি চার্জ = মোট।
+   ডেলিভারি চার্জ সার্ভার সিল করে রাখে (delivery.charge — দলের প্রথম নথিতে, বাকিগুলোতে ০),
+   তাই যোগ করলে একবারই আসে। দোকান থেকে নিজে নিলে চার্জ ০। */
+function hbOrderBill(items){
+  items = items || [];
+  const sub = items.reduce((s,o)=> s + (Number(o.price) || 0) * (Number(o.qty) || 1), 0);
+  const pickup = items.some(o=> o.deliveryMode === "pickup");
+  let del = 0, known = true;
+  if(!pickup){
+    const sealed = items.filter(o=> o.delivery && typeof o.delivery.charge === "number");
+    if(sealed.length) del = sealed.reduce((s,o)=> s + o.delivery.charge, 0);
+    else{
+      const c = items.map(o=> Number(o.clientDeliveryCharge)).filter(n=> n > 0);
+      if(c.length) del = Math.max(...c); else known = false;
+    }
+  }
+  const r = n=> Math.round(n * 100) / 100;
+  return { sub: r(sub), del: r(del), known, pickup, grand: r(sub + del) };
+}
+
 function ordGroupHtml(g, prods){
   const priv = g.items.find(o=> o.privateOrder);
   const total = g.items.reduce((s,o)=> s + (Number(o.price) || 0) * (Number(o.qty) || 1), 0);
@@ -2590,7 +2611,10 @@ function ordGroupHtml(g, prods){
         <div style="flex:1; min-width:0"><b>${esc(o.productName || "ওষুধ")}</b> <span class="hint">× ${bn(o.qty || 1)}</span><div style="margin-top:3px">${ordStockTxt(o, prods)}</div></div>
         <b class="num">${money((Number(o.price) || 0) * (Number(o.qty) || 1))}</b>
       </div>`).join("")}</div>
-    <div style="display:flex; justify-content:space-between; margin-top:8px; font-weight:800"><span>মোট (ডেলিভারি চার্জ ছাড়া)</span><span class="num">${money(total)}</span></div>
+    ${(()=>{ const b = hbOrderBill(g.items); return `<div style="margin-top:8px; line-height:1.9">
+      <div style="display:flex; justify-content:space-between"><span class="hint">ওষুধের দাম</span><span class="num">${money(b.sub)}</span></div>
+      <div style="display:flex; justify-content:space-between"><span class="hint">${b.pickup ? "🏪 দোকান থেকে নেবেন — ডেলিভারি চার্জ" : "🚚 ডেলিভারি চার্জ"}</span><span class="num">${b.known ? money(b.del) : "হিসাব হচ্ছে…"}</span></div>
+      <div style="display:flex; justify-content:space-between; font-weight:800; font-size:16px; border-top:1px solid var(--line); padding-top:4px"><span>মোট (গ্রাহক দেবেন)</span><span class="num">${money(b.grand)}</span></div></div>`; })()}
     ${act}
   </div>`;
 }
@@ -2735,7 +2759,11 @@ function ordSlip(g){
     ${g.orderCode ? `<div style="border:3px solid #000; border-radius:6px; padding:6px; margin:8px 0; text-align:center"><div style="font-size:10px">অর্ডার নম্বর</div><div style="font-size:32px; font-weight:800; letter-spacing:6px">${esc(g.orderCode)}</div></div>` : ""}
     ${priv ? `<div style="text-align:center; font-weight:800; font-size:14px">${esc(ORD_PACK[priv.packLabel] || ORD_PACK.code)}</div>`
       : `<div>গ্রাহক: ${esc(g.customerName || "—")}</div>${g.phone ? `<div>ফোন: ${esc(g.phone)}</div>` : ""}${g.address && !g.pickup ? `<div>ঠিকানা: ${esc(g.address)}</div>` : ""}
-         <div style="border-top:1px dashed #000; margin:6px 0"></div>${g.items.map(o=> `<div>${esc(o.productName)} × ${o.qty || 1}</div>`).join("")}`}
+         <div style="border-top:1px dashed #000; margin:6px 0"></div>${g.items.map(o=> `<div style="display:flex; justify-content:space-between; gap:6px"><span>${esc(String(o.productName).replace(/^🔒 /, ""))} × ${o.qty || 1}</span><span>${money((Number(o.price) || 0) * (Number(o.qty) || 1))}</span></div>`).join("")}`}
+    ${(()=>{ const b = hbOrderBill(g.items); return `<div style="margin-top:6px; border-top:1px dashed #000; padding-top:4px">
+      <div style="display:flex; justify-content:space-between"><span>${priv ? "পণ্যের দাম" : "ওষুধের দাম"}</span><span>${money(b.sub)}</span></div>
+      <div style="display:flex; justify-content:space-between"><span>${b.pickup ? "ডেলিভারি (দোকান থেকে নেবেন)" : "ডেলিভারি চার্জ"}</span><span>${b.known ? money(b.del) : "—"}</span></div>
+      <div style="display:flex; justify-content:space-between; font-weight:800; font-size:15px; border-top:2px solid #000; margin-top:4px; padding-top:4px"><span>মোট</span><span>${money(b.grand)}</span></div></div>`; })()}
   </div>`;
   const a = $("printArea"); const old = a.style.cssText; a.style.cssText = "position:static;";
   const hide = [...document.body.children].filter(c=> c !== a);
