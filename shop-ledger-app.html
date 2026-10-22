@@ -5551,6 +5551,7 @@ async function hbAcctRows(kind){
     rows.push({ section: "🏪 দোকান" });
     add("🏷️", "দোকানের নাম", shop.shopName || se.shopName);
     add("👑", "মালিক", shop.ownerName);
+    add("📞", "দোকানের ফোন", shop.phone);
     if(shop.ownerEmail && shop.ownerEmail !== user.email) add("📨", "মালিকের ইমেইল", shop.ownerEmail);
     add("🌍", "দেশ", shop.country || HB_ACCT_COUNTRY[shop.countryCode] || shop.countryCode || "বাংলাদেশ");
     add("💰", "মুদ্রা", [shop.currencyCode, shop.currencySymbol].filter(Boolean).join(" · ") || "BDT · ৳");
@@ -20130,6 +20131,7 @@ function watchShopStatus(shopId){
   db.collection("shops").doc(shopId).onSnapshot(snap=>{
     if(!snap.exists) return;
     const shop = snap.data();
+    try{ const __se0 = (typeof getSession === 'function') ? getSession() : null; if(typeof hbAskShopPhone === 'function') hbAskShopPhone(shopId, shop, __se0 && __se0.role); }catch(e){}
     if(shop.status === "blocked"){
       document.getElementById("blockedReasonText").textContent =
         shop.blockedReason ? ("কারণ: " + shop.blockedReason) : "দোকানের এডমিনের সাথে যোগাযোগ করুন।";

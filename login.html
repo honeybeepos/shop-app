@@ -87,6 +87,8 @@
     <input type="text" id="suShopName" placeholder="যেমন: রহিম স্টোর">
     <label>আপনার নাম</label>
     <input type="text" id="suName" placeholder="আপনার নাম">
+    <label>📞 দোকানের মোবাইল নম্বর</label>
+    <input type="tel" id="suPhone" maxlength="20" placeholder="01XXXXXXXXX — অর্ডারে সমস্যা হলে গ্রাহক এই নম্বরে ফোন করবেন">
     <label>ইমেইল</label>
     <input type="email" id="suEmail" placeholder="you@example.com">
     <label>পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)</label>
@@ -917,6 +919,7 @@ document.querySelectorAll(".suTypeBtn").forEach(b=> b.addEventListener("click", 
 document.getElementById("signupBtn").addEventListener("click", async ()=>{
   const shopName = document.getElementById("suShopName").value.trim();
   const name = document.getElementById("suName").value.trim();
+  const shopPhone = document.getElementById("suPhone").value.replace(/[০-৯]/g, d=> "০১২৩৪৫৬৭৮৯".indexOf(d)).replace(/[^0-9+]/g, "");
   // 🐞 বাগ-ফিক্স: lowercase করে রাখা হচ্ছে — নাহলে লগইনের সময় আলাদা
   // ছোট/বড় হাতের অক্ষরে টাইপ করলে loginAttempts/auto-lock সিস্টেমের
   // users.email কোয়েরি এই একাউন্টটা খুঁজে না পাওয়ার ঝুঁকি থাকে।
@@ -934,6 +937,9 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
 
   if(!shopName || !name || !email || pass.length < 6){
     showMsg("signupMsg","সব ঘর সঠিকভাবে পূরণ করুন (পাসওয়ার্ড কমপক্ষে ৬ অক্ষর)",false); return;
+  }
+  if(shopPhone.replace(/\D/g, "").length < 8){
+    showMsg("signupMsg","দোকানের মোবাইল নম্বর দিন — অর্ডারে সমস্যা হলে গ্রাহক এই নম্বরে ফোন করবেন।",false); return;
   }
   if(isBdShop && !district){
     showMsg("signupMsg","জেলা নির্বাচন করুন।",false); return;
@@ -955,7 +961,7 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
     const cred = await auth.createUserWithEmailAndPassword(email, pass);
     const uid = cred.user.uid;
     await db.collection("shops").doc(uid).set({
-      shopId: uid, ownerUid: uid, shopName, ownerName: name, ownerEmail: email,
+      shopId: uid, ownerUid: uid, shopName, ownerName: name, ownerEmail: email, phone: shopPhone,
       status: "active",
       // 💊 ফার্মেসি হিসেবে নিবন্ধন — কারো অনুমতি লাগে না, সাথে সাথেই চালু।
       // ড্রাগ লাইসেন্স ঐচ্ছিক (যাচাই সরকারের কাজ); বাজারের এজেন্ট চাইলে পরে লক করতে পারেন।

@@ -2623,6 +2623,7 @@ auth.onAuthStateChanged(async (user)=>{
     const info = sd.exists ? sd.data() : {};
     if(info.status === "blocked"){ $("gateMsg").textContent = "🔒 একাউন্ট ব্লক করা আছে — এডমিনের সাথে যোগাযোগ করুন।"; return; }
     if(info.currencySymbol) localStorage.setItem("shop-currency-symbol", info.currencySymbol);
+    setTimeout(()=>{ try{ hbAskShopPhone(s.shopId, info, s.role); }catch(e){} }, 1500);
   }catch(e){}
   enableAutoSync(s.shopId);
   // 💊 ফার্মেসি হিসেবে নিবন্ধিত দোকানে মোড প্রথমবার নিজে থেকেই চালু হয় (সব ফোনে সিঙ্ক),

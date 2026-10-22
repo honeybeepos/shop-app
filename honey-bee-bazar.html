@@ -12544,6 +12544,7 @@ function hbPackLabelText(k){ const x = HB_PACK_LABELS.find(l=> l.k === k); retur
 // ফার্মেসী PIN দিয়ে খোলা থাকলে আসল নাম, নাহলে ঢাকা
 function hbPrivName(name, isPriv){
   if(!isPriv) return name;
+  name = String(name || "").replace(/^🔒\s*/, "");
   return (typeof __phUnlockedUid !== "undefined" && __phUnlockedUid) ? ("🔒 " + name) : "🔒 গোপনীয় পণ্য";
 }
 function hbToastLite(msg){
@@ -13291,6 +13292,41 @@ function hbTrackMiniRender(){
   $("hbTrackMiniClickable").addEventListener("click", ()=> hbOpenTracker(latest));
 }
 
+
+/* 🏪 অর্ডারে দোকানের পরিচয় — নাম, মালিক, ফোন, ম্যাপ। ভুল হলে গ্রাহক যেন সরাসরি যোগাযোগ করতে পারেন। */
+const __hbShopInfo = {};
+function hbShopInfoLoad(shopId){
+  if(!shopId || __hbShopInfo[shopId]) return;
+  __hbShopInfo[shopId] = { loading:true };
+  db.collection("shops").doc(shopId).get().then(d=>{
+    const s = d.exists ? d.data() : {};
+    __hbShopInfo[shopId] = {
+      name: s.shopName || s.name || "দোকান",
+      owner: s.ownerName || "",
+      phone: s.phone || hbExtractShopPhone(s.logoDescription || "") || "",
+      loc: (s.storeLocation && s.storeLocation.lat != null) ? s.storeLocation : null
+    };
+  }).catch(()=>{ __hbShopInfo[shopId] = { name:"", owner:"", phone:"", loc:null }; })
+    .then(()=>{
+      document.querySelectorAll('[data-hbshop="' + shopId + '"]').forEach(el=> el.innerHTML = hbShopContactInner(shopId));
+    });
+}
+function hbShopContactInner(shopId){
+  const i = __hbShopInfo[shopId];
+  if(!i || i.loading) return '<span style="color:var(--muted);">🏪 দোকানের তথ্য লোড হচ্ছে...</span>';
+  const btn = "display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:8px; font-size:11.5px; font-weight:700; text-decoration:none; border:1px solid var(--border); color:#fff8e8; background:rgba(255,255,255,0.05);";
+  return `<div style="font-size:12px; line-height:1.6;">🏪 <b>${escapeHtml(i.name || "দোকান")}</b>${i.owner ? ' · 👤 ' + escapeHtml(i.owner) : ''}</div>
+    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+      ${i.phone ? `<a href="tel:${escapeHtml(i.phone)}" onclick="event.stopPropagation();" style="${btn} border-color:#4ade80; color:#4ade80;">📞 ${escapeHtml(i.phone)}</a>` : '<span style="font-size:11px; color:var(--muted);">📞 দোকান এখনো ফোন নম্বর দেয়নি</span>'}
+      ${i.loc ? `<a href="https://www.google.com/maps/search/?api=1&query=${i.loc.lat},${i.loc.lng}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="${btn}">🗺️ ম্যাপে দোকান</a>` : ''}
+    </div>`;
+}
+function hbShopContactHtml(shopId){
+  if(!shopId) return "";
+  hbShopInfoLoad(shopId);
+  return `<div data-hbshop="${escapeHtml(shopId)}" style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.1);">${hbShopContactInner(shopId)}</div>`;
+}
+
 function hbOrdersRender(){
   const listEl = $("hbCartOrdersList");
   // 🧹 গ্রাহক যেগুলো নিজের তালিকা থেকে সরিয়েছেন সেগুলো আর দেখানো হয় না
@@ -13340,7 +13376,8 @@ function hbOrdersRender(){
     const status = o.status || "pending";
     const time = o.createdAt ? o.createdAt.toDate().toLocaleDateString('bn-BD') : "";
     return `
-      <div class="hbOrderCard" data-oid="${o.id}" style="display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px; background:var(--card); border:1px solid var(--border); border-radius:12px; cursor:pointer;">
+      <div class="hbOrderCard" data-oid="${o.id}" style="padding:12px 14px; margin-bottom:8px; background:var(--card); border:1px solid var(--border); border-radius:12px; cursor:pointer;">
+      <div style="display:flex; align-items:center; gap:12px;">
         <div style="flex:1; min-width:0;">
           <div style="font-weight:700; font-size:13px;">${escapeHtml(hbPrivName(o.productName||"প্রোডাক্ট", o.isPrivate))}</div>
           <div style="font-size:11px; color:var(--muted);">${o.orderCode ? '🧾 <b style="color:var(--amber);">' + escapeHtml(o.orderCode) + '</b> · ' : ''}পরিমাণ: ${o.qty||1} · ${time}</div>
@@ -13353,6 +13390,8 @@ function hbOrdersRender(){
           : (status === "delivered" || status === "cancelled")
             ? `<button class="hbOrderHide" data-oid="${o.id}" title="তালিকা থেকে সরান" style="flex-shrink:0; padding:6px 10px; border-radius:9px; border:1px solid var(--border); background:transparent; color:var(--muted); font-size:13px; font-family:inherit; cursor:pointer;">✕</button>`
             : `<span style="color:var(--muted); font-size:14px;">›</span>`}
+      </div>
+      ${hbShopContactHtml(o.shopId)}
       </div>`;
   }).join("");
 
@@ -13458,7 +13497,9 @@ function hbOpenTracker(order){
         <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">পরিমাণ: ${order.qty||1}${time ? " · " + time : ""}</div>
       </div>
       <span style="font-size:11px; font-weight:800; flex-shrink:0;">${HB_STATUS_LABEL[status]||status}</span>
-    </div>`;
+    </div>
+    ${order.orderCode ? `<div style="font-size:12px; margin-top:8px;">🧾 অর্ডার নম্বর: <b style="color:var(--amber);">${escapeHtml(order.orderCode)}</b></div>` : ""}
+    ${hbShopContactHtml(order.shopId)}`;
 
   // 🚴 রাইডার ডিসপ্যাচ স্ট্যাটাস — "প্রস্তুত হচ্ছে" ধাপে থাকা অবস্থায় দোকানদার
   // আসলে কী করছে (রাইডার খুঁজছে/এখনো পায়নি/পেয়ে গেছে) সেটা সরাসরি Firestore-এর

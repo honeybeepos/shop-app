@@ -809,3 +809,46 @@ document.addEventListener("visibilitychange", () => {
     pushLocalStorageToCloud().catch(()=>{});
   }
 });
+
+
+/* 📞 দোকানের মোবাইল নম্বর — Bazar-এর গ্রাহক অর্ডারে দোকানের নাম, মালিক,
+   ফোন আর ম্যাপ দেখেন, যাতে ভুল হলে সরাসরি যোগাযোগ করতে পারেন।
+   পুরনো দোকানে নম্বর না থাকলে এডমিনকে একবার জিজ্ঞেস করা হয়। */
+function hbAskShopPhone(shopId, shop, role){
+  try{
+    if(!shopId || !shop || shop.phone || role !== "admin") return;
+    if(shop.onlineEnabled === false || (shop.countryCode && shop.countryCode !== "BD")) return;
+    if(sessionStorage.getItem("hb-ask-phone-later")) return;
+    if(document.getElementById("hbAskPhoneOv")) return;
+  }catch(e){ return; }
+  const ov = document.createElement("div");
+  ov.id = "hbAskPhoneOv";
+  ov.style.cssText = "position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; padding:16px; font-family:inherit;";
+  ov.innerHTML = '<div style="width:100%; max-width:380px; background:#fff; color:#1f2937; border-radius:16px; padding:18px;">'
+    + '<div style="font-size:16px; font-weight:800;">📞 দোকানের মোবাইল নম্বর দিন</div>'
+    + '<div style="font-size:12.5px; color:#6b7280; margin-top:6px; line-height:1.7;">Bazar-এ অর্ডার দিলে গ্রাহক আপনার দোকানের নাম, ফোন আর ম্যাপ দেখবেন — অর্ডারে কোনো ভুল হলে যেন সরাসরি ফোন করতে পারেন।</div>'
+    + '<input id="hbAskPhoneIn" type="tel" maxlength="20" placeholder="01XXXXXXXXX" style="width:100%; box-sizing:border-box; margin-top:12px; padding:11px; border:1px solid #d1d5db; border-radius:10px; font-size:15px; font-family:inherit;">'
+    + '<div id="hbAskPhoneMsg" style="font-size:12px; color:#dc2626; min-height:16px; margin-top:6px;"></div>'
+    + '<div style="display:flex; gap:8px; margin-top:6px;">'
+    + '<button type="button" id="hbAskPhoneLater" style="flex:1; padding:11px; border:1px solid #d1d5db; border-radius:10px; background:#fff; font-family:inherit; font-weight:700; cursor:pointer;">পরে</button>'
+    + '<button type="button" id="hbAskPhoneSave" style="flex:2; padding:11px; border:0; border-radius:10px; background:#16a34a; color:#fff; font-family:inherit; font-weight:800; cursor:pointer;">✅ সেভ করুন</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  document.getElementById("hbAskPhoneLater").onclick = function(){
+    try{ sessionStorage.setItem("hb-ask-phone-later", "1"); }catch(e){}
+    ov.remove();
+  };
+  document.getElementById("hbAskPhoneSave").onclick = async function(){
+    const raw = document.getElementById("hbAskPhoneIn").value;
+    const v = raw.replace(/[০-৯]/g, function(d){ return "০১২৩৪৫৬৭৮৯".indexOf(d); }).replace(/[^0-9+]/g, "");
+    if(v.replace(/\D/g, "").length < 8){ document.getElementById("hbAskPhoneMsg").textContent = "সঠিক মোবাইল নম্বর দিন"; return; }
+    this.disabled = true; this.textContent = "সেভ হচ্ছে...";
+    try{
+      await firebase.firestore().collection("shops").doc(shopId).set({ phone: v }, { merge: true });
+      ov.remove();
+    }catch(e){
+      this.disabled = false; this.textContent = "✅ সেভ করুন";
+      document.getElementById("hbAskPhoneMsg").textContent = "সেভ হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন";
+    }
+  };
+}
