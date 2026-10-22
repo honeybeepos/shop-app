@@ -13374,10 +13374,13 @@ function hbShopInfoLoad(shopId){
     };
   }).catch(()=>{ __hbShopInfo[shopId] = { name:"", owner:"", phone:"", loc:null }; })
     .then(()=>{
-      document.querySelectorAll('[data-hbshop="' + shopId + '"]').forEach(el=> el.innerHTML = hbShopContactInner(shopId));
+      document.querySelectorAll('[data-hbshop="' + shopId + '"]').forEach(el=>{
+        const oid = el.getAttribute("data-hbord");
+        el.innerHTML = hbShopContactInner(shopId, oid ? __hbOrdersData.find(x=> x.id === oid) : null);
+      });
     });
 }
-function hbShopContactInner(shopId){
+function hbShopContactInner(shopId, order){
   const i = __hbShopInfo[shopId];
   if(!i || i.loading) return '<span style="color:var(--muted);">🏪 দোকানের তথ্য লোড হচ্ছে...</span>';
   const btn = "display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:8px; font-size:11.5px; font-weight:700; text-decoration:none; border:1px solid var(--border); color:#fff8e8; background:rgba(255,255,255,0.05);";
@@ -13385,12 +13388,46 @@ function hbShopContactInner(shopId){
     <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
       ${i.phone ? `<a href="tel:${escapeHtml(i.phone)}" onclick="event.stopPropagation();" style="${btn} border-color:#4ade80; color:#4ade80;">📞 ${escapeHtml(i.phone)}</a>` : '<span style="font-size:11px; color:var(--muted);">📞 দোকান এখনো ফোন নম্বর দেয়নি</span>'}
       ${i.loc ? `<a href="https://www.google.com/maps/search/?api=1&query=${i.loc.lat},${i.loc.lng}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="${btn}">🗺️ ম্যাপে দোকান</a>` : ''}
+      ${i.phone ? `<a href="${hbPhoneToWaLink(String(i.phone).replace(/\D/g, "").replace(/^880/, "0"), hbOrderWaText(order))}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="${btn} border-color:#25D366; color:#25D366;" title="WhatsApp-এ রসিদ পাঠান"><svg width="15" height="15" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg> WhatsApp</a>` : ''}
     </div>`;
 }
-function hbShopContactHtml(shopId){
+function hbShopContactHtml(shopId, order){
   if(!shopId) return "";
   hbShopInfoLoad(shopId);
-  return `<div data-hbshop="${escapeHtml(shopId)}" style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.1);">${hbShopContactInner(shopId)}</div>`;
+  return `<div data-hbshop="${escapeHtml(shopId)}" data-hbord="${escapeHtml(order && order.id || "")}" style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.1);">${hbShopContactInner(shopId, order)}</div>`;
+}
+/* 💬 দোকানদারকে WhatsApp-এ রসিদ — অর্ডার নম্বর, পণ্য, মোট টাকা, এখনকার অবস্থা।
+   গোপনীয় পণ্যের নাম মেসেজে যায় না (ফোনের নোটিফিকেশনে অন্য কেউ দেখে ফেলতে পারে)। */
+function hbOrderWaText(order){
+  if(!order) return "Honey Bee Bazar-এ আপনার দোকান দেখে মেসেজ করছি।";
+  const items = order.orderCode
+    ? __hbOrdersData.filter(x=> x.orderCode === order.orderCode && x.shopId === order.shopId && (x.status||"pending") !== "cancelled")
+    : [order];
+  if(!items.length) items.push(order);
+  const sub = items.reduce((s,o)=> s + (Number(o.price)||0) * (Number(o.qty)||1), 0);
+  const pickup = items.some(o=> o.deliveryMode === "pickup");
+  let del = 0;
+  if(!pickup){
+    const sealed = items.filter(o=> o.delivery && typeof o.delivery.charge === "number");
+    if(sealed.length) del = sealed.reduce((s,o)=> s + o.delivery.charge, 0);
+    else{ const c = items.map(o=> Number(o.clientDeliveryCharge)).filter(n=> n > 0); if(c.length) del = Math.max(...c); }
+  }
+  const r = n=> Math.round(n * 100) / 100;
+  const st = order.status || "pending";
+  const stTxt = (HB_STATUS_LABEL[st] || st).replace(/^\S+\s/, "");
+  const lines = items.map(o=> "• " + (o.isPrivate ? "🔒 গোপনীয় পণ্য" : (o.productName || "পণ্য")) + (o.variantColor ? " (" + o.variantColor + "/" + o.variantSize + ")" : "") + " × " + (o.qty || 1) + " = ৳" + r((Number(o.price)||0) * (Number(o.qty)||1)));
+  const ask = (st === "pending" || st === "holding" || st === "preparing") ? "অর্ডারটা এখনো পাঠানো হয়নি — দয়া করে তাড়াতাড়ি পাঠাবেন।"
+            : st === "shipped" ? "এখনো হাতে পাইনি — একটু খোঁজ নেবেন?"
+            : st === "cancelled" ? "অর্ডারটা বাতিল দেখাচ্ছে — কেন হলো জানাবেন?"
+            : "এই অর্ডার নিয়ে কথা বলতে চাই।";
+  return "আসসালামু আলাইকুম, আমি " + ((currentCustomer && currentCustomer.name) || order.customerName || "গ্রাহক") + "।\n"
+    + "Honey Bee Bazar-এ আমার অর্ডার:\n"
+    + (order.orderCode ? "🧾 অর্ডার নম্বর: " + order.orderCode + "\n" : "")
+    + lines.join("\n") + "\n"
+    + "পণ্যের দাম: ৳" + r(sub) + "\n"
+    + (pickup ? "🏪 দোকান থেকে নিজে নেব (ডেলিভারি চার্জ ৳0)\n" : "🚚 ডেলিভারি চার্জ: ৳" + r(del) + "\n")
+    + "💰 মোট: ৳" + r(sub + del) + "\n"
+    + "📍 এখন: " + stTxt + "\n\n" + ask;
 }
 
 function hbOrdersRender(){
@@ -13457,7 +13494,7 @@ function hbOrdersRender(){
             ? `<button class="hbOrderHide" data-oid="${o.id}" title="তালিকা থেকে সরান" style="flex-shrink:0; padding:6px 10px; border-radius:9px; border:1px solid var(--border); background:transparent; color:var(--muted); font-size:13px; font-family:inherit; cursor:pointer;">✕</button>`
             : `<span style="color:var(--muted); font-size:14px;">›</span>`}
       </div>
-      ${hbShopContactHtml(o.shopId)}
+      ${hbShopContactHtml(o.shopId, o)}
       </div>`;
   }).join("");
 
@@ -13587,7 +13624,7 @@ function hbOpenTracker(order){
     </div>
     ${order.orderCode ? `<div style="font-size:12px; margin-top:8px;">🧾 অর্ডার নম্বর: <b style="color:var(--amber);">${escapeHtml(order.orderCode)}</b></div>` : ""}
     ${hbTrackerBillHtml(order)}
-    ${hbShopContactHtml(order.shopId)}`;
+    ${hbShopContactHtml(order.shopId, order)}`;
 
   // 🚴 রাইডার ডিসপ্যাচ স্ট্যাটাস — "প্রস্তুত হচ্ছে" ধাপে থাকা অবস্থায় দোকানদার
   // আসলে কী করছে (রাইডার খুঁজছে/এখনো পায়নি/পেয়ে গেছে) সেটা সরাসরি Firestore-এর
