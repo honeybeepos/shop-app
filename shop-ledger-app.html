@@ -7553,11 +7553,20 @@ document.getElementById('ordBellBtn').addEventListener('click', ()=>{
   ordRenderBellList();
   document.getElementById('ordBellModalOverlay').classList.add('show');
 });
-document.getElementById('ordBellModalCloseBtn').addEventListener('click', ()=>{
+/* 💊 ফার্মেসি থেকে অর্ডার দেখতে এলে, অর্ডারের পাতা বন্ধ করলেই ফার্মেসিতে ফেরত */
+function ordCloseBell(){
   document.getElementById('ordBellModalOverlay').classList.remove('show');
-});
+  let fromPh = false; try{ fromPh = !!sessionStorage.getItem('hb-from-pharmacy'); }catch(e){}
+  const se = (typeof getSession === 'function') ? (getSession() || {}) : {};
+  if(fromPh || se.shopType === 'pharmacy' || localStorage.getItem('hb-pharmacy-mode') === '1'){
+    try{ sessionStorage.removeItem('hb-from-pharmacy'); }catch(e){}
+    try{ if(typeof pushLocalStorageToCloud === 'function') pushLocalStorageToCloud().catch(()=>{}); }catch(e){}
+    location.href = 'pharmacy.html';
+  }
+}
+document.getElementById('ordBellModalCloseBtn').addEventListener('click', ordCloseBell);
 document.getElementById('ordBellModalOverlay').addEventListener('click', (ev)=>{
-  if(ev.target.id === 'ordBellModalOverlay') document.getElementById('ordBellModalOverlay').classList.remove('show');
+  if(ev.target.id === 'ordBellModalOverlay') ordCloseBell();
 });
 
 /* 📞 দোকানের ফোন। shops ঘরে আলাদা ফোন ফিল্ড নেই — দোকানদার
@@ -23619,11 +23628,11 @@ auth.onAuthStateChanged(async (user)=>{
      সিঙ্ক হয়) POS খুললেই pharmacy.html খোলে। একই খাতা, তাই কিছু হারায় না।
      ফার্মেসি পাতার "সাধারণ POS-এ খুলুন" লিংকে ?stay=1 থাকে — তখন ফেরত পাঠানো হয় না। */
   const __hbSess = (typeof getSession === "function") ? (getSession() || {}) : {};
-  if((localStorage.getItem("hb-pharmacy-mode") === "1" || (__hbSess.shopType === "pharmacy" && localStorage.getItem("hb-pharmacy-mode") === null)) && !/[?&]stay=1/.test(location.search)){
+  if((localStorage.getItem("hb-pharmacy-mode") === "1" || (__hbSess.shopType === "pharmacy" && localStorage.getItem("hb-pharmacy-mode") === null)) && !/[?&](stay=1|open=orders)/.test(location.search) && !sessionStorage.getItem("hb-from-pharmacy")){
     location.replace("pharmacy.html");
     return;
   }
-  if(session.role === "admin"){
+  if(session.role === "admin" || __hbSess.shopType === "pharmacy" || localStorage.getItem("hb-pharmacy-mode") === "1"){
     // 💊 সাধারণ দোকানে "ফার্মেসি মোড" বোতাম আর দেখায় না — ফার্মেসি এখন নিবন্ধনের সময়ই
     //    আলাদা বাছা হয়। শুধু ফার্মেসি দোকান (বা আগে মোড চালু করা দোকান) "সাধারণ POS"
     //    দেখতে এলে ফেরার জন্য বোতামটা থাকে।
@@ -23638,6 +23647,7 @@ auth.onAuthStateChanged(async (user)=>{
           pmBtn.disabled = true; pmBtn.textContent = "⏳ চালু হচ্ছে…";
           try{ await Promise.race([pushLocalStorageToCloud(), new Promise(r=> setTimeout(r, 8000))]); }catch(e){}
         }
+        try{ sessionStorage.removeItem("hb-from-pharmacy"); }catch(e){}
         location.href = "pharmacy.html";
       });
     }

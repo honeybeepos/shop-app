@@ -325,6 +325,7 @@
       <div class="shop" id="shopName">—</div>
       <div class="search"><input id="topSearch" placeholder="ওষুধ, বারকোড বা জেনেরিক নাম লিখুন…" autocomplete="off"></div>
       <span class="sync" id="syncTxt">🟢 অনলাইন</span>
+      <button class="bell" id="ordBtn" type="button" title="Bazar অর্ডার" onclick="phOpenBazarOrders()">🛍️<i id="ordN" hidden>0</i></button>
       <button class="bell" id="bellBtn" type="button" title="মেয়াদ ও কম স্টকের সতর্কতা">🔔<i id="bellN" hidden>0</i></button>
       <div class="me"><div class="av">👤</div><div><b id="meName">—</b><small id="meRole">—</small></div></div>
     </header>
@@ -467,6 +468,7 @@ function ensureMedCategory(){
 const MENU = [
   { key:"dash",      ic:"🏠", label:"ড্যাশবোর্ড" },
   { key:"pos",       ic:"🛒", label:"বিক্রয় (POS)" },
+  { key:"orders",    ic:"🛍️", label:"Bazar অর্ডার" },
   { key:"rx",        ic:"📄", label:"প্রেসক্রিপশন" },
   { key:"meds",      ic:"💊", label:"ওষুধের তালিকা" },
   { key:"purchase",  ic:"📥", label:"ক্রয়" },
@@ -485,10 +487,34 @@ const BNAV = [
   { key:"more", ic:"☰", label:"আরও" },
 ];
 let CUR_PAGE = "dash";
+/* 🛍️ Bazar অর্ডার — অর্ডার নেওয়া, রাইডার ডাকা, ডেলিভারি — সব POS-এর অর্ডার পাতাতেই হয়
+   (একই খাতা)। এখানে শুধু নতুন অর্ডারের সংখ্যা দেখানো আর এক চাপে সেখানে নিয়ে যাওয়া।
+   অর্ডারের পাতা বন্ধ করলে আবার ফার্মেসিতে ফেরত আসে। */
+let __phOrdN = 0, __phOrdUnsub = null, __phOrdFirst = true;
+function phOpenBazarOrders(){
+  try{ sessionStorage.setItem("hb-from-pharmacy", "1"); }catch(e){}
+  try{ pushNow(); }catch(e){}
+  location.href = "shop-ledger-app.html?open=orders";
+}
+function phOrdersListen(shopId){
+  if(__phOrdUnsub || !shopId) return;
+  __phOrdUnsub = db.collection("orderRequests").where("shopId", "==", shopId).where("status", "==", "pending")
+    .onSnapshot(qs=>{
+      const n = qs.docs.filter(d=> d.data().hiddenForSeller !== true).length;
+      const more = !__phOrdFirst && n > __phOrdN;
+      __phOrdFirst = false; __phOrdN = n;
+      const b = $("ordN"); if(b){ b.hidden = !n; b.textContent = bn(n); }
+      renderNav();
+      if(more){
+        try{ toast("🛍️ Bazar থেকে নতুন অর্ডার এসেছে — উপরের 🛍️ চাপুন"); }catch(e){}
+        try{ const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.value = 0.15; o.start(); setTimeout(()=>{ o.frequency.value = 1180; }, 180); setTimeout(()=>{ o.stop(); a.close(); }, 420); }catch(e){}
+      }
+    }, err=>{ console.warn("orders listen", err); __phOrdUnsub = null; });
+}
 function renderNav(){
   const items = MENU.filter(m=> !m.admin || isAdmin());
   const rxNew = (typeof RX_LIST !== "undefined") ? RX_LIST.filter(r=> r.status === "new").length : 0;
-  $("nav").innerHTML = items.map(m=> `<button type="button" data-go="${m.key}" class="${m.key === CUR_PAGE ? "on" : ""}"><span class="ic">${m.ic}</span>${esc(m.label)}${m.soon ? '<span class="soon">শীঘ্রই</span>' : ""}${m.key === "rx" && rxNew ? `<span class="soon" style="background:#DC2626; color:#fff">${bn(rxNew)}</span>` : ""}</button>`).join("");
+  $("nav").innerHTML = items.map(m=> `<button type="button" data-go="${m.key}" class="${m.key === CUR_PAGE ? "on" : ""}"><span class="ic">${m.ic}</span>${esc(m.label)}${m.soon ? '<span class="soon">শীঘ্রই</span>' : ""}${m.key === "rx" && rxNew ? `<span class="soon" style="background:#DC2626; color:#fff">${bn(rxNew)}</span>` : ""}${m.key === "orders" && __phOrdN ? `<span class="soon" style="background:#DC2626; color:#fff">${bn(__phOrdN)}</span>` : ""}</button>`).join("");
   $("bnav").innerHTML = BNAV.map(m=> `<button type="button" data-go="${m.key}" class="${m.key === CUR_PAGE ? "on" : ""}"><span class="ic">${m.ic}</span>${m.label}</button>`).join("");
 }
 document.addEventListener("click", (e)=>{
@@ -507,6 +533,7 @@ function go(k){
   try{ history.replaceState(null, "", "#" + k); }catch(e){}
   renderNav();
   window.scrollTo(0, 0);
+  if(k === "orders"){ phOpenBazarOrders(); return; }
   const P = { dash: pageDash, pos: pagePos, rx: pageRx, meds: pageMeds, alerts: pageAlerts, users: pageUsers, purchase: pagePurchase, suppliers: pageSuppliers, customers: pageCustomers, stock: pageStock, reports: pageReports, accounts: pageAccounts, settings: pageSettings }[k];
   if(P) P(); else pageSoon(k);
   refreshBell();
@@ -2755,6 +2782,7 @@ auth.onAuthStateChanged(async (user)=>{
       hbShowLocBanner(__phHasLoc, "দোকানের", s.role === "admin", function(){ phSetShopLocation(this); });
   }catch(e){}
   enableAutoSync(s.shopId);
+  phOrdersListen(s.shopId);
   // 💊 ফার্মেসি হিসেবে নিবন্ধিত দোকানে মোড প্রথমবার নিজে থেকেই চালু হয় (সব ফোনে সিঙ্ক),
   // যাতে কোনো ফোনে সাধারণ POS খুললেও সোজা এখানে চলে আসে
   if(s.shopType === "pharmacy" && localStorage.getItem("hb-pharmacy-mode") === null) localStorage.setItem("hb-pharmacy-mode", "1");
