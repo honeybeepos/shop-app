@@ -23628,8 +23628,8 @@ auth.onAuthStateChanged(async (user)=>{
      সিঙ্ক হয়) POS খুললেই pharmacy.html খোলে। একই খাতা, তাই কিছু হারায় না।
      ফার্মেসি পাতার "সাধারণ POS-এ খুলুন" লিংকে ?stay=1 থাকে — তখন ফেরত পাঠানো হয় না। */
   const __hbSess = (typeof getSession === "function") ? (getSession() || {}) : {};
-  if((localStorage.getItem("hb-pharmacy-mode") === "1" || (__hbSess.shopType === "pharmacy" && localStorage.getItem("hb-pharmacy-mode") === null)) && !/[?&](stay=1|open=orders)/.test(location.search) && !sessionStorage.getItem("hb-from-pharmacy")){
-    location.replace("pharmacy.html");
+  if((localStorage.getItem("hb-pharmacy-mode") === "1" || (__hbSess.shopType === "pharmacy" && localStorage.getItem("hb-pharmacy-mode") === null)) && !/[?&]stay=1/.test(location.search)){
+    location.replace(/[?&]open=orders/.test(location.search) ? "pharmacy.html#orders" : "pharmacy.html");
     return;
   }
   if(session.role === "admin" || __hbSess.shopType === "pharmacy" || localStorage.getItem("hb-pharmacy-mode") === "1"){

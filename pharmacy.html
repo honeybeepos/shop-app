@@ -341,6 +341,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script src="firebase-init.js"></script>
 <script>
 /* =====================================================================
@@ -487,15 +488,9 @@ const BNAV = [
   { key:"more", ic:"☰", label:"আরও" },
 ];
 let CUR_PAGE = "dash";
-/* 🛍️ Bazar অর্ডার — অর্ডার নেওয়া, রাইডার ডাকা, ডেলিভারি — সব POS-এর অর্ডার পাতাতেই হয়
-   (একই খাতা)। এখানে শুধু নতুন অর্ডারের সংখ্যা দেখানো আর এক চাপে সেখানে নিয়ে যাওয়া।
-   অর্ডারের পাতা বন্ধ করলে আবার ফার্মেসিতে ফেরত আসে। */
+/* 🛍️ Bazar অর্ডার — নতুন অর্ডারের সংখ্যা, শব্দ; পাতাটা নিচে (pageOrders) */
 let __phOrdN = 0, __phOrdUnsub = null, __phOrdFirst = true;
-function phOpenBazarOrders(){
-  try{ sessionStorage.setItem("hb-from-pharmacy", "1"); }catch(e){}
-  try{ pushNow(); }catch(e){}
-  location.href = "shop-ledger-app.html?open=orders";
-}
+function phOpenBazarOrders(){ ORD_TAB = "pending"; go("orders"); }
 function phOrdersListen(shopId){
   if(__phOrdUnsub || !shopId) return;
   __phOrdUnsub = db.collection("orderRequests").where("shopId", "==", shopId).where("status", "==", "pending")
@@ -507,6 +502,7 @@ function phOrdersListen(shopId){
       renderNav();
       if(more){
         try{ toast("🛍️ Bazar থেকে নতুন অর্ডার এসেছে — উপরের 🛍️ চাপুন"); }catch(e){}
+        if(CUR_PAGE === "orders" && ORD_TAB === "pending"){ const t = document.querySelector('[data-ot="pending"]'); if(t) t.textContent = "🆕 নতুন (" + bn(n) + ")"; }
         try{ const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = 880; g.gain.value = 0.15; o.start(); setTimeout(()=>{ o.frequency.value = 1180; }, 180); setTimeout(()=>{ o.stop(); a.close(); }, 420); }catch(e){}
       }
     }, err=>{ console.warn("orders listen", err); __phOrdUnsub = null; });
@@ -533,8 +529,8 @@ function go(k){
   try{ history.replaceState(null, "", "#" + k); }catch(e){}
   renderNav();
   window.scrollTo(0, 0);
-  if(k === "orders"){ phOpenBazarOrders(); return; }
-  const P = { dash: pageDash, pos: pagePos, rx: pageRx, meds: pageMeds, alerts: pageAlerts, users: pageUsers, purchase: pagePurchase, suppliers: pageSuppliers, customers: pageCustomers, stock: pageStock, reports: pageReports, accounts: pageAccounts, settings: pageSettings }[k];
+  const P = { dash: pageDash, pos: pagePos, rx: pageRx, meds: pageMeds, alerts: pageAlerts, users: pageUsers, purchase: pagePurchase, suppliers: pageSuppliers, customers: pageCustomers, stock: pageStock, reports: pageReports, accounts: pageAccounts, settings: pageSettings, orders: pageOrders }[k];
+  if(k !== "orders" && typeof ORD_LIST_UNSUB !== "undefined" && ORD_LIST_UNSUB){ ORD_LIST_UNSUB(); ORD_LIST_UNSUB = null; }
   if(P) P(); else pageSoon(k);
   refreshBell();
 }
@@ -2483,6 +2479,271 @@ function pageRx(){
   document.querySelectorAll("[data-rxt]").forEach(b=> b.onclick = ()=>{ RX_TAB = b.dataset.rxt; pageRx(); });
   document.querySelectorAll("[data-rxo]").forEach(b=> b.onclick = ()=> openRx(b.dataset.rxo));
 }
+
+/* =====================================================================
+   🛍️ Bazar অর্ডার — ফার্মেসির নিজের পাতায় (POS-এ যেতে হয় না)
+   নতুন → গ্রহণ (রাইডার / নিজে) → প্যাক → পথে → ডেলিভার্ড (বিক্রির খাতায় ওঠে, স্টক কমে)
+   ===================================================================== */
+const ORD_TABS = [["pending","🆕 নতুন"],["preparing","📦 প্রস্তুত হচ্ছে"],["shipped","🚚 পথে আছে"],["delivered","✅ ডেলিভার্ড"],["cancelled","❌ বাতিল"]];
+const ORD_PACK = { personal:"🧴 ব্যক্তিগত পণ্য", cosmetics:"💄 প্রসাধনী", household:"🏠 গৃহস্থালি সামগ্রী", code:"🔢 শুধু অর্ডার নম্বর" };
+const ORD_DISPATCH = {
+  searching_rider:"🤖 রাইডার খোঁজা হচ্ছে…", offer_sent:"🤖 রাইডারকে অফার পাঠানো হয়েছে — সাড়ার অপেক্ষায়",
+  assigned:"✅ রাইডার পাওয়া গেছে", batched:"🔗 এই রসিদের অন্য ওষুধের সাথে একই রাইডারে যাবে",
+  waiting_for_rider:"⚠️ এখন কোনো রাইডার ডিউটিতে নেই — নিচে থেকে রাইডার বাছুন বা নিজে পাঠান"
+};
+let ORD_TAB = "pending", ORD_LIST = [], ORD_LIST_UNSUB = null, ORD_SECRET = {}, ORD_SHOP = null;
+let __ordFns = null;
+function ordFns(){ try{ if(!__ordFns && firebase.functions) __ordFns = firebase.functions(); }catch(e){} return __ordFns; }
+function ordWhen(o){ const t = o.createdAt && o.createdAt.toDate ? o.createdAt.toDate() : null; return t ? t.toLocaleString("bn-BD", { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }) : ""; }
+async function ordShop(){
+  if(ORD_SHOP) return ORD_SHOP;
+  try{ const d = await db.collection("shops").doc(SESSION.shopId).get(); ORD_SHOP = d.exists ? d.data() : {}; }catch(e){ ORD_SHOP = {}; }
+  return ORD_SHOP;
+}
+// 🔒 গোপনীয় পণ্যের আসল নাম — শুধু এই দোকান আর গ্রাহক পড়তে পারে
+async function ordResolvePrivate(list){
+  await Promise.all(list.filter(o=> o.isPrivate && !o.__ok).map(async o=>{
+    try{
+      let sec = ORD_SECRET[o.id];
+      if(!sec){ const d = await db.collection("orderRequests").doc(o.id).collection("secret").doc("item").get(); if(!d.exists) return; sec = ORD_SECRET[o.id] = d.data(); }
+      o.productName = "🔒 " + (sec.productName || "গোপনীয় পণ্য"); o.productId = sec.productId || null; o.__ok = true;
+    }catch(e){}
+  }));
+  return list;
+}
+function ordListenTab(){
+  if(ORD_LIST_UNSUB){ ORD_LIST_UNSUB(); ORD_LIST_UNSUB = null; }
+  ORD_LIST = null;
+  ORD_LIST_UNSUB = db.collection("orderRequests").where("shopId", "==", SESSION.shopId).where("status", "==", ORD_TAB)
+    .onSnapshot(async qs=>{
+      const list = qs.docs.map(d=> ({ id:d.id, ...d.data() })).filter(o=> o.hiddenForSeller !== true)
+        .sort((a,b)=> (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
+      await ordResolvePrivate(list);
+      ORD_LIST = list;
+      if(ORD_TAB === "delivered") list.forEach(o=> ordRecordSale(o)); // রাইডার/গ্রাহক "পেয়েছি" চাপলেও বিক্রি খাতায় ওঠে
+      if(CUR_PAGE === "orders" && !document.querySelector("#modalRoot .modal")) renderOrders();
+    }, err=>{ console.warn(err); ORD_LIST = []; if(CUR_PAGE === "orders") renderOrders("লোড করা যায়নি — ইন্টারনেট দেখুন"); });
+}
+function ordGroups(list){
+  const map = {}, keys = [];
+  list.forEach(o=>{
+    const k = (o.orderCode || "") + "|" + (o.customerUid || o.deliveryPhone || o.id);
+    if(!map[k]){ map[k] = { key:k, orderCode:o.orderCode, customerUid:o.customerUid, customerName:o.customerName, phone:o.deliveryPhone, address:o.deliveryAddress, lat:o.deliveryLat, lng:o.deliveryLng, pickup:o.deliveryMode === "pickup", items:[] }; keys.push(k); }
+    map[k].items.push(o);
+  });
+  return keys.map(k=> map[k]);
+}
+function ordStockTxt(o, prods){
+  if(!o.productId) return o.prescriptionId ? `<span class="chip">📄 প্রেসক্রিপশন থেকে</span>` : "";
+  const p = prods.find(x=> x.id === o.productId);
+  if(!p) return `<span class="chip org">⚠️ তালিকায় নেই</span>`;
+  const q = Number(p.qty) || 0, need = Number(o.qty) || 1;
+  return q <= 0 ? `<span class="chip red">🔴 স্টকে নেই</span>` : q < need ? `<span class="chip org">⚠️ স্টকে মাত্র ${bn(q)}</span>` : `<span class="chip">🟢 স্টকে ${bn(q)}</span>`;
+}
+function ordGroupHtml(g, prods){
+  const priv = g.items.find(o=> o.privateOrder);
+  const total = g.items.reduce((s,o)=> s + (Number(o.price) || 0) * (Number(o.qty) || 1), 0);
+  const self = g.items.some(o=> o.selfDelivery === true) || g.pickup;
+  const packed = g.items.every(o=> o.packagingDone === true);
+  const lead = g.items[0];
+  let act = "";
+  if(ORD_TAB === "pending"){
+    act = `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px">
+      <button class="btn green" type="button" data-oacc="${esc(g.key)}" style="flex:1">✅ গ্রহণ করুন</button>
+      <button class="btn red" type="button" data-ocan="${esc(g.key)}">❌ বাতিল</button></div>`;
+  }else if(ORD_TAB === "preparing"){
+    const ds = g.items.map(o=> o.dispatchState).find(Boolean);
+    const waiting = !self && g.items.some(o=> o.dispatchState === "waiting_for_rider" || (!o.dispatchState && o.preparingAt && o.preparingAt.toMillis && Date.now() - o.preparingAt.toMillis() > 3 * 60000));
+    act = `${self ? `<div class="calc" style="margin-top:10px">${g.pickup ? "🏪 গ্রাহক নিজে দোকানে এসে নেবেন — অর্ডার নম্বর মিলিয়ে হাতে দিন" : "🤝 নিজে/অন্য মাধ্যমে পাঠাবেন — রাইডার লাগবে না"}</div>`
+          : `<div class="calc" style="margin-top:10px">${esc(ORD_DISPATCH[ds] || "🤖 রাইডার খোঁজা হচ্ছে…")}</div>`}
+      ${waiting ? `<div style="display:flex; gap:8px; margin-top:8px"><select class="in" data-orsel="${esc(g.key)}" style="flex:1"><option value="">রাইডার বাছুন…</option></select><button class="btn" type="button" data-orasg="${esc(g.key)}">🚚 পাঠান</button></div>
+        <button class="btn ghost" type="button" data-oself="${esc(g.key)}" style="margin-top:8px; width:100%">🤝 রাইডার লাগবে না — নিজে পাঠাব</button>` : ""}
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px">
+        <button class="btn ghost" type="button" data-oslip="${esc(g.key)}">🖨️ স্লিপ</button>
+        ${packed ? `<span class="chip" style="align-self:center">✅ প্যাক করা হয়েছে</span>` : `<button class="btn" type="button" data-opack="${esc(g.key)}" style="flex:1">📦 প্যাক শেষ</button>`}
+        ${self && packed ? (g.pickup
+          ? `<button class="btn green" type="button" data-odone="${esc(g.key)}" style="flex:1">✅ গ্রাহক নিয়ে গেছেন</button>`
+          : `<button class="btn green" type="button" data-oship="${esc(g.key)}" style="flex:1">🛵 পাঠিয়ে দিয়েছি</button>`) : ""}
+        <button class="btn red" type="button" data-ocan="${esc(g.key)}">❌ বাতিল</button>
+      </div>`;
+  }else if(ORD_TAB === "shipped"){
+    act = `<div class="hint" style="margin-top:8px">🚚 ${lead.selfDelivery ? "নিজে/অন্য মাধ্যমে পাঠানো" : "রাইডার: " + esc(lead.assignedRiderName || "—")}${lead.pickedUp === false ? " · রাইডার এখনো দোকানে আসেননি" : ""}</div>
+      <button class="btn green" type="button" data-odone="${esc(g.key)}" style="margin-top:8px; width:100%">✅ ডেলিভারি হয়ে গেছে</button>`;
+  }else{
+    act = `<button class="btn ghost" type="button" data-ohide="${esc(g.key)}" style="margin-top:10px">🧹 তালিকা থেকে সরান</button>`;
+  }
+  return `<div class="panel" style="margin-bottom:12px">
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+      <b style="font-size:16px">👤 ${esc(g.customerName || "গ্রাহক")}</b>
+      ${g.orderCode ? `<span class="chip org" style="font-weight:800; font-size:13px">🧾 ${esc(g.orderCode)}</span>` : ""}
+      <span class="hint" style="margin-left:auto">${esc(ordWhen(lead))}</span>
+    </div>
+    <div class="hint" style="margin-top:4px; line-height:1.7">
+      ${[g.phone ? `📞 <a href="tel:${esc(g.phone)}" style="color:var(--green); font-weight:700">${esc(g.phone)}</a>` : "",
+         g.pickup ? "🏪 দোকান থেকে নেবেন" : (g.address ? "📍 " + esc(g.address) : ""),
+         !g.pickup && g.lat != null ? `<a href="https://www.google.com/maps/search/?api=1&query=${g.lat},${g.lng}" target="_blank" rel="noopener" style="color:#0284c7; font-weight:700">🗺️ ম্যাপ</a>` : ""].filter(Boolean).join(" · ")}
+    </div>
+    ${priv ? `<div style="margin-top:10px; padding:10px 12px; border-radius:10px; background:#FCE7F3; border:1px solid #F9A8D4; color:#9D174D; font-size:13px; line-height:1.7">
+      <b>🔒 গোপনীয় অর্ডার</b> — সাধারণ ব্যাগে সিল করে দিন, বাইরে ওষুধের নাম লিখবেন না।<br>📦 প্যাকেটে লিখুন: <b>${esc(ORD_PACK[priv.packLabel] || ORD_PACK.code)}</b>${g.orderCode ? " · 🧾 <b>" + esc(g.orderCode) + "</b>" : ""}</div>` : ""}
+    <div style="margin-top:8px">${g.items.map(o=> `
+      <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line)">
+        <div style="flex:1; min-width:0"><b>${esc(o.productName || "ওষুধ")}</b> <span class="hint">× ${bn(o.qty || 1)}</span><div style="margin-top:3px">${ordStockTxt(o, prods)}</div></div>
+        <b class="num">${money((Number(o.price) || 0) * (Number(o.qty) || 1))}</b>
+      </div>`).join("")}</div>
+    <div style="display:flex; justify-content:space-between; margin-top:8px; font-weight:800"><span>মোট (ডেলিভারি চার্জ ছাড়া)</span><span class="num">${money(total)}</span></div>
+    ${act}
+  </div>`;
+}
+function pageOrders(){
+  $("page").innerHTML = `<div class="pageHead"><h1>🛍️ Bazar অর্ডার</h1><div class="date">Honey Bee Bazar থেকে আসা অর্ডার — গ্রহণ, প্যাক, পাঠানো সব এখানেই</div></div>
+    <div class="tabs">${ORD_TABS.map(([k,l])=> `<button type="button" data-ot="${k}" class="${k === ORD_TAB ? "on" : ""}">${l}${k === "pending" && __phOrdN ? " (" + bn(__phOrdN) + ")" : ""}</button>`).join("")}</div>
+    <div id="ordBody"><div class="empty">লোড হচ্ছে…</div></div>`;
+  document.querySelectorAll("[data-ot]").forEach(b=> b.onclick = ()=>{ ORD_TAB = b.dataset.ot; pageOrders(); });
+  ordListenTab();
+}
+function renderOrders(err){
+  const el = $("ordBody"); if(!el) return;
+  if(err){ el.innerHTML = `<div class="empty">${esc(err)}</div>`; return; }
+  if(ORD_LIST == null){ el.innerHTML = `<div class="empty">লোড হচ্ছে…</div>`; return; }
+  const groups = ordGroups(ORD_LIST);
+  if(!groups.length){ el.innerHTML = `<div class="panel"><div class="empty">এই ধাপে কোনো অর্ডার নেই</div></div>`; return; }
+  const prods = loadProducts();
+  el.innerHTML = groups.map(g=> ordGroupHtml(g, prods)).join("");
+  const G = k=> groups.find(g=> g.key === k);
+  el.querySelectorAll("[data-oacc]").forEach(b=> b.onclick = ()=> ordAccept(G(b.dataset.oacc)));
+  el.querySelectorAll("[data-ocan]").forEach(b=> b.onclick = ()=>{ if(confirm("এই অর্ডার বাতিল করবেন? গ্রাহক তাঁর অ্যাপে দেখবেন।")) ordSetStatus(G(b.dataset.ocan), "cancelled"); });
+  el.querySelectorAll("[data-opack]").forEach(b=> b.onclick = ()=> ordPacked(G(b.dataset.opack), b));
+  el.querySelectorAll("[data-oship]").forEach(b=> b.onclick = ()=>{ if(confirm("পাঠিয়ে দিয়েছেন? গ্রাহক \"পথে আছে\" দেখবেন।")) ordSetStatus(G(b.dataset.oship), "shipped"); });
+  el.querySelectorAll("[data-odone]").forEach(b=> b.onclick = ()=>{ if(confirm("ডেলিভারি হয়ে গেছে? বিক্রির খাতায় উঠবে আর স্টক কমবে।")) ordSetStatus(G(b.dataset.odone), "delivered"); });
+  el.querySelectorAll("[data-oslip]").forEach(b=> b.onclick = ()=> ordSlip(G(b.dataset.oslip)));
+  el.querySelectorAll("[data-ohide]").forEach(b=> b.onclick = ()=> ordHide(G(b.dataset.ohide)));
+  el.querySelectorAll("[data-oself]").forEach(b=> b.onclick = ()=> ordUpdateAll(G(b.dataset.oself), { selfDelivery:true }, "🤝 নিজে পাঠাবেন"));
+  if(el.querySelector("[data-orsel]")) ordFillRiders(el, G);
+}
+async function ordUpdateAll(g, upd, msg){
+  try{ const bt = db.batch(); g.items.forEach(o=> bt.update(db.collection("orderRequests").doc(o.id), upd)); await bt.commit(); if(msg) toast(msg); }
+  catch(e){ alert("হয়নি: " + (e.code || e.message)); }
+}
+function ordAccept(g){
+  if(!g) return;
+  let mode = g.pickup ? "self" : "rider";
+  const draw = ()=> openModal(`
+    <div class="head"><h3>✅ অর্ডার গ্রহণ — ${esc(g.customerName || "গ্রাহক")}</h3><button class="x" type="button" data-close aria-label="বন্ধ">✕</button></div>
+    <div class="hint">${g.items.map(o=> esc(o.productName) + " × " + bn(o.qty || 1)).join(" · ")}</div>
+    ${g.pickup ? `<div class="calc" style="margin-top:12px">🏪 গ্রাহক নিজে দোকান থেকে নেবেন — রাইডার লাগবে না।</div>` : `
+    <label class="f" style="margin-top:12px">কীভাবে পাঠাবেন?</label>
+    <div style="display:flex; gap:8px">
+      <button type="button" class="btn ${mode === "rider" ? "" : "ghost"}" data-om="rider" style="flex:1">🛵 Honey Bee রাইডার</button>
+      <button type="button" class="btn ${mode === "self" ? "" : "ghost"}" data-om="self" style="flex:1">🤝 নিজে / অন্য মাধ্যম</button>
+    </div>
+    <div class="hint" style="margin-top:6px">${mode === "rider" ? "গ্রহণ করলেই কাছের রাইডার খোঁজা শুরু হবে।" : "নিজে পাঠালে প্যাক শেষে \"পাঠিয়ে দিয়েছি\" চাপবেন।"}</div>`}
+    <div class="foot"><button class="btn ghost" type="button" data-close>পরে</button><button class="btn green" type="button" id="oaOk">✅ গ্রহণ করুন</button></div>`);
+  draw();
+  const wire = ()=>{
+    document.querySelectorAll("[data-om]").forEach(b=> b.onclick = ()=>{ mode = b.dataset.om; draw(); wire(); });
+    $("oaOk").onclick = async ()=>{
+      $("oaOk").disabled = true; $("oaOk").textContent = "⏳…";
+      try{
+        const bt = db.batch(), gid = "batch-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
+        g.items.forEach((o, i)=>{
+          const u = { status:"preparing", preparingAt: firebase.firestore.FieldValue.serverTimestamp(), selfDelivery: mode === "self", groupBatchId: gid };
+          if(i > 0) u.dispatchState = "batched"; // পুরো রসিদ একজন রাইডারেই যাবে
+          bt.update(db.collection("orderRequests").doc(o.id), u);
+        });
+        await bt.commit();
+        closeModal(); toast("✅ অর্ডার গ্রহণ করা হয়েছে — \"প্রস্তুত হচ্ছে\" ট্যাবে");
+      }catch(e){ $("oaOk").disabled = false; $("oaOk").textContent = "✅ গ্রহণ করুন"; alert("গ্রহণ করা যায়নি: " + (e.code || e.message)); }
+    };
+  };
+  wire();
+}
+async function ordSetStatus(g, st){
+  if(!g) return;
+  const tf = { preparing:"preparingAt", shipped:"shippedAt", delivered:"deliveredAt", cancelled:"cancelledAt" }[st];
+  const upd = { status: st }; if(tf) upd[tf] = firebase.firestore.FieldValue.serverTimestamp();
+  try{
+    const bt = db.batch(); g.items.forEach(o=> bt.update(db.collection("orderRequests").doc(o.id), upd)); await bt.commit();
+    if(st === "delivered") g.items.forEach(o=> ordRecordSale(o));
+    toast({ cancelled:"❌ বাতিল করা হয়েছে", shipped:"🛵 গ্রাহক \"পথে আছে\" দেখছেন", delivered:"✅ ডেলিভার্ড — বিক্রির খাতায় উঠেছে" }[st] || "✅ হয়েছে");
+  }catch(e){ alert("আপডেট করা যায়নি: " + (e.code || e.message)); }
+}
+async function ordPacked(g, btn){
+  if(!g) return;
+  btn.disabled = true;
+  await ordUpdateAll(g, { packagingDone:true, packagingDoneAt: firebase.firestore.FieldValue.serverTimestamp() }, "📦 প্যাক শেষ — গ্রাহককে জানানো হচ্ছে");
+  try{ const f = ordFns(); if(f && g.customerUid) await f.httpsCallable("notifyOrderPackagingDone")({ shopId: SESSION.shopId, customerUid: g.customerUid, itemCount: g.items.length }); }catch(e){ console.warn(e); }
+}
+async function ordHide(g){
+  try{ const bt = db.batch(); g.items.forEach(o=> bt.set(db.collection("orderRequests").doc(o.id), { hiddenForSeller:true, hiddenAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge:true })); await bt.commit(); }
+  catch(e){ alert("সরানো যায়নি: " + (e.code || e.message)); }
+}
+// 💰 ডেলিভার্ড অর্ডার → বিক্রির খাতা + স্টক কমানো (একই অর্ডার দুবার ওঠে না)
+function ordRecordSale(o){
+  try{
+    const all = readJSON("phone-shop-entries", []);
+    if(all.some(e=> e.onlineOrderId === o.id)) return;
+    const qty = Number(o.qty) || 1, unit = Number(o.price) || 0;
+    const prods = loadProducts();
+    const p = o.productId ? prods.find(x=> x.id === o.productId) : null;
+    const unitCost = p ? (Number(p.buy) || 0) : 0;
+    const name = String(o.productName || "ওষুধ").replace(/^🔒 /, "");
+    all.unshift({ id: uid(), name: o.customerName || "অনলাইন গ্রাহক", phone: o.deliveryPhone || "", item: name,
+      productId: o.productId || null, qty, unitPrice: unit, unitCost, cost: r2(unitCost * qty), price: r2(unit * qty), paid: r2(unit * qty),
+      paymentMethod:"cash", payVia:"cash", status:"নগদ-বিক্রি", date: new Date().toISOString(),
+      soldBy:"🐝 Honey Bee Bazar (Online)", source:"pharmacy", onlineOrderId: o.id, invoiceNo: o.orderCode || "" });
+    localStorage.setItem("phone-shop-entries", JSON.stringify(all));
+    if(p){
+      p.qty = Math.max(0, (Number(p.qty) || 0) - qty);
+      let left = qty;
+      (p.batches || []).filter(b=> b && Number(b.qty) > 0).sort((a,b)=> String(a.expiryDate || "9999").localeCompare(String(b.expiryDate || "9999")))
+        .forEach(b=>{ if(left <= 0) return; const t = Math.min(left, Number(b.qty) || 0); b.qty = (Number(b.qty) || 0) - t; left -= t; });
+      saveProducts(prods); syncBazarStock([p]);
+    }
+    pushNow();
+  }catch(e){ console.error("ordRecordSale", e); }
+}
+async function ordFillRiders(el, G){
+  const shop = await ordShop();
+  let riders = [];
+  try{
+    if(shop.marketId){
+      const qs = await db.collection("riders").where("marketId", "==", shop.marketId).where("online", "==", true).get();
+      riders = qs.docs.map(d=> ({ id:d.id, ...d.data() }));
+      const L = shop.storeLocation;
+      if(L) riders.forEach(r=> r.km = (r.liveLocation && r.liveLocation.lat != null) ? hbKm(L.lat, L.lng, r.liveLocation.lat, r.liveLocation.lng) : null);
+      riders.sort((a,b)=> (a.km == null ? 1e9 : a.km) - (b.km == null ? 1e9 : b.km));
+    }
+  }catch(e){ console.warn(e); }
+  el.querySelectorAll("[data-orsel]").forEach(s=>{
+    s.innerHTML = `<option value="">রাইডার বাছুন (কাছেরটা আগে)…</option>` + (riders.length ? riders.map(r=> `<option value="${esc(r.id)}">${esc(r.name || "রাইডার")} ${r.phone ? "(" + esc(r.phone) + ")" : ""} ${r.km != null ? "— " + r.km.toFixed(1) + " কিমি" : ""}</option>`).join("") : `<option value="" disabled>🔴 এখন কোনো রাইডার অনলাইনে নেই</option>`);
+  });
+  el.querySelectorAll("[data-orasg]").forEach(b=> b.onclick = async ()=>{
+    const g = G(b.dataset.orasg), sel = el.querySelector(`[data-orsel="${CSS.escape(b.dataset.orasg)}"]`);
+    const r = riders.find(x=> x.id === (sel && sel.value)); if(!r){ alert("আগে একজন রাইডার বাছুন"); return; }
+    await ordUpdateAll(g, { status:"shipped", assignedRiderId:r.id, assignedRiderName:r.name || null, pickedUp:false,
+      pickupName: shop.shopName || shop.name || null, pickupPhone: shop.phone || null,
+      pickupLat: shop.storeLocation ? shop.storeLocation.lat : null, pickupLng: shop.storeLocation ? shop.storeLocation.lng : null,
+      riderAssignedAt: firebase.firestore.FieldValue.serverTimestamp(), shippedAt: firebase.firestore.FieldValue.serverTimestamp(), dispatchState:"assigned" }, "🚚 রাইডারকে পাঠানো হয়েছে");
+  });
+}
+function hbKm(a, b, c, d){ const R = 6371, x = (c - a) * Math.PI / 180, y = (d - b) * Math.PI / 180; const h = Math.sin(x/2) ** 2 + Math.cos(a * Math.PI/180) * Math.cos(c * Math.PI/180) * Math.sin(y/2) ** 2; return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)); }
+function ordSlip(g){
+  if(!g) return;
+  const priv = g.items.find(o=> o.privateOrder);
+  $("printArea").innerHTML = `<div style="width:280px; padding:10px; font-family:monospace; font-size:12px; color:#000">
+    <div style="text-align:center; font-weight:800">🧾 অর্ডার স্লিপ</div>
+    ${g.orderCode ? `<div style="border:3px solid #000; border-radius:6px; padding:6px; margin:8px 0; text-align:center"><div style="font-size:10px">অর্ডার নম্বর</div><div style="font-size:32px; font-weight:800; letter-spacing:6px">${esc(g.orderCode)}</div></div>` : ""}
+    ${priv ? `<div style="text-align:center; font-weight:800; font-size:14px">${esc(ORD_PACK[priv.packLabel] || ORD_PACK.code)}</div>`
+      : `<div>গ্রাহক: ${esc(g.customerName || "—")}</div>${g.phone ? `<div>ফোন: ${esc(g.phone)}</div>` : ""}${g.address && !g.pickup ? `<div>ঠিকানা: ${esc(g.address)}</div>` : ""}
+         <div style="border-top:1px dashed #000; margin:6px 0"></div>${g.items.map(o=> `<div>${esc(o.productName)} × ${o.qty || 1}</div>`).join("")}`}
+  </div>`;
+  const a = $("printArea"); const old = a.style.cssText; a.style.cssText = "position:static;";
+  const hide = [...document.body.children].filter(c=> c !== a);
+  hide.forEach(c=> c.dataset.prevDisp = c.style.display); hide.forEach(c=> c.style.display = "none");
+  window.print();
+  setTimeout(()=>{ hide.forEach(c=> c.style.display = c.dataset.prevDisp || ""); a.style.cssText = old; }, 400);
+}
+
 function rxBlankLine(){ return { pid:null, name:"", qty:1, unitPrice:0, dose:{ m:1, n:0, e:1 }, food:"after", days:5, note:"" }; }
 function openRx(id){
   const r = RX_LIST.find(x=> x.id === id); if(!r) return;
@@ -2799,7 +3060,7 @@ auth.onAuthStateChanged(async (user)=>{
   $("gate").remove(); $("app").hidden = false; $("bnav").hidden = false;
   const start = (location.hash || "").replace("#", "");
   rxListen();
-  go(["dash","pos","rx","meds","alerts","purchase","suppliers","customers","stock"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
+  go(["dash","pos","orders","rx","meds","alerts","purchase","suppliers","customers","stock"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
 });
 </script>
 </body>
