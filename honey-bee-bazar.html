@@ -7160,14 +7160,17 @@ function phRxOpenDetail(id){
   ov.innerHTML = `<div style="width:100%; max-width:460px; background:#1a1206; border:1px solid var(--border); border-radius:20px; padding:18px; color:#fff8e8; max-height:92vh; overflow:auto;">
     <div style="display:flex; align-items:center;"><b style="font-size:16px;">📄 ${phEsc(r.shopName || "ফার্মেসি")}</b><span id="rxX" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span></div>
     <div style="margin-top:6px; font-size:13px; font-weight:800; color:${st.c};">${st.t}</div>
-    <div id="rxImg" style="margin-top:12px; min-height:60px; border-radius:12px; overflow:hidden; background:rgba(255,255,255,0.04); text-align:center; font-size:12px; color:var(--muted); padding:${r.photoReady ? "0" : "16px"};">${r.photoReady ? "ছবি লোড হচ্ছে..." : "ছবি পাওয়া যায়নি"}</div>
+    <div id="rxQuote"></div>
+    ${(["quoted","accepted"].includes(r.status) && r.photoReady) ? `<button type="button" id="rxImgToggle" style="margin-top:14px; width:100%; padding:10px; border:1px solid var(--border); border-radius:11px; background:rgba(255,255,255,0.04); color:#fff8e8; font-family:inherit; font-weight:700; font-size:13px; cursor:pointer;">📄 প্রেসক্রিপশনের ছবি দেখুন ▾</button>` : ""}
+    <div id="rxImg" style="margin-top:12px; min-height:60px; border-radius:12px; overflow:hidden; background:rgba(255,255,255,0.04); text-align:center; font-size:12px; color:var(--muted); padding:${r.photoReady ? "0" : "16px"}; ${(["quoted","accepted"].includes(r.status) && r.photoReady) ? "display:none;" : ""}">${r.photoReady ? "ছবি লোড হচ্ছে..." : "ছবি পাওয়া যায়নি"}</div>
     ${r.status === "new" ? `<div style="margin-top:12px; font-size:12.5px; color:var(--muted); line-height:1.7;">ফার্মেসি ছবি দেখে ওষুধ, দাম আর খাওয়ার নিয়ম লিখে পাঠাবে — তখন এখানে দেখাবে।</div>` : ""}
     ${r.status === "rejected" && r.shopNote ? `<div style="margin-top:12px; font-size:13px;">ফার্মেসি বলেছে: ${phEsc(r.shopNote)}</div>` : ""}
-    <div id="rxQuote"></div>
     ${r.status === "new" ? `<button type="button" id="rxCancel" style="margin-top:14px; width:100%; padding:11px; border:1px solid #f87171; border-radius:11px; background:transparent; color:#f87171; font-family:inherit; font-weight:800; cursor:pointer;">🚫 বাতিল করুন</button>` : ""}
     <button type="button" id="rxDel" style="margin-top:10px; width:100%; padding:10px; border:0; border-radius:11px; background:rgba(255,255,255,0.05); color:var(--muted); font-family:inherit; font-weight:700; cursor:pointer;">🗑️ এখনই মুছে ফেলুন</button>
   </div>`;
   ov.querySelector("#rxX").onclick = close;
+  const tg = ov.querySelector("#rxImgToggle");
+  if(tg) tg.onclick = ()=>{ const box = ov.querySelector("#rxImg"); const show = box.style.display === "none"; box.style.display = show ? "block" : "none"; tg.textContent = show ? "📄 ছবি লুকান ▴" : "📄 প্রেসক্রিপশনের ছবি দেখুন ▾"; };
   if(r.photoReady){
     firebase.storage().ref(r.photoPath).getDownloadURL().then(url=>{
       const box = ov.querySelector("#rxImg"); if(box) box.innerHTML = `<img src="${url}" alt="" style="width:100%; display:block;">`;
@@ -7202,32 +7205,95 @@ function phRxItemsHtml(r){
       ${it.note ? `<div style="font-size:12px; color:#fde68a; margin-top:6px;">📝 ${phEsc(it.note)}</div>` : ""}
     </div>`).join("");
 }
+function phRxPerDay(it){ const d = it.dose || {}; return (Number(d.m)||0) + (Number(d.n)||0) + (Number(d.e)||0); }
+// কত দিনের জন্য কত পিস — খাওয়ার নিয়ম থাকলে দিনে কয়টা × দিন, না থাকলে অনুপাতে; ফার্মেসির দেওয়া পরিমাণের বেশি না
+function phRxQtyForDays(it, days){
+  const full = Number(it.qty) || 1;
+  if(!days) return full;
+  const pd = phRxPerDay(it);
+  const q = pd ? pd * days : Math.ceil(full * Math.min(1, days / (Number(it.days) || days)));
+  return Math.max(1, Math.min(full, Math.ceil(q)));
+}
 function phRxRenderQuote(r, el, close){
   if(!el || !["quoted","accepted"].includes(r.status) || !(r.items && r.items.length)) return;
-  el.innerHTML = `<div style="margin-top:14px; font-weight:800; font-size:14px;">💊 ওষুধ, দাম আর খাওয়ার নিয়ম</div>
-    ${phRxItemsHtml(r)}
-    <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:15px; font-weight:800; color:var(--amber);"><span>মোট</span><span>৳${phEsc(r.total)}</span></div>
-    ${r.shopNote ? `<div style="margin-top:8px; font-size:12.5px; color:#fde68a;">🏥 ফার্মেসির নোট: ${phEsc(r.shopNote)}</div>` : ""}
-    <div style="font-size:11px; color:var(--muted); margin-top:8px; line-height:1.6;">এই নিয়ম আপনার প্রেসক্রিপশন দেখে ফার্মেসি লিখেছে। কোনো সন্দেহ হলে ডাক্তারকে জিজ্ঞেস করুন।</div>
-    ${r.status === "quoted" ? `<button type="button" id="rxAccept" style="margin-top:14px; width:100%; padding:13px; border:0; border-radius:12px; background:#16a34a; color:#fff; font-family:inherit; font-weight:800; font-size:14.5px; cursor:pointer;">✅ ঠিক আছে — Cart-এ নিন</button>` : ""}`;
-  const b = el.querySelector("#rxAccept");
-  if(b) b.onclick = async ()=>{
-    b.disabled = true; b.textContent = "⏳ একটু অপেক্ষা...";
-    try{
-      await db.collection("prescriptions").doc(r.id).update({ status:"accepted", acceptedAt: firebase.firestore.FieldValue.serverTimestamp() });
-      const cart = hbCartGet();
-      r.items.forEach((it, i)=>{
-        const pid = it.pid || `rx:${r.id}:${i}`;
-        const ex = cart.find(c=> c.productId === pid && c.shopId === r.shopId);
-        if(ex) ex.qty = it.qty;
-        else cart.push({ shopId: r.shopId, shopName: r.shopName || "ফার্মেসি", productId: pid, productName: it.name, price: Number(it.unitPrice) || 0, qty: Number(it.qty) || 1, variantColor:null, variantSize:null, isPrivate:false, rxId: r.id });
-      });
-      hbCartSet(cart);
-      close();
-      hbToastLite("🛒 ওষুধগুলো Cart-এ আছে — ঠিকানা দিয়ে অর্ডার করুন");
-      if(typeof hbOpenCart === "function") hbOpenCart();
-    }catch(e){ console.error(e); b.disabled = false; b.textContent = "✅ ঠিক আছে — Cart-এ নিন"; alert("হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন"); }
+  if(r.status === "accepted"){
+    el.innerHTML = `<div style="margin-top:14px; font-weight:800; font-size:14px;">💊 ওষুধ, দাম আর খাওয়ার নিয়ম</div>
+      ${phRxItemsHtml(r)}
+      ${r.shopNote ? `<div style="margin-top:8px; font-size:12.5px; color:#fde68a;">🏥 ফার্মেসির নোট: ${phEsc(r.shopNote)}</div>` : ""}`;
+    return;
+  }
+  // 🛒 গ্রাহক চাইলে কম দিনের ওষুধ নিতে পারেন (যেমন ১ মাসের বদলে ১০ দিনের), বা কোনো ওষুধ বাদ দিতে পারেন
+  const maxDays = Math.max(...r.items.map(it=> Number(it.days) || 0), 0);
+  const sel = r.items.map(it=> ({ on:true, qty: Number(it.qty) || 1 }));
+  let days = 0; // 0 = পুরো কোর্স
+  const chips = [0, 3, 5, 7, 10, 15].filter(d=> d === 0 || !maxDays || d < maxDays);
+  const chipCss = on=> `padding:7px 12px; border-radius:999px; font-family:inherit; font-size:12.5px; font-weight:800; cursor:pointer; border:1.5px solid ${on ? "#16a34a" : "var(--border)"}; background:${on ? "rgba(22,163,74,0.2)" : "rgba(255,255,255,0.04)"}; color:#fff8e8;`;
+  const qbtn = "width:30px; height:30px; border-radius:8px; border:1px solid var(--border); background:transparent; color:#fff8e8; font-weight:800; font-size:15px; cursor:pointer; font-family:inherit;";
+  const total = ()=> Math.round(r.items.reduce((a, it, i)=> a + (sel[i].on ? sel[i].qty * (Number(it.unitPrice) || 0) : 0), 0) * 100) / 100;
+  const draw = ()=>{
+    const t = total(), n = sel.filter(x=> x.on).length;
+    el.innerHTML = `
+      <div style="margin-top:14px; padding:12px; border-radius:14px; background:rgba(22,163,74,0.08); border:1px solid rgba(74,222,128,0.4);">
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:15px; font-weight:800;"><span>🧾 মোট</span><span style="color:var(--amber); font-size:18px;">৳${phEsc(t)}</span></div>
+        ${t < r.total ? `<div style="font-size:11.5px; color:var(--muted); margin-top:2px;">পুরো কোর্স: ৳${phEsc(r.total)}</div>` : ""}
+        <button type="button" id="rxAccept" ${n ? "" : "disabled"} style="margin-top:10px; width:100%; padding:13px; border:0; border-radius:12px; background:${n ? "#16a34a" : "#374151"}; color:#fff; font-family:inherit; font-weight:800; font-size:14.5px; cursor:pointer;">✅ ঠিক আছে — Cart-এ নিন</button>
+      </div>
+      <div style="margin-top:14px; font-weight:800; font-size:13.5px;">🗓️ কত দিনের ওষুধ কিনবেন?</div>
+      <div style="font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.6;">টাকা কম থাকলে কম দিনের নিন — পরে বাকিটা আবার নিতে পারবেন।</div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">${chips.map(d=> `<button type="button" data-days="${d}" style="${chipCss(days === d)}">${d ? phBnNum(d) + " দিন" : "পুরো কোর্স" + (maxDays ? " (" + phBnNum(maxDays) + " দিন)" : "")}</button>`).join("")}</div>
+      <div style="margin-top:12px; font-weight:800; font-size:14px;">💊 ওষুধ, দাম আর খাওয়ার নিয়ম</div>
+      ${r.items.map((it, i)=>{
+        const sx = sel[i], line = Math.round(sx.qty * (Number(it.unitPrice) || 0) * 100) / 100;
+        return `<div style="padding:10px 0; border-bottom:1px solid var(--border); ${sx.on ? "" : "opacity:.5;"}">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" data-on="${i}" ${sx.on ? "checked" : ""} style="width:18px; height:18px; accent-color:#16a34a; flex-shrink:0;">
+            <b style="font-size:14px; flex:1; min-width:0;">💊 ${phEsc(it.name)}</b>
+            <b style="font-size:13.5px; white-space:nowrap;">${sx.on ? "৳" + phEsc(line) : "বাদ"}</b>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12.5px;">
+            <button type="button" data-q="${i}:-1" style="${qbtn}" ${sx.on ? "" : "disabled"}>−</button>
+            <b style="min-width:26px; text-align:center;">${phBnNum(sx.qty)}</b>
+            <button type="button" data-q="${i}:1" style="${qbtn}" ${sx.on ? "" : "disabled"}>+</button>
+            <span style="color:var(--muted);">× ৳${phEsc(it.unitPrice)}${phRxPerDay(it) ? " · প্রায় " + phBnNum(Math.floor(sx.qty / phRxPerDay(it))) + " দিনের" : ""}</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:8px;">${phDoseHtml(it.dose)}
+            <span style="font-size:12px; line-height:1.6;">🍽️ ${phEsc(PH_FOOD[it.food] || "")}<br>📅 ডাক্তার: ${phBnNum(it.days)} দিন</span></div>
+          ${it.note ? `<div style="font-size:12px; color:#fde68a; margin-top:6px;">📝 ${phEsc(it.note)}</div>` : ""}
+        </div>`;
+      }).join("")}
+      ${r.shopNote ? `<div style="margin-top:8px; font-size:12.5px; color:#fde68a;">🏥 ফার্মেসির নোট: ${phEsc(r.shopNote)}</div>` : ""}
+      <div style="font-size:11px; color:var(--muted); margin-top:8px; line-height:1.6;">এই নিয়ম আপনার প্রেসক্রিপশন দেখে ফার্মেসি লিখেছে। কোনো সন্দেহ হলে ডাক্তারকে জিজ্ঞেস করুন।</div>`;
+    el.querySelectorAll("[data-days]").forEach(b=> b.onclick = ()=>{
+      days = Number(b.dataset.days);
+      r.items.forEach((it, i)=>{ sel[i].qty = phRxQtyForDays(it, days); });
+      draw();
+    });
+    el.querySelectorAll("[data-on]").forEach(c=> c.onchange = ()=>{ sel[Number(c.dataset.on)].on = c.checked; draw(); });
+    el.querySelectorAll("[data-q]").forEach(b=> b.onclick = ()=>{
+      const [i, d] = b.dataset.q.split(":").map(Number);
+      sel[i].qty = Math.max(1, sel[i].qty + d); days = -1; draw();
+    });
+    const b = el.querySelector("#rxAccept");
+    if(b) b.onclick = async ()=>{
+      b.disabled = true; b.textContent = "⏳ একটু অপেক্ষা...";
+      try{
+        await db.collection("prescriptions").doc(r.id).update({ status:"accepted", acceptedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        const cart = hbCartGet();
+        r.items.forEach((it, i)=>{
+          if(!sel[i].on) return;
+          const pid = it.pid || `rx:${r.id}:${i}`;
+          const ex = cart.find(c=> c.productId === pid && c.shopId === r.shopId);
+          if(ex) ex.qty = sel[i].qty;
+          else cart.push({ shopId: r.shopId, shopName: r.shopName || "ফার্মেসি", productId: pid, productName: it.name, price: Number(it.unitPrice) || 0, qty: sel[i].qty, variantColor:null, variantSize:null, isPrivate:false, rxId: r.id });
+        });
+        hbCartSet(cart);
+        close();
+        hbToastLite("🛒 ওষুধগুলো Cart-এ আছে — ঠিকানা দিয়ে অর্ডার করুন");
+        if(typeof hbOpenCart === "function") hbOpenCart();
+      }catch(e){ console.error(e); b.disabled = false; b.textContent = "✅ ঠিক আছে — Cart-এ নিন"; alert("হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন"); }
+    };
   };
+  draw();
 }
 // 💊 খাওয়ার নিয়মের কার্ড — "ঠিক আছে" চাপা প্রেসক্রিপশনগুলো, মুছে যাওয়া পর্যন্ত
 function phDoseCardsHtml(){
