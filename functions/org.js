@@ -213,6 +213,9 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
     await db.runTransaction(async (tx) => {
       const org = await getOrg(tx, oid, true);
       const m = await needMember(tx, oid, me.uid);
+      if (org.createdBy === me.uid && (org.memberCount || 1) > 1) {
+        throw new HttpsError("failed-precondition", "আপনি প্রতিষ্ঠাতা — সংগঠনে সদস্য থাকা অবস্থায় ছেড়ে যেতে পারবেন না");
+      }
       if (m.role === "admin" && (org.adminCount || 1) <= 1 && (org.memberCount || 1) > 1) {
         throw new HttpsError("failed-precondition", "আপনি একমাত্র অ্যাডমিন — আগে আরেকজনকে অ্যাডমিন করুন, তারপর ছাড়তে পারবেন");
       }
@@ -530,7 +533,37 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
   /* অ্যাডমিন বানানো / অ্যাডমিন সরানো / সদস্য বাদ — প্রস্তাব + অনুমোদন।
      যাঁকে নিয়ে কাজ, তিনি নিজে অনুমোদন দিতে পারেন না। অনুমোদন লাগে:
      যত অ্যাডমিন আছেন (তিনি বাদে) তার মধ্যে ২ জন — একজন থাকলে একজন। */
-  const ACTIONS = { make_admin: "অ্যাডমিন বানানো", remove_admin: "অ্যাডমিন থেকে সরানো", remove_member: "সদস্যপদ বাতিল" };
+  const ACTIONS = { make_admin: "অ্যাডমিন বানানো", remove_admin: "অ্যাডমিন থেকে সরানো", remove_member: "সদস্যপদ বাতিল", resign_admin: "অ্যাডমিন পদ থেকে পদত্যাগ" };
+  /* 🙋 পদত্যাগের আবেদন — অ্যাডমিন নিজে আবেদন করেন, অন্য অ্যাডমিনরা অনুমতি দেন
+     (অন্য অ্যাডমিন ২+ হলে দুইজন, একজন হলে একজন)। একমাত্র অ্যাডমিন পারেন না —
+     তাহলে সংগঠন অ্যাডমিন ছাড়া পড়ে থাকত। অনুমতির আগে আবেদন তুলে নেওয়া যায়। */
+  async function resignRequest(me, d) {
+    const oid = id(d.orgId, "সংগঠন");
+    const reason = optStr(d.reason, 300);
+    const aref = orgRef(oid).collection("adminActions").doc(`resign_admin_${me.uid}`);
+    return db.runTransaction(async (tx) => {
+      const org = await getOrg(tx, oid);
+      const m = await needAdmin(tx, oid, me.uid);
+      const others = (org.adminCount || 1) - 1;
+      if (others < 1) throw new HttpsError("failed-precondition", "আপনি একমাত্র অ্যাডমিন — আগে আরেকজনকে অ্যাডমিন বানান, তারপর পদত্যাগ করতে পারবেন");
+      const s = await tx.get(aref);
+      if (s.exists && s.data().status === "pending") throw new HttpsError("already-exists", "আপনার পদত্যাগের আবেদন আগেই জমা আছে");
+      tx.set(aref, { kind: "resign_admin", targetUid: me.uid, targetName: m.name, reason, status: "pending", need: Math.min(2, others), approvedBy: [], approvedNames: [], createdAt: FieldValue.serverTimestamp() });
+      audit(tx, oid, me, "resign_request", { detail: reason });
+      return { ok: true, need: Math.min(2, others) };
+    });
+  }
+  async function resignCancel(me, d) {
+    const oid = id(d.orgId, "সংগঠন");
+    const aref = orgRef(oid).collection("adminActions").doc(`resign_admin_${me.uid}`);
+    await db.runTransaction(async (tx) => {
+      const s = await tx.get(aref);
+      if (!s.exists || s.data().status !== "pending") throw new HttpsError("not-found", "অপেক্ষমাণ আবেদন নেই");
+      tx.update(aref, { status: "withdrawn", decidedAt: FieldValue.serverTimestamp() });
+      audit(tx, oid, me, "resign_cancel", {});
+    });
+    return { ok: true };
+  }
   async function adminAction(me, d) {
     const oid = id(d.orgId, "সংগঠন");
     const kind = Object.keys(ACTIONS).includes(d.kind) ? d.kind : null;
@@ -544,16 +577,20 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
       await needAdmin(tx, oid, me.uid);
       const t = await member(tx, oid, target);
       if (!t) throw new HttpsError("not-found", "সদস্য পাওয়া যায়নি");
+      // 🛡️ প্রতিষ্ঠাতাকে কেউ সরাতে পারেন না — তিনি নিজে চাইলে শুধু পদত্যাগের আবেদন
+      if (target === org.createdBy && (kind === "remove_admin" || kind === "remove_member")) throw new HttpsError("permission-denied", "প্রতিষ্ঠাতাকে সরানো যায় না");
       if (kind === "make_admin" && t.role === "admin") throw new HttpsError("already-exists", "ইনি আগেই অ্যাডমিন");
+      if (kind === "resign_admin" && t.role !== "admin") throw new HttpsError("failed-precondition", "ইনি আর অ্যাডমিন নন");
       if (kind === "remove_admin" && t.role !== "admin") throw new HttpsError("failed-precondition", "ইনি অ্যাডমিন নন");
       const othersAdmins = (org.adminCount || 1) - (t.role === "admin" ? 1 : 0);
       if (othersAdmins < 1) throw new HttpsError("failed-precondition", "এটা করার মতো অন্য অ্যাডমিন নেই");
-      if (kind !== "make_admin" && t.role === "admin" && othersAdmins < 2) {
+      if ((kind === "remove_admin" || kind === "remove_member") && t.role === "admin" && othersAdmins < 2) {
         throw new HttpsError("failed-precondition", "একজন অ্যাডমিনকে সরাতে আরও দুইজন অ্যাডমিন লাগবে — এখন সেটা সম্ভব না");
       }
       const needN = Math.min(2, othersAdmins);
       const s = await tx.get(aref);
       const cur = (s.exists && s.data().status === "pending") ? s.data() : null;
+      if (kind === "resign_admin" && !cur) throw new HttpsError("not-found", "পদত্যাগের আবেদন পাওয়া যায়নি");
       if (!approve) {
         if (!cur) throw new HttpsError("not-found", "অপেক্ষমাণ প্রস্তাব নেই");
         tx.update(aref, { status: "rejected", rejectedBy: me.name, decidedAt: FieldValue.serverTimestamp() });
@@ -562,7 +599,7 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
       }
       const ap = addApproval(cur || {}, me);
       if (ap.approvedBy.length < needN) {
-        tx.set(aref, Object.assign({ kind, targetUid: target, targetName: t.name, status: "pending", need: needN, createdAt: cur ? cur.createdAt : FieldValue.serverTimestamp() }, ap));
+        tx.set(aref, Object.assign({}, cur || {}, { kind, targetUid: target, targetName: t.name, status: "pending", need: needN, createdAt: cur ? cur.createdAt : FieldValue.serverTimestamp() }, ap));
         audit(tx, oid, me, "action_propose", { targetUid: target, targetName: t.name, detail: ACTIONS[kind] });
         return { ok: true, status: "pending", approvals: ap.approvedBy.length, need: needN };
       }
@@ -572,8 +609,8 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
         tx.update(mref, { role: "admin", title: t.title === "সদস্য" ? "অ্যাডমিন" : t.title });
         oupd.adminCount = FieldValue.increment(1);
         tx.set(idx(target), { orgs: { [oid]: { name: org.name, role: "admin" } } }, { merge: true });
-      } else if (kind === "remove_admin") {
-        tx.update(mref, { role: "member", title: "সদস্য" });
+      } else if (kind === "remove_admin" || kind === "resign_admin") {
+        tx.update(mref, { role: "member", title: target === org.createdBy ? "প্রতিষ্ঠাতা" : "সদস্য" });
         oupd.adminCount = FieldValue.increment(-1);
         tx.set(idx(target), { orgs: { [oid]: { name: org.name, role: "member" } } }, { merge: true });
       } else {
@@ -583,7 +620,7 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
         tx.set(idx(target), { orgs: { [oid]: FieldValue.delete() } }, { merge: true });
       }
       tx.update(orgRef(oid), oupd);
-      tx.set(aref, Object.assign({ kind, targetUid: target, targetName: t.name, status: "done", need: needN, decidedAt: FieldValue.serverTimestamp() }, ap));
+      tx.set(aref, Object.assign({}, cur || {}, { kind, targetUid: target, targetName: t.name, status: "done", need: needN, decidedAt: FieldValue.serverTimestamp() }, ap));
       audit(tx, oid, me, "action_done", { targetUid: target, targetName: t.name, detail: ACTIONS[kind] });
       return { ok: true, status: "done" };
     });
@@ -625,6 +662,298 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
     return { ok: true };
   }
 
+
+  /* =================================================================
+     🗳️ নির্বাচন — পদের জন্য (সভাপতি, সম্পাদক…)। জয়ী পদবি পান, অ্যাডমিনের ক্ষমতা না —
+     ক্ষমতা দেন শুধু অ্যাডমিনরা (মালিকের নিয়ম: "কেউ চাইলে অ্যাডমিন হতে পারবে না")।
+     ধাপ: খসড়া (লুকানো) → প্রকাশ (দুই-অ্যাডমিন) → প্রার্থী আবেদন → আবেদন বন্ধ →
+     কাউন্টডাউন → ভোট (গোপন, একবার) → ফলাফল → জয়ীর পদবি।
+     · ভোটার ও প্রার্থী: নির্বাচন প্রকাশের আগে যাঁরা সদস্য — পরে ঢুকে ভোট জেতা যায় না
+     · মোট ভোট কম হলে (ন্যূনতম % এর নিচে) নির্বাচন বাতিল
+     · প্রার্থী আসনের সমান বা কম হলে বিনা প্রতিদ্বন্দ্বিতায় জয়ী
+     · শেষ আসনে সমান ভোট হলে শুধু তাঁদের মধ্যে ২৪ ঘণ্টার আবার ভোট
+     · কে কাকে ভোট দিলেন কোথাও লেখা থাকে না — শুধু "ভোট দিয়েছেন" আর গোপন গণনা
+     ================================================================= */
+  const SYMBOLS = ["🌹","🌳","⭐","🐝","🕊️","🌙","☀️","🌾","⛵","🔔","🏠","📚","🌻","🐟","🦚","🍀","🪔","⚖️","🚲","☂️"];
+  const elRef = (oid, eid) => orgRef(oid).collection("elections").doc(eid);
+  const tallyRef = (oid, eid, round) => elRef(oid, eid).collection("private").doc("tally_" + (round || 1));
+  function needTimes(d) {
+    const now = Date.now();
+    const a = Number(d.applyEndAt), vs = Number(d.voteStartAt), ve = Number(d.voteEndAt);
+    if (!(a > now + 10 * 60000)) throw new HttpsError("invalid-argument", "আবেদনের শেষ সময় এখন থেকে অন্তত ১০ মিনিট পরে দিন");
+    if (!(vs >= a)) throw new HttpsError("invalid-argument", "ভোট শুরু হবে আবেদন বন্ধ হওয়ার পরে");
+    if (!(ve >= vs + 3600000)) throw new HttpsError("invalid-argument", "ভোট অন্তত ১ ঘণ্টা চলবে");
+    if (ve > now + 90 * 86400000) throw new HttpsError("invalid-argument", "পুরো নির্বাচন ৯০ দিনের মধ্যে শেষ করুন");
+    return { a, vs, ve };
+  }
+  async function electionCreate(me, d) {
+    const oid = id(d.orgId, "সংগঠন");
+    const title = str(d.title, 3, 80, "নির্বাচনের নাম");
+    const post = str(d.post, 2, 40, "পদের নাম");
+    const seats = Math.round(Number(d.seats) || 1);
+    if (!(seats >= 1 && seats <= 20)) throw new HttpsError("invalid-argument", "আসন ১ থেকে ২০");
+    const maxChoices = Math.round(Number(d.maxChoices) || seats);
+    if (!(maxChoices >= 1 && maxChoices <= seats)) throw new HttpsError("invalid-argument", "একজন কতজনকে বাছবেন — ১ থেকে আসনসংখ্যা পর্যন্ত");
+    const note = optStr(d.note, 800);
+    const t = needTimes(d);
+    const ref = orgRef(oid).collection("elections").doc();
+    await db.runTransaction(async (tx) => {
+      const org = await getOrg(tx, oid);
+      await needAdmin(tx, oid, me.uid);
+      tx.set(ref, {
+        title, post, seats, maxChoices, note, status: "draft",
+        applyEndAt: Timestamp.fromMillis(t.a), voteStartAt: Timestamp.fromMillis(t.vs), voteEndAt: Timestamp.fromMillis(t.ve),
+        quorumPct: org.quorumPct || 30, round: 1, winners: [], candidateCount: 0, ballotCount: 0,
+        createdBy: me.uid, createdByName: me.name, publishBy: [], publishNames: [], createdAt: FieldValue.serverTimestamp(),
+      });
+      audit(tx, oid, me, "election_create", { detail: `${title} — ${post} (${seats} আসন)` });
+    });
+    return { ok: true, electionId: ref.id };
+  }
+  async function electionPublish(me, d) {
+    const oid = id(d.orgId, "সংগঠন"), eid = id(d.electionId, "নির্বাচন");
+    return db.runTransaction(async (tx) => {
+      const org = await getOrg(tx, oid);
+      await needAdmin(tx, oid, me.uid);
+      const es = await tx.get(elRef(oid, eid));
+      if (!es.exists || es.data().status !== "draft") throw new HttpsError("failed-precondition", "এই নির্বাচন আর খসড়া নেই");
+      const e = es.data();
+      if (e.applyEndAt.toMillis() <= Date.now() + 5 * 60000) throw new HttpsError("failed-precondition", "আবেদনের সময় পেরিয়ে যাচ্ছে — নির্বাচনটা বাতিল করে নতুন সময় দিয়ে আবার তৈরি করুন");
+      const by = e.publishBy || [];
+      if (by.includes(me.uid)) throw new HttpsError("already-exists", "আপনি আগেই অনুমতি দিয়েছেন — আরেকজন অ্যাডমিন লাগবে");
+      const newBy = by.concat(me.uid), names = (e.publishNames || []).concat(me.name);
+      if (newBy.length < need2(org)) {
+        tx.update(es.ref, { publishBy: newBy, publishNames: names });
+        audit(tx, oid, me, "election_publish_1", { detail: e.title });
+        return { ok: true, status: "draft", approvals: newBy.length, need: need2(org) };
+      }
+      tx.update(es.ref, { status: "open", publishBy: newBy, publishNames: names, publishedAt: FieldValue.serverTimestamp(), publishedMs: Date.now(), eligible: org.memberCount || 1 });
+      timer(tx, "election_apply_close", oid, eid, e.applyEndAt.toMillis());
+      timer(tx, "election_close", oid, eid, e.voteEndAt.toMillis());
+      audit(tx, oid, me, "election_publish", { detail: e.title });
+      return { ok: true, status: "open" };
+    });
+  }
+  async function electionCancel(me, d) {
+    const oid = id(d.orgId, "সংগঠন"), eid = id(d.electionId, "নির্বাচন");
+    const reason = optStr(d.reason, 300);
+    return db.runTransaction(async (tx) => {
+      const org = await getOrg(tx, oid, true);
+      await needAdmin(tx, oid, me.uid);
+      const es = await tx.get(elRef(oid, eid));
+      if (!es.exists || !["draft", "open"].includes(es.data().status)) throw new HttpsError("failed-precondition", "এই নির্বাচন আর বাতিল করা যায় না");
+      const e = es.data();
+      if (e.status === "draft") {
+        tx.update(es.ref, { status: "cancelled", cancelReason: reason, decidedAt: FieldValue.serverTimestamp() });
+        audit(tx, oid, me, "election_cancel", { detail: e.title });
+        return { ok: true, status: "cancelled" };
+      }
+      // প্রকাশিত নির্বাচন বাতিলে দুই-অ্যাডমিন — একজন একা চলমান নির্বাচন থামাতে পারেন না
+      const by = e.cancelBy || [];
+      if (by.includes(me.uid)) throw new HttpsError("already-exists", "আপনি আগেই বাতিলের অনুমতি দিয়েছেন — আরেকজন অ্যাডমিন লাগবে");
+      const newBy = by.concat(me.uid), names = (e.cancelNames || []).concat(me.name);
+      if (newBy.length < need2(org)) {
+        tx.update(es.ref, { cancelBy: newBy, cancelNames: names, cancelReason: reason || e.cancelReason || "" });
+        audit(tx, oid, me, "election_cancel_1", { detail: e.title });
+        return { ok: true, status: "open", approvals: newBy.length };
+      }
+      tx.update(es.ref, { status: "cancelled", cancelBy: newBy, cancelNames: names, cancelReason: reason || e.cancelReason || "", decidedAt: FieldValue.serverTimestamp() });
+      tx.delete(db.collection("orgTimers").doc(`election_apply_close_${oid}_${eid}`));
+      tx.delete(db.collection("orgTimers").doc(`election_close_${oid}_${eid}`));
+      audit(tx, oid, me, "election_cancel", { detail: e.title });
+      return { ok: true, status: "cancelled" };
+    });
+  }
+  function eligibleFor(e, m) {
+    const joined = m.joinedAt && m.joinedAt.toMillis ? m.joinedAt.toMillis() : 0;
+    return joined <= (e.publishedMs || 0);
+  }
+  async function candidateApply(me, d) {
+    const oid = id(d.orgId, "সংগঠন"), eid = id(d.electionId, "নির্বাচন");
+    const symbol = SYMBOLS.includes(d.symbol) ? d.symbol : null;
+    if (!symbol) throw new HttpsError("invalid-argument", "একটা মার্কা বাছুন");
+    const statement = optStr(d.statement, 500);
+    return db.runTransaction(async (tx) => {
+      await getOrg(tx, oid);
+      const m = await needMember(tx, oid, me.uid);
+      const es = await tx.get(elRef(oid, eid));
+      if (!es.exists || es.data().status !== "open") throw new HttpsError("failed-precondition", "নির্বাচন খোলা নেই");
+      const e = es.data();
+      if (Date.now() >= e.applyEndAt.toMillis()) throw new HttpsError("failed-precondition", "প্রার্থী হওয়ার সময় শেষ");
+      if (!eligibleFor(e, m)) throw new HttpsError("permission-denied", "নির্বাচন ঘোষণার পরে সদস্য হয়েছেন — এতে প্রার্থী হতে পারবেন না");
+      const all = await tx.get(elRef(oid, eid).collection("candidates"));
+      const mine = all.docs.find((c) => c.id === me.uid);
+      if (mine && mine.data().status === "ok") throw new HttpsError("already-exists", "আপনি আগেই প্রার্থী");
+      if (mine && mine.data().status === "removed") throw new HttpsError("permission-denied", "অ্যাডমিনরা আপনাকে এই নির্বাচন থেকে বাদ দিয়েছেন");
+      if (all.docs.some((c) => c.id !== me.uid && c.data().status === "ok" && c.data().symbol === symbol)) throw new HttpsError("already-exists", "এই মার্কা আরেকজন নিয়েছেন — অন্যটা বাছুন");
+      tx.set(elRef(oid, eid).collection("candidates").doc(me.uid), {
+        uid: me.uid, name: me.name, photo: me.photo, memberNo: m.memberNo || 0, title: m.title || "সদস্য",
+        symbol, statement, status: "ok", appliedAt: FieldValue.serverTimestamp(),
+      });
+      tx.update(es.ref, { candidateCount: FieldValue.increment(1) });
+      audit(tx, oid, me, "candidate_apply", { detail: `${e.title} — ${symbol}` });
+      return { ok: true };
+    });
+  }
+  async function candidateWithdraw(me, d) {
+    const oid = id(d.orgId, "সংগঠন"), eid = id(d.electionId, "নির্বাচন");
+    await db.runTransaction(async (tx) => {
+      const es = await tx.get(elRef(oid, eid));
+      const cs = await tx.get(elRef(oid, eid).collection("candidates").doc(me.uid));
+      if (!es.exists || es.data().status !== "open" || Date.now() >= es.data().applyEndAt.toMillis()) throw new HttpsError("failed-precondition", "আবেদনের সময় শেষ — এখন আর নাম তোলা যায় না");
+      if (!cs.exists || cs.data().status !== "ok") throw new HttpsError("not-found", "আপনি প্রার্থী নন");
+      tx.update(cs.ref, { status: "withdrawn", withdrawnAt: FieldValue.serverTimestamp() });
+      tx.update(es.ref, { candidateCount: FieldValue.increment(-1) });
+      audit(tx, oid, me, "candidate_withdraw", { detail: es.data().title });
+    });
+    return { ok: true };
+  }
+  async function candidateRemove(me, d) {
+    const oid = id(d.orgId, "সংগঠন"), eid = id(d.electionId, "নির্বাচন"), target = id(d.uid, "প্রার্থী");
+    const reason = str(d.reason, 5, 300, "বাদ দেওয়ার কারণ");
+    return db.runTransaction(async (tx) => {
+      const org = await getOrg(tx, oid);
+      await needAdmin(tx, oid, me.uid);
+      if (target === me.uid) throw new HttpsError("failed-precondition", "নিজেকে বাদ দিতে চাইলে \"নাম তুলে নিন\" চাপুন");
+      const es = await tx.get(elRef(oid, eid));
+      const cs = await tx.get(elRef(oid, eid).collection("candidates").doc(target));
+      if (!es.exists || es.data().status !== "open" || Date.now() >= es.data().voteStartAt.toMillis()) throw new HttpsError("failed-precondition", "ভোট শুরুর পরে প্রার্থী বাদ দেওয়া যায় না");
+      if (!cs.exists || cs.data().status !== "ok") throw new HttpsError("not-found", "প্রার্থী পাওয়া যায়নি");
+      const c = cs.data(), by = c.removeBy || [];
+      if (by.includes(me.uid)) throw new HttpsError("already-exists", "আপনি আগেই অনুমতি দিয়েছেন — আরেকজন অ্যাডমিন লাগবে");
+      const others = (org.adminCount || 1) - (c.uid && (await member(tx, oid, target) || {}).role === "admin" ? 1 : 0);
+      const needN = Math.max(1, Math.min(2, others));
+      const newBy = by.concat(me.uid), names = (c.removeNames || []).concat(me.name);
+      if (newBy.length < needN) {
+        tx.update(cs.ref, { removeBy: newBy, removeNames: names, removeReason: reason });
+        audit(tx, oid, me, "candidate_remove_1", { targetUid: target, targetName: c.name, detail: reason });
+        return { ok: true, status: "pending" };
+      }
+      tx.update(cs.ref, { status: "removed", removeBy: newBy, removeNames: names, removeReason: reason, removedAt: FieldValue.serverTimestamp() });
+      tx.update(es.ref, { candidateCount: FieldValue.increment(-1) });
+      audit(tx, oid, me, "candidate_remove", { targetUid: target, targetName: c.name, detail: reason });
+      return { ok: true, status: "removed" };
+    });
+  }
+  async function electionVote(me, d) {
+    const oid = id(d.orgId, "সংগঠন"), eid = id(d.electionId, "নির্বাচন");
+    const choices = Array.isArray(d.choices) ? [...new Set(d.choices.map(String))] : [];
+    return db.runTransaction(async (tx) => {
+      await getOrg(tx, oid, true);
+      const m = await needMember(tx, oid, me.uid);
+      const es = await tx.get(elRef(oid, eid));
+      if (!es.exists || !["open", "runoff"].includes(es.data().status)) throw new HttpsError("failed-precondition", "ভোট খোলা নেই");
+      const e = es.data(), now = Date.now(), round = e.round || 1;
+      if (now < e.voteStartAt.toMillis()) throw new HttpsError("failed-precondition", "ভোট এখনো শুরু হয়নি");
+      if (now >= e.voteEndAt.toMillis()) throw new HttpsError("failed-precondition", "ভোটের সময় শেষ");
+      if (!eligibleFor(e, m)) throw new HttpsError("permission-denied", "নির্বাচন ঘোষণার পরে সদস্য হয়েছেন — এতে ভোট দিতে পারবেন না");
+      const bref = elRef(oid, eid).collection("ballots").doc(round === 1 ? me.uid : `${me.uid}_r${round}`);
+      const b = await tx.get(bref);
+      if (b.exists) throw new HttpsError("already-exists", "আপনি আগেই ভোট দিয়েছেন — একবারই দেওয়া যায়");
+      const allowed = round === 1 ? null : (e.runoffUids || []);
+      const maxC = round === 1 ? (e.maxChoices || 1) : (e.runoffSeats || 1);
+      if (!choices.length || choices.length > maxC) throw new HttpsError("invalid-argument", `১ থেকে ${maxC} জন প্রার্থী বাছুন`);
+      const cands = await tx.get(elRef(oid, eid).collection("candidates"));
+      const ok = new Set(cands.docs.filter((c) => c.data().status === "ok").map((c) => c.id));
+      if (choices.some((c) => !ok.has(c) || (allowed && !allowed.includes(c)))) throw new HttpsError("invalid-argument", "প্রার্থী ঠিক নেই — পাতা আবার খুলে দেখুন");
+      const tref = tallyRef(oid, eid, round);
+      const inc = {}; choices.forEach((c) => { inc[c] = FieldValue.increment(1); });
+      tx.set(tref, inc, { merge: true });
+      tx.set(bref, { at: FieldValue.serverTimestamp(), round }); // কাকে দিলেন লেখা থাকে না
+      tx.update(es.ref, { ballotCount: FieldValue.increment(1) });
+      return { ok: true };
+    });
+  }
+  // জয়ীদের পদবি দেওয়া; আগে যাঁরা এই পদে ছিলেন (জয়ী নন) তাঁরা "সদস্য" (প্রতিষ্ঠাতা হলে "প্রতিষ্ঠাতা")
+  function applyWinners(tx, oid, org, e, winners, mems) {
+    return () => {
+      mems.docs.forEach((m) => {
+        const x = m.data();
+        if (winners.includes(m.id)) tx.update(m.ref, { title: e.post });
+        else if (x.title === e.post) tx.update(m.ref, { title: m.id === org.createdBy ? "প্রতিষ্ঠাতা" : (x.role === "admin" ? "অ্যাডমিন" : "সদস্য") });
+      });
+    };
+  }
+  async function electionStep(oid, eid) {
+    const sys = { uid: "system", name: "নির্বাচনের ফলাফল" };
+    await db.runTransaction(async (tx) => {
+      const os = await tx.get(orgRef(oid));
+      const es = await tx.get(elRef(oid, eid));
+      if (!os.exists || !es.exists) return;
+      const org = os.data(), e = es.data(), now = Date.now();
+      if (!["open", "runoff"].includes(e.status)) return;
+      const cands = await tx.get(elRef(oid, eid).collection("candidates"));
+      const ok = cands.docs.filter((c) => c.data().status === "ok").map((c) => ({ id: c.id, ...c.data() }));
+      // transaction-এ সব পড়া আগে, লেখা পরে
+      const round = e.round || 1;
+      const ts = await tx.get(tallyRef(oid, eid, round));
+      const mems = await tx.get(orgRef(oid).collection("members").where("status", "==", "active"));
+      // ১) আবেদন বন্ধের পর — প্রার্থী না থাকলে বাতিল, আসনের সমান/কম হলে বিনা প্রতিদ্বন্দ্বিতায়
+      if (e.status === "open" && now >= e.applyEndAt.toMillis() && !e.applyClosed) {
+        if (!ok.length) {
+          tx.update(es.ref, { status: "void", voidReason: "কেউ প্রার্থী হননি", applyClosed: true, decidedAt: FieldValue.serverTimestamp() });
+          audit(tx, oid, sys, "election_void", { detail: `${e.title} — কেউ প্রার্থী হননি` });
+          return;
+        }
+        if (ok.length <= e.seats) {
+          const winners = ok.map((c) => c.id);
+          applyWinners(tx, oid, org, e, winners, mems)();
+          tx.update(es.ref, { status: "done", unopposed: true, applyClosed: true, winners, winnerNames: ok.map((c) => c.name), results: ok.map((c) => ({ uid: c.id, name: c.name, symbol: c.symbol, votes: null })), decidedAt: FieldValue.serverTimestamp() });
+          tx.delete(db.collection("orgTimers").doc(`election_close_${oid}_${eid}`));
+          audit(tx, oid, sys, "election_done", { detail: `${e.title} — বিনা প্রতিদ্বন্দ্বিতায়: ${ok.map((c) => c.name).join(", ")}` });
+          return;
+        }
+        if (now < e.voteEndAt.toMillis()){ tx.update(es.ref, { applyClosed: true }); return; }
+      }
+      if (now < e.voteEndAt.toMillis()) return;
+      // ২) ভোট শেষ — গণনা
+      const tally = ts.exists ? ts.data() : {};
+      const pool = round === 1 ? ok : ok.filter((c) => (e.runoffUids || []).includes(c.id));
+      const seatsLeft = round === 1 ? e.seats : (e.runoffSeats || 1);
+      const prevWinners = round === 1 ? [] : (e.winners || []);
+      const needVotes = Math.ceil((e.eligible || 1) * (e.quorumPct || 30) / 100);
+      const ballots = e.ballotCount || 0;
+      const roundBallots = round === 1 ? ballots : ballots - (e.ballotsBeforeRunoff || 0);
+      if (round === 1 && ballots < needVotes) {
+        tx.update(es.ref, { applyClosed: true, status: "void", voidReason: `যথেষ্ট ভোট পড়েনি (দরকার ছিল ${needVotes}, পড়েছে ${ballots})`, decidedAt: FieldValue.serverTimestamp(), results: pool.map((c) => ({ uid: c.id, name: c.name, symbol: c.symbol, votes: tally[c.id] || 0 })) });
+        audit(tx, oid, sys, "election_void", { detail: `${e.title} — যথেষ্ট ভোট পড়েনি` });
+        return;
+      }
+      const ranked = pool.map((c) => ({ uid: c.id, name: c.name, symbol: c.symbol, votes: tally[c.id] || 0 })).sort((a, b) => b.votes - a.votes);
+      let winners = [], tied = [];
+      if (ranked.length <= seatsLeft) winners = ranked.map((r) => r.uid);
+      else {
+        const cut = ranked[seatsLeft - 1].votes;
+        const above = ranked.filter((r) => r.votes > cut), at = ranked.filter((r) => r.votes === cut);
+        if (above.length + at.length === seatsLeft) winners = above.concat(at).map((r) => r.uid);
+        else { winners = above.map((r) => r.uid); tied = at.map((r) => r.uid); }
+      }
+      const allWinners = prevWinners.concat(winners);
+      const roundResults = (e.results || []).concat([{ round, rows: ranked, ballots: roundBallots }]);
+      if (tied.length && round < 3) {
+        // শেষ আসনে সমান — শুধু তাঁদের মধ্যে ২৪ ঘণ্টার আবার ভোট
+        const vs = now, ve = now + 24 * 3600000;
+        tx.update(es.ref, { applyClosed: true, status: "runoff", round: round + 1, runoffUids: tied, runoffSeats: seatsLeft - winners.length, winners: allWinners,
+          voteStartAt: Timestamp.fromMillis(vs), voteEndAt: Timestamp.fromMillis(ve), ballotsBeforeRunoff: ballots, results: roundResults });
+        timer(tx, "election_close", oid, eid, ve);
+        audit(tx, oid, sys, "election_runoff", { detail: `${e.title} — সমান ভোট, আবার ভোট: ${ranked.filter((r) => tied.includes(r.uid)).map((r) => r.name).join(", ")}` });
+        return;
+      }
+      if (tied.length) winners = winners.concat(tied.slice(0, seatsLeft - winners.length)); // তিনবারেও সমান — আগে যিনি আবেদন করেছিলেন
+      const finalWinners = prevWinners.concat(winners);
+      applyWinners(tx, oid, org, e, finalWinners, mems)();
+      const names = ok.filter((c) => finalWinners.includes(c.id)).map((c) => c.name);
+      tx.update(es.ref, { applyClosed: true, status: "done", winners: finalWinners, winnerNames: names, results: roundResults, decidedAt: FieldValue.serverTimestamp() });
+      audit(tx, oid, sys, "election_done", { detail: `${e.title} — জয়ী: ${names.join(", ")}` });
+    });
+  }
+  // ফোন থেকে "সময় হয়ে গেছে, দেখো" — সার্ভার নিজের ঘড়িতে মিলিয়ে কাজ করে (ফোনের ঘড়িতে না)
+  async function electionSync(me, d) {
+    const oid = id(d.orgId, "সংগঠন"), eid = id(d.electionId, "নির্বাচন");
+    await electionStep(oid, eid);
+    return { ok: true };
+  }
+
   /* =================================================================
      একটাই দরজা — orgApi
      ================================================================= */
@@ -632,7 +961,8 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
     create, update, apply, cancelApply, decide, leave,
     postCreate, postEdit, postRemove, txCreate, txDecide,
     proposalCreate, proposalCancel, vote,
-    aidSave, setTitle, adminAction, deleteRequest, deleteCancel, deleteFinalize,
+    aidSave, setTitle, adminAction, resignRequest, resignCancel, deleteRequest, deleteCancel, deleteFinalize,
+    electionCreate, electionPublish, electionCancel, candidateApply, candidateWithdraw, candidateRemove, electionVote, electionSync,
   };
   const orgApi = onCall(async (request) => {
     const me = needUser(request);
@@ -654,6 +984,7 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
       const { kind, orgId: oid, refId } = t.data();
       try {
         if (kind === "proposal_close") await closeProposal(oid, refId);
+        else if (kind === "election_apply_close" || kind === "election_close") await electionStep(oid, refId);
         else if (kind === "post_publish" || kind === "post_expire") {
           const pref = orgRef(oid).collection("posts").doc(refId);
           await db.runTransaction(async (tx) => {
