@@ -3667,4 +3667,4 @@ async function markTailorLegDone(o) {
 }
 
 /* 🤝🐝 Honey Bee Org — সংগঠন (আলাদা ফাইল: org.js) */
-Object.assign(exports, require("./org")({ db, FieldValue, onCall, HttpsError }));
+Object.assign(exports, require("./org")({ db, FieldValue, Timestamp, onCall, HttpsError, onSchedule, onDocumentWritten, getStorage }));
