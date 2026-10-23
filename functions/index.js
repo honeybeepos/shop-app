@@ -3671,3 +3671,6 @@ Object.assign(exports, require("./org")({ db, FieldValue, Timestamp, onCall, Htt
 
 /* 🌦️ আবহাওয়ার আগাম সতর্কতা — ফোনে নোটিফিকেশন (আলাদা ফাইল: weather.js) */
 Object.assign(exports, require("./weather")({ db, FieldValue, onSchedule, getMessaging }));
+
+/* 🕌 নামাজ / সেহরি / ইফতারের নোটিফিকেশন (আলাদা ফাইল: prayer.js) */
+Object.assign(exports, require("./prayer")({ db, FieldValue, Timestamp, onSchedule, getMessaging }));
