@@ -264,6 +264,31 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
     return { ok: true, postId: ref.id };
   }
 
+  /* ✏️ পোস্ট এডিট — লেখা আর মেয়াদ বদলানো যায় (অ্যাডমিন)। কারা দেখবেন বা ছবি বদলানো যায় না —
+     ছবি পাবলিক/সদস্য আলাদা ফোল্ডারে থাকে, বদলালে ভুল লোক ছবি দেখে ফেলত; দরকার হলে নতুন পোস্ট দিন। */
+  async function postEdit(me, d) {
+    const oid = id(d.orgId, "সংগঠন"), pid = id(d.postId, "পোস্ট");
+    const text = str(d.text, 1, 3000, "পোস্টের লেখা");
+    let expireAt = d.expireAt === null || d.expireAt === 0 ? 0 : Number(d.expireAt) || 0;
+    await db.runTransaction(async (tx) => {
+      await getOrg(tx, oid, true);
+      await needAdmin(tx, oid, me.uid);
+      const ps = await tx.get(orgRef(oid).collection("posts").doc(pid));
+      if (!ps.exists || ps.data().status === "removed") throw new HttpsError("not-found", "পোস্ট পাওয়া যায়নি");
+      const p = ps.data();
+      const base = Math.max(Date.now(), p.publishAt ? p.publishAt.toMillis() : 0);
+      const same = expireAt && p.expireAt && p.expireAt.toMillis() === expireAt;
+      if (expireAt && !same && (expireAt <= base + 10 * 60000 || expireAt > base + 366 * 86400000)) throw new HttpsError("invalid-argument", "মেয়াদ এখন থেকে ১০ মিনিট থেকে ১ বছরের মধ্যে দিন");
+      const upd = { text, editedAt: FieldValue.serverTimestamp(), editedBy: me.name, expireAt: expireAt ? Timestamp.fromMillis(expireAt) : null };
+      if (p.status === "expired" && (!expireAt || expireAt > Date.now())) upd.status = "published"; // মেয়াদ বাড়ালে আবার দেখা যাবে
+      tx.update(ps.ref, upd);
+      const tref = db.collection("orgTimers").doc(`post_expire_${oid}_${pid}`);
+      if (expireAt) timer(tx, "post_expire", oid, pid, expireAt); else tx.delete(tref);
+      audit(tx, oid, me, "post_edit", { postId: pid, detail: text.slice(0, 60) });
+    });
+    return { ok: true };
+  }
+
   async function postRemove(me, d) {
     const oid = id(d.orgId, "সংগঠন"), pid = id(d.postId, "পোস্ট");
     let img = null;
@@ -605,7 +630,7 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
      ================================================================= */
   const ACTIONS_MAP = {
     create, update, apply, cancelApply, decide, leave,
-    postCreate, postRemove, txCreate, txDecide,
+    postCreate, postEdit, postRemove, txCreate, txDecide,
     proposalCreate, proposalCancel, vote,
     aidSave, setTitle, adminAction, deleteRequest, deleteCancel, deleteFinalize,
   };
