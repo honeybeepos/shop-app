@@ -3668,3 +3668,6 @@ async function markTailorLegDone(o) {
 
 /* 🤝🐝 Honey Bee Org — সংগঠন (আলাদা ফাইল: org.js) */
 Object.assign(exports, require("./org")({ db, FieldValue, Timestamp, onCall, HttpsError, onSchedule, onDocumentWritten, getStorage }));
+
+/* 🌦️ আবহাওয়ার আগাম সতর্কতা — ফোনে নোটিফিকেশন (আলাদা ফাইল: weather.js) */
+Object.assign(exports, require("./weather")({ db, FieldValue, onSchedule, getMessaging }));
