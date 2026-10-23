@@ -1042,5 +1042,45 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    // 🤝🐝 Honey Bee Org — সংগঠন। ফোন থেকে কিছুই সরাসরি লেখা যায় না — সব লেখা
+    // Cloud Function (functions/org.js) করে, প্রতিবার অ্যাডমিন/সদস্য যাচাই করে।
+    // এখানে শুধু কে কী পড়তে পারবেন সেটা ঠিক করা।
+    function orgMemberDoc(orgId) {
+      return get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
+    }
+    function isOrgMember(orgId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)) &&
+        orgMemberDoc(orgId).data.status == 'active';
+    }
+    function isOrgAdmin(orgId) {
+      return isOrgMember(orgId) && orgMemberDoc(orgId).data.role == 'admin';
+    }
+    match /orgs/{orgId} {
+      // সংগঠনের পরিচিতি (নাম, এলাকা, সদস্য সংখ্যা) — সবার জন্য খোলা
+      allow read: if resource.data.status == 'active';
+      allow write: if false;
+      // সদস্য তালিকা — শুধু সেই সংগঠনের সক্রিয় সদস্যরা
+      match /members/{uid} {
+        allow read: if isOrgMember(orgId) || (isSignedIn() && request.auth.uid == uid);
+        allow write: if false;
+      }
+      // সদস্য আবেদন — আবেদনকারী নিজেরটা, আর সংগঠনের অ্যাডমিনরা সবগুলো
+      match /requests/{uid} {
+        allow read: if isSignedIn() && (request.auth.uid == uid || isOrgAdmin(orgId));
+        allow write: if false;
+      }
+      // কাজের খাতা — শুধু অ্যাডমিন পড়তে পারেন; কেউ বদলাতে/মুছতে পারেন না
+      match /auditLogs/{logId} {
+        allow read: if isOrgAdmin(orgId);
+        allow write: if false;
+      }
+    }
+    // আমি কোন কোন সংগঠনে আছি — শুধু নিজেরটা পড়া যায়
+    match /orgUserIndex/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
   }
 }

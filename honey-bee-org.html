@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a1206">
+<title>Honey Bee Org</title>
+<link rel="icon" href="bazar-icon-192.png">
+<!--
+  🤝🐝 Honey Bee Org — মানুষের সংগঠন (ধাপ ১)
+  · সংগঠন খোলা, খোঁজা, সদস্য আবেদন, দুই-অ্যাডমিন অনুমোদন, সদস্য তালিকা, ছেড়ে যাওয়া
+  · নিরাপত্তা: এই পাতা থেকে Firestore-এ সরাসরি কিছু লেখা হয় না। সব কাজ Cloud Function
+    (functions/org.js) দিয়ে — সার্ভার প্রতিবার যাচাই করে কে অ্যাডমিন, কে সদস্য।
+    পড়ার অনুমতিও Firestore rules-এ বাঁধা (সদস্য তালিকা শুধু সদস্যরা দেখেন)।
+  · লগইন Bazar-এর একই Google একাউন্ট — আলাদা একাউন্ট লাগে না।
+  · পরের ধাপে: পোস্ট, টাকার হিসাব, প্রস্তাব ও ভোট, মানবিক সেবা, পদ ও অ্যাডমিন নিয়োগ।
+-->
+<style>
+:root{
+  --bg1:#1a1206; --bg2:#3d2405; --gold:#ffb703; --amber:#ffd166;
+  --card:#241705; --card2:#2d1d08; --border:rgba(255,209,102,0.22); --ink:#fff8e8;
+  --muted:rgba(255,248,232,0.6); --ok:#2fbf71; --danger:#e2543d; --pink:#f472b6;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{min-height:100vh; min-height:100dvh; background:linear-gradient(160deg,var(--bg1) 0%,var(--bg2) 100%) fixed; color:var(--ink);
+  font-family:"Noto Sans Bengali","Hind Siliguri","Nirmala UI",system-ui,sans-serif; -webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit; color:inherit}
+button{cursor:pointer}
+.wrap{max-width:960px; margin:0 auto; padding:14px 16px calc(40px + env(safe-area-inset-bottom))}
+.top{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+.back{border:1px solid var(--border); background:transparent; border-radius:10px; padding:7px 12px; color:var(--amber); font-weight:700; font-size:13px}
+.brand{display:flex; align-items:center; gap:8px; font-weight:800; font-size:18px}
+.brand .lg{position:relative; font-size:24px} .brand .lg i{position:absolute; right:-8px; bottom:-3px; font-size:12px; font-style:normal}
+.me{margin-left:auto; display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted)}
+.me img{width:30px; height:30px; border-radius:50%; border:1px solid var(--border)}
+.card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:12px}
+.h{font-size:15px; font-weight:800; margin:0 0 10px; display:flex; align-items:center; gap:8px}
+.small{font-size:12px; color:var(--muted); line-height:1.6}
+.btn{border:0; border-radius:12px; padding:11px 16px; font-weight:800; font-size:14px; background:linear-gradient(135deg,var(--amber),var(--gold)); color:var(--bg1)}
+.btn.ghost{background:rgba(255,255,255,0.05); color:var(--ink); border:1px solid var(--border)}
+.btn.green{background:var(--ok); color:#fff}
+.btn.red{background:rgba(226,84,61,0.14); color:#fca5a5; border:1px solid rgba(226,84,61,0.45)}
+.btn:disabled{opacity:.5; cursor:not-allowed}
+.btn.full{width:100%}
+.row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.f{display:block; font-size:12px; font-weight:700; color:var(--muted); margin:12px 0 6px}
+.in{width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); font-size:14px}
+.in:focus{outline:2px solid rgba(255,209,102,0.5)}
+select.in option{background:#241705}
+textarea.in{min-height:84px; resize:vertical}
+.grid{display:grid; grid-template-columns:1fr; gap:10px}
+@media(min-width:720px){ .grid{grid-template-columns:1fr 1fr} .wrap{padding-top:22px} }
+.org{display:flex; gap:12px; align-items:flex-start; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:13px; cursor:pointer; text-align:left; width:100%}
+.org:hover{border-color:rgba(255,209,102,0.5)}
+.av{width:44px; height:44px; border-radius:12px; background:rgba(255,209,102,0.14); display:grid; place-items:center; font-size:22px; flex-shrink:0}
+.org b{font-size:14.5px} .org .small{margin-top:2px}
+.chip{display:inline-block; font-size:11px; font-weight:800; padding:3px 8px; border-radius:999px; background:rgba(255,255,255,0.07); color:var(--muted)}
+.chip.ok{background:rgba(47,191,113,0.16); color:#86efac} .chip.wait{background:rgba(255,183,3,0.16); color:var(--amber)}
+.chip.no{background:rgba(226,84,61,0.16); color:#fca5a5} .chip.admin{background:rgba(244,114,182,0.16); color:#f9a8d4}
+.tabs{display:flex; gap:6px; overflow-x:auto; margin:4px 0 12px; padding-bottom:2px}
+.tabs button{flex:0 0 auto; border:1px solid var(--border); background:rgba(255,255,255,0.04); border-radius:999px; padding:8px 14px; font-weight:700; font-size:13px; color:var(--ink)}
+.tabs button.on{background:linear-gradient(135deg,var(--amber),var(--gold)); color:var(--bg1); border-color:transparent}
+.tabs button.soon{opacity:.45}
+.item{display:flex; gap:10px; align-items:center; padding:11px 0; border-bottom:1px solid rgba(255,255,255,0.07)}
+.item:last-child{border-bottom:0}
+.item .grow{flex:1; min-width:0}
+.empty{padding:18px; text-align:center; color:var(--muted); font-size:13px}
+.notice{padding:11px 12px; border-radius:12px; background:rgba(255,183,3,0.1); border:1px solid rgba(255,183,3,0.3); color:#fde68a; font-size:12.5px; line-height:1.7}
+.hero{position:relative; overflow:hidden}
+.hero .big{font-size:20px; font-weight:800}
+.stats{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+.stat{flex:1; min-width:90px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:12px; padding:9px 10px}
+.stat b{display:block; font-size:18px; color:var(--amber)}
+.toast{position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:#ec4899; color:#fff; padding:11px 16px; border-radius:999px; font-weight:800; font-size:13px; z-index:50; display:none; max-width:92vw; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.modal{position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:40; display:none; align-items:flex-end; justify-content:center}
+.modal.show{display:flex}
+.modal .box{width:100%; max-width:520px; background:#1f1508; border:1px solid var(--border); border-radius:20px 20px 0 0; padding:18px; max-height:92vh; overflow:auto}
+@media(min-width:720px){ .modal{align-items:center} .modal .box{border-radius:20px} }
+.spin{display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+a{color:var(--amber)}
+</style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+<script src="bd-locations.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <button class="back" id="backBtn" type="button">←</button>
+    <div class="brand"><span class="lg">🤝<i>🐝</i></span> Honey Bee Org</div>
+    <div class="me" id="meBox"></div>
+  </div>
+  <div id="view"><div class="empty"><span class="spin"></span> লোড হচ্ছে…</div></div>
+</div>
+<div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyD6qmuWkNUrskMIBHq8Z_AQ0N_WT1DL8Is",
+  authDomain: "honeybee-984dd.firebaseapp.com",
+  projectId: "honeybee-984dd",
+  storageBucket: "honeybee-984dd.firebasestorage.app",
+  messagingSenderId: "610211112501",
+  appId: "1:610211112501:web:9ea40b9060d425e85b737c"
+});
+const db = firebase.firestore(), auth = firebase.auth(), fns = firebase.functions();
+const $ = id=> document.getElementById(id);
+const esc = v=> String(v == null ? "" : v).replace(/[&<>"']/g, c=> ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const bn = v=> String(v).replace(/\d/g, d=> "০১২৩৪৫৬৭৮৯"[d]);
+const memNo = n=> "HB-" + bn(String(n || 0).padStart(3, "0"));
+function toast(t, ms){ const el = $("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast._t); toast._t = setTimeout(()=> el.style.display = "none", ms || 2600); }
+function when(ts){ const d = ts && ts.toDate ? ts.toDate() : null; return d ? d.toLocaleString("bn-BD", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : ""; }
+function errText(e){ return (e && e.message && !/^(internal|INTERNAL)$/.test(e.message)) ? e.message : "হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন"; }
+async function call(name, data){ return (await fns.httpsCallable(name)(data || {})).data; }
+function districts(){ const l = []; Object.values(BD_LOCATIONS).forEach(dv=> Object.keys(dv).forEach(d=> l.push(d))); return l.sort((a,b)=> a.localeCompare(b, "bn")); }
+function upazilas(dist){ let f = []; Object.values(BD_LOCATIONS).forEach(dv=>{ if(dv[dist]) f = dv[dist]; }); return f.slice().sort((a,b)=> a.localeCompare(b, "bn")); }
+function openModal(html){ $("modalBox").innerHTML = html; $("modal").classList.add("show"); }
+function closeModal(){ $("modal").classList.remove("show"); $("modalBox").innerHTML = ""; }
+$("modal").addEventListener("click", e=>{ if(e.target.id === "modal" || e.target.closest("[data-close]")) closeModal(); });
+
+/* ---------- লগইন (Bazar-এর একই Google একাউন্ট) ---------- */
+let ME = null; // { uid, name, photo }
+function realUser(u){ return u && !u.isAnonymous ? u : null; }
+async function login(){
+  const p = new firebase.auth.GoogleAuthProvider();
+  try{ await auth.signInWithPopup(p); }
+  catch(e){ if(e.code === "auth/popup-blocked" || e.code === "auth/cancelled-popup-request" || e.code === "auth/operation-not-supported-in-this-environment") auth.signInWithRedirect(p); else if(e.code !== "auth/popup-closed-by-user") toast("লগইন হয়নি — আবার চেষ্টা করুন"); }
+}
+function needLogin(msg){
+  if(ME) return false;
+  openModal(`<div class="h">🔐 Google দিয়ে লগইন করুন</div>
+    <div class="small">${esc(msg || "এই কাজ করতে লগইন লাগবে।")} Honey Bee Bazar-এর একই একাউন্ট — আলাদা একাউন্ট লাগবে না।</div>
+    <div class="row" style="margin-top:14px"><button class="btn ghost" data-close type="button">পরে</button><button class="btn" id="lgGo" type="button" style="flex:1">🔵 Google দিয়ে লগইন</button></div>`);
+  $("lgGo").onclick = ()=>{ closeModal(); login(); };
+  return true;
+}
+function renderMe(){
+  $("meBox").innerHTML = ME
+    ? `${ME.photo ? `<img src="${esc(ME.photo)}" alt="" referrerpolicy="no-referrer">` : "👤"}<span style="max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(ME.name)}</span>`
+    : `<button class="btn ghost" type="button" style="padding:7px 12px; font-size:12.5px" onclick="login()">🔵 লগইন</button>`;
+}
+
+/* ---------- আমার সংগঠন (সার্ভার যা লিখে রাখে — orgUserIndex) ---------- */
+let MYIDX = { orgs:{}, applied:{} }, __idxUnsub = null;
+function listenIndex(){
+  if(__idxUnsub){ __idxUnsub(); __idxUnsub = null; }
+  MYIDX = { orgs:{}, applied:{} };
+  if(!ME) return;
+  __idxUnsub = db.collection("orgUserIndex").doc(ME.uid).onSnapshot(d=>{
+    const x = d.exists ? d.data() : {};
+    MYIDX = { orgs: x.orgs || {}, applied: x.applied || {} };
+    if(ROUTE.page === "home") renderHomeMine();
+  }, ()=>{});
+}
+
+/* ---------- পাতা বদল (#org=ID থাকলে সরাসরি সেই সংগঠন) ---------- */
+let ROUTE = { page:"home" };
+function go(page, arg){
+  ROUTE = { page, arg };
+  try{ history.replaceState(null, "", page === "org" ? "#org=" + arg : location.pathname); }catch(e){}
+  window.scrollTo(0, 0);
+  if(page === "org") pageOrg(arg); else if(page === "create") pageCreate(); else pageHome();
+}
+$("backBtn").onclick = ()=>{
+  if(ROUTE.page !== "home"){ go("home"); return; }
+  if(document.referrer && /honey-bee-bazar/.test(document.referrer) && history.length > 1) history.back();
+  else location.href = "honey-bee-bazar.html";
+};
+
+/* =====================================================================
+   🏠 হোম — আমার সংগঠন + খোঁজা + নতুন সংগঠন
+   ===================================================================== */
+let SEARCH = { d:"", u:"", q:"" };
+try{ const a = JSON.parse(localStorage.getItem("hbOrgArea") || "null") || JSON.parse(localStorage.getItem("hbPhArea") || "null"); if(a && a.d) SEARCH.d = a.d, SEARCH.u = a.u || ""; }catch(e){}
+function pageHome(){
+  $("view").innerHTML = `
+    <div class="card hero">
+      <div class="big">মানুষের পাশে, একসাথে 🤝</div>
+      <div class="small" style="margin-top:4px">আপনার এলাকার সংগঠন খুঁজুন, সদস্য হোন, অথবা নিজেই নতুন সংগঠন খুলুন। সদস্য গ্রহণে দুইজন অ্যাডমিনের অনুমোদন লাগে — একা কেউ কিছু করতে পারেন না।</div>
+      <div class="row" style="margin-top:12px"><button class="btn" type="button" id="newOrgBtn">➕ নতুন সংগঠন খুলুন</button></div>
+    </div>
+    <div id="mine"></div>
+    <div class="card">
+      <div class="h">🔎 সংগঠন খুঁজুন</div>
+      <div class="row">
+        <select class="in" id="sD" style="flex:1; min-width:130px"><option value="">সব জেলা</option>${districts().map(d=> `<option${d === SEARCH.d ? " selected" : ""}>${esc(d)}</option>`).join("")}</select>
+        <select class="in" id="sU" style="flex:1; min-width:130px"></select>
+      </div>
+      <input class="in" id="sQ" placeholder="সংগঠনের নাম লিখুন…" value="${esc(SEARCH.q)}" style="margin-top:8px">
+      <div id="results" style="margin-top:12px"><div class="empty"><span class="spin"></span></div></div>
+    </div>`;
+  $("newOrgBtn").onclick = ()=>{ if(!needLogin("নতুন সংগঠন খুলতে")) go("create"); };
+  const fillU = ()=>{ $("sU").innerHTML = `<option value="">সব উপজেলা/থানা</option>` + (SEARCH.d ? upazilas(SEARCH.d).map(u=> `<option${u === SEARCH.u ? " selected" : ""}>${esc(u)}</option>`).join("") : ""); $("sU").disabled = !SEARCH.d; };
+  fillU();
+  const save = ()=>{ try{ localStorage.setItem("hbOrgArea", JSON.stringify({ d:SEARCH.d, u:SEARCH.u })); }catch(e){} };
+  $("sD").onchange = ()=>{ SEARCH.d = $("sD").value; SEARCH.u = ""; fillU(); save(); runSearch(); };
+  $("sU").onchange = ()=>{ SEARCH.u = $("sU").value; save(); runSearch(); };
+  let t; $("sQ").oninput = ()=>{ SEARCH.q = $("sQ").value; clearTimeout(t); t = setTimeout(renderResults, 200); };
+  renderHomeMine();
+  runSearch();
+}
+function orgCardHtml(o, extra){
+  return `<button type="button" class="org" data-org="${esc(o.id)}">
+    <div class="av">🤝</div>
+    <div style="flex:1; min-width:0">
+      <b>${esc(o.name)}</b> ${extra || ""}
+      <div class="small">📍 ${esc([o.upazila, o.district].filter(Boolean).join(", "))} · 👥 ${bn(o.memberCount || 0)} সদস্য</div>
+      <div class="small" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden">${esc(o.desc || "")}</div>
+    </div></button>`;
+}
+function wireOrgCards(root){ root.querySelectorAll("[data-org]").forEach(b=> b.onclick = ()=> go("org", b.dataset.org)); }
+function renderHomeMine(){
+  const el = $("mine"); if(!el) return;
+  if(!ME){ el.innerHTML = ""; return; }
+  const mine = Object.entries(MYIDX.orgs || {}), applied = Object.entries(MYIDX.applied || {});
+  if(!mine.length && !applied.length){ el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="card"><div class="h">⭐ আমার সংগঠন</div><div class="grid">
+    ${mine.map(([id, o])=> orgCardHtml({ id, name:o.name, desc:"", memberCount:0 }, o.role === "admin" ? `<span class="chip admin">অ্যাডমিন</span>` : `<span class="chip ok">সদস্য</span>`).replace(/<div class="small">📍[^]*?<\/div>/, "")).join("")}
+    ${applied.map(([id, o])=> orgCardHtml({ id, name:o.name, desc:"", memberCount:0 }, `<span class="chip wait">আবেদন অপেক্ষায়</span>`).replace(/<div class="small">📍[^]*?<\/div>/, "")).join("")}
+  </div></div>`;
+  wireOrgCards(el);
+}
+let RESULTS = [], __seq = 0;
+async function runSearch(){
+  const seq = ++__seq;
+  const el = $("results"); if(!el) return;
+  el.innerHTML = `<div class="empty"><span class="spin"></span></div>`;
+  try{
+    let q = db.collection("orgs").where("status", "==", "active");
+    if(SEARCH.d) q = q.where("district", "==", SEARCH.d);
+    if(SEARCH.d && SEARCH.u) q = q.where("upazila", "==", SEARCH.u);
+    const qs = await q.limit(200).get();
+    if(seq !== __seq) return;
+    RESULTS = qs.docs.map(d=> ({ id:d.id, ...d.data() })).sort((a,b)=> (b.memberCount || 0) - (a.memberCount || 0));
+  }catch(e){ console.warn(e); RESULTS = []; if(seq === __seq) el.innerHTML = `<div class="empty">লোড করা যায়নি — ইন্টারনেট দেখুন</div>`; return; }
+  renderResults();
+}
+function renderResults(){
+  const el = $("results"); if(!el) return;
+  const q = (SEARCH.q || "").trim().toLowerCase();
+  const list = q ? RESULTS.filter(o=> (o.name + " " + (o.desc || "")).toLowerCase().includes(q)) : RESULTS;
+  el.innerHTML = list.length ? `<div class="grid">${list.map(o=> orgCardHtml(o)).join("")}</div>`
+    : `<div class="empty">${SEARCH.d ? "এই এলাকায় এখনো কোনো সংগঠন নেই — আপনিই প্রথমটা খুলুন!" : "কোনো সংগঠন পাওয়া যায়নি"}</div>`;
+  wireOrgCards(el);
+}
+
+/* =====================================================================
+   ➕ নতুন সংগঠন
+   ===================================================================== */
+function pageCreate(){
+  if(!ME){ go("home"); return; }
+  $("view").innerHTML = `<div class="card">
+    <div class="h">➕ নতুন সংগঠন খুলুন</div>
+    <div class="notice">আপনি হবেন প্রতিষ্ঠাতা ও প্রথম অ্যাডমিন। দ্বিতীয় অ্যাডমিন না আসা পর্যন্ত সদস্য গ্রহণ আপনি একাই করতে পারবেন; এরপর থেকে প্রতিটা সদস্য গ্রহণে দুইজন আলাদা অ্যাডমিনের অনুমোদন লাগবে।</div>
+    <label class="f">সংগঠনের নাম *</label><input class="in" id="cN" maxlength="60" placeholder="যেমন: মানবতার হাত">
+    <label class="f">সংগঠনের উদ্দেশ্য ও পরিচিতি *</label><textarea class="in" id="cD" maxlength="600" placeholder="সংগঠন কী কাজ করে, কাদের পাশে দাঁড়ায়…"></textarea>
+    <div class="row">
+      <div style="flex:1; min-width:140px"><label class="f">জেলা *</label><select class="in" id="cDi"><option value="">জেলা বাছুন</option>${districts().map(d=> `<option${d === SEARCH.d ? " selected" : ""}>${esc(d)}</option>`).join("")}</select></div>
+      <div style="flex:1; min-width:140px"><label class="f">উপজেলা/থানা</label><select class="in" id="cU"></select></div>
+    </div>
+    <label class="f">গ্রাম / এলাকা (ঐচ্ছিক)</label><input class="in" id="cA" maxlength="80" placeholder="যেমন: বাজার রোড, ৩ নং ওয়ার্ড">
+    <div id="cMsg" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
+    <div class="row" style="margin-top:6px"><button class="btn ghost" type="button" onclick="go('home')">বাতিল</button><button class="btn" type="button" id="cGo" style="flex:1">✅ সংগঠন খুলুন</button></div>
+  </div>`;
+  const fillU = ()=>{ const d = $("cDi").value; $("cU").innerHTML = `<option value="">—</option>` + (d ? upazilas(d).map(u=> `<option${u === SEARCH.u ? " selected" : ""}>${esc(u)}</option>`).join("") : ""); };
+  fillU(); $("cDi").onchange = fillU;
+  $("cGo").onclick = async ()=>{
+    const name = $("cN").value.trim(), desc = $("cD").value.trim(), district = $("cDi").value;
+    if(name.length < 3) return $("cMsg").textContent = "সংগঠনের নাম দিন (কমপক্ষে ৩ অক্ষর)";
+    if(desc.length < 10) return $("cMsg").textContent = "সংগঠনের পরিচিতি একটু বিস্তারিত লিখুন (কমপক্ষে ১০ অক্ষর)";
+    if(!district) return $("cMsg").textContent = "জেলা বাছুন";
+    const b = $("cGo"); b.disabled = true; b.innerHTML = `<span class="spin"></span> খোলা হচ্ছে…`;
+    try{
+      const r = await call("orgCreate", { name, desc, district, upazila: $("cU").value, area: $("cA").value.trim() });
+      toast("🎉 সংগঠন খোলা হয়েছে — আপনি প্রতিষ্ঠাতা অ্যাডমিন");
+      go("org", r.orgId);
+    }catch(e){ b.disabled = false; b.textContent = "✅ সংগঠন খুলুন"; $("cMsg").textContent = errText(e); }
+  };
+}
+
+/* =====================================================================
+   🏛️ সংগঠনের পাতা
+   ===================================================================== */
+let ORG = null, MYMEM = null, MYREQ = null, ORG_TAB = "about", __orgUnsubs = [];
+function stopOrg(){ __orgUnsubs.forEach(u=>{ try{ u(); }catch(e){} }); __orgUnsubs = []; }
+function pageOrg(id){
+  stopOrg(); ORG = null; MYMEM = null; MYREQ = null; ORG_TAB = "about";
+  $("view").innerHTML = `<div class="empty"><span class="spin"></span> লোড হচ্ছে…</div>`;
+  __orgUnsubs.push(db.collection("orgs").doc(id).onSnapshot(d=>{
+    if(!d.exists){ $("view").innerHTML = `<div class="card"><div class="empty">সংগঠন পাওয়া যায়নি</div><button class="btn full" type="button" onclick="go('home')">← সব সংগঠন</button></div>`; return; }
+    ORG = { id:d.id, ...d.data() }; renderOrg();
+  }, ()=>{ $("view").innerHTML = `<div class="card"><div class="empty">এই সংগঠন আর নেই বা দেখা যাচ্ছে না</div><button class="btn full" type="button" onclick="go('home')">← সব সংগঠন</button></div>`; }));
+  if(ME){
+    __orgUnsubs.push(db.collection("orgs").doc(id).collection("members").doc(ME.uid).onSnapshot(d=>{
+      const m = d.exists ? d.data() : null; MYMEM = (m && m.status === "active") ? m : null; renderOrg();
+    }, ()=>{ MYMEM = null; renderOrg(); }));
+    __orgUnsubs.push(db.collection("orgs").doc(id).collection("requests").doc(ME.uid).onSnapshot(d=>{
+      MYREQ = d.exists ? d.data() : null; renderOrg();
+    }, ()=>{ MYREQ = null; }));
+  }
+}
+const isAdmin = ()=> !!(MYMEM && MYMEM.role === "admin");
+const SOON = [["posts","📰 পোস্ট"],["money","৳ হিসাব"],["votes","🗳️ প্রস্তাব ও ভোট"],["aid","❤️ মানবিক সেবা"]];
+function renderOrg(){
+  if(!ORG) return;
+  const tabs = [["about","ℹ️ পরিচিতি"]];
+  if(MYMEM) tabs.push(["members","👥 সদস্য"]);
+  if(isAdmin()) tabs.push(["requests","📝 আবেদন"], ["log","📜 কাজের খাতা"]);
+  if(!tabs.some(t=> t[0] === ORG_TAB)) ORG_TAB = "about";
+  $("view").innerHTML = `
+    <div class="card hero">
+      <div class="row" style="align-items:flex-start; flex-wrap:nowrap">
+        <div class="av" style="width:56px; height:56px; font-size:28px">🤝</div>
+        <div style="flex:1; min-width:0">
+          <div class="big">${esc(ORG.name)}</div>
+          <div class="small">📍 ${esc([ORG.area, ORG.upazila, ORG.district].filter(Boolean).join(", "))}</div>
+          <div style="margin-top:6px">${MYMEM ? (isAdmin() ? `<span class="chip admin">⚙️ আপনি অ্যাডমিন · ${esc(MYMEM.title || "")}</span>` : `<span class="chip ok">✅ আপনি সদস্য · ${memNo(MYMEM.memberNo)}</span>`)
+            : MYREQ && MYREQ.status === "pending" ? `<span class="chip wait">⏳ আপনার আবেদন অপেক্ষায়</span>` : ""}</div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b>${bn(ORG.memberCount || 0)}</b><span class="small">সদস্য</span></div>
+        <div class="stat"><b>${bn(ORG.adminCount || 0)}</b><span class="small">অ্যাডমিন</span></div>
+        <div class="stat"><b style="font-size:13px; line-height:1.9">${esc(ORG.founderName || "—")}</b><span class="small">প্রতিষ্ঠাতা</span></div>
+      </div>
+    </div>
+    <div class="tabs">${tabs.map(([k,l])=> `<button type="button" data-t="${k}" class="${k === ORG_TAB ? "on" : ""}">${l}${k === "requests" && __reqN ? " (" + bn(__reqN) + ")" : ""}</button>`).join("")}${MYMEM ? SOON.map(([k,l])=> `<button type="button" class="soon" data-soon="1">${l}</button>`).join("") : ""}</div>
+    <div id="tabBody"></div>`;
+  document.querySelectorAll("[data-t]").forEach(b=> b.onclick = ()=>{ ORG_TAB = b.dataset.t; renderOrg(); });
+  document.querySelectorAll("[data-soon]").forEach(b=> b.onclick = ()=> toast("এটা পরের ধাপে আসছে 🐝"));
+  ({ about: tabAbout, members: tabMembers, requests: tabRequests, log: tabLog })[ORG_TAB]();
+}
+
+/* ---------- ℹ️ পরিচিতি + আবেদন ---------- */
+function tabAbout(){
+  let action = "";
+  if(!ME) action = `<button class="btn full" type="button" onclick="needLogin('সদস্য হওয়ার আবেদন করতে')">✋ সদস্য হওয়ার আবেদন করুন</button>`;
+  else if(MYMEM) action = `<div class="notice">✅ আপনি এই সংগঠনের ${isAdmin() ? "অ্যাডমিন" : "সদস্য"}। সদস্য নম্বর: <b>${memNo(MYMEM.memberNo)}</b></div>
+    <button class="btn red" type="button" id="leaveBtn" style="margin-top:12px">🚪 সংগঠন ছেড়ে দিন</button>`;
+  else if(MYREQ && MYREQ.status === "pending"){
+    const need = (ORG.adminCount || 1) >= 2 ? 2 : 1;
+    action = `<div class="notice">⏳ আপনার আবেদন জমা আছে — ${need === 2 ? "দুইজন অ্যাডমিন অনুমোদন দিলে" : "অ্যাডমিন অনুমোদন দিলে"} আপনি সদস্য হবেন।<br>অনুমোদন: <b>${bn((MYREQ.approvedBy || []).length)}/${bn(need)}</b></div>
+      <button class="btn ghost" type="button" id="cancelReq" style="margin-top:10px">আবেদন তুলে নিন</button>`;
+  }else{
+    const rej = MYREQ && MYREQ.status === "rejected";
+    action = `${rej ? `<div class="notice" style="margin-bottom:10px">❌ আগের আবেদন গ্রহণ করা হয়নি। ২৪ ঘণ্টা পর আবার আবেদন করতে পারবেন।</div>` : ""}
+      <button class="btn full" type="button" id="applyBtn">✋ সদস্য হওয়ার আবেদন করুন</button>`;
+  }
+  $("tabBody").innerHTML = `<div class="card"><div class="h">ℹ️ আমাদের কথা</div>
+      <div style="line-height:1.8; font-size:14px; white-space:pre-wrap">${esc(ORG.desc || "")}</div>
+      <div class="small" style="margin-top:10px">🗓️ প্রতিষ্ঠা: ${esc(when(ORG.createdAt))}</div></div>
+    <div class="card">${action}</div>
+    <div class="card"><div class="h">🔒 এই সংগঠনে কীভাবে কাজ হয়</div>
+      <div class="small">• সদস্য গ্রহণে দুইজন আলাদা অ্যাডমিনের অনুমোদন লাগে — একজন একা কাউকে ঢোকাতে পারেন না।<br>
+      • সব অ্যাডমিনের ক্ষমতা সমান — পদবি যাই হোক।<br>
+      • প্রতিটা অনুমোদন, বাতিল, যোগ দেওয়া, ছেড়ে যাওয়া — কাজের খাতায় লেখা থাকে, কেউ মুছতে পারেন না।<br>
+      • সদস্যদের তালিকা শুধু সদস্যরাই দেখেন; আপনার ফোন নম্বর শুধু অ্যাডমিনরা দেখেন।</div></div>`;
+  const ab = $("applyBtn"); if(ab) ab.onclick = openApply;
+  const cr = $("cancelReq"); if(cr) cr.onclick = async ()=>{
+    if(!confirm("আবেদন তুলে নেবেন?")) return;
+    cr.disabled = true;
+    try{ await call("orgCancelApply", { orgId: ORG.id }); toast("আবেদন তুলে নেওয়া হয়েছে"); }catch(e){ cr.disabled = false; toast(errText(e)); }
+  };
+  const lb = $("leaveBtn"); if(lb) lb.onclick = async ()=>{
+    if(!confirm("সত্যিই " + ORG.name + " ছেড়ে দেবেন? আবার যোগ দিতে নতুন করে আবেদন করতে হবে।")) return;
+    lb.disabled = true;
+    try{ await call("orgLeave", { orgId: ORG.id }); toast("আপনি সংগঠন ছেড়ে দিয়েছেন"); ORG_TAB = "about"; }catch(e){ lb.disabled = false; toast(errText(e)); }
+  };
+}
+function openApply(){
+  if(needLogin("সদস্য হওয়ার আবেদন করতে")) return;
+  openModal(`<div class="h">✋ ${esc(ORG.name)} — সদস্য হওয়ার আবেদন</div>
+    <div class="small">আপনার নাম যাবে Google একাউন্ট থেকে: <b>${esc(ME.name)}</b>। মোবাইল নম্বর শুধু এই সংগঠনের অ্যাডমিনরা দেখবেন।</div>
+    <label class="f">মোবাইল নম্বর *</label><input class="in" id="aP" type="tel" inputmode="tel" maxlength="16" placeholder="01XXXXXXXXX">
+    <label class="f">কেন যোগ দিতে চান? (ঐচ্ছিক)</label><textarea class="in" id="aN" maxlength="300" placeholder="নিজের সম্পর্কে দু-এক কথা"></textarea>
+    <div id="aMsg" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
+    <div class="row"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="aGo" style="flex:1">📤 আবেদন পাঠান</button></div>`);
+  $("aGo").onclick = async ()=>{
+    const ph = $("aP").value.replace(/[০-৯]/g, c=> "০১২৩৪৫৬৭৮৯".indexOf(c)).replace(/\D/g, "").replace(/^880/, "0");
+    if(!/^01[3-9]\d{8}$/.test(ph)) return $("aMsg").textContent = "সঠিক মোবাইল নম্বর দিন (01XXXXXXXXX)";
+    const b = $("aGo"); b.disabled = true; b.innerHTML = `<span class="spin"></span>`;
+    try{ await call("orgApply", { orgId: ORG.id, phone: ph, note: $("aN").value.trim() }); closeModal(); toast("✅ আবেদন পাঠানো হয়েছে — অ্যাডমিনের অনুমোদনের অপেক্ষায়"); }
+    catch(e){ b.disabled = false; b.textContent = "📤 আবেদন পাঠান"; $("aMsg").textContent = errText(e); }
+  };
+}
+
+/* ---------- 👥 সদস্য তালিকা (শুধু সদস্যরা দেখেন) ---------- */
+function tabMembers(){
+  $("tabBody").innerHTML = `<div class="card"><div class="h">👥 সদস্য তালিকা</div><div id="memList"><div class="empty"><span class="spin"></span></div></div></div>`;
+  db.collection("orgs").doc(ORG.id).collection("members").where("status", "==", "active").get().then(qs=>{
+    const list = qs.docs.map(d=> d.data()).sort((a,b)=> (a.role === "admin" ? 0 : 1) - (b.role === "admin" ? 0 : 1) || (a.memberNo || 0) - (b.memberNo || 0));
+    const el = $("memList"); if(!el) return;
+    el.innerHTML = list.map(m=> `<div class="item">
+      <div class="av" style="width:38px; height:38px; font-size:16px; border-radius:50%; overflow:hidden">${m.photo ? `<img src="${esc(m.photo)}" alt="" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:cover">` : esc((m.name || "?").slice(0, 1))}</div>
+      <div class="grow"><b style="font-size:14px">${esc(m.name)}</b>${ME && m.uid === ME.uid ? ` <span class="small">(আপনি)</span>` : ""}
+        <div class="small">${memNo(m.memberNo)} · ${esc(m.title || "সদস্য")}${isAdmin() && m.phone ? ` · 📞 <a href="tel:${esc(m.phone)}">${esc(m.phone)}</a>` : ""}</div></div>
+      ${m.role === "admin" ? `<span class="chip admin">অ্যাডমিন</span>` : `<span class="chip ok">সদস্য</span>`}
+    </div>`).join("") || `<div class="empty">কোনো সদস্য নেই</div>`;
+  }).catch(()=>{ const el = $("memList"); if(el) el.innerHTML = `<div class="empty">দেখা যাচ্ছে না — শুধু সদস্যরা এই তালিকা দেখতে পারেন</div>`; });
+}
+
+/* ---------- 📝 আবেদন (অ্যাডমিন) — দুইজনের অনুমোদন ---------- */
+let __reqN = 0, __reqUnsub = null, __reqList = [];
+function watchRequests(){
+  if(__reqUnsub){ __reqUnsub(); __reqUnsub = null; }
+  if(!ORG || !isAdmin()) return;
+  __reqUnsub = db.collection("orgs").doc(ORG.id).collection("requests").where("status", "==", "pending").onSnapshot(qs=>{
+    __reqList = qs.docs.map(d=> d.data()).sort((a,b)=> (a.createdAt ? a.createdAt.toMillis() : 0) - (b.createdAt ? b.createdAt.toMillis() : 0));
+    const changed = __reqN !== __reqList.length; __reqN = __reqList.length;
+    if(ORG_TAB === "requests") drawRequests(); else if(changed) renderOrg();
+  }, ()=>{});
+  __orgUnsubs.push(()=>{ if(__reqUnsub){ __reqUnsub(); __reqUnsub = null; } __reqN = 0; });
+}
+function tabRequests(){
+  $("tabBody").innerHTML = `<div class="card"><div class="h">📝 সদস্য হওয়ার আবেদন</div>
+    <div class="small" style="margin-bottom:6px">${(ORG.adminCount || 1) >= 2 ? "প্রতিটা আবেদনে দুইজন আলাদা অ্যাডমিনের অনুমোদন লাগবে।" : "এখন অ্যাডমিন একজন — আপনার এক অনুমোদনেই সদস্য হবেন। দ্বিতীয় অ্যাডমিন এলে দুইজনের অনুমোদন লাগবে।"}</div>
+    <div id="reqList"><div class="empty"><span class="spin"></span></div></div></div>`;
+  drawRequests();
+}
+function drawRequests(){
+  const el = $("reqList"); if(!el) return;
+  const need = (ORG.adminCount || 1) >= 2 ? 2 : 1;
+  el.innerHTML = __reqList.map(r=>{
+    const mine = ME && (r.approvedBy || []).includes(ME.uid);
+    return `<div class="item" style="align-items:flex-start">
+      <div class="av" style="width:38px; height:38px; font-size:16px; border-radius:50%; overflow:hidden">${r.photo ? `<img src="${esc(r.photo)}" alt="" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:cover">` : esc((r.name || "?").slice(0, 1))}</div>
+      <div class="grow">
+        <b style="font-size:14px">${esc(r.name)}</b>
+        <div class="small">📞 <a href="tel:${esc(r.phone)}">${esc(r.phone)}</a> · ${esc(when(r.createdAt))}</div>
+        ${r.note ? `<div style="font-size:13px; margin-top:4px">💬 ${esc(r.note)}</div>` : ""}
+        <div class="small" style="margin-top:4px">অনুমোদন: <b>${bn((r.approvedBy || []).length)}/${bn(need)}</b>${(r.approvedNames || []).length ? " — " + esc(r.approvedNames.join(", ")) : ""}</div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn green" type="button" data-ok="${esc(r.uid)}" ${mine ? "disabled" : ""}>${mine ? "✓ আপনি দিয়েছেন — আরেকজন লাগবে" : "✅ অনুমোদন"}</button>
+          <button class="btn red" type="button" data-no="${esc(r.uid)}">❌ বাতিল</button>
+        </div>
+      </div></div>`;
+  }).join("") || `<div class="empty">এখন কোনো আবেদন নেই 🎉</div>`;
+  const act = async (b, approve)=>{
+    const r = __reqList.find(x=> x.uid === (b.dataset.ok || b.dataset.no));
+    if(!approve && !confirm(r.name + "-এর আবেদন বাতিল করবেন?")) return;
+    b.disabled = true; const t = b.textContent; b.innerHTML = `<span class="spin"></span>`;
+    try{
+      const res = await call("orgDecide", { orgId: ORG.id, uid: r.uid, approve });
+      toast(!approve ? "আবেদন বাতিল হয়েছে" : res.status === "approved" ? "🎉 " + r.name + " এখন সদস্য (" + memNo(res.memberNo) + ")" : "✅ আপনার অনুমোদন জমা — আরেকজন অ্যাডমিন লাগবে");
+    }catch(e){ b.disabled = false; b.textContent = t; toast(errText(e)); }
+  };
+  el.querySelectorAll("[data-ok]").forEach(b=> b.onclick = ()=> act(b, true));
+  el.querySelectorAll("[data-no]").forEach(b=> b.onclick = ()=> act(b, false));
+}
+
+/* ---------- 📜 কাজের খাতা (অ্যাডমিন) ---------- */
+const LOG_TXT = { org_create:"সংগঠন খুলেছেন", member_approve_1:"প্রথম অনুমোদন দিয়েছেন", member_approve:"সদস্য গ্রহণ করেছেন", member_reject:"আবেদন বাতিল করেছেন", member_leave:"সংগঠন ছেড়েছেন" };
+function tabLog(){
+  $("tabBody").innerHTML = `<div class="card"><div class="h">📜 কাজের খাতা</div><div class="small" style="margin-bottom:6px">কে কখন কী করেছেন — এই খাতা কেউ বদলাতে বা মুছতে পারেন না।</div><div id="logList"><div class="empty"><span class="spin"></span></div></div></div>`;
+  db.collection("orgs").doc(ORG.id).collection("auditLogs").orderBy("at", "desc").limit(50).get().then(qs=>{
+    const el = $("logList"); if(!el) return;
+    el.innerHTML = qs.docs.map(d=>{ const l = d.data(); return `<div class="item"><div class="grow">
+      <b style="font-size:13.5px">${esc(l.actorName || "—")}</b> <span style="font-size:13px">${esc(LOG_TXT[l.action] || l.action)}</span>${l.targetName ? ` — <b style="font-size:13px">${esc(l.targetName)}</b>` : ""}${l.memberNo ? ` <span class="small">(${memNo(l.memberNo)})</span>` : ""}
+      <div class="small">${esc(when(l.at))}</div></div></div>`; }).join("") || `<div class="empty">এখনো কিছু নেই</div>`;
+  }).catch(()=>{ const el = $("logList"); if(el) el.innerHTML = `<div class="empty">লোড করা যায়নি</div>`; });
+}
+
+/* ---------- শুরু ---------- */
+let __started = false;
+auth.onAuthStateChanged(u=>{
+  const r = realUser(u);
+  ME = r ? { uid:r.uid, name:r.displayName || "সদস্য", photo:r.photoURL || null } : null;
+  renderMe(); listenIndex();
+  if(!__started){
+    __started = true;
+    const m = /#org=([A-Za-z0-9]{10,40})/.exec(location.hash);
+    go(m ? "org" : "home", m ? m[1] : undefined);
+  }else if(ROUTE.page === "org") pageOrg(ROUTE.arg);
+  else if(ROUTE.page === "home") renderHomeMine();
+});
+// অ্যাডমিন হলে আবেদনের তালিকা লাইভ দেখা
+const __origRender = renderOrg;
+renderOrg = function(){ __origRender(); if(ORG && isAdmin() && !__reqUnsub) watchRequests(); };
+</script>
+</body>
+</html>
