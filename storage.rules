@@ -44,6 +44,27 @@ service firebase.storage {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
+    // 🤝🐝 Honey Bee Org — পোস্টের ছবি (WebP, সর্বোচ্চ ১০০ KB)।
+    // পাথ: orgPosts/{orgId}/{public|members}/{uid}/{ফাইল}
+    // · আপলোড: শুধু সেই সংগঠনের অ্যাডমিন, নিজের uid-এর ফোল্ডারে
+    // · দেখা: "public" ফোল্ডার সবাই; "members" ফোল্ডার শুধু সংগঠনের সক্রিয় সদস্য
+    match /orgPosts/{orgId}/{aud}/{uid}/{file} {
+      allow read: if aud == 'public'
+        || (aud == 'members' && request.auth != null
+            && firestore.exists(/databases/(default)/documents/orgs/$(orgId)/members/$(request.auth.uid))
+            && firestore.get(/databases/(default)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.status == 'active');
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && (aud == 'public' || aud == 'members')
+        && firestore.exists(/databases/(default)/documents/orgs/$(orgId)/members/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.role == 'admin'
+        && firestore.get(/databases/(default)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.status == 'active'
+        && request.resource.size <= 100 * 1024
+        && request.resource.contentType == 'image/webp';
+      allow update: if false;
+      allow delete: if false;
+    }
+
     match /vehicle-images/{uid}/{photoSlot} {
 
       // গাড়ির ছবি Bazar/Public App-এ দেখা যাবে

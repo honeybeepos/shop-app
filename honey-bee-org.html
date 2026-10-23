@@ -7,13 +7,15 @@
 <title>Honey Bee Org</title>
 <link rel="icon" href="bazar-icon-192.png">
 <!--
-  🤝🐝 Honey Bee Org — মানুষের সংগঠন (ধাপ ১)
-  · সংগঠন খোলা, খোঁজা, সদস্য আবেদন, দুই-অ্যাডমিন অনুমোদন, সদস্য তালিকা, ছেড়ে যাওয়া
+  🤝🐝 Honey Bee Org — মানুষের সংগঠন
+  · সংগঠন খোলা/খোঁজা, সদস্য আবেদন, দুই-অ্যাডমিন অনুমোদন, সদস্য তালিকা ও পদবি
+  · পোস্ট (পাবলিক/শুধু সদস্য, ছবি, নির্ধারিত সময়, মেয়াদ, লাইক, মন্তব্য, শেয়ার)
+  · টাকার হিসাব (জমা/খরচ দুই-অ্যাডমিনে নিশ্চিত, আমার চাঁদা), প্রস্তাব ও গোপন ভোট
+  · মানবিক সেবা, অ্যাডমিন নিয়োগ/বাদ, সদস্যপদ বাতিল, সংগঠন মোছা (১২ ঘণ্টা অপেক্ষা), কাজের খাতা
   · নিরাপত্তা: এই পাতা থেকে Firestore-এ সরাসরি কিছু লেখা হয় না। সব কাজ Cloud Function
     (functions/org.js) দিয়ে — সার্ভার প্রতিবার যাচাই করে কে অ্যাডমিন, কে সদস্য।
     পড়ার অনুমতিও Firestore rules-এ বাঁধা (সদস্য তালিকা শুধু সদস্যরা দেখেন)।
   · লগইন Bazar-এর একই Google একাউন্ট — আলাদা একাউন্ট লাগে না।
-  · পরের ধাপে: পোস্ট, টাকার হিসাব, প্রস্তাব ও ভোট, মানবিক সেবা, পদ ও অ্যাডমিন নিয়োগ।
 -->
 <style>
 :root{
@@ -22,7 +24,7 @@
   --muted:rgba(255,248,232,0.6); --ok:#2fbf71; --danger:#e2543d; --pink:#f472b6;
 }
 *{box-sizing:border-box}
-html,body{margin:0}
+html,body{margin:0} html{background:#1a1206}
 body{min-height:100vh; min-height:100dvh; background:linear-gradient(160deg,var(--bg1) 0%,var(--bg2) 100%) fixed; color:var(--ink);
   font-family:"Noto Sans Bengali","Hind Siliguri","Nirmala UI",system-ui,sans-serif; -webkit-tap-highlight-color:transparent}
 button,input,select,textarea{font:inherit; color:inherit}
@@ -85,6 +87,7 @@ a{color:var(--amber)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="bd-locations.js"></script>
 </head>
 <body>
@@ -108,28 +111,39 @@ firebase.initializeApp({
   messagingSenderId: "610211112501",
   appId: "1:610211112501:web:9ea40b9060d425e85b737c"
 });
-const db = firebase.firestore(), auth = firebase.auth(), fns = firebase.functions();
+const db = firebase.firestore(), auth = firebase.auth(), fns = firebase.functions(), storage = firebase.storage();
+const TS = ()=> firebase.firestore.FieldValue.serverTimestamp();
 const $ = id=> document.getElementById(id);
 const esc = v=> String(v == null ? "" : v).replace(/[&<>"']/g, c=> ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const bn = v=> String(v).replace(/\d/g, d=> "০১২৩৪৫৬৭৮৯"[d]);
+const tk = n=> "৳ " + bn(Number(n || 0).toLocaleString("en-US"));
 const memNo = n=> "HB-" + bn(String(n || 0).padStart(3, "0"));
-function toast(t, ms){ const el = $("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast._t); toast._t = setTimeout(()=> el.style.display = "none", ms || 2600); }
-function when(ts){ const d = ts && ts.toDate ? ts.toDate() : null; return d ? d.toLocaleString("bn-BD", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : ""; }
+const ms = t=> t && t.toMillis ? t.toMillis() : 0;
+function toast(t, d){ const el = $("toast"); el.textContent = t; el.style.display = "block"; clearTimeout(toast._t); toast._t = setTimeout(()=> el.style.display = "none", d || 2600); }
+function when(ts){ const d = ts && ts.toDate ? ts.toDate() : (typeof ts === "number" ? new Date(ts) : null); return d ? d.toLocaleString("bn-BD", { day:"numeric", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" }) : ""; }
+function left(msLeft){ if(msLeft <= 0) return "এখনই"; const t = Math.floor(msLeft / 1000), d = Math.floor(t / 86400), h = Math.floor(t % 86400 / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return bn((d ? d + " দিন " : "") + String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0")); }
 function errText(e){ return (e && e.message && !/^(internal|INTERNAL)$/.test(e.message)) ? e.message : "হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন"; }
-async function call(name, data){ return (await fns.httpsCallable(name)(data || {})).data; }
+async function api(action, data){ return (await fns.httpsCallable("orgApi")(Object.assign({ action }, data || {}))).data; }
 function districts(){ const l = []; Object.values(BD_LOCATIONS).forEach(dv=> Object.keys(dv).forEach(d=> l.push(d))); return l.sort((a,b)=> a.localeCompare(b, "bn")); }
 function upazilas(dist){ let f = []; Object.values(BD_LOCATIONS).forEach(dv=>{ if(dv[dist]) f = dv[dist]; }); return f.slice().sort((a,b)=> a.localeCompare(b, "bn")); }
 function openModal(html){ $("modalBox").innerHTML = html; $("modal").classList.add("show"); }
 function closeModal(){ $("modal").classList.remove("show"); $("modalBox").innerHTML = ""; }
 $("modal").addEventListener("click", e=>{ if(e.target.id === "modal" || e.target.closest("[data-close]")) closeModal(); });
+// একটা বোতাম চাপলে সার্ভারে কাজ — চলাকালীন ঘুরন্ত চিহ্ন, ভুল হলে বার্তা
+async function busy(btn, fn){
+  if(btn){ btn.disabled = true; btn.dataset.t = btn.innerHTML; btn.innerHTML = `<span class="spin"></span>`; }
+  try{ return await fn(); }
+  catch(e){ toast(errText(e), 3600); return null; }
+  finally{ if(btn && document.body.contains(btn)){ btn.disabled = false; btn.innerHTML = btn.dataset.t; } }
+}
+function digits(v){ return String(v || "").replace(/[০-৯]/g, c=> "০১২৩৪৫৬৭৮৯".indexOf(c)); }
 
 /* ---------- লগইন (Bazar-এর একই Google একাউন্ট) ---------- */
-let ME = null; // { uid, name, photo }
-function realUser(u){ return u && !u.isAnonymous ? u : null; }
+let ME = null;
 async function login(){
   const p = new firebase.auth.GoogleAuthProvider();
   try{ await auth.signInWithPopup(p); }
-  catch(e){ if(e.code === "auth/popup-blocked" || e.code === "auth/cancelled-popup-request" || e.code === "auth/operation-not-supported-in-this-environment") auth.signInWithRedirect(p); else if(e.code !== "auth/popup-closed-by-user") toast("লগইন হয়নি — আবার চেষ্টা করুন"); }
+  catch(e){ if(/popup-blocked|cancelled-popup-request|operation-not-supported/.test(e.code || "")) auth.signInWithRedirect(p); else if(e.code !== "auth/popup-closed-by-user") toast("লগইন হয়নি — আবার চেষ্টা করুন"); }
 }
 function needLogin(msg){
   if(ME) return false;
@@ -158,13 +172,13 @@ function listenIndex(){
   }, ()=>{});
 }
 
-/* ---------- পাতা বদল (#org=ID থাকলে সরাসরি সেই সংগঠন) ---------- */
+/* ---------- পাতা বদল (#org=ID[&post=PID] থাকলে সরাসরি সেই সংগঠন) ---------- */
 let ROUTE = { page:"home" };
-function go(page, arg){
+function go(page, arg, tab){
   ROUTE = { page, arg };
   try{ history.replaceState(null, "", page === "org" ? "#org=" + arg : location.pathname); }catch(e){}
   window.scrollTo(0, 0);
-  if(page === "org") pageOrg(arg); else if(page === "create") pageCreate(); else pageHome();
+  if(page === "org") pageOrg(arg, tab); else if(page === "create") pageCreate(); else { stopOrg(); pageHome(); }
 }
 $("backBtn").onclick = ()=>{
   if(ROUTE.page !== "home"){ go("home"); return; }
@@ -176,12 +190,12 @@ $("backBtn").onclick = ()=>{
    🏠 হোম — আমার সংগঠন + খোঁজা + নতুন সংগঠন
    ===================================================================== */
 let SEARCH = { d:"", u:"", q:"" };
-try{ const a = JSON.parse(localStorage.getItem("hbOrgArea") || "null") || JSON.parse(localStorage.getItem("hbPhArea") || "null"); if(a && a.d) SEARCH.d = a.d, SEARCH.u = a.u || ""; }catch(e){}
+try{ const a = JSON.parse(localStorage.getItem("hbOrgArea") || "null") || JSON.parse(localStorage.getItem("hbPhArea") || "null"); if(a && a.d){ SEARCH.d = a.d; SEARCH.u = a.u || ""; } }catch(e){}
 function pageHome(){
   $("view").innerHTML = `
     <div class="card hero">
       <div class="big">মানুষের পাশে, একসাথে 🤝</div>
-      <div class="small" style="margin-top:4px">আপনার এলাকার সংগঠন খুঁজুন, সদস্য হোন, অথবা নিজেই নতুন সংগঠন খুলুন। সদস্য গ্রহণে দুইজন অ্যাডমিনের অনুমোদন লাগে — একা কেউ কিছু করতে পারেন না।</div>
+      <div class="small" style="margin-top:4px">আপনার এলাকার সংগঠন খুঁজুন, সদস্য হোন, অথবা নিজেই নতুন সংগঠন খুলুন। সদস্য গ্রহণ, টাকা, অ্যাডমিন নিয়োগ — সবকিছুতে দুইজন অ্যাডমিনের অনুমোদন লাগে; খরচ হয় সদস্যদের ভোটে।</div>
       <div class="row" style="margin-top:12px"><button class="btn" type="button" id="newOrgBtn">➕ নতুন সংগঠন খুলুন</button></div>
     </div>
     <div id="mine"></div>
@@ -204,13 +218,13 @@ function pageHome(){
   renderHomeMine();
   runSearch();
 }
-function orgCardHtml(o, extra){
+function orgCardHtml(o, extra, short){
   return `<button type="button" class="org" data-org="${esc(o.id)}">
     <div class="av">🤝</div>
     <div style="flex:1; min-width:0">
       <b>${esc(o.name)}</b> ${extra || ""}
-      <div class="small">📍 ${esc([o.upazila, o.district].filter(Boolean).join(", "))} · 👥 ${bn(o.memberCount || 0)} সদস্য</div>
-      <div class="small" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden">${esc(o.desc || "")}</div>
+      ${short ? "" : `<div class="small">📍 ${esc([o.upazila, o.district].filter(Boolean).join(", "))} · 👥 ${bn(o.memberCount || 0)} সদস্য</div>
+      <div class="small" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden">${esc(o.desc || "")}</div>`}
     </div></button>`;
 }
 function wireOrgCards(root){ root.querySelectorAll("[data-org]").forEach(b=> b.onclick = ()=> go("org", b.dataset.org)); }
@@ -220,8 +234,8 @@ function renderHomeMine(){
   const mine = Object.entries(MYIDX.orgs || {}), applied = Object.entries(MYIDX.applied || {});
   if(!mine.length && !applied.length){ el.innerHTML = ""; return; }
   el.innerHTML = `<div class="card"><div class="h">⭐ আমার সংগঠন</div><div class="grid">
-    ${mine.map(([id, o])=> orgCardHtml({ id, name:o.name, desc:"", memberCount:0 }, o.role === "admin" ? `<span class="chip admin">অ্যাডমিন</span>` : `<span class="chip ok">সদস্য</span>`).replace(/<div class="small">📍[^]*?<\/div>/, "")).join("")}
-    ${applied.map(([id, o])=> orgCardHtml({ id, name:o.name, desc:"", memberCount:0 }, `<span class="chip wait">আবেদন অপেক্ষায়</span>`).replace(/<div class="small">📍[^]*?<\/div>/, "")).join("")}
+    ${mine.map(([id, o])=> orgCardHtml({ id, name:o.name }, o.role === "admin" ? `<span class="chip admin">অ্যাডমিন</span>` : `<span class="chip ok">সদস্য</span>`, true)).join("")}
+    ${applied.map(([id, o])=> orgCardHtml({ id, name:o.name }, `<span class="chip wait">আবেদন অপেক্ষায়</span>`, true)).join("")}
   </div></div>`;
   wireOrgCards(el);
 }
@@ -254,11 +268,12 @@ function renderResults(){
    ===================================================================== */
 function pageCreate(){
   if(!ME){ go("home"); return; }
+  stopOrg();
   $("view").innerHTML = `<div class="card">
     <div class="h">➕ নতুন সংগঠন খুলুন</div>
-    <div class="notice">আপনি হবেন প্রতিষ্ঠাতা ও প্রথম অ্যাডমিন। দ্বিতীয় অ্যাডমিন না আসা পর্যন্ত সদস্য গ্রহণ আপনি একাই করতে পারবেন; এরপর থেকে প্রতিটা সদস্য গ্রহণে দুইজন আলাদা অ্যাডমিনের অনুমোদন লাগবে।</div>
+    <div class="notice">আপনি হবেন প্রতিষ্ঠাতা ও প্রথম অ্যাডমিন। দ্বিতীয় অ্যাডমিন না আসা পর্যন্ত কাজ আপনি একাই করতে পারবেন; এরপর থেকে সদস্য গ্রহণ, টাকা জমা, অ্যাডমিন নিয়োগে দুইজন আলাদা অ্যাডমিনের অনুমোদন লাগবে।</div>
     <label class="f">সংগঠনের নাম *</label><input class="in" id="cN" maxlength="60" placeholder="যেমন: মানবতার হাত">
-    <label class="f">সংগঠনের উদ্দেশ্য ও পরিচিতি *</label><textarea class="in" id="cD" maxlength="600" placeholder="সংগঠন কী কাজ করে, কাদের পাশে দাঁড়ায়…"></textarea>
+    <label class="f">সংগঠনের উদ্দেশ্য ও পরিচিতি *</label><textarea class="in" id="cD" maxlength="1500" placeholder="সংগঠন কী কাজ করে, কাদের পাশে দাঁড়ায়…"></textarea>
     <div class="row">
       <div style="flex:1; min-width:140px"><label class="f">জেলা *</label><select class="in" id="cDi"><option value="">জেলা বাছুন</option>${districts().map(d=> `<option${d === SEARCH.d ? " selected" : ""}>${esc(d)}</option>`).join("")}</select></div>
       <div style="flex:1; min-width:140px"><label class="f">উপজেলা/থানা</label><select class="in" id="cU"></select></div>
@@ -274,45 +289,62 @@ function pageCreate(){
     if(name.length < 3) return $("cMsg").textContent = "সংগঠনের নাম দিন (কমপক্ষে ৩ অক্ষর)";
     if(desc.length < 10) return $("cMsg").textContent = "সংগঠনের পরিচিতি একটু বিস্তারিত লিখুন (কমপক্ষে ১০ অক্ষর)";
     if(!district) return $("cMsg").textContent = "জেলা বাছুন";
-    const b = $("cGo"); b.disabled = true; b.innerHTML = `<span class="spin"></span> খোলা হচ্ছে…`;
-    try{
-      const r = await call("orgCreate", { name, desc, district, upazila: $("cU").value, area: $("cA").value.trim() });
-      toast("🎉 সংগঠন খোলা হয়েছে — আপনি প্রতিষ্ঠাতা অ্যাডমিন");
-      go("org", r.orgId);
-    }catch(e){ b.disabled = false; b.textContent = "✅ সংগঠন খুলুন"; $("cMsg").textContent = errText(e); }
+    const r = await busy($("cGo"), ()=> api("create", { name, desc, district, upazila: $("cU").value, area: $("cA").value.trim() }));
+    if(r){ toast("🎉 সংগঠন খোলা হয়েছে — আপনি প্রতিষ্ঠাতা অ্যাডমিন"); go("org", r.orgId); }
   };
 }
 
 /* =====================================================================
    🏛️ সংগঠনের পাতা
    ===================================================================== */
-let ORG = null, MYMEM = null, MYREQ = null, ORG_TAB = "about", __orgUnsubs = [];
-function stopOrg(){ __orgUnsubs.forEach(u=>{ try{ u(); }catch(e){} }); __orgUnsubs = []; }
-function pageOrg(id){
-  stopOrg(); ORG = null; MYMEM = null; MYREQ = null; ORG_TAB = "about";
+let ORG = null, MYMEM = null, MYREQ = null, ORG_TAB = "about", __orgUnsubs = [], __tabUnsubs = [];
+function stopTab(){ __tabUnsubs.forEach(u=>{ try{ u(); }catch(e){} }); __tabUnsubs = []; }
+function stopOrg(){ stopTab(); __orgUnsubs.forEach(u=>{ try{ u(); }catch(e){} }); __orgUnsubs = []; __reqN = 0; }
+const isMember = ()=> !!MYMEM;
+const isAdmin = ()=> !!(MYMEM && MYMEM.role === "admin");
+const need2 = ()=> ((ORG && ORG.adminCount) || 1) >= 2 ? 2 : 1;
+let __orgFirst = true;
+function pageOrg(id, tab){
+  stopOrg(); ORG = null; MYMEM = null; MYREQ = null; ORG_TAB = tab || "about"; __orgFirst = true;
   $("view").innerHTML = `<div class="empty"><span class="spin"></span> লোড হচ্ছে…</div>`;
-  __orgUnsubs.push(db.collection("orgs").doc(id).onSnapshot(d=>{
-    if(!d.exists){ $("view").innerHTML = `<div class="card"><div class="empty">সংগঠন পাওয়া যায়নি</div><button class="btn full" type="button" onclick="go('home')">← সব সংগঠন</button></div>`; return; }
+  const oref = db.collection("orgs").doc(id);
+  __orgUnsubs.push(oref.onSnapshot(d=>{
+    if(!d.exists){ orgGone(); return; }
     ORG = { id:d.id, ...d.data() }; renderOrg();
-  }, ()=>{ $("view").innerHTML = `<div class="card"><div class="empty">এই সংগঠন আর নেই বা দেখা যাচ্ছে না</div><button class="btn full" type="button" onclick="go('home')">← সব সংগঠন</button></div>`; }));
+  }, orgGone));
   if(ME){
-    __orgUnsubs.push(db.collection("orgs").doc(id).collection("members").doc(ME.uid).onSnapshot(d=>{
-      const m = d.exists ? d.data() : null; MYMEM = (m && m.status === "active") ? m : null; renderOrg();
+    __orgUnsubs.push(oref.collection("members").doc(ME.uid).onSnapshot(d=>{
+      const m = d.exists ? d.data() : null; const was = isAdmin(); MYMEM = (m && m.status === "active") ? m : null;
+      if(isAdmin() && !was) watchAdminBits(); renderOrg();
     }, ()=>{ MYMEM = null; renderOrg(); }));
-    __orgUnsubs.push(db.collection("orgs").doc(id).collection("requests").doc(ME.uid).onSnapshot(d=>{
-      MYREQ = d.exists ? d.data() : null; renderOrg();
-    }, ()=>{ MYREQ = null; }));
+    __orgUnsubs.push(oref.collection("requests").doc(ME.uid).onSnapshot(d=>{ MYREQ = d.exists ? d.data() : null; if(ORG_TAB === "about") renderOrg(); }, ()=>{}));
   }
 }
-const isAdmin = ()=> !!(MYMEM && MYMEM.role === "admin");
-const SOON = [["posts","📰 পোস্ট"],["money","৳ হিসাব"],["votes","🗳️ প্রস্তাব ও ভোট"],["aid","❤️ মানবিক সেবা"]];
+function orgGone(){ $("view").innerHTML = `<div class="card"><div class="empty">এই সংগঠন আর নেই বা দেখা যাচ্ছে না</div><button class="btn full" type="button" onclick="go('home')">← সব সংগঠন</button></div>`; }
+function orgTabs(){
+  const t = [["about","ℹ️ পরিচিতি"], ["posts","📰 পোস্ট"]];
+  if(isMember() || ORG.publicFinance !== false) t.push(["money","৳ হিসাব"]);
+  if(isMember()) t.push(["dues","📒 আমার চাঁদা"], ["votes","🗳️ প্রস্তাব ও ভোট"]);
+  t.push(["aid","❤️ মানবিক সেবা"]);
+  if(isMember()) t.push(["members","👥 সদস্য"]);
+  if(isAdmin()) t.push(["requests","📝 আবেদন"], ["manage","⚙️ ব্যবস্থাপনা"], ["log","📜 কাজের খাতা"]);
+  return t;
+}
+let __renderedTab = null, __renderedSig = "";
 function renderOrg(){
   if(!ORG) return;
-  const tabs = [["about","ℹ️ পরিচিতি"]];
-  if(MYMEM) tabs.push(["members","👥 সদস্য"]);
-  if(isAdmin()) tabs.push(["requests","📝 আবেদন"], ["log","📜 কাজের খাতা"]);
+  if(ORG.status !== "active"){ orgGone(); return; }
+  const tabs = orgTabs();
   if(!tabs.some(t=> t[0] === ORG_TAB)) ORG_TAB = "about";
+  const del = ORG.deletion && ORG.deletion.status === "pending" ? ORG.deletion : null;
+  const fund = ORG.fund || { in:0, out:0 };
+  const showFund = isMember() || ORG.publicFinance !== false;
+  const sig = (isMember() ? "m" : "") + (isAdmin() ? "a" : "");
+  const keepBody = __renderedTab === ORG_TAB && __renderedSig === sig && $("tabBody") && !__orgFirst;
+  __renderedSig = sig;
+  const bodyNode = keepBody ? $("tabBody") : null;
   $("view").innerHTML = `
+    ${del && isMember() ? `<div class="notice" style="margin-bottom:12px; border-color:rgba(226,84,61,.6); background:rgba(226,84,61,.12); color:#fecaca">⚠️ <b>${esc(del.byName || "একজন অ্যাডমিন")}</b> সংগঠনটা মুছে ফেলার অনুরোধ করেছেন। মুছে যেতে বাকি: <b data-cd="${ms(del.deadline)}">${left(ms(del.deadline) - Date.now())}</b>। যেকোনো অ্যাডমিন এর মধ্যে বাতিল করতে পারেন।</div>` : ""}
     <div class="card hero">
       <div class="row" style="align-items:flex-start; flex-wrap:nowrap">
         <div class="av" style="width:56px; height:56px; font-size:28px">🤝</div>
@@ -326,25 +358,29 @@ function renderOrg(){
       <div class="stats">
         <div class="stat"><b>${bn(ORG.memberCount || 0)}</b><span class="small">সদস্য</span></div>
         <div class="stat"><b>${bn(ORG.adminCount || 0)}</b><span class="small">অ্যাডমিন</span></div>
-        <div class="stat"><b style="font-size:13px; line-height:1.9">${esc(ORG.founderName || "—")}</b><span class="small">প্রতিষ্ঠাতা</span></div>
+        ${showFund ? `<div class="stat"><b>${tk((fund.in || 0) - (fund.out || 0))}</b><span class="small">তহবিলে আছে</span></div>` : `<div class="stat"><b style="font-size:13px; line-height:1.9">${esc(ORG.founderName || "—")}</b><span class="small">প্রতিষ্ঠাতা</span></div>`}
       </div>
     </div>
-    <div class="tabs">${tabs.map(([k,l])=> `<button type="button" data-t="${k}" class="${k === ORG_TAB ? "on" : ""}">${l}${k === "requests" && __reqN ? " (" + bn(__reqN) + ")" : ""}</button>`).join("")}${MYMEM ? SOON.map(([k,l])=> `<button type="button" class="soon" data-soon="1">${l}</button>`).join("") : ""}</div>
+    <div class="tabs" id="orgTabs">${tabs.map(([k,l])=> `<button type="button" data-t="${k}" class="${k === ORG_TAB ? "on" : ""}">${l}${k === "requests" && __reqN ? " (" + bn(__reqN) + ")" : ""}${k === "members" && __actN ? " ⚠️" : ""}</button>`).join("")}</div>
     <div id="tabBody"></div>`;
-  document.querySelectorAll("[data-t]").forEach(b=> b.onclick = ()=>{ ORG_TAB = b.dataset.t; renderOrg(); });
-  document.querySelectorAll("[data-soon]").forEach(b=> b.onclick = ()=> toast("এটা পরের ধাপে আসছে 🐝"));
-  ({ about: tabAbout, members: tabMembers, requests: tabRequests, log: tabLog })[ORG_TAB]();
+  document.querySelectorAll("[data-t]").forEach(b=> b.onclick = ()=>{ if(ORG_TAB === b.dataset.t) return; ORG_TAB = b.dataset.t; renderOrg(); });
+  const on = document.querySelector("#orgTabs .on"); if(on && __orgFirst) on.scrollIntoView({ inline:"center", block:"nearest" });
+  if(keepBody){ $("tabBody").replaceWith(bodyNode); refreshTab(); }
+  else{ stopTab(); __renderedTab = ORG_TAB; TABS[ORG_TAB](); }
+  __orgFirst = false;
 }
+// সংগঠনের তথ্য বদলালে (যেমন তহবিল) খোলা ট্যাবটা নতুন করে বানানো লাগে না — শুধু যেগুলো সংগঠনের তথ্যের উপর নির্ভর করে
+function refreshTab(){ if(ORG_TAB === "about") tabAbout(); else if(ORG_TAB === "money") drawMoney(); else if(ORG_TAB === "manage") tabManage(); }
+const TABS = { about: tabAbout, posts: tabPosts, money: tabMoney, dues: tabDues, votes: tabVotes, aid: tabAid, members: tabMembers, requests: tabRequests, manage: tabManage, log: tabLog };
 
 /* ---------- ℹ️ পরিচিতি + আবেদন ---------- */
 function tabAbout(){
   let action = "";
   if(!ME) action = `<button class="btn full" type="button" onclick="needLogin('সদস্য হওয়ার আবেদন করতে')">✋ সদস্য হওয়ার আবেদন করুন</button>`;
-  else if(MYMEM) action = `<div class="notice">✅ আপনি এই সংগঠনের ${isAdmin() ? "অ্যাডমিন" : "সদস্য"}। সদস্য নম্বর: <b>${memNo(MYMEM.memberNo)}</b></div>
+  else if(MYMEM) action = `<div class="notice">✅ আপনি এই সংগঠনের ${isAdmin() ? "অ্যাডমিন" : "সদস্য"}। সদস্য নম্বর: <b>${memNo(MYMEM.memberNo)}</b> · পদবি: <b>${esc(MYMEM.title || "সদস্য")}</b></div>
     <button class="btn red" type="button" id="leaveBtn" style="margin-top:12px">🚪 সংগঠন ছেড়ে দিন</button>`;
   else if(MYREQ && MYREQ.status === "pending"){
-    const need = (ORG.adminCount || 1) >= 2 ? 2 : 1;
-    action = `<div class="notice">⏳ আপনার আবেদন জমা আছে — ${need === 2 ? "দুইজন অ্যাডমিন অনুমোদন দিলে" : "অ্যাডমিন অনুমোদন দিলে"} আপনি সদস্য হবেন।<br>অনুমোদন: <b>${bn((MYREQ.approvedBy || []).length)}/${bn(need)}</b></div>
+    action = `<div class="notice">⏳ আপনার আবেদন জমা আছে — ${need2() === 2 ? "দুইজন অ্যাডমিন অনুমোদন দিলে" : "অ্যাডমিন অনুমোদন দিলে"} আপনি সদস্য হবেন।<br>অনুমোদন: <b>${bn((MYREQ.approvedBy || []).length)}/${bn(need2())}</b></div>
       <button class="btn ghost" type="button" id="cancelReq" style="margin-top:10px">আবেদন তুলে নিন</button>`;
   }else{
     const rej = MYREQ && MYREQ.status === "rejected";
@@ -353,23 +389,19 @@ function tabAbout(){
   }
   $("tabBody").innerHTML = `<div class="card"><div class="h">ℹ️ আমাদের কথা</div>
       <div style="line-height:1.8; font-size:14px; white-space:pre-wrap">${esc(ORG.desc || "")}</div>
-      <div class="small" style="margin-top:10px">🗓️ প্রতিষ্ঠা: ${esc(when(ORG.createdAt))}</div></div>
+      <div class="small" style="margin-top:10px">👤 প্রতিষ্ঠাতা: ${esc(ORG.founderName || "—")} · 🗓️ ${esc(when(ORG.createdAt))}</div></div>
     <div class="card">${action}</div>
     <div class="card"><div class="h">🔒 এই সংগঠনে কীভাবে কাজ হয়</div>
-      <div class="small">• সদস্য গ্রহণে দুইজন আলাদা অ্যাডমিনের অনুমোদন লাগে — একজন একা কাউকে ঢোকাতে পারেন না।<br>
+      <div class="small">• সদস্য গ্রহণ, টাকা জমা নিশ্চিত, অ্যাডমিন নিয়োগ ও সদস্য বাদ — দুইজন আলাদা অ্যাডমিনের অনুমোদন লাগে। একজন একা কিছু করতে পারেন না।<br>
+      • বড় খরচ হয় প্রস্তাব আর সদস্যদের গোপন ভোটে। কমপক্ষে ${bn(ORG.quorumPct || 30)}% সদস্য ভোট না দিলে প্রস্তাব পাস হয় না।<br>
       • সব অ্যাডমিনের ক্ষমতা সমান — পদবি যাই হোক।<br>
-      • প্রতিটা অনুমোদন, বাতিল, যোগ দেওয়া, ছেড়ে যাওয়া — কাজের খাতায় লেখা থাকে, কেউ মুছতে পারেন না।<br>
-      • সদস্যদের তালিকা শুধু সদস্যরাই দেখেন; আপনার ফোন নম্বর শুধু অ্যাডমিনরা দেখেন।</div></div>`;
+      • প্রতিটা কাজ কাজের খাতায় লেখা থাকে, কেউ মুছতে পারেন না। টাকার হিসাবও মোছা যায় না।<br>
+      • সদস্যদের তালিকা শুধু সদস্যরাই দেখেন; আপনার ফোন নম্বর আর চাঁদার তথ্য শুধু অ্যাডমিনরা দেখেন।</div></div>`;
   const ab = $("applyBtn"); if(ab) ab.onclick = openApply;
-  const cr = $("cancelReq"); if(cr) cr.onclick = async ()=>{
-    if(!confirm("আবেদন তুলে নেবেন?")) return;
-    cr.disabled = true;
-    try{ await call("orgCancelApply", { orgId: ORG.id }); toast("আবেদন তুলে নেওয়া হয়েছে"); }catch(e){ cr.disabled = false; toast(errText(e)); }
-  };
+  const cr = $("cancelReq"); if(cr) cr.onclick = async ()=>{ if(!confirm("আবেদন তুলে নেবেন?")) return; if(await busy(cr, ()=> api("cancelApply", { orgId: ORG.id }))) toast("আবেদন তুলে নেওয়া হয়েছে"); };
   const lb = $("leaveBtn"); if(lb) lb.onclick = async ()=>{
     if(!confirm("সত্যিই " + ORG.name + " ছেড়ে দেবেন? আবার যোগ দিতে নতুন করে আবেদন করতে হবে।")) return;
-    lb.disabled = true;
-    try{ await call("orgLeave", { orgId: ORG.id }); toast("আপনি সংগঠন ছেড়ে দিয়েছেন"); ORG_TAB = "about"; }catch(e){ lb.disabled = false; toast(errText(e)); }
+    if(await busy(lb, ()=> api("leave", { orgId: ORG.id }))) toast("আপনি সংগঠন ছেড়ে দিয়েছেন");
   };
 }
 function openApply(){
@@ -381,50 +413,487 @@ function openApply(){
     <div id="aMsg" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
     <div class="row"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="aGo" style="flex:1">📤 আবেদন পাঠান</button></div>`);
   $("aGo").onclick = async ()=>{
-    const ph = $("aP").value.replace(/[০-৯]/g, c=> "০১২৩৪৫৬৭৮৯".indexOf(c)).replace(/\D/g, "").replace(/^880/, "0");
+    const ph = digits($("aP").value).replace(/\D/g, "").replace(/^880/, "0");
     if(!/^01[3-9]\d{8}$/.test(ph)) return $("aMsg").textContent = "সঠিক মোবাইল নম্বর দিন (01XXXXXXXXX)";
-    const b = $("aGo"); b.disabled = true; b.innerHTML = `<span class="spin"></span>`;
-    try{ await call("orgApply", { orgId: ORG.id, phone: ph, note: $("aN").value.trim() }); closeModal(); toast("✅ আবেদন পাঠানো হয়েছে — অ্যাডমিনের অনুমোদনের অপেক্ষায়"); }
-    catch(e){ b.disabled = false; b.textContent = "📤 আবেদন পাঠান"; $("aMsg").textContent = errText(e); }
+    if(await busy($("aGo"), ()=> api("apply", { orgId: ORG.id, phone: ph, note: $("aN").value.trim() }))){ closeModal(); toast("✅ আবেদন পাঠানো হয়েছে — অ্যাডমিনের অনুমোদনের অপেক্ষায়"); }
   };
 }
 
-/* ---------- 👥 সদস্য তালিকা (শুধু সদস্যরা দেখেন) ---------- */
+/* =====================================================================
+   📰 পোস্ট
+   ===================================================================== */
+let POSTS = [], MYLIKES = {};
+const POST_ST = { scheduled:["wait","⏰ নির্ধারিত"], expired:["no","⌛ মেয়াদ শেষ"], removed:["no","🗑️ সরানো"] };
+function tabPosts(){
+  $("tabBody").innerHTML = `${isAdmin() ? `<div class="card" style="padding:12px"><button class="btn full" type="button" id="newPost">✍️ নতুন পোস্ট লিখুন</button></div>` : ""}
+    <div id="postList"><div class="empty"><span class="spin"></span></div></div>`;
+  if($("newPost")) $("newPost").onclick = openNewPost;
+  let q = db.collection("orgs").doc(ORG.id).collection("posts");
+  if(!isAdmin()) q = isMember() ? q.where("status", "==", "published") : q.where("audience", "==", "public").where("status", "==", "published");
+  __tabUnsubs.push(q.limit(100).onSnapshot(qs=>{
+    POSTS = qs.docs.map(d=> ({ id:d.id, ...d.data() })).sort((a,b)=> ms(b.publishAt) - ms(a.publishAt));
+    drawPosts();
+  }, ()=>{ const el = $("postList"); if(el) el.innerHTML = `<div class="card"><div class="empty">পোস্ট লোড করা যায়নি</div></div>`; }));
+}
+const __imgCache = {};
+// খোলা মন্তব্যের বাক্স আবার আঁকার সময় হারাতে দেওয়া হয় না (লেখা অর্ধেক থাকলেও)
+function keepOpen(el, prefix){ const saved = {}; el.querySelectorAll(`[id^="${prefix}"]`).forEach(n=>{ if(n.children.length) saved[n.id] = n; }); return ()=> Object.keys(saved).forEach(k=>{ const fresh = document.getElementById(k); if(fresh) fresh.replaceWith(saved[k]); }); }
+function drawPosts(){
+  const el = $("postList"); if(!el) return;
+  const restore = keepOpen(el, "cm-");
+  const focus = (/[#&]post=([A-Za-z0-9]+)/.exec(location.hash) || [])[1];
+  el.innerHTML = POSTS.map(p=>{
+    const st = POST_ST[p.status];
+    return `<div class="card" id="post-${esc(p.id)}" ${focus === p.id ? `style="border-color:var(--amber)"` : ""}>
+      <div class="row" style="flex-wrap:nowrap">
+        <div class="av" style="width:38px; height:38px; font-size:18px; border-radius:50%">🤝</div>
+        <div style="flex:1; min-width:0"><b style="font-size:14px">${esc(ORG.name)}</b><div class="small">${esc(when(p.publishAt))}${p.expireAt ? " · মেয়াদ: " + esc(when(p.expireAt)) : ""}</div></div>
+        <span class="chip ${p.audience === "public" ? "" : "admin"}">${p.audience === "public" ? "🌐 পাবলিক" : "🔒 সদস্য"}</span>
+      </div>
+      ${st ? `<div style="margin-top:8px"><span class="chip ${st[0]}">${st[1]}</span></div>` : ""}
+      ${p.imagePath ? `<div data-img="${esc(p.imagePath)}" style="margin-top:12px; border-radius:12px; overflow:hidden; background:rgba(255,255,255,0.04); min-height:80px"></div>` : ""}
+      <div style="margin-top:10px; line-height:1.75; font-size:14.5px; white-space:pre-wrap">${esc(p.text)}</div>
+      <div class="row" style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px">
+        <button class="btn ghost" type="button" data-like="${esc(p.id)}" style="padding:7px 12px; font-size:13px">${MYLIKES[p.id] ? "❤️" : "🤍"} ${bn(p.likeCount || 0)}</button>
+        <button class="btn ghost" type="button" data-cm="${esc(p.id)}" style="padding:7px 12px; font-size:13px">💬 ${bn(p.commentCount || 0)}</button>
+        ${p.audience === "public" && p.status === "published" ? `<button class="btn ghost" type="button" data-share="${esc(p.id)}" style="padding:7px 12px; font-size:13px">↗ শেয়ার</button>` : ""}
+        ${isAdmin() && p.status !== "removed" ? `<button class="btn red" type="button" data-rm="${esc(p.id)}" style="padding:7px 12px; font-size:13px; margin-left:auto">🗑️</button>` : ""}
+      </div>
+      <div id="cm-${esc(p.id)}"></div>
+    </div>`;
+  }).join("") || `<div class="card"><div class="empty">${isMember() ? "এখনো কোনো পোস্ট নেই" : "এখনো কোনো পাবলিক পোস্ট নেই"}</div></div>`;
+  restore();
+  el.querySelectorAll("[data-img]").forEach(box=>{
+    const path = box.dataset.img;
+    const show = url=>{ box.innerHTML = `<img src="${esc(url)}" alt="" style="width:100%; max-height:460px; object-fit:contain; display:block">`; };
+    if(__imgCache[path]) show(__imgCache[path]);
+    else storage.ref(path).getDownloadURL().then(u=>{ __imgCache[path] = u; show(u); }).catch(()=>{ box.innerHTML = `<div class="empty">ছবি দেখা যাচ্ছে না</div>`; });
+  });
+  el.querySelectorAll("[data-like]").forEach(b=> b.onclick = ()=> toggleLike(b.dataset.like));
+  el.querySelectorAll("[data-cm]").forEach(b=> b.onclick = ()=> toggleComments("posts", b.dataset.cm, $("cm-" + b.dataset.cm)));
+  el.querySelectorAll("[data-share]").forEach(b=> b.onclick = ()=> sharePost(POSTS.find(x=> x.id === b.dataset.share)));
+  el.querySelectorAll("[data-rm]").forEach(b=> b.onclick = async ()=>{ if(!confirm("পোস্টটা সরিয়ে দেবেন? সবার কাছ থেকে লুকিয়ে যাবে।")) return; if(await busy(b, ()=> api("postRemove", { orgId: ORG.id, postId: b.dataset.rm }))) toast("পোস্ট সরানো হয়েছে"); });
+  if(ME) POSTS.forEach(p=>{ if(MYLIKES[p.id] === undefined){ MYLIKES[p.id] = false; db.collection("orgs").doc(ORG.id).collection("posts").doc(p.id).collection("likes").doc(ME.uid).get().then(d=>{ if(d.exists){ MYLIKES[p.id] = true; drawPosts(); } }).catch(()=>{}); } });
+  if(focus){ const f = $("post-" + focus); if(f && !drawPosts._done){ drawPosts._done = true; f.scrollIntoView({ block:"center" }); } }
+}
+async function toggleLike(pid){
+  if(needLogin("লাইক দিতে")) return;
+  const ref = db.collection("orgs").doc(ORG.id).collection("posts").doc(pid).collection("likes").doc(ME.uid);
+  const was = !!MYLIKES[pid]; MYLIKES[pid] = !was;
+  const p = POSTS.find(x=> x.id === pid); if(p) p.likeCount = Math.max(0, (p.likeCount || 0) + (was ? -1 : 1));
+  drawPosts();
+  try{ if(was) await ref.delete(); else await ref.set({ at: TS() }); }
+  catch(e){ MYLIKES[pid] = was; if(p) p.likeCount = Math.max(0, (p.likeCount || 0) + (was ? 1 : -1)); drawPosts(); toast("হয়নি — আবার চেষ্টা করুন"); }
+}
+function sharePost(p){
+  if(!p) return;
+  const url = location.origin + location.pathname + "#org=" + ORG.id + "&post=" + p.id;
+  const text = ORG.name + " — " + String(p.text).slice(0, 120);
+  if(navigator.share){ navigator.share({ title: ORG.name, text, url }).catch(()=>{}); return; }
+  openModal(`<div class="h">↗ পোস্ট শেয়ার করুন</div>
+    <div class="row" style="margin-top:8px">
+      <a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}">Facebook</a>
+      <a class="btn green" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(text + "\n" + url)}">WhatsApp</a>
+      <button class="btn ghost" type="button" id="cpy">🔗 লিংক কপি</button>
+    </div><div class="row" style="margin-top:12px"><button class="btn ghost" data-close type="button">বন্ধ</button></div>`);
+  $("cpy").onclick = ()=>{ try{ navigator.clipboard.writeText(url); toast("লিংক কপি হয়েছে"); }catch(e){ prompt("লিংক কপি করুন", url); } };
+}
+/* 💬 মন্তব্য — পোস্ট আর প্রস্তাব দুই জায়গাতেই একই নিয়ম */
+const __cmOpen = {};
+function toggleComments(kind, pid, box){
+  if(!box) return;
+  const key = kind + pid;
+  if(__cmOpen[key]){ __cmOpen[key](); delete __cmOpen[key]; box.innerHTML = ""; return; }
+  box.innerHTML = `<div style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.08); padding-top:8px"><div class="cmList"><div class="empty"><span class="spin"></span></div></div>
+    ${ME ? `<div class="row" style="margin-top:8px; flex-wrap:nowrap"><input class="in cmIn" maxlength="500" placeholder="মন্তব্য লিখুন…"><button class="btn cmGo" type="button" style="padding:10px 14px">➤</button></div>`
+         : `<button class="btn ghost full" type="button" onclick="needLogin('মন্তব্য করতে')" style="margin-top:8px">🔵 মন্তব্য করতে লগইন করুন</button>`}</div>`;
+  const col = db.collection("orgs").doc(ORG.id).collection(kind).doc(pid).collection("comments");
+  const unsub = col.orderBy("at", "asc").limit(200).onSnapshot(qs=>{
+    const l = box.querySelector(".cmList"); if(!l) return;
+    l.innerHTML = qs.docs.map(d=>{ const c = d.data(); const mine = ME && c.authorUid === ME.uid; return `<div class="item" style="align-items:flex-start; padding:8px 0">
+      <div class="av" style="width:30px; height:30px; font-size:13px; border-radius:50%">${esc((c.authorName || "?").slice(0, 1))}</div>
+      <div class="grow"><b style="font-size:13px">${esc(c.authorName)}</b> <span class="small">${esc(when(c.at))}</span><div style="font-size:13.5px; white-space:pre-wrap; margin-top:2px">${esc(c.text)}</div></div>
+      ${mine || isAdmin() ? `<button class="btn ghost" type="button" data-cdel="${esc(d.id)}" style="padding:4px 8px; font-size:12px">✕</button>` : ""}</div>`; }).join("") || `<div class="small" style="padding:6px 0">এখনো কোনো মন্তব্য নেই</div>`;
+    l.querySelectorAll("[data-cdel]").forEach(b=> b.onclick = ()=>{ if(confirm("মন্তব্যটা মুছবেন?")) col.doc(b.dataset.cdel).delete().catch(()=> toast("মোছা যায়নি")); });
+  }, ()=>{ const l = box.querySelector(".cmList"); if(l) l.innerHTML = `<div class="small">মন্তব্য দেখা যাচ্ছে না</div>`; });
+  __cmOpen[key] = unsub; __tabUnsubs.push(()=>{ unsub(); delete __cmOpen[key]; });
+  const go_ = box.querySelector(".cmGo");
+  if(go_){
+    const inp = box.querySelector(".cmIn");
+    const send = async ()=>{
+      const text = inp.value.trim(); if(!text) return;
+      const name = (auth.currentUser && auth.currentUser.displayName) || ME.name;
+      await busy(go_, ()=> col.add({ authorUid: ME.uid, authorName: name, text: text.slice(0, 500), at: TS() }).then(()=>{ inp.value = ""; }));
+    };
+    go_.onclick = send; inp.onkeydown = e=>{ if(e.key === "Enter") send(); };
+  }
+}
+/* ✍️ নতুন পোস্ট — ছবি ফোনেই WebP ১০০ KB-এর নিচে বানানো হয় */
+async function makeWebp(file, maxBytes){
+  if(!file || !/^image\//.test(file.type)) throw new Error("শুধু ছবি দেওয়া যাবে");
+  const img = await new Promise((res, rej)=>{ const im = new Image(), u = URL.createObjectURL(file); im.onload = ()=>{ URL.revokeObjectURL(u); res(im); }; im.onerror = ()=>{ URL.revokeObjectURL(u); rej(new Error("ছবি খোলা যায়নি")); }; im.src = u; });
+  let w = img.naturalWidth, h = img.naturalHeight, sc = Math.min(1, 1280 / Math.max(w, h)); w = Math.round(w * sc); h = Math.round(h * sc);
+  const draw = (q)=> new Promise(r=>{ const c = document.createElement("canvas"); c.width = w; c.height = h; const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h); c.toBlob(r, "image/webp", q); });
+  let blob = null;
+  for(let i = 0; i < 14; i++){
+    blob = await draw(i < 5 ? 0.82 - i * 0.09 : 0.42);
+    if(blob && blob.size <= maxBytes) break;
+    if(i >= 4){ w = Math.round(w * 0.84); h = Math.round(h * 0.84); }
+  }
+  if(!blob || blob.type !== "image/webp") throw new Error("এই ফোনে ছবি তৈরি করা যায়নি");
+  if(blob.size > maxBytes) throw new Error("ছবিটা ছোট করা গেল না — অন্য ছবি দিন");
+  return blob;
+}
+function dtLocal(msVal){ const d = new Date(msVal - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); }
+function openNewPost(){
+  let blob = null;
+  openModal(`<div class="h">✍️ নতুন পোস্ট — ${esc(ORG.name)}</div>
+    <label class="f">লেখা *</label><textarea class="in" id="pT" maxlength="3000" placeholder="কী জানাতে চান?"></textarea>
+    <label class="f">ছবি (ঐচ্ছিক — নিজে থেকেই ১০০ KB-এর নিচে ছোট হবে)</label>
+    <input class="in" id="pI" type="file" accept="image/*"><div id="pIs" class="small"></div><div id="pIp"></div>
+    <label class="f">কারা দেখবেন?</label>
+    <select class="in" id="pA"><option value="members">🔒 শুধু সংগঠনের সদস্য</option><option value="public">🌐 পাবলিক — সবাই</option></select>
+    <div class="row">
+      <div style="flex:1; min-width:150px"><label class="f">কখন প্রকাশ হবে?</label><select class="in" id="pW"><option value="now">এখনই</option><option value="later">নির্দিষ্ট সময়ে</option></select></div>
+      <div style="flex:1; min-width:150px"><label class="f">মেয়াদ</label><select class="in" id="pE"><option value="0">নিজে সরানো পর্যন্ত</option><option value="1">১ ঘণ্টা</option><option value="24">২৪ ঘণ্টা</option><option value="168">৭ দিন</option><option value="custom">নির্দিষ্ট তারিখ/সময়</option></select></div>
+    </div>
+    <div id="pWl" style="display:none"><label class="f">প্রকাশের তারিখ ও সময়</label><input class="in" id="pWt" type="datetime-local" min="${dtLocal(Date.now())}"></div>
+    <div id="pEl" style="display:none"><label class="f">মেয়াদ শেষের তারিখ ও সময়</label><input class="in" id="pEt" type="datetime-local" min="${dtLocal(Date.now())}"></div>
+    <div id="pMsg" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
+    <div class="row"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="pGo" style="flex:1">📤 পোস্ট করুন</button></div>`);
+  $("pW").onchange = ()=> $("pWl").style.display = $("pW").value === "later" ? "block" : "none";
+  $("pE").onchange = ()=> $("pEl").style.display = $("pE").value === "custom" ? "block" : "none";
+  $("pI").onchange = async ()=>{
+    blob = null; $("pIp").innerHTML = ""; const f = $("pI").files[0]; if(!f){ $("pIs").textContent = ""; return; }
+    $("pIs").textContent = "⏳ ছবি ছোট করা হচ্ছে…";
+    try{ blob = await makeWebp(f, 100 * 1024); $("pIs").textContent = "✅ প্রস্তুত: " + bn((blob.size / 1024).toFixed(1)) + " KB"; $("pIp").innerHTML = `<img src="${URL.createObjectURL(blob)}" alt="" style="max-width:100%; max-height:180px; border-radius:10px; margin-top:6px">`; }
+    catch(e){ $("pIs").textContent = "❌ " + e.message; $("pI").value = ""; }
+  };
+  $("pGo").onclick = async ()=>{
+    const text = $("pT").value.trim(); if(!text) return $("pMsg").textContent = "পোস্টের লেখা দিন";
+    const audience = $("pA").value;
+    let publishAt = 0, expireAt = 0;
+    if($("pW").value === "later"){ publishAt = new Date($("pWt").value).getTime(); if(!publishAt || publishAt < Date.now()) return $("pMsg").textContent = "প্রকাশের সঠিক সময় দিন (ভবিষ্যতের)"; }
+    const base = publishAt || Date.now(), e = $("pE").value;
+    if(e === "custom"){ expireAt = new Date($("pEt").value).getTime(); if(!expireAt || expireAt <= base + 10 * 60000) return $("pMsg").textContent = "মেয়াদ প্রকাশের অন্তত ১০ মিনিট পরের দিন"; }
+    else if(Number(e)) expireAt = base + Number(e) * 3600000;
+    const r = await busy($("pGo"), async ()=>{
+      let imagePath = null;
+      if(blob){
+        imagePath = `orgPosts/${ORG.id}/${audience}/${ME.uid}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
+        await storage.ref(imagePath).put(blob, { contentType: "image/webp" });
+      }
+      return api("postCreate", { orgId: ORG.id, text, audience, imagePath, publishAt, expireAt });
+    });
+    if(r){ closeModal(); toast(publishAt ? "⏰ পোস্ট নির্ধারিত সময়ে প্রকাশ হবে" : "✅ পোস্ট প্রকাশ হয়েছে"); }
+  };
+}
+
+/* =====================================================================
+   ৳ টাকার হিসাব
+   ===================================================================== */
+let TXS = [], AIDS = [], MEMBERS = [];
+const TX_ST = { pending:["wait","⏳ অনুমোদন অপেক্ষায়"], verified:["ok","✅ যাচাইকৃত"], approved:["ok","✅ অনুমোদিত"], rejected:["no","❌ বাতিল"] };
+function tabMoney(){
+  $("tabBody").innerHTML = `<div id="moneyTop"></div><div class="card"><div class="h">🧾 লেনদেনের ইতিহাস</div><div id="txList"><div class="empty"><span class="spin"></span></div></div></div>`;
+  let q = db.collection("orgs").doc(ORG.id).collection("transactions");
+  if(!isMember()) q = q.where("public", "==", true);
+  __tabUnsubs.push(q.limit(300).onSnapshot(qs=>{ TXS = qs.docs.map(d=> ({ id:d.id, ...d.data() })).sort((a,b)=> ms(b.createdAt) - ms(a.createdAt)); drawMoney(); },
+    ()=>{ const el = $("txList"); if(el) el.innerHTML = `<div class="empty">হিসাব দেখা যাচ্ছে না</div>`; }));
+  drawMoney();
+}
+function drawMoney(){
+  const top = $("moneyTop"); if(!top) return;
+  const f = ORG.fund || { in:0, out:0 };
+  top.innerHTML = `<div class="card">
+    <div class="stats" style="margin-top:0">
+      <div class="stat"><b style="color:#86efac">${tk(f.in)}</b><span class="small">মোট জমা</span></div>
+      <div class="stat"><b style="color:#fca5a5">${tk(f.out)}</b><span class="small">মোট খরচ</span></div>
+      <div class="stat"><b>${tk((f.in || 0) - (f.out || 0))}</b><span class="small">অবশিষ্ট</span></div>
+    </div>
+    <div class="small" style="margin-top:10px">${isMember() ? "সব জমা আর খরচ সদস্যরা দেখতে পারেন। কে কত চাঁদা দিলেন সেটা শুধু তিনি আর অ্যাডমিনরা দেখেন।" : "স্বচ্ছতার জন্য সংগঠন তাদের নিশ্চিত হওয়া জমা-খরচ সবার জন্য খোলা রেখেছে।"} প্রতিটা জমার পাশে টাকা কোন মাধ্যমে এসেছে আর রেফারেন্স দেখানো থাকে।</div>
+    ${isAdmin() ? `<div class="row" style="margin-top:12px"><button class="btn green" type="button" id="addIn">＋ টাকা জমা</button><button class="btn red" type="button" id="addOut">− সরাসরি খরচ</button></div>
+      <div class="small" style="margin-top:6px">বড় খরচ "🗳️ প্রস্তাব ও ভোট" দিয়ে করুন — ভোটে পাস হলে নিজে থেকেই হিসাবে ওঠে।</div>` : ""}
+  </div>`;
+  if($("addIn")) $("addIn").onclick = ()=> openMoney("in");
+  if($("addOut")) $("addOut").onclick = ()=> openMoney("out");
+  const el = $("txList"); if(!el) return;
+  el.innerHTML = TXS.map(t=>{
+    const st = TX_ST[t.status] || ["", t.status];
+    const mine = ME && (t.approvedBy || []).includes(ME.uid);
+    return `<div class="item" style="align-items:flex-start">
+      <div class="av" style="width:36px; height:36px; font-size:16px; border-radius:50%; color:${t.type === "in" ? "#86efac" : "#fca5a5"}">${t.type === "in" ? "＋" : "−"}</div>
+      <div class="grow">
+        <b style="font-size:14px">${esc(t.title)}</b>${t.aidTitle ? ` <span class="chip">❤️ ${esc(t.aidTitle)}</span>` : ""} <span class="chip ${st[0]}">${st[1]}</span>
+        <div class="small">${esc(bn(t.date || ""))} · মাধ্যম: ${esc(t.method || "—")}${t.reference ? " · রেফারেন্স: " + esc(t.reference) : ""}</div>
+        ${t.note && isMember() ? `<div class="small">📝 ${esc(t.note)}</div>` : ""}
+        ${isMember() ? `<div class="small">✍️ ${esc(t.createdByName || "")}${(t.approvedNames || []).length > 1 || t.status === "pending" ? " · অনুমোদন: " + esc((t.approvedNames || []).join(", ")) + (t.status === "pending" ? ` (${bn((t.approvedBy || []).length)}/${bn(need2())})` : "") : ""}</div>` : ""}
+        ${isAdmin() && t.status === "pending" ? `<div class="row" style="margin-top:8px"><button class="btn green" type="button" data-txok="${esc(t.id)}" ${mine ? "disabled" : ""} style="padding:7px 12px; font-size:13px">${mine ? "✓ আপনি দিয়েছেন — আরেকজন লাগবে" : "✅ নিশ্চিত করুন"}</button><button class="btn red" type="button" data-txno="${esc(t.id)}" style="padding:7px 12px; font-size:13px">❌ বাতিল</button></div>` : ""}
+      </div>
+      <b style="white-space:nowrap; color:${t.type === "in" ? "#86efac" : "#fca5a5"}">${t.type === "in" ? "+" : "−"}${tk(t.amount)}</b>
+    </div>`;
+  }).join("") || `<div class="empty">এখনো কোনো লেনদেন নেই</div>`;
+  el.querySelectorAll("[data-txok]").forEach(b=> b.onclick = async ()=>{ const r = await busy(b, ()=> api("txDecide", { orgId: ORG.id, txId: b.dataset.txok, approve: true })); if(r) toast(r.status === "pending" ? "✅ আপনার অনুমোদন জমা — আরেকজন লাগবে" : "✅ হিসাবে উঠেছে"); });
+  el.querySelectorAll("[data-txno]").forEach(b=> b.onclick = async ()=>{ if(!confirm("লেনদেনটা বাতিল করবেন? (মোছা হবে না — \"বাতিল\" হিসেবে থাকবে)")) return; if(await busy(b, ()=> api("txDecide", { orgId: ORG.id, txId: b.dataset.txno, approve: false }))) toast("বাতিল হয়েছে"); });
+}
+async function loadMembers(){ const qs = await db.collection("orgs").doc(ORG.id).collection("members").where("status", "==", "active").get(); MEMBERS = qs.docs.map(d=> d.data()).sort((a,b)=> (a.memberNo || 0) - (b.memberNo || 0)); return MEMBERS; }
+async function loadAids(){ const qs = await db.collection("orgs").doc(ORG.id).collection("aid").get(); AIDS = qs.docs.map(d=> ({ id:d.id, ...d.data() })); return AIDS; }
+async function openMoney(type){
+  const [mems, aids] = await Promise.all([type === "in" ? loadMembers().catch(()=> []) : [], type === "in" ? loadAids().catch(()=> []) : []]);
+  const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  openModal(`<div class="h">${type === "in" ? "＋ টাকা জমা" : "− সরাসরি খরচ"}</div>
+    ${need2() === 2 ? `<div class="notice">আরেকজন অ্যাডমিন নিশ্চিত করলে তবেই হিসাবে উঠবে।</div>` : ""}
+    ${type === "in" ? `<label class="f">কার কাছ থেকে?</label><select class="in" id="mW"><option value="">সাধারণ অনুদান / অন্যান্য</option>${mems.map(m=> `<option value="${esc(m.uid)}">সদস্য চাঁদা — ${esc(m.name)} (${memNo(m.memberNo)})</option>`).join("")}</select>` : ""}
+    <label class="f">${type === "in" ? "উৎস / বিবরণ" : "খরচের খাত"} *</label><input class="in" id="mT" maxlength="80" placeholder="${type === "in" ? "যেমন: অক্টোবর মাসের চাঁদা / সাধারণ অনুদান" : "যেমন: অফিস ভাড়া"}">
+    <div class="row">
+      <div style="flex:1; min-width:120px"><label class="f">টাকা (৳) *</label><input class="in" id="mA" type="number" inputmode="decimal" min="1"></div>
+      <div style="flex:1; min-width:120px"><label class="f">তারিখ</label><input class="in" id="mD" type="date" value="${today}"></div>
+    </div>
+    <label class="f">মাধ্যম</label><select class="in" id="mM">${["বিকাশ","নগদ","রকেট","হাতে নগদ","ব্যাংক ট্রান্সফার","অন্যান্য"].map(x=> `<option>${x}</option>`).join("")}</select>
+    <label class="f">লেনদেন আইডি / রসিদ নম্বর</label><input class="in" id="mR" maxlength="60" placeholder="TxnID / রসিদ নম্বর (থাকলে)">
+    ${type === "in" && aids.length ? `<label class="f">কোন মানবিক সেবার জন্য? (ঐচ্ছিক)</label><select class="in" id="mAid"><option value="">— সাধারণ তহবিল —</option>${aids.filter(a=> a.status !== "done").map(a=> `<option value="${esc(a.id)}">❤️ ${esc(a.title)}</option>`).join("")}</select>` : ""}
+    <label class="f">নোট / প্রমাণের বিবরণ</label><textarea class="in" id="mN" maxlength="300"></textarea>
+    <div id="mMsg" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
+    <div class="row"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="mGo" style="flex:1">✅ সংরক্ষণ</button></div>`);
+  $("mGo").onclick = async ()=>{
+    const title = $("mT").value.trim(), amount = Number(digits($("mA").value));
+    if(title.length < 2) return $("mMsg").textContent = "বিবরণ লিখুন";
+    if(!(amount > 0)) return $("mMsg").textContent = "টাকার পরিমাণ দিন";
+    const r = await busy($("mGo"), ()=> api("txCreate", { orgId: ORG.id, type, title, amount, date: $("mD").value, method: $("mM").value, reference: $("mR").value.trim(), note: $("mN").value.trim(), memberUid: $("mW") ? $("mW").value : null, aidId: $("mAid") ? $("mAid").value : null }));
+    if(r){ closeModal(); toast(r.status === "pending" ? "✅ লেখা হয়েছে — আরেকজন অ্যাডমিন নিশ্চিত করলে হিসাবে উঠবে" : "✅ হিসাবে উঠেছে"); }
+  };
+}
+
+/* ---------- 📒 আমার চাঁদা ---------- */
+function tabDues(){
+  $("tabBody").innerHTML = `<div class="card"><div class="h">📒 আমার চাঁদা</div><div id="duesBody"><div class="empty"><span class="spin"></span></div></div></div>`;
+  __tabUnsubs.push(db.collection("orgs").doc(ORG.id).collection("dues").where("memberUid", "==", ME.uid).onSnapshot(qs=>{
+    const l = qs.docs.map(d=> d.data()).sort((a,b)=> ms(b.createdAt) - ms(a.createdAt));
+    const tot = l.filter(x=> x.status === "verified").reduce((s,x)=> s + (x.amount || 0), 0);
+    const el = $("duesBody"); if(!el) return;
+    el.innerHTML = `<div class="stats" style="margin-top:0"><div class="stat"><b style="color:#86efac">${tk(tot)}</b><span class="small">আমার মোট জমা (যাচাইকৃত)</span></div><div class="stat"><b>${bn(l.length)}</b><span class="small">বার</span></div></div>
+      ${l.map(x=>{ const st = TX_ST[x.status] || ["", x.status]; return `<div class="item"><div class="av" style="width:34px; height:34px; font-size:15px; border-radius:50%">✓</div>
+        <div class="grow"><b style="font-size:13.5px">${esc(x.note || "চাঁদা")}</b> <span class="chip ${st[0]}">${st[1]}</span><div class="small">${esc(bn(x.date || ""))} · ${esc(x.method || "")}</div></div><b>${tk(x.amount)}</b></div>`; }).join("") || `<div class="empty">এখনো কোনো চাঁদা জমা হয়নি। অ্যাডমিনের কাছে টাকা দিলে তিনি এখানে লিখে দেবেন।</div>`}
+      <div class="small" style="margin-top:8px">এই তথ্য শুধু আপনি আর সংগঠনের অ্যাডমিনরা দেখেন।</div>`;
+  }, ()=>{ const el = $("duesBody"); if(el) el.innerHTML = `<div class="empty">লোড করা যায়নি</div>`; }));
+}
+
+/* =====================================================================
+   🗳️ প্রস্তাব ও ভোট — চেপে ধরে ভোট (১.৫ সেকেন্ড), গোপন ব্যালট
+   ===================================================================== */
+let PROPS = [], MYVOTES = {};
+const PR_ST = { approved:["ok","✅ পাস — অনুমোদিত"], rejected:["no","❌ পাস হয়নি"], cancelled:["no","🚫 বাতিল"] };
+function tabVotes(){
+  $("tabBody").innerHTML = `${isAdmin() ? `<div class="card" style="padding:12px"><button class="btn full" type="button" id="newProp">＋ নতুন খরচের প্রস্তাব</button></div>` : ""}
+    <div class="card" style="padding:12px 14px"><div class="small">খরচের আগে প্রস্তাব আসে, সদস্যরা আলোচনা করেন আর গোপনে ভোট দেন। পাস হলে খরচটা নিজে থেকেই হিসাবে ওঠে। ভুল ভোট এড়াতে বোতাম <b>১.৫ সেকেন্ড চেপে ধরে</b> রাখতে হয়। ভোট শেষ হওয়ার আগে মত বদলাতে পারবেন।</div></div>
+    <div id="propList"><div class="empty"><span class="spin"></span></div></div>`;
+  if($("newProp")) $("newProp").onclick = openNewProposal;
+  __tabUnsubs.push(db.collection("orgs").doc(ORG.id).collection("proposals").limit(100).onSnapshot(qs=>{
+    PROPS = qs.docs.map(d=> ({ id:d.id, ...d.data() })).sort((a,b)=> ms(b.createdAt) - ms(a.createdAt));
+    PROPS.forEach(p=>{ if(MYVOTES[p.id] === undefined){ MYVOTES[p.id] = null; db.collection("orgs").doc(ORG.id).collection("proposals").doc(p.id).collection("votes").doc(ME.uid).get().then(d=>{ if(d.exists){ MYVOTES[p.id] = d.data().choice; drawProps(); } }).catch(()=>{}); } });
+    drawProps();
+  }, ()=>{ const el = $("propList"); if(el) el.innerHTML = `<div class="card"><div class="empty">লোড করা যায়নি</div></div>`; }));
+}
+function drawProps(){
+  const el = $("propList"); if(!el) return;
+  const restore = keepOpen(el, "pcm-");
+  const now = Date.now();
+  el.innerHTML = PROPS.map(p=>{
+    const st = PR_ST[p.status], notStarted = p.status === "open" && now < ms(p.startAt), live = p.status === "open" && now >= ms(p.startAt) && now < ms(p.endAt);
+    const waiting = p.status === "open" && now >= ms(p.endAt);
+    const total = (p.yes || 0) + (p.no || 0), needVotes = Math.ceil((p.eligible || 1) * (p.quorumPct || 30) / 100);
+    const my = MYVOTES[p.id];
+    const canVote = live && MYMEM && ms(MYMEM.joinedAt) <= ms(p.createdAt);
+    const vbtn = (c, label, sub, col, bg)=> `<button type="button" class="btn vhold" data-v="${esc(p.id)}:${c}" ${canVote ? "" : "disabled"} style="flex:1; position:relative; overflow:hidden; background:${my === c ? col : bg}; color:${my === c ? "#fff" : col}; border:${my === c ? "2px solid #fff" : "1px solid " + col}; touch-action:none; user-select:none; -webkit-user-select:none">${label}<br><small style="font-weight:600">${sub}${my === c ? " · ✓ আপনার ভোট" : ""}</small><i class="vfill"></i></button>`;
+    return `<div class="card" ${notStarted ? `style="border-color:var(--amber); box-shadow:0 0 0 2px rgba(255,209,102,.18)"` : ""}>
+      <div class="row"><span class="chip">${esc(p.category || "")}</span>${st ? `<span class="chip ${st[0]}">${st[1]}</span>` : notStarted ? `<span class="chip wait">⏳ শিগগির শুরু</span>` : live ? `<span class="chip ok">● ভোট চলছে</span>` : waiting ? `<span class="chip wait">ফলাফল হিসাব হচ্ছে…</span>` : ""}<span class="small" style="margin-left:auto">PR-${esc(p.id.slice(-5).toUpperCase())}</span></div>
+      <div style="font-size:17px; font-weight:800; margin-top:10px">${esc(p.title)}</div>
+      <div class="small">প্রস্তাবদাতা: ${esc(p.createdByName || "")} · ${esc(when(p.createdAt))}</div>
+      <div class="notice" style="margin-top:10px"><b>কেন এই খরচ?</b><div style="white-space:pre-wrap; margin:4px 0">${esc(p.reason)}</div><b>প্রস্তাবিত খরচ: ${tk(p.amount)}</b>${p.evidence ? `<div class="small" style="color:#fde68a; margin-top:4px">📎 প্রমাণ: ${esc(p.evidence)}</div>` : ""}</div>
+      ${notStarted ? `<div class="chip wait" style="margin-top:10px; font-size:13px; padding:7px 12px">⏳ ভোট শুরু হতে বাকি: <b data-cd="${ms(p.startAt)}">${left(ms(p.startAt) - now)}</b></div>` : live ? `<div class="chip ok" style="margin-top:10px; font-size:13px; padding:7px 12px">● শেষ হতে বাকি: <b data-cd="${ms(p.endAt)}">${left(ms(p.endAt) - now)}</b></div>` : ""}
+      <div class="small" style="margin-top:8px">পাসের শর্ত: কমপক্ষে ${bn(needVotes)} জনের ভোট (${bn(p.quorumPct || 30)}%), আর "হ্যাঁ" "না"-এর চেয়ে ${bn(p.thresholdPct || 5)}% বেশি · ভোটের সময় ${bn(p.hours || 24)} ঘণ্টা</div>
+      ${p.status === "open" ? `<div class="row" style="margin-top:10px; flex-wrap:nowrap">${vbtn("yes", "👍 হ্যাঁ", "অনুমোদন", "#16a34a", "rgba(22,163,74,.12)")}${vbtn("no", "👎 না", "প্রত্যাখ্যান", "#ef4444", "rgba(239,68,68,.1)")}</div>
+        ${live && MYMEM && !canVote ? `<div class="small" style="margin-top:6px; color:#fca5a5">এই প্রস্তাব আসার পরে যোগ দিয়েছেন — এতে ভোট দিতে পারবেন না।</div>` : ""}` : ""}
+      <div style="height:10px; background:rgba(255,255,255,.08); border-radius:99px; overflow:hidden; display:flex; margin-top:12px"><div style="width:${total ? p.yes / total * 100 : 0}%; background:#16a34a"></div><div style="width:${total ? p.no / total * 100 : 0}%; background:#ef4444"></div></div>
+      <div class="row" style="justify-content:space-between; margin-top:6px"><span class="small" style="color:#86efac">হ্যাঁ: ${bn(p.yes || 0)}</span><span class="small" style="color:#fca5a5">না: ${bn(p.no || 0)}</span><span class="small">মোট: ${bn(total)} / ${bn(p.eligible || 0)} জন</span></div>
+      ${p.status === "rejected" && p.quorumOk === false ? `<div class="small" style="margin-top:4px">যথেষ্ট সদস্য ভোট দেননি (দরকার ছিল ${bn(p.needVotes || needVotes)} জন)।</div>` : ""}
+      <div class="row" style="margin-top:10px"><button class="btn ghost" type="button" data-pcm="${esc(p.id)}" style="padding:7px 12px; font-size:13px">💬 আলোচনা (${bn(p.commentCount || 0)})</button>
+        ${isAdmin() && notStarted ? `<button class="btn red" type="button" data-pcan="${esc(p.id)}" style="padding:7px 12px; font-size:13px">🚫 বাতিল</button>` : ""}</div>
+      <div id="pcm-${esc(p.id)}"></div>
+    </div>`;
+  }).join("") || `<div class="card"><div class="empty">এখনো কোনো প্রস্তাব নেই</div></div>`;
+  restore();
+  el.querySelectorAll(".vhold").forEach(wireHold);
+  el.querySelectorAll("[data-pcm]").forEach(b=> b.onclick = ()=> toggleComments("proposals", b.dataset.pcm, $("pcm-" + b.dataset.pcm)));
+  el.querySelectorAll("[data-pcan]").forEach(b=> b.onclick = async ()=>{ if(!confirm("প্রস্তাবটা বাতিল করবেন?")) return; if(await busy(b, ()=> api("proposalCancel", { orgId: ORG.id, proposalId: b.dataset.pcan }))) toast("প্রস্তাব বাতিল"); });
+}
+// ✋ চেপে ধরে ভোট — ১.৫ সেকেন্ড পুরো না হলে ভোট যায় না
+function wireHold(btn){
+  let t = null;
+  const fill = btn.querySelector(".vfill");
+  fill.style.cssText = "position:absolute; left:0; bottom:0; height:5px; width:0; background:#fff; border-radius:0 6px 6px 0; pointer-events:none";
+  const stop = ()=>{ clearTimeout(t); t = null; fill.style.transition = "none"; fill.style.width = "0"; btn.style.transform = ""; };
+  btn.addEventListener("pointerdown", e=>{
+    if(btn.disabled || (e.button !== undefined && e.button !== 0)) return;
+    e.preventDefault(); stop();
+    requestAnimationFrame(()=>{ fill.style.transition = "width 1.5s linear"; fill.style.width = "100%"; });
+    btn.style.transform = "scale(.985)";
+    t = setTimeout(async ()=>{
+      t = null; stop();
+      const [pid, choice] = btn.dataset.v.split(":");
+      if(navigator.vibrate) try{ navigator.vibrate(40); }catch(e){}
+      const r = await busy(btn, ()=> api("vote", { orgId: ORG.id, proposalId: pid, choice }));
+      if(r){ MYVOTES[pid] = choice; toast(r.same ? "আপনি আগেই এই ভোট দিয়েছেন" : "🗳️ আপনার ভোট জমা হয়েছে (গোপন)"); drawProps(); }
+    }, 1500);
+  });
+  ["pointerup","pointerleave","pointercancel"].forEach(ev=> btn.addEventListener(ev, ()=>{ if(t) stop(); }));
+  btn.addEventListener("contextmenu", e=> e.preventDefault());
+}
+function openNewProposal(){
+  const now = new Date(Date.now() + 3600000); now.setMinutes(0, 0, 0);
+  openModal(`<div class="h">＋ নতুন খরচের প্রস্তাব</div>
+    <label class="f">শিরোনাম *</label><input class="in" id="rT" maxlength="120" placeholder="যেমন: অসুস্থ ব্যক্তির চিকিৎসা সহায়তা">
+    <label class="f">কেন এই খরচ? *</label><textarea class="in" id="rR" maxlength="2000" placeholder="কারণ ও প্রয়োজন বিস্তারিত লিখুন"></textarea>
+    <div class="row">
+      <div style="flex:1; min-width:120px"><label class="f">টাকা (৳) *</label><input class="in" id="rA" type="number" inputmode="decimal" min="1"></div>
+      <div style="flex:1; min-width:140px"><label class="f">খরচের ধরন</label><input class="in" id="rC" maxlength="60" value="মানবিক সহায়তা"></div>
+    </div>
+    <label class="f">প্রমাণ / কাগজপত্র</label><textarea class="in" id="rE" maxlength="500" placeholder="ডাক্তারের কাগজ, কোটেশন ইত্যাদির বিবরণ"></textarea>
+    <div class="row">
+      <div style="flex:1; min-width:150px"><label class="f">ভোট শুরু</label><input class="in" id="rS" type="datetime-local" value="${dtLocal(now.getTime())}" min="${dtLocal(Date.now())}"></div>
+      <div style="flex:1; min-width:110px"><label class="f">ভোটের সময়</label><select class="in" id="rH"><option value="24">২৪ ঘণ্টা</option><option value="48">৪৮ ঘণ্টা</option><option value="72">৭২ ঘণ্টা</option></select></div>
+      <div style="flex:1; min-width:110px"><label class="f">পাসের ব্যবধান %</label><input class="in" id="rP" type="number" min="1" max="100" value="${ORG.thresholdPct || 5}"></div>
+    </div>
+    <div class="notice" style="margin-top:12px">শুরু পর্যন্ত সবাই প্রস্তাবটা দেখবেন আর কাউন্টডাউন চলবে। পাস হতে কমপক্ষে ${bn(ORG.quorumPct || 30)}% সদস্যের ভোট লাগবে (${bn(Math.ceil((ORG.memberCount || 1) * (ORG.quorumPct || 30) / 100))} জন)। এখন থেকে যাঁরা যোগ দেবেন, তাঁরা এই প্রস্তাবে ভোট দিতে পারবেন না।</div>
+    <div id="rMsg" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
+    <div class="row"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="rGo" style="flex:1">📢 প্রকাশ করুন</button></div>`);
+  $("rGo").onclick = async ()=>{
+    const title = $("rT").value.trim(), reason = $("rR").value.trim(), amount = Number(digits($("rA").value));
+    if(title.length < 5) return $("rMsg").textContent = "শিরোনাম লিখুন";
+    if(reason.length < 10) return $("rMsg").textContent = "কারণ একটু বিস্তারিত লিখুন";
+    if(!(amount > 0)) return $("rMsg").textContent = "টাকার পরিমাণ দিন";
+    let startAt = new Date($("rS").value).getTime() || Date.now(); if(startAt < Date.now()) startAt = Date.now();
+    const r = await busy($("rGo"), ()=> api("proposalCreate", { orgId: ORG.id, title, reason, amount, category: $("rC").value.trim(), evidence: $("rE").value.trim(), startAt, hours: Number($("rH").value), thresholdPct: Number($("rP").value) }));
+    if(r){ closeModal(); toast("📢 প্রস্তাব প্রকাশ হয়েছে"); }
+  };
+}
+
+/* =====================================================================
+   ❤️ মানবিক সেবা
+   ===================================================================== */
+function tabAid(){
+  $("tabBody").innerHTML = `${isAdmin() ? `<div class="card" style="padding:12px"><button class="btn full" type="button" id="newAid">＋ নতুন মানবিক সেবা</button></div>` : ""}<div id="aidList"><div class="empty"><span class="spin"></span></div></div>`;
+  if($("newAid")) $("newAid").onclick = ()=> openAid(null);
+  let q = db.collection("orgs").doc(ORG.id).collection("aid");
+  if(!isMember()) q = q.where("public", "==", true);
+  __tabUnsubs.push(q.onSnapshot(qs=>{
+    AIDS = qs.docs.map(d=> ({ id:d.id, ...d.data() })).sort((a,b)=> (a.status === "done") - (b.status === "done") || ms(b.createdAt) - ms(a.createdAt));
+    const el = $("aidList"); if(!el) return;
+    el.innerHTML = AIDS.map(a=>{ const pct = Math.min(100, a.target ? (a.raised || 0) / a.target * 100 : 0); return `<div class="card">
+      <div class="row"><b style="font-size:16px; flex:1">${esc(a.title)}</b><span class="chip ${a.status === "done" ? "ok" : "wait"}">${a.status === "done" ? "✅ সম্পন্ন" : "● চলমান"}</span>${!a.public ? `<span class="chip admin">🔒 শুধু সদস্য</span>` : ""}</div>
+      ${a.desc ? `<div style="margin-top:8px; line-height:1.7; font-size:14px; white-space:pre-wrap">${esc(a.desc)}</div>` : ""}
+      <div style="height:10px; background:rgba(255,255,255,.08); border-radius:99px; overflow:hidden; margin-top:12px"><div style="height:100%; width:${pct}%; background:linear-gradient(90deg,var(--amber),var(--ok))"></div></div>
+      <div class="row" style="justify-content:space-between; margin-top:6px"><span class="small">সংগ্রহ: <b style="color:#86efac">${tk(a.raised)}</b></span><span class="small">লক্ষ্য: <b>${tk(a.target)}</b> (${bn(Math.round(pct))}%)</span></div>
+      <div class="small" style="margin-top:6px">সাহায্য করতে চাইলে সংগঠনের অ্যাডমিনের সাথে যোগাযোগ করুন — জমা হলে এখানে আর "৳ হিসাব"-এ দেখা যাবে।</div>
+      ${isAdmin() ? `<button class="btn ghost" type="button" data-aed="${esc(a.id)}" style="margin-top:10px; padding:7px 12px; font-size:13px">✏️ এডিট</button>` : ""}
+    </div>`; }).join("") || `<div class="card"><div class="empty">এখনো কোনো মানবিক সেবার উদ্যোগ নেই</div></div>`;
+    el.querySelectorAll("[data-aed]").forEach(b=> b.onclick = ()=> openAid(AIDS.find(x=> x.id === b.dataset.aed)));
+  }, ()=>{ const el = $("aidList"); if(el) el.innerHTML = `<div class="card"><div class="empty">লোড করা যায়নি</div></div>`; }));
+}
+function openAid(a){
+  openModal(`<div class="h">${a ? "✏️ মানবিক সেবা এডিট" : "＋ নতুন মানবিক সেবা"}</div>
+    <label class="f">নাম *</label><input class="in" id="dT" maxlength="100" value="${esc(a ? a.title : "")}" placeholder="যেমন: বন্যা ক্ষতিগ্রস্ত পরিবারের সহায়তা">
+    <label class="f">বিবরণ</label><textarea class="in" id="dD" maxlength="1500">${esc(a ? a.desc || "" : "")}</textarea>
+    <label class="f">লক্ষ্য (৳) *</label><input class="in" id="dG" type="number" min="1" value="${a ? a.target : ""}">
+    <div class="row">
+      <div style="flex:1; min-width:140px"><label class="f">অবস্থা</label><select class="in" id="dS"><option value="running">● চলমান</option><option value="done"${a && a.status === "done" ? " selected" : ""}>✅ সম্পন্ন</option></select></div>
+      <div style="flex:1; min-width:140px"><label class="f">কারা দেখবেন?</label><select class="in" id="dP"><option value="1">🌐 সবাই</option><option value="0"${a && a.public === false ? " selected" : ""}>🔒 শুধু সদস্য</option></select></div>
+    </div>
+    <div class="small" style="margin-top:8px">সংগ্রহের টাকা আলাদা করে লিখতে হয় না — "৳ হিসাব"-এ জমা লেখার সময় এই সেবাটা বাছলে নিজে থেকেই যোগ হবে।</div>
+    <div id="dMsg" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
+    <div class="row"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="dGo" style="flex:1">✅ সংরক্ষণ</button></div>`);
+  $("dGo").onclick = async ()=>{
+    const title = $("dT").value.trim(), target = Number(digits($("dG").value));
+    if(title.length < 3) return $("dMsg").textContent = "নাম লিখুন";
+    if(!(target > 0)) return $("dMsg").textContent = "লক্ষ্যের টাকা দিন";
+    if(await busy($("dGo"), ()=> api("aidSave", { orgId: ORG.id, aidId: a ? a.id : null, title, desc: $("dD").value.trim(), target, status: $("dS").value, public: $("dP").value === "1" }))){ closeModal(); toast("✅ সংরক্ষণ হয়েছে"); }
+  };
+}
+
+/* =====================================================================
+   👥 সদস্য তালিকা + অ্যাডমিনের কাজ (পদবি, অ্যাডমিন বানানো/সরানো, সদস্যপদ বাতিল)
+   ===================================================================== */
+let __actN = 0, ACTIONS = [];
+const ACT_TXT = { make_admin:"অ্যাডমিন বানানো", remove_admin:"অ্যাডমিন থেকে সরানো", remove_member:"সদস্যপদ বাতিল" };
 function tabMembers(){
-  $("tabBody").innerHTML = `<div class="card"><div class="h">👥 সদস্য তালিকা</div><div id="memList"><div class="empty"><span class="spin"></span></div></div></div>`;
-  db.collection("orgs").doc(ORG.id).collection("members").where("status", "==", "active").get().then(qs=>{
-    const list = qs.docs.map(d=> d.data()).sort((a,b)=> (a.role === "admin" ? 0 : 1) - (b.role === "admin" ? 0 : 1) || (a.memberNo || 0) - (b.memberNo || 0));
+  $("tabBody").innerHTML = `<div id="actBox"></div><div class="card"><div class="h">👥 সদস্য তালিকা</div><div id="memList"><div class="empty"><span class="spin"></span></div></div></div>`;
+  drawActions();
+  __tabUnsubs.push(db.collection("orgs").doc(ORG.id).collection("members").where("status", "==", "active").onSnapshot(qs=>{
+    MEMBERS = qs.docs.map(d=> d.data()).sort((a,b)=> (a.role === "admin" ? 0 : 1) - (b.role === "admin" ? 0 : 1) || (a.memberNo || 0) - (b.memberNo || 0));
     const el = $("memList"); if(!el) return;
-    el.innerHTML = list.map(m=> `<div class="item">
+    el.innerHTML = MEMBERS.map(m=> `<div class="item">
       <div class="av" style="width:38px; height:38px; font-size:16px; border-radius:50%; overflow:hidden">${m.photo ? `<img src="${esc(m.photo)}" alt="" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:cover">` : esc((m.name || "?").slice(0, 1))}</div>
       <div class="grow"><b style="font-size:14px">${esc(m.name)}</b>${ME && m.uid === ME.uid ? ` <span class="small">(আপনি)</span>` : ""}
         <div class="small">${memNo(m.memberNo)} · ${esc(m.title || "সদস্য")}${isAdmin() && m.phone ? ` · 📞 <a href="tel:${esc(m.phone)}">${esc(m.phone)}</a>` : ""}</div></div>
       ${m.role === "admin" ? `<span class="chip admin">অ্যাডমিন</span>` : `<span class="chip ok">সদস্য</span>`}
+      ${isAdmin() ? `<button class="btn ghost" type="button" data-mm="${esc(m.uid)}" style="padding:6px 10px">⋯</button>` : ""}
     </div>`).join("") || `<div class="empty">কোনো সদস্য নেই</div>`;
-  }).catch(()=>{ const el = $("memList"); if(el) el.innerHTML = `<div class="empty">দেখা যাচ্ছে না — শুধু সদস্যরা এই তালিকা দেখতে পারেন</div>`; });
+    el.querySelectorAll("[data-mm]").forEach(b=> b.onclick = ()=> memberMenu(MEMBERS.find(x=> x.uid === b.dataset.mm)));
+  }, ()=>{ const el = $("memList"); if(el) el.innerHTML = `<div class="empty">দেখা যাচ্ছে না — শুধু সদস্যরা এই তালিকা দেখতে পারেন</div>`; }));
+}
+function drawActions(){
+  const box = $("actBox"); if(!box || !isAdmin()) return;
+  box.innerHTML = ACTIONS.length ? `<div class="card" style="border-color:rgba(255,183,3,.5)"><div class="h">⚠️ অনুমোদনের অপেক্ষায়</div>${ACTIONS.map(a=>{ const mine = (a.approvedBy || []).includes(ME.uid), isTarget = a.targetUid === ME.uid; return `<div class="item" style="align-items:flex-start"><div class="grow">
+      <b style="font-size:14px">${esc(ACT_TXT[a.kind] || a.kind)}: ${esc(a.targetName)}</b>
+      <div class="small">প্রস্তাব/অনুমোদন: ${esc((a.approvedNames || []).join(", "))} (${bn((a.approvedBy || []).length)}/${bn(a.need || 2)})</div>
+      ${isTarget ? `<div class="small">এটা আপনাকে নিয়ে — আপনি অনুমোদন দিতে পারবেন না।</div>` : `<div class="row" style="margin-top:8px"><button class="btn green" type="button" data-aok="${esc(a.kind)}:${esc(a.targetUid)}" ${mine ? "disabled" : ""} style="padding:7px 12px; font-size:13px">${mine ? "✓ আপনি দিয়েছেন" : "✅ অনুমোদন"}</button><button class="btn red" type="button" data-ano="${esc(a.kind)}:${esc(a.targetUid)}" style="padding:7px 12px; font-size:13px">❌ বাতিল</button></div>`}
+    </div></div>`; }).join("")}</div>` : "";
+  const act = async (b, approve)=>{ const [kind, uid] = (b.dataset.aok || b.dataset.ano).split(":"); const r = await busy(b, ()=> api("adminAction", { orgId: ORG.id, kind, uid, approve })); if(r) toast(r.status === "done" ? "✅ সম্পন্ন হয়েছে" : r.status === "rejected" ? "বাতিল হয়েছে" : "✅ অনুমোদন জমা"); };
+  box.querySelectorAll("[data-aok]").forEach(b=> b.onclick = ()=> act(b, true));
+  box.querySelectorAll("[data-ano]").forEach(b=> b.onclick = ()=> act(b, false));
+}
+function memberMenu(m){
+  if(!m) return;
+  const self = ME && m.uid === ME.uid;
+  openModal(`<div class="h">👤 ${esc(m.name)} <span class="small">${memNo(m.memberNo)}</span></div>
+    <label class="f">পদবি (যেমন: সভাপতি, সাধারণ সম্পাদক, কোষাধ্যক্ষ)</label>
+    <div class="row" style="flex-wrap:nowrap"><input class="in" id="tT" maxlength="40" value="${esc(m.title || "")}"><button class="btn" type="button" id="tGo">সেভ</button></div>
+    <div class="small" style="margin-top:4px">পদবি শুধু নাম — সব অ্যাডমিনের ক্ষমতা সমান।</div>
+    ${self ? "" : `<div style="margin-top:16px; display:grid; gap:8px">
+      ${m.role === "admin" ? `<button class="btn ghost" type="button" data-k="remove_admin">⬇️ অ্যাডমিন থেকে সরিয়ে সাধারণ সদস্য করুন</button>` : `<button class="btn ghost" type="button" data-k="make_admin">⬆️ অ্যাডমিন বানানোর প্রস্তাব</button>`}
+      <button class="btn red" type="button" data-k="remove_member">🚫 সদস্যপদ বাতিলের প্রস্তাব</button>
+      <div class="small">${need2() === 2 ? "এগুলোতে দুইজন অ্যাডমিনের অনুমোদন লাগবে (যাঁকে নিয়ে কাজ, তিনি বাদে)।" : "এখন অ্যাডমিন একজন — আপনার অনুমোদনেই হবে।"}</div></div>`}
+    <div class="row" style="margin-top:14px"><button class="btn ghost full" type="button" data-close>বন্ধ</button></div>`);
+  $("tGo").onclick = async ()=>{ const t = $("tT").value.trim(); if(t.length < 2) return toast("পদবি লিখুন"); if(await busy($("tGo"), ()=> api("setTitle", { orgId: ORG.id, uid: m.uid, title: t }))){ toast("✅ পদবি সেভ হয়েছে"); closeModal(); } };
+  document.querySelectorAll("#modalBox [data-k]").forEach(b=> b.onclick = async ()=>{
+    if(!confirm(ACT_TXT[b.dataset.k] + " — " + m.name + "। নিশ্চিত?")) return;
+    const r = await busy(b, ()=> api("adminAction", { orgId: ORG.id, kind: b.dataset.k, uid: m.uid, approve: true }));
+    if(r){ closeModal(); toast(r.status === "done" ? "✅ সম্পন্ন হয়েছে" : "✅ প্রস্তাব জমা — আরেকজন অ্যাডমিনের অনুমোদন লাগবে"); }
+  });
 }
 
-/* ---------- 📝 আবেদন (অ্যাডমিন) — দুইজনের অনুমোদন ---------- */
-let __reqN = 0, __reqUnsub = null, __reqList = [];
-function watchRequests(){
-  if(__reqUnsub){ __reqUnsub(); __reqUnsub = null; }
-  if(!ORG || !isAdmin()) return;
-  __reqUnsub = db.collection("orgs").doc(ORG.id).collection("requests").where("status", "==", "pending").onSnapshot(qs=>{
-    __reqList = qs.docs.map(d=> d.data()).sort((a,b)=> (a.createdAt ? a.createdAt.toMillis() : 0) - (b.createdAt ? b.createdAt.toMillis() : 0));
+/* ---------- 📝 আবেদন (অ্যাডমিন) ---------- */
+let __reqN = 0, __reqList = [];
+function watchAdminBits(){
+  const oref = db.collection("orgs").doc(ORG ? ORG.id : ROUTE.arg);
+  __orgUnsubs.push(oref.collection("requests").where("status", "==", "pending").onSnapshot(qs=>{
+    __reqList = qs.docs.map(d=> d.data()).sort((a,b)=> ms(a.createdAt) - ms(b.createdAt));
     const changed = __reqN !== __reqList.length; __reqN = __reqList.length;
     if(ORG_TAB === "requests") drawRequests(); else if(changed) renderOrg();
-  }, ()=>{});
-  __orgUnsubs.push(()=>{ if(__reqUnsub){ __reqUnsub(); __reqUnsub = null; } __reqN = 0; });
+  }, ()=>{}));
+  __orgUnsubs.push(oref.collection("adminActions").where("status", "==", "pending").onSnapshot(qs=>{
+    ACTIONS = qs.docs.map(d=> d.data()); const ch = __actN !== ACTIONS.length; __actN = ACTIONS.length;
+    if(ORG_TAB === "members") drawActions(); else if(ch) renderOrg();
+  }, ()=>{}));
 }
 function tabRequests(){
   $("tabBody").innerHTML = `<div class="card"><div class="h">📝 সদস্য হওয়ার আবেদন</div>
-    <div class="small" style="margin-bottom:6px">${(ORG.adminCount || 1) >= 2 ? "প্রতিটা আবেদনে দুইজন আলাদা অ্যাডমিনের অনুমোদন লাগবে।" : "এখন অ্যাডমিন একজন — আপনার এক অনুমোদনেই সদস্য হবেন। দ্বিতীয় অ্যাডমিন এলে দুইজনের অনুমোদন লাগবে।"}</div>
-    <div id="reqList"><div class="empty"><span class="spin"></span></div></div></div>`;
+    <div class="small" style="margin-bottom:6px">${need2() === 2 ? "প্রতিটা আবেদনে দুইজন আলাদা অ্যাডমিনের অনুমোদন লাগবে।" : "এখন অ্যাডমিন একজন — আপনার এক অনুমোদনেই সদস্য হবেন। দ্বিতীয় অ্যাডমিন এলে দুইজনের অনুমোদন লাগবে।"}</div>
+    <div id="reqList"></div></div>`;
   drawRequests();
 }
 function drawRequests(){
   const el = $("reqList"); if(!el) return;
-  const need = (ORG.adminCount || 1) >= 2 ? 2 : 1;
   el.innerHTML = __reqList.map(r=>{
     const mine = ME && (r.approvedBy || []).includes(ME.uid);
     return `<div class="item" style="align-items:flex-start">
@@ -433,7 +902,7 @@ function drawRequests(){
         <b style="font-size:14px">${esc(r.name)}</b>
         <div class="small">📞 <a href="tel:${esc(r.phone)}">${esc(r.phone)}</a> · ${esc(when(r.createdAt))}</div>
         ${r.note ? `<div style="font-size:13px; margin-top:4px">💬 ${esc(r.note)}</div>` : ""}
-        <div class="small" style="margin-top:4px">অনুমোদন: <b>${bn((r.approvedBy || []).length)}/${bn(need)}</b>${(r.approvedNames || []).length ? " — " + esc(r.approvedNames.join(", ")) : ""}</div>
+        <div class="small" style="margin-top:4px">অনুমোদন: <b>${bn((r.approvedBy || []).length)}/${bn(need2())}</b>${(r.approvedNames || []).length ? " — " + esc(r.approvedNames.join(", ")) : ""}</div>
         <div class="row" style="margin-top:8px">
           <button class="btn green" type="button" data-ok="${esc(r.uid)}" ${mine ? "disabled" : ""}>${mine ? "✓ আপনি দিয়েছেন — আরেকজন লাগবে" : "✅ অনুমোদন"}</button>
           <button class="btn red" type="button" data-no="${esc(r.uid)}">❌ বাতিল</button>
@@ -443,44 +912,75 @@ function drawRequests(){
   const act = async (b, approve)=>{
     const r = __reqList.find(x=> x.uid === (b.dataset.ok || b.dataset.no));
     if(!approve && !confirm(r.name + "-এর আবেদন বাতিল করবেন?")) return;
-    b.disabled = true; const t = b.textContent; b.innerHTML = `<span class="spin"></span>`;
-    try{
-      const res = await call("orgDecide", { orgId: ORG.id, uid: r.uid, approve });
-      toast(!approve ? "আবেদন বাতিল হয়েছে" : res.status === "approved" ? "🎉 " + r.name + " এখন সদস্য (" + memNo(res.memberNo) + ")" : "✅ আপনার অনুমোদন জমা — আরেকজন অ্যাডমিন লাগবে");
-    }catch(e){ b.disabled = false; b.textContent = t; toast(errText(e)); }
+    const res = await busy(b, ()=> api("decide", { orgId: ORG.id, uid: r.uid, approve }));
+    if(res) toast(!approve ? "আবেদন বাতিল হয়েছে" : res.status === "approved" ? "🎉 " + r.name + " এখন সদস্য (" + memNo(res.memberNo) + ")" : "✅ আপনার অনুমোদন জমা — আরেকজন অ্যাডমিন লাগবে");
   };
   el.querySelectorAll("[data-ok]").forEach(b=> b.onclick = ()=> act(b, true));
   el.querySelectorAll("[data-no]").forEach(b=> b.onclick = ()=> act(b, false));
 }
 
+/* ---------- ⚙️ ব্যবস্থাপনা (অ্যাডমিন) ---------- */
+function tabManage(){
+  const del = ORG.deletion && ORG.deletion.status === "pending" ? ORG.deletion : null;
+  const canFinal = del && Date.now() >= ms(del.deadline);
+  $("tabBody").innerHTML = `<div class="card"><div class="h">✏️ সংগঠনের তথ্য</div>
+      <label class="f">নাম</label><input class="in" id="eN" maxlength="60" value="${esc(ORG.name)}">
+      <label class="f">পরিচিতি</label><textarea class="in" id="eD" maxlength="1500">${esc(ORG.desc || "")}</textarea>
+      <label class="f">গ্রাম / এলাকা</label><input class="in" id="eA" maxlength="80" value="${esc(ORG.area || "")}">
+      <label class="f" style="display:flex; gap:8px; align-items:center"><input type="checkbox" id="eF" ${ORG.publicFinance !== false ? "checked" : ""} style="width:18px; height:18px"> নিশ্চিত হওয়া আয়-ব্যয় সবার জন্য খোলা রাখুন (স্বচ্ছতা)</label>
+      <label class="f">প্রস্তাব পাসে ন্যূনতম ভোট (% সদস্য)</label><input class="in" id="eQ" type="number" min="10" max="100" value="${ORG.quorumPct || 30}">
+      <button class="btn" type="button" id="eGo" style="margin-top:12px">💾 সেভ করুন</button>
+      <div class="small" style="margin-top:6px">যেকোনো একজন অ্যাডমিন এগুলো বদলাতে পারেন — কে কী বদলালেন কাজের খাতায় থাকে।</div></div>
+    <div class="card" style="border-color:rgba(226,84,61,.55); background:rgba(226,84,61,.06)">
+      <div class="h" style="color:#fca5a5">⚠️ সংগঠন মুছে ফেলা</div>
+      <div class="small">অনুরোধ করলে সব সদস্য সতর্কবার্তা দেখবেন আর ১২ ঘণ্টা অপেক্ষা করতে হবে। এর মধ্যে যেকোনো অ্যাডমিন বাতিল করতে পারেন। ১২ ঘণ্টা পরে অ্যাডমিন চূড়ান্তভাবে মুছতে পারবেন — সংগঠন সবার কাছ থেকে লুকিয়ে যাবে, তবে টাকার হিসাব আর কাজের খাতা রেকর্ড হিসেবে সংরক্ষিত থাকবে।</div>
+      ${del ? `<div class="notice" style="margin-top:10px">অনুরোধ করেছেন: <b>${esc(del.byName || "")}</b> · বাকি: <b data-cd="${ms(del.deadline)}">${left(ms(del.deadline) - Date.now())}</b></div>
+        <div class="row" style="margin-top:10px"><button class="btn green" type="button" id="xCancel">↩️ অনুরোধ বাতিল করুন</button>${canFinal ? `<button class="btn red" type="button" id="xFinal">🗑️ চূড়ান্তভাবে মুছুন</button>` : ""}</div>`
+      : `<button class="btn red" type="button" id="xReq" style="margin-top:10px">মুছে ফেলার অনুরোধ</button>`}
+    </div>`;
+  $("eGo").onclick = async ()=>{ if(await busy($("eGo"), ()=> api("update", { orgId: ORG.id, name: $("eN").value, desc: $("eD").value, area: $("eA").value, publicFinance: $("eF").checked, quorumPct: Number($("eQ").value) }))) toast("✅ সেভ হয়েছে"); };
+  if($("xReq")) $("xReq").onclick = async ()=>{ if(!confirm("সংগঠন মুছে ফেলার অনুরোধ শুরু করবেন? সব সদস্য সতর্কবার্তা দেখবেন, ১২ ঘণ্টা অপেক্ষা করতে হবে।")) return; if(await busy($("xReq"), ()=> api("deleteRequest", { orgId: ORG.id }))) toast("অনুরোধ শুরু — ১২ ঘণ্টা গোনা শুরু"); };
+  if($("xCancel")) $("xCancel").onclick = async ()=>{ if(await busy($("xCancel"), ()=> api("deleteCancel", { orgId: ORG.id }))) toast("↩️ অনুরোধ বাতিল হয়েছে"); };
+  if($("xFinal")) $("xFinal").onclick = async ()=>{ if(prompt("চূড়ান্তভাবে মুছতে সংগঠনের নাম হুবহু লিখুন:") !== ORG.name) return toast("নাম মেলেনি — মোছা হয়নি"); if(await busy($("xFinal"), ()=> api("deleteFinalize", { orgId: ORG.id }))){ toast("সংগঠন মুছে ফেলা হয়েছে"); go("home"); } };
+}
+
 /* ---------- 📜 কাজের খাতা (অ্যাডমিন) ---------- */
-const LOG_TXT = { org_create:"সংগঠন খুলেছেন", member_approve_1:"প্রথম অনুমোদন দিয়েছেন", member_approve:"সদস্য গ্রহণ করেছেন", member_reject:"আবেদন বাতিল করেছেন", member_leave:"সংগঠন ছেড়েছেন" };
+const LOG_TXT = { org_create:"সংগঠন খুলেছেন", org_update:"সংগঠনের তথ্য বদলেছেন", member_approve_1:"প্রথম অনুমোদন দিয়েছেন", member_approve:"সদস্য গ্রহণ করেছেন", member_reject:"আবেদন বাতিল করেছেন", member_leave:"সংগঠন ছেড়েছেন",
+  post_create:"পোস্ট দিয়েছেন", post_remove:"পোস্ট সরিয়েছেন", money_in:"জমা লিখেছেন", money_out:"খরচ লিখেছেন", money_in_ok:"জমা নিশ্চিত করেছেন", money_out_ok:"খরচ অনুমোদন করেছেন", money_reject:"লেনদেন বাতিল করেছেন",
+  proposal_create:"প্রস্তাব দিয়েছেন", proposal_cancel:"প্রস্তাব বাতিল করেছেন", proposal_pass:"প্রস্তাব পাস", proposal_fail:"প্রস্তাব পাস হয়নি", aid_create:"মানবিক সেবা খুলেছেন", aid_update:"মানবিক সেবা বদলেছেন",
+  set_title:"পদবি দিয়েছেন", action_propose:"প্রস্তাব/অনুমোদন দিয়েছেন", action_done:"সম্পন্ন করেছেন", action_reject:"প্রস্তাব বাতিল করেছেন", delete_request:"সংগঠন মোছার অনুরোধ করেছেন", delete_cancel:"মোছার অনুরোধ বাতিল করেছেন", org_delete:"সংগঠন মুছেছেন" };
 function tabLog(){
   $("tabBody").innerHTML = `<div class="card"><div class="h">📜 কাজের খাতা</div><div class="small" style="margin-bottom:6px">কে কখন কী করেছেন — এই খাতা কেউ বদলাতে বা মুছতে পারেন না।</div><div id="logList"><div class="empty"><span class="spin"></span></div></div></div>`;
-  db.collection("orgs").doc(ORG.id).collection("auditLogs").orderBy("at", "desc").limit(50).get().then(qs=>{
+  db.collection("orgs").doc(ORG.id).collection("auditLogs").orderBy("at", "desc").limit(100).get().then(qs=>{
     const el = $("logList"); if(!el) return;
     el.innerHTML = qs.docs.map(d=>{ const l = d.data(); return `<div class="item"><div class="grow">
-      <b style="font-size:13.5px">${esc(l.actorName || "—")}</b> <span style="font-size:13px">${esc(LOG_TXT[l.action] || l.action)}</span>${l.targetName ? ` — <b style="font-size:13px">${esc(l.targetName)}</b>` : ""}${l.memberNo ? ` <span class="small">(${memNo(l.memberNo)})</span>` : ""}
-      <div class="small">${esc(when(l.at))}</div></div></div>`; }).join("") || `<div class="empty">এখনো কিছু নেই</div>`;
+      <b style="font-size:13.5px">${esc(l.actorName || "—")}</b> <span style="font-size:13px">${esc(LOG_TXT[l.action] || l.action)}</span>${l.targetName ? ` — <b style="font-size:13px">${esc(l.targetName)}</b>` : ""}${l.memberNo ? ` <span class="small">(${memNo(l.memberNo)})</span>` : ""}${l.amount ? ` <b style="font-size:13px">${tk(l.amount)}</b>` : ""}
+      ${l.detail ? `<div class="small">${esc(l.detail)}</div>` : ""}<div class="small">${esc(when(l.at))}</div></div></div>`; }).join("") || `<div class="empty">এখনো কিছু নেই</div>`;
   }).catch(()=>{ const el = $("logList"); if(el) el.innerHTML = `<div class="empty">লোড করা যায়নি</div>`; });
 }
+
+/* ---------- কাউন্টডাউন — প্রতি সেকেন্ডে ---------- */
+setInterval(()=>{
+  document.querySelectorAll("[data-cd]").forEach(el=> el.textContent = left(Number(el.dataset.cd) - Date.now()));
+  // শুরু/শেষের মুহূর্ত পার হলে প্রস্তাবের অবস্থা নতুন করে দেখানো
+  if(ORG_TAB === "votes" && PROPS.some(p=> p.status === "open" && [ms(p.startAt), ms(p.endAt)].some(t=> t <= Date.now() && t > Date.now() - 1100))) drawProps();
+}, 1000);
 
 /* ---------- শুরু ---------- */
 let __started = false;
 auth.onAuthStateChanged(u=>{
-  const r = realUser(u);
+  const r = u && !u.isAnonymous ? u : null;
   ME = r ? { uid:r.uid, name:r.displayName || "সদস্য", photo:r.photoURL || null } : null;
-  renderMe(); listenIndex();
+  renderMe(); listenIndex(); MYLIKES = {}; MYVOTES = {};
   if(!__started){
     __started = true;
     const m = /#org=([A-Za-z0-9]{10,40})/.exec(location.hash);
-    go(m ? "org" : "home", m ? m[1] : undefined);
-  }else if(ROUTE.page === "org") pageOrg(ROUTE.arg);
+    const pm = /[#&]post=([A-Za-z0-9]+)/.exec(location.hash);
+    go(m ? "org" : "home", m ? m[1] : undefined, pm ? "posts" : undefined);
+    if(pm) try{ history.replaceState(null, "", "#org=" + m[1] + "&post=" + pm[1]); }catch(e){}
+  }else if(ROUTE.page === "org") pageOrg(ROUTE.arg, ORG_TAB);
   else if(ROUTE.page === "home") renderHomeMine();
 });
-// অ্যাডমিন হলে আবেদনের তালিকা লাইভ দেখা
-const __origRender = renderOrg;
-renderOrg = function(){ __origRender(); if(ORG && isAdmin() && !__reqUnsub) watchRequests(); };
 </script>
 </body>
 </html>

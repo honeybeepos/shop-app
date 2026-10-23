@@ -1043,9 +1043,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // 🤝🐝 Honey Bee Org — সংগঠন। ফোন থেকে কিছুই সরাসরি লেখা যায় না — সব লেখা
-    // Cloud Function (functions/org.js) করে, প্রতিবার অ্যাডমিন/সদস্য যাচাই করে।
-    // এখানে শুধু কে কী পড়তে পারবেন সেটা ঠিক করা।
+    // 🤝🐝 Honey Bee Org — সংগঠন। ফোন থেকে প্রায় কিছুই সরাসরি লেখা যায় না — সব লেখা
+    // Cloud Function (functions/org.js → orgApi) করে, প্রতিবার অ্যাডমিন/সদস্য যাচাই করে।
+    // ব্যতিক্রম শুধু লাইক আর মন্তব্য — সেগুলো নিচে কড়াভাবে বাঁধা।
+    function isRealUser() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
     function orgMemberDoc(orgId) {
       return get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid));
     }
@@ -1057,11 +1060,25 @@ service cloud.firestore {
     function isOrgAdmin(orgId) {
       return isOrgMember(orgId) && orgMemberDoc(orgId).data.role == 'admin';
     }
+    // পোস্ট/প্রস্তাবের নিচে যিনি পড়তে পারেন, শুধু তিনিই লাইক/মন্তব্য করতে পারেন
+    function orgPostOpen(orgId, postId) {
+      let p = get(/databases/$(database)/documents/orgs/$(orgId)/posts/$(postId)).data;
+      return p.status == 'published' && (p.audience == 'public' || isOrgMember(orgId));
+    }
+    function orgCommentOk() {
+      return isRealUser() &&
+        request.resource.data.keys().hasOnly(['authorUid', 'authorName', 'text', 'at']) &&
+        request.resource.data.authorUid == request.auth.uid &&
+        request.resource.data.authorName == request.auth.token.get('name', '') &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500 &&
+        request.resource.data.at == request.time;
+    }
     match /orgs/{orgId} {
-      // সংগঠনের পরিচিতি (নাম, এলাকা, সদস্য সংখ্যা) — সবার জন্য খোলা
+      // সংগঠনের পরিচিতি (নাম, এলাকা, সদস্য সংখ্যা, মোট তহবিল) — সবার জন্য খোলা
       allow read: if resource.data.status == 'active';
       allow write: if false;
-      // সদস্য তালিকা — শুধু সেই সংগঠনের সক্রিয় সদস্যরা
+      // সদস্য তালিকা — শুধু সেই সংগঠনের সক্রিয় সদস্যরা (নিজের নথি নিজে)
       match /members/{uid} {
         allow read: if isOrgMember(orgId) || (isSignedIn() && request.auth.uid == uid);
         allow write: if false;
@@ -1071,13 +1088,69 @@ service cloud.firestore {
         allow read: if isSignedIn() && (request.auth.uid == uid || isOrgAdmin(orgId));
         allow write: if false;
       }
-      // কাজের খাতা — শুধু অ্যাডমিন পড়তে পারেন; কেউ বদলাতে/মুছতে পারেন না
+      // কাজের খাতা আর অ্যাডমিন-কাজের প্রস্তাব — শুধু অ্যাডমিন
       match /auditLogs/{logId} {
         allow read: if isOrgAdmin(orgId);
         allow write: if false;
       }
+      match /adminActions/{actionId} {
+        allow read: if isOrgAdmin(orgId);
+        allow write: if false;
+      }
+      // 📰 পোস্ট — পাবলিক পোস্ট সবাই; "শুধু সদস্য" পোস্ট শুধু সদস্যরা; অ্যাডমিন সব (নির্ধারিত/মেয়াদোত্তীর্ণসহ)
+      match /posts/{postId} {
+        allow read: if (resource.data.status == 'published' &&
+                        (resource.data.audience == 'public' || isOrgMember(orgId))) ||
+                       isOrgAdmin(orgId);
+        allow write: if false;
+        // ❤️ লাইক — নিজের নামে একটাই; সংখ্যা গোনে সার্ভার
+        match /likes/{uid} {
+          allow read: if isSignedIn() && request.auth.uid == uid;
+          allow create: if isRealUser() && request.auth.uid == uid && orgPostOpen(orgId, postId) &&
+            request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time;
+          allow delete: if isSignedIn() && request.auth.uid == uid;
+          allow update: if false;
+        }
+        // 💬 মন্তব্য — পোস্ট যিনি পড়তে পারেন; নাম Google একাউন্টের নামই হতে হবে
+        match /comments/{cid} {
+          allow read: if orgPostOpen(orgId, postId) || isOrgAdmin(orgId);
+          allow create: if orgCommentOk() && orgPostOpen(orgId, postId);
+          allow delete: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isOrgAdmin(orgId));
+          allow update: if false;
+        }
+      }
+      // ৳ লেনদেন — সদস্যরা সব; বাইরের মানুষ শুধু সংগঠন যেগুলো প্রকাশ করেছে (নিশ্চিত হওয়াগুলো)
+      match /transactions/{txId} {
+        allow read: if isOrgMember(orgId) || resource.data.public == true;
+        allow write: if false;
+      }
+      // সদস্যের ব্যক্তিগত চাঁদা — শুধু সেই সদস্য আর অ্যাডমিনরা
+      match /dues/{duesId} {
+        allow read: if isSignedIn() && (resource.data.memberUid == request.auth.uid || isOrgAdmin(orgId));
+        allow write: if false;
+      }
+      // 🗳️ প্রস্তাব — শুধু সদস্যরা; কে কী ভোট দিলেন শুধু তিনি নিজে দেখেন
+      match /proposals/{pid} {
+        allow read: if isOrgMember(orgId);
+        allow write: if false;
+        match /votes/{uid} {
+          allow read: if isSignedIn() && request.auth.uid == uid;
+          allow write: if false;
+        }
+        match /comments/{cid} {
+          allow read: if isOrgMember(orgId);
+          allow create: if orgCommentOk() && isOrgMember(orgId);
+          allow delete: if isSignedIn() && (resource.data.authorUid == request.auth.uid || isOrgAdmin(orgId));
+          allow update: if false;
+        }
+      }
+      // ❤️ মানবিক সেবা — প্রকাশ করা উদ্যোগ সবাই, বাকিগুলো সদস্যরা
+      match /aid/{aidId} {
+        allow read: if resource.data.public == true || isOrgMember(orgId);
+        allow write: if false;
+      }
     }
-    // আমি কোন কোন সংগঠনে আছি — শুধু নিজেরটা পড়া যায়
+    // আমি কোন কোন সংগঠনে আছি — শুধু নিজেরটা পড়া যায় (orgTimers কেউ পড়তে পারে না)
     match /orgUserIndex/{uid} {
       allow read: if isSignedIn() && request.auth.uid == uid;
       allow write: if false;
