@@ -326,7 +326,7 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
         t.duesId = dref.id;
         tx.set(dref, { memberUid, memberName: mem.name, amount, date, method, txId: ref.id, status: one ? "verified" : "pending", note: title, createdAt: FieldValue.serverTimestamp() });
       }
-      if (one) Object.assign(t, countTx(tx, oid, org, t, ref));
+      if (one) Object.assign(t, countTx(tx, oid, org, Object.assign({}, t, { duesId: null }), ref)); // চাঁদার নথি উপরে আগেই "যাচাইকৃত" লেখা
       tx.set(ref, t);
       audit(tx, oid, me, type === "in" ? "money_in" : "money_out", { amount, detail: t.title + (mem ? " — " + mem.name : "") });
       return { ok: true, status: t.status };
@@ -652,13 +652,14 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
     await orgRef(event.params.orgId).collection("posts").doc(event.params.postId)
       .update({ likeCount: FieldValue.increment(after ? 1 : -1) }).catch(() => {});
   });
-  const orgPostCommentCount = onDocumentWritten("orgs/{orgId}/{kind}/{parentId}/comments/{cid}", async (event) => {
-    const { orgId: oid, kind, parentId } = event.params;
-    if (kind !== "posts" && kind !== "proposals") return;
+  const countComments = (kind) => async (event) => {
     const before = event.data.before.exists, after = event.data.after.exists;
     if (before === after) return;
-    await orgRef(oid).collection(kind).doc(parentId).update({ commentCount: FieldValue.increment(after ? 1 : -1) }).catch(() => {});
-  });
+    await orgRef(event.params.orgId).collection(kind).doc(event.params.parentId)
+      .update({ commentCount: FieldValue.increment(after ? 1 : -1) }).catch(() => {});
+  };
+  const orgPostCommentCount = onDocumentWritten("orgs/{orgId}/posts/{parentId}/comments/{cid}", countComments("posts"));
+  const orgProposalCommentCount = onDocumentWritten("orgs/{orgId}/proposals/{parentId}/comments/{cid}", countComments("proposals"));
 
-  return { orgApi, orgTick, orgPostLikeCount, orgPostCommentCount };
+  return { orgApi, orgTick, orgPostLikeCount, orgPostCommentCount, orgProposalCommentCount };
 };
