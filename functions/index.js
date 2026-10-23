@@ -3665,3 +3665,6 @@ async function markTailorLegDone(o) {
     .set({ status: "delivered", riderIncome: typeof o.legCharge === "number" ? o.legCharge : TAILOR_LEG_MIN, deliveredAt: FieldValue.serverTimestamp() }, { merge: true })
     .catch(() => {});
 }
+
+/* 🤝🐝 Honey Bee Org — সংগঠন (আলাদা ফাইল: org.js) */
+Object.assign(exports, require("./org")({ db, FieldValue, onCall, HttpsError }));
