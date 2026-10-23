@@ -674,7 +674,7 @@ function tabAbout(){
   let action = "";
   if(!ME) action = `<button class="btn full" type="button" onclick="needLogin('সদস্য হওয়ার আবেদন করতে')">✋ সদস্য হওয়ার আবেদন করুন</button>`;
   else if(MYMEM) action = `<div class="notice">✅ আপনি এই সংগঠনের ${isAdmin() ? "অ্যাডমিন" : "সদস্য"}। সদস্য নম্বর: <b>${memNo(MYMEM.memberNo)}</b> · পদবি: <b>${esc(MYMEM.title || "সদস্য")}</b></div>
-    <button class="btn red" type="button" id="leaveBtn" style="margin-top:12px">🚪 সংগঠন ছেড়ে দিন</button>`;
+    <div class="row" style="margin-top:12px">${isAdmin() ? `<button class="btn ghost" type="button" onclick="openResign()">🙋 অ্যাডমিন পদ থেকে পদত্যাগ</button>` : ""}${ORG.createdBy === ME.uid ? "" : `<button class="btn red" type="button" id="leaveBtn">🚪 সংগঠন ছেড়ে দিন</button>`}</div>`;
   else if(MYREQ && MYREQ.status === "pending"){
     action = `<div class="notice">⏳ আপনার আবেদন জমা আছে — ${need2() === 2 ? "দুইজন অ্যাডমিন অনুমোদন দিলে" : "অ্যাডমিন অনুমোদন দিলে"} আপনি সদস্য হবেন।<br>অনুমোদন: <b>${bn((MYREQ.approvedBy || []).length)}/${bn(need2())}</b></div>
       <button class="btn ghost" type="button" id="cancelReq" style="margin-top:10px">আবেদন তুলে নিন</button>`;
@@ -997,8 +997,14 @@ function tabDues(){
    ===================================================================== */
 let PROPS = [], MYVOTES = {};
 const PR_ST = { approved:["ok","✅ পাস — অনুমোদিত"], rejected:["no","❌ পাস হয়নি"], cancelled:["no","🚫 বাতিল"] };
+let VOTE_SUB = "elections";
 function tabVotes(){
-  $("tabBody").innerHTML = `${isAdmin() ? `<div class="card" style="padding:12px"><button class="btn full" type="button" id="newProp">＋ নতুন খরচের প্রস্তাব</button></div>` : ""}
+  $("tabBody").innerHTML = `<div class="row" style="margin-bottom:12px; flex-wrap:nowrap">
+      <button type="button" class="btn ${VOTE_SUB === "elections" ? "" : "ghost"}" data-vs="elections" style="flex:1">🗳️ নির্বাচন</button>
+      <button type="button" class="btn ${VOTE_SUB === "props" ? "" : "ghost"}" data-vs="props" style="flex:1">💰 খরচের প্রস্তাব</button></div><div id="voteSub"></div>`;
+  $("tabBody").querySelectorAll("[data-vs]").forEach(b=> b.onclick = ()=>{ if(VOTE_SUB === b.dataset.vs) return; VOTE_SUB = b.dataset.vs; stopTab(); tabVotes(); });
+  if(VOTE_SUB === "elections") return tabElections();
+  $("voteSub").innerHTML = `${isAdmin() ? `<div class="card" style="padding:12px"><button class="btn full" type="button" id="newProp">＋ নতুন খরচের প্রস্তাব</button></div>` : ""}
     <div class="card" style="padding:12px 14px"><div class="small">খরচের আগে প্রস্তাব আসে, সদস্যরা আলোচনা করেন আর গোপনে ভোট দেন। পাস হলে খরচটা নিজে থেকেই হিসাবে ওঠে। ভুল ভোট এড়াতে বোতাম <b>১.৫ সেকেন্ড চেপে ধরে</b> রাখতে হয়। ভোট শেষ হওয়ার আগে মত বদলাতে পারবেন।</div></div>
     <div id="propList"><div class="empty"><span class="spin"></span></div></div>`;
   if($("newProp")) $("newProp").onclick = openNewProposal;
@@ -1008,6 +1014,197 @@ function tabVotes(){
     drawProps();
   }, ()=>{ const el = $("propList"); if(el) el.innerHTML = `<div class="card"><div class="empty">লোড করা যায়নি</div></div>`; }));
 }
+
+/* =====================================================================
+   🗳️ নির্বাচন — পদের জন্য (জয়ী পদবি পান; অ্যাডমিনের ক্ষমতা দেন শুধু অ্যাডমিনরা)
+   ===================================================================== */
+const SYMBOLS = ["🌹","🌳","⭐","🐝","🕊️","🌙","☀️","🌾","⛵","🔔","🏠","📚","🌻","🐟","🦚","🍀","🪔","⚖️","🚲","☂️"];
+const SYM_NAME = {"🌹":"গোলাপ","🌳":"গাছ","⭐":"তারা","🐝":"মৌমাছি","🕊️":"পায়রা","🌙":"চাঁদ","☀️":"সূর্য","🌾":"ধানের শীষ","⛵":"নৌকা","🔔":"ঘণ্টা","🏠":"ঘর","📚":"বই","🌻":"সূর্যমুখী","🐟":"মাছ","🦚":"ময়ূর","🍀":"পাতা","🪔":"প্রদীপ","⚖️":"দাঁড়িপাল্লা","🚲":"সাইকেল","☂️":"ছাতা"};
+let ELECTIONS = [], CANDS = {}, MYBALLOT = {}, __elSynced = {}, PICK = {};
+function elPhase(e){
+  const n = Date.now();
+  if(e.status === "draft") return "draft";
+  if(["done","void","cancelled"].includes(e.status)) return e.status;
+  if(e.status === "runoff") return n < ms(e.voteEndAt) ? "voting" : "counting";
+  if(n < ms(e.applyEndAt)) return "apply";
+  if(n < ms(e.voteStartAt)) return "wait";
+  if(n < ms(e.voteEndAt)) return "voting";
+  return "counting";
+}
+const PH_CHIP = { draft:["admin","📝 খসড়া — সদস্যরা দেখছেন না"], apply:["ok","✋ প্রার্থী হওয়ার সময়"], wait:["wait","⏳ ভোটের অপেক্ষা"], voting:["ok","● ভোট চলছে"], counting:["wait","🧮 ফলাফল গণনা হচ্ছে…"], done:["ok","🏆 ফলাফল প্রকাশিত"], void:["no","❌ বাতিল (ফল হয়নি)"], cancelled:["no","🚫 বাতিল"] };
+function tabElections(){
+  CANDS = {}; __elSynced = {};
+  $("voteSub").innerHTML = `${isAdmin() ? `<div class="card" style="padding:12px"><button class="btn full" type="button" id="newElec">🗳️ নির্বাচন তৈরি ও পরিচালনা — নতুন নির্বাচন</button></div>` : ""}
+    <div class="card" style="padding:12px 14px"><div class="small">নির্বাচন হয় পদের জন্য (সভাপতি, সম্পাদক…)। ধাপ: প্রকাশ → প্রার্থী হওয়ার আবেদন → আবেদন বন্ধ → কাউন্টডাউন → গোপন ভোট (একবারই) → ফলাফল। জয়ী পদবি পান — অ্যাডমিনের ক্ষমতা দেন শুধু অ্যাডমিনরা। নির্বাচন ঘোষণার পরে যোগ দেওয়া সদস্য ভোট দিতে বা প্রার্থী হতে পারেন না। সময় চলে সার্ভারের ঘড়িতে।</div></div>
+    <div id="elList"><div class="empty"><span class="spin"></span></div></div>`;
+  if($("newElec")) $("newElec").onclick = openNewElection;
+  let q = db.collection("orgs").doc(ORG.id).collection("elections");
+  if(!isAdmin()) q = q.where("status", "in", ["open","runoff","done","void","cancelled"]);
+  __tabUnsubs.push(q.limit(50).onSnapshot(qs=>{
+    ELECTIONS = qs.docs.map(d=> ({ id:d.id, ...d.data() })).sort((a,b)=> ms(b.createdAt) - ms(a.createdAt));
+    ELECTIONS.forEach(e=>{
+      if(e.status !== "draft" && !CANDS[e.id]){
+        CANDS[e.id] = [];
+        __tabUnsubs.push(db.collection("orgs").doc(ORG.id).collection("elections").doc(e.id).collection("candidates").onSnapshot(cs=>{ CANDS[e.id] = cs.docs.map(d=> d.data()).sort((a,b)=> ms(a.appliedAt) - ms(b.appliedAt)); drawElections(); }, ()=>{}));
+      }
+      const r = e.round || 1, key = e.id + ":" + r;
+      if(ME && MYBALLOT[key] === undefined && ["open","runoff"].includes(e.status)){
+        MYBALLOT[key] = false;
+        db.collection("orgs").doc(ORG.id).collection("elections").doc(e.id).collection("ballots").doc(r === 1 ? ME.uid : ME.uid + "_r" + r).get().then(d=>{ if(d.exists){ MYBALLOT[key] = true; drawElections(); } }).catch(()=>{});
+      }
+    });
+    drawElections();
+  }, ()=>{ const el = $("elList"); if(el) el.innerHTML = `<div class="card"><div class="empty">লোড করা যায়নি</div></div>`; }));
+}
+function elEligible(e){ return MYMEM && ms(MYMEM.joinedAt) <= (e.publishedMs || 0); }
+function drawElections(){
+  const el = $("elList"); if(!el) return;
+  el.innerHTML = ELECTIONS.map(e=>{
+    const ph = elPhase(e), chip = PH_CHIP[ph], cands = (CANDS[e.id] || []).filter(c=> c.status === "ok");
+    const r = e.round || 1, voted = MYBALLOT[e.id + ":" + r] === true;
+    const mine = ME && (CANDS[e.id] || []).find(c=> c.uid === ME.uid);
+    const need = need2();
+    if((ph === "counting" || (ph === "wait" && !e.applyClosed)) && !__elSynced[e.id + ph + r]){ __elSynced[e.id + ph + r] = 1; api("electionSync", { orgId: ORG.id, electionId: e.id }).catch(()=>{}); }
+    let body = "";
+    if(ph === "draft"){
+      const meOk = (e.publishBy || []).includes(ME.uid);
+      body = `<div class="notice" style="margin-top:10px">এখনো খসড়া — সদস্যরা দেখছেন না। প্রকাশ করতে ${need === 2 ? "দুইজন অ্যাডমিনের" : "অ্যাডমিনের"} অনুমতি লাগবে: <b>${bn((e.publishBy || []).length)}/${bn(need)}</b>${(e.publishNames || []).length ? " — " + esc(e.publishNames.join(", ")) : ""}</div>
+        <div class="row" style="margin-top:10px"><button class="btn green" type="button" data-epub="${esc(e.id)}" ${meOk ? "disabled" : ""}>${meOk ? "✓ আপনি অনুমতি দিয়েছেন" : "📢 সদস্যদের জন্য নির্বাচন চালু করুন"}</button><button class="btn red" type="button" data-ecan="${esc(e.id)}">🗑️ বাতিল</button></div>`;
+    }else if(ph === "apply"){
+      body = `<div class="chip ok" style="margin-top:10px; font-size:13px; padding:7px 12px">✋ প্রার্থী হওয়ার সময় বাকি: <b data-cd="${ms(e.applyEndAt)}">${left(ms(e.applyEndAt) - Date.now())}</b></div>
+        <div class="row" style="margin-top:10px">${mine && mine.status === "ok" ? `<span class="chip ok">✅ আপনি প্রার্থী (${esc(mine.symbol)} ${esc(SYM_NAME[mine.symbol] || "")})</span><button class="btn ghost" type="button" data-ewd="${esc(e.id)}" style="padding:7px 12px; font-size:13px">নাম তুলে নিন</button>`
+          : mine && mine.status === "removed" ? `<span class="chip no">অ্যাডমিনরা আপনাকে বাদ দিয়েছেন: ${esc(mine.removeReason || "")}</span>`
+          : elEligible(e) ? `<button class="btn" type="button" data-eapply="${esc(e.id)}">✋ প্রার্থী হতে চাই</button>` : `<span class="small">নির্বাচন ঘোষণার পরে যোগ দিয়েছেন — এতে প্রার্থী হতে পারবেন না।</span>`}</div>`;
+    }else if(ph === "wait"){
+      body = `<div class="chip wait" style="margin-top:10px; font-size:13px; padding:7px 12px">⏳ প্রার্থী তালিকা চূড়ান্ত — ভোট শুরু হতে বাকি: <b data-cd="${ms(e.voteStartAt)}">${left(ms(e.voteStartAt) - Date.now())}</b></div>`;
+    }else if(ph === "voting"){
+      const pool = r === 1 ? cands : cands.filter(c=> (e.runoffUids || []).includes(c.uid));
+      const maxC = r === 1 ? (e.maxChoices || 1) : (e.runoffSeats || 1);
+      const pick = PICK[e.id] || [];
+      body = `${r > 1 ? `<div class="notice" style="margin-top:10px">⚖️ শেষ আসনে সমান ভোট হয়েছিল — শুধু এঁদের মধ্যে আবার ভোট (${bn(r)} নম্বর রাউন্ড)।${(e.winnerNames || e.winners || []).length ? "" : ""}</div>` : ""}
+        <div class="chip ok" style="margin-top:10px; font-size:13px; padding:7px 12px">● ভোট শেষ হতে বাকি: <b data-cd="${ms(e.voteEndAt)}">${left(ms(e.voteEndAt) - Date.now())}</b> · ভোট পড়েছে ${bn(e.ballotCount || 0)} / ${bn(e.eligible || 0)}</div>
+        ${voted ? `<div class="notice" style="margin-top:10px; background:rgba(47,191,113,.12); border-color:rgba(47,191,113,.4); color:#bbf7d0">✅ আপনি ভোট দিয়েছেন। আপনার ভোট গোপন — কাকে দিয়েছেন কেউ দেখতে পারবেন না।</div>`
+          : !elEligible(e) ? `<div class="small" style="margin-top:8px; color:#fca5a5">নির্বাচন ঘোষণার পরে যোগ দিয়েছেন — এতে ভোট দিতে পারবেন না।</div>`
+          : `<div class="small" style="margin-top:10px">ব্যালট: ${bn(maxC)} জন পর্যন্ত বাছুন — বাছা হয়েছে ${bn(pick.length)} জন</div>
+            <div class="grid" style="margin-top:8px">${pool.map(c=> `<button type="button" class="org" data-pick="${esc(e.id)}:${esc(c.uid)}" style="${pick.includes(c.uid) ? "border:2px solid var(--amber); background:rgba(255,209,102,.12)" : ""}">
+              <div class="av" style="font-size:28px">${esc(c.symbol)}</div><div style="flex:1; min-width:0"><b>${esc(c.name)}</b><div class="small">মার্কা: ${esc(SYM_NAME[c.symbol] || "")} · ${memNo(c.memberNo)}</div>${c.statement ? `<div class="small" style="margin-top:2px">💬 ${esc(c.statement)}</div>` : ""}</div>
+              <span style="font-size:22px">${pick.includes(c.uid) ? "☑️" : "⬜"}</span></button>`).join("")}</div>
+            <button class="btn green full" type="button" data-evote="${esc(e.id)}" ${pick.length ? "" : "disabled"} style="margin-top:10px">🗳️ ব্যালট জমা দিন</button>`}`;
+    }else if(ph === "counting"){
+      body = `<div class="notice" style="margin-top:10px">🧮 ভোটের সময় শেষ — সার্ভার গণনা করছে। কয়েক মিনিটের মধ্যে ফলাফল আসবে।</div>`;
+    }else if(ph === "done" || ph === "void"){
+      const rounds = e.results || [];
+      body = `${ph === "void" ? `<div class="notice" style="margin-top:10px">❌ ${esc(e.voidReason || "নির্বাচন বাতিল")}</div>` : `<div class="notice" style="margin-top:10px; background:rgba(47,191,113,.12); border-color:rgba(47,191,113,.4); color:#bbf7d0">🏆 ${esc(e.post)}: <b>${esc((e.winnerNames || []).join(", "))}</b>${e.unopposed ? " — বিনা প্রতিদ্বন্দ্বিতায়" : ""}</div>`}
+        ${rounds.length && rounds[0].rows ? rounds.map(rd=>{ const tot = rd.rows.reduce((a,x)=> a + (x.votes || 0), 0) || 1; return `<div class="small" style="margin-top:10px">${rounds.length > 1 ? bn(rd.round) + " নম্বর রাউন্ড · " : ""}ব্যালট: ${bn(rd.ballots || 0)}</div>${rd.rows.map(x=> `<div style="margin-top:6px"><div class="row" style="justify-content:space-between; flex-wrap:nowrap"><span>${esc(x.symbol)} <b>${esc(x.name)}</b> ${(e.winners || []).includes(x.uid) ? "🏆" : ""}</span><b>${bn(x.votes || 0)} ভোট</b></div><div style="height:8px; background:rgba(255,255,255,.08); border-radius:99px; overflow:hidden; margin-top:3px"><div style="height:100%; width:${(x.votes || 0) / tot * 100}%; background:${(e.winners || []).includes(x.uid) ? "var(--ok)" : "var(--amber)"}"></div></div></div>`).join("")}`; }).join("") : ""}`;
+    }else if(ph === "cancelled"){
+      body = `<div class="notice" style="margin-top:10px">🚫 নির্বাচন বাতিল করা হয়েছে${e.cancelReason ? ": " + esc(e.cancelReason) : ""}</div>`;
+    }
+    const showCands = ["apply","wait"].includes(ph) && cands.length;
+    const canCancelOpen = isAdmin() && ["apply","wait"].includes(ph);
+    return `<div class="card" ${ph === "apply" || ph === "voting" ? `style="border-color:var(--amber)"` : ""}>
+      <div class="row"><span class="chip ${chip[0]}">${chip[1]}</span><span class="small" style="margin-left:auto">${esc(when(e.createdAt))}</span></div>
+      <div style="font-size:17px; font-weight:800; margin-top:10px">${esc(e.title)}</div>
+      <div class="small">পদ: <b>${esc(e.post)}</b> · আসন: ${bn(e.seats)} · একজন বাছবেন ${bn(e.maxChoices || 1)} জন · ন্যূনতম ভোট ${bn(e.quorumPct || 30)}%</div>
+      <div class="small">✋ আবেদন শেষ: ${esc(when(e.applyEndAt))}<br>🗳️ ভোট: ${esc(when(e.voteStartAt))} — ${esc(when(e.voteEndAt))}</div>
+      ${e.note ? `<div style="font-size:13.5px; margin-top:6px; white-space:pre-wrap">${esc(e.note)}</div>` : ""}
+      ${body}
+      ${showCands ? `<div class="h" style="margin-top:14px; font-size:14px">👥 প্রার্থী (${bn(cands.length)})</div>${cands.map(c=> `<div class="item" style="align-items:flex-start"><div class="av" style="font-size:26px">${esc(c.symbol)}</div><div class="grow"><b style="font-size:14px">${esc(c.name)}</b> <span class="small">${memNo(c.memberNo)} · মার্কা: ${esc(SYM_NAME[c.symbol] || "")}</span>${c.statement ? `<div style="font-size:13px; margin-top:2px">💬 ${esc(c.statement)}</div>` : ""}${isAdmin() && (c.removeBy || []).length ? `<div class="small" style="color:#fca5a5">বাদের প্রস্তাব: ${esc((c.removeNames || []).join(", "))} — ${esc(c.removeReason || "")}</div>` : ""}</div>
+        ${isAdmin() && c.uid !== ME.uid ? `<button class="btn ghost" type="button" data-erm="${esc(e.id)}:${esc(c.uid)}" style="padding:5px 9px; font-size:12px">বাদ</button>` : ""}</div>`).join("")}` : ""}
+      ${canCancelOpen ? `<button class="btn red" type="button" data-ecan="${esc(e.id)}" style="margin-top:12px; padding:7px 12px; font-size:13px">🚫 নির্বাচন বাতিল${(e.cancelBy || []).length ? ` (${bn(e.cancelBy.length)}/${bn(need)})` : ""}</button>` : ""}
+    </div>`;
+  }).join("") || `<div class="card"><div class="empty">এখনো কোনো নির্বাচন নেই</div></div>`;
+  el.querySelectorAll("[data-epub]").forEach(b=> b.onclick = async ()=>{ if(!confirm("নির্বাচনটা সদস্যদের জন্য চালু করবেন? চালু হলে সময়গুলো আর বদলানো যাবে না।")) return; const r = await busy(b, ()=> api("electionPublish", { orgId: ORG.id, electionId: b.dataset.epub })); if(r) toast(r.status === "open" ? "📢 নির্বাচন চালু — সদস্যরা এখন দেখছেন" : "✅ আপনার অনুমতি জমা — আরেকজন অ্যাডমিন লাগবে"); });
+  el.querySelectorAll("[data-ecan]").forEach(b=> b.onclick = async ()=>{ const reason = prompt("বাতিলের কারণ লিখুন (সদস্যরা দেখবেন):", ""); if(reason === null) return; const r = await busy(b, ()=> api("electionCancel", { orgId: ORG.id, electionId: b.dataset.ecan, reason })); if(r) toast(r.status === "cancelled" ? "নির্বাচন বাতিল হয়েছে" : "✅ বাতিলের অনুমতি জমা — আরেকজন অ্যাডমিন লাগবে"); });
+  el.querySelectorAll("[data-eapply]").forEach(b=> b.onclick = ()=> openCandidate(ELECTIONS.find(x=> x.id === b.dataset.eapply)));
+  el.querySelectorAll("[data-ewd]").forEach(b=> b.onclick = async ()=>{ if(!confirm("প্রার্থী তালিকা থেকে নাম তুলে নেবেন?")) return; if(await busy(b, ()=> api("candidateWithdraw", { orgId: ORG.id, electionId: b.dataset.ewd }))) toast("নাম তুলে নেওয়া হয়েছে"); });
+  el.querySelectorAll("[data-erm]").forEach(b=> b.onclick = async ()=>{ const [eid, uid] = b.dataset.erm.split(":"); const reason = prompt("কেন বাদ দিচ্ছেন? (কাজের খাতায় থাকবে, প্রার্থী দেখবেন)", ""); if(!reason || reason.trim().length < 5) return reason === null ? null : toast("কারণ একটু বিস্তারিত লিখুন"); const r = await busy(b, ()=> api("candidateRemove", { orgId: ORG.id, electionId: eid, uid, reason: reason.trim() })); if(r) toast(r.status === "removed" ? "প্রার্থী বাদ দেওয়া হয়েছে" : "✅ আপনার অনুমতি জমা — আরেকজন অ্যাডমিন লাগবে"); });
+  el.querySelectorAll("[data-pick]").forEach(b=> b.onclick = ()=>{
+    const [eid, uid] = b.dataset.pick.split(":"); const e = ELECTIONS.find(x=> x.id === eid); if(!e) return;
+    const maxC = (e.round || 1) === 1 ? (e.maxChoices || 1) : (e.runoffSeats || 1);
+    let p = PICK[eid] || [];
+    if(p.includes(uid)) p = p.filter(x=> x !== uid);
+    else if(maxC === 1) p = [uid];
+    else if(p.length < maxC) p = p.concat(uid);
+    else return toast(`সর্বোচ্চ ${bn(maxC)} জন বাছা যায়`);
+    PICK[eid] = p; drawElections();
+  });
+  el.querySelectorAll("[data-evote]").forEach(b=> b.onclick = ()=> confirmBallot(ELECTIONS.find(x=> x.id === b.dataset.evote)));
+}
+function openCandidate(e){
+  if(!e) return;
+  const taken = (CANDS[e.id] || []).filter(c=> c.status === "ok").map(c=> c.symbol);
+  let sym = null;
+  openModal(`<div class="h">✋ প্রার্থী হওয়ার আবেদন — ${esc(e.post)}</div>
+    <div class="small">আপনার নাম আর ছবি যাবে Google একাউন্ট থেকে: <b>${esc(ME.name)}</b>। আবেদনের সময় শেষ হওয়ার আগে চাইলে নাম তুলে নিতে পারবেন।</div>
+    <label class="f">আপনার মার্কা বাছুন * (যিনি আগে নেবেন মার্কা তাঁর)</label>
+    <div id="symGrid" style="display:grid; grid-template-columns:repeat(5,1fr); gap:6px">${SYMBOLS.map(x=> `<button type="button" class="btn ghost" data-sym="${x}" ${taken.includes(x) ? "disabled" : ""} style="padding:8px 2px; font-size:22px; line-height:1.1">${x}<br><small style="font-size:9.5px; font-weight:600">${SYM_NAME[x]}</small></button>`).join("")}</div>
+    <label class="f">কেন আমাকে ভোট দেবেন? (ঐচ্ছিক)</label><textarea class="in" id="cSt" maxlength="500" placeholder="সংক্ষেপে আপনার পরিকল্পনা"></textarea>
+    <div id="cMsg2" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
+    <div class="row"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="cAp" style="flex:1">✋ আবেদন জমা দিন</button></div>`);
+  $("symGrid").querySelectorAll("[data-sym]").forEach(b=> b.onclick = ()=>{ sym = b.dataset.sym; $("symGrid").querySelectorAll("[data-sym]").forEach(x=> x.style.border = x === b ? "2px solid var(--amber)" : ""); });
+  $("cAp").onclick = async ()=>{ if(!sym) return $("cMsg2").textContent = "একটা মার্কা বাছুন"; if(await busy($("cAp"), ()=> api("candidateApply", { orgId: ORG.id, electionId: e.id, symbol: sym, statement: $("cSt").value.trim() }))){ closeModal(); toast("✅ আপনি এখন প্রার্থী"); } };
+}
+function confirmBallot(e){
+  if(!e) return;
+  const pick = PICK[e.id] || [], cands = CANDS[e.id] || [];
+  openModal(`<div class="h">🗳️ ব্যালট নিশ্চিত করুন</div>
+    <div class="small">একবার জমা দিলে আর বদলানো যাবে না। আপনার ভোট গোপন থাকবে।</div>
+    <div style="margin-top:10px">${pick.map(u=>{ const c = cands.find(x=> x.uid === u) || {}; return `<div class="item"><div class="av" style="font-size:26px">${esc(c.symbol || "")}</div><div class="grow"><b>${esc(c.name || "")}</b><div class="small">মার্কা: ${esc(SYM_NAME[c.symbol] || "")}</div></div></div>`; }).join("")}</div>
+    <div class="small" style="margin-top:8px">ভুল চাপ এড়াতে নিচের বোতাম <b>১.৫ সেকেন্ড চেপে ধরে</b> রাখুন।</div>
+    <div class="row" style="margin-top:10px; flex-wrap:nowrap"><button class="btn ghost" type="button" data-close>ফিরে যান</button><button type="button" class="btn green vhold" id="bGo" style="flex:1; position:relative; overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none">✋ চেপে ধরে জমা দিন<i class="vfill"></i></button></div>`);
+  const btn = $("bGo"), fill = btn.querySelector(".vfill");
+  fill.style.cssText = "position:absolute; left:0; bottom:0; height:5px; width:0; background:#fff; border-radius:0 6px 6px 0; pointer-events:none";
+  let t = null;
+  const stop = ()=>{ clearTimeout(t); t = null; fill.style.transition = "none"; fill.style.width = "0"; };
+  btn.addEventListener("pointerdown", ev=>{
+    ev.preventDefault(); stop();
+    requestAnimationFrame(()=>{ fill.style.transition = "width 1.5s linear"; fill.style.width = "100%"; });
+    t = setTimeout(async ()=>{
+      t = null; stop(); if(navigator.vibrate) try{ navigator.vibrate(40); }catch(x){}
+      const r = await busy(btn, ()=> api("electionVote", { orgId: ORG.id, electionId: e.id, choices: pick }));
+      if(r){ MYBALLOT[e.id + ":" + (e.round || 1)] = true; delete PICK[e.id]; closeModal(); toast("🗳️ আপনার ভোট জমা হয়েছে (গোপন)"); drawElections(); }
+    }, 1500);
+  });
+  ["pointerup","pointerleave","pointercancel"].forEach(x=> btn.addEventListener(x, ()=>{ if(t) stop(); }));
+  btn.addEventListener("contextmenu", ev=> ev.preventDefault());
+}
+function openNewElection(){
+  const base = new Date(); base.setMinutes(0, 0, 0);
+  const h = n=> dtLocal(base.getTime() + n * 3600000);
+  openModal(`<div class="h">🗳️ নতুন নির্বাচন তৈরি</div>
+    <div class="notice">তৈরির পর এটা খসড়া থাকবে — সদস্যরা দেখবেন না। "চালু করুন" চাপলে (${need2() === 2 ? "দুইজন অ্যাডমিনের অনুমতিতে" : "আপনার অনুমতিতে"}) সবাই দেখবেন আর প্রার্থী হওয়ার আবেদন শুরু হবে।</div>
+    <label class="f">নির্বাচনের নাম *</label><input class="in" id="nT" maxlength="80" placeholder="যেমন: ২০২৬ সালের কমিটি নির্বাচন — সভাপতি">
+    <div class="row">
+      <div style="flex:2; min-width:150px"><label class="f">পদের নাম *</label><input class="in" id="nP" maxlength="40" list="postList" placeholder="যেমন: সভাপতি"><datalist id="postList"><option>সভাপতি</option><option>সহ-সভাপতি</option><option>সাধারণ সম্পাদক</option><option>সাংগঠনিক সম্পাদক</option><option>কোষাধ্যক্ষ</option><option>কার্যনির্বাহী সদস্য</option></datalist></div>
+      <div style="flex:1; min-width:90px"><label class="f">আসন *</label><input class="in" id="nS" type="number" min="1" max="20" value="1"></div>
+      <div style="flex:1; min-width:110px"><label class="f">একজন বাছবেন</label><input class="in" id="nM" type="number" min="1" max="20" value="1"></div>
+    </div>
+    <label class="f">✋ প্রার্থী হওয়ার আবেদনের শেষ সময় *</label><input class="in" id="nA" type="datetime-local" value="${h(48)}" min="${dtLocal(Date.now())}">
+    <div class="row">
+      <div style="flex:1; min-width:150px"><label class="f">🗳️ ভোট শুরু *</label><input class="in" id="nVs" type="datetime-local" value="${h(60)}"></div>
+      <div style="flex:1; min-width:150px"><label class="f">🗳️ ভোট শেষ *</label><input class="in" id="nVe" type="datetime-local" value="${h(84)}"></div>
+    </div>
+    <label class="f">নিয়ম / বিস্তারিত (ঐচ্ছিক)</label><textarea class="in" id="nN" maxlength="800" placeholder="যেমন: মেয়াদ ১ বছর; প্রার্থীকে কমপক্ষে ৬ মাসের সদস্য হতে হবে"></textarea>
+    <div class="small" style="margin-top:8px">সমান ভোট হলে শুধু তাঁদের মধ্যে ২৪ ঘণ্টার আবার ভোট। প্রার্থী আসনের সমান বা কম হলে বিনা প্রতিদ্বন্দ্বিতায় জয়ী। কমপক্ষে ${bn(ORG.quorumPct || 30)}% সদস্য ভোট না দিলে নির্বাচন বাতিল।</div>
+    <div id="nMsg" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
+    <div class="row"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="nGo" style="flex:1">💾 খসড়া তৈরি করুন</button></div>`);
+  $("nS").oninput = ()=>{ if(Number($("nM").value) > Number($("nS").value)) $("nM").value = $("nS").value; };
+  $("nGo").onclick = async ()=>{
+    const title = $("nT").value.trim(), post = $("nP").value.trim(), seats = Number($("nS").value), maxChoices = Number($("nM").value);
+    const a = new Date($("nA").value).getTime(), vs = new Date($("nVs").value).getTime(), ve = new Date($("nVe").value).getTime();
+    const msg = t=> $("nMsg").textContent = t;
+    if(title.length < 3) return msg("নির্বাচনের নাম লিখুন");
+    if(post.length < 2) return msg("পদের নাম লিখুন");
+    if(!(seats >= 1)) return msg("আসনসংখ্যা দিন");
+    if(!(maxChoices >= 1 && maxChoices <= seats)) return msg("একজন কতজনকে বাছবেন — ১ থেকে আসনসংখ্যা পর্যন্ত");
+    if(!(a > Date.now() + 10 * 60000)) return msg("আবেদনের শেষ সময় এখন থেকে অন্তত ১০ মিনিট পরে দিন");
+    if(!(vs >= a)) return msg("ভোট শুরু হবে আবেদন বন্ধ হওয়ার পরে");
+    if(!(ve >= vs + 3600000)) return msg("ভোট অন্তত ১ ঘণ্টা চলবে");
+    const r = await busy($("nGo"), ()=> api("electionCreate", { orgId: ORG.id, title, post, seats, maxChoices, applyEndAt: a, voteStartAt: vs, voteEndAt: ve, note: $("nN").value.trim() }));
+    if(r){ closeModal(); toast("💾 খসড়া তৈরি — এবার \"চালু করুন\" চাপুন"); }
+  };
+}
+
 function drawProps(){
   const el = $("propList"); if(!el) return;
   const restore = keepOpen(el, "pcm-");
@@ -1138,7 +1335,7 @@ function openAid(a){
    👥 সদস্য তালিকা + অ্যাডমিনের কাজ (পদবি, অ্যাডমিন বানানো/সরানো, সদস্যপদ বাতিল)
    ===================================================================== */
 let __actN = 0, ACTIONS = [];
-const ACT_TXT = { make_admin:"অ্যাডমিন বানানো", remove_admin:"অ্যাডমিন থেকে সরানো", remove_member:"সদস্যপদ বাতিল" };
+const ACT_TXT = { make_admin:"অ্যাডমিন বানানো", remove_admin:"অ্যাডমিন থেকে সরানো", remove_member:"সদস্যপদ বাতিল", resign_admin:"🙋 পদত্যাগের আবেদন" };
 function tabMembers(){
   $("tabBody").innerHTML = `<div id="actBox"></div><div class="card"><div class="h">👥 সদস্য তালিকা</div><div id="memList"><div class="empty"><span class="spin"></span></div></div></div>`;
   drawActions();
@@ -1159,12 +1356,24 @@ function drawActions(){
   const box = $("actBox"); if(!box || !isAdmin()) return;
   box.innerHTML = ACTIONS.length ? `<div class="card" style="border-color:rgba(255,183,3,.5)"><div class="h">⚠️ অনুমোদনের অপেক্ষায়</div>${ACTIONS.map(a=>{ const mine = (a.approvedBy || []).includes(ME.uid), isTarget = a.targetUid === ME.uid; return `<div class="item" style="align-items:flex-start"><div class="grow">
       <b style="font-size:14px">${esc(ACT_TXT[a.kind] || a.kind)}: ${esc(a.targetName)}</b>
-      <div class="small">প্রস্তাব/অনুমোদন: ${esc((a.approvedNames || []).join(", "))} (${bn((a.approvedBy || []).length)}/${bn(a.need || 2)})</div>
-      ${isTarget ? `<div class="small">এটা আপনাকে নিয়ে — আপনি অনুমোদন দিতে পারবেন না।</div>` : `<div class="row" style="margin-top:8px"><button class="btn green" type="button" data-aok="${esc(a.kind)}:${esc(a.targetUid)}" ${mine ? "disabled" : ""} style="padding:7px 12px; font-size:13px">${mine ? "✓ আপনি দিয়েছেন" : "✅ অনুমোদন"}</button><button class="btn red" type="button" data-ano="${esc(a.kind)}:${esc(a.targetUid)}" style="padding:7px 12px; font-size:13px">❌ বাতিল</button></div>`}
+      ${a.reason ? `<div style="font-size:13px; margin-top:3px">💬 ${esc(a.reason)}</div>` : ""}
+      <div class="small">${a.kind === "resign_admin" ? "অনুমতি" : "প্রস্তাব/অনুমোদন"}: ${esc((a.approvedNames || []).join(", ") || "—")} (${bn((a.approvedBy || []).length)}/${bn(a.need || 2)})</div>
+      ${isTarget ? (a.kind === "resign_admin" ? `<div class="row" style="margin-top:8px"><span class="small">আপনার আবেদন — অন্য অ্যাডমিনের অনুমতির অপেক্ষায়।</span><button class="btn ghost" type="button" id="rsCancel" style="padding:6px 10px; font-size:12.5px">আবেদন তুলে নিন</button></div>` : `<div class="small">এটা আপনাকে নিয়ে — আপনি অনুমোদন দিতে পারবেন না।</div>`) : `<div class="row" style="margin-top:8px"><button class="btn green" type="button" data-aok="${esc(a.kind)}:${esc(a.targetUid)}" ${mine ? "disabled" : ""} style="padding:7px 12px; font-size:13px">${mine ? "✓ আপনি দিয়েছেন" : "✅ অনুমোদন"}</button><button class="btn red" type="button" data-ano="${esc(a.kind)}:${esc(a.targetUid)}" style="padding:7px 12px; font-size:13px">❌ বাতিল</button></div>`}
     </div></div>`; }).join("")}</div>` : "";
   const act = async (b, approve)=>{ const [kind, uid] = (b.dataset.aok || b.dataset.ano).split(":"); const r = await busy(b, ()=> api("adminAction", { orgId: ORG.id, kind, uid, approve })); if(r) toast(r.status === "done" ? "✅ সম্পন্ন হয়েছে" : r.status === "rejected" ? "বাতিল হয়েছে" : "✅ অনুমোদন জমা"); };
   box.querySelectorAll("[data-aok]").forEach(b=> b.onclick = ()=> act(b, true));
   box.querySelectorAll("[data-ano]").forEach(b=> b.onclick = ()=> act(b, false));
+  if($("rsCancel")) $("rsCancel").onclick = async ()=>{ if(await busy($("rsCancel"), ()=> api("resignCancel", { orgId: ORG.id }))) toast("আবেদন তুলে নেওয়া হয়েছে"); };
+}
+// 🙋 অ্যাডমিন নিজে পদত্যাগের আবেদন — অন্য অ্যাডমিনরা অনুমতি দেবেন
+function openResign(){
+  const others = (ORG.adminCount || 1) - 1;
+  if(others < 1){ openModal(`<div class="h">🙋 পদত্যাগ</div><div class="notice">আপনি এখন একমাত্র অ্যাডমিন। পদত্যাগ করলে সংগঠন অ্যাডমিন ছাড়া পড়ে থাকবে — তাই আগে 👥 সদস্য পাতা থেকে আরেকজন বিশ্বস্ত সদস্যকে অ্যাডমিন বানান, তারপর পদত্যাগ করতে পারবেন।</div><div class="row" style="margin-top:12px"><button class="btn ghost full" type="button" data-close>ঠিক আছে</button></div>`); return; }
+  openModal(`<div class="h">🙋 অ্যাডমিন পদ থেকে পদত্যাগ</div>
+    <div class="small">${others >= 2 ? "অন্য দুইজন অ্যাডমিন অনুমতি দিলে" : "অন্য অ্যাডমিন অনুমতি দিলে"} আপনি সাধারণ সদস্য হয়ে যাবেন — সংগঠন ছাড়বেন না। অনুমতির আগে চাইলে আবেদন তুলে নিতে পারবেন। ততক্ষণ আপনি অ্যাডমিনই থাকবেন।</div>
+    <label class="f">কারণ (ঐচ্ছিক)</label><textarea class="in" id="rsR" maxlength="300" placeholder="যেমন: ব্যস্ততার কারণে সময় দিতে পারছি না"></textarea>
+    <div class="row" style="margin-top:12px"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn red" type="button" id="rsGo" style="flex:1">🙋 আবেদন পাঠান</button></div>`);
+  $("rsGo").onclick = async ()=>{ if(await busy($("rsGo"), ()=> api("resignRequest", { orgId: ORG.id, reason: $("rsR").value.trim() }))){ closeModal(); toast("✅ আবেদন জমা — অন্য অ্যাডমিনের অনুমতির অপেক্ষায়"); } };
 }
 function memberMenu(m){
   if(!m) return;
@@ -1173,11 +1382,12 @@ function memberMenu(m){
     <label class="f">পদবি (যেমন: সভাপতি, সাধারণ সম্পাদক, কোষাধ্যক্ষ)</label>
     <div class="row" style="flex-wrap:nowrap"><input class="in" id="tT" maxlength="40" value="${esc(m.title || "")}"><button class="btn" type="button" id="tGo">সেভ</button></div>
     <div class="small" style="margin-top:4px">পদবি শুধু নাম — সব অ্যাডমিনের ক্ষমতা সমান।</div>
-    ${self ? "" : `<div style="margin-top:16px; display:grid; gap:8px">
+    ${self ? (m.role === "admin" ? `<button class="btn red full" type="button" id="selfResign" style="margin-top:16px">🙋 অ্যাডমিন পদ থেকে পদত্যাগের আবেদন</button>` : "") : m.uid === ORG.createdBy ? `<div class="notice" style="margin-top:14px">🛡️ ইনি প্রতিষ্ঠাতা — কেউ তাঁকে অ্যাডমিন থেকে সরাতে বা সদস্যপদ বাতিল করতে পারেন না।</div>` : `<div style="margin-top:16px; display:grid; gap:8px">
       ${m.role === "admin" ? `<button class="btn ghost" type="button" data-k="remove_admin">⬇️ অ্যাডমিন থেকে সরিয়ে সাধারণ সদস্য করুন</button>` : `<button class="btn ghost" type="button" data-k="make_admin">⬆️ অ্যাডমিন বানানোর প্রস্তাব</button>`}
       <button class="btn red" type="button" data-k="remove_member">🚫 সদস্যপদ বাতিলের প্রস্তাব</button>
       <div class="small">${need2() === 2 ? "এগুলোতে দুইজন অ্যাডমিনের অনুমোদন লাগবে (যাঁকে নিয়ে কাজ, তিনি বাদে)।" : "এখন অ্যাডমিন একজন — আপনার অনুমোদনেই হবে।"}</div></div>`}
     <div class="row" style="margin-top:14px"><button class="btn ghost full" type="button" data-close>বন্ধ</button></div>`);
+  if($("selfResign")) $("selfResign").onclick = openResign;
   $("tGo").onclick = async ()=>{ const t = $("tT").value.trim(); if(t.length < 2) return toast("পদবি লিখুন"); if(await busy($("tGo"), ()=> api("setTitle", { orgId: ORG.id, uid: m.uid, title: t }))){ toast("✅ পদবি সেভ হয়েছে"); closeModal(); } };
   document.querySelectorAll("#modalBox [data-k]").forEach(b=> b.onclick = async ()=>{
     if(!confirm(ACT_TXT[b.dataset.k] + " — " + m.name + "। নিশ্চিত?")) return;
@@ -1263,7 +1473,7 @@ function tabManage(){
 /* ---------- 📜 কাজের খাতা (অ্যাডমিন) ---------- */
 const LOG_TXT = { org_create:"সংগঠন খুলেছেন", org_update:"সংগঠনের তথ্য বদলেছেন", member_approve_1:"প্রথম অনুমোদন দিয়েছেন", member_approve:"সদস্য গ্রহণ করেছেন", member_reject:"আবেদন বাতিল করেছেন", member_leave:"সংগঠন ছেড়েছেন",
   post_create:"পোস্ট দিয়েছেন", post_edit:"পোস্ট এডিট করেছেন", post_remove:"পোস্ট সরিয়েছেন", money_in:"জমা লিখেছেন", money_out:"খরচ লিখেছেন", money_in_ok:"জমা নিশ্চিত করেছেন", money_out_ok:"খরচ অনুমোদন করেছেন", money_reject:"লেনদেন বাতিল করেছেন",
-  proposal_create:"প্রস্তাব দিয়েছেন", proposal_cancel:"প্রস্তাব বাতিল করেছেন", proposal_pass:"প্রস্তাব পাস", proposal_fail:"প্রস্তাব পাস হয়নি", aid_create:"মানবিক সেবা খুলেছেন", aid_update:"মানবিক সেবা বদলেছেন",
+  proposal_create:"প্রস্তাব দিয়েছেন", resign_request:"পদত্যাগের আবেদন করেছেন", resign_cancel:"পদত্যাগের আবেদন তুলে নিয়েছেন", election_create:"নির্বাচন তৈরি করেছেন", election_publish_1:"নির্বাচন চালুর অনুমতি দিয়েছেন", election_publish:"নির্বাচন চালু করেছেন", election_cancel_1:"নির্বাচন বাতিলের অনুমতি দিয়েছেন", election_cancel:"নির্বাচন বাতিল করেছেন", candidate_apply:"প্রার্থী হয়েছেন", candidate_withdraw:"প্রার্থিতা তুলে নিয়েছেন", candidate_remove_1:"প্রার্থী বাদের প্রস্তাব দিয়েছেন", candidate_remove:"প্রার্থী বাদ দিয়েছেন", election_runoff:"সমান ভোট — আবার ভোট", election_done:"নির্বাচনের ফলাফল", election_void:"নির্বাচন বাতিল (ফল হয়নি)", proposal_cancel:"প্রস্তাব বাতিল করেছেন", proposal_pass:"প্রস্তাব পাস", proposal_fail:"প্রস্তাব পাস হয়নি", aid_create:"মানবিক সেবা খুলেছেন", aid_update:"মানবিক সেবা বদলেছেন",
   set_title:"পদবি দিয়েছেন", action_propose:"প্রস্তাব/অনুমোদন দিয়েছেন", action_done:"সম্পন্ন করেছেন", action_reject:"প্রস্তাব বাতিল করেছেন", delete_request:"সংগঠন মোছার অনুরোধ করেছেন", delete_cancel:"মোছার অনুরোধ বাতিল করেছেন", org_delete:"সংগঠন মুছেছেন" };
 function tabLog(){
   $("tabBody").innerHTML = `<div class="card"><div class="h">📜 কাজের খাতা</div><div class="small" style="margin-bottom:6px">কে কখন কী করেছেন — এই খাতা কেউ বদলাতে বা মুছতে পারেন না।</div><div id="logList"><div class="empty"><span class="spin"></span></div></div></div>`;
@@ -1279,6 +1489,7 @@ function tabLog(){
 /* ---------- কাউন্টডাউন — প্রতি সেকেন্ডে ---------- */
 setInterval(()=>{
   document.querySelectorAll("[data-cd]").forEach(el=> el.textContent = left(Number(el.dataset.cd) - Date.now()));
+  if(ORG_TAB === "votes" && VOTE_SUB === "elections" && ELECTIONS.some(e=> [ms(e.applyEndAt), ms(e.voteStartAt), ms(e.voteEndAt)].some(x=> x <= Date.now() && x > Date.now() - 1100))) drawElections();
   if(ORG_TAB === "votes" && PROPS.some(p=> p.status === "open" && [ms(p.startAt), ms(p.endAt)].some(x=> x <= Date.now() && x > Date.now() - 1100))) drawProps();
 }, 1000);
 

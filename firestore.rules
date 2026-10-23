@@ -1144,6 +1144,23 @@ service cloud.firestore {
           allow update: if false;
         }
       }
+      // 🗳️ নির্বাচন — খসড়া শুধু অ্যাডমিন; প্রকাশের পর সদস্যরা। গোপন গণনা (private) কেউ পড়তে পারেন না,
+      // ব্যালটে শুধু "ভোট দিয়েছেন" — নিজেরটা নিজে দেখেন
+      match /elections/{eid} {
+        allow read: if isOrgAdmin(orgId) || (isOrgMember(orgId) && resource.data.status != 'draft');
+        allow write: if false;
+        match /candidates/{uid} {
+          allow read: if isOrgMember(orgId);
+          allow write: if false;
+        }
+        match /ballots/{bid} {
+          allow read: if isSignedIn() && (bid == request.auth.uid || bid.matches(request.auth.uid + '_r[0-9]+'));
+          allow write: if false;
+        }
+        match /private/{docId} {
+          allow read, write: if false;
+        }
+      }
       // ❤️ মানবিক সেবা — প্রকাশ করা উদ্যোগ সবাই, বাকিগুলো সদস্যরা
       match /aid/{aidId} {
         allow read: if resource.data.public == true || isOrgMember(orgId);
