@@ -843,6 +843,27 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['token','lat','lon','area','on','mode','utcHour','updatedAt','offReason']);
     }
 
+    // 🕌 নামাজ/সেহরি/ইফতারের নোটিফিকেশন — নিজের সাবস্ক্রিপশন শুধু নিজে।
+    //    pending*/lastKey/offReason সার্ভার লেখে; ক্লায়েন্ট nextAt শুধু "এখন" বা মুছতে পারে।
+    match /prayerSubs/{uid} {
+      function prOk(d){
+        return d.token is string && d.token.size() < 400
+          && d.lat is number && d.lat >= -90 && d.lat <= 90
+          && d.lon is number && d.lon >= -180 && d.lon <= 180
+          && d.on is bool && d.items is list && d.items.size() <= 7
+          && d.before is int && d.before >= 0 && d.before <= 30
+          && d.adj is int && d.adj >= -1 && d.adj <= 1
+          && (!('tz' in d) || (d.tz is string && d.tz.size() <= 60))
+          && (!('area' in d) || (d.area is string && d.area.size() <= 80))
+          && (!('nextAt' in d) || d.nextAt == request.time || (resource != null && 'nextAt' in resource.data && d.nextAt == resource.data.nextAt));
+      }
+      allow read, delete: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn() && request.auth.uid == uid && prOk(request.resource.data)
+        && request.resource.data.keys().hasOnly(['token','lat','lon','area','tz','on','items','before','adj','nextAt','updatedAt']);
+      allow update: if isSignedIn() && request.auth.uid == uid && prOk(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['token','lat','lon','area','tz','on','items','before','adj','nextAt','updatedAt','offReason']);
+    }
+
     match /customers/{uid} {
       allow read, write: if isSignedIn() && request.auth.uid == uid;
       // 👥 সুপার-এডমিন প্যানেলে মোট/সক্রিয় কাস্টমারের সংখ্যা গোনার জন্য (শুধু পড়া)
