@@ -752,7 +752,18 @@ service cloud.firestore {
       allow update: if isSignedIn() &&
         (isSuperAdmin() ||
          (myShopId() != null && resource.data.shopId == myShopId()) ||
-         resource.data.assignedRiderId == request.auth.uid);
+         resource.data.assignedRiderId == request.auth.uid ||
+         // 👤 গ্রাহক নিজের অর্ডারে শুধু দুইটা কাজ পারেন:
+         //   ১) নিজের তালিকা থেকে সরানো (hiddenForCustomer) — শেষ হওয়া অর্ডার
+         //   ২) "পথে আছে" অর্ডার হাতে পেলে "পেয়েছি" (shipped → delivered)
+         (resource.data.customerUid == request.auth.uid &&
+          ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenForCustomer','hiddenAt']) &&
+            resource.data.status in ['delivered','cancelled']) ||
+           (resource.data.status == 'shipped' && request.resource.data.status == 'delivered' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','deliveredAt'])))));
+      // ⏱️ গ্রাহক শুধু "অপেক্ষায়" (holding) থাকা নিজের অর্ডার বাতিল/মুছতে পারেন — দোকানে যাওয়ার আগে
+      allow delete: if isSignedIn() && resource.data.customerUid == request.auth.uid &&
+        resource.data.status == 'holding';
 
       // 🔒 গোপনীয় অর্ডারের আসল পণ্যের নাম/আইডি — শুধু অর্ডারকারী গ্রাহক আর
       // সেই দোকান। রাইডার আর সুপার-অ্যাডমিনও এটা পড়তে পারেন না।
