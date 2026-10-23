@@ -703,11 +703,12 @@ function drawPosts(){
       ${st ? `<div style="margin-top:8px"><span class="chip ${st[0]}">${st[1]}</span></div>` : ""}
       ${p.imagePath ? `<div data-img="${esc(p.imagePath)}" style="margin-top:12px; border-radius:12px; overflow:hidden; background:rgba(255,255,255,0.04); min-height:80px"></div>` : ""}
       <div style="margin-top:10px; line-height:1.75; font-size:14.5px; white-space:pre-wrap">${esc(p.text)}</div>
+      ${p.editedAt ? `<div class="small" style="margin-top:4px">✏️ এডিট করা হয়েছে · ${esc(when(p.editedAt))}</div>` : ""}
       <div class="row" style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px">
         <button class="btn ghost" type="button" data-like="${esc(p.id)}" style="padding:7px 12px; font-size:13px">${MYLIKES[p.id] ? "❤️" : "🤍"} ${bn(p.likeCount || 0)}</button>
         <button class="btn ghost" type="button" data-cm="${esc(p.id)}" style="padding:7px 12px; font-size:13px">💬 ${bn(p.commentCount || 0)}</button>
         ${p.audience === "public" && p.status === "published" ? `<button class="btn ghost" type="button" data-share="${esc(p.id)}" style="padding:7px 12px; font-size:13px">↗ শেয়ার</button>` : ""}
-        ${isAdmin() && p.status !== "removed" ? `<button class="btn red" type="button" data-rm="${esc(p.id)}" style="padding:7px 12px; font-size:13px; margin-left:auto">🗑️</button>` : ""}
+        ${isAdmin() && p.status !== "removed" ? `<button class="btn ghost" type="button" data-ed="${esc(p.id)}" style="padding:7px 12px; font-size:13px; margin-left:auto">✏️ এডিট</button><button class="btn red" type="button" data-rm="${esc(p.id)}" style="padding:7px 12px; font-size:13px">🗑️</button>` : ""}
       </div>
       <div id="cm-${esc(p.id)}"></div>
     </div>`;
@@ -722,6 +723,7 @@ function drawPosts(){
   el.querySelectorAll("[data-like]").forEach(b=> b.onclick = ()=> toggleLike(b.dataset.like));
   el.querySelectorAll("[data-cm]").forEach(b=> b.onclick = ()=> toggleComments("posts", b.dataset.cm, $("cm-" + b.dataset.cm)));
   el.querySelectorAll("[data-share]").forEach(b=> b.onclick = ()=> sharePost(POSTS.find(x=> x.id === b.dataset.share)));
+  el.querySelectorAll("[data-ed]").forEach(b=> b.onclick = ()=> openEditPost(POSTS.find(x=> x.id === b.dataset.ed)));
   el.querySelectorAll("[data-rm]").forEach(b=> b.onclick = async ()=>{ if(!confirm("পোস্টটা সরিয়ে দেবেন? সবার কাছ থেকে লুকিয়ে যাবে।")) return; if(await busy(b, ()=> api("postRemove", { orgId: ORG.id, postId: b.dataset.rm }))) toast("পোস্ট সরানো হয়েছে"); });
   if(ME) POSTS.forEach(p=>{ if(MYLIKES[p.id] === undefined){ MYLIKES[p.id] = false; db.collection("orgs").doc(ORG.id).collection("posts").doc(p.id).collection("likes").doc(ME.uid).get().then(d=>{ if(d.exists){ MYLIKES[p.id] = true; drawPosts(); } }).catch(()=>{}); } });
   if(focus){ const f = $("post-" + focus); if(f && !drawPosts._done){ drawPosts._done = true; f.scrollIntoView({ block:"center" }); } }
@@ -793,6 +795,27 @@ async function makeWebp(file, maxBytes){
   if(!blob || blob.type !== "image/webp") throw new Error("এই ফোনে ছবি তৈরি করা যায়নি");
   if(blob.size > maxBytes) throw new Error("ছবিটা ছোট করা গেল না — অন্য ছবি দিন");
   return blob;
+}
+function openEditPost(p){
+  if(!p) return;
+  const exp = ms(p.expireAt);
+  openModal(`<div class="h">✏️ পোস্ট এডিট</div>
+    <label class="f">লেখা *</label><textarea class="in" id="ePT" maxlength="3000" style="min-height:140px">${esc(p.text)}</textarea>
+    <label class="f">মেয়াদ</label>
+    <select class="in" id="ePE"><option value="keep">${exp ? "আগেরটাই রাখুন (" + esc(when(p.expireAt)) + ")" : "নিজে সরানো পর্যন্ত (আগের মতো)"}</option>${exp ? `<option value="0">মেয়াদ তুলে দিন — নিজে সরানো পর্যন্ত</option>` : ""}<option value="24">এখন থেকে ২৪ ঘণ্টা</option><option value="168">এখন থেকে ৭ দিন</option><option value="custom">নির্দিষ্ট তারিখ/সময়</option></select>
+    <div id="ePEl" style="display:none"><label class="f">মেয়াদ শেষের তারিখ ও সময়</label><input class="in" id="ePEt" type="datetime-local" min="${dtLocal(Date.now())}"></div>
+    <div class="small" style="margin-top:8px">কারা দেখবেন (${p.audience === "public" ? "🌐 পাবলিক" : "🔒 সদস্য"}) আর ছবি বদলানো যায় না — দরকার হলে পোস্টটা সরিয়ে নতুন দিন।</div>
+    <div id="ePMsg" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
+    <div class="row"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="ePGo" style="flex:1">💾 সেভ করুন</button></div>`);
+  $("ePE").onchange = ()=> $("ePEl").style.display = $("ePE").value === "custom" ? "block" : "none";
+  $("ePGo").onclick = async ()=>{
+    const text = $("ePT").value.trim(); if(!text) return $("ePMsg").textContent = "পোস্টের লেখা দিন";
+    const v = $("ePE").value; let expireAt;
+    if(v === "keep") expireAt = exp || 0;
+    else if(v === "custom"){ expireAt = new Date($("ePEt").value).getTime(); if(!expireAt || expireAt <= Date.now() + 10 * 60000) return $("ePMsg").textContent = "মেয়াদ এখন থেকে অন্তত ১০ মিনিট পরের দিন"; }
+    else expireAt = Number(v) ? Date.now() + Number(v) * 3600000 : 0;
+    if(await busy($("ePGo"), ()=> api("postEdit", { orgId: ORG.id, postId: p.id, text, expireAt }))){ closeModal(); toast("✅ পোস্ট আপডেট হয়েছে"); }
+  };
 }
 function dtLocal(msVal){ const d = new Date(msVal - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); }
 function openNewPost(){
@@ -1198,7 +1221,7 @@ function tabManage(){
 
 /* ---------- 📜 কাজের খাতা (অ্যাডমিন) ---------- */
 const LOG_TXT = { org_create:"সংগঠন খুলেছেন", org_update:"সংগঠনের তথ্য বদলেছেন", member_approve_1:"প্রথম অনুমোদন দিয়েছেন", member_approve:"সদস্য গ্রহণ করেছেন", member_reject:"আবেদন বাতিল করেছেন", member_leave:"সংগঠন ছেড়েছেন",
-  post_create:"পোস্ট দিয়েছেন", post_remove:"পোস্ট সরিয়েছেন", money_in:"জমা লিখেছেন", money_out:"খরচ লিখেছেন", money_in_ok:"জমা নিশ্চিত করেছেন", money_out_ok:"খরচ অনুমোদন করেছেন", money_reject:"লেনদেন বাতিল করেছেন",
+  post_create:"পোস্ট দিয়েছেন", post_edit:"পোস্ট এডিট করেছেন", post_remove:"পোস্ট সরিয়েছেন", money_in:"জমা লিখেছেন", money_out:"খরচ লিখেছেন", money_in_ok:"জমা নিশ্চিত করেছেন", money_out_ok:"খরচ অনুমোদন করেছেন", money_reject:"লেনদেন বাতিল করেছেন",
   proposal_create:"প্রস্তাব দিয়েছেন", proposal_cancel:"প্রস্তাব বাতিল করেছেন", proposal_pass:"প্রস্তাব পাস", proposal_fail:"প্রস্তাব পাস হয়নি", aid_create:"মানবিক সেবা খুলেছেন", aid_update:"মানবিক সেবা বদলেছেন",
   set_title:"পদবি দিয়েছেন", action_propose:"প্রস্তাব/অনুমোদন দিয়েছেন", action_done:"সম্পন্ন করেছেন", action_reject:"প্রস্তাব বাতিল করেছেন", delete_request:"সংগঠন মোছার অনুরোধ করেছেন", delete_cancel:"মোছার অনুরোধ বাতিল করেছেন", org_delete:"সংগঠন মুছেছেন" };
 function tabLog(){
