@@ -948,6 +948,8 @@
         <span id="hbswHeroWorkday" style="color:var(--ok); font-weight:700;">🏢 লোড হচ্ছে…</span>
         <span id="hbswHeroNextHoliday" style="color:var(--amber); font-weight:700;">🔔 লোড হচ্ছে…</span>
       </div>
+      <!-- ⚠️ আবহাওয়ার আগাম সতর্কতা — খারাপ আবহাওয়া আসলে তবেই দেখায়, চাপলে আবহাওয়া প্যানেল খোলে -->
+      <div id="hbWxAlertBanner" style="display:none;"></div>
 
       <!-- 🏛️ সরকারি ছুটি — বড়, সুন্দর ব্যাজ আকারে কার্ডের সাথে মিলিয়ে দেওয়া -->
       <div style="display:flex; align-items:center; gap:12px; margin-top:14px; padding:13px 15px; border-radius:14px; background:rgba(245,166,35,0.13); border:1px solid rgba(245,166,35,0.35);">
@@ -1358,7 +1360,7 @@
 
   <!-- 🌤️ Menu → আবহাওয়া: আবহাওয়া প্যানেল -->
   <div class="menuOverlay" id="hbswWeatherOverlay">
-    <div class="menuPanel">
+    <div class="menuPanel" style="max-height:88vh; overflow-y:auto;">
       <div style="display:flex; align-items:center; margin-bottom:16px;">
         <h3 style="margin:0; font-size:16px;">🌤️ আবহাওয়া</h3>
         <span id="hbswWeatherOverlayClose" style="margin-left:auto; font-size:20px; cursor:pointer; color:var(--muted);">✕</span>
@@ -1374,7 +1376,20 @@
         <span>সর্বোচ্চ <b id="hbswWxMax" style="color:#f0a35c;">--°</b></span>
         <span>সর্বনিম্ন <b id="hbswWxMin" style="color:#7ec8f2;">--°</b></span>
       </div>
+      <div id="hbWxAlertList" style="margin-top:12px;"></div>
+      <div id="hbWxPushBox" style="margin-top:12px; padding:11px 12px; border-radius:12px; background:rgba(245,166,35,0.08); border:1px solid rgba(245,166,35,0.3);">
+        <div style="font-weight:800; font-size:13px;">🔔 ফোনে আগাম সতর্কতা</div>
+        <div style="font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.5;">অ্যাপ বন্ধ থাকলেও বৃষ্টি, ঝড়, বজ্রপাত বা তীব্র গরমের সম্ভাবনা থাকলে ফোনে খবর যাবে। আবহাওয়া ভালো থাকলে কিছু যাবে না।</div>
+        <select id="hbWxPushMode" style="width:100%; margin-top:8px; padding:9px; border-radius:10px; background:var(--card); color:#fff; border:1px solid var(--border); font-family:inherit; font-size:13px;">
+          <option value="eve">রাত ৮টায় — আগামীকালের খবর</option>
+          <option value="morn">সকাল ৭টায় — আজকের খবর</option>
+        </select>
+        <button id="hbWxPushBtn" type="button" style="width:100%; margin-top:8px; padding:11px; border-radius:10px; border:0; background:#f5a623; color:#1a1206; font-weight:800; font-family:inherit; font-size:14px; cursor:pointer;">🔔 চালু করুন</button>
+        <div id="hbWxPushStatus" style="font-size:11.5px; margin-top:6px; color:var(--muted);"></div>
+      </div>
+      <div id="hbWxDays" style="margin-top:12px;"></div>
       <div style="font-size:9.5px; color:var(--muted); margin-top:8px;">* GPS লোকেশন থেকে লাইভ আবহাওয়া — অনুমতি না দিলে ঢাকার আবহাওয়া দেখানো হয়</div>
+      <div style="font-size:9.5px; color:var(--muted); margin-top:3px;">* পূর্বাভাস Open-Meteo আবহাওয়া মডেল থেকে — এটা সম্ভাবনা, সরকারি বিপদ সংকেত নয়। ঘূর্ণিঝড়ের সংকেতের জন্য আবহাওয়া অধিদপ্তরের খবর দেখুন।</div>
     </div>
   </div>
 
@@ -7902,6 +7917,114 @@ function hbApplyWeather(tempNow, wcode, tmax, tmin, areaLabel){
   if(wxMax) wxMax.textContent = Math.round(tmax) + "°";
   if(wxMin) wxMin.textContent = Math.round(tmin) + "°";
 }
+/* ════════ ⚠️ আবহাওয়ার আগাম সতর্কতা + ৭ দিনের পূর্বাভাস ════════
+   Open-Meteo-র মডেল থেকে: বৃষ্টির সম্ভাবনা, বৃষ্টির পরিমাণ, দমকা হাওয়া, বজ্রঝড়, গরম, কুয়াশা।
+   আজকের বাকি সময় + আগামীকাল + পরের দিনগুলো দেখে সবচেয়ে বিপদের খবরটা উপরে ব্যানারে দেখায়। */
+const HB_WD_BN = ["রবিবার","সোমবার","মঙ্গলবার","বুধবার","বৃহস্পতিবার","শুক্রবার","শনিবার"];
+function hbBn(n){ return Number(n).toLocaleString("bn-BD"); }
+function hbHourBn(h){
+  const part = h < 4 ? "রাত" : h < 6 ? "ভোর" : h < 12 ? "সকাল" : h < 15 ? "দুপুর" : h < 18 ? "বিকেল" : h < 20 ? "সন্ধ্যা" : "রাত";
+  let h12 = h % 12; if(h12 === 0) h12 = 12;
+  return part + " " + hbBn(h12) + "টা";
+}
+function hbDayName(i, dateStr){
+  if(i === 0) return "আজ";
+  if(i === 1) return "আগামীকাল";
+  const d = new Date(dateStr + "T12:00:00");
+  return isNaN(d) ? dateStr : HB_WD_BN[d.getDay()];
+}
+/* একটা দিনের ঘণ্টার তালিকা থেকে কোন সময়ে বৃষ্টি/ঝড় — "বিকেল ৩টা থেকে সন্ধ্যা ৬টা" */
+function hbWxWindow(data, dateStr, test, fromHour){
+  const H = data.hourly || {}, T = H.time || [];
+  const hrs = [];
+  T.forEach((t, k)=>{
+    if(String(t).slice(0,10) !== dateStr) return;
+    const h = Number(String(t).slice(11,13));
+    if(fromHour != null && h < fromHour) return;
+    if(test(k)) hrs.push(h);
+  });
+  if(!hrs.length) return "";
+  const a = hrs[0], b = hrs[hrs.length-1] + 1;
+  return a === b - 1 ? hbHourBn(a) + " নাগাদ" : hbHourBn(a) + " থেকে " + hbHourBn(Math.min(b,23)) + " পর্যন্ত";
+}
+function hbWxAlerts(data){
+  const D = data.daily || {}, days = D.time || [], H = data.hourly || {}, out = [];
+  const nowH = new Date().getHours();
+  for(let i = 0; i < Math.min(days.length, 7); i++){
+    const ds = days[i], when = hbDayName(i, ds), from = i === 0 ? nowH : null;
+    const code = (D.weathercode||[])[i], prob = (D.precipitation_probability_max||[])[i] || 0,
+          rain = (D.precipitation_sum||[])[i] || 0, gust = (D.windgusts_10m_max||[])[i] || 0,
+          tmax = (D.temperature_2m_max||[])[i];
+    // আজকের ক্ষেত্রে শুধু বাকি সময়টা ধরা — সকালে বৃষ্টি হয়ে গেলে রাতে সতর্ক করার মানে নেই
+    if(i === 0){
+      const left = (H.time||[]).some((t,k)=> String(t).slice(0,10) === ds && Number(String(t).slice(11,13)) >= nowH &&
+                   ((H.precipitation_probability||[])[k] >= 50 || [95,96,99].includes((H.weathercode||[])[k]) || (H.windgusts_10m||[])[k] >= 40));
+      if(!left) continue;
+    }
+    const storm = [95,96,99].includes(code) || (H.weathercode||[]).some((c,k)=> [95,96,99].includes(c) && String(H.time[k]).slice(0,10) === ds && (from == null || Number(String(H.time[k]).slice(11,13)) >= from));
+    if(storm){
+      const w = hbWxWindow(data, ds, k=> [95,96,99].includes(H.weathercode[k]), from);
+      out.push({ lv:3, day:i, icon:"⛈️", title: when + " বজ্রঝড়ের সম্ভাবনা", text:(w ? w + "। " : "") + "বাজ পড়তে পারে — খোলা মাঠ, গাছের নিচে ও পানিতে থাকবেন না। জরুরি কাজ আগে সেরে নিন।" });
+    }
+    if(gust >= 40){
+      const w = hbWxWindow(data, ds, k=> (H.windgusts_10m||[])[k] >= 40, from);
+      out.push({ lv: gust >= 60 ? 3 : 2, day:i, icon:"🌬️", title: when + (gust >= 60 ? " ঝড়ো হাওয়া" : " দমকা হাওয়া") + " — ঘণ্টায় " + hbBn(Math.round(gust)) + " কিমি পর্যন্ত", text:(w ? w + "। " : "") + "টিনের চাল, দোকানের সাইনবোর্ড, খামারের শেড বেঁধে রাখুন।" });
+    }
+    if(prob >= 50 || rain >= 10){
+      const heavy = rain >= 50, mid = rain >= 20 || prob >= 80;
+      const w = hbWxWindow(data, ds, k=> (H.precipitation_probability||[])[k] >= 50, from);
+      out.push({ lv: heavy ? 3 : mid ? 2 : 1, day:i, icon: heavy ? "🌧️" : "🌦️",
+        title: when + (heavy ? " ভারী বৃষ্টির সম্ভাবনা" : " বৃষ্টির সম্ভাবনা " + hbBn(Math.round(prob)) + "%"),
+        text:(w ? w + "। " : "") + (rain >= 1 ? "প্রায় " + hbBn(Math.round(rain)) + " মিমি বৃষ্টি হতে পারে। " : "") + (heavy ? "পানি জমতে পারে — পুকুরের পাড়, ধান/সবজি, মালামাল সামলে রাখুন।" : "বাইরের কাজ আগেভাগে শেষ করুন, ছাতা সাথে রাখুন।") });
+    }
+    if(tmax != null && tmax >= 37){
+      out.push({ lv: tmax >= 40 ? 3 : 2, day:i, icon:"🔥", title: when + " তীব্র গরম — " + hbBn(Math.round(tmax)) + "°", text:"দুপুর ১২টা থেকে ৩টা রোদে কাজ এড়ান, বেশি পানি পান করুন। মুরগি/গবাদি পশুকে ছায়া ও পানি দিন।" });
+    }
+    if([45,48].includes(code)){
+      out.push({ lv:1, day:i, icon:"🌫️", title: when + " ঘন কুয়াশা", text:"ভোরে রাস্তায় সাবধানে চলুন, গাড়ির হেডলাইট জ্বালান।" });
+    }
+  }
+  return out.sort((a,b)=> b.lv - a.lv || a.day - b.day);
+}
+function hbWxColor(lv){ return lv >= 3 ? ["rgba(239,68,68,0.15)","rgba(239,68,68,0.5)","#fca5a5"] : lv === 2 ? ["rgba(245,166,35,0.15)","rgba(245,166,35,0.5)","#fcd34d"] : ["rgba(96,165,250,0.13)","rgba(96,165,250,0.4)","#93c5fd"]; }
+function hbRenderForecast(data){
+  const alerts = hbWxAlerts(data);
+  // ব্যানার: আজ/কাল/পরশুর সবচেয়ে বড় বিপদ
+  const ban = document.getElementById("hbWxAlertBanner");
+  const soon = alerts.filter(a=> a.day <= 2);
+  if(ban){
+    if(soon.length){
+      const a = soon[0], [bg, bd, fg] = hbWxColor(a.lv);
+      ban.style.display = "block";
+      ban.innerHTML = '<div role="button" style="display:flex; gap:10px; align-items:flex-start; margin-top:12px; padding:11px 13px; border-radius:14px; background:' + bg + '; border:1px solid ' + bd + '; cursor:pointer;">' +
+        '<span style="font-size:24px; flex-shrink:0;">' + a.icon + '</span><div style="flex:1;"><div style="font-weight:800; font-size:14px; color:' + fg + ';">⚠️ ' + a.title + '</div>' +
+        '<div style="font-size:12px; color:#e7e2d4; margin-top:3px; line-height:1.5;">' + a.text + '</div>' +
+        (soon.length > 1 ? '<div style="font-size:11px; color:var(--muted); margin-top:4px;">আরও ' + hbBn(soon.length-1) + 'টা সতর্কতা · বিস্তারিত দেখতে চাপুন ›</div>' : '<div style="font-size:11px; color:var(--muted); margin-top:4px;">৭ দিনের পূর্বাভাস দেখতে চাপুন ›</div>') + '</div></div>';
+      ban.firstChild.onclick = ()=>{ const o = document.getElementById("hbswWeatherOverlay"); if(o) o.classList.add("show"); };
+    }else{ ban.style.display = "none"; ban.innerHTML = ""; }
+  }
+  // প্যানেলের ভিতরে সব সতর্কতা
+  const al = document.getElementById("hbWxAlertList");
+  if(al){
+    al.innerHTML = alerts.length
+      ? '<div style="font-weight:800; font-size:13px; margin-bottom:6px;">⚠️ আগাম সতর্কতা</div>' + alerts.map(a=>{ const [bg, bd, fg] = hbWxColor(a.lv);
+          return '<div style="display:flex; gap:9px; padding:9px 11px; border-radius:12px; background:' + bg + '; border:1px solid ' + bd + '; margin-bottom:6px;"><span style="font-size:20px;">' + a.icon + '</span><div><div style="font-weight:700; font-size:13px; color:' + fg + ';">' + a.title + '</div><div style="font-size:11.5px; color:#e7e2d4; line-height:1.5; margin-top:2px;">' + a.text + '</div></div></div>'; }).join("")
+      : '<div style="padding:9px 11px; border-radius:12px; background:rgba(47,191,113,0.12); border:1px solid rgba(47,191,113,0.35); color:#7ee7ac; font-size:12.5px; font-weight:700;">✅ সামনের ৭ দিনে বড় কোনো খারাপ আবহাওয়ার সম্ভাবনা দেখা যাচ্ছে না।</div>';
+  }
+  // ৭ দিনের তালিকা
+  const dv = document.getElementById("hbWxDays"), D = data.daily || {};
+  if(dv && D.time){
+    dv.innerHTML = '<div style="font-weight:800; font-size:13px; margin-bottom:6px;">📅 ৭ দিনের পূর্বাভাস</div>' + D.time.slice(0,7).map((ds, i)=>{
+      const [icon, label] = HB_WX_MAP[(D.weathercode||[])[i]] || ["🌤️","—"];
+      const prob = Math.round((D.precipitation_probability_max||[])[i] || 0), gust = Math.round((D.windgusts_10m_max||[])[i] || 0);
+      const lvl = alerts.filter(a=> a.day === i).reduce((m,a)=> Math.max(m, a.lv), 0), [bg, bd] = lvl ? hbWxColor(lvl) : ["rgba(255,255,255,0.03)","var(--border)"];
+      return '<div style="display:grid; grid-template-columns:78px 30px 1fr auto; gap:8px; align-items:center; padding:8px 10px; border-radius:11px; background:' + bg + '; border:1px solid ' + bd + '; margin-bottom:5px; font-size:12.5px;">' +
+        '<b style="color:#fff;">' + hbDayName(i, ds) + '</b><span style="font-size:19px;">' + icon + '</span>' +
+        '<span style="color:#cbd0dd;">' + label + '<br><span style="font-size:11px; color:var(--muted);">💧 ' + hbBn(prob) + '% · 🌬️ ' + hbBn(gust) + ' কিমি</span></span>' +
+        '<span style="text-align:right; white-space:nowrap;"><b style="color:#f0a35c;">' + hbBn(Math.round(D.temperature_2m_max[i])) + '°</b> <span style="color:#7ec8f2;">' + hbBn(Math.round(D.temperature_2m_min[i])) + '°</span></span></div>';
+    }).join("");
+  }
+}
 function hbFormatPrayerTime(t){
   const clean = String(t).split(" ")[0];
   const parts = clean.split(":").map(Number);
@@ -7934,6 +8057,7 @@ async function hbLoadLiveLocationFeatures(){
     }catch(e){ /* এলাকার নাম না পেলেও সমস্যা নেই, কোঅর্ডিনেট দিয়ে বাকিটা কাজ চলবে */ }
   }catch(e){ /* GPS অনুমতি না পেলে ঢাকার ডিফল্ট কোঅর্ডিনেট ব্যবহার হবে */ }
 
+  window.__hbWxLoc = { lat, lon, area: areaLabel, gps: gotGps };
   const now = new Date();
   const locMeta = document.getElementById("hbswPrayerLocDate");
   if(locMeta) locMeta.textContent = "📍 " + areaLabel + ", " + now.getDate() + " " + HB_MONTH_EN_SHORT[now.getMonth()];
@@ -7941,7 +8065,7 @@ async function hbLoadLiveLocationFeatures(){
   if(qiblaLoc) qiblaLoc.textContent = areaLabel + (gotGps ? "" : " (আনুমানিক)");
 
   try{
-    const wxUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current_weather=true&daily=temperature_2m_max,temperature_2m_min&timezone=auto";
+    const wxUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon + "&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max,precipitation_sum,windgusts_10m_max&hourly=precipitation_probability,weathercode,windgusts_10m&forecast_days=7&timezone=auto";
     const wxRes = await fetch(wxUrl);
     if(wxRes.ok){
       const wxData = await wxRes.json();
@@ -7949,6 +8073,8 @@ async function hbLoadLiveLocationFeatures(){
       const tmax = (wxData.daily && wxData.daily.temperature_2m_max) ? wxData.daily.temperature_2m_max[0] : cw.temperature;
       const tmin = (wxData.daily && wxData.daily.temperature_2m_min) ? wxData.daily.temperature_2m_min[0] : cw.temperature;
       hbApplyWeather(cw.temperature, cw.weathercode, tmax, tmin, areaLabel);
+      try{ hbRenderForecast(wxData); }catch(e){ console.warn("পূর্বাভাস দেখানো গেল না", e); }
+      try{ hbWxSubLoad(); }catch(e){}
     }
   }catch(e){
     const heroEl = document.getElementById("hbswHeroWeather");
@@ -7988,6 +8114,83 @@ async function hbLoadLiveLocationFeatures(){
   if(qDegEl) qDegEl.textContent = Math.round(qDeg) + "° (" + hbCompassLabel(qDeg) + ")";
 }
 hbLoadLiveLocationFeatures();
+/* 🔔 ফোনে আগাম সতর্কতা — weatherSubs/{uid}। সার্ভারের wxAlertTick (functions/weather.js) প্রতি ঘণ্টায় দেখে পাঠায়।
+   লোকেশন ২ দশমিকে গোল করা (প্রায় ১ কিমি) — ঠিকানা বোঝা যায় না, আবহাওয়ার জন্য যথেষ্ট। */
+let __hbWxSub = null;
+function hbWxUtcHour(localHour){ const off = new Date().getTimezoneOffset(); return (((Math.round((localHour*60 + off)/60)) % 24) + 24) % 24; }
+function hbWxPushUi(){
+  const btn = document.getElementById("hbWxPushBtn"), st = document.getElementById("hbWxPushStatus"), sel = document.getElementById("hbWxPushMode");
+  if(!btn) return;
+  const on = !!(__hbWxSub && __hbWxSub.on);
+  if(__hbWxSub && __hbWxSub.mode && sel) sel.value = __hbWxSub.mode;
+  btn.textContent = on ? "🔕 বন্ধ করুন" : "🔔 চালু করুন";
+  btn.style.background = on ? "rgba(255,255,255,0.08)" : "#f5a623";
+  btn.style.color = on ? "#fca5a5" : "#1a1206";
+  if(st){
+    if(on) st.innerHTML = '<span style="color:#7ee7ac; font-weight:700;">✅ চালু আছে</span> — ' + (__hbWxSub.mode === "morn" ? "প্রতিদিন সকাল ৭টায় আজকের" : "প্রতিদিন রাত ৮টায় আগামীকালের") + " খারাপ আবহাওয়ার খবর যাবে" + (__hbWxSub.area ? " · 📍 " + __hbWxSub.area : "");
+    else if(__hbWxSub && __hbWxSub.offReason === "token") st.textContent = "⚠️ এই ফোনে নোটিফিকেশন বন্ধ হয়ে গিয়েছিল — আবার চালু করুন।";
+    else st.textContent = currentCustomer ? "" : "চালু করতে Google দিয়ে লগইন লাগবে।";
+  }
+}
+async function hbWxSubLoad(){
+  if(!currentCustomer || !currentCustomer.uid){ __hbWxSub = null; hbWxPushUi(); return; }
+  try{
+    const d = await db.collection("weatherSubs").doc(currentCustomer.uid).get();
+    __hbWxSub = d.exists ? d.data() : null;
+    // জায়গা বদলালে (≈৫ কিমি+) চুপচাপ নতুন লোকেশন বসানো
+    const L = window.__hbWxLoc;
+    if(__hbWxSub && __hbWxSub.on && L && L.gps && (Math.abs(__hbWxSub.lat - L.lat) > 0.05 || Math.abs(__hbWxSub.lon - L.lon) > 0.05)){
+      const upd = { lat: Math.round(L.lat*100)/100, lon: Math.round(L.lon*100)/100, area: String(L.area||"").slice(0,80), updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+      await db.collection("weatherSubs").doc(currentCustomer.uid).update(upd); Object.assign(__hbWxSub, upd);
+    }
+  }catch(e){ console.warn("আবহাওয়া সতর্কতার তথ্য আনা গেল না", e); }
+  hbWxPushUi();
+}
+async function hbWxPushToggle(){
+  const btn = document.getElementById("hbWxPushBtn"), st = document.getElementById("hbWxPushStatus");
+  const say = (t, bad)=>{ if(st){ st.textContent = t; st.style.color = bad ? "#fca5a5" : "var(--muted)"; } };
+  if(!currentCustomer || !currentCustomer.uid){
+    say("Google দিয়ে লগইন হচ্ছে…");
+    try{ await auth.signInWithPopup(googleProvider); }
+    catch(e){ if(e && (e.code === "auth/popup-blocked" || e.code === "auth/cancelled-popup-request")){ auth.signInWithRedirect(googleProvider); return; } say("লগইন হয়নি — আবার চেষ্টা করুন।", true); return; }
+    for(let i = 0; i < 30 && !currentCustomer; i++) await new Promise(r=> setTimeout(r, 200));
+    if(!currentCustomer){ say("লগইন হয়নি — আবার চেষ্টা করুন।", true); return; }
+    await hbWxSubLoad();
+    if(__hbWxSub && __hbWxSub.on) return;
+  }
+  const ref = db.collection("weatherSubs").doc(currentCustomer.uid);
+  if(btn) btn.disabled = true;
+  try{
+    if(__hbWxSub && __hbWxSub.on){
+      await ref.update({ on: false, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      __hbWxSub.on = false; hbWxPushUi(); say("🔕 বন্ধ করা হয়েছে।"); return;
+    }
+    if(!("Notification" in window) || !("serviceWorker" in navigator)){ say("এই ব্রাউজারে নোটিফিকেশন চলে না — Chrome দিয়ে খুলুন।", true); return; }
+    say("নোটিফিকেশনের অনুমতি চাওয়া হচ্ছে…");
+    const perm = await Notification.requestPermission();
+    if(perm !== "granted"){ say("নোটিফিকেশনের অনুমতি দেওয়া হয়নি — ফোনের সেটিংস থেকে এই সাইটের নোটিফিকেশন চালু করুন।", true); return; }
+    const registration = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+    const token = await firebase.messaging().getToken({ vapidKey: HM_FCM_VAPID_KEY, serviceWorkerRegistration: registration });
+    if(!token){ say("ফোন থেকে নোটিফিকেশনের চাবি পাওয়া গেল না — আবার চেষ্টা করুন।", true); return; }
+    const L = window.__hbWxLoc || { lat: HB_DEFAULT_LAT, lon: HB_DEFAULT_LON, area: "ঢাকা" };
+    const mode = (document.getElementById("hbWxPushMode") || {}).value === "morn" ? "morn" : "eve";
+    const data = { token, lat: Math.round(L.lat*100)/100, lon: Math.round(L.lon*100)/100, area: String(L.area||"").slice(0,80),
+      on: true, mode, utcHour: hbWxUtcHour(mode === "morn" ? 7 : 20), updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+    await ref.set(data, { merge: true });
+    __hbWxSub = Object.assign(__hbWxSub || {}, data, { offReason: __hbWxSub && __hbWxSub.offReason });
+    hbWxPushUi();
+    if(!L.gps) say("✅ চালু হয়েছে। (GPS অনুমতি না থাকায় ঢাকার আবহাওয়া ধরা হয়েছে — লোকেশন চালু করলে নিজে থেকে আপনার এলাকা বসবে।)");
+  }catch(e){ console.warn(e); say("চালু করা গেল না — নেট দেখে আবার চেষ্টা করুন।", true); }
+  finally{ if(btn) btn.disabled = false; }
+}
+document.getElementById("hbWxPushBtn") && document.getElementById("hbWxPushBtn").addEventListener("click", hbWxPushToggle);
+document.getElementById("hbWxPushMode") && document.getElementById("hbWxPushMode").addEventListener("change", async (e)=>{
+  if(!(__hbWxSub && __hbWxSub.on) || !currentCustomer) return;
+  const mode = e.target.value === "morn" ? "morn" : "eve";
+  try{ await db.collection("weatherSubs").doc(currentCustomer.uid).update({ mode, utcHour: hbWxUtcHour(mode === "morn" ? 7 : 20), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); __hbWxSub.mode = mode; hbWxPushUi(); }catch(err){}
+});
+/* নোটিফিকেশন চাপলে (…#weather) সরাসরি আবহাওয়া প্যানেল */
+if(location.hash === "#weather") setTimeout(()=>{ try{ showScreen("screenSmartWatch"); const o = document.getElementById("hbswWeatherOverlay"); if(o) o.classList.add("show"); }catch(e){} }, 1200);
 setInterval(hbLoadLiveLocationFeatures, 15 * 60 * 1000); // ১৫ মিনিট পর পর রিফ্রেশ
 // 📅 Home Page Today Widget + সনাতনী পঞ্জিকা পেজ — অ্যাপ খোলার সাথে সাথেই একবার লোড
 if(typeof hbLoadPanchangShortCard === "function") hbLoadPanchangShortCard();

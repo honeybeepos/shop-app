@@ -826,6 +826,23 @@ service cloud.firestore {
       allow read, create, update, delete: if true;
     }
 
+    // 🌦️ আবহাওয়ার আগাম সতর্কতা — নিজের সাবস্ক্রিপশন শুধু নিজে। lastSent সার্ভার লেখে।
+    match /weatherSubs/{uid} {
+      function wxOk(d){
+        return d.token is string && d.token.size() < 400
+          && d.lat is number && d.lat >= -90 && d.lat <= 90
+          && d.lon is number && d.lon >= -180 && d.lon <= 180
+          && d.on is bool && d.mode in ['eve','morn']
+          && d.utcHour is int && d.utcHour >= 0 && d.utcHour <= 23
+          && (!('area' in d) || (d.area is string && d.area.size() <= 80));
+      }
+      allow read, delete: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn() && request.auth.uid == uid && wxOk(request.resource.data)
+        && request.resource.data.keys().hasOnly(['token','lat','lon','area','on','mode','utcHour','updatedAt']);
+      allow update: if isSignedIn() && request.auth.uid == uid && wxOk(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['token','lat','lon','area','on','mode','utcHour','updatedAt','offReason']);
+    }
+
     match /customers/{uid} {
       allow read, write: if isSignedIn() && request.auth.uid == uid;
       // 👥 সুপার-এডমিন প্যানেলে মোট/সক্রিয় কাস্টমারের সংখ্যা গোনার জন্য (শুধু পড়া)
