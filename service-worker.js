@@ -12,7 +12,7 @@
 // 🔔 পুশ নোটিফিকেশন — এই ফাইলটা একা বসলেও (পুরনো পাতা থেকে) অ্যাপ বন্ধ অবস্থায় পুশ আসবে
 importScripts("sw-push.js");
 
-const CACHE_VERSION = "shop-app-v196";
+const CACHE_VERSION = "shop-app-v197";
 
 const APP_SHELL = [
   "login.html",

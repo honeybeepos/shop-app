@@ -250,11 +250,12 @@
 <div class="modal" id="wkModal"><div class="sheet">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="font-size:17px" id="wkTitle">🏪 দোকানে অর্ডার নিন</b><button type="button" class="btn small ghost" data-close="wkModal">✕</button></div>
   <div class="muted">গ্রাহক নিজে দোকানে এসে কাপড় দিলে এখানে লিখুন — রসিদ প্রিন্ট বা শেয়ার করা যাবে, আর আয় লাভের হিসাবে যোগ হবে।</div>
-  <label>গ্রাহকের নাম</label><input id="wkName" maxlength="60" placeholder="যেমন: রুমা আক্তার">
+  <label>গ্রাহকের নাম</label><input id="wkName" maxlength="60" autocomplete="off" placeholder="নাম বা মোবাইল লিখলে আগের গ্রাহক খুঁজে দেখাবে">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <div><label>মোবাইল</label><input id="wkPhone" type="tel" inputmode="tel" maxlength="15" placeholder="01XXXXXXXXX"></div>
+    <div><label>মোবাইল</label><input id="wkPhone" autocomplete="off" type="tel" inputmode="tel" maxlength="15" placeholder="01XXXXXXXXX"></div>
     <div><label>কবে দেবেন</label><input id="wkDue" type="date"></div>
   </div>
+  <div id="wkSugg"></div>
   <label>ঠিকানা (ঐচ্ছিক — পরে রাইডারে পাঠাতে লাগবে)</label><input id="wkAddr" maxlength="120" placeholder="গ্রাম/মহল্লা, বাড়ি">
   <label>ডিজাইন</label>
   <select id="wkDesign"></select>
@@ -1006,6 +1007,7 @@ $("wkDesign").addEventListener("change", ()=>{
 });
 function openWalkin(id){
   wkEditId = id || null;
+  if($("wkSugg")){ $("wkSugg").innerHTML = ""; $("wkSugg").dataset.picked = id ? "1" : ""; }
   const w = id ? walkins.find(x=> x.id === id) : null;
   $("wkTitle").textContent = w ? "✏️ দোকানের অর্ডার বদলান" : "🏪 দোকানে অর্ডার নিন";
   $("wkName").value = w ? w.customerName||"" : ""; $("wkPhone").value = w ? w.customerPhone||"" : ""; $("wkAddr").value = w ? w.customerAddress||"" : "";
@@ -1188,6 +1190,66 @@ async function shareWalkin(id){
   window.open("https://wa.me/" + wa + "?text=" + encodeURIComponent(txt), "_blank");
 }
 $("homeShopBtn") && $("homeShopBtn").addEventListener("click", ()=> openWalkin());
+/* 🔎 আগের গ্রাহক খোঁজা — দোকানে অর্ডার নেওয়ার সময় নাম বা মোবাইল লিখলেই নিচে মিল দেখায়।
+   খোঁজে দুই জায়গায়: এই দোকানের আগের দোকান-অর্ডার (walkins) আর Bazar থেকে এই দর্জিকে দেওয়া
+   অনলাইন অর্ডার (orders)। চাপ দিলে নাম, নম্বর, ঠিকানা আর সবশেষ মাপ বসে যায়।
+   (অন্য দর্জির কাছে দেওয়া মাপ বা গ্রাহকের ব্যক্তিগত মাপের খাতা এখানে আসে না — ওগুলো গ্রাহকের নিজের।) */
+const wkDigits = (p)=> String(p||"").replace(/\D/g,"").slice(-10);
+const wkHasMeasure = (m)=> !!m && ["kameez","pajama"].some(k=> m[k] && Object.values(m[k]).some(v=> v !== "" && v != null));
+function wkCustomerIndex(){
+  const map = new Map();
+  const add = (r)=>{
+    const name = String(r.name||"").trim(); if(!name && !r.phone) return;
+    const key = wkDigits(r.phone).length >= 8 ? "p" + wkDigits(r.phone) : "n" + name.toLowerCase();
+    const cur = map.get(key);
+    if(!cur){ map.set(key, Object.assign({ count:1 }, r)); return; }
+    cur.count++;
+    // সবশেষ তথ্য রাখা; মাপ থাকলে সবশেষ যে অর্ডারে মাপ ছিল সেটা
+    if(r.at > cur.at){ cur.name = r.name || cur.name; cur.address = r.address || cur.address; cur.at = r.at; cur.src = r.src; }
+    if(wkHasMeasure(r.measure) && (!wkHasMeasure(cur.measure) || r.at >= (cur.mAt||0))){ cur.measure = r.measure; cur.mAt = r.at; }
+  };
+  (typeof walkins !== "undefined" ? walkins : []).forEach(w=> add({ name:w.customerName, phone:w.customerPhone, address:w.customerAddress, measure:w.measure, at:w.createdAt||0, mAt:w.createdAt||0, src:"🏪 দোকান" }));
+  orders.filter(o=> o.source !== "walkin").forEach(o=> add({ name:o.customerName, phone:o.customerPhone, address:o.customerAddress, measure:o.measure, at:ms(o.createdAt), mAt:ms(o.createdAt), src:"📱 Bazar" }));
+  return Array.from(map.values());
+}
+function wkShowSugg(){
+  const box = $("wkSugg"); if(!box) return;
+  const qn = $("wkName").value.trim().toLowerCase(), qp = wkDigits($("wkPhone").value);
+  if(qn.length < 2 && qp.length < 3){ box.innerHTML = ""; return; }
+  const list = wkCustomerIndex().filter(c=>
+      (qp.length >= 3 && wkDigits(c.phone).includes(qp)) ||
+      (qn.length >= 2 && String(c.name||"").toLowerCase().includes(qn)))
+    .sort((a,b)=> (wkHasMeasure(b.measure) - wkHasMeasure(a.measure)) || (b.at - a.at)).slice(0, 5);
+  // হুবহু একই লোক আগে থেকেই বসানো থাকলে আর দেখানোর দরকার নেই
+  if(!list.length || (list.length === 1 && qp.length >= 10 && wkDigits(list[0].phone) === qp && $("wkName").value.trim() === String(list[0].name||"").trim() && box.dataset.picked === "1")){ box.innerHTML = ""; return; }
+  box.dataset.picked = "";
+  box.innerHTML = `<div style="margin-top:8px;border:1.5px solid var(--pink2);border-radius:12px;overflow:hidden;background:#fff">
+    <div style="padding:6px 10px;background:var(--pink);font-size:11.5px;font-weight:800;color:var(--plum)">🔎 আগের গ্রাহক — চাপ দিলে তথ্য আর মাপ বসে যাবে</div>
+    ${list.map((c,i)=> `<button type="button" data-sg="${i}" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 10px;border:0;border-top:1px solid var(--line);background:#fff;font-family:inherit;cursor:pointer;color:var(--ink)">
+      <span style="font-size:20px">👤</span>
+      <span style="flex:1;min-width:0"><b style="display:block;font-size:13.5px">${esc(c.name||"নাম নেই")}</b>
+        <small style="color:var(--muted);font-size:11.5px">${c.phone ? "📞 " + esc(c.phone) + " · " : ""}${c.src} · ${bn(c.count)}বার</small></span>
+      ${wkHasMeasure(c.measure) ? `<span class="tag pub">📏 মাপ আছে</span>` : `<span class="tag hid">মাপ নেই</span>`}
+    </button>`).join("")}
+  </div>`;
+  box.querySelectorAll("[data-sg]").forEach(b=> b.onclick = ()=> wkPickCustomer(list[+b.dataset.sg]));
+}
+function wkPickCustomer(c){
+  if(!c) return;
+  $("wkName").value = c.name || $("wkName").value;
+  if(c.phone) $("wkPhone").value = c.phone;
+  if(c.address && !$("wkAddr").value.trim()) $("wkAddr").value = c.address;
+  if(wkHasMeasure(c.measure)){
+    wkParts = { kameez: !!(c.measure.kameez && Object.keys(c.measure.kameez).length), pajama: !!(c.measure.pajama && Object.keys(c.measure.pajama).length) };
+    if(!wkParts.kameez && !wkParts.pajama) wkParts.kameez = true;
+    wkRenderParts({ kameez: c.measure.kameez || {}, pajama: c.measure.pajama || {} });
+    toast("📏 আগের মাপ বসানো হয়েছে — দরকার হলে বদলে নিন");
+  }else toast("✅ গ্রাহকের তথ্য বসানো হয়েছে — আগের কোনো মাপ পাওয়া যায়নি");
+  const box = $("wkSugg"); box.innerHTML = ""; box.dataset.picked = "1";
+}
+["wkName","wkPhone"].forEach(id=> $(id).addEventListener("input", ()=>{ $("wkSugg").dataset.picked = ""; wkShowSugg(); }));
+
+
 
 /* 🛵 দোকানের অর্ডার রাইডারে — একটা tailorOrders নথি বানানো হয় (source: walkin, status: ready);
    সার্ভার চার্জ বসিয়ে কাছের রাইডার খোঁজে। পৌঁছে গেলে নিচের সিঙ্ক দোকানের অর্ডারটাও "নিয়ে গেছেন" করে দেয়। */
