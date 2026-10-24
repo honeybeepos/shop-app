@@ -2195,6 +2195,18 @@
     </div>
   </div>
 
+  <!-- 🔔 নোটিফিকেশন কেন্দ্র — উপরের বেল চাপলে খোলে। সব নোটিফিকেশন এক জায়গায় চালু/বন্ধ,
+       আর অনুমতি বন্ধ থাকলে ফোনের কোথায় চালু করতে হবে সেটা ধাপে ধাপে দেখায়। -->
+  <div id="hbNotifSheet" class="mfSheetOverlay">
+    <div class="mfSheetBox">
+      <div class="mfSheetHead">
+        <div class="t">🔔 নোটিফিকেশন</div>
+        <span class="mfSheetClose" id="hbNotifClose">✕</span>
+      </div>
+      <div id="hbNotifBody"></div>
+    </div>
+  </div>
+
   <!-- ☰ Market Feed — ফিল্টার/এলাকা মেনু বটম-শিট -->
   <div id="mfMenuSheet" class="mfSheetOverlay">
     <div class="mfSheetBox">
@@ -6474,6 +6486,7 @@ hbPanShowTab("today");
    panchangDailyReminder শিডিউল ফাংশন ব্যবহারকারীর নিজের সকাল ৮টায় পুশ পাঠায়। ==================== */
 async function hbPanEnsureFcmToken(uid){
   if(!("Notification" in window) || !("serviceWorker" in navigator)) return false;
+  if(typeof hbNotifSetOff === "function") hbNotifSetOff(false);
   try{
     const permission = await Notification.requestPermission();
     if(permission !== "granted") return false;
@@ -8249,6 +8262,7 @@ async function hbPrPushToggle(){
     const f = hbPrForm(); if(!f.items.length){ say("অন্তত একটা ওয়াক্ত বাছুন।", true); return; }
     if(!("Notification" in window) || !("serviceWorker" in navigator)){ say("এই ব্রাউজারে নোটিফিকেশন চলে না — Chrome দিয়ে খুলুন।", true); return; }
     say("নোটিফিকেশনের অনুমতি চাওয়া হচ্ছে…");
+    if(typeof hbNotifSetOff === "function") hbNotifSetOff(false); // নিজে চালু করছেন — "সব বন্ধ" আর খাটে না
     if(await Notification.requestPermission() !== "granted"){ say("নোটিফিকেশনের অনুমতি দেওয়া হয়নি — ফোনের সেটিংস থেকে এই সাইটের নোটিফিকেশন চালু করুন।", true); return; }
     const registration = await navigator.serviceWorker.register("firebase-messaging-sw.js");
     const token = await firebase.messaging().getToken({ vapidKey: HM_FCM_VAPID_KEY, serviceWorkerRegistration: registration });
@@ -8423,6 +8437,7 @@ async function hbWxPushToggle(){
     }
     if(!("Notification" in window) || !("serviceWorker" in navigator)){ say("এই ব্রাউজারে নোটিফিকেশন চলে না — Chrome দিয়ে খুলুন।", true); return; }
     say("নোটিফিকেশনের অনুমতি চাওয়া হচ্ছে…");
+    if(typeof hbNotifSetOff === "function") hbNotifSetOff(false); // নিজে চালু করছেন — "সব বন্ধ" আর খাটে না
     const perm = await Notification.requestPermission();
     if(perm !== "granted"){ say("নোটিফিকেশনের অনুমতি দেওয়া হয়নি — ফোনের সেটিংস থেকে এই সাইটের নোটিফিকেশন চালু করুন।", true); return; }
     const registration = await navigator.serviceWorker.register("firebase-messaging-sw.js");
@@ -8520,6 +8535,7 @@ const HM_FCM_VAPID_KEY = "BCEdpLGNUIBG2IW9lTVGcaM7qbFrbaEnGg9N1CYGNCojCVUIruqqcW
 
 async function hmSetupFcm(uid){
   if(!("Notification" in window) || !("serviceWorker" in navigator)) return;
+  if(typeof hbNotifOff === "function" && hbNotifOff()) return; // 🔕 ব্যবহারকারী বেল থেকে সব বন্ধ করেছেন
   try{
     const permission = await Notification.requestPermission();
     if(permission !== "granted") return;
@@ -8559,6 +8575,7 @@ async function hmSetupFcm(uid){
    অফার এলে বা ট্রিপ কনফার্ম হলে পুশ পাঠায়, deploy করার পর কার্যকর হবে)। */
 async function tmSetupFcm(uid){
   if(!("Notification" in window) || !("serviceWorker" in navigator)) return;
+  if(typeof hbNotifOff === "function" && hbNotifOff()) return; // 🔕 ব্যবহারকারী বেল থেকে সব বন্ধ করেছেন
   try{
     const permission = await Notification.requestPermission();
     if(permission !== "granted") return;
@@ -9572,9 +9589,140 @@ async function hmLoadMyComplaints(){
   }
 }
 
-$("headerNotifBtn").addEventListener("click", ()=>{
-  alert("🔔 এই মুহূর্তে কোনো নতুন নোটিফিকেশন নেই।");
+/* ==================== 🔔 নোটিফিকেশন কেন্দ্র (অক্টোবর ২০২৬) ====================
+   • উপরের বেল → এক জায়গায় সব নোটিফিকেশন চালু/বন্ধ
+   • অ্যাপ বসানোর পর নিজে থেকে চালু: অনুমতি এখনো চাওয়া না হলে প্রথম যেকোনো ট্যাপেই চাওয়া হয়
+     (ফোন শুধু ট্যাপের সময় অনুমতির প্রশ্ন দেখাতে দেয়)
+   • কেউ "Don't allow" দিয়ে থাকলে বেলে লাল বিন্দু, আর চাপলে কোথায় চালু করবেন তা দেখায়
+   • "সব বন্ধ" চাপলে ফোনের নোটিফিকেশন-চাবি মুছে দেওয়া হয় — তাই সার্ভার আর কিছু পাঠাতে পারে না।
+     hb-notif-off=1 থাকলে লগইনের সময়ও নিজে থেকে আবার চালু হয় না। */
+const HB_TWA_PACKAGE = "com.honeybeebazar.twa";
+function hbNotifOff(){ try{ return localStorage.getItem("hb-notif-off") === "1"; }catch(e){ return false; } }
+function hbNotifSetOff(v){ try{ v ? localStorage.setItem("hb-notif-off","1") : localStorage.removeItem("hb-notif-off"); }catch(e){} }
+// অ্যাপ (Play/APK) থেকে খোলা হয়েছে কি না — প্রথম খোলার সময় referrer-এ android-app:// থাকে
+(function(){ try{ if(document.referrer.indexOf("android-app://") === 0) sessionStorage.setItem("hb-twa","1"); }catch(e){} })();
+function hbIsApp(){
+  try{ if(sessionStorage.getItem("hb-twa") === "1") return true; }catch(e){}
+  try{ return window.matchMedia("(display-mode: standalone)").matches; }catch(e){ return false; }
+}
+function hbNotifPerm(){ return ("Notification" in window) ? Notification.permission : "unsupported"; }
+function hbNotifBadge(){
+  const btn = $("headerNotifBtn"); if(!btn) return;
+  let dot = document.getElementById("hbNotifDot");
+  if(!dot){
+    btn.style.position = "relative";
+    dot = document.createElement("span"); dot.id = "hbNotifDot";
+    dot.style.cssText = "position:absolute; top:2px; right:2px; width:10px; height:10px; border-radius:50%; background:#ef4444; border:2px solid #1a1206; display:none;";
+    btn.appendChild(dot);
+  }
+  const p = hbNotifPerm();
+  const on = p === "granted" && !hbNotifOff();
+  dot.style.display = (p === "unsupported" || on) ? "none" : "block";
+  btn.textContent = on ? "🔔" : "🔕"; btn.appendChild(dot);
+}
+async function hbNotifSaveTokens(){
+  if(!currentCustomer || !currentCustomer.uid) return false;
+  try{ await hmSetupFcm(currentCustomer.uid); await tmSetupFcm(currentCustomer.uid); return true; }catch(e){ return false; }
+}
+async function hbNotifTurnOn(){
+  hbNotifSetOff(false);
+  if(hbNotifPerm() === "unsupported"){ hbNotifRender("এই ব্রাউজারে নোটিফিকেশন চলে না।"); return; }
+  let p = hbNotifPerm();
+  if(p === "default"){ try{ p = await Notification.requestPermission(); }catch(e){} }
+  if(p !== "granted"){ hbNotifBadge(); hbNotifRender(); return; }
+  const saved = await hbNotifSaveTokens();
+  hbNotifBadge();
+  hbNotifRender(saved ? "✅ নোটিফিকেশন চালু হয়েছে।" : "✅ অনুমতি পাওয়া গেছে। অর্ডার আর মেসেজের খবর পেতে ☰ Menu থেকে Google দিয়ে লগইন করুন।");
+}
+async function hbNotifTurnOff(){
+  if(!confirm("সব নোটিফিকেশন বন্ধ করবেন? অর্ডার, ডেলিভারি, মেসেজ, নামাজ — কোনো খবরই আর ফোনে আসবে না।")) return;
+  hbNotifSetOff(true);
+  try{ await firebase.messaging().deleteToken(); }catch(e){}
+  if(currentCustomer && currentCustomer.uid){
+    const uid = currentCustomer.uid, del = firebase.firestore.FieldValue.delete(), now = firebase.firestore.FieldValue.serverTimestamp();
+    try{ await db.collection("customers").doc(uid).set({ fcmToken: del, panchangNotifyEnabled: false }, { merge:true }); }catch(e){}
+    try{ await db.collection("messengerUsers").doc(uid).set({ fcmToken: del }, { merge:true }); }catch(e){}
+    try{ if(typeof __hbPrSub !== "undefined" && __hbPrSub && __hbPrSub.on){ await db.collection("prayerSubs").doc(uid).update({ on:false, nextAt: del, updatedAt: now }); __hbPrSub.on = false; if(typeof hbPrUi === "function") hbPrUi(); } }catch(e){}
+    try{ if(typeof __hbWxSub !== "undefined" && __hbWxSub && __hbWxSub.on){ await db.collection("weatherSubs").doc(uid).update({ on:false, updatedAt: now }); __hbWxSub.on = false; if(typeof hbWxPushUi === "function") hbWxPushUi(); } }catch(e){}
+  }
+  hbNotifBadge();
+  hbNotifRender("🔕 সব নোটিফিকেশন বন্ধ করা হয়েছে।");
+}
+function hbNotifOpenPhoneSettings(){
+  // অ্যাপ থেকে সরাসরি ফোনের নোটিফিকেশন সেটিং খোলার চেষ্টা — অনেক ফোনে ব্রাউজার এটা আটকে দেয়,
+  // তাই নিচে ধাপগুলো সবসময় লেখা থাকে
+  try{ location.href = "intent:#Intent;action=android.settings.APP_NOTIFICATION_SETTINGS;S.android.provider.extra.APP_PACKAGE=" + HB_TWA_PACKAGE + ";end"; }catch(e){}
+}
+function hbNotifRender(msg){
+  const box = $("hbNotifBody"); if(!box) return;
+  const p = hbNotifPerm(), off = hbNotifOff(), on = p === "granted" && !off, app = hbIsApp();
+  const row = (ic, t, d, act)=> `<button type="button" class="mfMenuRow" data-nact="${act}"><span class="mfMenuRowIcon">${ic}</span><span class="mfMenuRowBody"><span class="t">${t}</span><span class="d">${d}</span></span><span class="mfMenuRowChev">›</span></button>`;
+  let head;
+  if(p === "unsupported") head = `<div style="padding:12px; border-radius:12px; background:rgba(255,255,255,0.05); font-size:13px;">এই ব্রাউজারে নোটিফিকেশন চলে না। Honey Bee Bazar অ্যাপ বা Chrome দিয়ে খুলুন।</div>`;
+  else if(p === "denied") head = `
+    <div style="padding:12px; border-radius:12px; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.45);">
+      <div style="font-weight:800; font-size:14px; color:#fca5a5;">🔕 ফোনে নোটিফিকেশন বন্ধ করা আছে</div>
+      <div style="font-size:12.5px; margin-top:4px; color:#fde2e2;">আগে কোনো সময় "Don't allow" চাপা হয়েছিল। এখন ফোনের সেটিং থেকে চালু করতে হবে — নিচের ধাপগুলো দেখুন।</div>
+    </div>
+    ${app ? `<button type="button" id="hbNotifSettingsBtn" style="width:100%; margin-top:10px; padding:12px; border-radius:12px; border:0; background:var(--amber); color:#1a1206; font-weight:800; font-family:inherit; font-size:14px; cursor:pointer;">⚙️ ফোনের নোটিফিকেশন সেটিং খুলুন</button>` : ""}
+    <div style="margin-top:10px; padding:12px; border-radius:12px; background:rgba(255,255,255,0.05); font-size:13px; line-height:1.75;">
+      ${app
+        ? `<b>অ্যাপে চালু করার নিয়ম:</b><br>১. ফোনের <b>Settings</b> খুলুন<br>২. <b>Apps</b> → <b>Honey Bee Bazar</b><br>৩. <b>Notifications</b> → <b>Show notifications</b> চালু করুন<br>৪. অ্যাপ পুরো বন্ধ করে আবার খুলুন, তারপর এই বেলে চাপুন`
+        : `<b>Chrome-এ চালু করার নিয়ম:</b><br>১. উপরে ঠিকানার পাশের <b>🔒 / ⚙️</b> চিহ্নে চাপুন<br>২. <b>Permissions</b> → <b>Notifications</b><br>৩. <b>Allow</b> করুন<br>৪. পাতা রিফ্রেশ করে আবার এই বেলে চাপুন`}
+    </div>`;
+  else head = `
+    <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; background:${on ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.05)"}; border:1px solid ${on ? "rgba(34,197,94,0.45)" : "var(--border)"};">
+      <div style="font-size:28px;">${on ? "🔔" : "🔕"}</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:800; font-size:14px;">${on ? "নোটিফিকেশন চালু আছে" : "নোটিফিকেশন বন্ধ"}</div>
+        <div style="font-size:12px; color:var(--muted);">${on ? "অর্ডার, ডেলিভারি, মেসেজ আর আপনার বাছা রিমাইন্ডার ফোনে আসবে।" : "চালু করলে অর্ডারের অবস্থা, মেসেজ আর রিমাইন্ডার ফোনে আসবে।"}</div>
+      </div>
+    </div>
+    <button type="button" id="hbNotifMainBtn" style="width:100%; margin-top:10px; padding:13px; border-radius:12px; border:0; font-weight:800; font-family:inherit; font-size:15px; cursor:pointer; ${on ? "background:rgba(239,68,68,0.15); color:#fca5a5; border:1px solid rgba(239,68,68,0.45);" : "background:#2fbf71; color:#062413;"}">${on ? "🔕 সব নোটিফিকেশন বন্ধ করুন" : "🔔 নোটিফিকেশন চালু করুন"}</button>`;
+  box.innerHTML = head
+    + (msg ? `<div style="margin-top:10px; font-size:12.5px; color:var(--amber);">${escapeHtml(msg)}</div>` : "")
+    + (!currentCustomer && p === "granted" && !off ? `<div style="margin-top:10px; font-size:12px; color:#fbbf24;">🔐 অর্ডার আর মেসেজের খবর পেতে ☰ Menu থেকে Google দিয়ে লগইন করুন।</div>` : "")
+    + `<div class="mfMenuSectionLabel" style="margin-top:16px;">⚙️ আলাদা আলাদা রিমাইন্ডার</div>`
+    + row("🕌", "নামাজ, সেহরি ও ইফতার", "কোন ওয়াক্তে জানাবে বাছুন", "prayer")
+    + row("🌦️", "আবহাওয়ার আগাম সতর্কতা", "ঝড়-বৃষ্টির খবর", "weather")
+    + row("📅", "পঞ্জিকা রিমাইন্ডার", "একাদশী, পূর্ণিমা, উৎসব", "panchang");
+  const mb = document.getElementById("hbNotifMainBtn"); if(mb) mb.onclick = ()=> on ? hbNotifTurnOff() : hbNotifTurnOn();
+  const sb = document.getElementById("hbNotifSettingsBtn"); if(sb) sb.onclick = hbNotifOpenPhoneSettings;
+  box.querySelectorAll("[data-nact]").forEach(b=> b.onclick = ()=>{
+    $("hbNotifSheet").classList.remove("show");
+    const a = b.dataset.nact;
+    if(a === "prayer"){ showScreen("screenPrayer"); setTimeout(()=>{ const e = document.getElementById("hbPrPushBtn"); e && e.scrollIntoView({ behavior:"smooth", block:"center" }); }, 300); }
+    else if(a === "weather"){ showScreen("screenSmartWatch"); const o = document.getElementById("hbswWeatherOverlay"); if(o) o.classList.add("show"); }
+    else if(a === "panchang"){ showScreen("screenPanchang"); setTimeout(()=>{ const e = document.getElementById("hbPanNotifEkadashi"); e && e.scrollIntoView({ behavior:"smooth", block:"center" }); }, 300); }
+  });
+}
+$("headerNotifBtn").addEventListener("click", ()=>{ hbNotifRender(); $("hbNotifSheet").classList.add("show"); });
+$("hbNotifClose") && $("hbNotifClose").addEventListener("click", ()=> $("hbNotifSheet").classList.remove("show"));
+$("hbNotifSheet") && $("hbNotifSheet").addEventListener("click", (e)=>{ if(e.target.id === "hbNotifSheet") $("hbNotifSheet").classList.remove("show"); });
+// 🚀 নিজে থেকে চালু: অনুমতি এখনো চাওয়া না হলে প্রথম ট্যাপে একবার চাওয়া হয়
+(function hbNotifAutoAsk(){
+  hbNotifBadge();
+  if(hbNotifOff() || hbNotifPerm() !== "default") return;
+  const once = async ()=>{
+    document.removeEventListener("click", once, true);
+    if(hbNotifOff() || hbNotifPerm() !== "default") return;
+    try{
+      const p = await Notification.requestPermission();
+      if(p === "granted") await hbNotifSaveTokens();
+    }catch(e){}
+    hbNotifBadge();
+  };
+  document.addEventListener("click", once, true);
+})();
+// অন্য অ্যাপ থেকে ফিরে এলে (যেমন সেটিং থেকে চালু করে) বেলের অবস্থা হালনাগাদ
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState !== "visible") return;
+  hbNotifBadge();
+  if(hbNotifPerm() === "granted" && !hbNotifOff() && currentCustomer) hbNotifSaveTokens();
+  if($("hbNotifSheet") && $("hbNotifSheet").classList.contains("show")) hbNotifRender();
 });
+
+
 $("footerNavMenu").addEventListener("click", ()=>{
   document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
   $("footerNavMenu").classList.add("active");
