@@ -4090,6 +4090,13 @@ const TLR_STATUS = {
   cancelled:  ["✕", "বাতিল করেছেন", "#a8a8a8"],
 };
 const TLR_STEPS = ["placed","accepted","collecting","stitching","ready","returning","delivered"];
+// 🚶 নিজে দোকানে দিয়ে-নিয়ে যাবেন — রাইডার নেই, তাই ধাপ কম আর লেখা আলাদা
+const TLR_STATUS_SELF = {
+  accepted:  ["✅", "দর্জি নিয়েছেন — কাপড় নিয়ে দোকানে যান", "#38bdf8"],
+  ready:     ["🎉", "তৈরি — দোকান থেকে নিয়ে আসুন", "#4ade80"],
+  delivered: ["✅", "নিয়ে এসেছেন", "#4ade80"],
+};
+const TLR_STEPS_SELF = ["placed","accepted","stitching","ready","delivered"];
 
 let __tlrOrd = null; // { design, tailor, loc }
 function tlrSheetEl(){
@@ -4206,22 +4213,43 @@ async function tlrOpenOrder(designId){
       <div><label style="${TLR_LBL}">কয়টা বানাবেন</label><input id="tlrOrdQty" type="number" inputmode="numeric" min="1" max="20" value="1" style="${TLR_IN}"></div>
       <div><label style="${TLR_LBL}">📱 আপনার মোবাইল</label><input id="tlrOrdPhone" type="tel" inputmode="tel" maxlength="20" value="${escapeHtml(phone)}" placeholder="01XXXXXXXXX" style="${TLR_IN}"></div>
     </div>
+    <label style="${TLR_LBL}">🚚 কাপড় দেওয়া-নেওয়া</label>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+      <button type="button" class="tlrModeBtn" data-mode="rider" style="padding:11px 6px; border-radius:10px; font-family:inherit; font-weight:800; font-size:12.5px; cursor:pointer;">🛵 রাইডার আনবে-দেবে</button>
+      <button type="button" class="tlrModeBtn" data-mode="self" style="padding:11px 6px; border-radius:10px; font-family:inherit; font-weight:800; font-size:12.5px; cursor:pointer;">🚶 নিজে দিয়ে-নিয়ে যাব</button>
+    </div>
+    <div id="tlrOrdSelfBox" style="display:none; margin-top:8px; padding:11px; border-radius:10px; background:rgba(74,222,128,0.08); border:1px solid rgba(74,222,128,0.35); font-size:12.5px; line-height:1.6;">
+      🧵 <b>${escapeHtml(t.name||"সেলাই ঘর")}</b><br>
+      ${[t.address, t.area].filter(Boolean).length ? "📍 " + escapeHtml([t.address, t.area].filter(Boolean).join(", ")) + "<br>" : ""}
+      ${t.phone ? `📞 <a href="tel:${escapeHtml(t.phone)}" style="color:#86efac;">${escapeHtml(t.phone)}</a><br>` : ""}
+      দর্জি অর্ডার নিলে কাপড় নিয়ে দোকানে যাবেন, তৈরি হলে জানানো হবে — নিজে গিয়ে নিয়ে আসবেন। ডেলিভারি চার্জ লাগবে না।
+    </div>
+    <div id="tlrOrdRiderBox">
     <label style="${TLR_LBL}">🏠 কাপড় কোথা থেকে নেবে / কোথায় ফেরত দেবে</label>
     <input id="tlrOrdAddr" maxlength="150" value="${escapeHtml(addr)}" placeholder="বাড়ি/রাস্তা/মহল্লা — রাইডার যেন খুঁজে পান" style="${TLR_IN}">
     <button type="button" id="tlrOrdLocBtn" style="width:100%; margin-top:8px; padding:12px; border-radius:10px; border:1.5px solid #38bdf8; background:rgba(56,189,248,0.1); color:#7dd3fc; font-weight:800; font-family:inherit; font-size:13.5px; cursor:pointer;">📍 আমার এখনকার লোকেশন দিন (জরুরি)</button>
     <div id="tlrOrdLocTxt" style="font-size:11.5px; color:var(--muted); margin-top:4px;">বাড়িতে থেকে চাপুন — রাইডার এই জায়গাতেই আসবেন।</div>
+    </div>
     <label style="${TLR_LBL}">📝 দর্জিকে কিছু বলবেন? (ঐচ্ছিক)</label>
     <input id="tlrOrdNote" maxlength="200" placeholder="যেমন: হাতা একটু ঢিলা, লেস লাগাবেন" style="${TLR_IN}">
 
     <div id="tlrOrdBill" style="margin-top:12px; background:rgba(190,24,93,0.12); border:1px solid rgba(244,114,182,0.35); border-radius:12px; padding:12px; font-size:13.5px;"></div>
     <button type="button" id="tlrOrdSubmit" style="width:100%; margin-top:12px; padding:14px; border:0; border-radius:12px; background:#be185d; color:#fff; font-weight:800; font-size:16px; font-family:inherit; cursor:pointer;">🧵 অর্ডার পাঠান</button>
     <div id="tlrOrdErr" style="display:none; margin-top:8px; padding:10px; border-radius:10px; background:rgba(248,113,113,0.15); color:#fca5a5; font-size:12.5px;"></div>
-    <div style="font-size:11.5px; color:var(--muted); text-align:center; margin-top:8px;">💵 টাকা দেবেন পোশাক হাতে পেয়ে — রাইডারকে নগদ।</div>`;
+    <div id="tlrOrdPayTxt" style="font-size:11.5px; color:var(--muted); text-align:center; margin-top:8px;">💵 টাকা দেবেন পোশাক হাতে পেয়ে — রাইডারকে নগদ।</div>`;
 
   const bill = ()=>{
     const qty = Math.max(1, Math.min(20, Math.round(Number(body.querySelector("#tlrOrdQty").value) || 1)));
     const stitch = Number(d.price) * qty;
     const loc = __tlrOrd.loc;
+    if(__tlrOrd.mode === "self"){
+      body.querySelector("#tlrOrdBill").innerHTML = `
+      <div style="font-weight:800; margin-bottom:6px;">🧾 বিল</div>
+      <div style="display:flex; justify-content:space-between;"><span>সেলাইয়ের মজুরি (৳${escapeHtml(String(d.price))} × ${qty})</span><b>৳ ${stitch}</b></div>
+      <div style="display:flex; justify-content:space-between; margin-top:3px;"><span>🚶 নিজে দেবেন-নেবেন</span><b>৳ 0</b></div>
+      <div style="display:flex; justify-content:space-between; margin-top:6px; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.2); font-size:15px;"><span><b>মোট</b></span><b style="color:#f472b6;">৳ ${stitch}</b></div>`;
+      return;
+    }
     const km = loc ? tlrKm(loc, t.storeLocation) : null;
     const leg = tlrLegCharge(km);
     body.querySelector("#tlrOrdBill").innerHTML = `
@@ -4231,7 +4259,24 @@ async function tlrOpenOrder(designId){
       <div style="display:flex; justify-content:space-between; margin-top:6px; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.2); font-size:15px;"><span><b>মোট</b></span><b style="color:#f472b6;">${loc ? "৳ " + (stitch + leg*2) : "—"}</b></div>
       ${loc ? `<div style="font-size:11px; color:var(--muted); margin-top:4px;">ডেলিভারি চার্জ দূরত্ব দেখে নিজে থেকে হিসাব হয়।</div>` : ""}`;
   };
-  bill();
+  // 🛵 / 🚶 বাছাই — শেষবার যেটা বেছেছিলেন সেটাই আগে থেকে থাকে
+  let lastMode = "rider"; try{ lastMode = localStorage.getItem("hbTlrMode") === "self" ? "self" : "rider"; }catch(e){}
+  const setMode = (m)=>{
+    __tlrOrd.mode = m;
+    try{ localStorage.setItem("hbTlrMode", m); }catch(e){}
+    body.querySelectorAll(".tlrModeBtn").forEach(b=>{
+      const on = b.dataset.mode === m;
+      b.style.border = "1.5px solid " + (on ? "#f472b6" : "var(--border)");
+      b.style.background = on ? "rgba(190,24,93,0.25)" : "rgba(255,255,255,0.04)";
+      b.style.color = on ? "#fff" : "var(--muted)";
+    });
+    body.querySelector("#tlrOrdSelfBox").style.display = m === "self" ? "block" : "none";
+    body.querySelector("#tlrOrdRiderBox").style.display = m === "self" ? "none" : "block";
+    body.querySelector("#tlrOrdPayTxt").textContent = m === "self" ? "💵 টাকা দেবেন পোশাক নেওয়ার সময় — দর্জিকে নগদ।" : "💵 টাকা দেবেন পোশাক হাতে পেয়ে — রাইডারকে নগদ।";
+    bill();
+  };
+  body.querySelectorAll(".tlrModeBtn").forEach(b=> b.onclick = ()=> setMode(b.dataset.mode));
+  setMode(lastMode);
   body.querySelector("#tlrOrdQty").addEventListener("input", bill);
   body.querySelector("#tlrOrdAddMeasure").onclick = ()=>{ sheet.style.display = "none"; showScreen("screenTailorMeasure"); tlrRender(); };
   body.querySelector("#tlrOrdLocBtn").onclick = ()=>{
@@ -4264,17 +4309,20 @@ async function tlrSubmitOrder(){
   const qty = Math.round(Number(body.querySelector("#tlrOrdQty").value));
   if(!(qty >= 1 && qty <= 20)){ err("কয়টা বানাবেন — ১ থেকে ২০-এর মধ্যে লিখুন।"); return; }
   const phone = body.querySelector("#tlrOrdPhone").value.trim();
-  if(!/^[0-9+\-\s]{8,20}$/.test(phone)){ err("📱 সঠিক মোবাইল নম্বর লিখুন — রাইডার কল করবেন।"); return; }
+  const self = __tlrOrd.mode === "self";
+  if(!/^[0-9+\-\s]{8,20}$/.test(phone)){ err(self ? "📱 সঠিক মোবাইল নম্বর লিখুন — দর্জি দরকারে কল করবেন।" : "📱 সঠিক মোবাইল নম্বর লিখুন — রাইডার কল করবেন।"); return; }
   const addr = body.querySelector("#tlrOrdAddr").value.trim();
-  if(addr.length < 4){ err("🏠 ঠিকানা লিখুন — রাইডার যেন খুঁজে পান।"); return; }
-  if(!loc){ err("📍 \"আমার এখনকার লোকেশন দিন\" চাপুন — রাইডার এই জায়গাতেই আসবেন।"); return; }
+  if(!self && addr.length < 4){ err("🏠 ঠিকানা লিখুন — রাইডার যেন খুঁজে পান।"); return; }
+  if(!self && !loc){ err("📍 \"আমার এখনকার লোকেশন দিন\" চাপুন — রাইডার এই জায়গাতেই আসবেন।"); return; }
   try{ localStorage.setItem("hbTlrPhone", phone); localStorage.setItem("hbTlrAddr", addr); }catch(e){}
 
   const measure = m ? { label: m.label || "মাপ", note: m.note || "" } : null;
   if(m){ (needs.length ? needs : ["kameez","pajama"]).forEach(n=>{ if(tlrFilled(m[n])) measure[n] = m[n]; }); }
   const rec = {
     customerUid: currentCustomer.uid, customerName: (currentCustomer.name || "গ্রাহক").slice(0,60),
-    customerPhone: phone, customerAddress: addr.slice(0,150), customerLoc: { lat: loc.lat, lng: loc.lng },
+    customerPhone: phone, customerAddress: addr.slice(0,150),
+    deliveryMode: self ? "self" : "rider",
+    ...(self ? {} : { customerLoc: { lat: loc.lat, lng: loc.lng } }),
     tailorId: d.tailorId, tailorName: t.name || d.tailorName || "",
     designId: d.id, designTitle: d.title || "", category: d.category || "other", price: d.price, days: d.days || null,
     qty, measure, note: body.querySelector("#tlrOrdNote").value.trim().slice(0,200),
@@ -4284,7 +4332,9 @@ async function tlrSubmitOrder(){
   try{
     await db.collection("tailorOrders").add(rec);
     sheet.style.display = "none";
-    alert("✅ অর্ডার গেছে! দর্জি গ্রহণ করলেই রাইডার আপনার কাপড় নিতে আসবেন।\n\nঅবস্থা দেখুন Cart → 🚚 Order Tracking-এ।");
+    alert(self
+      ? "✅ অর্ডার গেছে! দর্জি গ্রহণ করলে জানানো হবে — তখন কাপড় নিয়ে দোকানে যাবেন।\n\nঅবস্থা দেখুন Cart → 🚚 Order Tracking-এ।"
+      : "✅ অর্ডার গেছে! দর্জি গ্রহণ করলেই রাইডার আপনার কাপড় নিতে আসবেন।\n\nঅবস্থা দেখুন Cart → 🚚 Order Tracking-এ।");
     tlrOpenTracking();
   }catch(e){
     btn.disabled = false; btn.textContent = "🧵 অর্ডার পাঠান";
@@ -4327,10 +4377,12 @@ function tlrMyOrdersRender(list){
   box.innerHTML = `<div class="card" style="padding:12px; border:1px solid rgba(244,114,182,0.4);">
     <div style="font-weight:800; font-size:14px; margin-bottom:4px;">🧵 আমার সেলাই অর্ডার</div>
     ${list.map(o=>{
-      const s = TLR_STATUS[o.status] || ["•", o.status, "#fff"];
-      const idx = TLR_STEPS.indexOf(o.status);
+      const selfM = o.deliveryMode === "self";
+      const s = (selfM && TLR_STATUS_SELF[o.status]) || TLR_STATUS[o.status] || ["•", o.status, "#fff"];
+      const STEPS = selfM ? TLR_STEPS_SELF : TLR_STEPS;
+      const idx = STEPS.indexOf(o.status);
       const waiting = o.dispatch && o.dispatch.state === "waiting_for_rider" && (o.status === "accepted" || o.status === "ready");
-      const bar = idx >= 0 ? `<div style="display:flex; gap:3px; margin-top:7px;">${TLR_STEPS.map((_,i)=> `<div style="flex:1; height:4px; border-radius:2px; background:${i <= idx ? s[2] : "rgba(255,255,255,0.12)"};"></div>`).join("")}</div>` : "";
+      const bar = idx >= 0 ? `<div style="display:flex; gap:3px; margin-top:7px;">${STEPS.map((_,i)=> `<div style="flex:1; height:4px; border-radius:2px; background:${i <= idx ? s[2] : "rgba(255,255,255,0.12)"};"></div>`).join("")}</div>` : "";
       const rider = (o.status === "collecting" || o.status === "returning") && o.riderName
         ? `<div style="font-size:12px; margin-top:5px;">🛵 ${escapeHtml(o.riderName)}${o.riderPhone ? ` · <a href="tel:${escapeHtml(o.riderPhone)}" style="color:var(--amber); text-decoration:none;">📞 কল</a>` : ""}</div>` : "";
       return `<div style="padding:10px 0; border-top:1px solid var(--border);">
@@ -4342,6 +4394,7 @@ function tlrMyOrdersRender(list){
         <div style="font-size:12.5px; font-weight:800; color:${s[2]}; margin-top:4px;">${s[0]} ${s[1]}</div>
         ${waiting ? `<div style="font-size:11.5px; color:#fbbf24;">এখন রাইডার ব্যস্ত — দর্জি আবার খুঁজবেন।</div>` : ""}
         ${o.status === "declined" && o.tailorNote ? `<div style="font-size:11.5px; color:var(--muted);">দর্জি বলেছেন: ${escapeHtml(o.tailorNote)}</div>` : ""}
+        ${selfM && (o.status === "accepted" || o.status === "ready") && (o.tailorAddress || o.tailorPhone) ? `<div style="font-size:12px; margin-top:5px;">🚶 ${o.tailorAddress ? "📍 " + escapeHtml(o.tailorAddress) : ""}${o.tailorPhone ? ` · <a href="tel:${escapeHtml(o.tailorPhone)}" style="color:var(--amber); text-decoration:none;">📞 দর্জিকে কল</a>` : ""}</div>` : ""}
         ${rider}${bar}
         ${o.status === "placed" ? `<button type="button" data-tlr-cancel="${escapeHtml(o.id)}" style="margin-top:7px; border:1px solid rgba(248,113,113,0.5); background:transparent; color:#fca5a5; border-radius:9px; padding:6px 12px; font-family:inherit; font-size:12px; font-weight:800; cursor:pointer;">✕ বাতিল করুন</button>` : ""}
       </div>`;

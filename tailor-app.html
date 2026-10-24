@@ -565,6 +565,12 @@ const OST = {
   declined:   ["❌", "আপনি নেননি", "#64748b"],
   cancelled:  ["✕", "গ্রাহক বাতিল করেছেন", "#64748b"],
 };
+// 🚶 গ্রাহক নিজে দোকানে দেবেন-নেবেন
+const OST_SELF = {
+  accepted: ["🚶", "গ্রাহক কাপড় নিয়ে দোকানে আসবেন", "#0369a1"],
+  ready:    ["🎉", "তৈরি — গ্রাহক নিতে আসবেন", "#15803d"],
+  delivered:["✅", "গ্রাহক নিয়ে গেছেন", "#15803d"],
+};
 const OTAB = { new:["placed"], run:["accepted","collecting","stitching","ready","returning"], done:["delivered","declined","cancelled"] };
 let orders = [], oTab = "new", firstOrders = true;
 const ms = (x)=> (typeof x === "number" ? x : (x && x.toMillis ? x.toMillis() : Date.now()));
@@ -617,12 +623,16 @@ function billHTML(o){
   const stitch = o.stitchTotal != null ? o.stitchTotal : Number(o.price||0) * Number(o.qty||1);
   return `<div class="bill">
     <div><span>সেলাইয়ের মজুরি (${tk(o.price)} × ${bn(o.qty||1)})</span><b>${tk(stitch)}</b></div>
-    <div><span>🛵 ডেলিভারি (আনা + ফেরত)${o.distanceKm != null ? " · " + bn(o.distanceKm) + " কিমি" : ""}</span><b>${o.deliveryCharge != null ? tk(o.deliveryCharge) : "হিসাব হচ্ছে…"}</b></div>
+    ${o.deliveryMode === "self"
+      ? `<div><span>🚶 গ্রাহক নিজে দেবেন-নেবেন</span><b>${tk(0)}</b></div>`
+      : `<div><span>🛵 ডেলিভারি (আনা + ফেরত)${o.distanceKm != null ? " · " + bn(o.distanceKm) + " কিমি" : ""}</span><b>${o.deliveryCharge != null ? tk(o.deliveryCharge) : "হিসাব হচ্ছে…"}</b></div>`}
     <div style="border-top:1px dashed var(--pink2);padding-top:5px;margin-top:5px;font-size:15px"><b>মোট (গ্রাহক দেবেন)</b><b style="color:var(--plum)">${o.total != null ? tk(o.total) : "—"}</b></div>
     <div class="muted" style="display:block;margin-top:3px">আপনার মজুরি: <b style="color:var(--green)">${tk(stitch)}</b></div>
   </div>`;
 }
 function riderHTML(o){
+  if(o.deliveryMode === "self") return (o.status === "accepted" || o.status === "ready")
+    ? `<div class="info">🚶 রাইডার লাগবে না — গ্রাহক নিজে ${o.status === "accepted" ? "কাপড় দিয়ে যাবেন" : "পোশাক নিয়ে যাবেন"}।${o.customerPhone ? " দরকারে ফোন করুন।" : ""}</div>` : "";
   const d = o.dispatch || {};
   const waiting = d.state === "waiting_for_rider" && (o.status === "accepted" || o.status === "ready");
   if(waiting) return `<div class="info warn">⚠️ এখন কোনো রাইডার পাওয়া যায়নি।<button class="btn small" type="button" data-retry="${esc(o.id)}" style="display:block;margin-top:8px;width:100%">🔁 আবার রাইডার খুঁজুন</button></div>`;
@@ -637,14 +647,17 @@ function riderHTML(o){
   return "";
 }
 function orderCardHTML(o){
-  const s = OST[o.status] || ["•", o.status, "#333"];
+  const selfM = o.deliveryMode === "self";
+  const s = (selfM && OST_SELF[o.status]) || OST[o.status] || ["•", o.status, "#333"];
   const dz = designs.find(x=> x.id === o.designId);
   const showContact = !["placed","declined","cancelled"].includes(o.status);
   let acts = "";
   if(o.status === "placed") acts = `<div class="btnrow"><button class="btn ok" type="button" data-acc="${esc(o.id)}">✅ গ্রহণ করুন</button><button class="btn no" type="button" data-dec="${esc(o.id)}">❌ পারব না</button></div>`;
-  if(o.status === "stitching") acts = `<button class="btn ok" type="button" data-ready="${esc(o.id)}" style="margin-top:10px">✅ সেলাই শেষ — ফেরত পাঠান</button>`;
+  if(o.status === "stitching") acts = `<button class="btn ok" type="button" data-ready="${esc(o.id)}" data-self="${selfM ? 1 : ""}" style="margin-top:10px">${selfM ? "✅ সেলাই শেষ — গ্রাহককে জানান" : "✅ সেলাই শেষ — ফেরত পাঠান"}</button>`;
+  if(selfM && o.status === "accepted") acts = `<button class="btn ok" type="button" data-sgot="${esc(o.id)}" style="margin-top:10px">📦 গ্রাহক কাপড় দিয়ে গেছেন — সেলাই শুরু</button>`;
+  if(selfM && o.status === "ready") acts = `<button class="btn ok" type="button" data-sdone="${esc(o.id)}" style="margin-top:10px">🤝 গ্রাহক পোশাক নিয়ে গেছেন${o.total != null ? " · " + tk(o.total) + " পেলাম" : ""}</button>`;
   return `<div class="ord ${o.status === "placed" ? "new" : ""}">
-    <div class="hd"><span class="chip">🧾 ${esc(o.orderCode || "নতুন")}</span><span class="muted">${when(o.createdAt)}</span></div>
+    <div class="hd"><span class="chip">🧾 ${esc(o.orderCode || "নতুন")}${selfM ? " · 🚶" : ""}</span><span class="muted">${when(o.createdAt)}</span></div>
     <div class="st" style="color:${s[2]}">${s[0]} ${s[1]}</div>
     <div class="dz2" style="margin-top:8px">
       ${dz && dz.img ? `<img src="${esc(dz.img)}" alt="">` : `<div style="width:56px;height:72px;border-radius:10px;background:var(--pink);display:flex;align-items:center;justify-content:center;font-size:26px">🧵</div>`}
@@ -679,17 +692,27 @@ function renderOrders(){
     return;
   }
   box.innerHTML = list.map(orderCardHTML).join("");
-  box.querySelectorAll("[data-acc]").forEach(b=> b.onclick = ()=> !(T.data.storeLocation && T.data.storeLocation.lat != null)
+  box.querySelectorAll("[data-acc]").forEach(b=> b.onclick = ()=> !((orders.find(x=> x.id === b.dataset.acc)||{}).deliveryMode === "self") && !(T.data.storeLocation && T.data.storeLocation.lat != null)
     ? (alert("আগে দোকানের লোকেশন সেট করুন (👤 প্রোফাইল → 📍) — রাইডার এটা দেখেই কাপড় আনবেন।"), go("profile"))
-    : setStatus(b.dataset.acc, { status:"accepted", acceptedAt: firebase.firestore.FieldValue.serverTimestamp() }, "✅ গ্রহণ করেছেন — রাইডার গ্রাহকের কাপড় আনবেন", b));
+    : setStatus(b.dataset.acc, { status:"accepted", acceptedAt: firebase.firestore.FieldValue.serverTimestamp() },
+        (orders.find(x=> x.id === b.dataset.acc)||{}).deliveryMode === "self" ? "✅ গ্রহণ করেছেন — গ্রাহক কাপড় নিয়ে আসবেন" : "✅ গ্রহণ করেছেন — রাইডার গ্রাহকের কাপড় আনবেন", b));
   box.querySelectorAll("[data-dec]").forEach(b=> b.onclick = ()=>{
     const why = prompt("কেন নিতে পারছেন না? (গ্রাহক দেখবেন — খালিও রাখতে পারেন)", "এখন অনেক কাজ আছে");
     if(why === null) return;
     setStatus(b.dataset.dec, { status:"declined", declinedAt: firebase.firestore.FieldValue.serverTimestamp(), tailorNote: String(why).trim().slice(0,150) }, "গ্রাহককে জানানো হয়েছে", b);
   });
   box.querySelectorAll("[data-ready]").forEach(b=> b.onclick = ()=>{
-    if(!confirm("সেলাই শেষ? রাইডার এসে পোশাক গ্রাহকের কাছে নিয়ে যাবেন।")) return;
-    setStatus(b.dataset.ready, { status:"ready", readyAt: firebase.firestore.FieldValue.serverTimestamp() }, "🎉 রাইডার খোঁজা হচ্ছে — প্যাকেট তৈরি রাখুন", b);
+    const selfR = !!b.dataset.self;
+    if(!confirm(selfR ? "সেলাই শেষ? গ্রাহককে জানানো হবে দোকান থেকে নিয়ে যেতে।" : "সেলাই শেষ? রাইডার এসে পোশাক গ্রাহকের কাছে নিয়ে যাবেন।")) return;
+    setStatus(b.dataset.ready, { status:"ready", readyAt: firebase.firestore.FieldValue.serverTimestamp() }, selfR ? "🎉 গ্রাহককে জানানো হয়েছে — তিনি নিতে আসবেন" : "🎉 রাইডার খোঁজা হচ্ছে — প্যাকেট তৈরি রাখুন", b);
+  });
+  box.querySelectorAll("[data-sgot]").forEach(b=> b.onclick = ()=>{
+    if(!confirm("গ্রাহক কাপড় দিয়ে গেছেন? সেলাই শুরু হিসেবে ধরা হবে।")) return;
+    setStatus(b.dataset.sgot, { status:"stitching", stitchingAt: firebase.firestore.FieldValue.serverTimestamp() }, "✂️ সেলাই শুরু — গ্রাহককে জানানো হয়েছে", b);
+  });
+  box.querySelectorAll("[data-sdone]").forEach(b=> b.onclick = ()=>{
+    if(!confirm("গ্রাহক পোশাক নিয়ে গেছেন আর টাকা দিয়েছেন?")) return;
+    setStatus(b.dataset.sdone, { status:"delivered", deliveredAt: firebase.firestore.FieldValue.serverTimestamp() }, "✅ হয়ে গেল — মজুরি এ মাসের আয়ে যোগ হলো", b);
   });
   box.querySelectorAll("[data-retry]").forEach(b=> b.onclick = ()=> setStatus(b.dataset.retry, { retryAt: firebase.firestore.FieldValue.serverTimestamp() }, "🔁 আবার রাইডার খোঁজা হচ্ছে", b));
   box.querySelectorAll("[data-print]").forEach(b=> b.onclick = ()=> printOrder(b.dataset.print));

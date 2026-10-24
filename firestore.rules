@@ -279,6 +279,16 @@ service cloud.firestore {
           (resource.data.status in ['accepted', 'ready']
             && resource.data.get('dispatch', {}).get('state', '') == 'waiting_for_rider'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['retryAt'])) ||
+          // 🚶 গ্রাহক নিজে দোকানে দেবেন-নেবেন — রাইডার নেই, তাই দর্জি নিজেই
+          //    "কাপড় পেলাম" (accepted → stitching) আর "গ্রাহক নিয়ে গেছেন" (ready → delivered) চাপেন
+          (resource.data.get('deliveryMode', '') == 'self'
+            && resource.data.status == 'accepted'
+            && request.resource.data.status == 'stitching'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'stitchingAt'])) ||
+          (resource.data.get('deliveryMode', '') == 'self'
+            && resource.data.status == 'ready'
+            && request.resource.data.status == 'delivered'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliveredAt'])) ||
           // 🏪 দোকানের অর্ডারে রাইডার পাওয়া না গেলে দর্জি পাঠানো বাতিল করতে পারেন (গ্রাহক নিজে নেবেন)
           (resource.data.get('source', '') == 'walkin'
             && resource.data.status == 'ready'
