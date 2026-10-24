@@ -3588,7 +3588,8 @@ exports.onTailorOrderWritten = onDocumentWritten("tailorOrders/{id}", async (eve
       const tLoc = t.storeLocation && t.storeLocation.lat != null ? { lat: t.storeLocation.lat, lng: t.storeLocation.lng } : null;
       const cLoc = after.customerLoc && after.customerLoc.lat != null ? after.customerLoc : null;
       const km = (tLoc && cLoc) ? haversineKm(tLoc.lat, tLoc.lng, cLoc.lat, cLoc.lng) : null;
-      const legCharge = tailorLegCharge(km);
+      const selfMode = after.deliveryMode === "self"; // 🚶 গ্রাহক নিজে দোকানে দেবেন-নেবেন — রাইডার নেই, চার্জ নেই
+      const legCharge = selfMode ? 0 : tailorLegCharge(km);
       const stitch = Math.round(Number(after.price || 0) * Number(after.qty || 1));
       const orderCode = "S" + String(Math.floor(1000 + Math.random() * 9000));
       await ref.set({
@@ -3604,7 +3605,10 @@ exports.onTailorOrderWritten = onDocumentWritten("tailorOrders/{id}", async (eve
     const st = after.status;
     if (st !== before.status) {
       const total = after.total != null ? ` · মোট ৳${after.total}` : "";
-      if (st === "accepted") {
+      const selfMode = after.deliveryMode === "self";
+      if (st === "accepted" && selfMode) {
+        await toCust("✅ দর্জি অর্ডার নিয়েছেন", `${code}${after.tailorName || "সেলাই ঘর"} — কাপড় নিয়ে দোকানে যান${after.tailorAddress ? " (" + after.tailorAddress + ")" : ""}।`);
+      } else if (st === "accepted") {
         await toCust("✅ দর্জি অর্ডার নিয়েছেন", `${code}${after.tailorName || "সেলাই ঘর"} — রাইডার শিগগিরই আপনার কাপড় নিতে আসবেন।`);
         await dispatchTailorLeg(id, after, []);
       } else if (st === "declined") {
@@ -3616,9 +3620,11 @@ exports.onTailorOrderWritten = onDocumentWritten("tailorOrders/{id}", async (eve
         await toCust("🛵 রাইডার আসছেন কাপড় নিতে", `${code}${after.riderName || "রাইডার"}${after.riderPhone ? " (" + after.riderPhone + ")" : ""} — কাপড় গুছিয়ে রাখুন।`);
         await toTailor("🛵 রাইডার পাওয়া গেছে", `${code}${after.riderName || "রাইডার"} গ্রাহকের কাপড় নিয়ে আসবেন।`);
       } else if (st === "stitching") {
-        await toTailor("📦 কাপড় পৌঁছেছে — সেলাই শুরু করুন", `${code}${after.customerName || "গ্রাহক"} — ${after.designTitle || ""} × ${after.qty || 1}`);
+        if (!selfMode) await toTailor("📦 কাপড় পৌঁছেছে — সেলাই শুরু করুন", `${code}${after.customerName || "গ্রাহক"} — ${after.designTitle || ""} × ${after.qty || 1}`);
         await toCust("✂️ কাপড় দর্জির হাতে পৌঁছেছে", `${code}${after.days ? after.days + " দিনের মধ্যে" : "শিগগিরই"} তৈরি হবে — তৈরি হলেই জানাব।`);
         await markTailorLegDone(after);
+      } else if (st === "ready" && selfMode) {
+        await toCust("🎉 আপনার পোশাক তৈরি!", `${code}দোকান থেকে নিয়ে যান${total}`);
       } else if (st === "ready") {
         await toCust("🎉 আপনার পোশাক তৈরি!", `${code}রাইডার শিগগিরই নিয়ে আসবেন${total}`);
         await dispatchTailorLeg(id, after, []);
@@ -3626,7 +3632,7 @@ exports.onTailorOrderWritten = onDocumentWritten("tailorOrders/{id}", async (eve
         await toCust("🛵 রাইডার আপনার পোশাক আনতে যাচ্ছেন", `${code}${after.riderName || "রাইডার"}${after.riderPhone ? " (" + after.riderPhone + ")" : ""}${total} — নগদ রাখুন।`);
         await toTailor("🛵 রাইডার পোশাক নিতে আসছেন", `${code}${after.riderName || "রাইডার"} — প্যাকেট তৈরি রাখুন।`);
       } else if (st === "delivered") {
-        await toTailor("✅ পোশাক গ্রাহকের হাতে পৌঁছেছে", `${code}${after.customerName || "গ্রাহক"}${total}`);
+        if (!selfMode) await toTailor("✅ পোশাক গ্রাহকের হাতে পৌঁছেছে", `${code}${after.customerName || "গ্রাহক"}${total}`);
         await toCust("✅ পোশাক পৌঁছে গেছে", `${code}সেলাই ঘর ব্যবহারের জন্য ধন্যবাদ!`);
         await markTailorLegDone(after);
       }
