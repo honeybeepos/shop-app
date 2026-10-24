@@ -1025,6 +1025,7 @@ window.hbLoadLib = function(name){
 <script src="zatca-qr.js"></script>
 <script src="zatca-ledger.js"></script>
 <script src="firebase-init.js"></script>
+<script src="hb-btprint.js"></script>
 
 <div id="authGate">
   <div class="agBeeWrap"><div class="agBeeGlow"><div class="agBee">🐝</div></div></div>
@@ -2372,6 +2373,23 @@ window.hbLoadLib = function(name){
       <p class="pin-desc">ডিফল্ট পাসওয়ার্ড 12345। এটি দিয়ে হিসাব মোছা ও মোট অংক দেখা যায়।</p>
       <button class="btn" id="changePinBtn">পাসওয়ার্ড পরিবর্তন করুন</button>
       <button class="btn secondary" id="forgotPinBtn" style="margin-top:10px;">পাসওয়ার্ড রিসেট করুন (ডিফল্ট 12345)</button>
+    </div>
+
+    <!-- 🖨️ ধাপ ৪: প্রিন্টারের কাগজের মাপ — রসিদ (PC-র Print আর মোবাইলের ব্লুটুথ/RawBT) এই মাপেই ছাপা হয় -->
+    <div class="panel" id="hbPaperPanel">
+      <h2><span class="num">🖨</span> প্রিন্টার ও কাগজের মাপ</h2>
+      <p class="pin-desc">আপনার প্রিন্টারের কাগজ যত চওড়া, সেটা বেছে নিন। রসিদ সেই মাপেই ছাপা হবে।</p>
+      <div class="hbPaperOpts" role="radiogroup" aria-label="কাগজের মাপ">
+        <button type="button" class="hbPaperOpt" data-paper="58"><b>৫৮ mm</b><span>ছোট থার্মাল · মোবাইল ব্লুটুথ</span></button>
+        <button type="button" class="hbPaperOpt" data-paper="80"><b>৮০ mm</b><span>বড় থার্মাল · কাউন্টার</span></button>
+        <button type="button" class="hbPaperOpt" data-paper="A4"><b>A4</b><span>সাধারণ অফিস প্রিন্টার</span></button>
+      </div>
+      <div class="hbPaperNow" id="hbPaperNow"></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+        <button type="button" class="btn secondary" id="hbPaperTestPc" style="flex:1; min-width:150px;">🧪 পরীক্ষার রসিদ (PC/প্রিন্ট)</button>
+        <button type="button" class="btn secondary" id="hbPaperTestBt" style="flex:1; min-width:150px;">🔵 পরীক্ষা (ব্লুটুথ/RawBT)</button>
+      </div>
+      <p class="pin-desc" style="margin-top:8px;">ব্লুটুথ প্রিন্ট শুধু Android ফোনে, RawBT অ্যাপ দিয়ে চলে। A4 বাছলে ব্লুটুথে ৫৮ mm মাপে ছাপা হবে।</p>
     </div>
 
     <!-- 🇸🇦 সৌদি আরবের দোকানের জন্য — ZATCA (ফাতুরা) ই-ইনভয়েস।
@@ -8059,9 +8077,7 @@ function ordPrintReceipt(g){
       </div>` : ''}
     </div>`;
   const area = document.getElementById('ordReceiptPrintArea');
-  area.classList.add('printing');
-  window.print();
-  setTimeout(()=> area.classList.remove('printing'), 500);
+  hbThermalPrint(area);
 }
 
 // 📦 "প্রস্তুত হচ্ছে" রসিদে প্যাকেজিং শেষ হলে — পুরো রসিদের সব প্রোডাক্ট একসাথে
@@ -17264,9 +17280,7 @@ async function printSaleReceipt(name, phone, message){
       JsBarcode('#saleReceiptBarcode', barcodeValue, { format:'CODE128', displayValue:true, fontSize:12, height:38, margin:2 });
     }catch(e){ console.warn('রসিদের বারকোড রেন্ডার ব্যর্থ (রসিদ তবু প্রিন্ট হবে, শুধু বারকোড ছাড়া):', e); }
   }
-  printArea.classList.add('printing');
-  window.print();
-  setTimeout(()=> printArea.classList.remove('printing'), 500);
+  hbThermalPrint(printArea);
 }
 
 /* ==================== 🔵🖨️ ব্লুটুথ থার্মাল প্রিন্টার (RawBT দিয়ে) ====================
@@ -17313,11 +17327,11 @@ async function btRenderReceiptCanvas(shopName, message, zatca){
   if(zatca && typeof HBQR !== 'undefined'){
     try{
       __zq = HBQR.encode(zatca.qr, { ecl: 'M' });
-      __zqBlock = Math.max(2, Math.floor((BT_PRINTER_DOT_WIDTH - 48) / __zq.size));
+      __zqBlock = Math.max(2, Math.floor((hbBtDots() - 48) / __zq.size));
     }catch(e){ console.warn('ZATCA QR (thermal) failed:', e); __zq = null; }
   }
   if(document.fonts && document.fonts.ready) await document.fonts.ready;
-  const W = BT_PRINTER_DOT_WIDTH;
+  const W = hbBtDots();
   const marginX = 12;
   const usableW = W - marginX*2;
   const measureCanvas = document.createElement('canvas');
@@ -24206,6 +24220,172 @@ auth.onAuthStateChanged(async (user)=>{
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
   (mq.addEventListener ? mq.addEventListener("change", place) : mq.addListener(place));
   window.hbDeskSideRefresh = brand;
+})();
+</script>
+<!-- PC/Windows লেআউট (শুধু ১০০০px+ স্ক্রিনে; মোবাইলে কোনো পরিবর্তন নেই) -->
+<style id="pcLayoutFix">
+@media (min-width: 1000px){
+  body #program-monitor .monContent,
+  body #program-extraincome .eiContent,
+  body #program-ops .opsContent{ max-width:1100px; width:100%; box-sizing:border-box; padding-left:28px; padding-right:28px; }
+  body #program-bcc .bccContent{ max-width:1000px; width:100%; padding-left:28px; padding-right:28px; }
+  body #program-monitor .glassGrid,
+  body #program-ops .glassGrid,
+  body #program-extraincome .eiGrid{ grid-template-columns:repeat(4,1fr); gap:16px; }
+  body #program-monitor .glassCard.wide,
+  body #program-ops .glassCard.wide{ grid-column:span 2; }
+  body #program-extraincome .eiCard.wide{ grid-column:span 2; }
+  body #program-honeybee .hbComb{ grid-template-columns:repeat(3,1fr); max-width:900px; width:100%; box-sizing:border-box; }
+  body #program-honeybee .hbTagline{ max-width:620px; font-size:14px; }
+  body #program-bcc .bccMarketGrid{ grid-template-columns:repeat(4,1fr); }
+  body #program-honeybee .hbComb > .hbCard{ grid-column:auto !important; }
+  body #program-honeybee > button{ max-width:864px; margin-left:auto !important; margin-right:auto !important; width:calc(100% - 36px); }
+}
+</style>
+<!-- 🖥️ ধাপ ২: PC-তে মেনু আইকন (☰) — সব পাতায় একই জায়গায় (উপরে বাঁয়ে)।
+     চাপ দিলে বাঁ পাশের মেনু ছোট হয়ে সরু পট্টি হয়, আবার চাপলে খোলে।
+     শুধু ১০০০px+ পর্দায়; মোবাইলে বোতামটা তৈরিই হয় না। -->
+<style id="dsToggleCss">
+  #dsToggle{ display:none; }
+  @media (min-width:1000px){
+    #dsToggle{
+      display:grid; place-items:center; position:fixed; top:18px; left:198px; z-index:700;
+      width:38px; height:38px; border-radius:10px; border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.07); color:#fff; font-size:19px; line-height:1; cursor:pointer;
+      transition:left .18s, background .15s;
+    }
+    #dsToggle:hover{ background:rgba(244,180,0,.22); border-color:#F4B400; }
+    #deskSide .dsBrand{ padding-right:46px; }
+    #deskSide .dsName{ max-width:118px; }
+    body.dsMini{ padding-left:64px !important; }
+    body.dsMini #deskSide{ width:64px; padding:16px 0; overflow:hidden; }
+    body.dsMini #deskSide > *{ display:none !important; }
+    body.dsMini #dsToggle{ left:13px; }
+    body.dsMini [id^="program-"]{ left:64px !important; }
+  }
+</style>
+<script>
+(function(){
+  const mq = window.matchMedia("(min-width:1000px)");
+  const KEY = "hb-pos-side-mini";
+  let btn = null;
+  function setMini(on){
+    document.body.classList.toggle("dsMini", !!on);
+    if(btn){ btn.title = on ? "মেনু খুলুন" : "মেনু বন্ধ করুন"; btn.setAttribute("aria-expanded", on ? "false" : "true"); }
+    try{ localStorage.setItem(KEY, on ? "1" : "0"); }catch(e){}
+  }
+  function build(){
+    if(!mq.matches){ document.body.classList.remove("dsMini"); return; }
+    if(!btn){
+      btn = document.createElement("button");
+      btn.id = "dsToggle"; btn.type = "button"; btn.textContent = "☰"; btn.setAttribute("aria-label", "মেনু");
+      btn.addEventListener("click", ()=> setMini(!document.body.classList.contains("dsMini")));
+      document.body.appendChild(btn);
+    }
+    let saved = "0"; try{ saved = localStorage.getItem(KEY) || "0"; }catch(e){}
+    setMini(saved === "1");
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
+  (mq.addEventListener ? mq.addEventListener("change", build) : mq.addListener(build));
+})();
+</script>
+<!-- 🖨️ ধাপ ৪ (ভাগ ১-২): কাগজের মাপ — ৫৮mm / ৮০mm / A4।
+     PC-তে রসিদ ঠিক সেই চওড়া আর লম্বায় ছাপা হয় (@page দিয়ে, যাতে বাড়তি কাগজ
+     না যায়); মোবাইলের ব্লুটুথে (RawBT) ৫৮mm = ৩৮৪ ডট, ৮০mm = ৫৭৬ ডট। -->
+<style id="hbPaperCss">
+  .hbPaperOpts{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .hbPaperOpt{ display:flex; flex-direction:column; align-items:center; gap:3px; padding:12px 6px; border-radius:12px; cursor:pointer;
+    border:2px solid rgba(128,128,128,.35); background:rgba(128,128,128,.06); color:inherit; font-family:inherit; }
+  .hbPaperOpt b{ font-size:16px; }
+  .hbPaperOpt span{ font-size:11px; opacity:.75; text-align:center; line-height:1.35; }
+  .hbPaperOpt.on{ border-color:#F4B400; background:rgba(244,180,0,.16); }
+  .hbPaperNow{ margin-top:8px; font-size:12.5px; font-weight:700; }
+</style>
+<script>
+function hbPaper(){
+  let v = '58';
+  try{ v = localStorage.getItem('hb-paper') || '58'; }catch(e){}
+  return (v === '80' || v === 'A4') ? v : '58';
+}
+function hbBtDots(){ return hbPaper() === '80' ? 576 : 384; }
+const HB_PAPER_SPEC = {
+  '58': { label:'৫৮ mm', w:48,  page:58, fs:11,   pad:'2mm 1mm' },
+  '80': { label:'৮০ mm', w:72,  page:80, fs:12.5, pad:'2mm 2mm' },
+  'A4': { label:'A4',    w:120, page:0,  fs:14,   pad:'0' }
+};
+/* রসিদের প্রিন্ট-এরিয়াকে বেছে নেওয়া কাগজের মাপে ছাপা — আগে রসিদ সবসময় ২৮০px
+   (প্রায় ৭৪mm) চওড়া হতো, তাই ৫৮mm প্রিন্টারে ডান দিক কেটে যেত বা ছোট হয়ে যেত */
+function hbThermalPrint(area){
+  if(!area){ window.print(); return; }
+  const p = hbPaper(), sp = HB_PAPER_SPEC[p];
+  const box = area.firstElementChild;
+  let st = document.getElementById('hbPaperPage');
+  if(!st){ st = document.createElement('style'); st.id = 'hbPaperPage'; document.head.appendChild(st); }
+  const oldStyle = box ? box.getAttribute('style') : null;
+  if(box){
+    box.style.width = sp.w + 'mm';
+    box.style.fontSize = sp.fs + 'px';
+    box.style.padding = sp.pad;
+    box.style.boxSizing = 'border-box';
+    box.querySelectorAll('svg').forEach(el=>{ el.style.maxWidth = '100%'; el.style.height = 'auto'; });
+    box.querySelectorAll('img').forEach(el=>{ el.style.maxWidth = '100%'; });
+  }
+  /* বাকি পাতাটা "লুকানো" থাকলেও জায়গা নিত — থার্মাল রোলে তাই ফাঁকা কাগজ বের হতো।
+     ছাপার সময় রসিদটাকে body-র সরাসরি নিচে এনে বাকি সব display:none করা হয়,
+     ছাপা শেষে আবার আগের জায়গায় ফেরত। */
+  const home = { parent: area.parentNode, next: area.nextSibling };
+  document.body.appendChild(area);
+  document.body.classList.add('hbTP');
+  const solo = '@media print{ body.hbTP > *:not(#' + area.id + '){ display:none !important; } html:has(body.hbTP), body.hbTP{ padding:0 !important; margin:0 !important; height:auto !important; min-height:0 !important; overflow:visible !important; background:#fff !important; } body.hbTP #' + area.id + '.printing{ position:static !important; } }';
+  if(p === 'A4'){
+    st.textContent = '@page{ size:A4; margin:12mm; } ' + solo;
+  } else {
+    let hPx = box ? box.offsetHeight : 0;
+    const hMm = hPx > 0 ? Math.ceil(hPx * 25.4 / 96) + 6 : 200;
+    st.textContent = '@page{ size:' + sp.page + 'mm ' + hMm + 'mm; margin:0; } ' + solo;
+  }
+  area.classList.add('printing');
+  window.print();
+  setTimeout(()=>{
+    area.classList.remove('printing');
+    document.body.classList.remove('hbTP');
+    if(home.parent){ home.parent.insertBefore(area, home.next && home.next.parentNode === home.parent ? home.next : null); }
+    st.textContent = '';
+    if(box){ if(oldStyle === null) box.removeAttribute('style'); else box.setAttribute('style', oldStyle); }
+  }, 600);
+}
+(function(){
+  function paint(){
+    const p = hbPaper();
+    document.querySelectorAll('.hbPaperOpt').forEach(b=>{
+      const on = b.dataset.paper === p;
+      b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); b.setAttribute('role', 'radio');
+    });
+    const now = document.getElementById('hbPaperNow');
+    if(now) now.textContent = '✅ এখন বাছা আছে: ' + HB_PAPER_SPEC[p].label + (p === 'A4' ? '' : ' (ব্লুটুথে ' + hbBtDots() + ' ডট)');
+  }
+  function sample(){
+    const lbl = HB_PAPER_SPEC[hbPaper()].label;
+    const cur = (typeof HB_CUR !== 'undefined' && HB_CUR) ? HB_CUR : '৳';
+    return 'পরীক্ষার রসিদ — ' + lbl + '\nইনভয়েস: TEST-001\n- মিনিকেট চাল ৫ কেজি: ' + cur + ' 420\n- সয়াবিন তেল ১ লিটার: ' + cur + ' 190\nমোট: ' + cur + ' 610\nবাংলা লেখা, বারকোড আর লাইন ঠিকমতো এসেছে কি না দেখুন।';
+  }
+  function wire(){
+    const panel = document.getElementById('hbPaperPanel'); if(!panel) return;
+    panel.addEventListener('click', (e)=>{
+      const b = e.target.closest('.hbPaperOpt'); if(!b) return;
+      try{ localStorage.setItem('hb-paper', b.dataset.paper); }catch(err){}
+      paint();
+      if(typeof toast === 'function') toast('🖨️ কাগজের মাপ: ' + HB_PAPER_SPEC[hbPaper()].label);
+    });
+    const pc = document.getElementById('hbPaperTestPc');
+    if(pc) pc.addEventListener('click', ()=>{ if(typeof printSaleReceipt === 'function') printSaleReceipt('পরীক্ষা', '01700000000', sample()); });
+    const bt = document.getElementById('hbPaperTestBt');
+    if(bt) bt.addEventListener('click', ()=>{ if(typeof btPrintReceipt === 'function') btPrintReceipt('পরীক্ষা', '', sample()); });
+    paint();
+    // 📖 প্রিন্টার লাগানোর নিয়ম (hb-btprint.js-এর একই গাইড, সব অ্যাপে এক লেখা)
+    if(window.HBBT && HBBT.guideHtml && !panel.querySelector('.hbPrGuide')) panel.insertAdjacentHTML('beforeend', HBBT.guideHtml());
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire); else wire();
 })();
 </script>
 </body>

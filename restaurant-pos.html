@@ -500,6 +500,7 @@ button{cursor:pointer;border:0}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="firebase-init.js"></script>
+<script src="hb-btprint.js"></script>
 <script>
 const defaultProducts=[
  {id:1,name:"Chicken Burger",cat:"Burger",price:15,available:true,published:true,description:"Grilled chicken burger",img:"https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=700&q=80",variants:[{name:"Regular",price:0},{name:"Large",price:5}],addons:[{name:"Extra Cheese",price:2},{name:"Extra Chicken",price:4}]},
@@ -1510,6 +1511,7 @@ function ooRender(){
     //    চাইবেন, মিলিয়ে দেওয়ার একমাত্র উপায় এটাই।
     if(g.status === "pending" || g.status === "preparing" || g.status === "shipped"){
       btns += '<button class="btn" data-ooslip="1" data-k="'+g.key+'">🖨️ স্লিপ</button>';
+      btns += '<button class="btn" data-oobt="1" data-k="'+g.key+'">🔵 ব্লুটুথ</button>';
     }
 
     return '<div class="order-row" style="align-items:flex-start;flex-direction:column;gap:8px">'
@@ -1534,6 +1536,12 @@ function ooRender(){
       + '</div>';
   }).join("");
 
+  box.querySelectorAll("[data-oobt]").forEach(function(b){
+    b.addEventListener("click", function(){
+      const g = list.find(function(x){ return x.key === b.dataset.k; });
+      if(g) ooPrintSlip(g, true);
+    });
+  });
   box.querySelectorAll("[data-ooslip]").forEach(function(b){
     b.addEventListener("click", function(){
       const g = list.find(function(x){ return x.key === b.dataset.k; });
@@ -1568,10 +1576,8 @@ function ooEsc(t){
   return String(t == null ? "" : t)
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
-function ooPrintSlip(g){
+function ooPrintSlip(g, bt){
   if(!g) return;
-  const w = window.open("", "_blank", "width=380,height=620");
-  if(!w){ alert("ব্রাউজার নতুন উইন্ডো আটকে দিয়েছে — পপ-আপ অনুমতি দিয়ে আবার চেষ্টা করুন।"); return; }
   const rows = g.items.map(function(i){
     return '<div style="display:flex;justify-content:space-between;gap:6px;padding:4px 0;border-bottom:1px dashed #999">'
          + '<span>' + ooEsc(i.productName || "খাবার") + ' × ' + (i.qty || 1) + '</span>'
@@ -1586,9 +1592,8 @@ function ooPrintSlip(g){
     ? '<div style="border-top:1px dashed #000;margin-top:10px;padding-top:6px;text-align:center;font-size:10px">'
       + '🛵 রাইডার এই নম্বর বলে পার্সেল চাইবেন — মিলিয়ে দিন</div>'
     : '';
-  w.document.write(
-    '<html><head><meta charset="utf-8"><title>স্লিপ</title></head>'
-    + '<body style="margin:0"><div style="width:280px;margin:0 auto;padding:10px;'
+  const inner = (''
+    + '<div style="width:280px;margin:0 auto;padding:10px;'
     + 'font-family:monospace;font-size:12px;color:#000">'
     + '<div style="text-align:center;font-weight:800;margin-bottom:6px">🧾 ' + ooEsc(getPrintShopName()) + '</div>'
     + codeBox
@@ -1601,7 +1606,13 @@ function ooPrintSlip(g){
       + '<div style="display:flex;justify-content:space-between"><span>খাবারের দাম</span><span>' + ooMoney(b.sub) + '</span></div>'
       + '<div style="display:flex;justify-content:space-between"><span>' + (b.pickup ? 'ডেলিভারি (নিজে নেবেন)' : 'ডেলিভারি চার্জ') + '</span><span>' + (b.known ? ooMoney(b.del) : '—') + '</span></div>'
       + '<div style="display:flex;justify-content:space-between;font-weight:800;font-size:15px;border-top:2px solid #000;margin-top:4px;padding-top:4px"><span>মোট</span><span>' + ooMoney(b.grand) + '</span></div></div>'; })()
-    + foot + '</div>'
+    + foot + '</div>');
+  // 🔵 ব্লুটুথ (RawBT, Android) — একই স্লিপ, নতুন উইন্ডো ছাড়াই
+  if(bt){ if(window.HBBT) HBBT.printHtml(inner); return; }
+  const w = window.open("", "_blank", "width=380,height=620");
+  if(!w){ alert("ব্রাউজার নতুন উইন্ডো আটকে দিয়েছে — পপ-আপ অনুমতি দিয়ে আবার চেষ্টা করুন।"); return; }
+  w.document.write(
+    '<html><head><meta charset="utf-8"><title>স্লিপ</title></head><body style="margin:0">' + inner
     + '<scr' + 'ipt>setTimeout(function(){window.print();},350);<\/scr' + 'ipt>'
     + '</body></html>');
   w.document.close();

@@ -12,7 +12,7 @@
 // 🔔 পুশ নোটিফিকেশন — এই ফাইলটা একা বসলেও (পুরনো পাতা থেকে) অ্যাপ বন্ধ অবস্থায় পুশ আসবে
 importScripts("sw-push.js");
 
-const CACHE_VERSION = "shop-app-v197";
+const CACHE_VERSION = "shop-app-v200";
 
 const APP_SHELL = [
   "login.html",
@@ -22,6 +22,7 @@ const APP_SHELL = [
   "honey-bee-track.html",
   "firebase-init.js",
   "hb-currency.js",
+  "hb-btprint.js",
   "sw-push.js",
   "hb-qr.js",
   "zatca-qr.js",

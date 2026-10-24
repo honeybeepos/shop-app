@@ -335,6 +335,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="firebase-init.js"></script>
+<script src="hb-btprint.js"></script>
 <script>
 const $ = (id)=> document.getElementById(id);
 const esc = (s)=> String(s == null ? "" : s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -672,7 +673,7 @@ function orderCardHTML(o){
     ${riderHTML(o)}
     ${o.status === "declined" && o.tailorNote ? `<div class="muted" style="margin-top:6px">কারণ: ${esc(o.tailorNote)}</div>` : ""}
     ${acts}
-    ${o.status !== "cancelled" ? `<button class="btn small ghost" type="button" data-print="${esc(o.id)}" style="margin-top:10px">🖨️ রসিদ প্রিন্ট</button>` : ""}
+    ${o.status !== "cancelled" ? `<button class="btn small ghost" type="button" data-print="${esc(o.id)}" style="margin-top:10px">🖨️ রসিদ প্রিন্ট</button> <button class="btn small ghost" type="button" data-btprint="${esc(o.id)}" style="margin-top:10px">🔵 ব্লুটুথ প্রিন্ট</button>` : ""}
   </div>`;
 }
 function renderOrders(){
@@ -717,6 +718,7 @@ function renderOrders(){
   });
   box.querySelectorAll("[data-retry]").forEach(b=> b.onclick = ()=> setStatus(b.dataset.retry, { retryAt: firebase.firestore.FieldValue.serverTimestamp() }, "🔁 আবার রাইডার খোঁজা হচ্ছে", b));
   box.querySelectorAll("[data-print]").forEach(b=> b.onclick = ()=> printOrder(b.dataset.print));
+  box.querySelectorAll("[data-btprint]").forEach(b=> b.onclick = ()=>{ tlrBtNext = true; printOrder(b.dataset.btprint); });
 }
 async function setStatus(id, upd, okMsg, btn){
   if(btn) btn.disabled = true;
@@ -725,6 +727,14 @@ async function setStatus(id, upd, okMsg, btn){
 }
 document.querySelectorAll(".otabs button").forEach(b=> b.addEventListener("click", ()=>{ oTab = b.dataset.ot; renderOrders(); }));
 
+/* 🖨️ একই রসিদ — সাধারণ প্রিন্ট (PC/Windows প্রিন্টার) অথবা 🔵 ব্লুটুথ (RawBT, Android)।
+   ব্লুটুথ বোতাম আগে tlrBtNext চালু করে, তারপর একই রসিদ-বানানোর কোড চলে। */
+let tlrBtNext = false;
+function tlrDoPrint(){
+  const bt = tlrBtNext; tlrBtNext = false;
+  if(bt && window.HBBT){ HBBT.printElement($("printArea")); return; }
+  window.print();
+}
 function printOrder(id){
   const o = orders.find(x=> x.id === id); if(!o) return;
   const d = T.data, m = o.measure;
@@ -749,7 +759,7 @@ function printOrder(id){
       <tr><td><b>মোট</b></td><td style="text-align:right"><b>${o.total != null ? tk(o.total) : "—"}</b></td></tr>
     </table>
     <div style="text-align:center;margin-top:8px">Honey Bee Bazar · সেলাই ঘর</div>`;
-  window.print();
+  tlrDoPrint();
 }
 
 /* ── 🪟 শিট খোলা/বন্ধ ── */
@@ -1097,6 +1107,10 @@ function walkinCardHTML(w){
       <button class="btn small ghost" type="button" data-wshare="${esc(w.id)}" style="flex:1">📤 শেয়ার</button>
     </div>
     <div class="btnrow" style="margin-top:6px">
+      <button class="btn small ghost" type="button" data-wbt="${esc(w.id)}" style="flex:1">🔵 ব্লুটুথ: গ্রাহকের রসিদ</button>
+      <button class="btn small ghost" type="button" data-wmbt="${esc(w.id)}" style="flex:1">🔵 ব্লুটুথ: মাপের কপি</button>
+    </div>
+    <div class="btnrow" style="margin-top:6px">
       ${(w.status === "stitching" || w.status === "ready") ? `<button class="btn small ghost" type="button" data-wedit="${esc(w.id)}" style="flex:1">✏️ বদলান</button><button class="btn small no" type="button" data-wdel="${esc(w.id)}">🗑️</button>` : ""}
     </div>
   </div>`;
@@ -1127,6 +1141,8 @@ function renderWalkins(box){
   });
   box.querySelectorAll("[data-wprint]").forEach(b=> b.onclick = ()=> printWalkin(b.dataset.wprint, false));
   box.querySelectorAll("[data-wmprint]").forEach(b=> b.onclick = ()=> printWalkin(b.dataset.wmprint, true));
+  box.querySelectorAll("[data-wbt]").forEach(b=> b.onclick = ()=>{ tlrBtNext = true; printWalkin(b.dataset.wbt, false); });
+  box.querySelectorAll("[data-wmbt]").forEach(b=> b.onclick = ()=>{ tlrBtNext = true; printWalkin(b.dataset.wmbt, true); });
   box.querySelectorAll("[data-wshare]").forEach(b=> b.onclick = ()=> shareWalkin(b.dataset.wshare));
   box.querySelectorAll("[data-wedit]").forEach(b=> b.onclick = ()=> openWalkin(b.dataset.wedit));
   box.querySelectorAll("[data-wdel]").forEach(b=> b.onclick = async ()=>{
@@ -1176,7 +1192,7 @@ async function printWalkin(id, withMeasure){
     </table>
     ${!withMeasure && w.claimCode ? `<div style="border:1.5px dashed #000;border-radius:8px;padding:6px;margin-top:8px;text-align:center">📱 মোবাইলে অর্ডার আর মাপ দেখতে:<br>Honey Bee Bazar → সেলাই ঘর → "দোকানের রসিদ যোগ করুন"<br>রসিদ নং <b style="font-size:16px;letter-spacing:1px">${esc(claimFmt(w.claimCode))}</b> দিন</div>` : ""}
     <div style="text-align:center;margin-top:8px">${withMeasure ? "দোকানে রাখার কপি" : "রসিদটা যত্নে রাখুন — পোশাক নেওয়ার সময় দেখাবেন।"}<br>Honey Bee Bazar · সেলাই ঘর</div>`;
-  window.print();
+  tlrDoPrint();
 }
 async function shareWalkin(id){
   const w = await ensureClaim(walkins.find(x=> x.id === id)); if(!w) return;

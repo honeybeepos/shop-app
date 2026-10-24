@@ -16814,5 +16814,122 @@ document.addEventListener("visibilitychange", ()=>{
 });
 if(document.visibilityState === "visible") __startHeartbeat();
 </script>
+<!-- 🖥️ ধাপ ২: PC-তে মেনু আইকন (☰) — বাঁ পাশের পট্টির একদম উপরে, সব পাতায় একই জায়গায়।
+     চাপ দিলে পাশে একটা তালিকা খোলে (সব সেবা এক জায়গায়), আবার চাপলে বা বাইরে চাপলে বন্ধ।
+     শুধু ১০২৪px+ পর্দায়; মোবাইলে কিছুই তৈরি হয় না। প্রতিটা লাইনে চাপ দিলে
+     হোমের আসল কার্ড/বোতামটাই চাপা হয় — নতুন কোনো পথ বানানো হয়নি। -->
+<style id="hbDeskMenuCss">
+  #hbDeskMenuBtn, #hbDeskMenu, #hbDeskMenuShade{ display:none; }
+  @media (min-width:1024px){
+    #hbDeskMenuBtn{
+      display:flex; flex-direction:column; align-items:center; gap:2px; position:absolute; top:14px; left:8px; right:8px;
+      padding:10px 4px; border-radius:14px; border:0; background:none; color:var(--muted); cursor:pointer; font-family:inherit;
+    }
+    #hbDeskMenuBtn .ic{ font-size:24px; line-height:1; }
+    #hbDeskMenuBtn .lbl{ font-size:11px; font-weight:700; }
+    #hbDeskMenuBtn:hover{ background:rgba(255,183,3,0.08); color:#fff8e8; }
+    body.hbDeskMenuOpen #hbDeskMenuBtn{ background:rgba(255,183,3,0.14); color:var(--amber); }
+    #hbDeskMenuShade{ position:fixed; inset:0 0 0 92px; z-index:9000; background:rgba(0,0,0,.35); }
+    #hbDeskMenu{
+      position:fixed; top:0; bottom:0; left:92px; width:270px; z-index:9001; overflow-y:auto; box-sizing:border-box;
+      background:var(--card); border-right:1px solid var(--border); padding:18px 12px 24px; box-shadow:8px 0 24px rgba(0,0,0,.35);
+    }
+    body.hbDeskMenuOpen #hbDeskMenu, body.hbDeskMenuOpen #hbDeskMenuShade{ display:block; }
+    #hbDeskMenu .hdmTitle{ display:flex; align-items:center; justify-content:space-between; color:#fff8e8; font-weight:800; font-size:16px; padding:0 6px 10px; }
+    #hbDeskMenu .hdmX{ width:32px; height:32px; border-radius:9px; border:1px solid var(--border); background:none; color:var(--muted); cursor:pointer; font-size:15px; }
+    #hbDeskMenu .hdmX:hover{ color:#fff8e8; border-color:var(--amber); }
+    #hbDeskMenu .hdmGrp{ color:var(--muted); font-size:11px; font-weight:800; letter-spacing:.6px; padding:14px 8px 6px; opacity:.8; }
+    #hbDeskMenu .hdmItem{
+      display:flex; align-items:center; gap:11px; width:100%; padding:9px 10px; border:0; border-radius:11px; background:none;
+      color:#fff8e8; font-family:inherit; font-size:14px; font-weight:600; text-align:left; cursor:pointer;
+    }
+    #hbDeskMenu .hdmItem .e{ width:30px; height:30px; border-radius:9px; display:grid; place-items:center; background:rgba(255,183,3,0.10); font-size:16px; flex-shrink:0; }
+    #hbDeskMenu .hdmItem:hover{ background:rgba(255,183,3,0.12); }
+  }
+</style>
+<script>
+(function(){
+  const mq = window.matchMedia("(min-width:1024px)");
+  const $id = (x)=> document.getElementById(x);
+  function goHomeActive(){
+    document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
+    const h = $id("footerNavHome"); if(h) h.classList.add("active");
+  }
+  function svc(name){
+    return ()=>{
+      goHomeActive();
+      const c = document.querySelector('.serviceCard[data-svc="' + name + '"]');
+      if(c) c.click();
+    };
+  }
+  function scr(id, after){
+    return ()=>{ goHomeActive(); if(typeof showScreen === "function") showScreen(id); if(after) try{ after(); }catch(e){} };
+  }
+  function nav(id){ return ()=>{ const b = $id(id); if(b) b.click(); }; }
+  const GROUPS = [
+    ["প্রধান", [
+      ["🏠","Home", nav("footerNavHome")],
+      ["🛍️","আপনার পছন্দের বাজার", svc("favmarket")],
+      ["🗂️","ক্যাটাগরি", nav("footerNavCategory")],
+      ["🛒","Cart", nav("footerNavCart")]
+    ]],
+    ["সেবা", [
+      ["🚕","Transport", svc("transport")],
+      ["🧵","সেলাই ঘর", svc("tailor")],
+      ["🍽️","রেস্টুরেন্ট", svc("restaurant")],
+      ["🪷","একাদশী পণ্য", svc("ekadashi")],
+      ["⛵","জীবন তরী", svc("jibontori")],
+      ["💊","ফার্মেসী", svc("medicalequipment")],
+      ["🩸","Blood Bank", svc("bloodbank")],
+      ["🚑","অ্যাম্বুলেন্স", svc("ambulance")],
+      ["🤝","Honey Bee Org", svc("hborg")]
+    ]],
+    ["দৈনন্দিন", [
+      ["⌚","Smart Watch", svc("smartwatch")],
+      ["🕌","নামাজ", scr("screenPrayer")],
+      ["🕉️","পঞ্জিকা", scr("screenPanchang", ()=>{ if(typeof hbLoadPanchangShortCard === "function") hbLoadPanchangShortCard(); })],
+      ["🧮","ক্যালকুলেটর", scr("screenSmartCalculator")]
+    ]],
+    ["আমার", [
+      ["💬","Messenger", nav("footerNavSms")],
+      ["👤","প্রোফাইল", nav("footerNavMenu")]
+    ]]
+  ];
+  let built = false;
+  function setOpen(on){ document.body.classList.toggle("hbDeskMenuOpen", !!on); const b = $id("hbDeskMenuBtn"); if(b) b.setAttribute("aria-expanded", on ? "true" : "false"); }
+  function build(){
+    if(!mq.matches){ setOpen(false); return; }
+    if(built) return;
+    const rail = document.querySelector(".footerNav"); if(!rail) return;
+    built = true;
+    const btn = document.createElement("button");
+    btn.id = "hbDeskMenuBtn"; btn.type = "button"; btn.setAttribute("aria-label", "মেনু");
+    btn.innerHTML = '<span class="ic">☰</span><span class="lbl">মেনু</span>';
+    btn.addEventListener("click", (e)=>{ e.stopPropagation(); setOpen(!document.body.classList.contains("hbDeskMenuOpen")); });
+    rail.insertBefore(btn, rail.firstChild);
+
+    const shade = document.createElement("div"); shade.id = "hbDeskMenuShade";
+    shade.addEventListener("click", ()=> setOpen(false));
+    const panel = document.createElement("nav"); panel.id = "hbDeskMenu"; panel.setAttribute("aria-label", "সব সেবা");
+    let html = '<div class="hdmTitle"><span>🐝 সব সেবা</span><button type="button" class="hdmX" aria-label="বন্ধ">✕</button></div>';
+    GROUPS.forEach(([g, items], gi)=>{
+      html += '<div class="hdmGrp">' + g + '</div>';
+      items.forEach(([e, t], ii)=>{ html += '<button type="button" class="hdmItem" data-g="' + gi + '" data-i="' + ii + '"><span class="e">' + e + '</span><span>' + t + '</span></button>'; });
+    });
+    panel.innerHTML = html;
+    panel.addEventListener("click", (e)=>{
+      if(e.target.closest(".hdmX")){ setOpen(false); return; }
+      const it = e.target.closest(".hdmItem"); if(!it) return;
+      setOpen(false);
+      const fn = GROUPS[+it.dataset.g][1][+it.dataset.i][2];
+      try{ fn(); }catch(err){ console.warn("hbDeskMenu", err); }
+    });
+    document.body.appendChild(shade); document.body.appendChild(panel);
+    document.addEventListener("keydown", (e)=>{ if(e.key === "Escape") setOpen(false); });
+  }
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
+  (mq.addEventListener ? mq.addEventListener("change", build) : mq.addListener(build));
+})();
+</script>
 </body>
 </html>

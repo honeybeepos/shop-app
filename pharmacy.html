@@ -343,6 +343,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script src="firebase-init.js"></script>
+<script src="hb-btprint.js"></script>
 <script>
 /* =====================================================================
    ছোট হেল্পার
@@ -1045,8 +1046,10 @@ function showReceipt(entries, T, payLabel, got){
       ${e0.status === "বাকি" ? `<tr><td>এই বিলে বাকি</td><td style="text-align:right">${esc(money(T.net - (got != null && got < T.net ? got : 0)))}</td></tr><tr><td>মোট বাকি এখন</td><td style="text-align:right">${esc(money(custDue(e0.name, e0.phone)))}</td></tr>` : ""}
     </table><hr><div class="c">${esc(st.footer || "")}</div></div>`;
   openModal(`<div class="head"><h3>✅ বিক্রি সম্পন্ন</h3></div>${html}
-    <div class="foot"><button class="btn ghost" type="button" data-close>নতুন বিক্রি</button><button class="btn" type="button" id="printBtn">🖨️ রসিদ প্রিন্ট</button></div>`);
+    <div class="foot"><button class="btn ghost" type="button" data-close>নতুন বিক্রি</button><button class="btn ghost" type="button" id="btPrintBtn">🔵 ব্লুটুথ</button><button class="btn" type="button" id="printBtn">🖨️ রসিদ প্রিন্ট</button></div>`);
   $("printBtn").onclick = ()=>{ $("printArea").innerHTML = html; window.print(); };
+  // 🔵 Android ফোনে ব্লুটুথ থার্মাল প্রিন্টার (RawBT অ্যাপ দিয়ে) — সেটিংসের কাগজের মাপেই
+  $("btPrintBtn").onclick = ()=>{ if(window.HBBT) HBBT.printHtml(html, { paper: st.paper }); };
 }
 
 /* =====================================================================
@@ -2335,7 +2338,7 @@ function pageSettings(){
         <div class="row2"><div><label class="f">ফোন</label><input class="in" id="sPhone" inputmode="tel" value="${esc(st.phone)}"></div>
           <div><label class="f">ড্রাগ লাইসেন্স নম্বর</label><input class="in" id="sLic" value="${esc(st.license)}" placeholder="DL-…"></div></div>
         <label class="f">রসিদের নিচের লেখা</label><input class="in" id="sFoot" value="${esc(st.footer)}">
-        <label class="f">রসিদের কাগজ</label><select class="in" id="sPaper"><option value="58"${st.paper === "58" ? " selected" : ""}>৫৮ মিমি (ছোট থার্মাল)</option><option value="80"${st.paper === "80" ? " selected" : ""}>৮০ মিমি (থার্মাল)</option><option value="a4"${st.paper === "a4" ? " selected" : ""}>A4 কাগজ</option></select>
+        <label class="f">রসিদের কাগজ</label><select class="in" id="sPaper"><option value="58"${st.paper === "58" ? " selected" : ""}>৫৮ মিমি (ছোট থার্মাল)</option><option value="80"${st.paper === "80" ? " selected" : ""}>৮০ মিমি (থার্মাল)</option><option value="a4"${st.paper === "a4" ? " selected" : ""}>A4 কাগজ</option></select>${window.HBBT ? HBBT.guideHtml() : ""}
       </div>
       <div class="panel"><h2>🛒 বিক্রি</h2>
         <label class="f">ওষুধ যোগ করলে শুরুতে কোন এককে বসবে</label>
@@ -2581,6 +2584,7 @@ function ordGroupHtml(g, prods){
         <button class="btn ghost" type="button" data-oself="${esc(g.key)}" style="margin-top:8px; width:100%">🤝 রাইডার লাগবে না — নিজে পাঠাব</button>` : ""}
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px">
         <button class="btn ghost" type="button" data-oslip="${esc(g.key)}">🖨️ স্লিপ</button>
+        <button class="btn ghost" type="button" data-obt="${esc(g.key)}">🔵 ব্লুটুথ</button>
         ${packed ? `<span class="chip" style="align-self:center">✅ প্যাক করা হয়েছে</span>` : `<button class="btn" type="button" data-opack="${esc(g.key)}" style="flex:1">📦 প্যাক শেষ</button>`}
         ${self && packed ? (g.pickup
           ? `<button class="btn green" type="button" data-odone="${esc(g.key)}" style="flex:1">✅ গ্রাহক নিয়ে গেছেন</button>`
@@ -2640,6 +2644,7 @@ function renderOrders(err){
   el.querySelectorAll("[data-oship]").forEach(b=> b.onclick = ()=>{ if(confirm("পাঠিয়ে দিয়েছেন? গ্রাহক \"পথে আছে\" দেখবেন।")) ordSetStatus(G(b.dataset.oship), "shipped"); });
   el.querySelectorAll("[data-odone]").forEach(b=> b.onclick = ()=>{ if(confirm("ডেলিভারি হয়ে গেছে? বিক্রির খাতায় উঠবে আর স্টক কমবে।")) ordSetStatus(G(b.dataset.odone), "delivered"); });
   el.querySelectorAll("[data-oslip]").forEach(b=> b.onclick = ()=> ordSlip(G(b.dataset.oslip)));
+  el.querySelectorAll("[data-obt]").forEach(b=> b.onclick = ()=>{ phBtNext = true; ordSlip(G(b.dataset.obt)); });
   el.querySelectorAll("[data-ohide]").forEach(b=> b.onclick = ()=> ordHide(G(b.dataset.ohide)));
   el.querySelectorAll("[data-oself]").forEach(b=> b.onclick = ()=> ordUpdateAll(G(b.dataset.oself), { selfDelivery:true }, "🤝 নিজে পাঠাবেন"));
   if(el.querySelector("[data-orsel]")) ordFillRiders(el, G);
@@ -2751,6 +2756,7 @@ async function ordFillRiders(el, G){
   });
 }
 function hbKm(a, b, c, d){ const R = 6371, x = (c - a) * Math.PI / 180, y = (d - b) * Math.PI / 180; const h = Math.sin(x/2) ** 2 + Math.cos(a * Math.PI/180) * Math.cos(c * Math.PI/180) * Math.sin(y/2) ** 2; return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)); }
+let phBtNext = false; // 🔵 ব্লুটুথ বোতাম চাপলে একই স্লিপ RawBT-তে যায়
 function ordSlip(g){
   if(!g) return;
   const priv = g.items.find(o=> o.privateOrder);
@@ -2765,6 +2771,8 @@ function ordSlip(g){
       <div style="display:flex; justify-content:space-between"><span>${b.pickup ? "ডেলিভারি (দোকান থেকে নেবেন)" : "ডেলিভারি চার্জ"}</span><span>${b.known ? money(b.del) : "—"}</span></div>
       <div style="display:flex; justify-content:space-between; font-weight:800; font-size:15px; border-top:2px solid #000; margin-top:4px; padding-top:4px"><span>মোট</span><span>${money(b.grand)}</span></div></div>`; })()}
   </div>`;
+  if(phBtNext && window.HBBT){ phBtNext = false; HBBT.printElement($("printArea"), { paper: SET().paper }); return; }
+  phBtNext = false;
   const a = $("printArea"); const old = a.style.cssText; a.style.cssText = "position:static;";
   const hide = [...document.body.children].filter(c=> c !== a);
   hide.forEach(c=> c.dataset.prevDisp = c.style.display); hide.forEach(c=> c.style.display = "none");
