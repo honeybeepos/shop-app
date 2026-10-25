@@ -1135,8 +1135,17 @@ async function mouGeminiReply(text, apiKey, history, image) {
 - রেস্টুরেন্ট/খাবার অর্ডার: {"type":"find_restaurant","words":["খাবার বা রেস্টুরেন্টের নাম"]}
 - নিজের অর্ডারের খবর ("আমার অর্ডার কোথায়", "জামা কবে আসবে"): {"type":"my_orders"}
 - অন্য সব কথায়: {"type":"none"}
-- action থাকলে reply-তে শুধু ছোট একটা ভূমিকা লিখবে; কোনো দাম, দোকানের নাম, স্টক বা অর্ডারের অবস্থা লিখবে না — ওগুলো সার্ভার আসল ডেটা থেকে বসাবে।
-- "words"-এ সম্বোধন/পরিমাণ (ভাই, এক কেজি, লাগবে) বাদ দিয়ে শুধু জিনিসের নাম দেবে।`;
+- find_product/find_tailor/find_restaurant/my_orders action থাকলে reply-তে শুধু ছোট একটা ভূমিকা লিখবে; কোনো দাম, দোকানের নাম, স্টক বা অর্ডারের অবস্থা লিখবে না — ওগুলো সার্ভার আসল ডেটা থেকে বসাবে।
+- "words"-এ সম্বোধন/পরিমাণ (ভাই, এক কেজি, লাগবে) বাদ দিয়ে শুধু জিনিসের নাম দেবে।
+
+📘 অ্যাপ কীভাবে চলে — গ্রাহক কোনো অংশ কীভাবে ব্যবহার করবেন জানতে চাইলে (যেমন "সংগঠন কীভাবে কাজ করে", "দর্জির অর্ডার কীভাবে দেব", "লগইন কোথায়"):
+- উত্তর দেবে শুধু নিচের "অ্যাপ গাইড" থেকে। গাইডে যা নেই তা বানাবে না — তখন বলবে "এটা আমি ঠিক জানি না, Messenger-এ Honey Bee-কে জিজ্ঞেস করুন"।
+- এই ধরনের প্রশ্নে ১-২ বাক্যের সীমা নেই: সহজ ভাষায় ছোট ধাপে (১), ২), ৩)…) লিখবে, সর্বোচ্চ ৮ লাইন আর ৭০০ অক্ষর। প্রতিটা ধাপ নতুন লাইনে। গ্রাহক যে অংশ জানতে চাইলেন শুধু সেটুকু; পরে আরও জানতে চাইলে বাকিটা।
+- action হবে {"type":"app_help","topic":"shopping"|"tailor"|"ekadashi"|"restaurant"|"pharmacy"|"org"|"orders"|"other"} (topic গাইডের ভাগ অনুযায়ী)।
+
+===== অ্যাপ গাইড =====
+${MOU_GUIDE}
+===== গাইড শেষ =====`;
 
   // 🧠 history-র প্রতিটা টার্ন Gemini-এর role-ভিত্তিক contents-এ বসানো হয়
   // (আমাদের "mou" role → Gemini-এর "model" role) — এরপর সবশেষে চলতি বার্তাটা
@@ -1182,7 +1191,7 @@ async function mouGeminiReply(text, apiKey, history, image) {
   }
   // 🔎 action-ও অন্ধভাবে বিশ্বাস না — শুধু জানা ধরনগুলো, ছোট শব্দ, সংখ্যা যাচাই করে
   const a = parsed.action && typeof parsed.action === "object" ? parsed.action : {};
-  const ALLOWED = ["find_product", "find_tailor", "find_restaurant", "my_orders"];
+  const ALLOWED = ["find_product", "find_tailor", "find_restaurant", "my_orders", "app_help"];
   const action = ALLOWED.includes(a.type) ? {
     type: a.type,
     words: Array.isArray(a.words) ? a.words.filter((w) => typeof w === "string").slice(0, 5).map((w) => w.slice(0, 40)) : [],
@@ -1190,6 +1199,7 @@ async function mouGeminiReply(text, apiKey, history, image) {
     sort: ["cheap", "best", "new"].includes(a.sort) ? a.sort : null,
     maxPrice: Number(a.maxPrice) > 0 && Number(a.maxPrice) < 10000000 ? Math.round(Number(a.maxPrice)) : null,
     category: typeof a.category === "string" ? a.category : null,
+    topic: typeof a.topic === "string" ? a.topic.slice(0, 20) : null,
   } : null;
   return {
     reply: parsed.reply.trim(),
@@ -1230,6 +1240,7 @@ async function mouTakeQuota(uid, signedIn) {
   });
 }
 const mouTools = require("./mou-tools")({ db });
+const { MOU_GUIDE, MOU_GUIDE_LINKS } = require("./mou-guide"); // 📘 মৌ-এর অ্যাপ গাইড (অ্যাপ কীভাবে চলে)
 
 exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   // 🔒 Security — সম্পূর্ণ open/anonymous কল আটকাতে অন্তত একটা বৈধ Firebase
@@ -1283,8 +1294,8 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   if (!quota.ok) {
     return {
       reply: signedIn
-        ? `আজ আমরা অনেক কথা বললাম (${quota.max}টা প্রশ্ন)! 🐝 কাল আবার জিজ্ঞেস করবেন বন্ধু।`
-        : `আজকের ${quota.max}টা প্রশ্ন শেষ। 🐝 Google দিয়ে লগইন করলে আরও বেশি জিজ্ঞেস করতে পারবেন।`,
+        ? `আজ আমরা অনেক কথা বললাম (${String(quota.max).replace(/[0-9]/g, (d) => "০১২৩৪৫৬৭৮৯"[d])}টা প্রশ্ন)! 🐝 কাল আবার জিজ্ঞেস করবেন বন্ধু।`
+        : `আজকের ${String(quota.max).replace(/[0-9]/g, (d) => "০১২৩৪৫৬৭৮৯"[d])}টা প্রশ্ন শেষ। 🐝 Google দিয়ে লগইন করলে আরও বেশি জিজ্ঞেস করতে পারবেন।`,
       mood: "idle", engine: "limit",
     };
   }
@@ -1301,6 +1312,15 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   try {
     const result = await mouGeminiReply(text.trim(), apiKey, history, image);
     // 🔎 গ্রাহক কিছু খুঁজলে আসল ডেটা — উত্তরের বাক্যও ডেটা থেকে বানানো (AI-এর দাম না)
+    // 📘 "কীভাবে কাজ করে" — উত্তর গাইড থেকে Gemini-এর নিজের ভাষায়; সাথে সেই অংশ খোলার কার্ড
+    if (result.action && result.action.type === "app_help") {
+      const ln = MOU_GUIDE_LINKS[result.action.topic];
+      console.log(JSON.stringify({ event: "MOU_CHAT_REPLIED", uid: request.auth.uid, action: "app_help", topic: result.action.topic }));
+      return {
+        reply: result.reply.slice(0, 900), mood: result.mood, engine: "gemini-3.1-flash-lite", action: "app_help",
+        results: ln ? [{ kind: "link", name: ln.name, href: ln.href, icon: ln.icon }] : [], left: quota.left,
+      };
+    }
     let tool = null;
     if (result.action) {
       try { tool = await mouTools.run(result.action, { area, uid: request.auth.uid, signedIn }); }
