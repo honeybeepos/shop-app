@@ -1212,7 +1212,9 @@ ${MOU_GUIDE}
    আজকের তারিখ আর কতবার প্রশ্ন হলো। সীমা বদলাতে চাইলে appConfig/mou ডকে
    {dailyAnon, dailyUser} বসালেই হবে, কোড বদলাতে হবে না। ফোন থেকে mouUsage
    পড়া/লেখা যায় না (rules-এ কোনো match নেই = সব বন্ধ), শুধু সার্ভার লেখে। */
-const MOU_LIMIT_DEFAULT = { dailyAnon: 20, dailyUser: 60 };
+// dailyIp — লগইন-পরিচয় ছাড়া আসা অনুরোধ এক ইন্টারনেট-ঠিকানা (IP) ধরে গোনা হয়; মোবাইল
+// নেটওয়ার্কে অনেকে একই IP ভাগ করেন, তাই এই সীমা একটু বড়
+const MOU_LIMIT_DEFAULT = { dailyAnon: 20, dailyUser: 60, dailyIp: 100 };
 let __mouCfg = null, __mouCfgAt = 0;
 async function mouLimits() {
   if (__mouCfg && Date.now() - __mouCfgAt < 5 * 60 * 1000) return __mouCfg;
@@ -1221,13 +1223,14 @@ async function mouLimits() {
   __mouCfg = {
     dailyAnon: Number(c.dailyAnon) > 0 ? Number(c.dailyAnon) : MOU_LIMIT_DEFAULT.dailyAnon,
     dailyUser: Number(c.dailyUser) > 0 ? Number(c.dailyUser) : MOU_LIMIT_DEFAULT.dailyUser,
+    dailyIp: Number(c.dailyIp) > 0 ? Number(c.dailyIp) : MOU_LIMIT_DEFAULT.dailyIp,
   };
   __mouCfgAt = Date.now();
   return __mouCfg;
 }
 async function mouTakeQuota(uid, signedIn) {
   const lim = await mouLimits();
-  const max = signedIn ? lim.dailyUser : lim.dailyAnon;
+  const max = signedIn ? lim.dailyUser : (String(uid).startsWith("ip_") ? lim.dailyIp : lim.dailyAnon);
   const day = new Date(Date.now() + 6 * 3600000).toISOString().slice(0, 10); // বাংলাদেশের তারিখ
   const ref = db.collection("mouUsage").doc(uid);
   return db.runTransaction(async (tx) => {
@@ -1247,9 +1250,15 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   // Auth সেশন লাগবে (anonymous sign-in-ও চলবে — customer-কে জোর করে
   // লগইন করতে বলা হচ্ছে না, শুধু random/unauthenticated script যেন
   // সরাসরি এই ফাংশন কল করতে না পারে)
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "চ্যাট করতে সেশন প্রয়োজন।");
-  }
+  /* 🐛 ঠিক করা (২৫ অক্টোবর ২০২৬): লগে দেখা গেল ফোন থেকে অনেক অনুরোধ লগইন-পরিচয়
+     ছাড়াই আসছে ("auth":"MISSING") — তখন আগে এখানেই আটকে যেত, আর গ্রাহক শুধু
+     "যোগাযোগ করা যাচ্ছে না" দেখতেন। এখন পরিচয় না থাকলেও মৌ উত্তর দেয়, তবে
+     খরচ নিয়ন্ত্রণে সেই ইন্টারনেট-ঠিকানার (IP) জন্য দিনে অতিথির সীমা, আর নিজের
+     অর্ডারের খবর শুধু লগইন করা গ্রাহক পান। */
+  const ip = String((request.rawRequest && (request.rawRequest.headers["x-forwarded-for"] || request.rawRequest.ip)) || "unknown").split(",")[0].trim();
+  const who = request.auth
+    ? { uid: request.auth.uid, key: request.auth.uid }
+    : { uid: null, key: "ip_" + require("crypto").createHash("sha256").update(ip).digest("hex").slice(0, 24) };
   const text = request.data && request.data.text;
   if (!text || typeof text !== "string" || !text.trim()) {
     throw new HttpsError("invalid-argument", "text (string) প্রয়োজন");
@@ -1287,10 +1296,10 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   }
 
   // 🔢 দৈনিক সীমা — লগইন করা গ্রাহক বেশি, অতিথি (anonymous) কম
-  const tok = request.auth.token || {};
-  const signedIn = !(tok.firebase && tok.firebase.sign_in_provider === "anonymous");
+  const tok = (request.auth && request.auth.token) || {};
+  const signedIn = !!request.auth && !(tok.firebase && tok.firebase.sign_in_provider === "anonymous");
   let quota = { ok: true };
-  try { quota = await mouTakeQuota(request.auth.uid, signedIn); } catch (e) { console.warn("mou quota:", String(e && e.message || e)); }
+  try { quota = await mouTakeQuota(who.key, signedIn); } catch (e) { console.warn("mou quota:", String(e && e.message || e)); }
   if (!quota.ok) {
     return {
       reply: signedIn
@@ -1315,7 +1324,7 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
     // 📘 "কীভাবে কাজ করে" — উত্তর গাইড থেকে Gemini-এর নিজের ভাষায়; সাথে সেই অংশ খোলার কার্ড
     if (result.action && result.action.type === "app_help") {
       const ln = MOU_GUIDE_LINKS[result.action.topic];
-      console.log(JSON.stringify({ event: "MOU_CHAT_REPLIED", uid: request.auth.uid, action: "app_help", topic: result.action.topic }));
+      console.log(JSON.stringify({ event: "MOU_CHAT_REPLIED", uid: who.uid, action: "app_help", topic: result.action.topic }));
       return {
         reply: result.reply.slice(0, 900), mood: result.mood, engine: "gemini-3.1-flash-lite", action: "app_help",
         results: ln ? [{ kind: "link", name: ln.name, href: ln.href, icon: ln.icon }] : [], left: quota.left,
@@ -1323,11 +1332,11 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
     }
     let tool = null;
     if (result.action) {
-      try { tool = await mouTools.run(result.action, { area, uid: request.auth.uid, signedIn }); }
+      try { tool = await mouTools.run(result.action, { area, uid: who.uid, signedIn }); }
       catch (e) { console.warn(JSON.stringify({ event: "MOU_TOOL_FAILED", type: result.action.type, error: String(e && e.message || e) })); }
     }
     console.log(JSON.stringify({
-      event: "MOU_CHAT_REPLIED", uid: request.auth.uid, historyLen: history.length, hasImage: !!image,
+      event: "MOU_CHAT_REPLIED", uid: who.uid, historyLen: history.length, hasImage: !!image,
       action: result.action ? result.action.type : null, found: tool && tool.results ? tool.results.length : null,
     }));
     if (tool) {
