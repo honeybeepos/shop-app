@@ -451,6 +451,7 @@ function mouLinkFor(r){
   if(r.kind === "design") return `honey-bee-bazar.html?d=${enc(r.id)}`;
   if(r.kind === "restaurant") return "honey-bee-bazar.html?screen=restaurant";
   if(r.kind === "order") return r.sub === "tailor" ? "honey-bee-bazar.html?screen=tailor" : "honey-bee-bazar.html?screen=orders";
+  if(r.kind === "link" && /^[a-z0-9-]+\.html(\?[a-z0-9=&]*)?$/i.test(r.href || "")) return r.href;
   return "honey-bee-bazar.html";
 }
 function mouAppendCards(list){
@@ -460,7 +461,7 @@ function mouAppendCards(list){
     const a = document.createElement("a");
     a.className = "mouCard mouCard-" + r.kind;
     a.href = mouLinkFor(r);
-    const img = r.img ? `<img src="${String(r.img).replace(/"/g, "&quot;")}" alt="" loading="lazy">` : `<span class="mouCardIc">${r.kind === "design" ? "🧵" : r.kind === "restaurant" ? "🍽️" : r.kind === "order" ? "📦" : "🛍️"}</span>`;
+    const img = r.img ? `<img src="${String(r.img).replace(/"/g, "&quot;")}" alt="" loading="lazy">` : `<span class="mouCardIc">${r.kind === "link" ? (r.icon || "📘") : r.kind === "design" ? "🧵" : r.kind === "restaurant" ? "🍽️" : r.kind === "order" ? "📦" : "🛍️"}</span>`;
     let line1 = "", line2 = "", btn = "দেখুন ›";
     if(r.kind === "product"){
       line1 = `<b>${mouMoney(r.price, r.cur)}</b>${r.unit ? "/" + r.unit : ""}${r.oldPrice ? ` <s>${mouMoney(r.oldPrice, r.cur)}</s>` : ""}${r.inStock ? "" : " · <em>স্টক শেষ</em>"}`;
@@ -470,6 +471,8 @@ function mouAppendCards(list){
       line2 = `✂️ ${r.shopName}${r.upazila ? " · " + r.upazila : ""}`; btn = "অর্ডার ›";
     } else if(r.kind === "restaurant"){
       line2 = r.upazila ? "📍 " + r.upazila : ""; btn = "মেনু ›";
+    } else if(r.kind === "link"){
+      line2 = "এখানে চাপলে খুলবে"; btn = "খুলুন ›";
     } else if(r.kind === "order"){
       line1 = r.status; line2 = (r.qty > 1 ? "× " + mouBn(r.qty) : "") + (r.code ? "  #" + r.code : ""); btn = "খবর ›";
     }
