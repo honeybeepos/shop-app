@@ -94,12 +94,22 @@ async function recordFailedLogin(email) {
   const snap = await ref.get();
   const prev = snap.exists ? snap.data() : null;
   const expired = !prev || __attemptAgeMin(prev) >= LOGIN_LOCK_MINUTES;
-  const count = (expired ? 0 : (prev.count || 0)) + 1;
+  let count = (expired ? 0 : (prev.count || 0)) + 1;
   /* মেয়াদ ফুরোলে autoLockApplied-ও মুছে দিই, নইলে Cloud Function
-     ভাবত এই একাউন্টে আগেই তালা দেওয়া হয়ে গেছে। */
-  await ref.set({ count, lastAttempt: fbNow(),
-                  autoLockApplied: expired ? false : (prev && prev.autoLockApplied) || false },
-                { merge: true });
+     ভাবত এই একাউন্টে আগেই তালা দেওয়া হয়ে গেছে।
+     🔒 rules এখন গণনা শুধু ১ করে বাড়াতে দেয়। ফোনের ঘড়ি একটু এগিয়ে
+     থাকলে "মেয়াদ শেষ" ভেবে ১ বসাতে গিয়ে আটকে যেতে পারে — তখন
+     আগের গণনা + ১ দিয়ে আবার চেষ্টা। কোনো অবস্থাতেই লগইন আটকাবে না। */
+  try {
+    await ref.set({ count, lastAttempt: fbNow(),
+                    autoLockApplied: expired ? false : (prev && prev.autoLockApplied) || false },
+                  { merge: true });
+  } catch (e) {
+    if (expired && prev && prev.count) {
+      count = Math.min((prev.count || 0) + 1, 20);
+      await ref.set({ count, lastAttempt: fbNow() }, { merge: true }).catch(() => {});
+    }
+  }
   // 🐞 বাগ-ফিক্স: আগে এখানেই ক্লায়েন্ট থেকে সরাসরি shops/{shopId}.status =
   // "blocked" লেখার চেষ্টা হতো — কিন্তু ব্যর্থ-লগইনের মুহূর্তে সাধারণত
   // request.auth == null থাকে (সাইন-ইনই তো ব্যর্থ হয়েছে), আর

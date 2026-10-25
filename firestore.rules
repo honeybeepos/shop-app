@@ -33,13 +33,38 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow create: if isSignedIn() &&
-        (request.auth.uid == uid || isSuperAdmin() || isAgent() ||
-         (myRole() == 'admin' && request.resource.data.shopId == myShopId()));
+      /* 🔒 নিরাপত্তা (ধাপ ৬): আগে যে-কেউ নিজের users ডকে shopId/role
+         নিজেই বসাতে পারত — অন্যের দোকানের shopId বসিয়ে সেই দোকানের খাতা
+         পড়া/লেখা, বা role:'agent' বসিয়ে এজেন্ট হয়ে যাওয়া সম্ভব ছিল।
+         এখন নিজের ডক বানাতে গেলে শুধু এই কয়টা নিরাপদ রূপ চলবে:
+           • নতুন দোকান: role 'admin' আর shopId == নিজের uid
+           • ড্রাইভার/দর্জি/রেস্টুরেন্ট: shopId ছাড়া
+           • পোলট্রি/সুইচ অ্যাপ: role/shopId কিছুই না
+         দোকানের এডমিন শুধু নিজের দোকানে 'subuser' বানাতে পারে,
+         এজেন্ট শুধু 'rider' বানাতে পারে, সুপারঅ্যাডমিন সব। */
+      allow create: if isSignedIn() && (
+        isSuperAdmin() ||
+        (request.auth.uid == uid && (
+          (request.resource.data.get('role', null) == 'admin' &&
+           request.resource.data.get('shopId', null) == uid) ||
+          (request.resource.data.get('role', null) in ['transport_driver','tailor','restaurant'] &&
+           !('shopId' in request.resource.data)) ||
+          (!('role' in request.resource.data) && !('shopId' in request.resource.data))
+        )) ||
+        (request.auth.uid != uid && myRole() == 'admin' &&
+         request.resource.data.get('role', null) == 'subuser' &&
+         request.resource.data.get('shopId', null) == myShopId()) ||
+        (request.auth.uid != uid && isAgent() &&
+         request.resource.data.get('role', null) == 'rider' &&
+         !('shopId' in request.resource.data))
+      );
       allow read: if isSignedIn() &&
         (request.auth.uid == uid || isSuperAdmin() ||
          myShopId() == get(/databases/$(database)/documents/users/$(uid)).data.shopId);
-      allow update: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin());
+      // নিজের ডক বদলানো যাবে, কিন্তু role/shopId নয় — ওগুলো শুধু সুপারঅ্যাডমিন
+      allow update: if isSignedIn() && (isSuperAdmin() ||
+        (request.auth.uid == uid &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','shopId'])));
       allow delete: if isSuperAdmin();
     }
 
@@ -402,6 +427,12 @@ service cloud.firestore {
       match /foods/{foodId} {
         allow read: if true;
         allow write: if isSignedIn() && request.auth.uid == restaurantId;
+      }
+
+      /* ☁️ ক্যাশিয়ারের অর্ডার/বিল (দোকানে বসে নেওয়া) — শুধু রেস্টুরেন্ট নিজে।
+         গ্রাহক বা অন্য কেউ পড়তেও পারেন না। */
+      match /bills/{billId} {
+        allow read, write: if isSignedIn() && request.auth.uid == restaurantId;
       }
 
       /* অর্ডার — গ্রাহক Bazar থেকে অর্ডার বসায়, রেস্টুরেন্ট সেটা দেখে ও
@@ -951,9 +982,16 @@ service cloud.firestore {
       allow write: if isSignedIn() && request.auth.uid == uid;
     }
 
+    /* 🔒 ইউজারনেম — যে নিয়েছে শুধু সে-ই বদলাতে/ছাড়তে পারে (আগে যে-কেউ
+       অন্যের ইউজারনেম নিজের নামে লিখে নিতে পারত)। */
     match /messengerUsernames/{username} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.keys().hasOnly(['uid'])
+                    && request.resource.data.uid == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.uid == request.auth.uid
+                    && request.resource.data.keys().hasOnly(['uid'])
+                    && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.uid == request.auth.uid || isSuperAdmin());
     }
 
     match /messengerFriendRequests/{pairId} {
@@ -983,13 +1021,14 @@ service cloud.firestore {
 
     match /medicalEquipment/{equipmentId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      // 🔒 তালিকা শুধু এজেন্ট/সুপারঅ্যাডমিন বদলাবে (আগে যে-কেউ পারত)
+      allow write: if isSignedIn() && (isSuperAdmin() || isAgent());
     }
 
     match /medicalEquipmentOrders/{orderId} {
       allow read: if isSignedIn() && (isSuperAdmin() || isAgent() || resource.data.customerGoogleId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.customerGoogleId == request.auth.uid;
-      allow update: if isSignedIn();
+      allow update: if isSignedIn() && (isSuperAdmin() || isAgent());
     }
 
     /* 📊 বাজারের লাইভ অ্যানালিটিক্স — অতিথিরাও লেখে, তাই লগইন লাগে না।
@@ -1011,7 +1050,10 @@ service cloud.firestore {
 
     match /loginAttempts/{email} {
       allow read: if true;
-      allow delete: if true;
+      /* 🔒 গণনা মোছা: আগে যে-কেউ মুছে দিতে পারত। এখন শুধু সেই ইমেইলের
+         মালিক (সঠিক পাসওয়ার্ডে লগইনের পর) বা এজেন্ট/সুপারঅ্যাডমিন। */
+      allow delete: if isSignedIn() && (isSuperAdmin() || isAgent() ||
+        (request.auth.token.email is string && request.auth.token.email.lower() == email));
       // 🐞 বাগ-ফিক্স: 'autoLockApplied' যোগ করা হলো — এই ফিল্ডটা এখন
       // functions/index.js-এর onFailedLoginThreshold Cloud Function
       // (Admin SDK, rules বাইপাস করে) থ্রেশহোল্ড পার হলে merge করে বসিয়ে
@@ -1020,8 +1062,16 @@ service cloud.firestore {
       // Function লেখার পর ক্লায়েন্টের পরবর্তী যেকোনো ভুল-পাসওয়ার্ড
       // গণনার merge-write hasOnly ব্যর্থ হয়ে reject হয়ে যেতো (merge-এর
       // resulting document-এ autoLockApplied-ও থাকতো)।
-      allow create, update: if request.resource.data.keys().hasOnly(['count','lastAttempt','autoLockApplied']) &&
-        request.resource.data.count is int && request.resource.data.count <= 20;
+      /* 🔒 গণনা একবারে শুধু ১ বাড়ানো যায় (আগে সরাসরি ২০ বসানো যেত),
+         আর ১৪ মিনিটের বেশি পুরনো হলে আবার ১ থেকে শুরু। */
+      allow create: if request.resource.data.keys().hasOnly(['count','lastAttempt','autoLockApplied']) &&
+        request.resource.data.count == 1;
+      allow update: if request.resource.data.keys().hasOnly(['count','lastAttempt','autoLockApplied']) &&
+        request.resource.data.count is int && request.resource.data.count <= 20 &&
+        (request.resource.data.count == resource.data.get('count', 0) + 1 ||
+         (request.resource.data.count == 1 &&
+          (!('lastAttempt' in resource.data) || !(resource.data.lastAttempt is timestamp) ||
+           resource.data.lastAttempt < request.time - duration.value(14, 'm'))));
     }
 
     match /imageIndex/{imageId} {

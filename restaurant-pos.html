@@ -879,7 +879,84 @@ function nextOrderNumber(){
   localStorage.setItem("hbNextOrderNo",String(n+1)); return n;
 }
 function getOrders(){return JSON.parse(localStorage.getItem("hbOrders")||"[]");}
-function saveOrders(a){localStorage.setItem("hbOrders",JSON.stringify(a));}
+/* ☁️ ক্যাশিয়ারের অর্ডার/বিল ক্লাউডেও থাকে (ধাপ ৬, অক্টোবর ২০২৬)।
+   আগে শুধু এই ফোনে থাকত — ফোন হারালে বা ব্রাউজারের ডেটা মুছলে বিক্রির
+   হিসাব হারিয়ে যেত। এখন প্রতিটা অর্ডার আলাদা নথিতে যায়:
+   restaurants/{uid}/bills/o_{অর্ডার নম্বর} — শুধু রেস্টুরেন্ট নিজে পড়তে/লিখতে পারে।
+   · শুধু যে অর্ডার বদলেছে সেটাই পাঠানো হয় (ছোট "ছায়া-হিসাব" মিলিয়ে)
+   · নেট না থাকলে "পাঠাতে বাকি" তালিকায় থাকে, নেট এলে নিজে থেকে যায়
+   · লগইনের সময় ক্লাউড থেকে আনা হয় — নতুন ফোনেও আগের সব অর্ডার আসে;
+     দুই জায়গায় একই অর্ডার থাকলে যেটা পরে বদলানো হয়েছে সেটা থাকে */
+const RP_BILL_SHADOW = "hbOrders::shadow", RP_BILL_PENDING = "hbOrders::pending", RP_BILL_WM = "hbOrders::wm";
+function rpJ(k, d){ try{ return JSON.parse(localStorage.getItem(k) || "null") || d; }catch(e){ return d; } }
+function rpHash(str){ let h = 5381; for(let i = 0; i < str.length; i++){ h = ((h << 5) + h + str.charCodeAt(i)) | 0; } return String(h >>> 0); }
+function rpBillKey(o){ const { _u, ...rest } = o || {}; return rpHash(JSON.stringify(rest)); }
+function saveOrders(a){
+  const shadow = rpJ(RP_BILL_SHADOW, {}), pending = new Set(rpJ(RP_BILL_PENDING, []));
+  (a || []).forEach(o=>{
+    if(!o || o.orderNo == null) return;
+    const k = String(o.orderNo), h = rpBillKey(o);
+    if(shadow[k] !== h){ o._u = Date.now(); shadow[k] = h; pending.add(k); }
+  });
+  localStorage.setItem("hbOrders", JSON.stringify(a));
+  localStorage.setItem(RP_BILL_SHADOW, JSON.stringify(shadow));
+  localStorage.setItem(RP_BILL_PENDING, JSON.stringify([...pending]));
+  rpBillsPushSoon();
+}
+let __rpBillTimer = null, __rpBillPushing = false;
+function rpBillsPushSoon(){ clearTimeout(__rpBillTimer); __rpBillTimer = setTimeout(rpBillsPush, 1500); }
+async function rpBillsPush(){
+  if(__rpBillPushing || !RP.uid || !navigator.onLine) return;
+  const pending = rpJ(RP_BILL_PENDING, []); if(!pending.length) return;
+  __rpBillPushing = true;
+  try{
+    const orders = getOrders(), col = db.collection("restaurants").doc(RP.uid).collection("bills"), done = [];
+    for(const k of pending.slice(0, 40)){
+      const o = orders.find(x=> String(x.orderNo) === k);
+      if(!o){ done.push(k); continue; }
+      try{
+        await col.doc("o_" + k).set(Object.assign(JSON.parse(JSON.stringify(o)), { u: firebase.firestore.FieldValue.serverTimestamp() }));
+        done.push(k);
+      }catch(e){ console.warn("bill sync:", k, e && e.code); break; }
+    }
+    const left = rpJ(RP_BILL_PENDING, []).filter(k=> !done.includes(k));
+    localStorage.setItem(RP_BILL_PENDING, JSON.stringify(left));
+    if(left.length) rpBillsPushSoon();
+  }finally{ __rpBillPushing = false; }
+}
+async function rpBillsPull(){
+  if(!RP.uid) return;
+  try{
+    const wm = Number(localStorage.getItem(RP_BILL_WM) || 0);
+    let q = db.collection("restaurants").doc(RP.uid).collection("bills");
+    if(wm) q = q.where("u", ">", firebase.firestore.Timestamp.fromMillis(Math.max(0, wm - 60000)));
+    const qs = await q.limit(2000).get();
+    if(qs.empty){ rpBillsPush(); return; }
+    const orders = getOrders(), shadow = rpJ(RP_BILL_SHADOW, {});
+    let maxU = wm, changed = false, maxNo = 0;
+    qs.docs.forEach(d=>{
+      const { u, ...o } = d.data();
+      const um = u && u.toMillis ? u.toMillis() : 0; if(um > maxU) maxU = um;
+      const i = orders.findIndex(x=> String(x.orderNo) === String(o.orderNo));
+      if(i === -1){ orders.push(o); changed = true; }
+      else if((o._u || 0) > (orders[i]._u || 0)){ orders[i] = o; changed = true; }
+      const fin = orders.find(x=> String(x.orderNo) === String(o.orderNo));
+      shadow[String(o.orderNo)] = rpBillKey(fin);
+    });
+    orders.forEach(o=>{ maxNo = Math.max(maxNo, Number(o.orderNo) || 0); });
+    if(changed){
+      orders.sort((a,b)=> (b._u || 0) - (a._u || 0));
+      localStorage.setItem("hbOrders", JSON.stringify(orders));   // সরাসরি — আবার পাঠানোর দরকার নেই
+      localStorage.setItem(RP_BILL_SHADOW, JSON.stringify(shadow));
+      if(typeof renderOrderHistory === "function") try{ renderOrderHistory(); }catch(e){}
+    }
+    // অন্য ফোনে নেওয়া অর্ডারের নম্বর আবার যেন না আসে
+    if(maxNo && Number(localStorage.getItem("hbNextOrderNo") || 0) <= maxNo) localStorage.setItem("hbNextOrderNo", String(maxNo + 1));
+    localStorage.setItem(RP_BILL_WM, String(maxU));
+  }catch(e){ console.warn("bill pull:", e && e.code); }
+  rpBillsPush();
+}
+window.addEventListener("online", ()=> rpBillsPush());
 function currentOrderPayload(){
   const no=Number(document.getElementById("orderNo").textContent);
   const source=document.getElementById("orderSource")?.value||"Cashier";
@@ -1835,6 +1912,7 @@ auth.onAuthStateChanged(async function(user){
     }
 
     RP.uid = user.uid;
+    rpBillsPull();   // ☁️ ক্লাউডে রাখা অর্ডার/বিল আনা, আর বাকি থাকা গুলো পাঠানো
     RP.name = d.name || "রেস্টুরেন্ট";
     RP.cur = d.currency || "SAR";
     RP.marketId = d.marketId || null;   // 🛵 ডেলিভারি ম্যানের জন্য
