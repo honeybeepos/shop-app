@@ -3798,3 +3798,49 @@ Object.assign(exports, require("./weather")({ db, FieldValue, onSchedule, getMes
 
 /* 🕌 নামাজ / সেহরি / ইফতারের নোটিফিকেশন (আলাদা ফাইল: prayer.js) */
 Object.assign(exports, require("./prayer")({ db, FieldValue, Timestamp, onSchedule, getMessaging }));
+
+// 🐝 মৌ — দোকান/দর্জি/রেস্টুরেন্টের মালিক অনলাইনে না থাকলে Messenger-এ তাঁর হয়ে উত্তর (functions/mou-shop.js)
+exports.mouShopAutoReply = require("./mou-shop")({ db, FieldValue, Timestamp, onDocumentCreated, geminiApiKey }).mouShopAutoReply;
+
+/* 🐝 দোকানদারের মৌ (POS-এর "মৌ — দোকানের সহকারী") — ফোন সাধারণ প্রশ্নের উত্তর নিজেই দেয়;
+   অন্য রকম প্রশ্ন হলে দোকানের হিসাবের ছোট সারাংশ (facts) পাঠায়। মৌ শুধু সেই
+   সারাংশ থেকে উত্তর দেয়, কিছু বানায় না। শুধু Google-লগইন করা মানুষ, আর দৈনিক সীমার ভেতরে। */
+exports.mouOwner = onCall({ secrets: [geminiApiKey] }, async (request) => {
+  const a = request.auth;
+  if (!a || (a.token && a.token.firebase && a.token.firebase.sign_in_provider === "anonymous")) {
+    throw new HttpsError("unauthenticated", "লগইন প্রয়োজন");
+  }
+  const text = request.data && typeof request.data.text === "string" ? request.data.text.trim().slice(0, 300) : "";
+  const facts = request.data && typeof request.data.facts === "string" ? request.data.facts.slice(0, 9000) : "";
+  if (!text || !facts) throw new HttpsError("invalid-argument", "প্রশ্ন আর হিসাব দুটোই লাগবে");
+  let quota = { ok: true };
+  try { quota = await mouTakeQuota("owner_" + a.uid, true); } catch (e) { /* সীমা পড়া না গেলেও উত্তর দেওয়া হয় */ }
+  if (!quota.ok) return { reply: "আজকের প্রশ্নের সীমা শেষ 🐝 কাল আবার জিজ্ঞেস করবেন।" };
+  const apiKey = geminiApiKey.value();
+  if (!apiKey) return { reply: "এই মুহূর্তে উত্তর দিতে পারছি না 🐝" };
+  const sys = `তুমি "মৌ" — একজন দোকানদারের সহকারী। নিচে তাঁর দোকানের হিসাবের সারাংশ (JSON) আছে।
+নিয়ম:
+- শুধু এই সারাংশ থেকে উত্তর দেবে। এতে নেই এমন সংখ্যা, নাম বা তথ্য কখনো বানাবে না — না থাকলে বলবে "এই হিসাবটা আমার কাছে নেই"।
+- sales.today/yesterday/week(গত ৭ দিন)/month/lastMonth: sales=বিক্রি, profit=লাভ, paid=হাতে এসেছে, bills=বিল, qty=পণ্য সংখ্যা।
+- dueTop=সবচেয়ে বেশি বাকি যাঁদের, lowStock=কম স্টক (qty ০ মানে শেষ), expenseToday/expenseMonth=খরচ।
+- বাংলায়, ছোট (সর্বোচ্চ ৬ লাইন), টাকা লিখবে "৳" দিয়ে। পরামর্শ চাইলে সারাংশ দেখে সহজ, বাস্তব পরামর্শ দিতে পারো।
+- শুধু JSON: {"reply":"..."}
+
+===== দোকানের হিসাব =====
+${facts}`;
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: sys }] }, contents: [{ role: "user", parts: [{ text }] }], generationConfig: { temperature: 0.3, responseMimeType: "application/json" } }),
+    });
+    if (!res.ok) throw new Error(`Gemini ${res.status}`);
+    const data = await res.json();
+    const raw = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text;
+    const reply = String((JSON.parse(raw || "{}").reply) || "").trim();
+    if (!reply) throw new Error("empty");
+    return { reply: reply.slice(0, 900) };
+  } catch (e) {
+    console.warn(JSON.stringify({ event: "MOU_OWNER_FAILED", error: String(e && e.message || e) }));
+    return { reply: "এই মুহূর্তে উত্তর দিতে পারছি না 🐝 একটু পরে আবার চেষ্টা করুন।" };
+  }
+});
