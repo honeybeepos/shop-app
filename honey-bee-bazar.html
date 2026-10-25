@@ -16785,6 +16785,73 @@ $("tpWaitToggleBtn") && $("tpWaitToggleBtn").addEventListener("click", async ()=
   }
 });
 
+/* 💳 ভাড়া — যাত্রীর অনুমতি
+   ড্রাইভার Pick Up করে ভাড়া লিখলে যাত্রীর ফোনে জিজ্ঞেস করা হয়:
+   "Wallet থেকে দেবেন?" — রাজি হলে সার্ভার (walletChargeRide) পয়েন্ট
+   কেটে ড্রাইভারকে দেয়; "নগদ দেব" চাপলে কিছু কাটে না। যাত্রীর অনুমতি
+   ছাড়া কেউ তাঁর পয়েন্ট কাটতে পারে না। */
+(function(){
+  let unsub = null, shown = new Set(), box = null;
+  const tk = (n)=> String(n).replace(/[0-9]/g, (d)=> "০১২৩৪৫৬৭৮৯"[d]);
+  function close(){ if(box){ box.remove(); box = null; } }
+  function ask(id, d){
+    if(shown.has(id + ":" + d.fare)) return;
+    shown.add(id + ":" + d.fare);
+    close();
+    box = document.createElement("div");
+    box.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;";
+    box.innerHTML = `<div style="background:#fff;color:#241605;border-radius:16px;max-width:340px;width:100%;padding:18px 16px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-family:inherit;">
+      <div style="font-size:17px;font-weight:700;margin-bottom:6px;">🚕 ড্রাইভার আপনাকে Pick Up করেছেন</div>
+      <div style="font-size:14.5px;margin-bottom:14px;">ভাড়া: <b>৳ ${tk(d.fare)}</b><br>Wallet-এর পয়েন্ট থেকে দেবেন?</div>
+      <div id="hbRideMsg" style="font-size:13px;color:#b45309;margin-bottom:10px;display:none;"></div>
+      <div style="display:flex;gap:8px;">
+        <button id="hbRideYes" style="flex:1;padding:11px;border:0;border-radius:10px;background:#16a34a;color:#fff;font-weight:700;font-size:14px;">✅ রাজি, Wallet থেকে দিন</button>
+        <button id="hbRideNo" style="flex:1;padding:11px;border:0;border-radius:10px;background:#f1f5f9;color:#241605;font-weight:700;font-size:14px;">💵 নগদ দেব</button>
+      </div></div>`;
+    document.body.appendChild(box);
+    const msg = (t)=>{ const m = box && box.querySelector("#hbRideMsg"); if(m){ m.textContent = t; m.style.display = "block"; } };
+    box.querySelector("#hbRideNo").onclick = async ()=>{
+      close();
+      try{ await db.collection("passenger_waiting_queue").doc(id).update({ fareDeclined: true }); }catch(e){}
+    };
+    box.querySelector("#hbRideYes").onclick = async (ev)=>{
+      const b = ev.currentTarget; b.disabled = true; b.textContent = "দেওয়া হচ্ছে...";
+      try{
+        const r = await firebase.functions().httpsCallable("walletChargeRide")({ queueId: id, fare: d.fare });
+        const x = (r && r.data) || {};
+        if(x.success){ close(); alert(`✅ Wallet থেকে ৳ ${tk(x.fare)} দেওয়া হয়েছে। বাকি পয়েন্ট: ${tk(x.balance)}`); return; }
+        const why = {
+          insufficient_balance: `Wallet-এ যথেষ্ট পয়েন্ট নেই (আছে ${tk(x.balance || 0)})। নগদ দিন।`,
+          fare_changed: "ড্রাইভার ভাড়া বদলেছেন — নতুন ভাড়াটা দেখে আবার বলুন।",
+          fare_too_high: "এই ভাড়া Wallet থেকে দেওয়ার সীমার বেশি। নগদ দিন।",
+          too_late: "অনেক দেরি হয়ে গেছে। নগদ দিন।",
+          already: "আগেই দেওয়া হয়েছে।"
+        }[x.reason] || "Wallet থেকে দেওয়া গেল না। নগদ দিন।";
+        msg(why); b.disabled = false; b.textContent = "✅ রাজি, Wallet থেকে দিন";
+        if(x.reason === "already"){ setTimeout(close, 1500); }
+      }catch(e){
+        msg("দেওয়া গেল না: " + (e.message || "ইন্টারনেট দেখুন")); b.disabled = false; b.textContent = "✅ রাজি, Wallet থেকে দিন";
+      }
+    };
+  }
+  auth.onAuthStateChanged((u)=>{
+    if(unsub){ unsub(); unsub = null; }
+    close();
+    if(!u || u.isAnonymous) return;
+    unsub = db.collection("passenger_waiting_queue")
+      .where("owner_uid", "==", u.uid).where("status", "==", "PICKED_UP")
+      .onSnapshot((qs)=>{
+        qs.docs.forEach((doc)=>{
+          const d = doc.data() || {};
+          const at = d.picked_up_at && d.picked_up_at.toMillis ? d.picked_up_at.toMillis() : 0;
+          if(!(Number(d.fare) > 0) || d.walletCharged || d.fareDeclined) return;
+          if(!at || Date.now() - at > 30 * 60 * 1000) return;
+          ask(doc.id, d);
+        });
+      }, (e)=> console.warn("ride fare listener:", e));
+  });
+})();
+
 
 /* ==================== 📊 সুপার অ্যাডমিনের জন্য লাইভ ব্যবহার-অ্যানালিটিক্স ====================
    কোনো ব্যক্তিগত তথ্য পাঠানো হয় না — শুধু সময়/স্ক্রল/কোন দোকান দেখা হচ্ছে।

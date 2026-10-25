@@ -866,8 +866,9 @@ service cloud.firestore {
     /* 🚕 রাস্তায় অপেক্ষমাণ যাত্রী। অতিথিরাও ওঠেন, তাই লগইন লাগে না।
        🔒 owner_uid = যে নিজে তালিকায় উঠেছে (থাকলে নিজের uid-ই হতে হবে) —
        ওয়ালেট থেকে ভাড়া কাটা হয় শুধু যখন owner_uid == user_id।
-       user_id/owner_uid পরে বদলানো যায় না; Pick Up করলে picked_up_by
-       নিজের uid-ই হতে হবে; ভাড়া কাটা হয়ে গেলে ডক আর বদলানো যায় না। */
+       user_id/owner_uid পরে বদলানো যায় না; Pick Up একবারই — picked_up_by
+       নিজের uid-ই হতে হবে, পরে আর কেউ বদলাতে পারে না; ভাড়া কাটা হয়ে
+       গেলে ডক আর বদলানো যায় না। ভাড়া কাটার অনুমতি দেন যাত্রী নিজে। */
     match /passenger_waiting_queue/{docId} {
       allow read: if true;
       allow create: if (!('owner_uid' in request.resource.data) ||
@@ -877,9 +878,9 @@ service cloud.firestore {
                     && request.resource.data.get('owner_uid', null) == resource.data.get('owner_uid', null)
                     && request.resource.data.get('walletCharged', null) == resource.data.get('walletCharged', null)
                     && resource.data.get('walletCharged', null) != true
-                    && (!('picked_up_by' in request.resource.data) ||
-                        request.resource.data.picked_up_by == resource.data.get('picked_up_by', null) ||
-                        (request.auth != null && request.resource.data.picked_up_by == request.auth.uid));
+                    && (request.resource.data.get('picked_up_by', null) == resource.data.get('picked_up_by', null) ||
+                        (resource.data.get('picked_up_by', null) == null && request.auth != null &&
+                         request.resource.data.get('picked_up_by', null) == request.auth.uid));
       allow delete: if true;
     }
 

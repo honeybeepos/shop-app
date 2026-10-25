@@ -22352,20 +22352,23 @@ function dmBuildRadarPopup(group){
    থেকে)। যাত্রীর ওয়ালেটে পর্যাপ্ত ব্যালেন্স থাকলে সেখান থেকে কাটা হয় এবং
    ড্রাইভারের ওয়ালেটে যোগ হয়; না থাকলে নগদ নেওয়ার কথা বলা হয় (তখনো Pick Up
    হয়ে যায়, শুধু ওয়ালেট থেকে টাকা কাটা হয় না)। */
-async function walletChargeFare(passengerUserId, driverUid, fare, queueId){
-  /* 🔒 ওয়ালেট এখন শুধু সার্ভার বদলায় (functions/wallet.js → walletChargeRide)।
-     ভাড়া নেওয়া হয় passenger_waiting_queue ডক থেকে, একবারই কাটা যায়। */
-  if(!fare || fare <= 0) return { success: false, reason: "invalid_fare" };
-  if(!passengerUserId || String(passengerUserId).startsWith("guest_") || !queueId){
-    return { success: false, reason: "no_wallet" };
-  }
-  try{
-    const r = await firebase.functions().httpsCallable("walletChargeRide")({ queueId });
-    return (r && r.data) || { success: false, reason: "error" };
-  }catch(e){
-    console.error("wallet charge failed:", e);
-    return { success: false, reason: "error" };
-  }
+/* 🔒 ভাড়া Wallet থেকে নেওয়া হয় শুধু যাত্রী নিজে "রাজি" চাপলে
+   (functions/wallet.js → walletChargeRide, যাত্রীর ফোন থেকে ডাকা হয়)।
+   এখানে শুধু অপেক্ষা: যাত্রী রাজি হলে "paid", না করলে "declined",
+   ২ মিনিটে সাড়া না এলে "timeout"। */
+function hbRideHasWallet(p){
+  return !!(p && p.owner_uid && p.owner_uid === p.user_id && !String(p.user_id).startsWith("guest_"));
+}
+function hbWaitRideWallet(queueId, done){
+  let fin = false, unsub = null, tm = null;
+  const end = (res)=>{ if(fin) return; fin = true; clearTimeout(tm); try{ unsub && unsub(); }catch(e){} done(res); };
+  tm = setTimeout(()=> end("timeout"), 120000);
+  unsub = db.collection("passenger_waiting_queue").doc(queueId).onSnapshot((s)=>{
+    if(!s.exists) return end("gone");
+    const d = s.data() || {};
+    if(d.walletCharged) end("paid");
+    else if(d.fareDeclined) end("declined");
+  }, ()=> end("error"));
 }
 
 async function dmPickUpPassenger(passenger){
@@ -22376,12 +22379,14 @@ async function dmPickUpPassenger(passenger){
     await db.collection("passenger_waiting_queue").doc(passenger.id).update({
       status: "PICKED_UP", picked_up_by: __dmDriverId, picked_up_at: fbNow(), fare: fare || null
     });
-    if(fare > 0){
-      const result = await walletChargeFare(passenger.user_id, __dmDriverId, fare, passenger.id);
-      if(result.success) alert(`✅ Pick Up সম্পন্ন — Wallet থেকে ${HB_CUR} ${fare} কাটা হয়েছে।`);
-      else if(result.reason === "insufficient_balance") alert(`✅ Pick Up সম্পন্ন — যাত্রীর Wallet-এ পর্যাপ্ত ব্যালেন্স নেই, নগদ ${HB_CUR} ${fare} নিন।`);
-      else if(result.reason === "no_wallet") alert(`✅ Pick Up সম্পন্ন — যাত্রী লগইন করা নেই (কোনো Wallet নেই), নগদ ${HB_CUR} ${fare} নিন।`);
-      else alert("✅ Pick Up সম্পন্ন — তবে Wallet থেকে কাটা যায়নি, নগদ নিন।");
+    if(fare > 0 && hbRideHasWallet(passenger)){
+      alert(`✅ Pick Up সম্পন্ন — যাত্রীর ফোনে ${HB_CUR} ${fare} দেওয়ার অনুমতি চাওয়া হয়েছে। রাজি হলে Wallet থেকে পাবেন, নইলে নগদ নিন।`);
+      hbWaitRideWallet(passenger.id, (res)=>{
+        if(res === "paid") alert(`✅ যাত্রী Wallet থেকে ${HB_CUR} ${fare} দিয়েছেন।`);
+        else alert(`💵 Wallet থেকে আসেনি — নগদ ${HB_CUR} ${fare} নিন।`);
+      });
+    }else if(fare > 0){
+      alert(`✅ Pick Up সম্পন্ন — যাত্রী লগইন করা নেই (Wallet নেই), নগদ ${HB_CUR} ${fare} নিন।`);
     }
     __dmRadarMap.closePopup();
     await dmRecordDailyEarning(fare, 1); // 📊 Phase 2 — রাস্তা থেকে পিক-আপও আয়ের লেজারে যোগ হবে
@@ -23566,10 +23571,14 @@ async function rmDoPickUp(p){
     await db.collection("passenger_waiting_queue").doc(p.id).update({
       status:"PICKED_UP", picked_up_by: rmCurrentRider.uid, picked_up_at: fbNow(), fare: fare || null
     });
-    if(fare > 0){
-      const result = await walletChargeFare(p.user_id, rmCurrentRider.uid, fare, p.id);
-      if(result.success) alert(`✅ Pick Up সম্পন্ন — Wallet থেকে ${HB_CUR} ${fare} কাটা হয়েছে।`);
-      else alert(`✅ Pick Up সম্পন্ন — Wallet থেকে কাটা যায়নি, নগদ ${HB_CUR} ${fare} নিন।`);
+    if(fare > 0 && hbRideHasWallet(p)){
+      alert(`✅ Pick Up সম্পন্ন — যাত্রীর ফোনে ${HB_CUR} ${fare} দেওয়ার অনুমতি চাওয়া হয়েছে। রাজি হলে Wallet থেকে পাবেন, নইলে নগদ নিন।`);
+      hbWaitRideWallet(p.id, (res)=>{
+        if(res === "paid") alert(`✅ যাত্রী Wallet থেকে ${HB_CUR} ${fare} দিয়েছেন।`);
+        else alert(`💵 Wallet থেকে আসেনি — নগদ ${HB_CUR} ${fare} নিন।`);
+      });
+    }else if(fare > 0){
+      alert(`✅ Pick Up সম্পন্ন — নগদ ${HB_CUR} ${fare} নিন।`);
     }
     rmTmMap.closePopup();
   }catch(e){ alert("Pick Up করা যায়নি: " + e.message); }

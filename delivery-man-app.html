@@ -10,7 +10,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1285,15 +1284,20 @@ function buildPassengerPopup(group){
 }
 
 async function doPickUp(p){
-  const input = prompt("ভাড়া কত নেবেন? (৳)\n\nযাত্রীর Wallet-এ টাকা থাকলে সেখান থেকে কাটার চেষ্টা হবে, না কাটা গেলে নগদ নিন।", "");
+  const input = prompt("ভাড়া কত নেবেন? (৳)\n\nযাত্রীর ফোনে ভাড়াটা দেখানো হবে — তিনি রাজি হলে Wallet থেকে পাবেন, না হলে নগদ নিন।", "");
   if(input === null){ const e = new Error("বাতিল"); e.__cancelled = true; throw e; }
   const fare = Number(input) || 0;
   await db.collection("passenger_waiting_queue").doc(p.id).update({
     status: "PICKED_UP", picked_up_by: RIDER.uid, picked_up_at: fbNow(), fare: fare || null
   });
-  if(fare > 0){
-    const r = await chargeWallet(p.user_id, fare, p.id);
-    toast(r ? `✅ Wallet থেকে ৳ ${bn(fare)} কাটা হয়েছে` : `✅ Pick Up হলো — নগদ ৳ ${bn(fare)} নিন`);
+  if(fare > 0 && hbRideHasWallet(p)){
+    toast(`✅ Pick Up হলো — যাত্রীর ফোনে ৳ ${bn(fare)} দেওয়ার অনুমতি চাওয়া হয়েছে…`);
+    hbWaitRideWallet(p.id, (res)=>{
+      if(res === "paid"){ toast(`✅ যাত্রী Wallet থেকে ৳ ${bn(fare)} দিয়েছেন`); addNotif(`💳 Wallet থেকে ৳ ${bn(fare)} পেয়েছেন`); }
+      else toast(`💵 Wallet থেকে আসেনি — নগদ ৳ ${bn(fare)} নিন`);
+    });
+  }else if(fare > 0){
+    toast(`✅ Pick Up হলো — নগদ ৳ ${bn(fare)} নিন`);
   }else{
     toast("✅ Pick Up হলো");
   }
@@ -1303,14 +1307,23 @@ async function doPickUp(p){
 
 /* 💳 যাত্রীর ওয়ালেট থেকে ভাড়া কাটার চেষ্টা। না পারলে false — তখন
    চালককে নগদ নিতে বলা হয়, চুপচাপ "কাটা হয়েছে" বলা হয় না। */
-async function chargeWallet(passengerId, fare, queueId){
-  /* 🔒 ওয়ালেট এখন শুধু সার্ভার বদলায় (functions/wallet.js)। ভাড়া নেওয়া
-     হয় passenger_waiting_queue ডক থেকে, একবারই কাটা যায়। */
-  if(!passengerId || String(passengerId).startsWith("guest_") || !queueId) return false;
-  try{
-    const r = await firebase.functions().httpsCallable("walletChargeRide")({ queueId });
-    return !!(r.data && r.data.success);
-  }catch(e){ console.warn("wallet charge failed:", e); return false; }
+/* 🔒 ভাড়া Wallet থেকে নেওয়া হয় শুধু যাত্রী নিজে "রাজি" চাপলে
+   (functions/wallet.js → walletChargeRide, যাত্রীর ফোন থেকে ডাকা হয়)।
+   এখানে শুধু অপেক্ষা: যাত্রী রাজি হলে "paid", না করলে "declined",
+   ২ মিনিটে সাড়া না এলে "timeout"। */
+function hbRideHasWallet(p){
+  return !!(p && p.owner_uid && p.owner_uid === p.user_id && !String(p.user_id).startsWith("guest_"));
+}
+function hbWaitRideWallet(queueId, done){
+  let fin = false, unsub = null, tm = null;
+  const end = (res)=>{ if(fin) return; fin = true; clearTimeout(tm); try{ unsub && unsub(); }catch(e){} done(res); };
+  tm = setTimeout(()=> end("timeout"), 120000);
+  unsub = db.collection("passenger_waiting_queue").doc(queueId).onSnapshot((s)=>{
+    if(!s.exists) return end("gone");
+    const d = s.data() || {};
+    if(d.walletCharged) end("paid");
+    else if(d.fareDeclined) end("declined");
+  }, ()=> end("error"));
 }
 
 /* ════════ 🔗 পুরনো শপ-কোড (ঐচ্ছিক) ════════
