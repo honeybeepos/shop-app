@@ -346,6 +346,8 @@ async function mouHandleSend(text, image){
     thinkingBubble.remove();
     const failReply = "দুঃখিত বন্ধু, এই মুহূর্তে আমার সাথে যোগাযোগ করা যাচ্ছে না। একটু পরে চেষ্টা করুন। 🐝";
     mouAppendBubble("mou", failReply);
+    // 🔎 কারণটা ছোট করে দেখানো — পরে সমস্যা হলে স্ক্রিনশটেই বোঝা যাবে কোথায় আটকাল
+    try{ mouAppendNote("কারণ: " + String((e && (e.code || e.message)) || "অজানা").slice(0, 60) + (mouAuthReady ? "" : " · সেশন নেই")); }catch(_){}
     mouSetState("idle");
     mouSpeak(failReply);
     // ⚠️ ব্যর্থতার বার্তাটা ইচ্ছাকৃতভাবে মেমোরিতে/Firestore-এ সেভ করা হচ্ছে না —
