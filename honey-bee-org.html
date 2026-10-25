@@ -387,7 +387,7 @@ function viewGuide(){
       "লগইন হয় Honey Bee Bazar-এর একই Google একাউন্টে — আলাদা পাসওয়ার্ড মনে রাখতে হয় না।"
     ]))}
     ${sec("👣", "কীভাবে ব্যবহার করবেন", `<b>সাধারণ মানুষ</b>${li(["🔎 সংগঠন — জেলা/থানা বেছে এলাকার সংগঠন খুঁজুন।", "✋ আবেদন — মোবাইল নম্বর দিয়ে সদস্য হওয়ার আবেদন করুন; অ্যাডমিনরা অনুমোদন দিলে আপনি সদস্য।", "➕ সংগঠন তৈরি — নিজেই নতুন সংগঠন খুলুন; আপনি হবেন প্রতিষ্ঠাতা অ্যাডমিন।"])}
-      <b>সদস্য</b>${li(["📰 পোস্ট — সংগঠনের খবর, লাইক আর মন্তব্য।", "🗳️ প্রস্তাব — খরচের প্রস্তাব পড়ুন, আলোচনা করুন, বোতাম চেপে ধরে ভোট দিন।", "📒 চাঁদা — আপনার জমার ইতিহাস। ৳ হিসাব — সংগঠনের পুরো আয়-ব্যয়।"])}
+      <b>সদস্য</b>${li(["📰 পোস্ট — সংগঠনের খবর, লাইক আর মন্তব্য। নিজেও পোস্ট দিতে পারেন; নিজের পোস্ট ✏️ এডিট বা 🗑️ সরাতে পারেন।", "🗳️ প্রস্তাব — খরচের প্রস্তাব পড়ুন, আলোচনা করুন, বোতাম চেপে ধরে ভোট দিন।", "📒 চাঁদা — আপনার জমার ইতিহাস। ৳ হিসাব — বাইরের অনুদান আর খরচ (অন্যের চাঁদা দেখা যায় না)।", "📥 বাইরে থেকে টাকা তুললে — নিজেই লিখে দিন; অ্যাডমিন নিশ্চিত করলে হিসাবে ওঠে।"])}
       <b>অ্যাডমিন</b>${li(["📝 আবেদন — নতুন সদস্য অনুমোদন (দুইজন অ্যাডমিন)।", "৳ হিসাব — ＋টাকা জমা / −খরচ লিখুন; আরেকজন অ্যাডমিন নিশ্চিত করলে হিসাবে ওঠে।", "🗳️ প্রস্তাব — বড় খরচের প্রস্তাব দিন; ভোটে পাস হলে খরচ নিজে থেকেই হিসাবে ওঠে।", "✍️ পোস্ট — পাবলিক বা শুধু সদস্যদের জন্য, ছবিসহ, নির্দিষ্ট সময়ে প্রকাশ, মেয়াদ; ভুল হলে ✏️ এডিট।", "👥 সদস্য — পদবি দিন, অ্যাডমিন বানান, দরকার হলে সদস্যপদ বাতিল (দুইজন অ্যাডমিন)।", "❤️ মানবিক সেবা — উদ্যোগ খুলুন, লক্ষ্য দিন; জমা লেখার সময় উদ্যোগটা বাছলে নিজে থেকেই যোগ হয়।"])}`)}
     ${sec("💡", "শুরু করার পরামর্শ", li([
       "সংগঠন খোলার পর প্রথমেই আরেকজন বিশ্বস্ত সদস্যকে অ্যাডমিন বানান — তাহলে শুরু থেকেই দুই-অ্যাডমিন সুরক্ষা চালু হয়ে যায়।",
@@ -475,6 +475,8 @@ function memberHome(){
     <div class="sec"><h2>📰 সংগঠনের পোস্ট</h2><button class="btn ghost" type="button" style="padding:7px 12px" onclick="setView('posts')">সব দেখুন</button></div><div id="homePosts"></div>
     <div class="sec"><h2>⚡ দ্রুত কাজ</h2></div>
     <div class="grid2 grid4">
+      <button class="qcard" type="button" onclick="openNewPost()"><b>✍️ নতুন পোস্ট</b><span class="small">সংগঠনের খবর জানান</span></button>
+      <button class="qcard" type="button" onclick="openCollect()"><b>📥 বাইরে থেকে টাকা তুলেছি</b><span class="small">অনুদান লিখুন — অ্যাডমিন নিশ্চিত করবেন</span></button>
       <button class="qcard" type="button" onclick="setView('dues')"><b>📒 আমার চাঁদা</b><span class="small">জমা ও ইতিহাস</span></button>
       <button class="qcard" type="button" onclick="setView('money')"><b>৳ সংগঠনের হিসাব</b><span class="small">আয়, ব্যয় ও ব্যালেন্স</span></button>
       <button class="qcard" type="button" onclick="setView('aid')"><b>❤️ মানবিক সেবা</b><span class="small">চলমান সহায়তা</span></button>
@@ -714,7 +716,7 @@ function openApply(){
 let POSTS = [], MYLIKES = {};
 const POST_ST = { scheduled:["wait","⏰ নির্ধারিত"], expired:["no","⌛ মেয়াদ শেষ"], removed:["no","🗑️ সরানো"] };
 function tabPosts(){
-  $("tabBody").innerHTML = `${isAdmin() ? `<div class="card" style="padding:12px"><button class="btn full" type="button" id="newPost">✍️ নতুন পোস্ট লিখুন</button></div>` : ""}
+  $("tabBody").innerHTML = `${isMember() ? `<div class="card" style="padding:12px"><button class="btn full" type="button" id="newPost">✍️ নতুন পোস্ট লিখুন</button></div>` : ""}
     <div id="postList"><div class="empty"><span class="spin"></span></div></div>`;
   if($("newPost")) $("newPost").onclick = openNewPost;
   let q = db.collection("orgs").doc(ORG.id).collection("posts");
@@ -736,7 +738,7 @@ function drawPosts(){
     return `<div class="card" id="post-${esc(p.id)}" ${focus === p.id ? `style="border-color:var(--amber)"` : ""}>
       <div class="row" style="flex-wrap:nowrap">
         <div class="av" style="width:38px; height:38px; font-size:18px; border-radius:50%">🤝</div>
-        <div style="flex:1; min-width:0"><b style="font-size:14px">${esc(ORG.name)}</b><div class="small">${esc(when(p.publishAt))}${p.expireAt ? " · মেয়াদ: " + esc(when(p.expireAt)) : ""}</div></div>
+        <div style="flex:1; min-width:0"><b style="font-size:14px">${esc(ORG.name)}</b><div class="small">${p.authorName ? "✍️ " + esc(p.authorName) + " · " : ""}${esc(when(p.publishAt))}${p.expireAt ? " · মেয়াদ: " + esc(when(p.expireAt)) : ""}</div></div>
         <span class="chip ${p.audience === "public" ? "" : "admin"}">${p.audience === "public" ? "🌐 পাবলিক" : "🔒 সদস্য"}</span>
       </div>
       ${st ? `<div style="margin-top:8px"><span class="chip ${st[0]}">${st[1]}</span></div>` : ""}
@@ -747,7 +749,7 @@ function drawPosts(){
         <button class="btn ghost" type="button" data-like="${esc(p.id)}" style="padding:7px 12px; font-size:13px">${MYLIKES[p.id] ? "❤️" : "🤍"} ${bn(p.likeCount || 0)}</button>
         <button class="btn ghost" type="button" data-cm="${esc(p.id)}" style="padding:7px 12px; font-size:13px">💬 ${bn(p.commentCount || 0)}</button>
         ${p.audience === "public" && p.status === "published" ? `<button class="btn ghost" type="button" data-share="${esc(p.id)}" style="padding:7px 12px; font-size:13px">↗ শেয়ার</button>` : ""}
-        ${isAdmin() && p.status !== "removed" ? `<button class="btn ghost" type="button" data-ed="${esc(p.id)}" style="padding:7px 12px; font-size:13px; margin-left:auto">✏️ এডিট</button><button class="btn red" type="button" data-rm="${esc(p.id)}" style="padding:7px 12px; font-size:13px">🗑️</button>` : ""}
+        ${(isAdmin() || (ME && p.authorUid === ME.uid)) && p.status !== "removed" ? `<button class="btn ghost" type="button" data-ed="${esc(p.id)}" style="padding:7px 12px; font-size:13px; margin-left:auto">✏️ এডিট</button><button class="btn red" type="button" data-rm="${esc(p.id)}" style="padding:7px 12px; font-size:13px">🗑️</button>` : ""}
       </div>
       <div id="cm-${esc(p.id)}"></div>
     </div>`;
@@ -923,14 +925,18 @@ function drawMoney(){
       <div class="stat"><b style="color:#fca5a5">${tk(f.out)}</b><span class="small">মোট খরচ</span></div>
       <div class="stat"><b>${tk((f.in || 0) - (f.out || 0))}</b><span class="small">অবশিষ্ট</span></div>
     </div>
-    <div class="small" style="margin-top:10px">${isMember() ? "সব জমা আর খরচ সদস্যরা দেখতে পারেন। কে কত চাঁদা দিলেন সেটা শুধু তিনি আর অ্যাডমিনরা দেখেন।" : "স্বচ্ছতার জন্য সংগঠন তাদের নিশ্চিত হওয়া জমা-খরচ সবার জন্য খোলা রেখেছে।"} প্রতিটা জমার পাশে টাকা কোন মাধ্যমে এসেছে আর রেফারেন্স দেখানো থাকে।</div>
+    <div class="small" style="margin-top:10px">${isAdmin() ? "সব জমা আর খরচ সদস্যরা দেখতে পারেন। সদস্যদের চাঁদার লাইন শুধু অ্যাডমিনরা দেখেন — সদস্যরা দেখেন বাইরের অনুদান আর খরচ।" : isMember() ? "এখানে বাইরের অনুদান আর সংগঠনের খরচ দেখা যায়। কে কত চাঁদা দিলেন সেটা শুধু তিনি আর অ্যাডমিনরা জানেন — আপনার নিজের চাঁদা \"📒 চাঁদা\"-তে।" : "স্বচ্ছতার জন্য সংগঠন তাদের নিশ্চিত হওয়া জমা-খরচ সবার জন্য খোলা রেখেছে।"} প্রতিটা জমার পাশে টাকা কোন মাধ্যমে এসেছে আর রেফারেন্স দেখানো থাকে।</div>
     ${isAdmin() ? `<div class="row" style="margin-top:12px"><button class="btn green" type="button" id="addIn">＋ টাকা জমা</button><button class="btn red" type="button" id="addOut">− সরাসরি খরচ</button></div>
       <div class="small" style="margin-top:6px">বড় খরচ "🗳️ প্রস্তাব ও ভোট" দিয়ে করুন — ভোটে পাস হলে নিজে থেকেই হিসাবে ওঠে।</div>` : ""}
   </div>`;
+  if(!isAdmin() && isMember()) top.insertAdjacentHTML("beforeend", `<div class="card" style="padding:12px"><button class="btn full" type="button" id="addCollect">📥 বাইরে থেকে টাকা তুলেছি — লিখুন</button><div class="small" style="margin-top:6px">অ্যাডমিন নিশ্চিত করলে তবেই হিসাবে উঠবে।</div></div>`);
+  if($("addCollect")) $("addCollect").onclick = openCollect;
   if($("addIn")) $("addIn").onclick = ()=> openMoney("in");
   if($("addOut")) $("addOut").onclick = ()=> openMoney("out");
   const el = $("txList"); if(!el) return;
-  el.innerHTML = TXS.map(t=>{
+  // 🔒 সদস্যদের চাঁদার লাইন শুধু অ্যাডমিন দেখেন; সাধারণ সদস্য দেখেন বাইরের অনুদান আর খরচ
+  const SHOW = isAdmin() ? TXS : TXS.filter(t=> !t.duesId);
+  el.innerHTML = SHOW.map(t=>{
     const st = TX_ST[t.status] || ["", t.status];
     const mine = ME && (t.approvedBy || []).includes(ME.uid);
     return `<div class="item" style="align-items:flex-start">
@@ -939,6 +945,7 @@ function drawMoney(){
         <b style="font-size:14px">${esc(t.title)}</b>${t.aidTitle ? ` <span class="chip">❤️ ${esc(t.aidTitle)}</span>` : ""} <span class="chip ${st[0]}">${st[1]}</span>
         <div class="small">${esc(bn(t.date || ""))} · মাধ্যম: ${esc(t.method || "—")}${t.reference ? " · রেফারেন্স: " + esc(t.reference) : ""}</div>
         ${t.note && isMember() ? `<div class="small">📝 ${esc(t.note)}</div>` : ""}
+        ${t.collectorName ? `<div class="small">📥 তুলেছেন: ${esc(t.collectorName)}</div>` : ""}
         ${isMember() ? `<div class="small">✍️ ${esc(t.createdByName || "")}${(t.approvedNames || []).length > 1 || t.status === "pending" ? " · অনুমোদন: " + esc((t.approvedNames || []).join(", ")) + (t.status === "pending" ? ` (${bn((t.approvedBy || []).length)}/${bn(need2())})` : "") : ""}</div>` : ""}
         ${isAdmin() && t.status === "pending" ? `<div class="row" style="margin-top:8px"><button class="btn green" type="button" data-txok="${esc(t.id)}" ${mine ? "disabled" : ""} style="padding:7px 12px; font-size:13px">${mine ? "✓ আপনি দিয়েছেন — আরেকজন লাগবে" : "✅ নিশ্চিত করুন"}</button><button class="btn red" type="button" data-txno="${esc(t.id)}" style="padding:7px 12px; font-size:13px">❌ বাতিল</button></div>` : ""}
       </div>
@@ -973,6 +980,33 @@ async function openMoney(type){
     if(!(amount > 0)) return $("mMsg").textContent = "টাকার পরিমাণ দিন";
     const r = await busy($("mGo"), ()=> api("txCreate", { orgId: ORG.id, type, title, amount, date: $("mD").value, method: $("mM").value, reference: $("mR").value.trim(), note: $("mN").value.trim(), memberUid: $("mW") ? $("mW").value : null, aidId: $("mAid") ? $("mAid").value : null }));
     if(r){ closeModal(); toast(r.status === "pending" ? "✅ লেখা হয়েছে — আরেকজন অ্যাডমিন নিশ্চিত করলে হিসাবে উঠবে" : "✅ হিসাবে উঠেছে"); }
+  };
+}
+
+/* ---------- 📥 সদস্য বাইরে থেকে টাকা তুললে ---------- */
+async function openCollect(){
+  if(!isMember()) return toast("শুধু সদস্যরা লিখতে পারেন");
+  const aids = await loadAids().catch(()=> []);
+  const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  openModal(`<div class="h">📥 বাইরে থেকে টাকা তুলেছি</div>
+    <div class="notice">অ্যাডমিন নিশ্চিত করলে তবেই সংগঠনের হিসাবে উঠবে। টাকাটা অ্যাডমিনের হাতে/নম্বরে জমা দিন।</div>
+    <label class="f">কার কাছ থেকে তুলেছেন? *</label><input class="in" id="cS" maxlength="60" placeholder="যেমন: বাজারের দোকানদারদের কাছ থেকে / প্রবাসী ভাই রহিম">
+    <div class="row">
+      <div style="flex:1; min-width:120px"><label class="f">টাকা (৳) *</label><input class="in" id="cA" type="number" inputmode="decimal" min="1"></div>
+      <div style="flex:1; min-width:120px"><label class="f">তারিখ</label><input class="in" id="cD" type="date" value="${today}"></div>
+    </div>
+    <label class="f">মাধ্যম</label><select class="in" id="cM">${["হাতে নগদ","বিকাশ","নগদ","রকেট","ব্যাংক ট্রান্সফার","অন্যান্য"].map(x=> `<option>${x}</option>`).join("")}</select>
+    <label class="f">লেনদেন আইডি / রসিদ নম্বর</label><input class="in" id="cR" maxlength="60" placeholder="থাকলে">
+    ${aids.filter(a=> a.status !== "done").length ? `<label class="f">কোন মানবিক সেবার জন্য? (ঐচ্ছিক)</label><select class="in" id="cAid"><option value="">— সাধারণ তহবিল —</option>${aids.filter(a=> a.status !== "done").map(a=> `<option value="${esc(a.id)}">${esc(a.title)}</option>`).join("")}</select>` : ""}
+    <label class="f">নোট</label><textarea class="in" id="cN" maxlength="300"></textarea>
+    <div id="cMsg" class="small" style="color:#fca5a5; min-height:18px; margin-top:8px"></div>
+    <div class="row"><button class="btn ghost" type="button" data-close>বাতিল</button><button class="btn" type="button" id="cGo" style="flex:1">📤 জমা দিন</button></div>`);
+  $("cGo").onclick = async ()=>{
+    const source = $("cS").value.trim(), amount = Number(digits($("cA").value));
+    if(source.length < 2) return $("cMsg").textContent = "কার কাছ থেকে তুলেছেন লিখুন";
+    if(!(amount > 0)) return $("cMsg").textContent = "টাকার পরিমাণ দিন";
+    const r = await busy($("cGo"), ()=> api("txCollect", { orgId: ORG.id, source, amount, date: $("cD").value, method: $("cM").value, reference: $("cR").value.trim(), note: $("cN").value.trim(), aidId: $("cAid") ? $("cAid").value || null : null }));
+    if(r){ closeModal(); toast("✅ লেখা হয়েছে — অ্যাডমিন নিশ্চিত করলে হিসাবে উঠবে"); }
   };
 }
 
@@ -1487,7 +1521,7 @@ function tabManage(){
 
 /* ---------- 📜 কাজের খাতা (অ্যাডমিন) ---------- */
 const LOG_TXT = { org_create:"সংগঠন খুলেছেন", org_update:"সংগঠনের তথ্য বদলেছেন", member_approve_1:"প্রথম অনুমোদন দিয়েছেন", member_approve:"সদস্য গ্রহণ করেছেন", member_reject:"আবেদন বাতিল করেছেন", member_leave:"সংগঠন ছেড়েছেন",
-  post_create:"পোস্ট দিয়েছেন", post_edit:"পোস্ট এডিট করেছেন", post_remove:"পোস্ট সরিয়েছেন", money_in:"জমা লিখেছেন", money_out:"খরচ লিখেছেন", money_in_ok:"জমা নিশ্চিত করেছেন", money_out_ok:"খরচ অনুমোদন করেছেন", money_reject:"লেনদেন বাতিল করেছেন",
+  post_create:"পোস্ট দিয়েছেন", post_edit:"পোস্ট এডিট করেছেন", post_remove:"পোস্ট সরিয়েছেন", money_in:"জমা লিখেছেন", money_collect:"বাইরে থেকে টাকা তোলা লিখেছেন", money_out:"খরচ লিখেছেন", money_in_ok:"জমা নিশ্চিত করেছেন", money_out_ok:"খরচ অনুমোদন করেছেন", money_reject:"লেনদেন বাতিল করেছেন",
   proposal_create:"প্রস্তাব দিয়েছেন", resign_request:"পদত্যাগের আবেদন করেছেন", resign_cancel:"পদত্যাগের আবেদন তুলে নিয়েছেন", election_create:"নির্বাচন তৈরি করেছেন", election_publish_1:"নির্বাচন চালুর অনুমতি দিয়েছেন", election_publish:"নির্বাচন চালু করেছেন", election_cancel_1:"নির্বাচন বাতিলের অনুমতি দিয়েছেন", election_cancel:"নির্বাচন বাতিল করেছেন", candidate_apply:"প্রার্থী হয়েছেন", candidate_withdraw:"প্রার্থিতা তুলে নিয়েছেন", candidate_remove_1:"প্রার্থী বাদের প্রস্তাব দিয়েছেন", candidate_remove:"প্রার্থী বাদ দিয়েছেন", election_runoff:"সমান ভোট — আবার ভোট", election_done:"নির্বাচনের ফলাফল", election_void:"নির্বাচন বাতিল (ফল হয়নি)", proposal_cancel:"প্রস্তাব বাতিল করেছেন", proposal_pass:"প্রস্তাব পাস", proposal_fail:"প্রস্তাব পাস হয়নি", aid_create:"মানবিক সেবা খুলেছেন", aid_update:"মানবিক সেবা বদলেছেন",
   set_title:"পদবি দিয়েছেন", action_propose:"প্রস্তাব/অনুমোদন দিয়েছেন", action_done:"সম্পন্ন করেছেন", action_reject:"প্রস্তাব বাতিল করেছেন", delete_request:"সংগঠন মোছার অনুরোধ করেছেন", delete_cancel:"মোছার অনুরোধ বাতিল করেছেন", org_delete:"সংগঠন মুছেছেন" };
 /* 🔎 খোঁজা আর ছাঁকা (২৫ অক্টোবর ২০২৬) — নাম, টাকার অঙ্ক বা যেকোনো লেখা দিয়ে খোঁজা;
