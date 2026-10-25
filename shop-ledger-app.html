@@ -24262,6 +24262,22 @@ auth.onAuthStateChanged(async (user)=>{
     body.dsMini #deskSide > *{ display:none !important; }
     body.dsMini #dsToggle{ left:13px; }
     body.dsMini [id^="program-"]{ left:64px !important; }
+    #dsToggle.on{ background:#F4B400; color:#1E2430; border-color:#F4B400; }
+    #dsQuick{ display:none; position:fixed; top:64px; left:198px; z-index:9000; width:310px; max-height:calc(100vh - 80px); overflow-y:auto;
+      background:#1E2430; border:1px solid rgba(255,255,255,.14); border-radius:14px; padding:10px; box-shadow:0 16px 40px rgba(0,0,0,.35); box-sizing:border-box; }
+    body.dsMini #dsQuick{ left:13px; }
+    #dsQuick.open{ display:block; }
+    #dsQuick .dsqHead{ color:#F4B400; font-weight:800; font-size:13px; padding:4px 8px 8px; }
+    #dsQuick .deskBizItem{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; cursor:pointer; color:#E5E7EB; }
+    #dsQuick .deskBizItem:hover{ background:rgba(244,180,0,.16); color:#fff; }
+    #dsQuick .deskBizItem .ic{ width:32px; height:32px; border-radius:9px; display:grid; place-items:center; flex-shrink:0; font-size:16px; }
+    #dsQuick .deskBizItem .tx{ min-width:0; flex:1; }
+    #dsQuick .deskBizItem .t1{ font-size:13.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #dsQuick .deskBizItem .t2{ font-size:10.5px; color:#9CA3AF; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #dsQuick .deskBizItem .bdg{ background:#DC2626; color:#fff; font-size:11px; font-weight:800; border-radius:9px; padding:1px 7px; }
+    #dsQuick .dsqMini{ width:100%; margin-top:8px; padding:9px; border-radius:10px; border:1px dashed rgba(255,255,255,.25); background:none; color:#D1D5DB; font-family:inherit; font-size:12.5px; cursor:pointer; }
+    #dsQuick .dsqMini:hover{ border-color:#F4B400; color:#fff; }
+    #dsQuick .dsqEmpty{ color:#9CA3AF; font-size:12px; padding:8px; }
   }
 </style>
 <script>
@@ -24271,15 +24287,44 @@ auth.onAuthStateChanged(async (user)=>{
   let btn = null;
   function setMini(on){
     document.body.classList.toggle("dsMini", !!on);
-    if(btn){ btn.title = on ? "মেনু খুলুন" : "মেনু বন্ধ করুন"; btn.setAttribute("aria-expanded", on ? "false" : "true"); }
+    if(btn){ btn.title = "Business Management মেনু"; }
     try{ localStorage.setItem(KEY, on ? "1" : "0"); }catch(e){}
   }
+  let panel = null;
+  function closePanel(){ if(panel) panel.classList.remove("open"); if(btn) btn.classList.remove("on"); }
+  function fillPanel(){
+    if(typeof hbBuildDeskBizMenu === "function") try{ hbBuildDeskBizMenu(); }catch(e){}
+    const list = panel.querySelector(".dsqList"); list.innerHTML = "";
+    document.querySelectorAll("#deskBizMenu .deskBizItem").forEach((orig)=>{
+      const row = orig.cloneNode(true);
+      row.classList.remove("on");
+      row.addEventListener("click", ()=>{ closePanel(); orig.click(); });
+      list.appendChild(row);
+    });
+    if(!list.children.length) list.innerHTML = '<div class="dsqEmpty">এখনো কিছু নেই</div>';
+    panel.querySelector(".dsqMini").textContent = document.body.classList.contains("dsMini") ? "⇥ বাঁ পাশের মেনু বড় করুন" : "⇤ বাঁ পাশের মেনু ছোট করুন";
+  }
+  function togglePanel(){
+    if(!panel){
+      panel = document.createElement("div"); panel.id = "dsQuick";
+      panel.innerHTML = '<div class="dsqHead">🏢 Business Management</div><div class="dsqList"></div><button type="button" class="dsqMini"></button>';
+      panel.addEventListener("click", (e)=> e.stopPropagation());
+      panel.querySelector(".dsqMini").addEventListener("click", ()=>{ setMini(!document.body.classList.contains("dsMini")); closePanel(); });
+      document.body.appendChild(panel);
+      document.addEventListener("click", closePanel);
+      document.addEventListener("keydown", (e)=>{ if(e.key === "Escape") closePanel(); });
+    }
+    if(panel.classList.contains("open")){ closePanel(); return; }
+    fillPanel(); panel.classList.add("open"); btn.classList.add("on");
+  }
   function build(){
-    if(!mq.matches){ document.body.classList.remove("dsMini"); return; }
+    if(!mq.matches){ document.body.classList.remove("dsMini"); closePanel(); return; }
     if(!btn){
       btn = document.createElement("button");
       btn.id = "dsToggle"; btn.type = "button"; btn.textContent = "☰"; btn.setAttribute("aria-label", "মেনু");
-      btn.addEventListener("click", ()=> setMini(!document.body.classList.contains("dsMini")));
+      /* ☰ চাপলে Business Management-এর সব অপশন একটা তালিকায় খোলে (বাঁ পাশে নিচে
+         স্ক্রল করে খুঁজতে হয় না)। তালিকার নিচে বাঁ পাশের মেনু ছোট/বড় করার বোতাম। */
+      btn.addEventListener("click", (e)=>{ e.stopPropagation(); togglePanel(); });
       document.body.appendChild(btn);
     }
     let saved = "0"; try{ saved = localStorage.getItem(KEY) || "0"; }catch(e){}
