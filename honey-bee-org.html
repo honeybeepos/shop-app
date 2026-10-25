@@ -74,6 +74,13 @@ textarea.in{min-height:84px; resize:vertical}
 .chip.ok{background:rgba(47,191,113,0.16); color:#86efac} .chip.wait{background:rgba(255,183,3,0.16); color:var(--amber)}
 .chip.no{background:rgba(226,84,61,0.16); color:#fca5a5} .chip.admin{background:rgba(244,114,182,0.16); color:#f9a8d4}
 .item{display:flex; gap:10px; align-items:center; padding:11px 0; border-bottom:1px solid rgba(255,255,255,0.07)}
+/* 🔎 কাজের খাতা খোঁজা + 📒 সদস্যের খাতা */
+.lgChips{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px}
+.lgChips button{border:1px solid var(--border); background:rgba(255,255,255,0.05); color:inherit; border-radius:999px; padding:6px 11px; font-size:12.5px; font-family:inherit; cursor:pointer}
+.lgChips button.on{background:var(--amber); color:#1a1206; border-color:var(--amber); font-weight:800}
+.mlStats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px}
+.mlStats div{background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:12px; padding:9px 8px; text-align:center}
+.mlStats span{display:block; font-size:11px; color:var(--muted)} .mlStats b{font-size:15px}
 .item:last-child{border-bottom:0} .item .grow{flex:1; min-width:0}
 .empty{padding:18px; text-align:center; color:var(--muted); font-size:13px}
 .notice{padding:11px 12px; border-radius:12px; background:rgba(255,183,3,0.1); border:1px solid rgba(255,183,3,0.3); color:#fde68a; font-size:12.5px; line-height:1.7}
@@ -1337,19 +1344,34 @@ function openAid(a){
 let __actN = 0, ACTIONS = [];
 const ACT_TXT = { make_admin:"অ্যাডমিন বানানো", remove_admin:"অ্যাডমিন থেকে সরানো", remove_member:"সদস্যপদ বাতিল", resign_admin:"🙋 পদত্যাগের আবেদন" };
 function tabMembers(){
-  $("tabBody").innerHTML = `<div id="actBox"></div><div class="card"><div class="h">👥 সদস্য তালিকা</div><div id="memList"><div class="empty"><span class="spin"></span></div></div></div>`;
+  $("tabBody").innerHTML = `<div id="actBox"></div><div class="card"><div class="h">👥 সদস্য তালিকা</div>
+    <input class="in" id="memQ" type="search" placeholder="🔎 নাম, সদস্য নম্বর (HB-০০৫) বা ফোন দিয়ে খুঁজুন" autocomplete="off" style="margin-bottom:6px">
+    <div class="small" id="memSum"></div>
+    <div id="memList"><div class="empty"><span class="spin"></span></div></div></div>`;
   drawActions();
-  __tabUnsubs.push(db.collection("orgs").doc(ORG.id).collection("members").where("status", "==", "active").onSnapshot(qs=>{
-    MEMBERS = qs.docs.map(d=> d.data()).sort((a,b)=> (a.role === "admin" ? 0 : 1) - (b.role === "admin" ? 0 : 1) || (a.memberNo || 0) - (b.memberNo || 0));
-    const el = $("memList"); if(!el) return;
-    el.innerHTML = MEMBERS.map(m=> `<div class="item">
+  // 📒 অ্যাডমিন হলে প্রত্যেকের মোট চাঁদা পাশে দেখায় (চাঁদার নথি শুধু অ্যাডমিন পড়তে পারেন)
+  let duesBy = null;
+  if(isAdmin()) loadAllDues(true).then(all=>{ duesBy = {}; all.forEach(d=>{ if(d.status === "verified") duesBy[d.memberUid] = (duesBy[d.memberUid] || 0) + Number(d.amount || 0); }); drawMem(); }).catch(()=>{});
+  const drawMem = ()=>{
+    const el = $("memList"); if(!el || !MEMBERS) return;
+    const q = enDigits(($("memQ") && $("memQ").value || "").trim()).toLowerCase().replace(/^hb-?/, "");
+    const list = MEMBERS.filter(m=> !q || enDigits([m.name, m.title, m.phone, String(m.memberNo || "").padStart(3, "0")].join(" ")).toLowerCase().indexOf(q) > -1);
+    $("memSum").textContent = q ? `পাওয়া গেছে ${bn(list.length)} জন` : `মোট ${bn(MEMBERS.length)} জন সদস্য`;
+    el.innerHTML = list.map(m=> `<div class="item">
       <div class="av" style="width:38px; height:38px; font-size:16px; border-radius:50%; overflow:hidden">${m.photo ? `<img src="${esc(m.photo)}" alt="" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:cover">` : esc((m.name || "?").slice(0, 1))}</div>
       <div class="grow"><b style="font-size:14px">${esc(m.name)}</b>${ME && m.uid === ME.uid ? ` <span class="small">(আপনি)</span>` : ""}
         <div class="small">${memNo(m.memberNo)} · ${esc(m.title || "সদস্য")}${isAdmin() && m.phone ? ` · 📞 <a href="tel:${esc(m.phone)}">${esc(m.phone)}</a>` : ""}</div></div>
       ${m.role === "admin" ? `<span class="chip admin">অ্যাডমিন</span>` : `<span class="chip ok">সদস্য</span>`}
-      ${isAdmin() ? `<button class="btn ghost" type="button" data-mm="${esc(m.uid)}" style="padding:6px 10px">⋯</button>` : ""}
-    </div>`).join("") || `<div class="empty">কোনো সদস্য নেই</div>`;
+      ${isAdmin() && duesBy ? `<span class="small" title="মোট নিশ্চিত চাঁদা" style="white-space:nowrap">${tk(duesBy[m.uid] || 0)}</span>` : ""}
+      ${isAdmin() ? `<button class="btn ghost" type="button" data-ml="${esc(m.uid)}" style="padding:6px 10px" title="সদস্যের খাতা">📒</button><button class="btn ghost" type="button" data-mm="${esc(m.uid)}" style="padding:6px 10px">⋯</button>` : ""}
+    </div>`).join("") || `<div class="empty">${q ? "কাউকে পাওয়া যায়নি" : "কোনো সদস্য নেই"}</div>`;
     el.querySelectorAll("[data-mm]").forEach(b=> b.onclick = ()=> memberMenu(MEMBERS.find(x=> x.uid === b.dataset.mm)));
+    el.querySelectorAll("[data-ml]").forEach(b=> b.onclick = ()=> memberLedger(MEMBERS.find(x=> x.uid === b.dataset.ml)));
+  };
+  $("memQ").oninput = drawMem;
+  __tabUnsubs.push(db.collection("orgs").doc(ORG.id).collection("members").where("status", "==", "active").onSnapshot(qs=>{
+    MEMBERS = qs.docs.map(d=> d.data()).sort((a,b)=> (a.role === "admin" ? 0 : 1) - (b.role === "admin" ? 0 : 1) || (a.memberNo || 0) - (b.memberNo || 0));
+    drawMem();
   }, ()=>{ const el = $("memList"); if(el) el.innerHTML = `<div class="empty">দেখা যাচ্ছে না — শুধু সদস্যরা এই তালিকা দেখতে পারেন</div>`; }));
 }
 function drawActions(){
@@ -1386,7 +1408,9 @@ function memberMenu(m){
       ${m.role === "admin" ? `<button class="btn ghost" type="button" data-k="remove_admin">⬇️ অ্যাডমিন থেকে সরিয়ে সাধারণ সদস্য করুন</button>` : `<button class="btn ghost" type="button" data-k="make_admin">⬆️ অ্যাডমিন বানানোর প্রস্তাব</button>`}
       <button class="btn red" type="button" data-k="remove_member">🚫 সদস্যপদ বাতিলের প্রস্তাব</button>
       <div class="small">${need2() === 2 ? "এগুলোতে দুইজন অ্যাডমিনের অনুমোদন লাগবে (যাঁকে নিয়ে কাজ, তিনি বাদে)।" : "এখন অ্যাডমিন একজন — আপনার অনুমোদনেই হবে।"}</div></div>`}
-    <div class="row" style="margin-top:14px"><button class="btn ghost full" type="button" data-close>বন্ধ</button></div>`);
+    <button class="btn ghost full" type="button" id="mlOpen" style="margin-top:14px">📒 এই সদস্যের খাতা (চাঁদা ও কাজ)</button>
+    <div class="row" style="margin-top:10px"><button class="btn ghost full" type="button" data-close>বন্ধ</button></div>`);
+  if($("mlOpen")) $("mlOpen").onclick = ()=> memberLedger(m);
   if($("selfResign")) $("selfResign").onclick = openResign;
   $("tGo").onclick = async ()=>{ const t = $("tT").value.trim(); if(t.length < 2) return toast("পদবি লিখুন"); if(await busy($("tGo"), ()=> api("setTitle", { orgId: ORG.id, uid: m.uid, title: t }))){ toast("✅ পদবি সেভ হয়েছে"); closeModal(); } };
   document.querySelectorAll("#modalBox [data-k]").forEach(b=> b.onclick = async ()=>{
@@ -1475,14 +1499,104 @@ const LOG_TXT = { org_create:"সংগঠন খুলেছেন", org_update
   post_create:"পোস্ট দিয়েছেন", post_edit:"পোস্ট এডিট করেছেন", post_remove:"পোস্ট সরিয়েছেন", money_in:"জমা লিখেছেন", money_out:"খরচ লিখেছেন", money_in_ok:"জমা নিশ্চিত করেছেন", money_out_ok:"খরচ অনুমোদন করেছেন", money_reject:"লেনদেন বাতিল করেছেন",
   proposal_create:"প্রস্তাব দিয়েছেন", resign_request:"পদত্যাগের আবেদন করেছেন", resign_cancel:"পদত্যাগের আবেদন তুলে নিয়েছেন", election_create:"নির্বাচন তৈরি করেছেন", election_publish_1:"নির্বাচন চালুর অনুমতি দিয়েছেন", election_publish:"নির্বাচন চালু করেছেন", election_cancel_1:"নির্বাচন বাতিলের অনুমতি দিয়েছেন", election_cancel:"নির্বাচন বাতিল করেছেন", candidate_apply:"প্রার্থী হয়েছেন", candidate_withdraw:"প্রার্থিতা তুলে নিয়েছেন", candidate_remove_1:"প্রার্থী বাদের প্রস্তাব দিয়েছেন", candidate_remove:"প্রার্থী বাদ দিয়েছেন", election_runoff:"সমান ভোট — আবার ভোট", election_done:"নির্বাচনের ফলাফল", election_void:"নির্বাচন বাতিল (ফল হয়নি)", proposal_cancel:"প্রস্তাব বাতিল করেছেন", proposal_pass:"প্রস্তাব পাস", proposal_fail:"প্রস্তাব পাস হয়নি", aid_create:"মানবিক সেবা খুলেছেন", aid_update:"মানবিক সেবা বদলেছেন",
   set_title:"পদবি দিয়েছেন", action_propose:"প্রস্তাব/অনুমোদন দিয়েছেন", action_done:"সম্পন্ন করেছেন", action_reject:"প্রস্তাব বাতিল করেছেন", delete_request:"সংগঠন মোছার অনুরোধ করেছেন", delete_cancel:"মোছার অনুরোধ বাতিল করেছেন", org_delete:"সংগঠন মুছেছেন" };
-function tabLog(){
-  $("tabBody").innerHTML = `<div class="card"><div class="h">📜 কাজের খাতা</div><div class="small" style="margin-bottom:6px">কে কখন কী করেছেন — এই খাতা কেউ বদলাতে বা মুছতে পারেন না।</div><div id="logList"><div class="empty"><span class="spin"></span></div></div></div>`;
-  db.collection("orgs").doc(ORG.id).collection("auditLogs").orderBy("at", "desc").limit(100).get().then(qs=>{
-    const el = $("logList"); if(!el) return;
-    el.innerHTML = qs.docs.map(d=>{ const l = d.data(); return `<div class="item"><div class="grow">
+/* 🔎 খোঁজা আর ছাঁকা (২৫ অক্টোবর ২০২৬) — নাম, টাকার অঙ্ক বা যেকোনো লেখা দিয়ে খোঁজা;
+   ধরন (টাকা/সদস্য/পোস্ট/ভোট), কোন সদস্য, আর তারিখ দিয়ে আলাদা করে বের করা।
+   খাতা যেমন ছিল তেমনই থাকে — শুধু দেখার ধরন বদলেছে, কিছু মোছা বা বদলানো যায় না। */
+const LOG_KIND = { money:/^money_/, member:/^(member_|action_|set_title|resign_)/, post:/^post_/, vote:/^(proposal_|election_|candidate_)/, aid:/^aid_/, org:/^(org_|delete_)/ };
+let __logAll = [], __logLoaded = false;
+function enDigits(v){ return String(v == null ? "" : v).replace(/[০-৯]/g, c=> "০১২৩৪৫৬৭৮৯".indexOf(c)); }
+function logText(l){ return enDigits([l.actorName, LOG_TXT[l.action] || l.action, l.targetName, l.detail, l.amount, l.memberNo ? memNo(l.memberNo) : ""].filter(Boolean).join(" ")).toLowerCase(); }
+function logRow(l){
+  return `<div class="item"><div class="grow">
       <b style="font-size:13.5px">${esc(l.actorName || "—")}</b> <span style="font-size:13px">${esc(LOG_TXT[l.action] || l.action)}</span>${l.targetName ? ` — <b style="font-size:13px">${esc(l.targetName)}</b>` : ""}${l.memberNo ? ` <span class="small">(${memNo(l.memberNo)})</span>` : ""}${l.amount ? ` <b style="font-size:13px">${tk(l.amount)}</b>` : ""}
-      ${l.detail ? `<div class="small">${esc(l.detail)}</div>` : ""}<div class="small">${esc(when(l.at))}</div></div></div>`; }).join("") || `<div class="empty">এখনো কিছু নেই</div>`;
-  }).catch(()=>{ const el = $("logList"); if(el) el.innerHTML = `<div class="empty">লোড করা যায়নি</div>`; });
+      ${l.detail ? `<div class="small">${esc(l.detail)}</div>` : ""}<div class="small">${esc(when(l.at))}</div></div></div>`;
+}
+async function loadAllLogs(force){
+  if(__logLoaded && !force) return __logAll;
+  const qs = await db.collection("orgs").doc(ORG.id).collection("auditLogs").orderBy("at", "desc").limit(1000).get();
+  __logAll = qs.docs.map(d=> d.data()); __logLoaded = true;
+  return __logAll;
+}
+async function ensureMembers(){
+  if(MEMBERS && MEMBERS.length) return MEMBERS;
+  try{ const qs = await db.collection("orgs").doc(ORG.id).collection("members").where("status", "==", "active").get(); MEMBERS = qs.docs.map(d=> d.data()); }catch(e){}
+  return MEMBERS || [];
+}
+function logMatchesMember(l, m){
+  if(!m) return true;
+  if(l.actorUid === m.uid || l.targetUid === m.uid) return true;
+  return !!(m.name && l.detail && l.detail.indexOf(m.name) > -1);
+}
+async function tabLog(){
+  $("tabBody").innerHTML = `<div class="card"><div class="h">📜 কাজের খাতা</div>
+    <div class="small" style="margin-bottom:8px">কে কখন কী করেছেন — এই খাতা কেউ বদলাতে বা মুছতে পারেন না।</div>
+    <input class="in" id="lgQ" type="search" placeholder="🔎 নাম, টাকা, বা যেকোনো লেখা দিয়ে খুঁজুন" autocomplete="off">
+    <div class="lgChips" id="lgKinds">
+      <button type="button" data-k="" class="on">সব</button><button type="button" data-k="money">💰 টাকা</button><button type="button" data-k="member">👥 সদস্য</button>
+      <button type="button" data-k="vote">🗳️ ভোট/নির্বাচন</button><button type="button" data-k="post">📰 পোস্ট</button><button type="button" data-k="aid">❤️ মানবিক</button><button type="button" data-k="org">⚙️ সংগঠন</button>
+    </div>
+    <div class="row" style="gap:8px; flex-wrap:wrap; margin-top:8px">
+      <select class="in" id="lgM" style="flex:1 1 100%"><option value="">👤 সব সদস্য</option></select>
+      <label style="flex:1; min-width:130px"><span class="small">📅 এই তারিখ থেকে</span><input class="in" id="lgF" type="date"></label>
+      <label style="flex:1; min-width:130px"><span class="small">📅 এই তারিখ পর্যন্ত</span><input class="in" id="lgT" type="date"></label>
+    </div>
+    <div class="small" id="lgSum" style="margin:8px 0 2px"></div>
+    <div id="logList"><div class="empty"><span class="spin"></span></div></div></div>`;
+  let kind = "";
+  const draw = ()=>{
+    const el = $("logList"); if(!el) return;
+    const q = enDigits($("lgQ").value.trim()).toLowerCase();
+    const m = (MEMBERS || []).find(x=> x.uid === $("lgM").value) || null;
+    const f = $("lgF").value ? new Date($("lgF").value + "T00:00:00").getTime() : 0;
+    const t = $("lgT").value ? new Date($("lgT").value + "T23:59:59").getTime() : 0;
+    const list = __logAll.filter(l=> (!kind || LOG_KIND[kind].test(l.action || "")) && logMatchesMember(l, m)
+      && (!f || ms(l.at) >= f) && (!t || ms(l.at) <= t) && (!q || logText(l).indexOf(q) > -1));
+    const money = list.filter(l=> /^money_(in|out)$/.test(l.action) && l.amount);
+    const inSum = money.filter(l=> l.action === "money_in").reduce((a,l)=> a + Number(l.amount || 0), 0);
+    const outSum = money.filter(l=> l.action === "money_out").reduce((a,l)=> a + Number(l.amount || 0), 0);
+    $("lgSum").innerHTML = `পাওয়া গেছে <b>${bn(list.length)}</b>টা${inSum ? ` · লেখা জমা <b>${tk(inSum)}</b>` : ""}${outSum ? ` · লেখা খরচ <b>${tk(outSum)}</b>` : ""}${__logAll.length >= 1000 ? " · (শেষ ১০০০টা কাজ থেকে)" : ""}`;
+    el.innerHTML = list.slice(0, 300).map(logRow).join("") || `<div class="empty">কিছু পাওয়া যায়নি</div>`;
+  };
+  try{
+    await Promise.all([loadAllLogs(true), ensureMembers()]);
+  }catch(e){ const el = $("logList"); if(el) el.innerHTML = `<div class="empty">লোড করা যায়নি</div>`; return; }
+  if(!$("lgM")) return;
+  $("lgM").insertAdjacentHTML("beforeend", (MEMBERS || []).slice().sort((a,b)=> (a.memberNo || 0) - (b.memberNo || 0)).map(m=> `<option value="${esc(m.uid)}">${esc(m.name)} · ${memNo(m.memberNo)}</option>`).join(""));
+  $("lgQ").oninput = draw; $("lgM").onchange = draw; $("lgF").onchange = draw; $("lgT").onchange = draw;
+  $("lgKinds").querySelectorAll("button").forEach(b=> b.onclick = ()=>{ kind = b.dataset.k; $("lgKinds").querySelectorAll("button").forEach(x=> x.classList.toggle("on", x === b)); draw(); });
+  draw();
+}
+
+/* 📒 সদস্যের আলাদা খাতা (অ্যাডমিন) — একজন সদস্যের পরিচয়, মোট চাঁদা, প্রতিটা জমা
+   (তারিখ, মাধ্যম, অবস্থা) আর তাঁকে নিয়ে বা তিনি যা যা করেছেন — সব এক পাতায়। */
+let __allDues = null;
+async function loadAllDues(force){
+  if(__allDues && !force) return __allDues;
+  const qs = await db.collection("orgs").doc(ORG.id).collection("dues").limit(3000).get();
+  __allDues = qs.docs.map(d=> Object.assign({ id: d.id }, d.data()));
+  return __allDues;
+}
+const DUE_ST = { verified:["✅ নিশ্চিত","ok"], pending:["⏳ অপেক্ষায়","wait"], rejected:["❌ বাতিল","no"], cancelled:["❌ বাতিল","no"] };
+async function memberLedger(m){
+  if(!m) return;
+  openModal(`<div class="h">📒 ${esc(m.name)} <span class="small">${memNo(m.memberNo)}</span></div><div id="mlBody"><div class="empty"><span class="spin"></span></div></div>
+    <div class="row" style="margin-top:12px"><button class="btn ghost full" type="button" data-close>বন্ধ</button></div>`);
+  let dues = [], logs = [];
+  try{ [dues, logs] = await Promise.all([loadAllDues(true), loadAllLogs(true)]); }
+  catch(e){ const b = $("mlBody"); if(b) b.innerHTML = `<div class="empty">লোড করা যায়নি — শুধু অ্যাডমিনরা দেখতে পারেন</div>`; return; }
+  const mine = dues.filter(d=> d.memberUid === m.uid).sort((a,b)=> String(b.date || "").localeCompare(String(a.date || "")) || ms(b.createdAt) - ms(a.createdAt));
+  const ok = mine.filter(d=> d.status === "verified").reduce((a,d)=> a + Number(d.amount || 0), 0);
+  const wait = mine.filter(d=> d.status === "pending").reduce((a,d)=> a + Number(d.amount || 0), 0);
+  const acts = logs.filter(l=> logMatchesMember(l, m));
+  const b = $("mlBody"); if(!b) return;
+  b.innerHTML = `
+    <div class="small">${esc(m.title || "সদস্য")}${m.role === "admin" ? " · অ্যাডমিন" : ""}${m.phone ? ` · 📞 <a href="tel:${esc(m.phone)}">${esc(m.phone)}</a>` : ""}${m.joinedAt ? ` · যোগ: ${esc(when(m.joinedAt))}` : ""}</div>
+    <div class="mlStats"><div><span>মোট চাঁদা (নিশ্চিত)</span><b>${tk(ok)}</b></div><div><span>অপেক্ষায়</span><b>${tk(wait)}</b></div><div><span>জমা হয়েছে</span><b>${bn(mine.filter(d=> d.status === "verified").length)} বার</b></div></div>
+    <div class="h" style="font-size:14px; margin-top:12px">💰 চাঁদার খাতা</div>
+    ${mine.map(d=>{ const st = DUE_ST[d.status] || [d.status || "", ""]; return `<div class="item"><div class="grow"><b style="font-size:14px">${tk(d.amount)}</b> <span class="small">· ${esc(d.method || "")}</span>
+      <div class="small">${esc(d.date ? bn(d.date) : when(d.createdAt))}${d.note && d.note !== "সদস্য চাঁদা" ? " · " + esc(d.note) : ""}</div></div><span class="chip ${st[1]}">${st[0]}</span></div>`; }).join("") || `<div class="empty">এখনো কোনো চাঁদা লেখা হয়নি</div>`}
+    <div class="h" style="font-size:14px; margin-top:12px">📜 এই সদস্যের কাজের খাতা</div>
+    ${acts.slice(0, 100).map(logRow).join("") || `<div class="empty">কিছু নেই</div>`}`;
 }
 
 
