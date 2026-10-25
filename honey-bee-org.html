@@ -504,17 +504,8 @@ function drawHomeStats(){
 /* ---------- অ্যাডমিন হোম ---------- */
 function adminHome(){
   $("tabBody").innerHTML = `${heroHtml()}<div class="grid2 grid4" id="homeStats"></div>
-    <div class="actions"><button class="btn green" type="button" onclick="openMoney('in')">＋ টাকা জমা</button><button class="btn red" type="button" onclick="openMoney('out')">− খরচ যোগ</button><button class="btn" type="button" onclick="openNewPost()">✍️ নতুন পোস্ট</button><button class="btn ghost" type="button" onclick="setView('votes')">🗳️ প্রস্তাব ও ভোট</button></div>
-    <div class="sec"><h2>📝 সদস্য আবেদন</h2><button class="btn ghost" type="button" style="padding:7px 12px" onclick="setView('requests')">সব দেখুন</button></div><div class="card" style="padding:4px 14px"><div id="reqList"></div></div>
-    <div class="sec"><h2>🧾 সাম্প্রতিক লেনদেন</h2><button class="btn ghost" type="button" style="padding:7px 12px" onclick="setView('money')">সব হিসাব</button></div><div class="card" style="padding:4px 14px"><div id="homeTx"></div></div>`;
-  drawHomeStats(); drawRequests(2);
-  __tabUnsubs.push(db.collection("orgs").doc(ORG.id).collection("transactions").limit(100).onSnapshot(qs=>{
-    const l = qs.docs.map(d=> ({ id:d.id, ...d.data() })).sort((a,b)=> ms(b.createdAt) - ms(a.createdAt)).slice(0, 5);
-    const el = $("homeTx"); if(!el) return;
-    el.innerHTML = l.map(t=>{ const st = TX_ST[t.status] || ["", t.status]; return `<div class="item"><div class="av" style="width:34px; height:34px; font-size:16px; border-radius:50%; color:${t.type === "in" ? "#86efac" : "#fca5a5"}">${t.type === "in" ? "＋" : "−"}</div>
-      <div class="grow"><b style="font-size:13.5px">${esc(t.title)}</b> <span class="chip ${st[0]}">${st[1]}</span><div class="small">${esc(bn(t.date || ""))} · ${esc(t.method || "")}</div></div>
-      <b style="white-space:nowrap; color:${t.type === "in" ? "#86efac" : "#fca5a5"}">${t.type === "in" ? "+" : "−"}${tk(t.amount)}</b></div>`; }).join("") || `<div class="empty">এখনো কোনো লেনদেন নেই</div>`;
-  }, ()=>{}));
+    <div class="actions"><button class="btn green" type="button" onclick="openMoney('in')">＋ টাকা জমা</button><button class="btn red" type="button" onclick="openMoney('out')">− খরচ যোগ</button><button class="btn" type="button" onclick="openNewPost()">✍️ নতুন পোস্ট</button><button class="btn ghost" type="button" onclick="setView('votes')">🗳️ প্রস্তাব ও ভোট</button></div>`;
+  drawHomeStats(); // 🧹 আবেদন আর সাম্প্রতিক লেনদেন হোম থেকে সরানো — নিচের মেনুর "আবেদন" আর "হিসাব"-এ আছে
 }
 
 /* =====================================================================
