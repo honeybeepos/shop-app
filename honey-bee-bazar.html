@@ -16751,8 +16751,11 @@ $("tpWaitToggleBtn") && $("tpWaitToggleBtn").addEventListener("click", async ()=
     $("tpWaitStatusTxt").textContent = "📍 লোকেশন খোঁজা হচ্ছে...";
     navigator.geolocation.getCurrentPosition(async (pos)=>{
       try{
+        const __au = (typeof auth !== "undefined" && auth.currentUser) ? auth.currentUser : null;
         const docRef = await db.collection("passenger_waiting_queue").add({
           user_id: tpGetUserId(),
+          // 🔒 ওয়ালেট থেকে ভাড়া কাটার জন্য — নিজের লগইনেই তালিকায় উঠেছেন তার প্রমাণ
+          ...(__au && !__au.isAnonymous ? { owner_uid: __au.uid } : {}),
           location: new firebase.firestore.GeoPoint(pos.coords.latitude, pos.coords.longitude),
           transport_types: tpSelectedVehicles,
           status: "WAITING",

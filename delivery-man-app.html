@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1291,7 +1292,7 @@ async function doPickUp(p){
     status: "PICKED_UP", picked_up_by: RIDER.uid, picked_up_at: fbNow(), fare: fare || null
   });
   if(fare > 0){
-    const r = await chargeWallet(p.user_id, fare);
+    const r = await chargeWallet(p.user_id, fare, p.id);
     toast(r ? `✅ Wallet থেকে ৳ ${bn(fare)} কাটা হয়েছে` : `✅ Pick Up হলো — নগদ ৳ ${bn(fare)} নিন`);
   }else{
     toast("✅ Pick Up হলো");
@@ -1302,28 +1303,13 @@ async function doPickUp(p){
 
 /* 💳 যাত্রীর ওয়ালেট থেকে ভাড়া কাটার চেষ্টা। না পারলে false — তখন
    চালককে নগদ নিতে বলা হয়, চুপচাপ "কাটা হয়েছে" বলা হয় না। */
-async function chargeWallet(passengerId, fare){
-  if(!passengerId || String(passengerId).startsWith("guest_")) return false;
+async function chargeWallet(passengerId, fare, queueId){
+  /* 🔒 ওয়ালেট এখন শুধু সার্ভার বদলায় (functions/wallet.js)। ভাড়া নেওয়া
+     হয় passenger_waiting_queue ডক থেকে, একবারই কাটা যায়। */
+  if(!passengerId || String(passengerId).startsWith("guest_") || !queueId) return false;
   try{
-    const ref = db.collection("wallets").doc(passengerId);
-    const ok = await db.runTransaction(async (t)=>{
-      const d = await t.get(ref);
-      const bal = d.exists ? (d.data().balance || 0) : 0;
-      if(bal < fare) return false;
-      t.set(ref, { balance: bal - fare, updatedAt: fbNow() }, { merge:true });
-      return true;
-    });
-    if(!ok) return false;
-    await ref.collection("transactions").add({
-      type:"ride_payment", amount:-fare, note:"ট্রিপ ভাড়া", createdAt: fbNow()
-    });
-    const mine = db.collection("wallets").doc(RIDER.uid);
-    await db.runTransaction(async (t)=>{
-      const d = await t.get(mine);
-      const bal = d.exists ? (d.data().balance || 0) : 0;
-      t.set(mine, { balance: bal + fare, updatedAt: fbNow() }, { merge:true });
-    });
-    return true;
+    const r = await firebase.functions().httpsCallable("walletChargeRide")({ queueId });
+    return !!(r.data && r.data.success);
   }catch(e){ console.warn("wallet charge failed:", e); return false; }
 }
 

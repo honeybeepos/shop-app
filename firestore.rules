@@ -863,8 +863,24 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    /* 🚕 রাস্তায় অপেক্ষমাণ যাত্রী। অতিথিরাও ওঠেন, তাই লগইন লাগে না।
+       🔒 owner_uid = যে নিজে তালিকায় উঠেছে (থাকলে নিজের uid-ই হতে হবে) —
+       ওয়ালেট থেকে ভাড়া কাটা হয় শুধু যখন owner_uid == user_id।
+       user_id/owner_uid পরে বদলানো যায় না; Pick Up করলে picked_up_by
+       নিজের uid-ই হতে হবে; ভাড়া কাটা হয়ে গেলে ডক আর বদলানো যায় না। */
     match /passenger_waiting_queue/{docId} {
-      allow read, create, update, delete: if true;
+      allow read: if true;
+      allow create: if (!('owner_uid' in request.resource.data) ||
+                        (request.auth != null && request.resource.data.owner_uid == request.auth.uid))
+                    && !('walletCharged' in request.resource.data);
+      allow update: if request.resource.data.get('user_id', null) == resource.data.get('user_id', null)
+                    && request.resource.data.get('owner_uid', null) == resource.data.get('owner_uid', null)
+                    && request.resource.data.get('walletCharged', null) == resource.data.get('walletCharged', null)
+                    && resource.data.get('walletCharged', null) != true
+                    && (!('picked_up_by' in request.resource.data) ||
+                        request.resource.data.picked_up_by == resource.data.get('picked_up_by', null) ||
+                        (request.auth != null && request.resource.data.picked_up_by == request.auth.uid));
+      allow delete: if true;
     }
 
     // 🌦️ আবহাওয়ার আগাম সতর্কতা — নিজের সাবস্ক্রিপশন শুধু নিজে। lastSent সার্ভার লেখে।
@@ -938,13 +954,15 @@ service cloud.firestore {
       }
     }
 
+    /* 🔒 ওয়ালেট (পয়েন্ট) — ফোন থেকে শুধু দেখা যায়। যোগ/কাটা হয় শুধু
+       Cloud Function দিয়ে (functions/wallet.js: walletTopup, walletChargeRide)। */
     match /wallets/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin() || isAgent());
-      allow write: if isSignedIn();
+      allow write: if false;
 
       match /transactions/{txId} {
         allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin() || isAgent());
-        allow write: if isSignedIn();
+        allow write: if false;
       }
     }
 

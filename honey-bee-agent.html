@@ -12,6 +12,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <style>
   :root{
     --bg1:#1a1206; --bg2:#3d2405; --gold:#ffb703; --amber:#ffd166;
@@ -1224,17 +1225,8 @@ $("walletTopupBtn").addEventListener("click", async ()=>{
   const btn = $("walletTopupBtn");
   btn.disabled = true; btn.textContent = "যোগ হচ্ছে...";
   try{
-    const walletRef = db.collection("wallets").doc(uid);
-    await db.runTransaction(async (t)=>{
-      const doc = await t.get(walletRef);
-      const currentBalance = doc.exists ? (doc.data().balance || 0) : 0;
-      t.set(walletRef, { balance: currentBalance + amount, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-    });
-    await walletRef.collection("transactions").add({
-      type: "topup", amount, note: note || null,
-      byUid: currentAgent.uid, byName: currentAgent.name || "এজেন্ট",
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    // 🔒 ওয়ালেট এখন শুধু সার্ভার বদলায় (functions/wallet.js → walletTopup)
+    await firebase.functions().httpsCallable("walletTopup")({ uid, amount, note: note || null });
     $("walletUid").value = ""; $("walletAmount").value = ""; $("walletNote").value = "";
     msgEl.textContent = `✅ ৳ ${amount} সফলভাবে যোগ হয়েছে।`;
     msgEl.style.color = "#2fbf71"; msgEl.style.display = "block";
