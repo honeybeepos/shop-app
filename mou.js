@@ -321,13 +321,19 @@ async function mouHandleSend(text, image){
 
   try{
     const callMouChat = mouFunctions.httpsCallable("mouChat");
-    const payload = { text: text || "এই ছবিতে কী দেখছ, বলো তো!", history: historyForGemini };
+    const payload = { text: text || "এই ছবিতে কী দেখছ, বলো তো!", history: historyForGemini, area: mouArea() };
     if(image){ payload.image = { mimeType: image.mimeType, data: image.base64 }; }
     const result = await callMouChat(payload);
     thinkingBubble.remove();
     const reply = (result.data && result.data.reply) || "দুঃখিত বন্ধু, আবার বলবেন? 🐝";
     const mood = (result.data && result.data.mood) || "idle";
     mouAppendBubble("mou", reply);
+    // 🔎 আসল বাজারের কার্ড (দোকান/দাম/ডিজাইন/অর্ডার) — সার্ভার ডেটাবেস থেকে পাঠায়
+    if(result.data && Array.isArray(result.data.results) && result.data.results.length) mouAppendCards(result.data.results);
+    if(result.data && typeof result.data.left === "number" && result.data.left <= 3){
+      mouAppendNote(result.data.left > 0 ? `আজ আর ${mouBn(result.data.left)}টা প্রশ্ন করা যাবে 🐝` : "আজকের প্রশ্ন শেষ — কাল আবার কথা হবে 🐝");
+    }
+    if(result.data && result.data.engine === "fallback") mouAppendNote("⚠️ মৌ এখন পুরো শক্তিতে নেই — একটু পরে আবার চেষ্টা করুন");
     mouSetState(mood);
     mouHistory.push({ role: "mou", text: reply });
     mouSaveMessage("mou", reply);
@@ -421,4 +427,68 @@ function mouInitVoiceInput(){
 mouInitVoiceInput();
 
 // শুরুতে idle state দিয়ে শুরু (HTML-এও ডিফল্ট বসানো আছে, এখানে আবার নিশ্চিত করা হলো)
+
+/* ==================== 🔎 মৌ-এর কার্ড (ধাপ ৫) ====================
+   সার্ভার যে আসল তথ্য পাঠায় (পণ্য, দর্জির ডিজাইন, রেস্টুরেন্ট, নিজের অর্ডার)
+   সেগুলো চ্যাটের নিচে ছোট কার্ড হয়ে দেখায়। কার্ডে চাপলে Bazar-এর সেই পাতা
+   খোলে — কার্টে রাখা বা অর্ডার দেওয়া গ্রাহক নিজে সেখানেই করেন। */
+const MOU_BN = "০১২৩৪৫৬৭৮৯";
+function mouBn(v){ return String(v).replace(/[0-9]/g, (d)=> MOU_BN[d]); }
+function mouMoney(n, cur){ return (cur || "৳") + mouBn(Math.round(Number(n) || 0).toLocaleString("en-IN")); }
+// 📍 Bazar-এ গ্রাহক যে এলাকা বাছেন (একাদশী/সেলাই ঘর/ফার্মেসি — যেকোনোটা), সেটাই
+function mouArea(){
+  for(const k of ["hbEkaArea", "hbTlrArea", "hbPhArea"]){
+    try{
+      const a = JSON.parse(localStorage.getItem(k) || "null");
+      if(a && (a.d || a.u)) return { d: a.d || "", u: a.u || "" };
+    }catch(e){}
+  }
+  return {};
+}
+function mouLinkFor(r){
+  const enc = encodeURIComponent;
+  if(r.kind === "product") return `honey-bee-bazar.html?s=${enc(r.shopId)}&p=${enc(r.productId)}`;
+  if(r.kind === "design") return `honey-bee-bazar.html?d=${enc(r.id)}`;
+  if(r.kind === "restaurant") return "honey-bee-bazar.html?screen=restaurant";
+  if(r.kind === "order") return r.sub === "tailor" ? "honey-bee-bazar.html?screen=tailor" : "honey-bee-bazar.html?screen=orders";
+  return "honey-bee-bazar.html";
+}
+function mouAppendCards(list){
+  const wrap = document.createElement("div");
+  wrap.className = "mouCards";
+  list.slice(0, 6).forEach((r)=>{
+    const a = document.createElement("a");
+    a.className = "mouCard mouCard-" + r.kind;
+    a.href = mouLinkFor(r);
+    const img = r.img ? `<img src="${String(r.img).replace(/"/g, "&quot;")}" alt="" loading="lazy">` : `<span class="mouCardIc">${r.kind === "design" ? "🧵" : r.kind === "restaurant" ? "🍽️" : r.kind === "order" ? "📦" : "🛍️"}</span>`;
+    let line1 = "", line2 = "", btn = "দেখুন ›";
+    if(r.kind === "product"){
+      line1 = `<b>${mouMoney(r.price, r.cur)}</b>${r.unit ? "/" + r.unit : ""}${r.oldPrice ? ` <s>${mouMoney(r.oldPrice, r.cur)}</s>` : ""}${r.inStock ? "" : " · <em>স্টক শেষ</em>"}`;
+      line2 = `🏪 ${r.shopName}${r.upazila ? " · " + r.upazila : ""}`;
+    } else if(r.kind === "design"){
+      line1 = `<b>${mouMoney(r.price)}</b> মজুরি${r.days ? " · " + mouBn(r.days) + " দিনে" : ""}`;
+      line2 = `✂️ ${r.shopName}${r.upazila ? " · " + r.upazila : ""}`; btn = "অর্ডার ›";
+    } else if(r.kind === "restaurant"){
+      line2 = r.upazila ? "📍 " + r.upazila : ""; btn = "মেনু ›";
+    } else if(r.kind === "order"){
+      line1 = r.status; line2 = (r.qty > 1 ? "× " + mouBn(r.qty) : "") + (r.code ? "  #" + r.code : ""); btn = "খবর ›";
+    }
+    a.innerHTML = `${img}<span class="mouCardTx"><span class="mouCardNm"></span><span class="mouCardL1">${line1}</span><span class="mouCardL2"></span></span><span class="mouCardGo">${btn}</span>`;
+    a.querySelector(".mouCardNm").textContent = r.name || "";
+    a.querySelector(".mouCardL2").textContent = line2;
+    wrap.appendChild(a);
+  });
+  mouChatArea.appendChild(wrap);
+  mouScreen.classList.add("mouCompact"); // কার্ড এলে মৌ ছোট হয়, কথার জায়গা বড়
+  mouChatArea.scrollTop = mouChatArea.scrollHeight;
+}
+function mouAppendNote(t){
+  const n = document.createElement("div");
+  n.className = "mouNote"; n.textContent = t;
+  mouChatArea.appendChild(n);
+  mouChatArea.scrollTop = mouChatArea.scrollHeight;
+}
+// 🧪 Idle/Happy… পরীক্ষার বোতাম শুধু ডেভেলপারের জন্য — ঠিকানার শেষে ?debug দিলে দেখা যায়
+if(!/[?&]debug\b/.test(location.search) && mouDemoRow) mouDemoRow.style.display = "none";
+
 mouSetState("idle");
