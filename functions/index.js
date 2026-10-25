@@ -1122,10 +1122,21 @@ async function mouGeminiReply(text, apiKey, history, image) {
   তবে ছবিতে কোনো প্রোডাক্ট/দাম থাকলেও সেটার দাম/স্টক অনুমান করে বলবে না।
 - শুধু JSON রিটার্ন করবে, অন্য কোনো টেক্সট না।
 
-ফরম্যাট: {"reply": "তোমার উত্তর", "mood": "happy" অথবা "idle" অথবা "serious"}
+ফরম্যাট: {"reply": "তোমার উত্তর", "mood": "happy" অথবা "idle" অথবা "serious", "action": {...}}
 - সাধারণ/হাসিখুশি কথায় mood হবে "happy"
 - গুরুত্বপূর্ণ/সমস্যার কথায় mood হবে "serious"
-- বাকি সব ক্ষেত্রে "idle"`;
+- বাকি সব ক্ষেত্রে "idle"
+
+🔎 action — গ্রাহক বাজারের কিছু খুঁজলে (তুমি নিজে খুঁজবে না, শুধু বলবে কী খুঁজতে হবে; Honey Bee-এর সার্ভার আসল ডেটা থেকে খুঁজে দেবে):
+- পণ্য/দাম জানতে চাইলে (যেমন "আলু কোথায় সস্তা", "এক কেজি চিনি লাগবে", "নাপা আছে?"):
+  {"type":"find_product","words":["পণ্যের সাধারণ বাংলা নাম","ইংরেজি/অন্য বানান"],"sort":"cheap" বা "best","maxPrice":সংখ্যা বা null}
+- দর্জি/সেলাই/জামা বানানো (যেমন "৬০০ টাকার নিচে দর্জি", "ব্লাউজ সেলাই"):
+  {"type":"find_tailor","words":["ডিজাইনের ধরন"],"category":"kameez"|"pajama"|"set"|"blouse"|"kids"|"other"|null,"maxPrice":সংখ্যা বা null,"sort":"cheap" বা "new"}
+- রেস্টুরেন্ট/খাবার অর্ডার: {"type":"find_restaurant","words":["খাবার বা রেস্টুরেন্টের নাম"]}
+- নিজের অর্ডারের খবর ("আমার অর্ডার কোথায়", "জামা কবে আসবে"): {"type":"my_orders"}
+- অন্য সব কথায়: {"type":"none"}
+- action থাকলে reply-তে শুধু ছোট একটা ভূমিকা লিখবে; কোনো দাম, দোকানের নাম, স্টক বা অর্ডারের অবস্থা লিখবে না — ওগুলো সার্ভার আসল ডেটা থেকে বসাবে।
+- "words"-এ সম্বোধন/পরিমাণ (ভাই, এক কেজি, লাগবে) বাদ দিয়ে শুধু জিনিসের নাম দেবে।`;
 
   // 🧠 history-র প্রতিটা টার্ন Gemini-এর role-ভিত্তিক contents-এ বসানো হয়
   // (আমাদের "mou" role → Gemini-এর "model" role) — এরপর সবশেষে চলতি বার্তাটা
@@ -1169,11 +1180,56 @@ async function mouGeminiReply(text, apiKey, history, image) {
   if (!parsed || typeof parsed.reply !== "string" || !parsed.reply.trim()) {
     throw new Error("Gemini রেসপন্সে reply নেই");
   }
+  // 🔎 action-ও অন্ধভাবে বিশ্বাস না — শুধু জানা ধরনগুলো, ছোট শব্দ, সংখ্যা যাচাই করে
+  const a = parsed.action && typeof parsed.action === "object" ? parsed.action : {};
+  const ALLOWED = ["find_product", "find_tailor", "find_restaurant", "my_orders"];
+  const action = ALLOWED.includes(a.type) ? {
+    type: a.type,
+    words: Array.isArray(a.words) ? a.words.filter((w) => typeof w === "string").slice(0, 5).map((w) => w.slice(0, 40)) : [],
+    query: typeof a.query === "string" ? a.query.slice(0, 40) : "",
+    sort: ["cheap", "best", "new"].includes(a.sort) ? a.sort : null,
+    maxPrice: Number(a.maxPrice) > 0 && Number(a.maxPrice) < 10000000 ? Math.round(Number(a.maxPrice)) : null,
+    category: typeof a.category === "string" ? a.category : null,
+  } : null;
   return {
     reply: parsed.reply.trim(),
     mood: validMoods.includes(parsed.mood) ? parsed.mood : "idle",
+    action,
   };
 }
+
+/* 🐝 মৌ-এর দৈনিক প্রশ্নের সীমা (Gemini-এর খরচ নিয়ন্ত্রণে) — mouUsage/{uid}-এ
+   আজকের তারিখ আর কতবার প্রশ্ন হলো। সীমা বদলাতে চাইলে appConfig/mou ডকে
+   {dailyAnon, dailyUser} বসালেই হবে, কোড বদলাতে হবে না। ফোন থেকে mouUsage
+   পড়া/লেখা যায় না (rules-এ কোনো match নেই = সব বন্ধ), শুধু সার্ভার লেখে। */
+const MOU_LIMIT_DEFAULT = { dailyAnon: 20, dailyUser: 60 };
+let __mouCfg = null, __mouCfgAt = 0;
+async function mouLimits() {
+  if (__mouCfg && Date.now() - __mouCfgAt < 5 * 60 * 1000) return __mouCfg;
+  let c = {};
+  try { const d = await db.collection("appConfig").doc("mou").get(); if (d.exists) c = d.data() || {}; } catch (e) { /* ডিফল্টই চলবে */ }
+  __mouCfg = {
+    dailyAnon: Number(c.dailyAnon) > 0 ? Number(c.dailyAnon) : MOU_LIMIT_DEFAULT.dailyAnon,
+    dailyUser: Number(c.dailyUser) > 0 ? Number(c.dailyUser) : MOU_LIMIT_DEFAULT.dailyUser,
+  };
+  __mouCfgAt = Date.now();
+  return __mouCfg;
+}
+async function mouTakeQuota(uid, signedIn) {
+  const lim = await mouLimits();
+  const max = signedIn ? lim.dailyUser : lim.dailyAnon;
+  const day = new Date(Date.now() + 6 * 3600000).toISOString().slice(0, 10); // বাংলাদেশের তারিখ
+  const ref = db.collection("mouUsage").doc(uid);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const d = snap.exists ? snap.data() : {};
+    const n = d.day === day ? Number(d.n) || 0 : 0;
+    if (n >= max) return { ok: false, max, signedIn };
+    tx.set(ref, { day, n: n + 1, updatedAt: FieldValue.serverTimestamp() });
+    return { ok: true, left: max - n - 1, max };
+  });
+}
+const mouTools = require("./mou-tools")({ db });
 
 exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   // 🔒 Security — সম্পূর্ণ open/anonymous কল আটকাতে অন্তত একটা বৈধ Firebase
@@ -1219,6 +1275,22 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
     image = { mimeType: rawImage.mimeType, data: rawImage.data };
   }
 
+  // 🔢 দৈনিক সীমা — লগইন করা গ্রাহক বেশি, অতিথি (anonymous) কম
+  const tok = request.auth.token || {};
+  const signedIn = !(tok.firebase && tok.firebase.sign_in_provider === "anonymous");
+  let quota = { ok: true };
+  try { quota = await mouTakeQuota(request.auth.uid, signedIn); } catch (e) { console.warn("mou quota:", String(e && e.message || e)); }
+  if (!quota.ok) {
+    return {
+      reply: signedIn
+        ? `আজ আমরা অনেক কথা বললাম (${quota.max}টা প্রশ্ন)! 🐝 কাল আবার জিজ্ঞেস করবেন বন্ধু।`
+        : `আজকের ${quota.max}টা প্রশ্ন শেষ। 🐝 Google দিয়ে লগইন করলে আরও বেশি জিজ্ঞেস করতে পারবেন।`,
+      mood: "idle", engine: "limit",
+    };
+  }
+  // 📍 গ্রাহকের বাছা এলাকা (Bazar-এ যেটা বাছা আছে) — খোঁজা এই এলাকাতেই হবে
+  const area = request.data && request.data.area && typeof request.data.area === "object" ? request.data.area : {};
+
   const apiKey = geminiApiKey.value();
   if (!apiKey) {
     // 🛟 key সেট করা না থাকলেও ফাংশনটা crash না করে পরিষ্কার fallback দেয়
@@ -1228,10 +1300,27 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
 
   try {
     const result = await mouGeminiReply(text.trim(), apiKey, history, image);
+    // 🔎 গ্রাহক কিছু খুঁজলে আসল ডেটা — উত্তরের বাক্যও ডেটা থেকে বানানো (AI-এর দাম না)
+    let tool = null;
+    if (result.action) {
+      try { tool = await mouTools.run(result.action, { area, uid: request.auth.uid, signedIn }); }
+      catch (e) { console.warn(JSON.stringify({ event: "MOU_TOOL_FAILED", type: result.action.type, error: String(e && e.message || e) })); }
+    }
     console.log(JSON.stringify({
       event: "MOU_CHAT_REPLIED", uid: request.auth.uid, historyLen: history.length, hasImage: !!image,
+      action: result.action ? result.action.type : null, found: tool && tool.results ? tool.results.length : null,
     }));
-    return { reply: result.reply, mood: result.mood, engine: "gemini-3.1-flash-lite" };
+    if (tool) {
+      return {
+        reply: mouTools.summary(tool.type, tool.results, result.action, tool.area),
+        mood: tool.results && tool.results.length ? "happy" : "idle",
+        engine: "gemini-3.1-flash-lite", action: tool.type, results: tool.results || [], left: quota.left,
+      };
+    }
+    if (result.action) {
+      return { reply: "এই মুহূর্তে বাজারে খুঁজে দেখতে পারলাম না, একটু পরে আবার জিজ্ঞেস করবেন? 🐝", mood: "idle", engine: "gemini-3.1-flash-lite", left: quota.left };
+    }
+    return { reply: result.reply, mood: result.mood, engine: "gemini-3.1-flash-lite", left: quota.left };
   } catch (e) {
     console.warn(JSON.stringify({ event: "MOU_CHAT_FAILED", error: String(e && e.message || e) }));
     // 🛟 Step 7 — error হলেও গ্রাহক খালি হাতে ফেরত যান না, একটা উষ্ণ fallback বার্তা পান
