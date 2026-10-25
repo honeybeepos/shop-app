@@ -253,9 +253,9 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
     const ref = orgRef(oid).collection("posts").doc();
     await db.runTransaction(async (tx) => {
       const org = await getOrg(tx, oid);
-      await needAdmin(tx, oid, me.uid);
+      const mm = await needMember(tx, oid, me.uid); // ✍️ সদস্যরাও পোস্ট দিতে পারেন (অক্টোবর ২০২৬)
       tx.set(ref, {
-        authorUid: me.uid, authorName: me.name, orgName: org.name, text, audience, imagePath,
+        authorUid: me.uid, authorName: me.name, authorRole: mm.role, orgName: org.name, text, audience, imagePath,
         status: publishAt > now + 30000 ? "scheduled" : "published",
         publishAt: Timestamp.fromMillis(publishAt), expireAt: expireAt ? Timestamp.fromMillis(expireAt) : null,
         likeCount: 0, commentCount: 0, createdAt: FieldValue.serverTimestamp(),
@@ -275,9 +275,11 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
     let expireAt = d.expireAt === null || d.expireAt === 0 ? 0 : Number(d.expireAt) || 0;
     await db.runTransaction(async (tx) => {
       await getOrg(tx, oid, true);
-      await needAdmin(tx, oid, me.uid);
+      const mm = await needMember(tx, oid, me.uid);
       const ps = await tx.get(orgRef(oid).collection("posts").doc(pid));
       if (!ps.exists || ps.data().status === "removed") throw new HttpsError("not-found", "পোস্ট পাওয়া যায়নি");
+      // ✏️ অ্যাডমিন যেকোনো পোস্ট, সাধারণ সদস্য শুধু নিজের পোস্ট এডিট করতে পারেন
+      if (mm.role !== "admin" && ps.data().authorUid !== me.uid) throw new HttpsError("permission-denied", "শুধু নিজের পোস্ট এডিট করা যায়");
       const p = ps.data();
       const base = Math.max(Date.now(), p.publishAt ? p.publishAt.toMillis() : 0);
       const same = expireAt && p.expireAt && p.expireAt.toMillis() === expireAt;
@@ -297,9 +299,11 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
     let img = null;
     await db.runTransaction(async (tx) => {
       await getOrg(tx, oid, true);
-      await needAdmin(tx, oid, me.uid);
+      const mm = await needMember(tx, oid, me.uid);
       const p = await tx.get(orgRef(oid).collection("posts").doc(pid));
       if (!p.exists || p.data().status === "removed") throw new HttpsError("not-found", "পোস্ট পাওয়া যায়নি");
+      // 🗑️ অ্যাডমিন যেকোনো পোস্ট, সাধারণ সদস্য শুধু নিজের পোস্ট সরাতে পারেন
+      if (mm.role !== "admin" && p.data().authorUid !== me.uid) throw new HttpsError("permission-denied", "শুধু নিজের পোস্ট সরানো যায়");
       img = p.data().imagePath;
       tx.update(p.ref, { status: "removed", removedBy: me.uid, removedAt: FieldValue.serverTimestamp(), imagePath: null });
       audit(tx, oid, me, "post_remove", { postId: pid, detail: String(p.data().text || "").slice(0, 60) });
@@ -360,6 +364,34 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
       return { ok: true, status: t.status };
     });
   }
+  /* 📥 সদস্য বাইরে থেকে টাকা তুললে (অনুদান সংগ্রহ) নিজেই লিখে দেন — অ্যাডমিন
+     নিশ্চিত করলে তবেই হিসাবে ওঠে (অ্যাডমিন দুইজন থাকলে দুইজনই)। যিনি তুলেছেন
+     তিনি নিজে নিশ্চিত করতে পারেন না। */
+  async function txCollect(me, d) {
+    const oid = id(d.orgId, "সংগঠন");
+    const source = str(d.source, 2, 60, "কার কাছ থেকে তুলেছেন");
+    const amount = money(d.amount);
+    const method = METHODS.includes(d.method) ? d.method : "অন্যান্য";
+    const reference = optStr(d.reference, 60), note = optStr(d.note, 300);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(d.date || "")) ? String(d.date) : new Date().toISOString().slice(0, 10);
+    const aidId = d.aidId ? id(d.aidId, "সেবা") : null;
+    const ref = orgRef(oid).collection("transactions").doc();
+    return db.runTransaction(async (tx) => {
+      await getOrg(tx, oid);
+      await needMember(tx, oid, me.uid);
+      let aid = null;
+      if (aidId) { aid = await tx.get(orgRef(oid).collection("aid").doc(aidId)); if (!aid.exists) throw new HttpsError("not-found", "মানবিক সেবা পাওয়া যায়নি"); }
+      tx.set(ref, {
+        type: "in", title: "বাহিরের অনুদান — " + source, amount, method, reference, note, date,
+        aidId, aidTitle: aid ? aid.data().title : null, createdBy: me.uid, createdByName: me.name,
+        collectorUid: me.uid, collectorName: me.name, kind: "collect",
+        approvedBy: [], approvedNames: [], status: "pending", public: false, counted: false,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      audit(tx, oid, me, "money_collect", { amount, detail: "বাহিরের অনুদান — " + source });
+      return { ok: true, status: "pending" };
+    });
+  }
   async function txDecide(me, d) {
     const oid = id(d.orgId, "সংগঠন"), tid = id(d.txId, "লেনদেন"), approve = d.approve === true;
     const ref = orgRef(oid).collection("transactions").doc(tid);
@@ -375,6 +407,7 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
         audit(tx, oid, me, "money_reject", { amount: t.amount, detail: t.title });
         return { ok: true, status: "rejected" };
       }
+      if (t.collectorUid && t.collectorUid === me.uid && (org.adminCount || 1) > 1) throw new HttpsError("permission-denied", "নিজের তোলা টাকা নিজে নিশ্চিত করা যায় না — অন্য অ্যাডমিন করবেন");
       const ap = addApproval(t, me);
       if (ap.approvedBy.length < need2(org)) { tx.update(ref, ap); return { ok: true, status: "pending" }; }
       const st = t.type === "in" ? "verified" : "approved";
@@ -959,7 +992,7 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
      ================================================================= */
   const ACTIONS_MAP = {
     create, update, apply, cancelApply, decide, leave,
-    postCreate, postEdit, postRemove, txCreate, txDecide,
+    postCreate, postEdit, postRemove, txCreate, txCollect, txDecide,
     proposalCreate, proposalCancel, vote,
     aidSave, setTitle, adminAction, resignRequest, resignCancel, deleteRequest, deleteCancel, deleteFinalize,
     electionCreate, electionPublish, electionCancel, candidateApply, candidateWithdraw, candidateRemove, electionVote, electionSync,
