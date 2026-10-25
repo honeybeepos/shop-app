@@ -3387,6 +3387,15 @@ window.hbLoadLib = function(name){
       </div>
       <div class="bizChevron">›</div>
     </div>
+    <!-- 🐝 দোকানদারের মৌ — "আজ কত বিক্রি?", "কোন পণ্য ফুরিয়ে আসছে?" (ধাপ ৫, অক্টোবর ২০২৬) -->
+    <div class="bizGlassCard bizNavCard" id="bizMouCard">
+      <div class="bizIconBadge" style="background:linear-gradient(135deg,#fde68a,#f59e0b);">🐝</div>
+      <div class="bizCardBody">
+        <div class="bizCardTitle">মৌ — দোকানের সহকারী</div>
+        <div class="bizCardSub">বিক্রি · লাভ · বাকি · স্টক — প্রশ্ন করুন</div>
+      </div>
+      <div class="bizChevron">›</div>
+    </div>
   </div>
 </div>
 
@@ -24431,6 +24440,171 @@ function hbThermalPrint(area){
     if(window.HBBT && HBBT.guideHtml && !panel.querySelector('.hbPrGuide')) panel.insertAdjacentHTML('beforeend', HBBT.guideHtml());
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire); else wire();
+})();
+</script>
+<!-- 🐝 দোকানদারের মৌ — পুরো পর্দার পাতা (অন্য Business Management পাতার মতো) -->
+<div id="program-mou" style="display:none; flex-direction:column; position:fixed; inset:0; z-index:500; background:linear-gradient(180deg,#1a1206,#2a1d08);">
+  <div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid rgba(255,183,3,.25);">
+    <button type="button" class="backBtn" id="backFromMou" style="width:38px; height:38px; border-radius:11px; border:1px solid rgba(255,183,3,.35); background:rgba(255,255,255,.05); color:#fff8e8; font-size:18px; cursor:pointer;">←</button>
+    <div><div style="font-weight:800; font-size:17px; color:#fff8e8;">🐝 মৌ — দোকানের সহকারী</div>
+      <div style="font-size:11.5px; color:#f5d27a;">আপনার দোকানের আসল হিসাব থেকে উত্তর</div></div>
+  </div>
+  <div id="mouOwnChat" style="flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:9px; max-width:820px; width:100%; margin:0 auto; box-sizing:border-box;"></div>
+  <div style="max-width:820px; width:100%; margin:0 auto; box-sizing:border-box; padding:0 16px;">
+    <div id="mouOwnChips" style="display:flex; gap:6px; overflow-x:auto; padding:6px 0 8px;"></div>
+  </div>
+  <div style="display:flex; gap:8px; padding:10px 16px 16px; max-width:820px; width:100%; margin:0 auto; box-sizing:border-box;">
+    <input id="mouOwnInput" type="text" maxlength="300" placeholder="মৌকে জিজ্ঞেস করুন… (যেমন: আজ কত বিক্রি?)" style="flex:1; padding:12px 14px; border-radius:14px; border:1px solid rgba(255,183,3,.35); background:rgba(255,255,255,.06); color:#fff8e8; font-family:inherit; font-size:14px;">
+    <button type="button" id="mouOwnSend" style="width:48px; border:0; border-radius:14px; background:#ffb703; color:#1a1206; font-size:18px; font-weight:800; cursor:pointer;">➤</button>
+  </div>
+</div>
+<style id="mouOwnCss">
+  #mouOwnChat .mb{ max-width:86%; padding:10px 13px; border-radius:15px; font-size:14px; line-height:1.6; white-space:pre-line; }
+  #mouOwnChat .mb.me{ align-self:flex-end; background:#ffb703; color:#1a1206; border-bottom-right-radius:4px; }
+  #mouOwnChat .mb.mou{ align-self:flex-start; background:rgba(255,255,255,.07); color:#fff8e8; border:1px solid rgba(255,183,3,.22); border-bottom-left-radius:4px; }
+  #mouOwnChat .mb .src{ display:block; font-size:10.5px; opacity:.65; margin-top:5px; }
+  #mouOwnChips button{ flex-shrink:0; border:1px solid rgba(255,183,3,.35); background:rgba(255,183,3,.08); color:#fff8e8; border-radius:999px; padding:7px 12px; font-family:inherit; font-size:12.5px; cursor:pointer; white-space:nowrap; }
+</style>
+<script>
+/* ==================== 🐝 দোকানদারের মৌ ====================
+   সংখ্যাগুলো এই ফোনের হিসাব থেকেই গোনা হয় — Monitoring পাতা যেভাবে গোনে
+   হুবহু সেভাবে (বিক্রি = বাকি + নগদ-বিক্রি + বদলি; বাকি = getCustomerTotalDue;
+   কম স্টক = ২ বা তার কম)। সাধারণ প্রশ্ন (আজ/গতকাল/সপ্তাহ/মাসের বিক্রি, লাভ,
+   বাকি, স্টক, খরচ, বেশি বিক্রি) ফোনেই উত্তর হয় — ইন্টারনেট বা AI লাগে না।
+   অন্য রকম প্রশ্ন হলে এই হিসাবের সারাংশটুকু নিয়ে সার্ভারের মৌ (Gemini) উত্তর দেয় —
+   সারাংশের বাইরে কিছু বানায় না। */
+(function(){
+  const $m = (id)=> document.getElementById(id);
+  const BNd = "০১২৩৪৫৬৭৮৯";
+  const bn = (v)=> String(v).replace(/[0-9]/g, (d)=> BNd[d]);
+  const tk = (n)=> (typeof HB_CUR !== "undefined" ? HB_CUR : "৳") + " " + bn(Math.round(Number(n) || 0).toLocaleString("en-IN"));
+  const SALE = (typeof SALE_STATUSES !== "undefined") ? SALE_STATUSES : ['বাকি','নগদ-বিক্রি','বদলি'];
+
+  function facts(){
+    const now = new Date();
+    const dayStart = (d)=>{ const x = new Date(d); x.setHours(0,0,0,0); return x; };
+    const today0 = dayStart(now), yest0 = new Date(today0 - 86400000);
+    const week0 = new Date(today0); week0.setDate(week0.getDate() - 6);
+    const month0 = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth0 = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const P = ()=> ({ sales:0, profit:0, paid:0, qty:0, bills:new Set() });
+    const r = { today:P(), yesterday:P(), week:P(), month:P(), lastMonth:P() };
+    const itemsToday = {}, itemsWeek = {}, itemsMonth = {};
+    (typeof retailEntries !== "undefined" ? retailEntries : []).forEach((e)=>{
+      if(!SALE.includes(e.status)) return;
+      const d = new Date(e.date); if(isNaN(d)) return;
+      const add = (o)=>{ o.sales += Number(e.price) || 0; o.profit += (Number(e.price) || 0) - (Number(e.cost) || 0); o.paid += Number(e.paid) || 0; o.qty += Number(e.qty) || 0; o.bills.add(e.billId || e.id); };
+      if(d >= today0) { add(r.today); itemsToday[e.item] = (itemsToday[e.item] || 0) + (Number(e.qty) || 0); }
+      if(d >= yest0 && d < today0) add(r.yesterday);
+      if(d >= week0) { add(r.week); itemsWeek[e.item] = (itemsWeek[e.item] || 0) + (Number(e.qty) || 0); }
+      if(d >= month0) { add(r.month); itemsMonth[e.item] = (itemsMonth[e.item] || 0) + (Number(e.qty) || 0); }
+      if(d >= lastMonth0 && d < month0) add(r.lastMonth);
+    });
+    Object.keys(r).forEach((k)=>{ r[k].bills = r[k].bills.size; });
+    const top = (m)=> Object.entries(m).sort((a,b)=> b[1] - a[1]).slice(0, 5).map(([n,q])=> ({ name:n, qty:q }));
+    // বাকি — কাস্টমার ধরে (Monitoring-এর মতোই হিসাব)
+    const dueMap = {};
+    (typeof retailEntries !== "undefined" ? retailEntries : []).forEach((e)=>{
+      const due = Math.max((Number(e.price) || 0) - (Number(e.paid) || 0), 0);
+      if(due > 0){ const k = e.phone || e.name; if(!dueMap[k]) dueMap[k] = { name:e.name, phone:e.phone || "", due:0 }; dueMap[k].due += due; }
+    });
+    const dues = Object.values(dueMap).sort((a,b)=> b.due - a.due);
+    const prods = (typeof bccLoadProducts === "function") ? bccLoadProducts() : [];
+    const low = prods.filter((p)=> (Number(p.qty) || 0) <= (typeof BCC_LOW_STOCK_THRESHOLD !== "undefined" ? BCC_LOW_STOCK_THRESHOLD : 2))
+      .sort((a,b)=> (Number(a.qty) || 0) - (Number(b.qty) || 0)).map((p)=> ({ name:p.name, qty:Number(p.qty) || 0 }));
+    const exps = (typeof opsLoadExpenses === "function") ? opsLoadExpenses() : [];
+    const expSum = (from)=> exps.filter((x)=> new Date(x.date) >= from).reduce((a,x)=> a + (Number(x.amount) || 0), 0);
+    return {
+      date: now.toLocaleDateString("bn-BD", { day:"numeric", month:"long", year:"numeric" }),
+      sales: r, topToday: top(itemsToday), topWeek: top(itemsWeek), topMonth: top(itemsMonth),
+      dueTotal: dues.reduce((a,x)=> a + x.due, 0), dueCount: dues.length, dueTop: dues.slice(0, 10),
+      products: prods.length, lowStock: low.slice(0, 25), lowCount: low.length, outCount: low.filter((p)=> p.qty <= 0).length,
+      expenseToday: expSum(today0), expenseMonth: expSum(month0)
+    };
+  }
+
+  // ---- ফোনেই উত্তর (সাধারণ প্রশ্ন) ----
+  function localAnswer(q, f){
+    const t = q.toLowerCase();
+    const has = (...w)=> w.some((x)=> t.indexOf(x) > -1);
+    const period = has("গতকাল","কাল","yesterday") && !has("আজ") ? ["yesterday","গতকাল"] : has("গত মাস","last month") ? ["lastMonth","গত মাসে"]
+      : has("মাস","month") ? ["month","এই মাসে"] : has("সপ্তাহ","হপ্তা","week","৭ দিন") ? ["week","গত ৭ দিনে"] : ["today","আজ"];
+    const S = f.sales[period[0]];
+    if(has("ফুরিয়ে","স্টক","stock","শেষ হয়ে","কম আছে","অর্ডার দিতে হবে","মাল কম")){
+      if(!f.lowCount) return `সব পণ্যের স্টক ঠিক আছে 🎉 (কোনোটাই ২-এর নিচে না)।`;
+      return `⚠️ ${bn(f.lowCount)}টা পণ্যের স্টক কম${f.outCount ? `, এর মধ্যে ${bn(f.outCount)}টা একদম শেষ` : ""}:\n` +
+        f.lowStock.slice(0, 12).map((p,i)=> `${bn(i+1)}. ${p.name} — ${p.qty <= 0 ? "শেষ" : bn(p.qty) + "টা আছে"}`).join("\n") +
+        (f.lowCount > 12 ? `\n…আরও ${bn(f.lowCount - 12)}টা। পুরো তালিকা: Product Management → ⚠️ লো স্টক` : "");
+    }
+    if(has("বাকি","পাওনা","due","কার কাছে")){
+      if(!f.dueCount) return "কারো কাছে কোনো বাকি নেই 🎉";
+      return `মোট বাকি ${tk(f.dueTotal)} — ${bn(f.dueCount)} জন কাস্টমারের কাছে।\nসবচেয়ে বেশি:\n` +
+        f.dueTop.slice(0, 7).map((x,i)=> `${bn(i+1)}. ${x.name}${x.phone ? " (" + x.phone + ")" : ""} — ${tk(x.due)}`).join("\n");
+    }
+    if(has("খরচ","expense")) return `আজ খরচ ${tk(f.expenseToday)}, এই মাসে ${tk(f.expenseMonth)}।\n(এটা "অন্য খরচ"-এর হিসাব; স্টাফের বেতন আলাদা — Shop Operations Center-এ।)`;
+    if(has("বেশি বিক্রি","বেশি চলে","জনপ্রিয়","top","টপ","কোনটা বেশি")){
+      const l = period[0] === "today" ? f.topToday : period[0] === "week" ? f.topWeek : f.topMonth;
+      const label = period[0] === "today" ? "আজ" : period[0] === "week" ? "গত ৭ দিনে" : "এই মাসে";
+      if(!l.length) return `${label} এখনো কোনো পণ্য বিক্রি হয়নি।`;
+      return `${label} সবচেয়ে বেশি বিক্রি:\n` + l.map((x,i)=> `${bn(i+1)}. ${x.name} — ${bn(x.qty)}টা`).join("\n");
+    }
+    if(has("লাভ","profit","মুনাফা")){
+      return `${period[1]} বিক্রি ${tk(S.sales)}, লাভ ${tk(S.profit)}।` + (period[0] !== "month" ? `\nএই মাসে মোট লাভ ${tk(f.sales.month.profit)}।` : "") +
+        `\n(লাভ = বিক্রির দাম − কেনা দাম; যেখানে কেনা দাম দেওয়া নেই সেখানে পুরোটাই লাভ ধরা হয়েছে।)`;
+    }
+    if(has("বিক্রি","sale","sell","বেচা","কত টাকা")){
+      let a = `${period[1]} বিক্রি ${tk(S.sales)} — ${bn(S.bills)}টা বিল, ${bn(S.qty)}টা পণ্য। হাতে এসেছে ${tk(S.paid)}।`;
+      if(period[0] === "today") a += `\nগতকাল ছিল ${tk(f.sales.yesterday.sales)}।`;
+      if(period[0] === "month") a += `\nগত মাসে ছিল ${tk(f.sales.lastMonth.sales)}।`;
+      return a;
+    }
+    return null;
+  }
+
+  function bubble(cls, text, src){
+    const el = document.createElement("div");
+    el.className = "mb " + cls; el.textContent = text;
+    if(src){ const s = document.createElement("span"); s.className = "src"; s.textContent = src; el.appendChild(s); }
+    $m("mouOwnChat").appendChild(el);
+    $m("mouOwnChat").scrollTop = $m("mouOwnChat").scrollHeight;
+    return el;
+  }
+  async function ask(q){
+    q = (q || "").trim(); if(!q) return;
+    $m("mouOwnInput").value = "";
+    bubble("me", q);
+    const f = facts();
+    const local = localAnswer(q, f);
+    if(local){ bubble("mou", local, "📒 এই ফোনের হিসাব থেকে"); return; }
+    const wait = bubble("mou", "⏳ ভাবছি…");
+    try{
+      if(typeof firebase === "undefined" || !firebase.functions) throw new Error("no-functions");
+      const res = await firebase.functions().httpsCallable("mouOwner")({ text: q.slice(0, 300), facts: JSON.stringify(f).slice(0, 9000) });
+      wait.remove();
+      bubble("mou", (res.data && res.data.reply) || "দুঃখিত, এখন উত্তর দিতে পারলাম না।", "🐝 মৌ (দোকানের হিসাব দেখে)");
+    }catch(e){
+      wait.remove();
+      bubble("mou", "এই প্রশ্নটা এখন বুঝতে পারলাম না 🐝\nআমি বলতে পারি: আজ/গতকাল/সপ্তাহ/মাসের বিক্রি, লাভ, কার কাছে কত বাকি, কোন পণ্য ফুরিয়ে আসছে, খরচ, আর কোনটা বেশি বিক্রি হলো।");
+    }
+  }
+  const CHIPS = ["আজ কত বিক্রি?", "কোন পণ্য ফুরিয়ে আসছে?", "কার কাছে কত বাকি?", "এই মাসে লাভ কত?", "এই সপ্তাহে কোনটা বেশি বিক্রি?", "আজ খরচ কত?", "গতকাল কত বিক্রি?"];
+  function open(){
+    if(!$m("mouOwnChat").children.length){
+      bubble("mou", "আসসালামু আলাইকুম! আমি মৌ 🐝\nআপনার দোকানের হিসাব দেখে উত্তর দিই। নিচের যেকোনো প্রশ্নে চাপ দিন, বা নিজে লিখুন।");
+      $m("mouOwnChips").innerHTML = CHIPS.map((c)=> `<button type="button">${c}</button>`).join("");
+      $m("mouOwnChips").querySelectorAll("button").forEach((b)=> b.onclick = ()=> ask(b.textContent));
+    }
+    setTimeout(()=>{ try{ $m("mouOwnInput").focus(); }catch(e){} }, 200);
+  }
+  function wire(){
+    const card = $m("bizMouCard"); if(!card) return;
+    card.addEventListener("click", ()=>{ switchProgram("program-bizmgmt", "program-mou"); open(); });
+    $m("backFromMou").addEventListener("click", ()=> switchProgram("program-mou", "program-bizmgmt"));
+    $m("mouOwnSend").addEventListener("click", ()=> ask($m("mouOwnInput").value));
+    $m("mouOwnInput").addEventListener("keydown", (e)=>{ if(e.key === "Enter") ask($m("mouOwnInput").value); });
+  }
+  window.hbMouOwnerFacts = facts; window.hbMouOwnerLocal = localAnswer; // পরীক্ষার জন্য
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire); else wire();
 })();
 </script>
 </body>

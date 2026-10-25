@@ -3085,6 +3085,15 @@
           <div class="rmSwitch" id="hmAppearOfflineSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
         </div>
 
+        <!-- 🐝 মালিক (দোকান/দর্জি/রেস্টুরেন্ট) অনলাইনে না থাকলে মৌ উত্তর দেবে — সব চ্যাটের জন্য একটাই সুইচ -->
+        <div style="display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+          <div style="flex:1;">
+            <div style="font-weight:700; font-size:13px;">🐝 আমি অনলাইনে না থাকলে মৌ উত্তর দেবে</div>
+            <div style="font-size:10.5px; color:var(--muted); margin-top:2px;">শুধু দোকান, দর্জি বা রেস্টুরেন্টের মালিকদের জন্য। মৌ আপনার আসল দাম আর তথ্য থেকে উত্তর দেয়, অর্ডার নিশ্চিত করে না। সব চ্যাটে প্রযোজ্য।</div>
+          </div>
+          <div class="rmSwitch on" id="hmMouAutoSwitch" style="flex-shrink:0;"><div class="rmKnob"></div></div>
+        </div>
+
         <div style="display:flex; align-items:center; gap:10px; padding:12px 0;">
           <div style="flex:1;">
             <div style="font-weight:700; font-size:13px;">🔐 প্রাইভেসি মোড (Auto Wipe)</div>
@@ -9249,6 +9258,7 @@ function hmActuallyOpenChat(otherUid, otherUsername, otherName, chatId){
           return `
             <div style="display:flex; justify-content:${isMine ? "flex-end" : "flex-start"}; margin-bottom:14px;">
               <div class="hmMsgBubble" data-mid="${d.id}" data-mine="${isMine}" style="position:relative; max-width:75%; background:${isMine ? "var(--amber)" : "rgba(255,255,255,0.08)"}; color:${isMine ? "var(--bg1)" : "#eee"}; padding:9px 13px; border-radius:16px; ${isMine ? "border-bottom-right-radius:4px;" : "border-bottom-left-radius:4px;"} user-select:none; -webkit-user-select:none;">
+                ${m.byMou ? `<div style="font-size:10.5px; font-weight:800; color:${isMine ? "var(--bg1)" : "var(--amber)"}; margin-bottom:3px;">🐝 মৌ উত্তর দিয়েছে${isMine ? " (আপনি অনলাইনে ছিলেন না)" : " — মালিক এখন অনলাইনে নেই"}</div>` : ""}
                 <div style="font-size:14px; line-height:1.4;">${escapeHtml(m.text||"")}</div>
                 <div style="font-size:9.5px; opacity:0.7; margin-top:3px; text-align:right;">${timeTxt}${editedTxt}</div>
                 ${reactionBadge}
@@ -9294,6 +9304,7 @@ $("hmChatSettingsBtn").addEventListener("click", async ()=>{
     const myDoc = await db.collection("messengerUsers").doc(currentCustomer.uid).get();
     const list = (myDoc.exists && myDoc.data().appearOfflineTo) || [];
     $("hmAppearOfflineSwitch").classList.toggle("on", list.includes(hmCurrentOtherUid));
+    $("hmMouAutoSwitch").classList.toggle("on", !(myDoc.exists && myDoc.data().mouAutoReply === false));
   }catch(e){ console.warn("appear-offline status load failed:", e); }
   // 🔐 এই চ্যাট এখন প্রাইভেসি মোডে আছে কিনা ও কত সময়ের জন্য সেট করা, দেখিয়ে দেওয়া
   const isPrivacy = hmCurrentChatMode === "privacy";
@@ -9302,6 +9313,12 @@ $("hmChatSettingsBtn").addEventListener("click", async ()=>{
   $("hmPrivacyDurationSelect").value = String(hmCurrentPrivacyDuration);
 });
 $("hmChatSettingsCloseBtn").addEventListener("click", ()=> $("hmChatSettingsOverlay").style.display = "none");
+$("hmMouAutoSwitch").addEventListener("click", async ()=>{
+  const on = !$("hmMouAutoSwitch").classList.contains("on");
+  $("hmMouAutoSwitch").classList.toggle("on", on);
+  try{ await db.collection("messengerUsers").doc(currentCustomer.uid).set({ mouAutoReply: on }, { merge: true }); }
+  catch(e){ $("hmMouAutoSwitch").classList.toggle("on", !on); alert("সেভ হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
+});
 
 function hmDurationLabel(seconds){
   const map = { 60:"১ মিনিট", 300:"৫ মিনিট", 3600:"১ ঘণ্টা", 86400:"১ দিন", 604800:"৭ দিন" };
