@@ -4,9 +4,9 @@
    পারত। এখন firestore.rules-এ wallets শুধু পড়া যায়; যোগ/কাটা হয়
    এই দুই ফাংশন দিয়ে:
      • walletTopup      — শুধু এজেন্ট/সুপারঅ্যাডমিন পয়েন্ট যোগ করে
-     • walletChargeRide — ড্রাইভার/রাইডার যাত্রীকে Pick Up করার পর
-                          ভাড়া কাটে; ভাড়া নেওয়া হয় সার্ভারে রাখা
-                          passenger_waiting_queue ডক থেকে, একবারই কাটা যায়।
+     • walletChargeRide — ড্রাইভার Pick Up করে ভাড়া লেখার পর যাত্রী নিজে
+                          "রাজি" চাপলে তাঁর পয়েন্ট থেকে ড্রাইভারের কাছে যায়;
+                          একবারই কাটা যায়।
    সীমা appConfig/wallet থেকে বদলানো যায়:
      { maxTopup: 50000, maxRideFare: 2000 } */
 module.exports = function makeWallet({ db, FieldValue, onCall, HttpsError }) {
@@ -70,61 +70,66 @@ module.exports = function makeWallet({ db, FieldValue, onCall, HttpsError }) {
     return { ok: true, balance };
   });
 
-  /* 🚕 ভাড়া কাটা — {queueId}
-     শর্ত: ডকটা PICKED_UP, picked_up_by == যে ডাকছে, যাত্রী নিজের লগইন
-     দিয়েই অপেক্ষার তালিকায় উঠেছিলেন (owner_uid == user_id), আগে কাটা
-     হয়নি, Pick Up ৩০ মিনিটের মধ্যে, আর ভাড়া সীমার ভেতরে। */
+  /* 🚕 ভাড়া দেওয়া — যাত্রী নিজে "রাজি" চাপলে — {queueId, fare}
+     ড্রাইভার Pick Up করে ভাড়া লেখেন; যাত্রীর ফোনে "Wallet থেকে দেবেন?"
+     আসে। যাত্রী রাজি হলে তাঁর ফোন থেকেই এটা ডাকা হয়। তাই ড্রাইভার
+     ইচ্ছেমতো বেশি ভাড়া লিখে পয়েন্ট কেটে নিতে পারেন না।
+     শর্ত: যে ডাকছে সে-ই যাত্রী (owner_uid == user_id == নিজে), ডকটা
+     PICKED_UP, যাত্রী যে ভাড়া দেখেছেন সেটাই ডকে আছে (মাঝপথে বদলায়নি),
+     আগে কাটা হয়নি, Pick Up ৩০ মিনিটের মধ্যে, ভাড়া সীমার ভেতরে, আর
+     যিনি Pick Up করেছেন তিনি সত্যিই ড্রাইভার/রাইডার। */
   const walletChargeRide = onCall(async (request) => {
     const me = needUser(request);
-    const queueId = String((request.data || {}).queueId || "").trim();
+    const d = request.data || {};
+    const queueId = String(d.queueId || "").trim();
+    const seenFare = Math.round(Number(d.fare) || 0);
     if (!queueId || queueId.includes("/"))
-      throw new HttpsError("invalid-argument", "যাত্রীর তথ্য পাওয়া যায়নি।");
-
-    const [r, td] = await Promise.all([
-      roleOf(me),
-      db.collection("transportDrivers").doc(me).get(),
-    ]);
-    if (!r.superadmin && !td.exists && r.role !== "rider" && r.role !== "transport_driver")
-      throw new HttpsError("permission-denied", "শুধু ড্রাইভার/রাইডার ভাড়া কাটতে পারেন।");
+      throw new HttpsError("invalid-argument", "ট্রিপের তথ্য পাওয়া যায়নি।");
 
     const lim = await limits();
     const qRef = db.collection("passenger_waiting_queue").doc(queueId);
+    const pre = await qRef.get();
+    if (!pre.exists) return { success: false, reason: "not_found" };
+    const driver = String(pre.data().picked_up_by || "");
+    if (!driver || driver === me) return { success: false, reason: "no_driver" };
+    const [r, td] = await Promise.all([roleOf(driver), db.collection("transportDrivers").doc(driver).get()]);
+    if (!td.exists && r.role !== "rider" && r.role !== "transport_driver")
+      return { success: false, reason: "no_driver" };
 
     return db.runTransaction(async (t) => {
       const q = await t.get(qRef);
       if (!q.exists) return { success: false, reason: "not_found" };
       const p = q.data();
-      if (p.status !== "PICKED_UP" || p.picked_up_by !== me)
-        return { success: false, reason: "not_yours" };
+      if (p.status !== "PICKED_UP" || p.picked_up_by !== driver)
+        return { success: false, reason: "changed" };
+      if (p.user_id !== me || p.owner_uid !== me) return { success: false, reason: "not_yours" };
       if (p.walletCharged) return { success: false, reason: "already" };
-      const passenger = String(p.user_id || "");
-      if (!passenger || passenger.startsWith("guest_") || !p.owner_uid || p.owner_uid !== passenger)
-        return { success: false, reason: "no_wallet" };
-      if (passenger === me) return { success: false, reason: "self" };
+      if (p.fareDeclined) return { success: false, reason: "declined" };
       const fare = Math.round(Number(p.fare) || 0);
       if (!(fare > 0)) return { success: false, reason: "invalid_fare" };
+      if (fare !== seenFare) return { success: false, reason: "fare_changed", fare };
       if (fare > lim.maxRideFare) return { success: false, reason: "fare_too_high", max: lim.maxRideFare };
       const at = p.picked_up_at && p.picked_up_at.toMillis ? p.picked_up_at.toMillis() : 0;
       if (!at || Date.now() - at > 30 * 60 * 1000) return { success: false, reason: "too_late" };
 
-      const pRef = db.collection("wallets").doc(passenger);
-      const dRef = db.collection("wallets").doc(me);
+      const pRef = db.collection("wallets").doc(me);
+      const dRef = db.collection("wallets").doc(driver);
       const [pw, dw] = await Promise.all([t.get(pRef), t.get(dRef)]);
       const pBal = pw.exists ? Number(pw.data().balance) || 0 : 0;
-      if (pBal < fare) return { success: false, reason: "insufficient_balance" };
+      if (pBal < fare) return { success: false, reason: "insufficient_balance", balance: pBal };
       const dBal = dw.exists ? Number(dw.data().balance) || 0 : 0;
       const now = FieldValue.serverTimestamp();
 
       t.set(pRef, { balance: pBal - fare, updatedAt: now }, { merge: true });
       t.set(pRef.collection("transactions").doc(), {
-        type: "ride_payment", amount: -fare, note: "ট্রিপ ভাড়া", queueId, driverUid: me, createdAt: now,
+        type: "ride_payment", amount: -fare, note: "ট্রিপ ভাড়া", queueId, driverUid: driver, createdAt: now,
       });
       t.set(dRef, { balance: dBal + fare, updatedAt: now }, { merge: true });
       t.set(dRef.collection("transactions").doc(), {
-        type: "ride_earning", amount: fare, note: "ট্রিপ আয়", queueId, passengerUid: passenger, createdAt: now,
+        type: "ride_earning", amount: fare, note: "ট্রিপ আয়", queueId, passengerUid: me, createdAt: now,
       });
       t.update(qRef, { walletCharged: true, walletChargedAt: now });
-      return { success: true, fare };
+      return { success: true, fare, balance: pBal - fare };
     });
   });
 
