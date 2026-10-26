@@ -120,12 +120,24 @@ ${facts}
     return reply.slice(0, 700);
   }
 
+  let __ai = null, __aiAt = 0;
+  async function aiOn() {
+    if (__ai !== null && Date.now() - __aiAt < 5 * 60 * 1000) return __ai;
+    try { const d = await db.collection("appConfig").doc("mou").get(); __ai = !!(d.exists && d.data().aiEnabled === true); }
+    catch (e) { __ai = false; }
+    __aiAt = Date.now();
+    return __ai;
+  }
+
   const mouShopAutoReply = onDocumentCreated(
     { document: "messengerChats/{chatId}/messages/{messageId}", secrets: [geminiApiKey] },
     async (event) => {
       const chatId = event.params.chatId;
       const m = event.data && event.data.data();
       if (!m || m.byMou || !m.senderUid || typeof m.text !== "string" || !m.text.trim()) return;
+      // 💸 AI বন্ধ (ডিফল্ট) — কিছুই পড়া হয় না, Gemini ডাকা হয় না, খরচ শূন্য।
+      // সুপার এডমিন appConfig/mou-তে aiEnabled: true বসালে তবেই চালু।
+      if (!(await aiOn())) return;
 
       const chatRef = db.collection("messengerChats").doc(chatId);
       const chat = await chatRef.get();

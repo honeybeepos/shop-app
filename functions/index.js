@@ -1078,7 +1078,8 @@ exports.parseShoppingIntent = onCall({ secrets: [geminiApiKey] }, async (request
     throw new HttpsError("invalid-argument", "text (string) প্রয়োজন");
   }
 
-  const apiKey = geminiApiKey.value();
+  // 💸 AI বন্ধ থাকলে (ডিফল্ট) সরাসরি নিয়ম-ভিত্তিক — খরচ শূন্য
+  const apiKey = (await mouLimits()).aiEnabled ? geminiApiKey.value() : "";
   if (apiKey) {
     try {
       const items = await geminiParse(text, apiKey);
@@ -1224,6 +1225,9 @@ async function mouLimits() {
     dailyAnon: Number(c.dailyAnon) > 0 ? Number(c.dailyAnon) : MOU_LIMIT_DEFAULT.dailyAnon,
     dailyUser: Number(c.dailyUser) > 0 ? Number(c.dailyUser) : MOU_LIMIT_DEFAULT.dailyUser,
     dailyIp: Number(c.dailyIp) > 0 ? Number(c.dailyIp) : MOU_LIMIT_DEFAULT.dailyIp,
+    // 💸 AI (Gemini) — ডিফল্ট বন্ধ, খরচ শূন্য। সুপার এডমিন appConfig/mou-তে
+    // aiEnabled: true বসালে তবেই চালু (বাজারের মৌ, দোকানদারের মৌ, Messenger উত্তর, শপিং লিস্ট)।
+    aiEnabled: c.aiEnabled === true,
   };
   __mouCfgAt = Date.now();
   return __mouCfg;
@@ -1244,6 +1248,7 @@ async function mouTakeQuota(uid, signedIn) {
 }
 const mouTools = require("./mou-tools")({ db });
 const { MOU_GUIDE, MOU_GUIDE_LINKS } = require("./mou-guide"); // 📘 মৌ-এর অ্যাপ গাইড (অ্যাপ কীভাবে চলে)
+const mouFree = require("./mou-free")({ MOU_GUIDE }); // 🐝 বিনা খরচের মৌ (AI ছাড়া)
 
 exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   // 🔒 Security — সম্পূর্ণ open/anonymous কল আটকাতে অন্তত একটা বৈধ Firebase
@@ -1310,6 +1315,30 @@ exports.mouChat = onCall({ secrets: [geminiApiKey] }, async (request) => {
   }
   // 📍 গ্রাহকের বাছা এলাকা (Bazar-এ যেটা বাছা আছে) — খোঁজা এই এলাকাতেই হবে
   const area = request.data && request.data.area && typeof request.data.area === "object" ? request.data.area : {};
+
+  /* 💸 বিনা খরচের মৌ — AI বন্ধ থাকলে (ডিফল্ট) Gemini ডাকা হয় না।
+     লেখা থেকে শব্দ দেখে বোঝা হয় কী চাই (functions/mou-free.js), তারপর একই
+     আসল-ডেটা খোঁজা (mou-tools.js)। ছবি পাঠালে শুধু জানানো হয় যে এখন ছবি বোঝে না। */
+  if (!(await mouLimits()).aiEnabled) {
+    if (image && (!text.trim() || /এই ছবিতে কী দেখছ/.test(text))) {
+      return { reply: "এখন আমি ছবি বুঝতে পারি না 🐝 জিনিসের নাম লিখে জিজ্ঞেস করুন।", mood: "idle", engine: "free", left: quota.left };
+    }
+    const r = mouFree.route(text.trim());
+    if (r.help) {
+      const ln = MOU_GUIDE_LINKS[r.topic];
+      return { reply: r.reply, mood: "idle", engine: "free", action: "app_help",
+        results: ln ? [{ kind: "link", name: ln.name, href: ln.href, icon: ln.icon }] : [], left: quota.left };
+    }
+    if (!r.action) return { reply: r.reply, mood: r.mood || "idle", engine: "free", left: quota.left };
+    let tool = null;
+    try { tool = await mouTools.run(r.action, { area, uid: who.uid, signedIn }); }
+    catch (e) { console.warn(JSON.stringify({ event: "MOU_TOOL_FAILED", type: r.action.type, error: String(e && e.message || e) })); }
+    if (!tool) return { reply: "এই মুহূর্তে বাজারে খুঁজে দেখতে পারলাম না, একটু পরে আবার জিজ্ঞেস করবেন? 🐝", mood: "idle", engine: "free", left: quota.left };
+    let reply = mouTools.summary(tool.type, tool.results, r.action, tool.area);
+    if (tool.type === "find_product" && tool.results && !tool.results.length) reply += "\n\n" + mouFree.EXAMPLES;
+    return { reply, mood: tool.results && tool.results.length ? "happy" : "idle", engine: "free",
+      action: tool.type, results: tool.results || [], left: quota.left };
+  }
 
   const apiKey = geminiApiKey.value();
   if (!apiKey) {
@@ -3816,6 +3845,8 @@ exports.mouOwner = onCall({ secrets: [geminiApiKey] }, async (request) => {
   const text = request.data && typeof request.data.text === "string" ? request.data.text.trim().slice(0, 300) : "";
   const facts = request.data && typeof request.data.facts === "string" ? request.data.facts.slice(0, 9000) : "";
   if (!text || !facts) throw new HttpsError("invalid-argument", "প্রশ্ন আর হিসাব দুটোই লাগবে");
+  // 💸 AI বন্ধ (ডিফল্ট) — ফোনের হিসাব থেকেই যা বলা যায় তা ফোন নিজেই বলে; এখানে শুধু "বন্ধ" জানানো
+  if (!(await mouLimits()).aiEnabled) return { off: true };
   let quota = { ok: true };
   try { quota = await mouTakeQuota("owner_" + a.uid, true); } catch (e) { /* সীমা পড়া না গেলেও উত্তর দেওয়া হয় */ }
   if (!quota.ok) return { reply: "আজকের প্রশ্নের সীমা শেষ 🐝 কাল আবার জিজ্ঞেস করবেন।" };

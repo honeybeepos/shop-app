@@ -6,12 +6,12 @@
    কোড Firestore থেকে আসল দোকান, আসল দাম, আসল ডিজাইন খুঁজে কার্ড বানায়।
    তাই উত্তরের প্রতিটা দাম ডেটাবেস থেকে আসে, AI-এর কল্পনা থেকে না।
 
-   খরচ বাঁচাতে: একই এলাকার দোকান/পণ্যের তালিকা ৩ মিনিট মেমোরিতে রাখা হয়
+   খরচ বাঁচাতে: একই এলাকার দোকান/পণ্যের তালিকা ১৫ মিনিট মেমোরিতে রাখা হয়
    (ফাংশনের একই ইনস্ট্যান্সে পরপর প্রশ্ন এলে আবার পড়তে হয় না)।
    ===================================================================== */
 
 module.exports = function makeMouTools({ db }) {
-  const TTL = 3 * 60 * 1000;
+  const TTL = 15 * 60 * 1000; // 💸 ১৫ মিনিট — Firestore-এর ফ্রি সীমার ভেতরে থাকতে
   const cache = new Map();
   async function cached(key, fn) {
     const hit = cache.get(key);
@@ -66,7 +66,7 @@ module.exports = function makeMouTools({ db }) {
       const qs = await q.get();
       return qs.docs.map((d) => ({ id: d.id, ...d.data() }))
         .filter((s) => s.status === "active" && (!area.d || !s.district || s.district === area.d))
-        .slice(0, 60)
+        .slice(0, 40)
         .map((s) => ({ id: s.id, name: s.shopName || s.name || "দোকান", upazila: s.upazila || "", district: s.district || "", cc: s.countryCode || "BD" }));
     });
   }
@@ -75,7 +75,7 @@ module.exports = function makeMouTools({ db }) {
       const shops = await areaShops(area);
       const lists = await Promise.all(shops.map(async (s) => {
         try {
-          const qs = await db.collection("shops").doc(s.id).collection("publicStock").limit(400).get();
+          const qs = await db.collection("shops").doc(s.id).collection("publicStock").limit(200).get();
           return qs.docs.map((d) => {
             const p = d.data() || {};
             if (p.private) return null;
