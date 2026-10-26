@@ -2625,6 +2625,8 @@
 
       <button id="sfiSearchBtn" style="width:100%; margin-top:14px; padding:14px; border:none; border-radius:12px; font-weight:800; font-size:14px; cursor:pointer; font-family:inherit; background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1);">🔍 ফ্লাইট খুঁজুন</button>
       <div id="sfiSearchMsg" style="font-size:12px; color:var(--danger); margin-top:10px; display:none;"></div>
+      <!-- ✈️ ফ্রি প্ল্যানের নিয়ম — গ্রাহক যেন জানেন -->
+      <div style="font-size:11px; color:var(--muted); margin-top:10px; line-height:1.6;">ℹ️ শুধু আজকের ফ্লাইট দেখা যায়। একজন খুঁজলে সবাই সেই তথ্য পান; বিমান নামার প্রায় ২৫ মিনিট পরে নিশ্চিত খবর (কোথায়, কখন নামল) নিজে থেকেই আসে।</div>
     </div>
 
     <!-- 📋 একাধিক ফলাফল হলে তালিকা (route সার্চে), নাহলে সরাসরি বিস্তারিত কার্ড -->
@@ -2662,6 +2664,11 @@
       <div id="sfiTimelineWrap" style="margin-bottom:14px;">
         <div id="sfiTimelineTrack" style="display:flex; align-items:center;"></div>
         <div id="sfiTimelineLabel" style="font-size:10.5px; color:var(--muted); text-align:center; margin-top:6px;">—</div>
+        <!-- ⏱️ ঘড়ি দেখে আনুমানিক হিসাব (API ছাড়া) -->
+        <div id="sfiClockWrap" style="display:none; margin-top:10px;">
+          <div style="height:6px; border-radius:6px; background:rgba(255,255,255,0.12); overflow:hidden;"><div id="sfiClockBar" style="height:100%; width:0%; background:var(--amber);"></div></div>
+          <div id="sfiClockText" style="font-size:12px; text-align:center; margin-top:6px; font-weight:700;"></div>
+        </div>
       </div>
 
       <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:12px; margin-bottom:10px;">
@@ -10055,7 +10062,7 @@ function sfiStartAutoRefresh(){
     }catch(e){
       // 🛟 auto-refresh ব্যর্থ হলে চুপচাপ স্কিপ — যা আগে দেখানো ছিল সেটাই থেকে যায়, ইউজারকে বিরক্ত করা হয় না
     }
-  }, 45000);
+  }, 120000); // ২ মিনিট — এখন তথ্য সার্ভারের জমা থেকে আসে, ঘন ঘন দেখার দরকার নেই
 }
 
 function sfiRenderDetail(flight, cameFromList){
@@ -10096,6 +10103,13 @@ function sfiRenderDetail(flight, cameFromList){
     const stageLabel = SFI_STAGE_LABEL[flight.stage] || "—";
     const approxNote = (flight.stage === "boarding" || flight.stage === "approaching") ? " (আনুমানিক)" : "";
     timelineLabel.textContent = `বর্তমান ধাপঃ ${stageLabel}${approxNote}`;
+  }
+  // ⏱️ ঘড়ি দেখে আনুমানিক অবস্থা (সার্ভার পাঠায়, API খরচ ছাড়া)
+  const ck = flight.clock;
+  $("sfiClockWrap").style.display = ck ? "block" : "none";
+  if(ck){
+    $("sfiClockBar").style.width = (ck.progress != null ? Math.round(ck.progress * 100) : 0) + "%";
+    $("sfiClockText").textContent = ck.text || "";
   }
 
   $("sfiDepDetails").innerHTML = `
