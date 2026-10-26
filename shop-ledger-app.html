@@ -24567,6 +24567,7 @@ function hbThermalPrint(area){
       if(typeof firebase === "undefined" || !firebase.functions) throw new Error("no-functions");
       const res = await firebase.functions().httpsCallable("mouOwner")({ text: q.slice(0, 300), facts: JSON.stringify(f).slice(0, 9000) });
       wait.remove();
+      if(res.data && res.data.off) throw new Error("ai-off"); // 💸 AI বন্ধ — নিচের "আমি বলতে পারি…" দেখাই
       bubble("mou", (res.data && res.data.reply) || "দুঃখিত, এখন উত্তর দিতে পারলাম না।", "🐝 মৌ (দোকানের হিসাব দেখে)");
     }catch(e){
       wait.remove();
