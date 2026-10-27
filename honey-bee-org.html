@@ -222,11 +222,44 @@ function renderMe(){
 let MYIDX = { orgs:{}, applied:{} }, __idxUnsub = null, __idxReady = false;
 let ORG = null, MYMEM = null, MYREQ = null, ORG_TAB = "home", __orgUnsubs = [], __tabUnsubs = [], CTX = null;
 function stopTab(){ __tabUnsubs.forEach(u=>{ try{ u(); }catch(e){} }); __tabUnsubs = []; }
-function stopOrg(){ stopTab(); __orgUnsubs.forEach(u=>{ try{ u(); }catch(e){} }); __orgUnsubs = []; __reqN = 0; __actN = 0; }
+function stopOrg(){ stopTab(); __orgUnsubs.forEach(u=>{ try{ u(); }catch(e){} }); __orgUnsubs = []; __reqN = 0; __actN = 0; if(__trUnsub){ try{ __trUnsub(); }catch(e){} __trUnsub = null; } __trList = []; }
+/* 💰 তহবিল রক্ষকের তালিকা — "হাতে পৌঁছানোর অপেক্ষায়" জমাগুলো */
+let __trUnsub = null, __trList = [];
+function ensureTrWatch(){
+  const want = isTreasurer() || (isAdmin() && ORG && ORG.treasurerUid);
+  if(want && !__trUnsub){
+    __trUnsub = db.collection("orgs").doc(ORG.id).collection("transactions").where("status", "==", "pending").onSnapshot(qs=>{
+      __trList = qs.docs.map(d=> ({ id:d.id, ...d.data() })).filter(t=> t.stage === "treasurer").sort((a,b)=> ms(a.createdAt) - ms(b.createdAt));
+      drawTrBox();
+    }, ()=>{ __trList = []; drawTrBox(); });
+  }else if(!want && __trUnsub){ try{ __trUnsub(); }catch(e){} __trUnsub = null; __trList = []; drawTrBox(); }
+}
+function drawTrBox(){
+  const el = $("trBox"); if(!el) return;
+  if(!isTreasurer()){ el.innerHTML = ""; return; }
+  const sum = __trList.reduce((a,t)=> a + Number(t.amount || 0), 0);
+  el.innerHTML = `<div class="card" style="border-color:rgba(250,204,21,.45)">
+    <div class="h">💰 আপনি তহবিল রক্ষক</div>
+    <div class="small">${__trList.length ? `হাতে পৌঁছানোর অপেক্ষায়: <b>${tk(sum)}</b> (${bn(__trList.length)}টা জমা)। টাকা হাতে পেলে "✅ হাতে পেয়েছি" চাপুন — তখনই তহবিলে উঠবে।` : "এখন হাতে পৌঁছানোর অপেক্ষায় কোনো জমা নেই। ✅"}</div>
+    ${__trList.map(t=> `<div class="item" style="align-items:flex-start; margin-top:8px">
+      <div class="grow"><b style="font-size:14px">${esc(t.title)}</b> <b style="color:#86efac">+${tk(t.amount)}</b>
+        <div class="small">✍️ লিখেছেন: ${esc(t.createdByName || "")} · ${esc(bn(t.date || ""))} · ${esc(t.method || "")}${t.reference ? " · " + esc(t.reference) : ""}</div>
+        ${t.collectorName ? `<div class="small">📥 তুলেছেন: ${esc(t.collectorName)}</div>` : ""}
+        <div class="row" style="margin-top:8px"><button class="btn green" type="button" data-trok="${esc(t.id)}" style="padding:7px 12px; font-size:13px">✅ হাতে পেয়েছি</button><button class="btn red" type="button" data-trno="${esc(t.id)}" style="padding:7px 12px; font-size:13px">❌ পাইনি</button></div>
+      </div></div>`).join("")}
+    <div class="row" style="margin-top:12px"><button class="btn ghost full" type="button" id="trAdd">＋ আমি নিজে টাকা পেয়েছি — জমা লিখুন</button></div>
+    <div class="small" style="margin-top:6px">আপনার নিজের লেখা জমা আরেকজন অ্যাডমিন নিশ্চিত করলে হিসাবে উঠবে।</div>
+  </div>`;
+  el.querySelectorAll("[data-trok]").forEach(b=> b.onclick = async ()=>{ if(await busy(b, ()=> api("txDecide", { orgId: ORG.id, txId: b.dataset.trok, approve: true }))) toast("✅ তহবিলে উঠেছে"); });
+  el.querySelectorAll("[data-trno]").forEach(b=> b.onclick = async ()=>{ if(!confirm("এই টাকা হাতে পাননি? জমাটা বাতিল হবে (মোছা হবে না)।")) return; if(await busy(b, ()=> api("txDecide", { orgId: ORG.id, txId: b.dataset.trno, approve: false }))) toast("বাতিল হয়েছে"); });
+  if($("trAdd")) $("trAdd").onclick = ()=> openMoney("in");
+}
 const isMember = ()=> !!MYMEM;
 const isAdmin = ()=> !!(MYMEM && MYMEM.role === "admin");
 const ROLE = ()=> isAdmin() ? "admin" : isMember() ? "member" : "public";
 const need2 = ()=> ((ORG && ORG.adminCount) || 1) >= 2 ? 2 : 1;
+// 💰 তহবিল রক্ষক — সংগঠনের একজন; অ্যাডমিনরা জমা লিখলে তিনি "হাতে পেয়েছি" চাপলে তবেই হিসাবে ওঠে
+const isTreasurer = ()=> !!(ORG && ME && MYMEM && ORG.treasurerUid === ME.uid);
 function saveCtx(id){ try{ if(id) localStorage.setItem("hbOrgCtx", id); else localStorage.removeItem("hbOrgCtx"); }catch(e){} }
 function listenIndex(){
   if(__idxUnsub){ __idxUnsub(); __idxUnsub = null; }
@@ -265,6 +298,7 @@ function openCtx(id, view){
     const first = !gotOrg; ORG = { id:d.id, ...d.data() }; gotOrg = true;
     if(!ready()) return;
     renderChrome(); if(first) drawView(); else refreshView();
+    ensureTrWatch(); drawTrBox();
   }, ()=>{ saveCtx(null); openCtx(null, "home"); }));
   if(ME){
     __orgUnsubs.push(oref.collection("members").doc(ME.uid).onSnapshot(d=>{
@@ -276,6 +310,7 @@ function openCtx(id, view){
       if(!ready()) return;
       renderChrome();
       if(first || before !== ROLE()){ if(!navItems().some(n=> n[0] === ORG_TAB) && !EXTRA_VIEWS.includes(ORG_TAB)) ORG_TAB = "home"; drawView(); }
+      ensureTrWatch(); drawTrBox();
     }, ()=>{ gotMem = true; MYMEM = null; if(ready()){ renderChrome(); drawView(); } }));
     __orgUnsubs.push(oref.collection("requests").doc(ME.uid).onSnapshot(d=>{ MYREQ = d.exists ? d.data() : null; if(ready() && ["home","apply","about"].includes(ORG_TAB) && ROLE() === "public") drawView(); }, ()=>{}));
   }
@@ -336,7 +371,7 @@ function setView(v){
   ORG_TAB = v; setUrl(); renderChrome(); drawView(); window.scrollTo(0, 0);
 }
 // সংগঠনের তথ্য বদলালে (যেমন তহবিল) খোলা পাতা নতুন করে বানানো লাগে না — যেগুলো নির্ভর করে সেগুলো ছাড়া
-function refreshView(){ if(ORG_TAB === "money") drawMoney(); else if(ORG_TAB === "manage") tabManage(); else if(ORG_TAB === "home") drawHomeStats(); }
+function refreshView(){ if(ORG_TAB === "money") drawMoney(); else if(ORG_TAB === "manage") tabManage(); else if(ORG_TAB === "home") drawHomeStats(); drawTrBox(); }
 const VIEWS = { guide: viewGuide, home: viewHome, search: viewSearch, apply: viewApply, create: viewCreate, account: viewAccount,
   posts: ()=> CTX ? tabPosts() : viewPublicFeed(), money: tabMoney, dues: tabDues, votes: tabVotes, aid: tabAid,
   members: tabMembers, requests: tabRequests, manage: tabManage, log: tabLog, about: tabAbout };
@@ -415,8 +450,9 @@ function heroHtml(){
       <div class="av" style="width:54px; height:54px; font-size:27px">🤝</div>
       <div style="flex:1; min-width:0"><div class="hero"><div class="big">${esc(ORG.name)}</div></div>
         <div class="small">📍 ${esc([ORG.area, ORG.upazila, ORG.district].filter(Boolean).join(", "))} · 👥 ${bn(ORG.memberCount || 0)} সদস্য</div>
+        ${ORG.treasurerName ? `<div class="small" style="margin-top:2px">💰 তহবিল রক্ষক: <b>${esc(ORG.treasurerName)}</b></div>` : ""}
         <div style="margin-top:6px">${MYMEM ? (isAdmin() ? `<span class="chip admin">⚙️ আপনি অ্যাডমিন · ${esc(MYMEM.title || "")}</span>` : `<span class="chip ok">✅ সদস্য · ${memNo(MYMEM.memberNo)}</span>`) : MYREQ && MYREQ.status === "pending" ? `<span class="chip wait">⏳ আপনার আবেদন অপেক্ষায়</span>` : ""}</div>
-      </div></div></div>`;
+      </div></div></div>${isTreasurer() ? `<div id="trBox"></div>` : ""}`;
 }
 /* ---------- পাবলিক হোম ---------- */
 function publicHome(){
@@ -927,7 +963,10 @@ function drawMoney(){
       <div class="stat"><b style="color:#fca5a5">${tk(f.out)}</b><span class="small">মোট খরচ</span></div>
       <div class="stat"><b>${tk((f.in || 0) - (f.out || 0))}</b><span class="small">অবশিষ্ট</span></div>
     </div>
+    ${ORG.treasurerName ? (()=>{ const w = TXS.filter(t=> t.status === "pending" && t.stage === "treasurer"); const ws = w.reduce((a,t)=> a + Number(t.amount || 0), 0);
+      return `<div class="small" style="margin-top:10px">💰 তহবিল রক্ষক: <b>${esc(ORG.treasurerName)}</b>${w.length ? ` · তাঁর হাতে পৌঁছানোর অপেক্ষায় <b>${tk(ws)}</b> (${bn(w.length)}টা)` : ""}</div>`; })() : ""}
     <div class="small" style="margin-top:10px">${isAdmin() ? "সব জমা আর খরচ সদস্যরা দেখতে পারেন। সদস্যদের চাঁদার লাইন শুধু অ্যাডমিনরা দেখেন — সদস্যরা দেখেন বাইরের অনুদান আর খরচ।" : isMember() ? "এখানে বাইরের অনুদান আর সংগঠনের খরচ দেখা যায়। কে কত চাঁদা দিলেন সেটা শুধু তিনি আর অ্যাডমিনরা জানেন — আপনার নিজের চাঁদা \"📒 চাঁদা\"-তে।" : "স্বচ্ছতার জন্য সংগঠন তাদের নিশ্চিত হওয়া জমা-খরচ সবার জন্য খোলা রেখেছে।"} প্রতিটা জমার পাশে টাকা কোন মাধ্যমে এসেছে আর রেফারেন্স দেখানো থাকে।</div>
+    ${!isAdmin() && isTreasurer() ? `<div class="row" style="margin-top:12px"><button class="btn green" type="button" id="addIn">＋ টাকা জমা</button></div>` : ""}
     ${isAdmin() ? `<div class="row" style="margin-top:12px"><button class="btn green" type="button" id="addIn">＋ টাকা জমা</button><button class="btn red" type="button" id="addOut">− সরাসরি খরচ</button></div>
       <div class="small" style="margin-top:6px">বড় খরচ "🗳️ প্রস্তাব ও ভোট" দিয়ে করুন — ভোটে পাস হলে নিজে থেকেই হিসাবে ওঠে।</div>` : ""}
   </div>`;
@@ -935,7 +974,7 @@ function drawMoney(){
   if($("addOut")) $("addOut").onclick = ()=> openMoney("out");
   const el = $("txList"); if(!el) return;
   // 🔒 সদস্যদের চাঁদার লাইন শুধু অ্যাডমিন দেখেন; সাধারণ সদস্য দেখেন বাইরের অনুদান আর খরচ
-  const SHOW = isAdmin() ? TXS : TXS.filter(t=> !t.duesId);
+  const SHOW = isAdmin() || isTreasurer() ? TXS : TXS.filter(t=> !t.duesId);
   el.innerHTML = SHOW.map(t=>{
     const st = TX_ST[t.status] || ["", t.status];
     const mine = ME && (t.approvedBy || []).includes(ME.uid);
@@ -946,13 +985,17 @@ function drawMoney(){
         <div class="small">${esc(bn(t.date || ""))} · মাধ্যম: ${esc(t.method || "—")}${t.reference ? " · রেফারেন্স: " + esc(t.reference) : ""}</div>
         ${t.note && isMember() ? `<div class="small">📝 ${esc(t.note)}</div>` : ""}
         ${t.collectorName ? `<div class="small">📥 তুলেছেন: ${esc(t.collectorName)}</div>` : ""}
-        ${isMember() ? `<div class="small">✍️ ${esc(t.createdByName || "")}${(t.approvedNames || []).length > 1 || t.status === "pending" ? " · অনুমোদন: " + esc((t.approvedNames || []).join(", ")) + (t.status === "pending" ? ` (${bn((t.approvedBy || []).length)}/${bn(need2())})` : "") : ""}</div>` : ""}
-        ${isAdmin() && t.status === "pending" ? `<div class="row" style="margin-top:8px"><button class="btn green" type="button" data-txok="${esc(t.id)}" ${mine ? "disabled" : ""} style="padding:7px 12px; font-size:13px">${mine ? "✓ আপনি দিয়েছেন — আরেকজন লাগবে" : "✅ নিশ্চিত করুন"}</button><button class="btn red" type="button" data-txno="${esc(t.id)}" style="padding:7px 12px; font-size:13px">❌ বাতিল</button></div>` : ""}
+        ${isMember() ? `<div class="small">✍️ ${esc(t.createdByName || "")}${!t.stage && ((t.approvedNames || []).length > 1 || t.status === "pending") ? " · অনুমোদন: " + esc((t.approvedNames || []).join(", ")) + (t.status === "pending" ? ` (${bn((t.approvedBy || []).length)}/${bn(need2())})` : "") : ""}</div>` : ""}
+        ${t.status === "pending" && t.stage === "treasurer" ? `<div class="small" style="color:#fde68a">⏳ তহবিল রক্ষক ${esc(t.treasurerName || ORG.treasurerName || "")}-এর হাতে পৌঁছানোর অপেক্ষায়</div>` : ""}
+        ${t.status === "pending" && t.stage === "admin" ? `<div class="small" style="color:#fde68a">⏳ তহবিল রক্ষক নিজে পেয়েছেন — আরেকজন অ্যাডমিন নিশ্চিত করবেন</div>` : ""}
+        ${t.receivedName && t.status === "verified" && t.stage ? `<div class="small">✅ নিশ্চিত করেছেন: ${esc(t.receivedName)}</div>` : ""}
+        ${t.status === "pending" && t.stage === "treasurer" && (isTreasurer() || isAdmin()) ? `<div class="row" style="margin-top:8px">${isTreasurer() ? `<button class="btn green" type="button" data-txok="${esc(t.id)}" style="padding:7px 12px; font-size:13px">✅ হাতে পেয়েছি</button>` : ""}<button class="btn red" type="button" data-txno="${esc(t.id)}" style="padding:7px 12px; font-size:13px">${isTreasurer() ? "❌ পাইনি" : "❌ বাতিল"}</button></div>` : ""}
+        ${isAdmin() && t.status === "pending" && t.stage !== "treasurer" ? `<div class="row" style="margin-top:8px"><button class="btn green" type="button" data-txok="${esc(t.id)}" ${mine ? "disabled" : ""} style="padding:7px 12px; font-size:13px">${mine ? "✓ আপনি দিয়েছেন — আরেকজন লাগবে" : "✅ নিশ্চিত করুন"}</button><button class="btn red" type="button" data-txno="${esc(t.id)}" style="padding:7px 12px; font-size:13px">❌ বাতিল</button></div>` : ""}
       </div>
       <b style="white-space:nowrap; color:${t.type === "in" ? "#86efac" : "#fca5a5"}">${t.type === "in" ? "+" : "−"}${tk(t.amount)}</b>
     </div>`;
   }).join("") || `<div class="empty">এখনো কোনো লেনদেন নেই</div>`;
-  el.querySelectorAll("[data-txok]").forEach(b=> b.onclick = async ()=>{ const r = await busy(b, ()=> api("txDecide", { orgId: ORG.id, txId: b.dataset.txok, approve: true })); if(r) toast(r.status === "pending" ? "✅ আপনার অনুমোদন জমা — আরেকজন লাগবে" : "✅ হিসাবে উঠেছে"); });
+  el.querySelectorAll("[data-txok]").forEach(b=> b.onclick = async ()=>{ const r = await busy(b, ()=> api("txDecide", { orgId: ORG.id, txId: b.dataset.txok, approve: true })); if(r) toast(r.status === "pending" ? "✅ আপনার অনুমোদন জমা — আরেকজন লাগবে" : "✅ তহবিলে উঠেছে"); });
   el.querySelectorAll("[data-txno]").forEach(b=> b.onclick = async ()=>{ if(!confirm("লেনদেনটা বাতিল করবেন? (মোছা হবে না — \"বাতিল\" হিসেবে থাকবে)")) return; if(await busy(b, ()=> api("txDecide", { orgId: ORG.id, txId: b.dataset.txno, approve: false }))) toast("বাতিল হয়েছে"); });
 }
 async function loadMembers(){ const qs = await db.collection("orgs").doc(ORG.id).collection("members").where("status", "==", "active").get(); MEMBERS = qs.docs.map(d=> d.data()).sort((a,b)=> (a.memberNo || 0) - (b.memberNo || 0)); return MEMBERS; }
@@ -987,7 +1030,8 @@ async function openMoney(type){
   const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   let src = "member", picked = null;
   openModal(`<div class="h">${type === "in" ? "＋ টাকা জমা" : "− সরাসরি খরচ"}</div>
-    ${need2() === 2 ? `<div class="notice">আরেকজন অ্যাডমিন নিশ্চিত করলে তবেই হিসাবে উঠবে।</div>` : ""}
+    ${type === "in" && ORG.treasurerUid ? `<div class="notice">${isTreasurer() ? "💰 আপনি তহবিল রক্ষক — আপনার লেখা জমা আরেকজন অ্যাডমিন নিশ্চিত করলে হিসাবে উঠবে।" : `💰 তহবিল রক্ষক <b>${esc(ORG.treasurerName || "")}</b> টাকা হাতে পেয়ে "হাতে পেয়েছি" চাপলে তবেই হিসাবে উঠবে।`}</div>`
+      : need2() === 2 ? `<div class="notice">আরেকজন অ্যাডমিন নিশ্চিত করলে তবেই হিসাবে উঠবে।</div>` : ""}
     ${type === "in" ? `<label class="f">টাকা কোথা থেকে এলো?</label>
       <div class="lgChips" id="mSrc">
         <button type="button" data-s="member" class="on">👤 সদস্যের চাঁদা</button>
@@ -1028,7 +1072,7 @@ async function openMoney(type){
       memberUid: type === "in" && src === "member" && picked ? picked.uid : null,
       collectorUid: type === "in" && src === "collect" && picked ? picked.uid : null,
       aidId: $("mAid") ? $("mAid").value : null }));
-    if(r){ closeModal(); toast(r.status === "pending" ? "✅ লেখা হয়েছে — আরেকজন অ্যাডমিন নিশ্চিত করলে হিসাবে উঠবে" : "✅ হিসাবে উঠেছে"); }
+    if(r){ closeModal(); toast(r.status === "pending" ? (type === "in" && ORG.treasurerUid && !isTreasurer() ? "✅ লেখা হয়েছে — তহবিল রক্ষক হাতে পেলে হিসাবে উঠবে" : "✅ লেখা হয়েছে — আরেকজন অ্যাডমিন নিশ্চিত করলে হিসাবে উঠবে") : "✅ হিসাবে উঠেছে"); }
   };
 }
 
@@ -1389,7 +1433,7 @@ function openAid(a){
    👥 সদস্য তালিকা + অ্যাডমিনের কাজ (পদবি, অ্যাডমিন বানানো/সরানো, সদস্যপদ বাতিল)
    ===================================================================== */
 let __actN = 0, ACTIONS = [];
-const ACT_TXT = { make_admin:"অ্যাডমিন বানানো", remove_admin:"অ্যাডমিন থেকে সরানো", remove_member:"সদস্যপদ বাতিল", resign_admin:"🙋 পদত্যাগের আবেদন" };
+const ACT_TXT = { make_admin:"অ্যাডমিন বানানো", remove_admin:"অ্যাডমিন থেকে সরানো", remove_member:"সদস্যপদ বাতিল", resign_admin:"🙋 পদত্যাগের আবেদন", make_treasurer:"💰 তহবিল রক্ষক বানানো", remove_treasurer:"💰 তহবিল রক্ষক থেকে সরানো" };
 function tabMembers(){
   $("tabBody").innerHTML = `<div id="actBox"></div><div class="card"><div class="h">👥 সদস্য তালিকা</div>
     <input class="in" id="memQ" type="search" placeholder="🔎 নাম, সদস্য নম্বর (HB-০০৫) বা ফোন দিয়ে খুঁজুন" autocomplete="off" style="margin-bottom:6px">
@@ -1453,6 +1497,7 @@ function memberMenu(m){
     <div class="small" style="margin-top:4px">পদবি শুধু নাম — সব অ্যাডমিনের ক্ষমতা সমান।</div>
     ${self ? (m.role === "admin" ? `<button class="btn red full" type="button" id="selfResign" style="margin-top:16px">🙋 অ্যাডমিন পদ থেকে পদত্যাগের আবেদন</button>` : "") : m.uid === ORG.createdBy ? `<div class="notice" style="margin-top:14px">🛡️ ইনি প্রতিষ্ঠাতা — কেউ তাঁকে অ্যাডমিন থেকে সরাতে বা সদস্যপদ বাতিল করতে পারেন না।</div>` : `<div style="margin-top:16px; display:grid; gap:8px">
       ${m.role === "admin" ? `<button class="btn ghost" type="button" data-k="remove_admin">⬇️ অ্যাডমিন থেকে সরিয়ে সাধারণ সদস্য করুন</button>` : `<button class="btn ghost" type="button" data-k="make_admin">⬆️ অ্যাডমিন বানানোর প্রস্তাব</button>`}
+      ${ORG.treasurerUid === m.uid ? `<button class="btn ghost" type="button" data-k="remove_treasurer">💰 তহবিল রক্ষক পদ থেকে সরানো</button>` : `<button class="btn ghost" type="button" data-k="make_treasurer">💰 তহবিল রক্ষক বানানোর প্রস্তাব${ORG.treasurerName ? " (এখন: " + esc(ORG.treasurerName) + ")" : ""}</button>`}
       <button class="btn red" type="button" data-k="remove_member">🚫 সদস্যপদ বাতিলের প্রস্তাব</button>
       <div class="small">${need2() === 2 ? "এগুলোতে দুইজন অ্যাডমিনের অনুমোদন লাগবে (যাঁকে নিয়ে কাজ, তিনি বাদে)।" : "এখন অ্যাডমিন একজন — আপনার অনুমোদনেই হবে।"}</div></div>`}
     <button class="btn ghost full" type="button" id="mlOpen" style="margin-top:14px">📒 এই সদস্যের খাতা (চাঁদা ও কাজ)</button>
