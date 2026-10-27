@@ -99,6 +99,7 @@
   <button class="tab" data-go="markets">🏙️ বাজার</button>
   <button class="tab" data-go="reports">🚩 রিপোর্ট</button>
   <button class="tab" data-go="announce">📢 ঘোষণা</button>
+  <button class="tab" data-go="billing">💰 আয়</button>
 </nav>
 
 <div class="wrap">
@@ -113,6 +114,65 @@
   <div class="card" data-pane="overview">
     <h2>🧮 মোট ইউজার</h2>
     <div id="overviewSummary" style="font-size:13px;">লোড হচ্ছে...</div>
+  </div>
+
+  <!-- 💰 আয়ের পথ (আয়-১: ভিত্তি) — সেটিংস আর দোকানের ক্রেডিট। সব শুরুতে বন্ধ। -->
+  <div class="card" data-pane="billing">
+    <h2>💰 আয়ের সেটিংস</h2>
+    <div id="bilState" class="meta">লোড হচ্ছে...</div>
+    <label style="display:flex; gap:8px; align-items:center; font-weight:800; margin:6px 0 10px;"><input type="checkbox" id="bilEnabled" style="width:auto; margin:0;"> আয়ের ব্যবস্থা চালু (মূল সুইচ)</label>
+    <div class="meta" style="margin-top:-4px;">মূল সুইচ বন্ধ থাকলে নিচের কোনো ব্যবসায় কিছু কাটে না। চালু করলেও শুধু যে ধরনের পাশে টিক আছে সেখানে চলবে।</div>
+    <div class="feat" id="bilTypes"></div>
+
+    <h2 style="margin-top:16px;">📲 টাকা নেওয়ার নম্বর</h2>
+    <div class="row" style="margin-top:0;">
+      <div style="flex:1; min-width:150px;"><small>bKash নম্বর</small><input id="bilBkash" inputmode="tel" placeholder="01XXXXXXXXX"></div>
+      <div style="flex:1; min-width:150px;"><small>bKash ধরন</small><select id="bilBkashType"><option value="personal">Personal (Send Money)</option><option value="agent">Agent (Cash Out)</option><option value="merchant">Merchant (Payment)</option></select></div>
+    </div>
+    <div class="row" style="margin-top:0;">
+      <div style="flex:1; min-width:150px;"><small>Nagad (ঐচ্ছিক)</small><input id="bilNagad" inputmode="tel"></div>
+      <div style="flex:1; min-width:150px;"><small>Rocket (ঐচ্ছিক)</small><input id="bilRocket" inputmode="tel"></div>
+    </div>
+    <div class="row" style="margin-top:0;">
+      <div style="flex:1; min-width:150px;"><small>সৌদির জন্য মাধ্যম (যেমন STC Pay)</small><input id="bilSaMethod"></div>
+      <div style="flex:1; min-width:150px;"><small>সৌদির নম্বর/একাউন্ট</small><input id="bilSaNumber"></div>
+    </div>
+    <small>দোকানদারকে দেখানোর নোট (ঐচ্ছিক)</small><textarea id="bilPayNote" rows="2" placeholder="যেমন: Send Money করে TrxID লিখুন"></textarea>
+    <div class="row" style="margin-top:0;">
+      <div style="flex:1; min-width:150px;"><small>যোগাযোগের ফোন</small><input id="bilPhone" inputmode="tel"></div>
+      <div style="flex:1; min-width:150px;"><small>যোগাযোগের ইমেইল</small><input id="bilEmail" type="email"></div>
+    </div>
+
+    <h2 style="margin-top:16px;">🏷️ দাম</h2>
+    <div class="row" style="margin-top:0;" id="bilCountryTabs">
+      <button class="btn" type="button" data-cc="BD">🇧🇩 বাংলাদেশ (৳)</button>
+      <button class="btn ghost" type="button" data-cc="SA">🇸🇦 সৌদি (রিয়াল)</button>
+    </div>
+    <div id="bilPriceBox" style="margin-top:10px;"></div>
+
+    <h2 style="margin-top:16px;">⚙️ অন্যান্য</h2>
+    <div class="row" style="margin-top:0;">
+      <div style="flex:1; min-width:150px;"><small>"বড় দোকান" — মাসে কত অনলাইন অর্ডার</small><input id="bilBig" type="number" min="1"></div>
+      <div style="flex:1; min-width:150px;"><small>দোকান কত মিনিটে সাড়া না দিলে গ্রাহক অন্য দোকানে</small><input id="bilTimeout" type="number" min="5"></div>
+    </div>
+    <button class="btn" id="bilSave" style="width:100%; margin-top:6px;">💾 সেটিংস সেভ করুন</button>
+    <p id="bilMsg" style="display:none; font-size:12.5px; margin:8px 0 0;"></p>
+  </div>
+
+  <div class="card" data-pane="billing">
+    <h2>📊 আজকের হিসাব</h2>
+    <div class="strip" id="bilToday"></div>
+    <div class="meta">পুরো আয়ের হিসাব (দিন/সপ্তাহ/মাস, গ্রাফ, এক্সেল) আসবে ধাপ আয়-৮-এ।</div>
+  </div>
+
+  <div class="card" data-pane="billing">
+    <h2>💳 ব্যবসার ক্রেডিট</h2>
+    <div class="meta">দোকানের তালিকায় "💳 ক্রেডিট" চাপলে আইডি নিজে বসে যাবে। দর্জি/রেস্টুরেন্ট/ড্রাইভারের আইডি = তাঁদের ইউজার আইডি।</div>
+    <div class="row" style="margin-top:0; flex-wrap:nowrap;">
+      <input id="bilBizId" placeholder="ব্যবসার আইডি" style="margin:0;">
+      <button class="btn" id="bilLookup" style="flex:0 0 auto; min-width:0;">🔎 দেখুন</button>
+    </div>
+    <div id="bilBizBox" style="margin-top:10px;"></div>
   </div>
 
   <div class="card" data-pane="announce">
@@ -282,10 +342,11 @@ auth.onAuthStateChanged(async (user)=>{
   startDriversListener();
   startTmReportsListener();
   startAnalyticsListener();
+  bilLoad();
 });
 
 /* ==================== 🗂️ ট্যাব (আলাদা আলাদা অপশন) ==================== */
-const PANES = ["overview","riders","agents","shops","restaurants","tailors","drivers","customers","markets","reports","announce"];
+const PANES = ["overview","riders","agents","shops","restaurants","tailors","drivers","customers","markets","reports","announce","billing"];
 function showPane(name){
   if(!PANES.includes(name)) name = "overview";
   document.querySelectorAll(".card[data-pane]").forEach(c => c.classList.toggle("show", c.dataset.pane === name));
@@ -760,6 +821,7 @@ async function loadShops(){
         <button class="btn ghost" data-act="savefeat" data-id="${shopId}">💾 ফিচার সেভ করুন</button>
         <button class="btn secondary" data-act="editshop" data-id="${shopId}">✏️ এডিট</button>
         <button class="btn secondary" data-act="fixemail" data-id="${shopId}">📧 ইমেইল ঠিক করুন</button>
+        <button class="btn secondary" data-act="credit" data-id="${shopId}">💳 ক্রেডিট</button>
         <button class="btn" style="background:var(--due);" data-act="deleteshop" data-id="${shopId}">🗑️ ডিলিট</button>
       </div>
     `;
@@ -772,6 +834,7 @@ async function loadShops(){
   list.querySelectorAll('[data-act="savefeat"]').forEach(b=>b.addEventListener("click", ()=>saveFeatures(b.dataset.id, b.closest(".shop"))));
   list.querySelectorAll('[data-act="editshop"]').forEach(b=>b.addEventListener("click", ()=>editShop(b.dataset.id)));
   list.querySelectorAll('[data-act="fixemail"]').forEach(b=>b.addEventListener("click", ()=>fixShopOwnerEmail(b.dataset.id)));
+  list.querySelectorAll('[data-act="credit"]').forEach(b=>b.addEventListener("click", ()=>bilOpenBiz(b.dataset.id)));
   list.querySelectorAll('[data-act="deleteshop"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "shop", "দোকান")));
 }
 
@@ -1275,6 +1338,132 @@ function startAnalyticsListener(){
           </div>`;
         }).join("");
   }, (err)=> console.warn("analytics listener error:", err));
+}
+
+/* ==================== 💰 আয়ের পথ — আয়-১ (সেটিংস + ক্রেডিট) ====================
+   সব লেখা functions/billing.js-এর billingAdmin দিয়ে (সার্ভার যাচাই করে)।
+   পড়া সরাসরি Firestore থেকে (rules: সুপার এডমিন)। */
+const billingAdminFn = cloudFunctions.httpsCallable("billingAdmin");
+const BIL_TYPES = [["shop","🏪 দোকান (POS)"],["pharmacy","💊 ফার্মেসি"],["tailor","🧵 সেলাই ঘর"],["restaurant","🍽️ রেস্টুরেন্ট"],["driver","🚑 ড্রাইভার"]];
+const BIL_KEYS = [["perSale","প্রতি বিক্রিতে"],["orderFee","অনলাইন অর্ডারে"],["pkg6","৬ মাসের প্যাকেজ"],["pkg12","১২ মাসের প্যাকেজ"],["freeProducts","ফ্রি পণ্য (সংখ্যা)"]];
+const BIL_KIND = { recharge:"💵 রিচার্জ", gift:"🎁 উপহার", correction:"✏️ সংশোধন", sale:"🧾 বিক্রি", order:"🛒 অনলাইন অর্ডার", refund:"↩️ ফেরত", package:"📅 প্যাকেজ" };
+let BIL = null, bilCC = "BD";
+const bilEsc = (v)=> String(v == null ? "" : v).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const bilMoney = (n, cc)=> (cc === "SA" ? "SAR " : "৳") + bnNum((Math.round(Number(n || 0) * 100) / 100).toLocaleString("en-IN"));
+function bilMsg(t, ok){ const el = document.getElementById("bilMsg"); el.textContent = t; el.style.color = ok ? "var(--paid)" : "var(--due)"; el.style.display = t ? "block" : "none"; }
+
+async function bilLoad(){
+  try{
+    const r = await billingAdminFn({ action:"getConfig" });
+    BIL = r.data.config; bilFill(); bilLoadToday();
+  }catch(e){ document.getElementById("bilState").textContent = "সেটিংস আনা যায়নি: " + (e.message || e); }
+}
+function bilFill(){
+  const c = BIL, $ = (id)=> document.getElementById(id);
+  $("bilState").innerHTML = c.enabled ? `<b style="color:var(--paid)">🟢 আয়ের ব্যবস্থা চালু</b>` : `<b style="color:var(--due)">⚪ আয়ের ব্যবস্থা বন্ধ</b> — কোনো ব্যবসায় কিছু কাটছে না`;
+  $("bilEnabled").checked = !!c.enabled;
+  $("bilTypes").innerHTML = BIL_TYPES.map(([k,l])=> `<label><input type="checkbox" data-bt="${k}" ${c.types && c.types[k] ? "checked" : ""} style="width:auto; margin:0;"> ${l}</label>`).join("");
+  $("bilBkash").value = c.pay.bkash || ""; $("bilBkashType").value = c.pay.bkashType || "personal";
+  $("bilNagad").value = c.pay.nagad || ""; $("bilRocket").value = c.pay.rocket || "";
+  $("bilSaMethod").value = c.pay.saMethod || ""; $("bilSaNumber").value = c.pay.saNumber || ""; $("bilPayNote").value = c.pay.note || "";
+  $("bilPhone").value = c.contact.phone || ""; $("bilEmail").value = c.contact.email || "";
+  $("bilBig").value = c.bigShopOrders; $("bilTimeout").value = c.orderTimeoutMin;
+  bilDrawPrices();
+}
+function bilReadPrices(){
+  if(!BIL) return;
+  document.querySelectorAll("#bilPriceBox [data-pk]").forEach(i=>{ const [t,k] = i.dataset.pk.split("."); BIL.prices[bilCC][t][k] = Number(i.value || 0); });
+  const mr = document.getElementById("bilMinRe"), gd = document.getElementById("bilGift");
+  if(mr) BIL.minRecharge[bilCC] = Number(mr.value || 0);
+  if(gd) BIL.giftDefault[bilCC] = Number(gd.value || 0);
+}
+function bilDrawPrices(){
+  const c = BIL, cc = bilCC, cur = cc === "SA" ? "রিয়াল" : "৳";
+  document.querySelectorAll("#bilCountryTabs [data-cc]").forEach(b=> b.className = b.dataset.cc === cc ? "btn" : "btn ghost");
+  document.getElementById("bilPriceBox").innerHTML = `
+    <div class="row" style="margin-top:0;">
+      <div style="flex:1; min-width:150px;"><small>ন্যূনতম রিচার্জ (${cur})</small><input id="bilMinRe" type="number" step="0.01" min="0" value="${c.minRecharge[cc]}"></div>
+      <div style="flex:1; min-width:150px;"><small>🎁 উপহার ক্রেডিট (${cur})</small><input id="bilGift" type="number" step="0.01" min="0" value="${c.giftDefault[cc]}"></div>
+    </div>
+    ${BIL_TYPES.map(([t,l])=> `<div class="shop" style="margin-bottom:8px;"><div class="shop-name" style="font-size:13.5px;">${l}</div>
+      <div class="row" style="margin-top:6px;">${BIL_KEYS.map(([k,kl])=> `<div style="flex:1; min-width:110px;"><small>${kl}${k === "freeProducts" ? "" : " (" + cur + ")"}</small><input data-pk="${t}.${k}" type="number" step="${k === "freeProducts" ? 1 : 0.01}" min="0" value="${c.prices[cc][t][k]}" style="margin:0;"></div>`).join("")}</div></div>`).join("")}`;
+}
+document.querySelectorAll("#bilCountryTabs [data-cc]").forEach(b=> b.addEventListener("click", ()=>{ if(!BIL) return; bilReadPrices(); bilCC = b.dataset.cc; bilDrawPrices(); }));
+document.getElementById("bilSave").addEventListener("click", async ()=>{
+  if(!BIL) return;
+  bilReadPrices();
+  const $ = (id)=> document.getElementById(id);
+  const wantOn = $("bilEnabled").checked;
+  if(wantOn && !BIL.enabled && !confirm("⚠️ আয়ের ব্যবস্থা চালু করছেন। যে ধরনের ব্যবসায় টিক আছে সেখানে নিয়ম চালু হবে। নিশ্চিত?")) return;
+  const cfg = Object.assign({}, BIL, {
+    enabled: wantOn,
+    types: Object.fromEntries(BIL_TYPES.map(([k])=> [k, !!document.querySelector(`#bilTypes [data-bt="${k}"]`).checked])),
+    pay: { bkash: $("bilBkash").value.trim(), bkashType: $("bilBkashType").value, nagad: $("bilNagad").value.trim(), rocket: $("bilRocket").value.trim(),
+      saMethod: $("bilSaMethod").value.trim(), saNumber: $("bilSaNumber").value.trim(), note: $("bilPayNote").value.trim() },
+    contact: { phone: $("bilPhone").value.trim(), email: $("bilEmail").value.trim() },
+    bigShopOrders: Number($("bilBig").value || 10), orderTimeoutMin: Number($("bilTimeout").value || 20),
+  });
+  delete cfg.updatedAt; delete cfg.updatedBy;
+  const btn = $("bilSave"); btn.disabled = true; btn.textContent = "সেভ হচ্ছে...";
+  try{ await billingAdminFn({ action:"saveConfig", config: cfg }); bilMsg("✅ সেটিংস সেভ হয়েছে", true); await bilLoad(); }
+  catch(e){ bilMsg("⚠️ " + (e.message || e)); }
+  finally{ btn.disabled = false; btn.textContent = "💾 সেটিংস সেভ করুন"; }
+});
+
+async function bilLoadToday(){
+  const day = new Date(Date.now() + 6 * 3600000).toISOString().slice(0, 10);
+  try{
+    const d = await db.collection("billingDaily").doc(day).get();
+    const x = (d.exists && d.data().BD) || {};
+    document.getElementById("bilToday").innerHTML = [
+      ["আসল আয়", bilMoney(x.income), "ok"], ["কেনা ক্রেডিট", bilMoney(x.issuedPaid), ""], ["🎁 উপহার", bilMoney(x.issuedGift), "warn"],
+      ["বিক্রিতে খরচ", bilMoney(x.spentSale), ""], ["অর্ডারে খরচ", bilMoney(x.spentOrder), ""]
+    ].map(([l,v,t])=> `<div class="s ${t}"><small>${l}</small><b style="font-size:14px;">${v}</b></div>`).join("");
+  }catch(e){ document.getElementById("bilToday").textContent = "হিসাব আনা যায়নি"; }
+}
+
+function bilOpenBiz(id){ showPane("billing"); document.getElementById("bilBizId").value = id; bilShowBiz(id); }
+document.getElementById("bilLookup").addEventListener("click", ()=>{ const id = document.getElementById("bilBizId").value.trim(); if(id) bilShowBiz(id); });
+async function bilShowBiz(id){
+  const box = document.getElementById("bilBizBox");
+  box.innerHTML = "লোড হচ্ছে...";
+  let info;
+  try{ info = (await billingAdminFn({ action:"lookup", bizId: id })).data.info; }
+  catch(e){ box.innerHTML = `<p style="color:var(--due)">⚠️ ${bilEsc(e.message || e)}</p>`; return; }
+  const ref = db.collection("billing").doc(id);
+  const [b, led] = await Promise.all([ref.get(), ref.collection("ledger").orderBy("at","desc").limit(30).get().catch(()=> ({ docs:[] }))]);
+  const x = b.exists ? b.data() : {}, cc = info.country;
+  const typeL = (BIL_TYPES.find(t=> t[0] === info.type) || [0, info.type])[1];
+  box.innerHTML = `<div class="shop">
+      <div class="shop-top"><span class="shop-name">${bilEsc(info.name || "(নামহীন)")}</span><span class="chip active">${typeL} · ${cc === "SA" ? "🇸🇦" : "🇧🇩"}</span></div>
+      <div class="strip" style="margin:8px 0;">
+        <div class="s ${Number(x.credit) < 0 ? "bad" : "ok"}"><small>বাকি ক্রেডিট</small><b>${bilMoney(x.credit, cc)}</b></div>
+        <div class="s warn"><small>🎁 মোট উপহার</small><b>${bilMoney(x.giftCredit, cc)}</b></div>
+        <div class="s"><small>মোট দেওয়া টাকা</small><b>${bilMoney(x.totals && x.totals.money, cc)}</b></div>
+      </div>
+      <div class="row">
+        <button class="btn unblock" id="bilGiftBtn" ${Number(x.giftCredit) > 0 ? "disabled title='আগেই উপহার পেয়েছে'" : ""}>🎁 উপহার ক্রেডিট দিন</button>
+        <button class="btn secondary" id="bilFixBtn">✏️ সংশোধন (+/−)</button>
+      </div>
+      <div style="margin-top:10px; font-size:12.5px;">${led.docs.length ? led.docs.map(d=>{ const l = d.data(); const t = l.at && l.at.toDate ? l.at.toDate().toLocaleString("bn-BD") : "";
+        return `<div class="sum-row"><span>${BIL_KIND[l.kind] || l.kind}${l.note ? " — " + bilEsc(l.note) : ""}<br><small style="color:#8a7f6c">${t}${l.byName ? " · " + bilEsc(l.byName) : ""}</small></span>
+          <span style="text-align:right; white-space:nowrap;"><b style="color:${l.amount < 0 ? "var(--due)" : "var(--paid)"}">${l.amount < 0 ? "−" : "+"}${bilMoney(Math.abs(l.amount), cc)}</b><br><small>বাকি ${bilMoney(l.balanceAfter, cc)}</small></span></div>`; }).join("") : "<p class='meta'>এখনো কোনো লেনদেন নেই</p>"}</div>
+    </div>`;
+  document.getElementById("bilGiftBtn").onclick = async ()=>{
+    const def = BIL ? BIL.giftDefault[cc] : 50;
+    const v = prompt(`কত ক্রেডিট উপহার দেবেন? (${cc === "SA" ? "রিয়াল" : "৳"}) — একবারই দেওয়া যায়`, String(def));
+    if(v === null) return;
+    try{ await billingAdminFn({ action:"adjust", bizId: id, kind:"gift", amount: Number(v) }); bilShowBiz(id); bilLoadToday(); }
+    catch(e){ alert("⚠️ " + (e.message || e)); }
+  };
+  document.getElementById("bilFixBtn").onclick = async ()=>{
+    const v = prompt("কত যোগ/বিয়োগ? (বিয়োগের জন্য সামনে − দিন, যেমন -10)", "");
+    if(v === null || !Number(v)) return;
+    const note = prompt("কারণ লিখুন (দোকানদারও দেখবেন):", "");
+    if(note === null) return;
+    try{ await billingAdminFn({ action:"adjust", bizId: id, kind:"correction", amount: Number(v), note }); bilShowBiz(id); bilLoadToday(); }
+    catch(e){ alert("⚠️ " + (e.message || e)); }
+  };
 }
 </script>
 </body>

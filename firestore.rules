@@ -1136,6 +1136,33 @@ service cloud.firestore {
     // (Admin SDK, rules বাইপাস করে) লেখে — ক্লায়েন্ট থেকে সরাসরি লেখা
     // যাবে না, শুধু পড়া যাবে (যাতে ভবিষ্যতে ক্লায়েন্ট-সাইড ক্যাশ-হিট
     // অপ্টিমাইজেশনও সম্ভব হয়)।
+    /* 💰 আয়ের পথ (functions/billing.js) — সব লেখা শুধু সার্ভারে।
+       সেটিংস (দাম, bKash নম্বর) লগইন করা সবাই পড়তে পারে; ক্রেডিট আর তার খাতা
+       শুধু সেই ব্যবসার মালিক/সদস্য আর সুপার এডমিন; দিনের সারাংশ শুধু সুপার এডমিন। */
+    match /billingConfig/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+    match /billing/{bizId} {
+      allow read: if isSignedIn() && (isSuperAdmin() || request.auth.uid == bizId || myShopId() == bizId);
+      allow write: if false;
+      match /ledger/{entryId} {
+        allow read: if isSignedIn() && (isSuperAdmin() || request.auth.uid == bizId || myShopId() == bizId);
+        allow write: if false;
+      }
+      match /dedupe/{k} {
+        allow read, write: if false;
+      }
+    }
+    match /billingDaily/{day} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+    match /billingAudit/{id} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+
     match /flightCache/{cacheId} {
       allow read: if true;
       allow write: if false;
