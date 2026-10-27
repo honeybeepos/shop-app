@@ -75,6 +75,8 @@
   .strip .s b{font-size:17px;font-family:'Space Mono',monospace;}
   .strip .s.ok b{color:var(--paid);} .strip .s.bad b{color:var(--due);} .strip .s.warn b{color:var(--copper);}
   .sum-row{display:flex;justify-content:space-between;padding:7px 0;border-top:1px dashed var(--line);font-size:13px;}
+  /* 💰 আয় ট্যাব — কম্পিউটারে দামের ৫টা ঘর এক সারিতে (নিচের .row নিজেই ছড়ায়); মোবাইলে দুই-দুই করে ভাঙে */
+  @media (min-width:1000px){ #bilBizBox .sum-row{font-size:13.5px;} }
 </style>
 <script src="bd-locations.js"></script>
 </head>
@@ -1385,8 +1387,8 @@ function bilDrawPrices(){
       <div style="flex:1; min-width:150px;"><small>ন্যূনতম রিচার্জ (${cur})</small><input id="bilMinRe" type="number" step="0.01" min="0" value="${c.minRecharge[cc]}"></div>
       <div style="flex:1; min-width:150px;"><small>🎁 উপহার ক্রেডিট (${cur})</small><input id="bilGift" type="number" step="0.01" min="0" value="${c.giftDefault[cc]}"></div>
     </div>
-    ${BIL_TYPES.map(([t,l])=> `<div class="shop" style="margin-bottom:8px;"><div class="shop-name" style="font-size:13.5px;">${l}</div>
-      <div class="row" style="margin-top:6px;">${BIL_KEYS.map(([k,kl])=> `<div style="flex:1; min-width:110px;"><small>${kl}${k === "freeProducts" ? "" : " (" + cur + ")"}</small><input data-pk="${t}.${k}" type="number" step="${k === "freeProducts" ? 1 : 0.01}" min="0" value="${c.prices[cc][t][k]}" style="margin:0;"></div>`).join("")}</div></div>`).join("")}`;
+    <div id="bilPriceGrid">${BIL_TYPES.map(([t,l])=> `<div class="shop" style="margin-bottom:8px;"><div class="shop-name" style="font-size:13.5px;">${l}</div>
+      <div class="row" style="margin-top:6px;">${BIL_KEYS.map(([k,kl])=> `<div style="flex:1; min-width:110px;"><small>${kl}${k === "freeProducts" ? "" : " (" + cur + ")"}</small><input data-pk="${t}.${k}" type="number" step="${k === "freeProducts" ? 1 : 0.01}" min="0" value="${c.prices[cc][t][k]}" style="margin:0;"></div>`).join("")}</div></div>`).join("")}</div>`;
 }
 document.querySelectorAll("#bilCountryTabs [data-cc]").forEach(b=> b.addEventListener("click", ()=>{ if(!BIL) return; bilReadPrices(); bilCC = b.dataset.cc; bilDrawPrices(); }));
 document.getElementById("bilSave").addEventListener("click", async ()=>{
