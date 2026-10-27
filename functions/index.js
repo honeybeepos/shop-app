@@ -28,7 +28,21 @@
    ============================================================ */
 
 const { onDocumentCreated, onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
-const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onSchedule: onScheduleReal } = require("firebase-functions/v2/scheduler");
+/* ⏱️ ঘড়ি একত্র (২৬ অক্টোবর ২০২৬) — আগে ১৩টা আলাদা ঘড়ি-চালিত কাজ ছিল, আর Google প্রতি
+   একাউন্টে মাত্র ৩টা ফ্রি দেয় (তারপর প্রতিটা মাসে $০.১০)। এখন কোডে আগের মতোই
+   onSchedule("every N minutes", কাজ) লেখা থাকে, কিন্তু এটা আসল ঘড়ি বানায় না —
+   শুধু কাজটা তালিকায় তোলে। ফাইলের শেষে মাত্র ২টা আসল ঘড়ি (hbTickMinute আর
+   hbTickDaily) সময় দেখে যার পালা তাকে চালায়। নতুন কাজ যোগ করলেও ঘড়ি বাড়ে না। */
+const __HB_JOBS = [];
+function onSchedule(spec, fn) {
+  const s = typeof spec === "string" ? spec : (spec && spec.schedule) || "";
+  const m = /every\s+(\d+)\s+(minute|minutes|hour|hours)/i.exec(s);
+  const every = m ? (/hour/i.test(m[2]) ? Number(m[1]) * 60 : Number(m[1])) : 1440;
+  const job = { __hbJob: true, every, fn, name: "job" + __HB_JOBS.length };
+  __HB_JOBS.push(job);
+  return job;
+}
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
@@ -1491,6 +1505,9 @@ function normalizeAviationstackFlight(raw) {
     arrivalGate: arr.gate || null,
 
     aircraft: aircraft.registration || aircraft.icao || null,
+    // 🕒 বিমানবন্দরের সময়-অঞ্চল (যেমন "Asia/Dhaka") — ঘড়ি দেখে আনুমানিক হিসাবের জন্য
+    departureTz: dep.timezone || null,
+    arrivalTz: arr.timezone || null,
 
     // 🛰️ Live position — শুধু flight active থাকা অবস্থায়, এবং শুধু
     // AviationStack-এর Real-Time Flight Tracking প্ল্যানে পাওয়া যায়
@@ -1520,20 +1537,115 @@ function normalizeAviationstackFlight(raw) {
   return normalized;
 }
 
-// ফ্লাইটের status অনুযায়ী Firestore cache-এর মেয়াদ (ms)
-function flightCacheTtlMs(status) {
-  switch (status) {
-    case "active":
-    case "diverted": return 10 * 60 * 1000; // ১০ মিনিট (আগে ৩) — ফ্রি প্ল্যানে মাসে মাত্র ১০০ অনুরোধ
-    case "scheduled": return 30 * 60 * 1000; // ৩০ মিনিট
-    case "landed":
-    case "cancelled": return 6 * 60 * 60 * 1000; // ৬ ঘণ্টা — আর বদলায় না
-    default: return 20 * 60 * 1000; // unknown
+/* ==================== ✈️ ফ্লাইট — মাসে ১০০ অনুরোধে চালানোর নিয়ম (২৬ অক্টোবর ২০২৬) ====================
+   AviationStack-এর ফ্রি প্ল্যানে মাসে ১০০টা অনুরোধ। তাই:
+   ১) একটা ফ্লাইট (নম্বর + তারিখ) সর্বোচ্চ ৩ বার API — সাধারণত ২ বার:
+      • প্রথমবার: সেদিন প্রথম যে খোঁজেন। তথ্য flightCache-এ থাকে, বাকি সবাই
+        (২৪৯ জন যাত্রী/ড্রাইভার) সেখান থেকেই পান — API খরচ হয় না।
+      • দ্বিতীয়বার: কেউ চাপলে না — সার্ভার নিজে, নামার সময়ের ~২৫ মিনিট পরে
+        (কোথায় নামল, কখন নামল জানতে)। তখনো না নামলে নতুন সময়ের পরে ৩য় বার।
+   ২) মাঝের সময়টা ফোনের ঘড়ি দেখে হিসাব ("আনুমানিক ২ ঘণ্টা বাকি") — API ছাড়া।
+   ৩) নামার/বাতিলের খবর যাঁরা ফ্লাইটটা সেভ করে নজরে রেখেছেন সবাইকে একসাথে।
+   ৪) মাসের গোনা: flightUsage/{YYYY-MM}। নতুন ফ্লাইটের প্রথম খোঁজা ৯০ পর্যন্ত;
+      বাকি ১০টা চলমান ফ্লাইটের পরের খবরের জন্য রাখা। appConfig/flight-এ
+      {monthlyLimit, reserve} বসিয়ে বদলানো যায়।
+   ৫) ফ্রি প্ল্যানে শুধু আজকের ফ্লাইট — অন্য তারিখ চাইলে API না ডেকেই জানানো হয়। */
+
+const FLIGHT_MAX_HITS = 3;
+const FLIGHT_AFTER_ARRIVAL_MS = 25 * 60 * 1000;
+
+async function flightLimits() {
+  let c = {};
+  try { const d = await db.collection("appConfig").doc("flight").get(); if (d.exists) c = d.data() || {}; } catch (e) { /* ডিফল্ট */ }
+  const monthlyLimit = Number(c.monthlyLimit) > 0 ? Number(c.monthlyLimit) : 100;
+  const reserve = Number(c.reserve) >= 0 && c.reserve != null ? Number(c.reserve) : 10;
+  return { monthlyLimit, reserve };
+}
+/* kind: "first" (নতুন ফ্লাইট) | "followup" (চলমান ফ্লাইটের পরের খবর) */
+async function flightTakeBudget(kind) {
+  const lim = await flightLimits();
+  const month = new Date().toISOString().slice(0, 7);
+  const ref = db.collection("flightUsage").doc(month);
+  return db.runTransaction(async (t) => {
+    const d = await t.get(ref);
+    const n = d.exists ? Number(d.data().n) || 0 : 0;
+    const cap = kind === "first" ? lim.monthlyLimit - lim.reserve : lim.monthlyLimit;
+    if (n >= cap) return { ok: false, n, cap };
+    t.set(ref, { n: n + 1, [kind]: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    return { ok: true, n: n + 1, cap };
+  });
+}
+
+/* বিমানবন্দরের স্থানীয় সময় ("2026-10-26T14:30:00+00:00" — শেষের +00:00 ভুল) → আসল UTC ms */
+function flightLocalToUtcMs(iso, tz) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const guess = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  if (!tz) return guess; // সময়-অঞ্চল জানা না থাকলে যা আছে তাই
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+      .formatToParts(new Date(guess)).reduce((o, p) => (o[p.type] = p.value, o), {});
+    const asLocal = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute);
+    return guess - (asLocal - guess);
+  } catch (e) { return guess; }
+}
+function flightTimes(f) {
+  const dep = flightLocalToUtcMs(f.actualDeparture || f.estimatedDeparture || f.scheduledDeparture, f.departureTz);
+  const arr = flightLocalToUtcMs(f.actualArrival || f.estimatedArrival || f.scheduledArrival, f.arrivalTz);
+  return { dep, arr };
+}
+
+/* ঘড়ি দেখে এখনকার আনুমানিক অবস্থা — API ছাড়া। চূড়ান্ত অবস্থায় (নেমেছে/বাতিল) কিছু বদলায় না। */
+function flightWithClock(f) {
+  const out = Object.assign({}, f);
+  if (!["scheduled", "active", "unknown"].includes(f.status)) { out.clock = null; return out; }
+  const { dep, arr } = flightTimes(f);
+  const now = Date.now();
+  const bnNum = (n) => String(n).replace(/[0-9]/g, (d) => "০১২৩৪৫৬৭৮৯"[d]);
+  const dur = (ms) => { const m = Math.max(0, Math.round(ms / 60000)); const h = Math.floor(m / 60); return (h ? bnNum(h) + " ঘণ্টা " : "") + bnNum(m % 60) + " মিনিট"; };
+  let clock = null;
+  if (dep && now < dep) {
+    out.stage = dep - now <= 45 * 60 * 1000 ? "boarding" : "scheduled";
+    clock = { phase: "before", text: `ছাড়তে আনুমানিক ${dur(dep - now)} বাকি` };
+  } else if (dep && arr && now < arr) {
+    out.stage = arr - now <= 30 * 60 * 1000 ? "approaching" : "in_air";
+    clock = { phase: "air", progress: Math.min(1, Math.max(0, (now - dep) / (arr - dep))), text: `✈️ আকাশে (আনুমানিক) — নামতে প্রায় ${dur(arr - now)} বাকি` };
+  } else if (arr && now >= arr) {
+    out.stage = "approaching";
+    clock = { phase: "due", progress: 1, text: "🛬 নামার সময় হয়ে গেছে — নিশ্চিত খবর কিছুক্ষণের মধ্যে আসবে" };
   }
+  if (clock) clock.estimate = true;
+  out.clock = clock;
+  return out;
+}
+function flightIsFinal(status) { return ["landed", "cancelled", "diverted"].includes(status); }
+function flightNextHitAt(f, hits) {
+  if (flightIsFinal(f.status) || hits >= FLIGHT_MAX_HITS) return null;
+  const { arr } = flightTimes(f);
+  const now = Date.now();
+  if (arr && arr + FLIGHT_AFTER_ARRIVAL_MS > now) return Timestamp.fromMillis(arr + FLIGHT_AFTER_ARRIVAL_MS);
+  return Timestamp.fromMillis(now + 60 * 60 * 1000); // সময় জানা নেই/পার হয়ে গেছে — ১ ঘণ্টা পরে
+}
+
+async function flightCallApi(params, apiKey) {
+  const q = new URLSearchParams(Object.assign({ access_key: apiKey }, params));
+  let apiRes;
+  try { apiRes = await fetch(`https://api.aviationstack.com/v1/flights?${q.toString()}`); }
+  catch (e) { throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।"); }
+  if (apiRes.status === 429) throw new HttpsError("resource-exhausted", "এই মুহূর্তে অনেক অনুরোধ হচ্ছে। একটু পরে আবার চেষ্টা করুন।");
+  if (!apiRes.ok) throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  let json; try { json = await apiRes.json(); } catch (e) { throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না।"); }
+  if (json.error) {
+    const code = String((json.error && (json.error.code || json.error.type)) || "");
+    console.warn(JSON.stringify({ event: "FLIGHT_API_LOGICAL_ERROR", code }));
+    if (/usage_limit|limit_reached/i.test(code)) throw new HttpsError("resource-exhausted", "এই মাসের ফ্লাইট-তথ্যের সীমা শেষ — নতুন মাসে আবার পাওয়া যাবে।");
+    if (/invalid_access_key|missing_access_key|inactive_user/i.test(code)) throw new HttpsError("unavailable", "ফ্লাইট সার্ভিসের চাবি (API key) ঠিক নেই — অ্যাডমিনকে জানান।");
+    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না।");
+  }
+  return Array.isArray(json.data) ? json.data : [];
 }
 
 exports.searchFlight = onCall({ secrets: [aviationstackApiKey] }, async (request) => {
-  // 🔒 লগইন ছাড়া না (অতিথি/anonymous-ও না) — নইলে যে কেউ বারবার ডেকে মাসের সীমা শেষ করে দিত
   if (!request.auth || (request.auth.token && request.auth.token.firebase && request.auth.token.firebase.sign_in_provider === "anonymous")) {
     throw new HttpsError("unauthenticated", "ফ্লাইট দেখতে আগে লগইন করুন।");
   }
@@ -1542,237 +1654,168 @@ exports.searchFlight = onCall({ secrets: [aviationstackApiKey] }, async (request
   const depIata = normalizeIata(data.departureIata);
   const arrIata = normalizeIata(data.arrivalIata);
   const flightDate = normalizeDateStr(data.flightDate);
-
-  // 🔎 দুই ধরনের সার্চ — ফ্লাইট নম্বর দিয়ে, অথবা Departure+Arrival Airport দিয়ে
-  // (Date ঐচ্ছিক, দুটোর সাথেই ব্যবহার করা যায়)
   if (!flightNumber && !(depIata && arrIata)) {
-    throw new HttpsError(
-      "invalid-argument",
-      "সঠিক ফ্লাইট নম্বর (যেমনঃ SV123) অথবা Departure ও Arrival Airport কোড (যেমনঃ DAC → DXB) দিন।"
-    );
+    throw new HttpsError("invalid-argument", "সঠিক ফ্লাইট নম্বর (যেমনঃ SV804) অথবা Departure ও Arrival Airport কোড (যেমনঃ JED → DAC) দিন।");
+  }
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const dhakaKey = new Date(Date.now() + 6 * 3600000).toISOString().slice(0, 10);
+  if (flightDate && flightDate !== todayKey && flightDate !== dhakaKey) {
+    throw new HttpsError("failed-precondition", "শুধু আজকের ফ্লাইট দেখা যায়। ফ্লাইটের দিন আবার খুঁজুন। ✈️");
   }
 
-  const todayKey = flightDate || new Date().toISOString().slice(0, 10);
   const cacheKey = flightNumber ? `fn_${flightNumber}_${todayKey}` : `route_${depIata}_${arrIata}_${todayKey}`;
   const cacheRef = db.collection("flightCache").doc(cacheKey);
 
-  try {
-    const cacheDoc = await cacheRef.get();
-    if (cacheDoc.exists) {
-      const cached = cacheDoc.data();
-      if (cached.expiresAt && cached.expiresAt.toMillis() > Date.now()) {
-        return { flights: cached.data, source: "cache" };
-      }
+  // ১) আগে কেউ খুঁজে থাকলে — সেখান থেকেই (API খরচ নেই)
+  const fromCache = async () => {
+    const d = await cacheRef.get();
+    if (!d.exists || !Array.isArray(d.data().data) || !d.data().data.length) return null;
+    const c = d.data();
+    // রুট-খোঁজা থেকে আসা তথ্য, এখন কেউ নম্বর দিয়ে খুঁজলেন → পরের খবরের সময় ঠিক করা
+    if (flightNumber && !c.interest && !c.final) {
+      const nh = flightNextHitAt(c.data[0], Number(c.hits) || 0);
+      await cacheRef.set({ interest: true, nextHitAt: nh }, { merge: true }).catch(() => {});
     }
-  } catch (e) {
-    console.warn(JSON.stringify({ event: "FLIGHT_CACHE_READ_FAILED", error: String((e && e.message) || e) }));
+    return { flights: c.data.map(flightWithClock), source: "cache", hits: Number(c.hits) || 0, final: !!c.final,
+      nextHitAt: c.nextHitAt && c.nextHitAt.toMillis ? c.nextHitAt.toMillis() : null };
+  };
+  const cached = await fromCache();
+  if (cached) return cached;
+
+  // ২) একসাথে দুজন খুঁজলে একবারই API — যে আগে "দখল" নেন তিনি ডাকেন, বাকিরা অপেক্ষা করেন
+  const claimed = await db.runTransaction(async (t) => {
+    const d = await t.get(cacheRef);
+    if (d.exists && d.data().pendingAt && Date.now() - d.data().pendingAt.toMillis() < 25000) return false;
+    t.set(cacheRef, { pendingAt: Timestamp.now() }, { merge: true });
+    return true;
+  });
+  if (!claimed) {
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const c2 = await fromCache();
+      if (c2) return c2;
+    }
+    throw new HttpsError("unavailable", "একটু পরে আবার চেষ্টা করুন।");
   }
 
+  const release = () => cacheRef.set({ pendingAt: FieldValue.delete() }, { merge: true }).catch(() => {});
   const apiKey = aviationstackApiKey.value();
-  if (!apiKey) {
-    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_NO_API_KEY" }));
-    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  if (!apiKey) { await release(); throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না।"); }
+
+  const budget = await flightTakeBudget("first");
+  if (!budget.ok) {
+    await release();
+    throw new HttpsError("resource-exhausted", "এই মাসে নতুন ফ্লাইট খোঁজার সীমা শেষ। ✈️ আগে যে ফ্লাইটগুলো খোঁজা হয়েছে সেগুলো দেখা যাবে; নতুন মাসে আবার খোঁজা যাবে।");
   }
 
-  const params = new URLSearchParams({ access_key: apiKey });
-  if (flightNumber) params.set("flight_iata", flightNumber);
-  if (depIata) params.set("dep_iata", depIata);
-  if (arrIata) params.set("arr_iata", arrIata);
-  // ⚠️ flight_date মানে AviationStack-এর "পুরনো দিনের ফ্লাইট" — ফ্রি প্ল্যানে নেই। আজকের তারিখ হলে
-  //    পাঠানোই হয় না (আজকেরটা এমনিতেই আসে); অন্য তারিখে চেষ্টা করা হয়, না পারলে পরিষ্কার করে বলা হয়
-  const todayStr = new Date().toISOString().slice(0, 10);
-  if (flightDate && flightDate !== todayStr) params.set("flight_date", flightDate);
-
-  let apiRes;
+  let results;
   try {
-    apiRes = await fetch(`https://api.aviationstack.com/v1/flights?${params.toString()}`);
-  } catch (e) {
-    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_NETWORK_ERROR", error: String((e && e.message) || e) }));
-    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+    const params = {};
+    if (flightNumber) params.flight_iata = flightNumber;
+    if (depIata) params.dep_iata = depIata;
+    if (arrIata) params.arr_iata = arrIata;
+    results = await flightCallApi(params, apiKey);
+  } catch (e) { await release(); throw e; }
+  if (!results.length) {
+    await cacheRef.set({ pendingAt: FieldValue.delete(), emptyAt: Timestamp.now() }, { merge: true }).catch(() => {});
+    throw new HttpsError("not-found", "আজ এই ফ্লাইটের কোনো তথ্য পাওয়া যায়নি। নম্বরটা আবার দেখে নিন।");
   }
 
-  if (apiRes.status === 429) {
-    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_API_LIMIT" }));
-    throw new HttpsError("resource-exhausted", "এই মুহূর্তে অনেক অনুরোধ হচ্ছে। একটু পরে আবার চেষ্টা করুন।");
-  }
-  if (!apiRes.ok) {
-    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_API_ERROR", status: apiRes.status }));
-    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
-  }
+  const list = results.slice(0, 20).map((r) => Object.assign(normalizeAviationstackFlight(r), { flightDate: todayKey }));
+  const main = list[0];
+  const hits = 1;
+  await cacheRef.set({
+    cacheKey, flightDate: todayKey, data: list, hits, interest: !!flightNumber,
+    final: flightNumber ? flightIsFinal(main.status) : true, // রুটের তালিকার নিজের পরের খবর নেই
+    nextHitAt: flightNumber ? flightNextHitAt(main, hits) : null,
+    cachedAt: FieldValue.serverTimestamp(), lastApiUpdate: FieldValue.serverTimestamp(), pendingAt: FieldValue.delete(),
+  }, { merge: true });
 
-  let json;
-  try {
-    json = await apiRes.json();
-  } catch (e) {
-    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
+  // রুট-খোঁজায় আসা প্রতিটা ফ্লাইট আলাদা করে জমা — পরে নম্বর দিয়ে খুঁজলে API লাগবে না
+  if (!flightNumber) {
+    await Promise.all(list.filter((f) => f.flightNumber).map((f) => {
+      const ref = db.collection("flightCache").doc(`fn_${f.flightNumber}_${todayKey}`);
+      return db.runTransaction(async (t) => {
+        const d = await t.get(ref);
+        if (d.exists && Array.isArray(d.data().data) && d.data().data.length) return;
+        t.set(ref, { cacheKey: ref.id, flightDate: todayKey, data: [f], hits: 0, interest: false, final: flightIsFinal(f.status),
+          nextHitAt: null, cachedAt: FieldValue.serverTimestamp(), lastApiUpdate: FieldValue.serverTimestamp(), fromRoute: true }, { merge: true });
+      }).catch(() => {});
+    }));
   }
-  if (json.error) {
-    const code = String((json.error && (json.error.code || json.error.type)) || "");
-    console.warn(JSON.stringify({ event: "FLIGHT_SEARCH_API_LOGICAL_ERROR", code, error: json.error }));
-    if (/usage_limit|limit_reached/i.test(code)) {
-      throw new HttpsError("resource-exhausted", "এই মাসের ফ্লাইট-তথ্যের সীমা শেষ হয়ে গেছে — নতুন মাসে আবার চালু হবে।");
-    }
-    if (/function_access_restricted|historical/i.test(code)) {
-      throw new HttpsError("failed-precondition", "অন্য দিনের ফ্লাইট দেখা এখনকার প্ল্যানে নেই — তারিখ ফাঁকা রেখে আজকের ফ্লাইট খুঁজুন।");
-    }
-    if (/invalid_access_key|missing_access_key|inactive_user/i.test(code)) {
-      throw new HttpsError("unavailable", "ফ্লাইট সার্ভিসের চাবি (API key) ঠিক নেই — অ্যাডমিনকে জানান।");
-    }
-    throw new HttpsError("unavailable", "বর্তমানে ফ্লাইট তথ্য পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন।");
-  }
-
-  const results = Array.isArray(json.data) ? json.data : [];
-  if (results.length === 0) {
-    throw new HttpsError("not-found", "এই ফ্লাইটের কোনো তথ্য পাওয়া যায়নি। তথ্যগুলো আবার চেক করুন।");
-  }
-
-  // সর্বোচ্চ ২০টা রেজাল্ট normalize করে পাঠানো হয় (route সার্চে একাধিক ফ্লাইট আসতে পারে)
-  // flightDate সহ পাঠানো হয় — ক্লায়েন্ট Save/Track করলে এই তারিখটাই
-  // customers/{uid}/savedFlights-এ লাগবে (checkWatchedFlights-এর
-  // flightDate কোয়েরির সাথে মিলিয়ে)
-  const normalizedList = results.slice(0, 20).map((r) => Object.assign(normalizeAviationstackFlight(r), { flightDate: todayKey }));
-
-  // সবচেয়ে বেশি পরিবর্তনশীল (active) ফ্লাইট থাকলে তার ভিত্তিতে cache-মেয়াদ ঠিক হয়
-  const worstTtlStatus = normalizedList.some((f) => f.status === "active") ? "active" : (normalizedList[0] && normalizedList[0].status);
-  try {
-    await cacheRef.set({
-      cacheKey,
-      flightDate: todayKey,
-      data: normalizedList,
-      cachedAt: FieldValue.serverTimestamp(),
-      expiresAt: Timestamp.fromMillis(Date.now() + flightCacheTtlMs(worstTtlStatus)),
-      lastApiUpdate: FieldValue.serverTimestamp(),
-    });
-  } catch (e) {
-    console.warn(JSON.stringify({ event: "FLIGHT_CACHE_WRITE_FAILED", error: String((e && e.message) || e) }));
-  }
-
-  return { flights: normalizedList, source: "live" };
+  console.log(JSON.stringify({ event: "FLIGHT_API_FIRST", cacheKey, monthUsed: budget.n }));
+  return { flights: list.map(flightWithClock), source: "live", hits };
 });
 
-/* ==================== 🔔 Smart Flight Tracking — Phase 2 (Saved Flights + Notification) ====================
-   Login করা কাস্টমার customers/{uid}/savedFlights/{flightId}-এ (ক্লায়েন্ট
-   থেকে সরাসরি Firestore write, firestore.rules-এ owner-only) একটা ফ্লাইট
-   Save করতে পারবেন, চাইলে Tracking (trackingEnabled) চালু করতে পারবেন।
-   চালু থাকলে প্রতি ৫ মিনিটে নিচের checkWatchedFlights status/gate/সময়
-   পরিবর্তন চেক করে — পরিবর্তন পেলেই sendFcmToCustomer() দিয়ে পুশ পাঠায়
-   (আগে থেকেই ট্রিপ-আপডেটে ব্যবহৃত ফাংশন, শুধু data.type "flight-update")।
-   ফ্লাইট landed/cancelled/diverted (চূড়ান্ত অবস্থা) হয়ে গেলে tracking
-   নিজে থেকেই বন্ধ হয়ে যায়। ⚠️ collectionGroup("savedFlights") কোয়েরি
-   প্রথমবার চালানোর সময় Firestore একটা composite index চাইতে পারে —
-   Cloud Function log-এ auto-create লিংক দেখাবে, সেটায় ক্লিক করলেই হবে। */
+/* ==================== 🔔 নজরে রাখা ফ্লাইট — পরের খবর (সার্ভার নিজে, ৫ মিনিট পরপর দেখে) ====================
+   flightCache-এ যেসব ফ্লাইটের nextHitAt পার হয়েছে শুধু সেগুলোর জন্য API — সাধারণত
+   নামার সময়ের ~২৫ মিনিট পরে একবার। খবর বদলালে যাঁরা ফ্লাইটটা সেভ করে
+   নজর চালু রেখেছেন (customers/{uid}/savedFlights) সবাইকে নোটিফিকেশন। */
 function flightChangeNotificationText(flight) {
-  if (flight.status === "cancelled") {
-    return { title: "🔴 ফ্লাইট বাতিল হয়েছে", body: `${flight.flightNumber} ফ্লাইটটা বাতিল করা হয়েছে।` };
-  }
-  if (flight.status === "landed") {
-    return { title: "🛬 ফ্লাইট অবতরণ করেছে", body: `${flight.flightNumber} নিরাপদে পৌঁছে গেছে।` };
-  }
-  if (flight.status === "diverted") {
-    return { title: "↪️ ফ্লাইট ভিন্ন গন্তব্যে সরানো হয়েছে", body: `${flight.flightNumber}-এর গন্তব্য পরিবর্তন হয়েছে।` };
-  }
-  if (flight.isDelayed) {
-    return { title: "🟡 ফ্লাইট বিলম্বিত", body: `${flight.flightNumber} প্রায় ${flight.delayMinutes} মিনিট দেরিতে চলছে।` };
-  }
-  if (flight.status === "active") {
-    return { title: "🟢 ফ্লাইট আকাশে", body: `${flight.flightNumber} এখন উড়ছে।` };
-  }
-  return { title: "✈️ ফ্লাইটের তথ্য আপডেট হয়েছে", body: `${flight.flightNumber}-এর সর্বশেষ তথ্য দেখুন — Smart Flight Information-এ চেক করুন।` };
+  const where = flight.arrivalAirport || flight.arrivalIata || "";
+  if (flight.status === "cancelled") return { title: "🔴 ফ্লাইট বাতিল হয়েছে", body: `${flight.flightNumber} ফ্লাইটটা বাতিল করা হয়েছে।` };
+  if (flight.status === "landed") return { title: "🛬 ফ্লাইট নেমেছে", body: `${flight.flightNumber} ${where ? where + "-এ " : ""}নেমেছে।` };
+  if (flight.status === "diverted") return { title: "↪️ ফ্লাইট অন্য জায়গায় নেমেছে", body: `${flight.flightNumber}-এর গন্তব্য বদলেছে — ${where || "বিস্তারিত দেখুন"}।` };
+  if (flight.isDelayed) return { title: "🟡 ফ্লাইট দেরিতে", body: `${flight.flightNumber} প্রায় ${flight.delayMinutes} মিনিট দেরিতে চলছে।` };
+  if (flight.status === "active") return { title: "🟢 ফ্লাইট আকাশে", body: `${flight.flightNumber} এখনো উড়ছে।` };
+  return { title: "✈️ ফ্লাইটের খবর", body: `${flight.flightNumber}-এর সর্বশেষ তথ্য দেখুন।` };
 }
 
-exports.checkWatchedFlights = onSchedule({ schedule: "every 15 minutes", secrets: [aviationstackApiKey] }, async () => { // ⏱️ আগে ৫ মিনিট — মাসের ১০০ অনুরোধ বাঁচাতে
+exports.flightFollowups = onSchedule({ schedule: "every 5 minutes", secrets: [aviationstackApiKey] }, async () => {
   const apiKey = aviationstackApiKey.value();
-  if (!apiKey) {
-    console.warn(JSON.stringify({ event: "FLIGHT_WATCH_NO_API_KEY" }));
-    return;
-  }
-  const todayKey = new Date().toISOString().slice(0, 10);
-
-  let watchedDocs;
+  if (!apiKey) return;
+  let due;
   try {
-    const snap = await db.collectionGroup("savedFlights")
-      .where("trackingEnabled", "==", true)
-      .where("flightDate", "==", todayKey)
-      .get();
-    watchedDocs = snap.docs;
-  } catch (e) {
-    console.warn(JSON.stringify({ event: "FLIGHT_WATCH_QUERY_FAILED", error: String((e && e.message) || e) }));
-    return;
-  }
-  if (watchedDocs.length === 0) return;
-
-  for (const doc of watchedDocs) {
-    const saved = doc.data();
-    const flightNumber = saved.flightNumber;
-    const customerUid = doc.ref.parent.parent && doc.ref.parent.parent.id;
-    if (!flightNumber || !customerUid) continue;
-
+    due = await db.collection("flightCache").where("nextHitAt", "<=", Timestamp.now()).limit(5).get();
+  } catch (e) { console.warn(JSON.stringify({ event: "FLIGHT_FOLLOWUP_QUERY_FAILED", error: String(e && e.message || e) })); return; }
+  for (const doc of due.docs) {
+    const c = doc.data();
+    const old = Array.isArray(c.data) && c.data[0];
+    const hits = Number(c.hits) || 0;
+    if (!old || !old.flightNumber || c.final || hits >= FLIGHT_MAX_HITS) { await doc.ref.update({ nextHitAt: null }).catch(() => {}); continue; }
+    // দখল — একই ফ্লাইটে দুবার না
+    const ok = await db.runTransaction(async (t) => {
+      const d = await t.get(doc.ref);
+      const nh = d.data().nextHitAt;
+      if (!nh || nh.toMillis() > Date.now()) return false;
+      t.update(doc.ref, { nextHitAt: null });
+      return true;
+    }).catch(() => false);
+    if (!ok) continue;
+    const budget = await flightTakeBudget("followup");
+    if (!budget.ok) { console.warn(JSON.stringify({ event: "FLIGHT_FOLLOWUP_NO_BUDGET", id: doc.id })); continue; }
+    let f;
     try {
-      const cacheRef = db.collection("flightCache").doc(`fn_${flightNumber}_${todayKey}`);
-      let normalized = null;
+      const res = await flightCallApi({ flight_iata: old.flightNumber }, apiKey);
+      if (!res.length) continue;
+      f = Object.assign(normalizeAviationstackFlight(res[0]), { flightDate: c.flightDate });
+    } catch (e) { console.warn(JSON.stringify({ event: "FLIGHT_FOLLOWUP_API_FAILED", id: doc.id, error: String(e && e.message || e) })); continue; }
+    const newHits = hits + 1;
+    const final = flightIsFinal(f.status);
+    await doc.ref.set({ data: [f], hits: newHits, final, nextHitAt: final ? null : flightNextHitAt(f, newHits),
+      lastApiUpdate: FieldValue.serverTimestamp() }, { merge: true });
+    console.log(JSON.stringify({ event: "FLIGHT_API_FOLLOWUP", id: doc.id, status: f.status, hits: newHits, monthUsed: budget.n }));
 
-      const cacheDoc = await cacheRef.get();
-      if (cacheDoc.exists) {
-        const cached = cacheDoc.data();
-        if (cached.expiresAt && cached.expiresAt.toMillis() > Date.now() && Array.isArray(cached.data) && cached.data[0]) {
-          normalized = cached.data[0];
+    // 🔔 নজরে রাখা সবাইকে
+    try {
+      const snap = await db.collectionGroup("savedFlights")
+        .where("trackingEnabled", "==", true).where("flightDate", "==", c.flightDate).get();
+      for (const s of snap.docs) {
+        const sv = s.data();
+        if (sv.flightNumber !== f.flightNumber && sv.flightNumber !== old.flightNumber) continue;
+        const customerUid = s.ref.parent.parent && s.ref.parent.parent.id;
+        if (!customerUid) continue;
+        const changed = f.status !== sv.lastKnownStatus || f.estimatedArrival !== sv.lastKnownEstimatedArrival || f.arrivalIata !== sv.lastKnownArrivalIata;
+        const upd = { lastKnownStatus: f.status, lastKnownEstimatedArrival: f.estimatedArrival, lastKnownArrivalIata: f.arrivalIata || null,
+          lastKnownEstimatedDeparture: f.estimatedDeparture, lastKnownGate: f.departureGate, lastCheckedAt: FieldValue.serverTimestamp() };
+        if (final) upd.trackingEnabled = false;
+        await s.ref.update(upd).catch(() => {});
+        if (changed || final) {
+          const { title, body } = flightChangeNotificationText(f);
+          await sendFcmToCustomer(customerUid, title, body, { type: "flight-update", flightNumber: f.flightNumber || "", flightDate: c.flightDate });
         }
       }
-
-      if (!normalized) {
-        const params = new URLSearchParams({ access_key: apiKey, flight_iata: flightNumber }); // আজকেরটা — flight_date ফ্রি প্ল্যানে নেই
-        const apiRes = await fetch(`https://api.aviationstack.com/v1/flights?${params.toString()}`);
-        if (!apiRes.ok) continue;
-        const json = await apiRes.json();
-        if (json.error) continue;
-        const results = Array.isArray(json.data) ? json.data : [];
-        if (results.length === 0) continue;
-        const normalizedList = results.slice(0, 20).map((r) => normalizeAviationstackFlight(r));
-        normalized = normalizedList[0];
-        await cacheRef.set({
-          cacheKey: `fn_${flightNumber}_${todayKey}`,
-          flightDate: todayKey,
-          data: normalizedList,
-          cachedAt: FieldValue.serverTimestamp(),
-          expiresAt: Timestamp.fromMillis(Date.now() + flightCacheTtlMs(normalized.status)),
-          lastApiUpdate: FieldValue.serverTimestamp(),
-        }).catch(() => {});
-      }
-      if (!normalized) continue;
-
-      const changed =
-        normalized.status !== saved.lastKnownStatus ||
-        normalized.estimatedDeparture !== saved.lastKnownEstimatedDeparture ||
-        normalized.estimatedArrival !== saved.lastKnownEstimatedArrival ||
-        normalized.departureGate !== saved.lastKnownGate;
-
-      const updatePayload = {
-        lastKnownStatus: normalized.status,
-        lastKnownEstimatedDeparture: normalized.estimatedDeparture,
-        lastKnownEstimatedArrival: normalized.estimatedArrival,
-        lastKnownGate: normalized.departureGate,
-        lastCheckedAt: FieldValue.serverTimestamp(),
-      };
-      // 🛬 চূড়ান্ত অবস্থায় পৌঁছালে আর ট্র্যাক করার দরকার নেই — Cloud
-      // Function-এর নিয়মিত খরচ/API-কল বাঁচাতে নিজে থেকেই বন্ধ হয়ে যায়
-      if (["landed", "cancelled", "diverted"].includes(normalized.status)) {
-        updatePayload.trackingEnabled = false;
-      }
-      await doc.ref.update(updatePayload).catch(() => {});
-
-      // 🔔 প্রথমবার status বসানোর সময় (saved.lastKnownStatus আগে সেট করা
-      // ছিল না) নোটিফিকেশন পাঠানো হয় না — শুধু প্রকৃত পরিবর্তনেই পাঠানো হয়
-      if (changed && saved.lastKnownStatus) {
-        const { title, body } = flightChangeNotificationText(normalized);
-        await sendFcmToCustomer(customerUid, title, body, {
-          type: "flight-update",
-          flightNumber,
-          flightDate: todayKey,
-        });
-      }
-    } catch (e) {
-      console.warn(JSON.stringify({ event: "FLIGHT_WATCH_CHECK_FAILED", flightNumber, error: String((e && e.message) || e) }));
-    }
+    } catch (e) { console.warn(JSON.stringify({ event: "FLIGHT_NOTIFY_FAILED", error: String(e && e.message || e) })); }
   }
 });
 
@@ -3877,4 +3920,34 @@ ${facts}`;
     console.warn(JSON.stringify({ event: "MOU_OWNER_FAILED", error: String(e && e.message || e) }));
     return { reply: "এই মুহূর্তে উত্তর দিতে পারছি না 🐝 একটু পরে আবার চেষ্টা করুন।" };
   }
+});
+
+/* ==================== ⏱️ ২টা আসল ঘড়ি (উপরের onSchedule-এর ব্যাখ্যা দেখুন) ==================== */
+for (const k of Object.keys(exports)) {
+  if (exports[k] && exports[k].__hbJob) { exports[k].name = k; delete exports[k]; }
+}
+async function hbRunJobs(jobs, label) {
+  const t0 = Date.now();
+  const res = await Promise.allSettled(jobs.map(async (j) => {
+    try { await j.fn(); } catch (e) { console.error(JSON.stringify({ event: "HB_JOB_FAILED", job: j.name, error: String(e && e.message || e) })); }
+  }));
+  if (Date.now() - t0 > 20000) console.log(JSON.stringify({ event: "HB_TICK_SLOW", label, ms: Date.now() - t0, jobs: jobs.map((j) => j.name) }));
+  return res;
+}
+// প্রতি মিনিটে: ১/২/৫/১৫ মিনিটের কাজ নিজের পালায়; ঘণ্টার কাজ প্রতি ঘণ্টার ৭ মিনিটে
+exports.hbTickMinute = onScheduleReal({
+  schedule: "every 1 minutes", timeZone: "UTC", timeoutSeconds: 540, memory: "256MiB",
+  secrets: [aviationstackApiKey, googleMapsApiKey],
+}, async (event) => {
+  const t = new Date(event && event.scheduleTime ? event.scheduleTime : Date.now());
+  const min = t.getUTCHours() * 60 + t.getUTCMinutes();
+  const due = __HB_JOBS.filter((j) => j.every < 1440 && (j.every <= 1 || (j.every >= 60 ? min % j.every === 7 : min % j.every === 0)));
+  if (due.length) await hbRunJobs(due, "minute");
+});
+// দিনে একবার (বাংলাদেশ সময় রাত ৩:১০): পুরনো ছবি/ইতিহাস মোছা
+exports.hbTickDaily = onScheduleReal({
+  schedule: "every day 03:10", timeZone: "Asia/Dhaka", timeoutSeconds: 540, memory: "512MiB",
+}, async () => {
+  const due = __HB_JOBS.filter((j) => j.every >= 1440);
+  if (due.length) await hbRunJobs(due, "daily");
 });

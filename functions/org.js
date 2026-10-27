@@ -222,6 +222,7 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
       tx.update(orgRef(oid).collection("members").doc(me.uid), { status: "left", leftAt: FieldValue.serverTimestamp() });
       const upd = { memberCount: FieldValue.increment(-1), updatedAt: FieldValue.serverTimestamp() };
       if (m.role === "admin") upd.adminCount = FieldValue.increment(-1);
+      if (org.treasurerUid === me.uid) { upd.treasurerUid = null; upd.treasurerName = null; } // 💰 তহবিল রক্ষক চলে গেলে পদ খালি
       tx.update(orgRef(oid), upd);
       tx.set(idx(me.uid), { orgs: { [oid]: FieldValue.delete() } }, { merge: true });
       audit(tx, oid, me, "member_leave", {});
@@ -344,14 +345,23 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
     const ref = orgRef(oid).collection("transactions").doc();
     return db.runTransaction(async (tx) => {
       const org = await getOrg(tx, oid);
-      await needAdmin(tx, oid, me.uid);
+      /* 💰 তহবিল রক্ষক থাকলে: অ্যাডমিন জমা লেখেন → তহবিল রক্ষক "হাতে পেয়েছি" চাপলে হিসাবে ওঠে।
+         তহবিল রক্ষক নিজে জমা লিখলে → আরেকজন অ্যাডমিন নিশ্চিত করেন। খরচ আগের নিয়মেই। */
+      const meM = await member(tx, oid, me.uid);
+      const meAdmin = !!meM && meM.role === "admin";
+      const tr = type === "in" && org.treasurerUid ? org.treasurerUid : null;
+      const meTr = !!tr && tr === me.uid && !!meM;
+      if (!meAdmin && !meTr) throw new HttpsError("permission-denied", "শুধু এই সংগঠনের অ্যাডমিন বা তহবিল রক্ষক টাকা জমা লিখতে পারেন");
       let mem = null, aid = null;
       if (memberUid) { mem = await member(tx, oid, memberUid); if (!mem) throw new HttpsError("not-found", "এই সদস্য পাওয়া যায়নি"); }
       let col = null;
       if (collectorUid) { col = await member(tx, oid, collectorUid); if (!col) throw new HttpsError("not-found", "এই সদস্য পাওয়া যায়নি"); }
       if (aidId) { aid = await tx.get(orgRef(oid).collection("aid").doc(aidId)); if (!aid.exists) throw new HttpsError("not-found", "মানবিক সেবা পাওয়া যায়নি"); }
-      const one = need2(org) === 1;
+      const otherAdmins = (org.adminCount || 1) - (meAdmin ? 1 : 0);
+      const stage = tr ? (meTr ? (otherAdmins >= 1 ? "admin" : null) : "treasurer") : null;
+      const one = tr ? stage === null : need2(org) === 1;
       const t = {
+        stage, treasurerUid: tr, treasurerName: tr ? (org.treasurerName || null) : null,
         type, title: memberUid ? "সদস্য চাঁদা" : (col ? "বাহিরের অনুদান — " + title : title), amount, method, reference, note, date,
         collectorUid: col ? collectorUid : null, collectorName: col ? col.name : null,
         aidId, aidTitle: aid ? aid.data().title : null, createdBy: me.uid, createdByName: me.name,
@@ -375,10 +385,20 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
     const ref = orgRef(oid).collection("transactions").doc(tid);
     return db.runTransaction(async (tx) => {
       const org = await getOrg(tx, oid, true);
-      await needAdmin(tx, oid, me.uid);
       const s = await tx.get(ref);
       if (!s.exists || s.data().status !== "pending") throw new HttpsError("failed-precondition", "এই লেনদেন আর অপেক্ষায় নেই");
       const t = s.data();
+      const meM = await member(tx, oid, me.uid);
+      const meAdmin = !!meM && meM.role === "admin";
+      const meTr = !!meM && !!org.treasurerUid && org.treasurerUid === me.uid;
+      // 💰 তহবিল রক্ষকের পালা: "হাতে পেয়েছি" শুধু তিনি; বাতিল তিনি বা যেকোনো অ্যাডমিন (ভুল লেখা হলে)
+      if (t.stage === "treasurer") {
+        if (approve && !meTr) throw new HttpsError("permission-denied", "টাকা হাতে পেয়েছেন কিনা শুধু তহবিল রক্ষক নিশ্চিত করবেন");
+        if (!approve && !meTr && !meAdmin) throw new HttpsError("permission-denied", "শুধু তহবিল রক্ষক বা অ্যাডমিন বাতিল করতে পারেন");
+      } else {
+        if (!meAdmin) throw new HttpsError("permission-denied", "শুধু এই সংগঠনের অ্যাডমিন এটা করতে পারেন");
+        if (approve && t.stage === "admin" && t.createdBy === me.uid) throw new HttpsError("permission-denied", "আরেকজন অ্যাডমিন নিশ্চিত করবেন");
+      }
       if (!approve) {
         tx.update(ref, { status: "rejected", rejectedBy: me.uid, rejectedName: me.name, decidedAt: FieldValue.serverTimestamp() });
         if (t.duesId) tx.update(orgRef(oid).collection("dues").doc(t.duesId), { status: "rejected" });
@@ -386,7 +406,8 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
         return { ok: true, status: "rejected" };
       }
       const ap = addApproval(t, me);
-      if (ap.approvedBy.length < need2(org)) { tx.update(ref, ap); return { ok: true, status: "pending" }; }
+      if (t.stage === "treasurer" || t.stage === "admin") ap.receivedBy = me.uid, ap.receivedName = me.name;
+      else if (ap.approvedBy.length < need2(org)) { tx.update(ref, ap); return { ok: true, status: "pending" }; }
       const st = t.type === "in" ? "verified" : "approved";
       const extra = countTx(tx, oid, org, t, ref);
       tx.update(ref, Object.assign({ status: st, decidedAt: FieldValue.serverTimestamp() }, ap, extra));
@@ -543,7 +564,7 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
   /* অ্যাডমিন বানানো / অ্যাডমিন সরানো / সদস্য বাদ — প্রস্তাব + অনুমোদন।
      যাঁকে নিয়ে কাজ, তিনি নিজে অনুমোদন দিতে পারেন না। অনুমোদন লাগে:
      যত অ্যাডমিন আছেন (তিনি বাদে) তার মধ্যে ২ জন — একজন থাকলে একজন। */
-  const ACTIONS = { make_admin: "অ্যাডমিন বানানো", remove_admin: "অ্যাডমিন থেকে সরানো", remove_member: "সদস্যপদ বাতিল", resign_admin: "অ্যাডমিন পদ থেকে পদত্যাগ" };
+  const ACTIONS = { make_admin: "অ্যাডমিন বানানো", remove_admin: "অ্যাডমিন থেকে সরানো", remove_member: "সদস্যপদ বাতিল", resign_admin: "অ্যাডমিন পদ থেকে পদত্যাগ" , make_treasurer: "তহবিল রক্ষক বানানো", remove_treasurer: "তহবিল রক্ষক পদ থেকে সরানো" };
   /* 🙋 পদত্যাগের আবেদন — অ্যাডমিন নিজে আবেদন করেন, অন্য অ্যাডমিনরা অনুমতি দেন
      (অন্য অ্যাডমিন ২+ হলে দুইজন, একজন হলে একজন)। একমাত্র অ্যাডমিন পারেন না —
      তাহলে সংগঠন অ্যাডমিন ছাড়া পড়ে থাকত। অনুমতির আগে আবেদন তুলে নেওয়া যায়। */
@@ -592,6 +613,8 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
       if (kind === "make_admin" && t.role === "admin") throw new HttpsError("already-exists", "ইনি আগেই অ্যাডমিন");
       if (kind === "resign_admin" && t.role !== "admin") throw new HttpsError("failed-precondition", "ইনি আর অ্যাডমিন নন");
       if (kind === "remove_admin" && t.role !== "admin") throw new HttpsError("failed-precondition", "ইনি অ্যাডমিন নন");
+      if (kind === "make_treasurer" && org.treasurerUid === target) throw new HttpsError("already-exists", "ইনি আগেই তহবিল রক্ষক");
+      if (kind === "remove_treasurer" && org.treasurerUid !== target) throw new HttpsError("failed-precondition", "ইনি তহবিল রক্ষক নন");
       const othersAdmins = (org.adminCount || 1) - (t.role === "admin" ? 1 : 0);
       if (othersAdmins < 1) throw new HttpsError("failed-precondition", "এটা করার মতো অন্য অ্যাডমিন নেই");
       if ((kind === "remove_admin" || kind === "remove_member") && t.role === "admin" && othersAdmins < 2) {
@@ -619,6 +642,11 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
         tx.update(mref, { role: "admin", title: t.title === "সদস্য" ? "অ্যাডমিন" : t.title });
         oupd.adminCount = FieldValue.increment(1);
         tx.set(idx(target), { orgs: { [oid]: { name: org.name, role: "admin" } } }, { merge: true });
+      } else if (kind === "make_treasurer") {
+        // 💰 একজনই তহবিল রক্ষক — নতুন জন হলে আগের জন নিজে থেকেই সরে যান
+        oupd.treasurerUid = target; oupd.treasurerName = t.name;
+      } else if (kind === "remove_treasurer") {
+        oupd.treasurerUid = null; oupd.treasurerName = null;
       } else if (kind === "remove_admin" || kind === "resign_admin") {
         tx.update(mref, { role: "member", title: target === org.createdBy ? "প্রতিষ্ঠাতা" : "সদস্য" });
         oupd.adminCount = FieldValue.increment(-1);
@@ -627,6 +655,7 @@ module.exports = function makeOrg({ db, FieldValue, Timestamp, onCall, HttpsErro
         tx.update(mref, { status: "removed", removedAt: FieldValue.serverTimestamp() });
         oupd.memberCount = FieldValue.increment(-1);
         if (t.role === "admin") oupd.adminCount = FieldValue.increment(-1);
+        if (org.treasurerUid === target) { oupd.treasurerUid = null; oupd.treasurerName = null; }
         tx.set(idx(target), { orgs: { [oid]: FieldValue.delete() } }, { merge: true });
       }
       tx.update(orgRef(oid), oupd);
