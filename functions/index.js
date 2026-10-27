@@ -3865,6 +3865,10 @@ async function markTailorLegDone(o) {
 /* 🤝🐝 Honey Bee Org — সংগঠন (আলাদা ফাইল: org.js) */
 Object.assign(exports, require("./org")({ db, FieldValue, Timestamp, onCall, HttpsError, onSchedule, onDocumentWritten, getStorage }));
 
+/* 💰 আয়ের পথ — ক্রেডিট, সেটিংস, দিনের সারাংশ (আলাদা ফাইল: billing.js) — সব শুরুতে বন্ধ */
+const __billing = require("./billing")({ db, FieldValue, Timestamp, onCall, HttpsError });
+exports.billingAdmin = __billing.billingAdmin;
+
 /* 💳 ওয়ালেট/পয়েন্ট — যোগ ও ভাড়া কাটা শুধু সার্ভারে (আলাদা ফাইল: wallet.js) */
 Object.assign(exports, require("./wallet")({ db, FieldValue, onCall, HttpsError }));
 
