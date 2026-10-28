@@ -2043,12 +2043,17 @@ exports.releaseHeldOrders = onSchedule({ schedule: "every 1 minutes", secrets: [
     if (sealed) {
       batch.set(db.collection("orderDeliveryCharges").doc(sealed.chargeId), sealed.snapshot, { merge: true });
     }
-    docs.forEach((d) => {
+    for (const d of docs) {
       const upd = { status: "pending", releasedAt: FieldValue.serverTimestamp() };
       if (sealed) upd.delivery = sealed.perDoc[d.id];
+      // 💰 অর্ডার-ফি চালু থাকলে গ্রাহকের তথ্য গ্রহণ পর্যন্ত লুকানো (billing.js)
+      try {
+        const hide = await __billing.maskOnRelease(d, batch, sealed ? sealed.perDoc[d.id] : (d.data().delivery || null));
+        if (hide) Object.assign(upd, hide);
+      } catch (e) { console.warn(JSON.stringify({ event: "BILLING_MASK_FAILED", error: String(e && e.message || e) })); }
       batch.set(d.ref, upd, { merge: true });
       released++;
-    });
+    }
   }
   if (released) await batch.commit();
   console.log(JSON.stringify({ event: "HELD_ORDERS_RELEASED", count: released, waitingForRoute: waiting }));
@@ -3866,8 +3871,8 @@ async function markTailorLegDone(o) {
 Object.assign(exports, require("./org")({ db, FieldValue, Timestamp, onCall, HttpsError, onSchedule, onDocumentWritten, getStorage }));
 
 /* 💰 আয়ের পথ — ক্রেডিট, সেটিংস, দিনের সারাংশ (আলাদা ফাইল: billing.js) — সব শুরুতে বন্ধ */
-const __billing = require("./billing")({ db, FieldValue, Timestamp, onCall, HttpsError });
-exports.billingAdmin = __billing.billingAdmin;
+const __billing = require("./billing")({ db, FieldValue, Timestamp, onCall, HttpsError, onDocumentCreated });
+Object.assign(exports, __billing.exports);
 
 /* 💳 ওয়ালেট/পয়েন্ট — যোগ ও ভাড়া কাটা শুধু সার্ভারে (আলাদা ফাইল: wallet.js) */
 Object.assign(exports, require("./wallet")({ db, FieldValue, onCall, HttpsError }));
