@@ -116,6 +116,32 @@
   .modalCard h3{ margin:0 0 14px; font-size:15px; color:var(--amber); }
   .modalClose{ text-align:center; margin-top:10px; }
   .modalClose span{ font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline; }
+  /* 💳 ক্রেডিট ট্যাব */
+  .acStock{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+  .acStock .s{ background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:12px; padding:10px 6px; text-align:center; }
+  .acStock .s b{ display:block; font-size:19px; color:var(--amber); }
+  .acStock .s small{ font-size:10.5px; color:var(--muted); }
+  .acStock .s.main{ grid-column:span 1; background:rgba(255,183,3,0.12); }
+  .acDetails{ margin-top:12px; font-size:12.5px; }
+  .acDetails summary{ cursor:pointer; color:var(--amber); font-weight:700; }
+  .acTop{ display:flex; gap:8px; } .acTop input{ flex:1; }
+  .acTop .btn{ margin-bottom:12px; }
+  .acItem{ border:1px solid var(--border); border-radius:12px; padding:11px 12px; margin-bottom:9px; background:rgba(255,255,255,0.02); }
+  .acItem.low{ border-color:rgba(226,84,61,0.6); }
+  .acItem .h{ display:flex; gap:8px; align-items:flex-start; }
+  .acItem .h .n{ flex:1; min-width:0; font-weight:700; font-size:14px; }
+  .acItem .h .n small{ display:block; font-weight:400; font-size:11px; color:var(--muted); word-break:break-all; }
+  .acPills{ display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+  .acPill{ font-size:11.5px; padding:4px 9px; border-radius:20px; background:rgba(255,255,255,0.06); }
+  .acPill.bad{ background:rgba(226,84,61,0.2); color:#ffb3a6; } .acPill.ok{ background:rgba(47,191,113,0.18); color:#8de0b4; } .acPill.gift{ background:rgba(255,209,102,0.16); color:var(--amber); }
+  .acBtns{ display:flex; gap:6px; flex-wrap:wrap; } .acBtns .btn{ flex:1; min-width:90px; width:auto; padding:9px 8px; font-size:12.5px; }
+  .acSeg{ display:flex; gap:6px; margin-bottom:12px; } .acSeg button{ flex:1; padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:transparent; color:var(--muted); font-weight:700; font-family:inherit; cursor:pointer; font-size:13px; }
+  .acSeg button.on{ background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); border-color:transparent; }
+  .acCode{ font-family:'Space Mono',monospace; font-size:22px; letter-spacing:2px; text-align:center; padding:14px; border:2px dashed var(--gold); border-radius:12px; margin:8px 0 12px; color:var(--amber); user-select:all; }
+  .acKey{ display:flex; gap:8px; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); font-size:12.5px; }
+  .acKey .c{ flex:1; min-width:0; } .acKey code{ font-family:'Space Mono',monospace; color:var(--amber); }
+  @media (max-width:520px){ .acStock{ grid-template-columns:repeat(4,1fr); gap:6px; } .acStock .s.main{ grid-column:span 4; } .acStock .s b{ font-size:17px; } }
+  @media (min-width:700px){ #acList{ display:grid; grid-template-columns:1fr 1fr; gap:0 10px; } }
 </style>
 </head>
 <body>
@@ -163,6 +189,7 @@
   <div class="tabs">
     <button class="tabBtn active" data-tab="tabOverview">📊 ওভারভিউ</button>
     <button class="tabBtn" data-tab="tabRiders">🛵 রাইডার</button>
+    <button class="tabBtn" data-tab="tabCredit">💳 ক্রেডিট</button>
     <button class="tabBtn" data-tab="tabShops">🏪 দোকান</button>
     <button class="tabBtn" data-tab="tabTransport">🚑 ট্রান্সপোর্ট</button>
     <button class="tabBtn" data-tab="tabWallet">💰 Wallet</button>
@@ -208,6 +235,53 @@
     </div>
 
     <div id="driversList"><div class="emptyMsg">লোড হচ্ছে...</div></div>
+  </div>
+
+  <!-- 💳 ক্রেডিট ও সাবস্ক্রিপশন — আয়-৪/৫ -->
+  <div class="tabPanel" id="tabCredit">
+    <div class="card">
+      <h2>📦 আমার স্টক</h2>
+      <div class="acStock" id="acStock"><div class="emptyMsg">লোড হচ্ছে...</div></div>
+      <details class="acDetails">
+        <summary>💵 স্টক কিনবেন? — দাম আর টাকা পাঠানোর নম্বর</summary>
+        <div id="acBuyInfo" style="font-size:12.5px; line-height:1.8; margin-top:8px;"></div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>🏪 আমার ব্যবসাগুলো</h2>
+      <div class="acTop">
+        <input type="search" id="acSearch" placeholder="🔎 নাম / ফোন / আইডি খুঁজুন">
+        <button class="btn secondary small" id="acRefresh">🔄</button>
+      </div>
+      <p style="font-size:11px; color:var(--muted); margin:-4px 0 10px;">যাদের ক্রেডিট কম বা মেয়াদ শেষের দিকে, তারা উপরে।</p>
+      <div id="acList"><div class="emptyMsg">লোড হচ্ছে...</div></div>
+      <button class="btn secondary" id="acKeyFree" style="margin-top:6px;">🔑 নতুন দোকানের জন্য কি বানান (দোকান বাছাই ছাড়া)</button>
+    </div>
+
+    <div class="card">
+      <h2>🔑 আমার বানানো কি</h2>
+      <div id="acKeys"><div class="emptyMsg">লোড হচ্ছে...</div></div>
+    </div>
+
+    <div class="card">
+      <h2>📞 দোকানদাররা আমাকে যে নম্বরে পাবেন</h2>
+      <div class="dpGrid2">
+        <div><label for="acPhone">ফোন</label><input type="tel" id="acPhone" inputmode="tel" placeholder="01XXXXXXXXX"></div>
+        <div><label for="acWa">WhatsApp</label><input type="tel" id="acWa" inputmode="tel" placeholder="01XXXXXXXXX"></div>
+      </div>
+      <button class="btn" id="acSaveContact">💾 সেভ করুন</button>
+      <p id="acContactMsg" style="display:none; font-size:12.5px; margin:8px 0 0;"></p>
+    </div>
+  </div>
+
+  <!-- দেওয়ার মডাল -->
+  <div class="modalOverlay" id="acModal">
+    <div class="modalCard">
+      <h3 id="acMTitle">💳 দিন</h3>
+      <div id="acMBody"></div>
+      <div class="modalClose"><span id="acMClose">বন্ধ করুন</span></div>
+    </div>
   </div>
 
   <!-- 💰 Honey Bee Central Wallet — ম্যানুয়াল টপ-আপ -->
@@ -1334,6 +1408,168 @@ $("approveVerifyBtn").addEventListener("click", async ()=>{
     btn.disabled = false; btn.textContent = "✅ Approve Account";
   }
 });
+
+/* ==================== 💳 ক্রেডিট ও সাবস্ক্রিপশন (আয়-৪/৫) ====================
+   স্টক আসে সুপার এডমিন থেকে (আপনি আগে টাকা দেন)। এখান থেকে:
+   • সরাসরি দোকানের আইডিতে দিন (দোকানে গিয়ে বা ফোনে কথা বলে)
+   • দূরে থাকলে একবারের "কি" বানিয়ে WhatsApp/SMS-এ পাঠান — লিংকে চাপলে অ্যাপে নিজে বসে যায়
+   সব হিসাব সার্ভারে (functions/billing.js → billingAgent)। */
+const acFn = firebase.functions().httpsCallable("billingAgent");
+const AC_M = [1,3,6,12];
+const AC_BN = "০১২৩৪৫৬৭৮৯";
+const acBn = (n)=> String(n).replace(/[0-9]/g, d=> AC_BN[d]);
+const acR2 = (n)=> Math.round(Number(n || 0) * 100) / 100;
+const acEsc = (v)=> String(v == null ? "" : v).replace(/[&<>"]/g, c=> ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const AC_TYPE = { shop:"🏪 দোকান", pharmacy:"💊 ফার্মেসি", tailor:"🧵 সেলাই ঘর", restaurant:"🍽️ রেস্টুরেন্ট", driver:"🚑 ট্রান্সপোর্ট" };
+let acItems = [], acStock = {}, acCfg = null, acStockUnsub = null, acKeysUnsub = null, acStarted = false;
+
+function acStart(){
+  if(acStarted || !currentAgent) return; acStarted = true;
+  $("acPhone").value = currentAgent.phone || ""; $("acWa").value = currentAgent.whatsapp || currentAgent.phone || "";
+  acStockUnsub = db.collection("agentStock").doc(currentAgent.uid).onSnapshot(d=>{ acStock = d.exists ? d.data() : {}; acDrawStock(); }, ()=> acDrawStock());
+  acKeysUnsub = db.collection("agentStock").doc(currentAgent.uid).collection("keys").orderBy("createdAt","desc").limit(30)
+    .onSnapshot(s=> acDrawKeys(s.docs.map(d=> Object.assign({ id: d.id }, d.data()))), ()=> $("acKeys").innerHTML = '<div class="emptyMsg">এখনো কোনো কি নেই</div>');
+  db.collection("billingConfig").doc("main").get().then(d=>{ acCfg = d.exists ? d.data() : null; acDrawBuy(); }).catch(()=>{});
+  acLoad();
+}
+function acDrawStock(){
+  const s = acStock.subs || {};
+  $("acStock").innerHTML = `<div class="s main"><b>${acBn(acR2(acStock.credit))}</b><small>ক্রেডিট</small></div>`
+    + AC_M.map(m=> `<div class="s"><b>${acBn(Number(s["m"+m] || 0))}</b><small>📅 ${acBn(m)} মাস</small></div>`).join("");
+}
+function acDrawBuy(){
+  const c = acCfg; if(!c){ $("acBuyInfo").textContent = "সুপার এডমিনের সাথে যোগাযোগ করুন।"; return; }
+  const cc = acStock.country === "SA" ? "SA" : "BD", p = (c.prices || {})[cc] || {}, cur = cc === "SA" ? "রিয়াল" : "৳";
+  const pay = c.pay || {}, sub = p.sub || {}, ag = p.agentSub || {};
+  const nums = cc === "SA" ? [pay.saMethod && pay.saNumber ? `${acEsc(pay.saMethod)}: <b>${acEsc(pay.saNumber)}</b>` : ""]
+    : [pay.bkash ? `bKash (${acEsc(pay.bkashType || "personal")}): <b>${acEsc(pay.bkash)}</b>` : "", pay.nagad ? `Nagad: <b>${acEsc(pay.nagad)}</b>` : "", pay.rocket ? `Rocket: <b>${acEsc(pay.rocket)}</b>` : ""];
+  $("acBuyInfo").innerHTML = `💳 ক্রেডিট: ১০০ ক্রেডিট = <b>${acBn(p.agentCreditPct || 100)} ${cur}</b>
+    <br>📅 সাবস্ক্রিপশন (আপনার কেনা দাম → দোকানদারের দাম):<br>`
+    + AC_M.map(m=> `&nbsp;&nbsp;${acBn(m)} মাস: <b>${acBn(ag["m"+m] || 0)}</b> → ${acBn(sub["m"+m] || 0)} ${cur} <span style="color:var(--ok)">(লাভ ${acBn((sub["m"+m] || 0) - (ag["m"+m] || 0))})</span>`).join("<br>")
+    + `<br><br>📲 টাকা পাঠান: ${nums.filter(Boolean).join(" · ") || "—"}`
+    + (pay.note ? `<br>📝 ${acEsc(pay.note)}` : "")
+    + `<br>টাকা পাঠিয়ে সুপার এডমিনকে জানান${c.contact && c.contact.phone ? ` (📞 <b>${acEsc(c.contact.phone)}</b>)` : ""} — তিনি আপনার আইডিতে স্টক বসিয়ে দেবেন।`;
+}
+async function acLoad(){
+  $("acList").innerHTML = '<div class="emptyMsg">লোড হচ্ছে...</div>';
+  try{
+    const r = await acFn({ action:"shops" });
+    acItems = r.data.items || [];
+    const score = (i)=> Math.min(i.subDaysLeft != null && i.subDaysLeft > 0 ? i.subDaysLeft * 3 : 9999, i.credit);
+    acItems.sort((a,b)=> score(a) - score(b));
+    acDraw();
+  }catch(e){ $("acList").innerHTML = `<div class="emptyMsg">⚠️ ${acEsc(e.message || e)}</div>`; }
+}
+function acDraw(){
+  const q = ($("acSearch").value || "").trim().toLowerCase();
+  const list = acItems.filter(i=> !q || [i.name, i.phone, i.id].some(v=> String(v || "").toLowerCase().includes(q)));
+  if(!list.length){ $("acList").innerHTML = `<div class="emptyMsg">${acItems.length ? "কিছু মেলেনি" : "আপনার অধীনে এখনো কোনো ব্যবসা নেই"}</div>`; return; }
+  $("acList").innerHTML = list.map(i=>{
+    const subOn = i.subDaysLeft != null && i.subDaysLeft > 0;
+    const low = i.credit < 10 && !subOn;
+    return `<div class="acItem ${low ? "low" : ""}">
+      <div class="h"><div class="n">${acEsc(i.name || "(নামহীন)")}<small>${AC_TYPE[i.type] || i.type}${i.phone ? " · " + acEsc(i.phone) : ""}</small></div></div>
+      <div class="acPills">
+        <span class="acPill ${i.credit <= 0 ? "bad" : i.credit < 10 ? "bad" : "ok"}">💳 ${acBn(i.credit)} ক্রেডিট</span>
+        <span class="acPill ${subOn ? (i.subDaysLeft <= 7 ? "bad" : "ok") : ""}">📅 ${subOn ? acBn(i.subDaysLeft) + " দিন বাকি" : "সাবস্ক্রিপশন নেই"}</span>
+        ${i.giftGiven ? `<span class="acPill gift">🎁 গিফট পেয়েছে</span>` : ""}
+        ${i.onlineOrdersOff ? `<span class="acPill bad">অনলাইন বন্ধ</span>` : ""}
+      </div>
+      <div class="acBtns">
+        <button class="btn small" data-ac="give" data-id="${acEsc(i.id)}">➕ দিন</button>
+        <button class="btn secondary small" data-ac="key" data-id="${acEsc(i.id)}">🔑 কি পাঠান</button>
+        ${i.phone ? `<a class="btn secondary small" style="text-decoration:none; text-align:center;" href="${acWa(i.phone, "আসসালামু আলাইকুম, Honey Bee থেকে বলছি — আপনার ক্রেডিট " + acBn(i.credit) + "।")}" target="_blank" rel="noopener">💬</a>` : ""}
+      </div></div>`;
+  }).join("");
+  $("acList").querySelectorAll("[data-ac]").forEach(b=> b.onclick = ()=> acOpen(acItems.find(x=> x.id === b.dataset.id), b.dataset.ac));
+}
+function acIntl(p){ let d = String(p || "").replace(/[০-৯]/g, x=> AC_BN.indexOf(x)).replace(/[^0-9]/g, ""); if(/^01\d{9}$/.test(d)) d = "88" + d; if(/^05\d{8}$/.test(d)) d = "966" + d.slice(1); return d; }
+function acWa(phone, text){ return `https://wa.me/${acIntl(phone)}?text=${encodeURIComponent(text)}`; }
+const acKeyLink = (code)=> location.origin + "/key.html?k=" + encodeURIComponent(code);
+const acKeyMsg = (code, what, name)=> `🐝 Honey Bee — ${name ? name + "-এর " : ""}${what}\n\nএই লিংকে চাপুন (অ্যাপে নিজে বসে যাবে):\n${acKeyLink(code)}\n\nবা অ্যাপে "আমার হিসাব" → "কি দিন"-এ লিখুন:\n${code}\n\n⚠️ একবারই ব্যবহার করা যায়। কাউকে দেখাবেন না।`;
+
+function acOpen(item, mode){
+  // mode: give | key | keyfree
+  const isKey = mode !== "give";
+  $("acMTitle").textContent = mode === "give" ? `➕ ${item.name || "ব্যবসা"}-কে দিন` : mode === "key" ? `🔑 ${item.name || "ব্যবসা"}-এর জন্য কি` : "🔑 নতুন দোকানের জন্য কি";
+  const s = acStock.subs || {};
+  $("acMBody").innerHTML = `
+    ${isKey ? `<p style="font-size:12px; color:var(--muted); margin:0 0 10px;">${mode === "key" ? "এই কি শুধু এই দোকানেই চলবে।" : "যে দোকান আগে বসাবে সে পাবে।"} বানানো মাত্র আপনার স্টক থেকে কমবে; ব্যবহার না হলে বাতিল করে ফেরত নিতে পারবেন।</p>` : ""}
+    <div class="acSeg" id="acKind"><button data-k="credit" class="on">💳 ক্রেডিট</button><button data-k="sub">📅 সাবস্ক্রিপশন</button></div>
+    <div id="acKCredit"><label>কত ক্রেডিট? (আপনার কাছে ${acBn(acR2(acStock.credit))})</label><input type="number" id="acAmt" min="1" step="1" inputmode="numeric" placeholder="যেমন 200">
+      <div class="acSeg" style="margin-top:-4px;">${[50,100,200,500].map(v=> `<button data-q="${v}">${acBn(v)}</button>`).join("")}</div></div>
+    <div id="acKSub" style="display:none;"><label>কত মাস?</label>
+      <div class="acSeg" id="acMon">${AC_M.map(m=> `<button data-m="${m}" ${Number(s["m"+m] || 0) ? "" : "disabled style='opacity:.4'"}>${acBn(m)} মাস<br><small>(${acBn(Number(s["m"+m] || 0))}টা)</small></button>`).join("")}</div>
+      <p style="font-size:11.5px; color:var(--muted); margin:-4px 0 10px;">সাবস্ক্রিপশন চললে দোকানে বিক্রিতে কিছু কাটে না। অনলাইন অর্ডারে ক্রেডিট লাগবেই।</p></div>
+    <button class="btn" id="acGo">${isKey ? "🔑 কি বানান" : "✅ দিন"}</button>
+    <p id="acMMsg" style="display:none; font-size:12.5px; margin:8px 0 0;"></p>`;
+  let kind = "credit", months = 0;
+  $("acKind").querySelectorAll("button").forEach(b=> b.onclick = ()=>{ kind = b.dataset.k; $("acKind").querySelectorAll("button").forEach(x=> x.classList.toggle("on", x === b));
+    $("acKCredit").style.display = kind === "credit" ? "" : "none"; $("acKSub").style.display = kind === "sub" ? "" : "none"; });
+  $("acKCredit").querySelectorAll("[data-q]").forEach(b=> b.onclick = ()=> $("acAmt").value = b.dataset.q);
+  $("acMon").querySelectorAll("[data-m]").forEach(b=> b.onclick = ()=>{ if(b.disabled) return; months = Number(b.dataset.m); $("acMon").querySelectorAll("button").forEach(x=> x.classList.toggle("on", x === b)); });
+  $("acGo").onclick = async ()=>{
+    const msg = $("acMMsg"); msg.style.display = "none";
+    const data = { action: isKey ? "makeKey" : "give", kind };
+    if(item) data.bizId = item.id;
+    if(kind === "credit"){ data.amount = Number(String($("acAmt").value).replace(/[০-৯]/g, x=> AC_BN.indexOf(x))); if(!(data.amount > 0)){ msg.textContent = "কত ক্রেডিট লিখুন"; msg.style.color = "var(--danger)"; msg.style.display = "block"; return; } }
+    else { if(!months){ msg.textContent = "মাস বাছাই করুন"; msg.style.color = "var(--danger)"; msg.style.display = "block"; return; } data.months = months; }
+    const what = kind === "credit" ? acBn(data.amount) + " ক্রেডিট" : acBn(months) + " মাসের সাবস্ক্রিপশন";
+    if(!isKey && !confirm(`${item.name || "ব্যবসা"}-কে ${what} দেবেন?`)) return;
+    const btn = $("acGo"); btn.disabled = true; btn.textContent = "হচ্ছে...";
+    try{
+      const r = (await acFn(data)).data;
+      if(isKey){ acShowCode(r.code, what, item); }
+      else { $("acModal").style.display = "none"; acLoad(); alert(`✅ ${item.name || "ব্যবসা"} পেয়েছে ${what}`); }
+    }catch(e){ msg.textContent = "⚠️ " + (e.message || e); msg.style.color = "var(--danger)"; msg.style.display = "block"; btn.disabled = false; btn.textContent = isKey ? "🔑 কি বানান" : "✅ দিন"; }
+  };
+  $("acModal").style.display = "flex";
+}
+function acShowCode(code, what, item){
+  const text = acKeyMsg(code, what, item && item.name);
+  $("acMTitle").textContent = "🔑 কি তৈরি হয়েছে";
+  $("acMBody").innerHTML = `<p style="font-size:12.5px; margin:0;">${acEsc(what)}${item ? " — " + acEsc(item.name) : ""}</p>
+    <div class="acCode">${acEsc(code)}</div>
+    <div class="acBtns">
+      <a class="btn ok small" style="text-decoration:none; text-align:center;" target="_blank" rel="noopener" href="${item && item.phone ? acWa(item.phone, text) : "https://wa.me/?text=" + encodeURIComponent(text)}">💬 WhatsApp</a>
+      <a class="btn secondary small" style="text-decoration:none; text-align:center;" href="sms:${item && item.phone ? acEsc(item.phone) : ""}?body=${encodeURIComponent(text)}">✉️ SMS</a>
+      <button class="btn secondary small" id="acCopy">📋 কপি</button>
+    </div>
+    <p style="font-size:11.5px; color:var(--muted); margin:10px 0 0;">নিচের "আমার বানানো কি" তালিকায় পরে আবার পাঠাতে বা বাতিল করতে পারবেন।</p>`;
+  $("acCopy").onclick = ()=> navigator.clipboard.writeText(text).then(()=> $("acCopy").textContent = "✅ কপি হয়েছে").catch(()=>{});
+}
+function acDrawKeys(keys){
+  if(!keys.length){ $("acKeys").innerHTML = '<div class="emptyMsg">এখনো কোনো কি নেই</div>'; return; }
+  const st = { new:"⏳ পাঠানো হয়েছে", used:"✅ ব্যবহার হয়েছে", void:"↩️ বাতিল" };
+  $("acKeys").innerHTML = keys.map(k=>{
+    const what = k.months ? acBn(k.months) + " মাস" : acBn(k.amount) + " ক্রেডিট";
+    const t = k.createdAt && k.createdAt.toDate ? k.createdAt.toDate().toLocaleDateString("bn-BD", { day:"numeric", month:"short" }) : "";
+    return `<div class="acKey"><div class="c"><code>${k.status === "new" ? acEsc(k.code) : "…" + acEsc(String(k.code).slice(-4))}</code> · <b>${what}</b><br>
+      <small style="color:var(--muted)">${st[k.status] || k.status} · ${t}${k.usedByName ? " · " + acEsc(k.usedByName) : k.bizName ? " · " + acEsc(k.bizName) : ""}</small></div>
+      ${k.status === "new" ? `<button class="btn secondary small" data-ks="${k.id}">📤</button><button class="btn danger small" data-kv="${k.id}">✖</button>` : ""}</div>`;
+  }).join("");
+  $("acKeys").querySelectorAll("[data-ks]").forEach(b=> b.onclick = ()=>{ const k = keys.find(x=> x.id === b.dataset.ks); const it = acItems.find(x=> x.id === k.bizId);
+    acShowCode(k.code, k.months ? acBn(k.months) + " মাসের সাবস্ক্রিপশন" : acBn(k.amount) + " ক্রেডিট", it || (k.bizName ? { name: k.bizName } : null)); $("acModal").style.display = "flex"; });
+  $("acKeys").querySelectorAll("[data-kv]").forEach(b=> b.onclick = async ()=>{
+    if(!confirm("এই কি বাতিল করবেন? স্টক আপনার কাছে ফেরত আসবে, কি আর কাজ করবে না।")) return;
+    b.disabled = true;
+    try{ await acFn({ action:"voidKey", keyId: b.dataset.kv }); }catch(e){ alert("⚠️ " + (e.message || e)); b.disabled = false; }
+  });
+}
+$("acSearch").addEventListener("input", acDraw);
+$("acRefresh").addEventListener("click", acLoad);
+$("acKeyFree").addEventListener("click", ()=> acOpen(null, "keyfree"));
+$("acMClose").addEventListener("click", ()=> $("acModal").style.display = "none");
+$("acModal").addEventListener("click", (e)=>{ if(e.target.id === "acModal") $("acModal").style.display = "none"; });
+$("acSaveContact").addEventListener("click", async ()=>{
+  const phone = $("acPhone").value.trim().slice(0, 20), whatsapp = ($("acWa").value.trim() || phone).slice(0, 20), m = $("acContactMsg");
+  if(phone && !/^[0-9+ \-০-৯]{6,20}$/.test(phone)){ m.textContent = "⚠️ ফোন নম্বর ঠিক নেই"; m.style.color = "var(--danger)"; m.style.display = "block"; return; }
+  try{ await db.collection("agents").doc(currentAgent.uid).update({ phone, whatsapp }); currentAgent.phone = phone; currentAgent.whatsapp = whatsapp;
+    m.textContent = "✅ সেভ হয়েছে — দোকানদাররা এই নম্বর দেখবেন"; m.style.color = "var(--ok)"; }
+  catch(e){ m.textContent = "⚠️ " + (e.message || e); m.style.color = "var(--danger)"; }
+  m.style.display = "block";
+});
+document.querySelector('.tabBtn[data-tab="tabCredit"]').addEventListener("click", acStart);
 </script>
 </body>
 </html>

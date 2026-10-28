@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Honey Bee — লাইসেন্স কি</title>
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{ --bg1:#1a1206; --bg2:#3d2405; --gold:#ffb703; --amber:#ffd166; --muted:rgba(255,248,232,.65); }
+  *{ box-sizing:border-box; }
+  body{ margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px 16px;
+    background:linear-gradient(160deg, var(--bg1), var(--bg2)); color:#fff8e8;
+    font-family:"Noto Sans Bengali","Hind Siliguri",system-ui,sans-serif; }
+  .box{ width:100%; max-width:420px; background:#241705; border:1px solid rgba(255,209,102,.25); border-radius:18px; padding:24px 18px; text-align:center; box-shadow:0 12px 30px rgba(0,0,0,.35); }
+  .bee{ font-size:46px; } h1{ font-size:18px; margin:6px 0 4px; } p{ font-size:13.5px; color:var(--muted); line-height:1.7; margin:6px 0; }
+  .code{ font-family:"Space Mono",ui-monospace,monospace; font-size:21px; letter-spacing:2px; color:var(--amber); border:2px dashed var(--gold); border-radius:12px; padding:14px 8px; margin:14px 0; user-select:all; word-break:break-all; }
+  .btn{ display:block; width:100%; padding:13px; border-radius:11px; border:none; font-size:15px; font-weight:800; font-family:inherit; cursor:pointer; text-decoration:none; margin-top:10px;
+    background:linear-gradient(135deg, var(--amber), var(--gold)); color:var(--bg1); }
+  .btn.sec{ background:transparent; color:var(--amber); border:1px solid rgba(255,209,102,.35); }
+  ol{ text-align:left; font-size:13px; color:var(--muted); line-height:1.8; padding-left:20px; margin:12px 0 0; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="bee">🐝</div>
+  <h1>Honey Bee — আপনার লাইসেন্স কি</h1>
+  <p id="txt">এজেন্ট আপনাকে ক্রেডিট/সাবস্ক্রিপশনের কি পাঠিয়েছেন।</p>
+  <div class="code" id="code">—</div>
+  <a class="btn" href="login.html" id="go">📲 অ্যাপ খুলুন — নিজে বসে যাবে</a>
+  <button class="btn sec" id="copy" type="button">📋 কি কপি করুন</button>
+  <ol>
+    <li>উপরের বোতামে চাপুন, দোকানের একাউন্টে লগইন থাকলে "আমার হিসাব" খুলে কি বসানো থাকবে।</li>
+    <li>"বসান" চাপুন — ক্রেডিট বা মাস সাথে সাথে যোগ হবে।</li>
+    <li>না হলে অ্যাপে ⚙️ → "💳 আমার হিসাব" → কি লিখে বসান।</li>
+  </ol>
+  <p style="font-size:12px; margin-top:12px;">⚠️ কি একবারই চলে। কাউকে দেখাবেন না।</p>
+</div>
+<script>
+(function(){
+  var k = "";
+  try{ k = (new URLSearchParams(location.search).get("k") || "").toUpperCase().replace(/[^0-9A-Z-]/g, "").slice(0, 24); }catch(e){}
+  var el = document.getElementById("code");
+  if(!k){ el.textContent = "কি পাওয়া যায়নি"; document.getElementById("txt").textContent = "লিংকটা পুরো কপি হয়নি — এজেন্টকে আবার পাঠাতে বলুন।"; return; }
+  el.textContent = k;
+  try{ localStorage.setItem("hb-pending-key", k); }catch(e){}
+  document.getElementById("copy").onclick = function(){
+    var b = this;
+    if(navigator.clipboard) navigator.clipboard.writeText(k).then(function(){ b.textContent = "✅ কপি হয়েছে"; });
+  };
+})();
+</script>
+</body>
+</html>

@@ -476,7 +476,9 @@ service cloud.firestore {
          আগে পুরো নথিই পারতেন — মানে নিজের কমিশন, বাজার বা স্ট্যাটাসও! */
       allow update: if isSignedIn() && (isSuperAdmin() ||
         (request.auth.uid == agentId &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryChargeConfig'])));
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryChargeConfig','phone','whatsapp']) &&
+         request.resource.data.get('phone', '') is string && request.resource.data.get('phone', '').size() <= 20 &&
+         request.resource.data.get('whatsapp', '') is string && request.resource.data.get('whatsapp', '').size() <= 20));
       allow delete: if isSuperAdmin();
     }
 
@@ -792,7 +794,13 @@ service cloud.firestore {
          resource.data.customerUid == request.auth.uid);
       allow update: if isSignedIn() &&
         (isSuperAdmin() ||
-         (myShopId() != null && resource.data.shopId == myShopId()) ||
+         // 💰 অর্ডার-ফি: গ্রাহকের তথ্য লুকানো থাকলে (contactHidden) দোকান আগে
+         // orderAccept (সার্ভার) দিয়ে ফি দিয়ে গ্রহণ করবে — নিজে status বদলাতে
+         // পারবে শুধু বাতিল/ফেরানোয়; ফি-র ঘরগুলো কেউ হাতে বদলাতে পারে না
+         (myShopId() != null && resource.data.shopId == myShopId() &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['contactHidden','feePaid','feePaidAt','feeAmount','approxKm']) &&
+          (resource.data.get('contactHidden', false) != true ||
+           request.resource.data.status in ['pending','cancelled','rejected'])) ||
          resource.data.assignedRiderId == request.auth.uid ||
          // 👤 গ্রাহক নিজের অর্ডারে শুধু দুইটা কাজ পারেন:
          //   ১) নিজের তালিকা থেকে সরানো (hiddenForCustomer) — শেষ হওয়া অর্ডার
@@ -801,7 +809,10 @@ service cloud.firestore {
           ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiddenForCustomer','hiddenAt']) &&
             resource.data.status in ['delivered','cancelled']) ||
            (resource.data.status == 'shipped' && request.resource.data.status == 'delivered' &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','deliveredAt'])))));
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','deliveredAt'])) ||
+           // ৩) দোকান এখনো গ্রহণ করেনি (pending) — গ্রাহক বাতিল করে অন্য দোকানে যেতে পারেন
+           (resource.data.status == 'pending' && request.resource.data.status == 'cancelled' &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','cancelledAt','cancelledBy','cancelReason'])))));
       // ⏱️ গ্রাহক শুধু "অপেক্ষায়" (holding) থাকা নিজের অর্ডার বাতিল/মুছতে পারেন — দোকানে যাওয়ার আগে
       allow delete: if isSignedIn() && resource.data.customerUid == request.auth.uid &&
         resource.data.status == 'holding';
@@ -809,13 +820,15 @@ service cloud.firestore {
       // 🔒 গোপনীয় অর্ডারের আসল পণ্যের নাম/আইডি — শুধু অর্ডারকারী গ্রাহক আর
       // সেই দোকান। রাইডার আর সুপার-অ্যাডমিনও এটা পড়তে পারেন না।
       match /secret/{docId} {
-        allow create: if isSignedIn() &&
+        // 'contact' = অর্ডার-ফি চালু থাকলে লুকানো গ্রাহকের তথ্য — শুধু সার্ভার লেখে,
+        // দোকান পড়তে পারে না (গ্রহণের পর সার্ভার মূল অর্ডারে ফিরিয়ে দেয়)
+        allow create: if isSignedIn() && docId != 'contact' &&
           get(/databases/$(database)/documents/orderRequests/$(orderId)).data.customerUid == request.auth.uid &&
           request.resource.data.customerUid == request.auth.uid;
         allow read: if isSignedIn() &&
           (resource.data.customerUid == request.auth.uid ||
-           (myShopId() != null && resource.data.shopId == myShopId()));
-        allow delete: if isSignedIn() && resource.data.customerUid == request.auth.uid;
+           (docId != 'contact' && myShopId() != null && resource.data.shopId == myShopId()));
+        allow delete: if isSignedIn() && docId != 'contact' && resource.data.customerUid == request.auth.uid;
         allow update: if false;
       }
     }
@@ -1162,6 +1175,19 @@ service cloud.firestore {
       allow read: if isSuperAdmin();
       allow write: if false;
     }
+    // 🧑‍💼 এজেন্টের স্টক — এজেন্ট নিজেরটা দেখেন (বানানো কি-সহ); লেখা শুধু সার্ভারে
+    match /agentStock/{agentUid} {
+      allow read: if isSignedIn() && (isSuperAdmin() || request.auth.uid == agentUid);
+      allow write: if false;
+      match /{sub}/{docId} {
+        allow read: if isSignedIn() && (isSuperAdmin() || request.auth.uid == agentUid);
+        allow write: if false;
+      }
+    }
+    // 🔑 কি যাচাই, গিফট পাওয়া ফোন, ভুল-কি গোনা — কেউ সরাসরি পড়তে/লিখতে পারে না
+    match /licenseKeys/{k} { allow read, write: if false; }
+    match /giftDevices/{k} { allow read, write: if false; }
+    match /billingKeyTries/{k} { allow read, write: if false; }
 
     match /flightCache/{cacheId} {
       allow read: if true;

@@ -1025,6 +1025,7 @@ window.hbLoadLib = function(name){
 <script src="zatca-qr.js"></script>
 <script src="zatca-ledger.js"></script>
 <script src="firebase-init.js"></script>
+<script src="hb-billing.js"></script>
 <script src="hb-btprint.js"></script>
 
 <div id="authGate">
@@ -1040,6 +1041,7 @@ window.hbLoadLib = function(name){
     <button id="subUserBtn" style="display:none;">+ সাব-ইউজার</button>
     <button id="pharmaModeBtn" style="display:none;" title="ফার্মেসি মোড চালু করুন">💊 ফার্মেসি মোড</button>
     <button id="shopSettingsBtn" title="সেটিং" style="padding:6px 10px; font-size:15px;">⚙️</button>
+    <span id="hbBillPillSlot"></span>
     <button id="ordBellBtn" title="Bazar অর্ডার" style="position:relative; padding:6px 10px; font-size:15px;">
       🔔<span id="ordBellBadge" style="display:none; position:absolute; top:-4px; right:-2px; background:#e0433c; color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:9px; line-height:16px; text-align:center; padding:0 3px; font-family:inherit;">0</span>
     </button>
@@ -1139,6 +1141,7 @@ window.hbLoadLib = function(name){
     <p id="shopSubtitle" contenteditable="true" spellcheck="false"
       style="outline:none; border:1px solid var(--line); border-radius:9px; padding:10px 12px; font-size:13.5px; margin:0 0 16px; background:#fff; min-height:18px;"></p>
 
+    <button class="btn" id="hbBillOpenBtn" type="button" style="width:100%; margin-bottom:8px; background:#fff7e6; color:#5b3f12; border:1px solid #e3cf9f;" onclick="window.HBBilling && HBBilling.open()">💳 আমার হিসাব — ক্রেডিট, সাবস্ক্রিপশন, এজেন্ট</button>
     <button class="btn" id="hbAcctOpenBtn" type="button" style="width:100%; margin-bottom:8px; background:#f5ecd9; color:#5b3f12; border:1px solid #e3cf9f;">ℹ️ আমার অ্যাকাউন্ট ও পাসওয়ার্ড</button>
     <button class="btn" id="shopSettingsCloseBtn" style="width:100%;">✓ সম্পন্ন</button>
   </div>
@@ -7745,7 +7748,7 @@ function ordGroupHeadHtml(g, titlePrefix){
   return `
     <div class="ordGroupHead">
       <div class="ordGroupCustomer">${titlePrefix} ${escapeAttr(g.customerName||'কাস্টমার')}${g.orderCode ? ` <span style="background:rgba(255,193,7,0.16); color:#FFC107; padding:1px 7px; border-radius:7px; font-size:11.5px; font-weight:800;">🧾 ${escapeAttr(g.orderCode)}</span>` : ''}</div>
-      <div class="ordGroupMeta">${g.deliveryAddress ? '📍 ' + escapeAttr(g.deliveryAddress) : ''}${g.deliveryPhone ? ' · 📞 ' + escapeAttr(g.deliveryPhone) : ''}${g.deliveryLat!=null ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${g.deliveryLat},${g.deliveryLng}" target="_blank" style="color:#0ea5e9;">🗺️ ম্যাপে দেখুন</a>` : ''}</div>
+      ${(window.HBBilling && g.items && g.items.some(o=> o.contactHidden && !o.feePaid)) ? `<div class="ordGroupMeta" style="color:#FFC107;">${escapeAttr(HBBilling.hiddenLine(g.items.find(o=> o.contactHidden)))}</div>` : `<div class="ordGroupMeta">${g.deliveryAddress ? '📍 ' + escapeAttr(g.deliveryAddress) : ''}${g.deliveryPhone ? ' · 📞 ' + escapeAttr(g.deliveryPhone) : ''}${g.deliveryLat!=null ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${g.deliveryLat},${g.deliveryLng}" target="_blank" style="color:#0ea5e9;">🗺️ ম্যাপে দেখুন</a>` : ''}</div>`}
     </div>`;
 }
 
@@ -8009,6 +8012,11 @@ document.getElementById('ordAGConfirmBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('ordAGConfirmBtn');
   btn.disabled = true; btn.textContent = 'গ্রহণ করা হচ্ছে...';
   try{
+    // 💰 অর্ডার-ফি চালু থাকলে আগে সার্ভারে ফি কাটা — তারপরই গ্রাহকের তথ্য খোলে (hb-billing.js)
+    if(window.HBBilling && !(await HBBilling.acceptOrders(__ordAGGroup.items))){
+      document.getElementById('ordAcceptGroupModal').classList.remove('show');
+      return;
+    }
     const batch = db.batch();
     // 🚚 এক রসিদে একাধিক প্রোডাক্ট (আলাদা orderRequests ডকুমেন্ট) থাকলে আগে
     // প্রতিটার জন্য Cloud Function আলাদাভাবে রাইডার খুঁজত — একই কাস্টমারের
@@ -24593,6 +24601,10 @@ function hbThermalPrint(area){
   window.hbMouOwnerFacts = facts; window.hbMouOwnerLocal = localAnswer; // পরীক্ষার জন্য
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire); else wire();
 })();
+</script>
+<script>
+/* 💳 আমার হিসাব — উপরের বারে ছোট ক্রেডিট বোতাম (আয়ের ব্যবস্থা চালু থাকলে দেখা যায়) */
+if(window.HBBilling) HBBilling.mount(document.getElementById("hbBillPillSlot"), { inside:true, style:"padding:5px 8px; font-size:12px;" });
 </script>
 </body>
 </html>

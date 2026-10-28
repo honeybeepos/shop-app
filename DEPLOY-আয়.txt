@@ -1,0 +1,68 @@
+🐝 Honey Bee — আয়ের নতুন ব্যবস্থা (আয়-২ থেকে আয়-১১) — একবারে deploy
+=====================================================================
+সব কিছু বন্ধ অবস্থায় যাবে। Deploy করার পর কোথাও কিছু কাটবে না, যতক্ষণ না
+আপনি এডমিন প্যানেলের "💰 আয়" ট্যাবে মূল সুইচ চালু করেন।
+
+এই zip-এ আছে:
+  ১১টা ফাইল (মূল ফোল্ডারে যাবে)
+    admin.html, firestore.rules, hb-billing.js (নতুন), honey-bee-agent.html,
+    honey-bee-bazar.html, key.html (নতুন), pharmacy.html, privacy.html,
+    restaurant-pos.html, service-worker.js, shop-ledger-app.html
+  ২টা ফাইল functions ফোল্ডারে যাবে
+    functions\billing.js, functions\index.js
+
+-------------------------------------------------
+ধাপ ১ — পুরনো ফাইলের ব্যাকআপ (কম্পিউটারে, CMD)
+-------------------------------------------------
+cd /d "E:\all tools\my  key\shop-app-main\shop-app-main"
+mkdir backup-2026-10-29
+copy firestore.rules backup-2026-10-29\
+copy functions\index.js backup-2026-10-29\
+copy functions\billing.js backup-2026-10-29\
+
+-------------------------------------------------
+ধাপ ২ — ফাইল বসানো
+-------------------------------------------------
+zip খুলে ১১টা ফাইল  E:\all tools\my  key\shop-app-main\shop-app-main  ফোল্ডারে
+বসান (Replace)। functions ফোল্ডারের ২টা ফাইল ওই ফোল্ডারের ভেতরের functions
+ফোল্ডারে বসান (Replace)।
+
+-------------------------------------------------
+ধাপ ৩ — ঠিক ফাইল বসেছে কিনা দেখা (দুটোতেই লেখা আসতে হবে)
+-------------------------------------------------
+findstr /c:"billingAgent" functions\index.js functions\billing.js
+findstr /c:"agentStock" firestore.rules
+
+প্রথমটায় billing.js-এর লাইন আসবে, index.js-এ "__billing.exports" আছে কিনা:
+findstr /c:"__billing.exports" functions\index.js
+
+কিছু না এলে থামুন — ফাইল ভুল জায়গায় বসেছে।
+
+-------------------------------------------------
+ধাপ ৪ — Deploy (একটা একটা করে)
+-------------------------------------------------
+firebase deploy --only firestore:rules
+firebase deploy --only functions
+
+নতুন ৬টা ফাংশন তৈরি হবে: billingAgent, billingShop, billingOnSale,
+billingOnRestaurantBill, billingOnOrderCreated, orderAccept
+(billingAdmin আর releaseHeldOrders-এর ঘড়ি hbTickMinute আপডেট হবে)।
+firebase-functions upgrade করার সতর্কতা এলে এখন কিছু করবেন না।
+
+-------------------------------------------------
+ধাপ ৫ — GitHub-এ ১১টা ফাইল (মূল ফোল্ডারে, functions-এ নয়!)
+-------------------------------------------------
+firestore.rules সহ ১১টা ফাইল repo-র মূল জায়গায়। functions ফোল্ডারের ২টা
+ফাইল GitHub-এর functions ফোল্ডারে। signing.keystore কখনো upload করবেন না।
+
+-------------------------------------------------
+ধাপ ৬ — Deploy-এর পর আপনার কাজ (এডমিন প্যানেল → 💰 আয়)
+-------------------------------------------------
+১) মূল সুইচ বন্ধই রাখুন। দাম, গিফট, bKash নম্বর দেখে "সেটিংস সেভ" করুন।
+২) এজেন্ট ট্যাবে প্রতিটা এজেন্টের "✏️ এডিট" — ফোন/WhatsApp নম্বর দিন
+   (দোকানদাররা এটাই দেখবেন)।
+৩) পরীক্ষা: একজন এজেন্টকে "📦 স্টক" দিন → এজেন্ট অ্যাপে "💳 ক্রেডিট" ট্যাবে
+   দেখুন → একটা দোকানে দিন / কি বানিয়ে পাঠান।
+৪) সব ঠিক থাকলে তবেই মূল সুইচ + "দোকান" টিক চালু করুন।
+
+এখনো যা কাটে না: সেলাই ঘর আর ট্রান্সপোর্ট (টিক দিলেও) — এদের নিয়ম পরে।

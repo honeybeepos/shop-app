@@ -427,6 +427,11 @@ button{cursor:pointer;border:0}
         <button class="btn green" type="button" onclick="hbAcctOpen('restaurant')">দেখুন ও পাসওয়ার্ড বদলান</button>
       </div>
       <div class="panel" style="margin-bottom:18px">
+        <h2>💳 আমার হিসাব</h2>
+        <div style="font-size:13px;color:var(--muted);margin:6px 0 12px">Honey Bee ক্রেডিট, সাবস্ক্রিপশন, এজেন্টের নম্বর আর এজেন্টের পাঠানো কি বসানো।</div>
+        <button class="btn" type="button" onclick="window.HBBilling && HBBilling.open()">💳 আমার হিসাব খুলুন</button>
+      </div>
+      <div class="panel" style="margin-bottom:18px">
         <h2>Restaurant Profile</h2>
         <div class="field" style="margin-top:12px">
           <label>Profile / Shop Banner Photo</label>
@@ -500,6 +505,7 @@ button{cursor:pointer;border:0}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="firebase-init.js"></script>
+<script src="hb-billing.js"></script>
 <script src="hb-btprint.js"></script>
 <script>
 const defaultProducts=[
@@ -1518,6 +1524,11 @@ function ooAlertIfNew(){
 /* একটা রসিদের সব ডকুমেন্ট একসাথে বদলানো — একটা বদলে আরেকটা বাদ
    পড়লে গ্রাহক আধা-বদলানো অর্ডার দেখতেন */
 async function ooSetStatus(ids, status, extra){
+  // 💰 অর্ডার-ফি চালু থাকলে গ্রহণের আগে সার্ভারে ফি — তারপর গ্রাহকের তথ্য খোলে (hb-billing.js)
+  if(status === "preparing" && window.HBBilling){
+    const items = ooAll.filter(function(o){ return ids.indexOf(o.id) >= 0; });
+    if(!(await HBBilling.acceptOrders(items))) return;
+  }
   try{
     const batch = db.batch();
     ids.forEach(function(id){
@@ -1605,6 +1616,8 @@ function ooRender(){
         + '<div style="display:flex;justify-content:space-between"><span>খাবারের দাম</span><span>' + ooMoney(b.sub) + '</span></div>'
         + '<div style="display:flex;justify-content:space-between"><span>' + (b.pickup ? '🏪 নিজে নেবেন — ডেলিভারি চার্জ' : '🚚 ডেলিভারি চার্জ') + '</span><span>' + (b.known ? ooMoney(b.del) : 'হিসাব হচ্ছে…') + '</span></div>'
         + '<div style="display:flex;justify-content:space-between;font-weight:800"><span>মোট (গ্রাহক দেবেন)</span><span>' + ooMoney(b.grand) + '</span></div></div>'; })()
+      + ((window.HBBilling && g.items.some(function(o){ return o.contactHidden && !o.feePaid; }))
+          ? '<div style="color:#b45309;font-size:12.5px;width:100%;font-weight:600">' + HBBilling.hiddenLine(g.items.find(function(o){ return o.contactHidden; })) + '</div>' : '')
       + '<div style="color:#64748b;font-size:12.5px;width:100%">'
       + (digits ? '<a href="tel:'+digits+'" style="color:#2563eb">📞 '+g.deliveryPhone+'</a>' : '')
       + (g.deliveryAddress ? '<br>📍 ' + g.deliveryAddress : '')

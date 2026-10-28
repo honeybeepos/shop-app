@@ -325,6 +325,7 @@
       <div class="shop" id="shopName">—</div>
       <div class="search"><input id="topSearch" placeholder="ওষুধ, বারকোড বা জেনেরিক নাম লিখুন…" autocomplete="off"></div>
       <span class="sync" id="syncTxt">🟢 অনলাইন</span>
+      <span id="hbBillPillSlot"></span>
       <button class="bell" id="ordBtn" type="button" title="Bazar অর্ডার" onclick="phOpenBazarOrders()">🛍️<i id="ordN" hidden>0</i></button>
       <button class="bell" id="bellBtn" type="button" title="মেয়াদ ও কম স্টকের সতর্কতা">🔔<i id="bellN" hidden>0</i></button>
       <div class="me"><div class="av">👤</div><div><b id="meName">—</b><small id="meRole">—</small></div></div>
@@ -343,6 +344,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script src="firebase-init.js"></script>
+<script src="hb-billing.js"></script>
 <script src="hb-btprint.js"></script>
 <script>
 /* =====================================================================
@@ -2353,6 +2355,9 @@ function pageSettings(){
       </div>
     </div>
     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px"><button class="btn" type="button" id="sSave" style="min-width:160px">💾 সেভ করুন</button></div>
+    <div class="panel" style="margin-top:16px"><h2>💳 আমার হিসাব</h2>
+      <p style="margin:0 0 10px; color:var(--ink-3)">Honey Bee ক্রেডিট, সাবস্ক্রিপশন, এজেন্টের নম্বর আর এজেন্টের পাঠানো কি বসানো।</p>
+      <button class="btn ghost" type="button" onclick="window.HBBilling && HBBilling.open()">💳 আমার হিসাব খুলুন</button></div>
     <div class="panel" style="margin-top:16px"><h2>📍 দোকানের লোকেশন</h2>
       <p style="margin:0 0 10px; color:var(--ink-3)">${__phHasLoc ? "✅ লোকেশন দেওয়া আছে। দোকান সরালে আবার দিন।" : "⚠️ লোকেশন দেওয়া নেই — Honey Bee Bazar থেকে ডেলিভারি অর্ডার আসবে না। দোকানের ভেতরে দাঁড়িয়ে চাপুন।"}</p>
       <button class="btn${__phHasLoc ? " ghost" : ""}" type="button" id="sLoc">📍 ${__phHasLoc ? "লোকেশন আবার দিন" : "এখনই লোকেশন দিন"}</button></div>
@@ -2603,6 +2608,7 @@ function ordGroupHtml(g, prods){
       ${g.orderCode ? `<span class="chip org" style="font-weight:800; font-size:13px">🧾 ${esc(g.orderCode)}</span>` : ""}
       <span class="hint" style="margin-left:auto">${esc(ordWhen(lead))}</span>
     </div>
+    ${(window.HBBilling && g.items.some(o=> o.contactHidden && !o.feePaid)) ? `<div class="hint" style="margin-top:4px; line-height:1.7; color:#b45309; font-weight:600">${esc(HBBilling.hiddenLine(g.items.find(o=> o.contactHidden)))}</div>` : ""}
     <div class="hint" style="margin-top:4px; line-height:1.7">
       ${[g.phone ? `📞 <a href="tel:${esc(g.phone)}" style="color:var(--green); font-weight:700">${esc(g.phone)}</a>` : "",
          g.pickup ? "🏪 দোকান থেকে নেবেন" : (g.address ? "📍 " + esc(g.address) : ""),
@@ -2673,6 +2679,8 @@ function ordAccept(g){
     $("oaOk").onclick = async ()=>{
       $("oaOk").disabled = true; $("oaOk").textContent = "⏳…";
       try{
+        // 💰 অর্ডার-ফি চালু থাকলে আগে সার্ভারে ফি — তারপর গ্রাহকের তথ্য খোলে (hb-billing.js)
+        if(window.HBBilling && !(await HBBilling.acceptOrders(g.items))){ closeModal(); return; }
         const bt = db.batch(), gid = "batch-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
         g.items.forEach((o, i)=>{
           const u = { status:"preparing", preparingAt: firebase.firestore.FieldValue.serverTimestamp(), selfDelivery: mode === "self", groupBatchId: gid };
@@ -3099,5 +3107,6 @@ auth.onAuthStateChanged(async (user)=>{
   go(["dash","pos","orders","rx","meds","alerts","purchase","suppliers","customers","stock"].includes(start) || MENU.some(m=> m.key === start && (!m.admin || isAdmin())) ? start : "dash");
 });
 </script>
+<script>if(window.HBBilling) HBBilling.mount(document.getElementById("hbBillPillSlot"), { inside:true });</script>
 </body>
 </html>

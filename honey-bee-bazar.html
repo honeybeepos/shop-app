@@ -13558,7 +13558,7 @@ $("hbCartCheckoutBtn").addEventListener("click", async ()=>{
   // (শপকিপারের হেডার সুইচ), সেগুলোর প্রোডাক্ট অর্ডার হতে দেওয়া হবে না
   const closedShopIds = new Set(items.map(it=> it.shopId).filter(sid=>{
     const s = allShops.find(x=> x.id === sid);
-    return s && s.isShopOpen === false;
+    return s && (s.isShopOpen === false || s.onlineOrdersOff === true); // 🔌 সুপার এডমিন অনলাইন অর্ডার বন্ধ রাখলেও
   }));
   if(closedShopIds.size > 0){
     const closedNames = [...closedShopIds].map(sid=>{
@@ -14084,16 +14084,51 @@ function hbShopInfoLoad(shopId){
       });
     });
 }
+/* ⏱️ দোকান সাড়া না দিলে — নির্দিষ্ট মিনিট পরে গ্রাহক বাতিল করে অন্য দোকানে যেতে পারেন।
+   দোকান গ্রহণ না করা পর্যন্ত (অর্ডার-ফি চালু থাকলে) দোকানের নম্বর দেখানো হয় না —
+   দুই পক্ষের নম্বর একসাথে খোলে। */
+let __hbOrderTimeoutMin = 20, __hbOrderTimeoutLoaded = false;
+function hbLoadOrderTimeout(){
+  if(__hbOrderTimeoutLoaded) return; __hbOrderTimeoutLoaded = true;
+  db.collection("billingConfig").doc("main").get().then(d=>{ const m = d.exists && Number(d.data().orderTimeoutMin); if(m > 0) __hbOrderTimeoutMin = m; }).catch(()=>{});
+}
+function hbOrderWaitInfo(order){
+  if(!order || (order.status || "pending") !== "pending") return null;
+  hbLoadOrderTimeout();
+  const t = (order.releasedAt && order.releasedAt.toMillis ? order.releasedAt.toMillis() : 0) || (order.createdAt && order.createdAt.toMillis ? order.createdAt.toMillis() : 0);
+  if(!t) return null;
+  const left = Math.ceil((t + __hbOrderTimeoutMin * 60000 - Date.now()) / 60000);
+  return { left, canCancel: left <= 0 };
+}
+async function hbCancelPendingOrder(oid){
+  const order = __hbOrdersData.find(x=> x.id === oid); if(!order) return;
+  if(!confirm("দোকান এখনো সাড়া দেয়নি। অর্ডারটা বাতিল করে অন্য দোকান থেকে নেবেন?")) return;
+  const items = __hbOrdersData.filter(x=> x.shopId === order.shopId && (x.status || "pending") === "pending" && (order.orderCode ? x.orderCode === order.orderCode : x.id === order.id));
+  try{
+    const bt = db.batch();
+    items.forEach(x=> bt.update(db.collection("orderRequests").doc(x.id), { status:"cancelled", cancelledAt: firebase.firestore.FieldValue.serverTimestamp(), cancelledBy:"customer", cancelReason:"দোকান সাড়া দেয়নি" }));
+    await bt.commit();
+    alert("✅ বাতিল হয়েছে — এখন অন্য দোকান থেকে একই জিনিস অর্ডার করতে পারেন।");
+  }catch(e){ alert("বাতিল করা যায়নি — দোকান হয়তো এইমাত্র গ্রহণ করেছে। আবার দেখুন।"); }
+}
 function hbShopContactInner(shopId, order){
   const i = __hbShopInfo[shopId];
   if(!i || i.loading) return '<span style="color:var(--muted);">🏪 দোকানের তথ্য লোড হচ্ছে...</span>';
+  const wait = hbOrderWaitInfo(order);
+  const waitHtml = !wait ? "" : wait.canCancel
+    ? `<div style="margin-top:8px; font-size:12px; color:#fbbf24;">⏱️ দোকান এখনো সাড়া দেয়নি।</div><button type="button" onclick="event.stopPropagation(); hbCancelPendingOrder('${escapeHtml(order.id)}')" style="margin-top:6px; width:100%; padding:9px; border-radius:9px; border:1px solid #f87171; background:rgba(248,113,113,0.12); color:#fca5a5; font-weight:800; font-family:inherit; cursor:pointer;">❌ বাতিল করে অন্য দোকান খুঁজুন</button>`
+    : `<div style="margin-top:8px; font-size:11.5px; color:var(--muted);">⏱️ দোকান ${wait.left} মিনিটের মধ্যে সাড়া না দিলে বাতিল করে অন্য দোকানে অর্ডার দিতে পারবেন।</div>`;
+  if(order && order.contactHidden && !order.feePaid){
+    return `<div style="font-size:12px; line-height:1.6;">🏪 <b>${escapeHtml(i.name || "দোকান")}</b></div>
+      <div style="font-size:11.5px; color:var(--muted); margin-top:4px;">📞 দোকান অর্ডার গ্রহণ করলে দুই পক্ষের নম্বর একসাথে দেখা যাবে।</div>${waitHtml}`;
+  }
   const btn = "display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:8px; font-size:11.5px; font-weight:700; text-decoration:none; border:1px solid var(--border); color:#fff8e8; background:rgba(255,255,255,0.05);";
   return `<div style="font-size:12px; line-height:1.6;">🏪 <b>${escapeHtml(i.name || "দোকান")}</b>${i.owner ? ' · 👤 ' + escapeHtml(i.owner) : ''}</div>
     <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
       ${i.phone ? `<a href="tel:${escapeHtml(i.phone)}" onclick="event.stopPropagation();" style="${btn} border-color:#4ade80; color:#4ade80;">📞 ${escapeHtml(i.phone)}</a>` : '<span style="font-size:11px; color:var(--muted);">📞 দোকান এখনো ফোন নম্বর দেয়নি</span>'}
       ${i.loc ? `<a href="https://www.google.com/maps/search/?api=1&query=${i.loc.lat},${i.loc.lng}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="${btn}">🗺️ ম্যাপে দোকান</a>` : ''}
       ${i.phone ? `<a href="${hbPhoneToWaLink(String(i.phone).replace(/\D/g, "").replace(/^880/, "0"), hbOrderWaText(order))}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="${btn} border-color:#25D366; color:#25D366;" title="WhatsApp-এ রসিদ পাঠান"><svg width="15" height="15" viewBox="0 0 24 24" fill="#25D366" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2z"/></svg> WhatsApp</a>` : ''}
-    </div>`;
+    </div>${waitHtml}`;
 }
 function hbShopContactHtml(shopId, order){
   if(!shopId) return "";
