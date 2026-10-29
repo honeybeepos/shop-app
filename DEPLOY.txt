@@ -1,0 +1,33 @@
+🐝 Honey Bee — নিরাপত্তা + আয়ের বাকি অংশ + দর্জি + মতামত (২৯ অক্টোবর)
+=====================================================================
+৯টা ফাইল মূল ফোল্ডারে:
+  admin.html, firestore.rules, honey-bee-bazar.html, service-worker.js, hb-billing.js,
+  shop-ledger-app.html, honey-bee-driver.html, tailor-app.html, feedback.html (নতুন)
+৩টা ফাইল functions ফোল্ডারে: billing.js, index.js, mou-tools.js
+(firestore.rules.old-backup = আজকের আগের rules — শুধু ফেরত যেতে হলে; upload করবেন না)
+
+ধাপ ১ — ফাইল বসান (Replace)
+
+ধাপ ২ — দেখুন ঠিক বসেছে কিনা (প্রতিটায় লেখা আসতে হবে)
+cd /d "E:\all tools\my  key\shop-app-main\shop-app-main"
+findstr /c:"isDriverUser" firestore.rules
+findstr /c:"billingOnRestBill" functions\billing.js
+findstr /c:"driversWithSub" functions\index.js
+findstr /c:"tlrSub" functions\mou-tools.js
+
+ধাপ ৩ — Deploy (একটা একটা করে)
+firebase deploy --only firestore:rules
+firebase deploy --only functions
+
+⚠️ functions deploy-এর সময় জিজ্ঞেস করবে billingOnRestaurantBill মুছবে কিনা —
+   y লিখে Enter দিন। (এটার জায়গায় নতুন billingOnRestBill আসছে।)
+
+ধাপ ৪ — GitHub: ৯টা ফাইল মূল জায়গায়, ৩টা functions ফোল্ডারে।
+
+Deploy-এর পর ফোনে একবার দেখবেন:
+• বাজার থেকে লগইন ছাড়া (গেস্ট) গাড়ি খুঁজুন → চালকের অ্যাপে ডাক আসে কিনা
+• চালক অফার গ্রহণ/বাতিল করতে পারেন কিনা
+• যাত্রীর "Waiting" চালু/বন্ধ হয় কিনা
+• বাজারে সেলাই ঘরের ডিজাইন আগের মতো দেখা যায় কিনা (আয়ের সুইচ বন্ধ থাকলে সবাই দেখা যাবে)
+• honeybeebazar.com/feedback.html খুলে একটা মতামত জমা দিন → এডমিন → রিপোর্ট-এ দেখুন
+সমস্যা হলে firestore.rules.old-backup-এর নাম firestore.rules করে আবার rules deploy করলেই আগের অবস্থা।

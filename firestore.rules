@@ -157,14 +157,18 @@ service cloud.firestore {
         allow read, write: if isSignedIn() && myShopId() == shopId;
       }
 
+      // 🔒 পুরনো "রাইডার ডাকুন" — ট্র্যাকিং লিংক (গ্রাহক) নির্দিষ্ট একটা ডাক পড়তে পারে;
+      //    পুরো তালিকা শুধু লগইন করা কেউ (রাইডার/দোকান); বদলাতে পারে শুধু সেই দোকান
       match /deliveryCalls/{callId} {
-        allow read: if true;
+        allow get: if true;
+        allow list: if isSignedIn();
         allow create: if isSignedIn() && myShopId() == shopId;
-        allow update: if true;
+        allow update: if isSignedIn() && (myShopId() == shopId || isSuperAdmin());
       }
 
+      // 🔒 পুরনো রাইডার-ফোনের পুশ টোকেন — এখন শুধু সার্ভার পড়ে/মোছে
       match /deliveryDevices/{token} {
-        allow read, write: if true;
+        allow read, write: if false;
       }
 
       // 🔔 দোকানের পুশ নোটিফিকেশন — প্রতিটা ডিভাইসের (মালিক/স্টাফ) টোকেন নিজের uid-এর নামে।
@@ -220,8 +224,10 @@ service cloud.firestore {
         allow write: if isSignedIn() && myShopId() == shopId;
       }
 
+      // 🔒 রাইডারের লাইভ অবস্থান — ট্র্যাকিং লিংকে সবাই দেখে, লেখে শুধু সেই দোকান
       match /live/{docId} {
-        allow read, write: if true;
+        allow read: if true;
+        allow write: if isSignedIn() && (myShopId() == shopId || isSuperAdmin());
       }
     }
 
@@ -235,7 +241,7 @@ service cloud.firestore {
       allow update: if isSuperAdmin() ||
                     (isSignedIn() && request.auth.uid == tailorId
                      && !request.resource.data.diff(resource.data).affectedKeys()
-                          .hasAny(['status', 'isVerified']));
+                          .hasAny(['status', 'isVerified', 'hbSubUntil']));
       allow delete: if isSuperAdmin();
     }
 
@@ -730,10 +736,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // 🔒 ট্রিপ — আগে যে-কেউ (লগইন ছাড়াও) যেকোনো ট্রিপ বানাতে/বদলাতে পারত।
+    //    এখন: যাত্রী নিজের নামে (passengerId = নিজের uid, গেস্টেরও anonymous uid),
+    //    চালক নিজের ক্যালেন্ডারে (driverId = নিজে)। বদলাতে পারেন সেই যাত্রী,
+    //    সেই চালক, বা নিবন্ধিত চালক/রাইডার (অফার/অপেক্ষা-তালিকা); যাত্রী বদলানো যায় না।
+    function isDriverUser() {
+      return isSignedIn() && (exists(/databases/$(database)/documents/transportDrivers/$(request.auth.uid)) ||
+        myRole() in ['rider', 'transport_driver']);
+    }
     match /trips/{tripId} {
       allow read: if true;
-      allow create: if true;
-      allow update: if true;
+      allow create: if isSignedIn() &&
+        (request.resource.data.get('passengerId', null) == request.auth.uid ||
+         request.resource.data.get('driverId', null) == request.auth.uid);
+      allow update: if isSignedIn() &&
+        request.resource.data.get('passengerId', null) == resource.data.get('passengerId', null) &&
+        (isSuperAdmin() ||
+         resource.data.get('passengerId', null) == request.auth.uid ||
+         resource.data.get('driverId', null) == request.auth.uid ||
+         isDriverUser());
       // 📅 Calendar/ম্যানুয়াল-বুকিং Phase 3 — "ব্লক তুলে নিন" ফিচারটা এই
       // ডকুমেন্ট delete করে (shop-ledger-app.html-এ dmCalToggleBlockBtn),
       // কিন্তু আগে কোনো delete rule-ই ছিল না বলে সেটা প্রোডাকশনে সবসময়
@@ -768,9 +789,11 @@ service cloud.firestore {
       }
     }
 
+    // 🔒 চালকের কাছে যাওয়া অফার — শুধু সেই চালক দেখেন ও সাড়া দেন
     match /tripOffers/{offerId} {
-      allow read: if true;
-      allow update: if true;
+      allow read: if isSignedIn() && (isSuperAdmin() || resource.data.driverId == request.auth.uid);
+      allow update: if isSignedIn() && resource.data.driverId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt']);
       allow create, delete: if false;
     }
 
@@ -883,8 +906,8 @@ service cloud.firestore {
        নিজের uid-ই হতে হবে, পরে আর কেউ বদলাতে পারে না; ভাড়া কাটা হয়ে
        গেলে ডক আর বদলানো যায় না। ভাড়া কাটার অনুমতি দেন যাত্রী নিজে। */
     match /passenger_waiting_queue/{docId} {
-      allow read: if true;
-      allow create: if (!('owner_uid' in request.resource.data) ||
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (!('owner_uid' in request.resource.data) ||
                         (request.auth != null && request.resource.data.owner_uid == request.auth.uid))
                     && !('walletCharged' in request.resource.data);
       allow update: if request.resource.data.get('user_id', null) == resource.data.get('user_id', null)
@@ -894,7 +917,11 @@ service cloud.firestore {
                     && (request.resource.data.get('picked_up_by', null) == resource.data.get('picked_up_by', null) ||
                         (resource.data.get('picked_up_by', null) == null && request.auth != null &&
                          request.resource.data.get('picked_up_by', null) == request.auth.uid));
-      allow delete: if true;
+      // 🔒 আগে যে-কেউ যেকোনো যাত্রীকে তালিকা থেকে মুছে দিতে পারত — এখন নিজেরটা (বা মালিকহীন পুরনোটা)
+      allow delete: if isSignedIn() && (isSuperAdmin() ||
+        resource.data.get('owner_uid', null) == request.auth.uid ||
+        resource.data.get('user_id', null) == request.auth.uid ||
+        resource.data.get('owner_uid', null) == null);
     }
 
     // 🌦️ আবহাওয়ার আগাম সতর্কতা — নিজের সাবস্ক্রিপশন শুধু নিজে। lastSent সার্ভার লেখে।
@@ -1183,6 +1210,17 @@ service cloud.firestore {
         allow read: if isSignedIn() && (isSuperAdmin() || request.auth.uid == agentUid);
         allow write: if false;
       }
+    }
+    // 📝 মতামতের প্রশ্নপত্র (feedback.html) — যে-কেউ (গেস্টও) একবার করে জমা দিতে পারেন, পড়েন শুধু সুপার এডমিন
+    match /feedback/{id} {
+      allow create: if isSignedIn() &&
+        request.resource.data.keys().hasOnly(['role', 'answers', 'uid', 'page', 'createdAt']) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.role in ['shop', 'customer', 'driver', 'rider'] &&
+        request.resource.data.answers is map && request.resource.data.answers.size() <= 12 &&
+        request.resource.data.createdAt == request.time;
+      allow read, delete: if isSuperAdmin();
+      allow update: if false;
     }
     // 🔑 কি যাচাই, গিফট পাওয়া ফোন, ভুল-কি গোনা — কেউ সরাসরি পড়তে/লিখতে পারে না
     match /licenseKeys/{k} { allow read, write: if false; }

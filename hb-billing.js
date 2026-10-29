@@ -88,13 +88,21 @@
     pills.forEach(p=>{
       if(!st || !st.on){ p.style.display = "none"; return; }
       p.style.display = "";
+      if(st.subOnly || st.type === "driver" || st.type === "tailor"){ // 🚑🧵 শুধু সাবস্ক্রিপশন
+        const dl = st.subUntil ? Math.ceil((st.subUntil - Date.now()) / 86400000) : 0;
+        p.className = "hbbPill" + (st.subActive ? (dl <= 3 ? " low" : " sub") : " low");
+        p.textContent = st.subActive ? "📅 " + bn(dl) + " দিন" : "📅 সাবস্ক্রিপশন নেই";
+        p.title = "আমার হিসাব — সাবস্ক্রিপশন"; return;
+      }
       const low = !st.subActive && st.credit < Math.max(2, (st.prices && st.prices.orderFee) || 0);
       p.className = "hbbPill" + (st.subActive ? " sub" : low ? " low" : "");
       p.textContent = st.subActive ? "💳 " + bn(r2(st.credit)) + " · 📅" : "💳 " + bn(r2(st.credit));
       p.title = "আমার হিসাব — ক্রেডিট ও সাবস্ক্রিপশন";
     });
   }
-  async function start(){
+  let startP = null;
+  function start(){ if(!startP) startP = start0(); return startP; }
+  async function start0(){
     if(started) return; started = true;
     try{
       const d = await firebase.firestore().collection("billingConfig").doc("main").get();
@@ -138,10 +146,15 @@
     const days = st.subUntil ? Math.ceil((st.subUntil - Date.now()) / 86400000) : 0;
     box.innerHTML = `<h3>💳 আমার হিসাব <button aria-label="বন্ধ">✕</button></h3>
       <div class="hbbStrip">
-        <div class="hbbS ${st.credit <= 0 ? "bad" : "ok"}"><small>বাকি ক্রেডিট</small><b>${bn(r2(st.credit))}</b></div>
-        <div class="hbbS ${st.subActive ? "ok" : ""}"><small>📅 সাবস্ক্রিপশন</small><b style="font-size:${st.subActive ? 14 : 16}px;">${st.subActive ? until + "<br><small>" + bn(days) + " দিন বাকি</small>" : "নেই"}</b></div>
+        ${st.subOnly ? "" : `<div class="hbbS ${st.credit <= 0 ? "bad" : "ok"}"><small>বাকি ক্রেডিট</small><b>${bn(r2(st.credit))}</b></div>`}
+        <div class="hbbS ${st.subActive ? "ok" : "bad"}"${st.subOnly ? ' style="grid-column:1 / -1;"' : ""}><small>📅 সাবস্ক্রিপশন</small><b style="font-size:${st.subActive ? 14 : 16}px;">${st.subActive ? until + "<br><small>" + bn(days) + " দিন বাকি</small>" : "নেই"}</b></div>
       </div>
-      ${st.on ? `<div class="hbbCard"><b class="t">📋 কীভাবে কাটে</b>
+      ${st.on && (st.type === "driver" || st.type === "tailor") ? `<div class="hbbCard"><b class="t">📋 নিয়ম</b>
+        ${st.type === "tailor"
+          ? "🧵 সাবস্ক্রিপশন চালু থাকলে Honey Bee Bazar-এ আপনার ডিজাইন, নম্বর আর অনলাইন অর্ডার গ্রাহকরা দেখবেন। নিজের খাতা আর মাপ সবসময় ফ্রি।" + (st.subActive ? "" : "<br><b style='color:#b42318'>🔴 এখন সাবস্ক্রিপশন নেই — বাজারে আপনার ডিজাইন দেখা যাচ্ছে না।</b>")
+          : "🚑 সাবস্ক্রিপশন চালু থাকলে অনলাইন হয়ে যাত্রীর ডাক পাবেন — প্রতি ট্রিপে কিছু কাটে না।"}<br>
+        📅 ${[1,3,6,12].map(m=> bn(m) + " মাস " + bn((p.sub || {})["m"+m] || 0) + " " + cur).join(" · ")}</div>`
+      : st.on ? `<div class="hbbCard"><b class="t">📋 কীভাবে কাটে</b>
         🧾 দোকানে প্রতি বিক্রিতে: <b>${bn(p.perSale)} ক্রেডিট</b>${st.subActive ? " — <b style='color:#11734b'>এখন ফ্রি (সাবস্ক্রিপশন চালু)</b>" : ""}<br>
         🛒 অনলাইন অর্ডার গ্রহণে: <b>${bn(p.orderFee)} ক্রেডিট</b> (সবসময়)<br>
         📅 সাবস্ক্রিপশন নিলে দোকানে বিক্রি ফ্রি: ${[1,3,6,12].map(m=> bn(m) + " মাস " + bn((p.sub || {})["m"+m] || 0) + " " + cur).join(" · ")}</div>` : `<div class="hbbCard">এখন Honey Bee-তে কোনো চার্জ কাটছে না।</div>`}
@@ -214,6 +227,18 @@
     document.getElementById("hbbOpenAcc").onclick = open;
   }
 
+  /* 🚑 চালক অনলাইন হওয়ার আগে — সাবস্ক্রিপশন লাগলে আর না থাকলে false (পাতা খুলে দেখায়) */
+  async function canGoOnline(){
+    try{ await start(); }catch(e){}
+    if(!st || !st.on || st.type !== "driver" || st.subActive) return true;
+    await open();
+    const box = document.getElementById("hbbBox");
+    if(box){ const n = document.createElement("div"); n.className = "hbbCard"; n.style.cssText = "background:#fde8e4;border-color:#f3b8ad;";
+      n.innerHTML = "🔴 অনলাইন হতে সাবস্ক্রিপশন লাগবে। এজেন্টের কাছ থেকে নিন, বা এজেন্টের পাঠানো কি নিচে বসান।";
+      box.insertBefore(n, box.children[1] || null); }
+    return false;
+  }
+
   function mount(anchor, opt){
     if(!anchor) return;
     addCss();
@@ -225,6 +250,6 @@
     return b;
   }
 
-  window.HBBilling = { mount, open, acceptOrders, hiddenLine, refresh, state: ()=> st, _whenAuthed: whenAuthed };
+  window.HBBilling = { mount, open, acceptOrders, hiddenLine, refresh, canGoOnline, state: ()=> st, _whenAuthed: whenAuthed };
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", whenAuthed); else whenAuthed();
 })();

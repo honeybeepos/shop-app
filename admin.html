@@ -307,6 +307,13 @@
        বাজারের রিপোর্ট Honey Bee Agent অ্যাপ থেকে দেখেন/হ্যান্ডেল করেন —
        এটা সুপারঅ্যাডমিনের জন্য সব বাজারের catch-all/escalation ভিউ। -->
   <div class="card" data-pane="reports">
+    <h2>📝 মতামত (প্রশ্নপত্র)</h2>
+    <div class="meta">লিংক: <b>honeybeebazar.com/feedback.html</b> — দোকানদারের জন্য শেষে <b>?r=shop</b>, ক্রেতা <b>?r=customer</b>, চালক <b>?r=driver</b>, ডেলিভারিম্যান <b>?r=rider</b>। WhatsApp-এ পাঠান।</div>
+    <div class="row"><button class="btn secondary" id="fbLoadBtn">📋 উত্তরগুলো দেখুন</button><button class="btn secondary" id="fbCsvBtn">⬇️ Excel (CSV)</button></div>
+    <div id="fbBox" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="card" data-pane="reports">
     <h2>🚩 Transport Media রিপোর্ট (<span id="tmReportCount">0</span>) <span id="pendingTmReportBadge" style="display:none; background:var(--due); color:#fff; font-size:11px; padding:2px 8px; border-radius:20px; margin-left:6px;"></span></h2>
     <p style="font-size:11.5px; color:#8a7f6c; margin:0 0 10px;">যাত্রীরা কোনো পোস্ট রিপোর্ট করলে এখানে দেখা যাবে (সব বাজার একসাথে) — সংশ্লিষ্ট বাজারের এজেন্টও নিজের অ্যাপ থেকে একই রিপোর্ট দেখতে/হ্যান্ডেল করতে পারেন।</p>
     <div id="tmReportList">লোড হচ্ছে...</div>
@@ -1390,7 +1397,7 @@ function startAnalyticsListener(){
    সব লেখা functions/billing.js-এর billingAdmin দিয়ে (সার্ভার যাচাই করে)।
    পড়া সরাসরি Firestore থেকে (rules: সুপার এডমিন)। */
 const billingAdminFn = cloudFunctions.httpsCallable("billingAdmin");
-const BIL_TYPES = [["shop","🏪 দোকান (POS)"],["pharmacy","💊 ফার্মেসি"],["restaurant","🍽️ রেস্টুরেন্ট"],["tailor","🧵 সেলাই ঘর (পরে)"],["driver","🚑 ট্রান্সপোর্ট (পরে)"]];
+const BIL_TYPES = [["shop","🏪 দোকান (POS)"],["pharmacy","💊 ফার্মেসি"],["restaurant","🍽️ রেস্টুরেন্ট"],["driver","🚑 ট্রান্সপোর্ট (শুধু সাবস্ক্রিপশন)"],["tailor","🧵 সেলাই ঘর (শুধু সাবস্ক্রিপশন)"]];
 const BIL_M = [1,3,6,12];
 const BIL_KIND = { agent:"🧑‍💼 এজেন্ট দিলেন", key:"🔑 কি দিয়ে", gift:"🎁 গিফট", correction:"✏️ সংশোধন", sale:"🧾 বিক্রি", order:"🛒 অনলাইন অর্ডার", refund:"↩️ ফেরত", sub:"📅 সাবস্ক্রিপশন",
   recharge:"💵 রিচার্জ", package:"📅 প্যাকেজ" };
@@ -1633,7 +1640,7 @@ async function bilShowBiz(id){
       </div>
       <div style="margin-top:10px; font-size:12.5px;">${led.docs.length ? led.docs.map(d=>{ const l = d.data(); const t = l.at && l.at.toDate ? l.at.toDate().toLocaleString("bn-BD") : "";
         const amt = l.months ? `<b style="color:var(--paid)">+${bnNum(l.months)} মাস</b>` : `<b style="color:${l.amount < 0 ? "var(--due)" : "var(--paid)"}">${l.amount < 0 ? "−" : "+"}${bnNum(Math.abs(bilR2(l.amount)))}</b>`;
-        return `<div class="sum-row"><span>${BIL_KIND[l.kind] || l.kind}${l.note ? " — " + bilEsc(l.note) : ""}<br><small style="color:#8a7f6c">${t}${l.byName ? " · " + bilEsc(l.byName) : ""}</small></span>
+        return `<div class="sum-row"><span>${BIL_KIND[l.kind] || l.kind}${l.note ? " — " + bilEsc(l.note) : ""}<br><small style="color:#8a7f6c">${t}${l.byName ? " · " + bilEsc(l.byName) : ""}</small>${l.kind === "order" ? `<br><button class="btn ghost" style="padding:3px 10px; font-size:12px; margin-top:3px;" data-refund="${d.id}">↩️ ফি ফেরত দিন</button>` : ""}</span>
           <span style="text-align:right; white-space:nowrap;">${amt}<br><small>বাকি ${bnNum(bilR2(l.balanceAfter))}</small></span></div>`; }).join("") : "<p class='meta'>এখনো কোনো লেনদেন নেই</p>"}</div>
     </div>`;
   const run = async (data)=>{ try{ await billingAdminFn(Object.assign({ bizId: id }, data)); bilShowBiz(id); bilLoadReport(); } catch(e){ alert("⚠️ " + (e.message || e)); } };
@@ -1653,7 +1660,38 @@ async function bilShowBiz(id){
     run({ action:"adjust", kind:"sub", months: n, note: prompt("নোট (ঐচ্ছিক):", "") || "" });
   };
   document.getElementById("bilOnBtn").onclick = ()=> run({ action:"onlineToggle", off: !info.onlineOrdersOff });
+  box.querySelectorAll("[data-refund]").forEach(b=> b.onclick = ()=>{
+    const note = prompt("কেন ফেরত দিচ্ছেন? (যেমন: ভুয়া অর্ডার, গ্রাহক নেননি) — দোকানদারও দেখবেন", "ভুয়া অর্ডার");
+    if(note === null) return;
+    run({ action:"refundOrder", ledgerId: b.dataset.refund, note });
+  });
 }
+
+/* ---------- 📝 মতামত (feedback.html) ---------- */
+let FB_ROWS = [];
+const FB_ROLE = { shop:"🏪 দোকানদার", customer:"🛒 ক্রেতা", driver:"🚑 চালক", rider:"🛵 ডেলিভারিম্যান" };
+async function fbLoad(){
+  const box = document.getElementById("fbBox"); box.textContent = "লোড হচ্ছে...";
+  try{
+    const s = await db.collection("feedback").orderBy("createdAt","desc").limit(300).get();
+    FB_ROWS = s.docs.map(d=> Object.assign({ id: d.id }, d.data()));
+    if(!FB_ROWS.length){ box.innerHTML = "<p class='meta'>এখনো কেউ মতামত দেননি</p>"; return; }
+    const by = {}; FB_ROWS.forEach(r=>{ const k = r.role || "?"; by[k] = by[k] || { n:0, s:0 }; by[k].n++; by[k].s += Number((r.answers || {}).stars || 0); });
+    box.innerHTML = `<div class="strip">${Object.keys(by).map(k=> `<div class="s"><small>${FB_ROLE[k] || k}</small><b style="font-size:14px;">${bnNum(by[k].n)} জন · ⭐${bnNum(Math.round(by[k].s / by[k].n * 10) / 10)}</b></div>`).join("")}</div>`
+      + FB_ROWS.slice(0, 100).map(r=>{ const a = r.answers || {}; const t = r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().toLocaleString("bn-BD") : "";
+        return `<div class="sum-row" style="display:block;"><b>${FB_ROLE[r.role] || r.role} · ${"⭐".repeat(Number(a.stars) || 0)}</b> <small style="color:#8a7f6c">${t}</small><br>`
+          + Object.keys(a).filter(k=> k !== "stars").map(k=> `<small><b>${bilEsc(k)}:</b> ${bilEsc(Array.isArray(a[k]) ? a[k].join(", ") : a[k])}</small>`).join("<br>") + `</div>`; }).join("");
+  }catch(e){ box.textContent = "⚠️ " + (e.message || e); }
+}
+document.getElementById("fbLoadBtn").addEventListener("click", fbLoad);
+document.getElementById("fbCsvBtn").addEventListener("click", async ()=>{
+  if(!FB_ROWS.length) await fbLoad();
+  const keys = [...new Set(FB_ROWS.flatMap(r=> Object.keys(r.answers || {})))];
+  const rows = [["সময়","কে"].concat(keys)].concat(FB_ROWS.map(r=> [r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().toISOString() : "", FB_ROLE[r.role] || r.role]
+    .concat(keys.map(k=>{ const v = (r.answers || {})[k]; return Array.isArray(v) ? v.join(" / ") : (v == null ? "" : v); }))));
+  const csv = "\ufeff" + rows.map(r=> r.map(v=> `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\r\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type:"text/csv;charset=utf-8" })); a.download = "honeybee-feedback.csv"; a.click();
+});
 
 /* ---------- 🎁 গিফট তালিকা ---------- */
 document.getElementById("bilGiftListBtn").addEventListener("click", async ()=>{

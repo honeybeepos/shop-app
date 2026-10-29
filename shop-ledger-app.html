@@ -21308,6 +21308,8 @@ document.getElementById("dmStatusSwitch").addEventListener("click", async ()=>{
   const current = __dmDriver.driverStatus || "offline";
   if(current === "busy"){ alert("এই মুহূর্তে ট্রিপে আছেন — ট্রিপ শেষ না হওয়া পর্যন্ত স্ট্যাটাস বদলানো যাবে না।"); return; }
   const next = current === "online" ? "offline" : "online";
+  // 💰 ট্রান্সপোর্টে সাবস্ক্রিপশন চালু থাকলে — না থাকলে অনলাইন হওয়া যায় না (hb-billing.js)
+  if(next === "online" && window.HBBilling && !(await HBBilling.canGoOnline())) return;
   __dmDriver.driverStatus = next;
   dmRefreshStatusUi(next);
   try{ await db.collection("transportDrivers").doc(__dmDriverId).update({ driverStatus: next }); }

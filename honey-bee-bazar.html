@@ -4042,6 +4042,26 @@ function tlrAreaInit(){
    একক-ফিল্ড কোয়েরি, তাই আলাদা ইনডেক্স লাগে না; এলাকা ফোনেই ছাঁকা হয়। */
 const TLR_CAT = { kameez:"👗 জামা", pajama:"👖 পায়জামা", set:"👗👖 সেট", blouse:"🥻 ব্লাউজ", kids:"🧒 ছোটদের", other:"🧵 অন্যান্য" };
 let __tlrDesigns = null, __tlrDesignsAt = 0;
+/* 💰 দর্জির সাবস্ক্রিপশন — আয়ের সুইচ + "সেলাই ঘর" টিক চালু থাকলে শুধু সাবস্ক্রিপশন থাকা
+   দর্জির ডিজাইন, অর্ডার আর নম্বর দেখা যায় (tailors.hbSubUntil সার্ভার বসায়)। বন্ধ থাকলে null = সবাই। */
+let __tlrSub = undefined, __tlrSubAt = 0;
+async function tlrSubGate(){
+  if(__tlrSub !== undefined && Date.now() - __tlrSubAt < 300000) return __tlrSub;
+  try{
+    if(typeof hbEnsureVisitorAuth === "function") await hbEnsureVisitorAuth();
+    const c = await db.collection("billingConfig").doc("main").get();
+    const x = c.exists ? c.data() : {};
+    if(!(x.enabled && x.types && x.types.tailor)) __tlrSub = null;
+    else{
+      const qs = await db.collection("tailors").where("hbSubUntil", ">", firebase.firestore.Timestamp.now()).limit(500).get();
+      __tlrSub = new Set(qs.docs.map(d=> d.id));
+    }
+  }catch(e){ __tlrSub = null; }
+  __tlrSubAt = Date.now();
+  return __tlrSub;
+}
+const tlrSubOk = (gate, tailorId)=> !gate || gate.has(tailorId);
+const TLR_OFF_MSG = "✂️ এই সেলাই ঘর এখন অনলাইনে অর্ডার নিচ্ছে না।<br><span style=\"color:var(--muted); font-size:12.5px;\">নিচে অন্য দর্জির ডিজাইন দেখুন।</span>";
 async function tlrRenderFeed(){
   const box = $("tlrFeed"); if(!box) return;
   const msg = (t)=> `<div class="card" style="text-align:center; color:var(--muted); font-size:12.5px; padding:22px 14px;">${t}</div>`;
@@ -4053,7 +4073,8 @@ async function tlrRenderFeed(){
       __tlrDesignsAt = Date.now();
     }catch(e){ box.innerHTML = msg("📶 ডিজাইন আনা যায়নি — ইন্টারনেট দেখে আবার খুলুন।"); return; }
   }
-  const list = __tlrDesigns.filter(d=>
+  const __gate = await tlrSubGate();
+  const list = __tlrDesigns.filter(d=> tlrSubOk(__gate, d.tailorId) &&
       (!tlrArea.d || d.district === tlrArea.d) && (!tlrArea.u || d.upazila === tlrArea.u) && (!tlrArea.m || d.marketId === tlrArea.m))
     .sort((a,b)=> ((b.createdAt&&b.createdAt.toMillis&&b.createdAt.toMillis())||0) - ((a.createdAt&&a.createdAt.toMillis&&a.createdAt.toMillis())||0));
   if(!list.length){
@@ -4172,6 +4193,7 @@ async function tlrOpenSharedDesign(designId){
     body.innerHTML = `<div style="text-align:center; padding:24px;">✂️ এই ডিজাইনটা এখন আর দেখা যাচ্ছে না।<br><span style="color:var(--muted); font-size:12.5px;">নিচে সেলাই ঘরের অন্য ডিজাইন দেখুন।</span></div>`;
     return;
   }
+  if(!tlrSubOk(await tlrSubGate(), d.tailorId)){ body.innerHTML = `<div style="text-align:center; padding:24px;">${TLR_OFF_MSG}</div>`; return; }
   if(!__tlrDesigns) __tlrDesigns = [];
   if(!__tlrDesigns.some(x=> x.id === d.id)) __tlrDesigns.push(d); // অর্ডার শিট এখান থেকেই ডিজাইন খোঁজে
   tlrLogView(d.id);
@@ -4197,6 +4219,7 @@ async function tlrOpenOrder(designId){
   let t = null;
   try{ const ts = await db.collection("tailors").doc(d.tailorId).get(); t = ts.exists ? ts.data() : null; }catch(e){}
   if(!t || t.status === "blocked"){ body.innerHTML = `<div style="text-align:center; padding:24px;">এই সেলাই ঘর এখন অর্ডার নিচ্ছে না।</div>`; return; }
+  if(!tlrSubOk(await tlrSubGate(), d.tailorId)){ body.innerHTML = `<div style="text-align:center; padding:24px;">${TLR_OFF_MSG}</div>`; return; }
   if(t.isOpen === false){ body.innerHTML = `<div style="text-align:center; padding:24px;">🔴 ${escapeHtml(t.name||"সেলাই ঘর")} এখন বন্ধ — পরে আবার চেষ্টা করুন।</div>`; return; }
   if(!t.storeLocation || t.storeLocation.lat == null){ body.innerHTML = `<div style="text-align:center; padding:24px;">📍 ${escapeHtml(t.name||"সেলাই ঘর")} এখনো দোকানের লোকেশন দেননি, তাই রাইডার পাঠানো যাচ্ছে না। পরে আবার দেখুন।</div>`; return; }
   __tlrOrd = { design: d, tailor: t, loc: null };
@@ -15799,6 +15822,8 @@ function bloodClearFilter(){
 
 function tripGetUserId(){
   if(currentCustomer && currentCustomer.uid) return currentCustomer.uid;
+  // 🔒 গেস্ট যাত্রীরও Firebase-এর নিজস্ব (anonymous) uid — নিয়মে "নিজের ট্রিপ" চেনার জন্য
+  if(typeof auth !== "undefined" && auth.currentUser && auth.currentUser.uid) return auth.currentUser.uid;
   if(typeof __sessionId !== "undefined") return __sessionId;
   return "guest_" + Date.now();
 }
@@ -15985,6 +16010,7 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
   try{
     const pickupLocation = await tripGetPickupLocation();
     $("tripSearchBtn").textContent = "খোঁজা হচ্ছে...";
+    if(typeof hbEnsureVisitorAuth === "function") await hbEnsureVisitorAuth();
     const now = Date.now();
     const tripRef = await db.collection("trips").add({
       passengerId: tripGetUserId(),

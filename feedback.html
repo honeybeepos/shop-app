@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Honey Bee — আপনার মতামত</title>
+<link rel="icon" href="bazar-icon-192.png">
+<style>
+  :root{ --bg:#fbf6ec; --card:#fff; --ink:#2b2113; --muted:#8b7f6c; --line:#eadcbd; --amber:#ffb703; --brown:#b8662f; --ok:#11734b; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:"Noto Sans Bengali","Hind Siliguri",system-ui,sans-serif; line-height:1.6; }
+  .wrap{ max-width:640px; margin:0 auto; padding:18px 16px 60px; }
+  header{ text-align:center; margin:6px 0 16px; } header .bee{ font-size:42px; } header h1{ font-size:20px; margin:4px 0; } header p{ margin:0; color:var(--muted); font-size:13.5px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px; }
+  .q{ font-weight:700; font-size:14.5px; margin:0 0 8px; } .hint{ font-size:12px; color:var(--muted); margin:-4px 0 8px; }
+  .roles{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .roles button,.opts button{ padding:12px 8px; border-radius:11px; border:1px solid var(--line); background:#fffaf0; font:inherit; font-size:14px; font-weight:700; cursor:pointer; color:var(--ink); }
+  .roles button.on,.opts button.on{ background:var(--amber); border-color:var(--amber); }
+  .opts{ display:flex; flex-wrap:wrap; gap:6px; } .opts button{ flex:1 1 auto; font-weight:600; font-size:13px; padding:9px 10px; }
+  .stars{ display:flex; gap:4px; } .stars button{ font-size:30px; background:none; border:none; cursor:pointer; padding:0 2px; filter:grayscale(1); opacity:.45; }
+  .stars button.on{ filter:none; opacity:1; }
+  textarea,input{ width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; font:inherit; font-size:14px; background:#fffdf8; }
+  .go{ width:100%; padding:14px; border:none; border-radius:12px; background:var(--brown); color:#fff; font:inherit; font-size:16px; font-weight:800; cursor:pointer; }
+  .go:disabled{ opacity:.6; }
+  .msg{ text-align:center; font-size:13.5px; margin:10px 0 0; }
+  .done{ text-align:center; padding:30px 10px; } .done .big{ font-size:54px; }
+  @media (min-width:900px){ .wrap{ max-width:760px; } .roles{ grid-template-columns:repeat(4,1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header><div class="bee">🐝</div><h1>Honey Bee — আপনার মতামত</h1><p>২ মিনিট লাগবে। আপনার কথা শুনেই আমরা অ্যাপ ভালো করি।</p></header>
+  <div class="card"><p class="q">আপনি কে?</p><div class="roles" id="roles">
+    <button data-r="shop">🏪 দোকানদার</button><button data-r="customer">🛒 ক্রেতা</button>
+    <button data-r="driver">🚑 গাড়ির চালক</button><button data-r="rider">🛵 ডেলিভারিম্যান</button></div></div>
+  <div id="qs"></div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="firebase-init.js"></script>
+<script>
+/* 📝 মতামতের প্রশ্নপত্র — উত্তর যায় feedback/ ঘরে, শুধু সুপার এডমিন পড়েন (এডমিন → রিপোর্ট)।
+   লিংক: honeybeebazar.com/feedback.html  (?r=shop দিলে সরাসরি দোকানদারের প্রশ্ন) */
+const Q = {
+  common: [
+    { id:"stars", t:"Honey Bee কেমন লাগছে?", type:"stars" },
+  ],
+  shop: [
+    { id:"use", t:"কোন কাজে সবচেয়ে বেশি ব্যবহার করেন?", type:"multi", o:["বিক্রির খাতা (POS)","বাকির হিসাব","স্টক","অনলাইন অর্ডার","প্রিন্ট/রসিদ","রিপোর্ট"] },
+    { id:"hard", t:"কোন জিনিসটা কঠিন বা ঝামেলার লাগে?", type:"text" },
+    { id:"pay", t:"অ্যাপ ভালো হলে মাসে কত দিতে রাজি?", type:"one", o:["ফ্রি হলে ব্যবহার করব","৫০ টাকা পর্যন্ত","১০০ টাকা পর্যন্ত","২০০ টাকা পর্যন্ত","আরও বেশি"] },
+    { id:"credit", t:"কোনটা ভালো লাগবে?", type:"one", o:["মাসিক সাবস্ক্রিপশন","প্রতি বিক্রিতে অল্প ক্রেডিট","এখনো বুঝি না"] },
+    { id:"want", t:"আর কী থাকলে ভালো হতো?", type:"text" },
+  ],
+  customer: [
+    { id:"use", t:"Honey Bee Bazar-এ কী করেন?", type:"multi", o:["জিনিস কিনি","দাম দেখি","রেস্টুরেন্ট","দর্জি","গাড়ি ডাকি","মৌ-কে জিজ্ঞেস করি"] },
+    { id:"deliv", t:"ডেলিভারি কেমন ছিল?", type:"one", o:["খুব ভালো","ঠিক আছে","দেরি হয়","এখনো অর্ডার করিনি"] },
+    { id:"hard", t:"কোথায় আটকে যান বা কী বুঝতে কষ্ট হয়?", type:"text" },
+    { id:"want", t:"কোন দোকান/জিনিস অ্যাপে চান?", type:"text" },
+  ],
+  driver: [
+    { id:"trips", t:"অ্যাপ থেকে যাত্রী পাচ্ছেন?", type:"one", o:["প্রতিদিন পাই","মাঝে মাঝে","খুব কম","এখনো পাইনি"] },
+    { id:"pay", t:"ভালো যাত্রী পেলে মাসে কত দিতে রাজি?", type:"one", o:["ফ্রি হলে ব্যবহার করব","১০০ টাকা পর্যন্ত","২০০ টাকা পর্যন্ত","৫০০ টাকা পর্যন্ত"] },
+    { id:"hard", t:"কোন জিনিসটা ঝামেলার?", type:"text" },
+  ],
+  rider: [
+    { id:"orders", t:"ডেলিভারির ডাক পাচ্ছেন?", type:"one", o:["প্রতিদিন","মাঝে মাঝে","খুব কম","এখনো পাইনি"] },
+    { id:"income", t:"ডেলিভারি চার্জ কেমন মনে হয়?", type:"one", o:["ঠিক আছে","কম","অনেক কম"] },
+    { id:"hard", t:"কোন জিনিসটা ঝামেলার?", type:"text" },
+  ],
+  end: [
+    { id:"recommend", t:"বন্ধু বা পাশের দোকানকে Honey Bee-র কথা বলবেন?", type:"one", o:["অবশ্যই","হয়তো","না"] },
+    { id:"phone", t:"ফোন নম্বর (ঐচ্ছিক — আমরা আপনার সাথে কথা বলতে চাইলে)", type:"phone" },
+  ],
+};
+const $ = (id)=> document.getElementById(id);
+const esc = (v)=> String(v == null ? "" : v).replace(/[&<>"]/g, c=> ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+let role = null; const ans = {};
+function draw(){
+  const list = Q.common.concat(Q[role] || [], Q.end);
+  $("qs").innerHTML = list.map(q=> `<div class="card" data-q="${q.id}"><p class="q">${esc(q.t)}</p>${
+    q.type === "stars" ? `<div class="stars">${[1,2,3,4,5].map(n=> `<button type="button" data-v="${n}">⭐</button>`).join("")}</div>`
+    : q.type === "one" || q.type === "multi" ? `${q.type === "multi" ? '<p class="hint">একাধিক বাছতে পারেন</p>' : ""}<div class="opts">${q.o.map(o=> `<button type="button" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>`
+    : q.type === "phone" ? `<input type="tel" inputmode="tel" maxlength="20" placeholder="01XXXXXXXXX">`
+    : `<textarea rows="3" maxlength="600" placeholder="এখানে লিখুন..."></textarea>`}</div>`).join("")
+    + `<button class="go" id="send">✅ জমা দিন</button><p class="msg" id="msg"></p>`;
+  list.forEach(q=>{
+    const box = document.querySelector(`[data-q="${q.id}"]`);
+    if(q.type === "stars") box.querySelectorAll("button").forEach(b=> b.onclick = ()=>{ ans[q.id] = Number(b.dataset.v); box.querySelectorAll("button").forEach(x=> x.classList.toggle("on", Number(x.dataset.v) <= ans[q.id])); });
+    if(q.type === "one") box.querySelectorAll("button").forEach(b=> b.onclick = ()=>{ ans[q.id] = b.dataset.v; box.querySelectorAll("button").forEach(x=> x.classList.toggle("on", x === b)); });
+    if(q.type === "multi") box.querySelectorAll("button").forEach(b=> b.onclick = ()=>{ b.classList.toggle("on"); ans[q.id] = [...box.querySelectorAll("button.on")].map(x=> x.dataset.v); });
+  });
+  $("send").onclick = send;
+}
+async function send(){
+  const btn = $("send"), msg = $("msg");
+  if(!ans.stars){ msg.textContent = "⭐ উপরে কত তারা দেবেন বাছাই করুন"; msg.style.color = "#b42318"; window.scrollTo({ top:0, behavior:"smooth" }); return; }
+  document.querySelectorAll("[data-q] textarea, [data-q] input").forEach(el=>{ const id = el.closest("[data-q]").dataset.q; if(el.value.trim()) ans[id] = el.value.trim().slice(0, 600); });
+  btn.disabled = true; btn.textContent = "পাঠানো হচ্ছে...";
+  try{
+    if(!auth.currentUser) await auth.signInAnonymously();
+    await db.collection("feedback").add({ role, answers: ans, uid: auth.currentUser.uid, page: "feedback", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    $("app").innerHTML = `<div class="card done"><div class="big">🙏</div><h2>ধন্যবাদ!</h2><p>আপনার মতামত আমাদের কাছে পৌঁছেছে।</p><a href="honey-bee-bazar.html" style="color:var(--brown); font-weight:700;">🐝 Honey Bee Bazar-এ যান</a></div>`;
+  }catch(e){ btn.disabled = false; btn.textContent = "✅ জমা দিন"; msg.textContent = "পাঠানো যায়নি — ইন্টারনেট দেখে আবার চাপুন।"; msg.style.color = "#b42318"; }
+}
+function pick(r){ role = r; document.querySelectorAll("#roles button").forEach(b=> b.classList.toggle("on", b.dataset.r === r)); draw(); }
+document.querySelectorAll("#roles button").forEach(b=> b.onclick = ()=> pick(b.dataset.r));
+try{ const r = new URLSearchParams(location.search).get("r"); if(Q[r] && r !== "common" && r !== "end") pick(r); }catch(e){}
+</script>
+</body>
+</html>

@@ -139,7 +139,7 @@ select option{background:#173a29;color:#eafff2}
     <div class="columns"><div class="card"><h2 class="section-title">🕘 শেষ হওয়া যাত্রা</h2><div id="histList" class="sub">⏳ আনা হচ্ছে...</div></div>
       <div class="card"><h2 class="section-title">⭐ যাত্রীরা যা বলেছেন</h2><div id="rateList" class="sub">⏳ আনা হচ্ছে...</div></div></div>
   </section>
-  <section id="profile" class="page hidden"><div class="card"><h2 class="section-title">ড্রাইভার প্রোফাইল</h2><form id="profileForm"><label>পূর্ণ নাম</label><input id="pName" placeholder="আপনার পূর্ণ নাম" required><div class="formgrid"><div><label>মোবাইল নম্বর (লগইন — বদলানো যায় না)</label><input id="pPhone" readonly style="background:#f4f6fb"></div><div><label>এলাকা</label><input id="pArea" readonly style="background:#f4f6fb"></div></div><label>ড্রাইভিং লাইসেন্স নম্বর</label><input id="pLicense" placeholder="লাইসেন্স নম্বর লিখুন"><button class="btn" style="margin-top:14px">প্রোফাইল আপডেট</button></form><div class="meta" id="pVerify" style="margin-top:12px"></div><div class="btnrow"><button class="btn secondary" type="button" id="hbLogoutProfile">⎋ লগআউট</button></div></div><div class="card" style="margin-top:14px"><h2 class="section-title">🪪 কাগজ যাচাই (NID / লাইসেন্স)</h2><div class="sub">ছবি জমা দিলে আপনার এজেন্ট দেখে যাচাই করবেন। যাচাই হলে যাত্রীরা আপনার নামের পাশে ✓ দেখবেন। ছবি শুধু আপনি আর আপনার এজেন্ট দেখতে পান।</div><div id="docStatus" class="notice" style="margin-top:10px">⏳ আনা হচ্ছে...</div><label>NID (দুই পাশ বাধ্যতামূলক)</label><div class="formgrid" id="docNid" style="grid-template-columns:1fr 1fr"></div><label>ড্রাইভিং লাইসেন্স (ঐচ্ছিক)</label><div class="formgrid" id="docLic" style="grid-template-columns:1fr 1fr"></div><button class="btn" type="button" id="docSubmit" style="margin-top:14px;width:100%">✅ যাচাইয়ের জন্য জমা দিন</button></div></section>
+  <section id="profile" class="page hidden"><div class="card"><h2 class="section-title">ড্রাইভার প্রোফাইল</h2><form id="profileForm"><label>পূর্ণ নাম</label><input id="pName" placeholder="আপনার পূর্ণ নাম" required><div class="formgrid"><div><label>মোবাইল নম্বর (লগইন — বদলানো যায় না)</label><input id="pPhone" readonly style="background:#f4f6fb"></div><div><label>এলাকা</label><input id="pArea" readonly style="background:#f4f6fb"></div></div><label>ড্রাইভিং লাইসেন্স নম্বর</label><input id="pLicense" placeholder="লাইসেন্স নম্বর লিখুন"><button class="btn" style="margin-top:14px">প্রোফাইল আপডেট</button></form><div class="meta" id="pVerify" style="margin-top:12px"></div><div class="btnrow"><button class="btn secondary" type="button" onclick="window.HBBilling && HBBilling.open()">💳 আমার হিসাব — সাবস্ক্রিপশন</button><button class="btn secondary" type="button" id="hbLogoutProfile">⎋ লগআউট</button></div></div><div class="card" style="margin-top:14px"><h2 class="section-title">🪪 কাগজ যাচাই (NID / লাইসেন্স)</h2><div class="sub">ছবি জমা দিলে আপনার এজেন্ট দেখে যাচাই করবেন। যাচাই হলে যাত্রীরা আপনার নামের পাশে ✓ দেখবেন। ছবি শুধু আপনি আর আপনার এজেন্ট দেখতে পান।</div><div id="docStatus" class="notice" style="margin-top:10px">⏳ আনা হচ্ছে...</div><label>NID (দুই পাশ বাধ্যতামূলক)</label><div class="formgrid" id="docNid" style="grid-template-columns:1fr 1fr"></div><label>ড্রাইভিং লাইসেন্স (ঐচ্ছিক)</label><div class="formgrid" id="docLic" style="grid-template-columns:1fr 1fr"></div><button class="btn" type="button" id="docSubmit" style="margin-top:14px;width:100%">✅ যাচাইয়ের জন্য জমা দিন</button></div></section>
 </main>
 </div>
 <nav class="mobile-nav"><button class="active" data-page="home"><span>⌂</span>হোম</button><button data-page="post"><span>＋</span>পোস্ট</button><button data-page="bookings"><span>▣</span>বুকিং</button><button data-page="schedule"><span>▦</span>সময়সূচি</button><button data-page="profile"><span>♙</span>প্রোফাইল</button></nav>
@@ -159,6 +159,7 @@ function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script src="firebase-init.js"></script>
+<script src="hb-billing.js"></script>
 <script>
 /* ==================== 🚑 ড্রাইভার অ্যাপ — আসল লগইন ও তথ্য (ধাপ ১) ====================
    login.html-এ ড্রাইভার নিবন্ধন/লগইন করলে এখানে আসে। লগইন না থাকলে বা অন্য
@@ -187,6 +188,8 @@ $id("toggleOnline").onclick = async ()=>{
   if(!DRV.uid) return;
   const cur = DRV.data.driverStatus || "offline";
   const next = cur === "online" ? "offline" : "online";
+  // 💰 ট্রান্সপোর্টে সাবস্ক্রিপশন চালু থাকলে — না থাকলে অনলাইন হওয়া যায় না (hb-billing.js)
+  if(next === "online" && window.HBBilling && !(await HBBilling.canGoOnline())) return;
   const btn = $id("toggleOnline"); btn.disabled = true;
   try{
     await db.collection("transportDrivers").doc(DRV.uid).update({ driverStatus: next, statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp() });
@@ -824,5 +827,6 @@ auth.onAuthStateChanged(async (user)=>{
   }
 });
 </script>
+<script>if(window.HBBilling) HBBilling.mount(document.getElementById("toggleOnline"), { after:true, style:"margin-left:6px;" });</script>
 </body>
 </html>
