@@ -1832,12 +1832,24 @@ exports.deleteAccount = onCall(async (request) => {
     }
 
     const { targetUid, accountType } = request.data || {};
-    if (!targetUid || !["shop", "agent", "rider", "driver"].includes(accountType)) {
-      throw new HttpsError("invalid-argument", "targetUid ও accountType (shop/agent/rider/driver) দিতে হবে।");
+    if (!targetUid || !["shop", "agent", "rider", "driver", "restaurant", "tailor"].includes(accountType)) {
+      throw new HttpsError("invalid-argument", "targetUid ও accountType (shop/agent/rider/driver/restaurant/tailor) দিতে হবে।");
     }
 
+    // 🔐 যার লগইন মুছতে হবে — দোকানের মালিকের uid দোকানের আইডি থেকে আলাদা হতে পারে
+    const authUids = new Set([targetUid]);
     if (accountType === "shop") {
+      const sd = await db.collection("shops").doc(targetUid).get();
+      if (sd.exists && sd.data().ownerUid) authUids.add(sd.data().ownerUid);
       await db.recursiveDelete(db.collection("shops").doc(targetUid));
+    } else if (accountType === "restaurant") {
+      // 🍽️ রেস্টুরেন্ট — মেনু, বিল সব সাবকালেকশনসহ
+      await db.recursiveDelete(db.collection("restaurants").doc(targetUid));
+    } else if (accountType === "tailor") {
+      // 🧵 সেলাই ঘর — দোকান, ডিজাইনগুলো (আলাদা ঘরে থাকে) সব
+      await db.recursiveDelete(db.collection("tailors").doc(targetUid));
+      const ds = await db.collection("tailorDesigns").where("tailorId", "==", targetUid).limit(500).get();
+      await Promise.all(ds.docs.map((d) => db.recursiveDelete(d.ref)));
     } else if (accountType === "agent") {
       await db.recursiveDelete(db.collection("agents").doc(targetUid));
     } else if (accountType === "rider") {
@@ -1845,15 +1857,21 @@ exports.deleteAccount = onCall(async (request) => {
     } else if (accountType === "driver") {
       await db.recursiveDelete(db.collection("transportDrivers").doc(targetUid));
     }
-    await db.collection("users").doc(targetUid).delete().catch(() => {});
+    // 💰 ক্রেডিট/সাবস্ক্রিপশনের খাতা আর এজেন্টের স্টকও
+    await db.recursiveDelete(db.collection("billing").doc(targetUid)).catch(() => {});
+    if (accountType === "agent") await db.recursiveDelete(db.collection("agentStock").doc(targetUid)).catch(() => {});
 
-    try {
-      await getAuth().deleteUser(targetUid);
-    } catch (e) {
-      if (e.code !== "auth/user-not-found") {
-        throw new HttpsError("internal", "Firestore ডেটা মুছে গেছে, কিন্তু Auth অ্যাকাউন্ট মুছতে সমস্যা হয়েছে: " + e.message);
+    for (const uid of authUids) {
+      await db.collection("users").doc(uid).delete().catch(() => {});
+      try {
+        await getAuth().deleteUser(uid);
+      } catch (e) {
+        if (e.code !== "auth/user-not-found") {
+          throw new HttpsError("internal", "Firestore ডেটা মুছে গেছে, কিন্তু Auth অ্যাকাউন্ট মুছতে সমস্যা হয়েছে: " + e.message);
+        }
       }
     }
+    await db.collection("adminAudit").add({ action: "deleteAccount", byUid: callerUid, targetUid, accountType, at: FieldValue.serverTimestamp() }).catch(() => {});
 
     return { success: true, deletedUid: targetUid, accountType };
   } catch (err) {
@@ -2200,7 +2218,7 @@ exports.adminResetPassword = onCall(async (request) => {
     // হচ্ছে — যাতে ভুল uid দিলে অন্য কারো পাসওয়ার্ড বদলে না যায়।
     const COLLECTION = {
       shop: "shops", rider: "riders", restaurant: "restaurants",
-      agent: "agents", transport_driver: "transportDrivers"
+      agent: "agents", transport_driver: "transportDrivers", tailor: "tailors"
     };
     const col = COLLECTION[accountType];
     if (!col) {

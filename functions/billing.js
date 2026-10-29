@@ -55,8 +55,8 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
   let __cfg = null, __cfgAt = 0;
   async function getConfig(fresh) {
     if (!fresh && __cfg && Date.now() - __cfgAt < 2 * 60 * 1000) return __cfg;
-    const d = await db.collection("billingConfig").doc("main").get();
-    __cfg = mergeDeep(defaults(), d.exists ? d.data() : {});
+    const [d, pv] = await Promise.all([db.collection("billingConfig").doc("main").get(), db.collection("billingConfig").doc("private").get()]);
+    __cfg = mergeDeep(mergeDeep(defaults(), d.exists ? d.data() : {}), pv.exists ? pv.data() : {});
     __cfgAt = Date.now();
     return __cfg;
   }
@@ -266,7 +266,10 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
     if (d.action === "saveConfig") {
       const c = cleanConfig(d.config);
       c.updatedAt = FieldValue.serverTimestamp(); c.updatedBy = me.uid;
-      await db.collection("billingConfig").doc("main").set(c);
+      // 🔒 সুপার এডমিনের bKash/ফোন আলাদা নথিতে — দোকানদার/গ্রাহক পড়তে পারেন না, শুধু এজেন্ট
+      const priv = { pay: c.pay, contact: c.contact, updatedAt: c.updatedAt };
+      delete c.pay; delete c.contact;
+      await Promise.all([db.collection("billingConfig").doc("main").set(c), db.collection("billingConfig").doc("private").set(priv)]);
       __cfg = null;
       await audit("saveConfig", { enabled: c.enabled, types: c.types, giftOn: c.gift.on });
       return { ok: true };
@@ -522,7 +525,7 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
         credit: r2(x.credit), giftCredit: r2(x.giftCredit), giftGiven: !!x.giftGiven,
         subUntil: tsMs(x.sub && x.sub.until) || null, subActive: subActive(x),
         prices: { perSale: pr.perSale, orderFee: pr.orderFee, sub: pr.sub }, agent,
-        contact: cfg.contact, onlineOrdersOff: biz.onlineOrdersOff,
+        onlineOrdersOff: biz.onlineOrdersOff,
       };
     }
     if (d.action === "redeem") {
