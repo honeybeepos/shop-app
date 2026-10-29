@@ -3516,6 +3516,11 @@ async function tripBuildQueue(trip, exclude) {
   } catch (e) { console.warn("TRIP_QUEUE_DRIVERS_FAILED", String(e && e.message || e)); }
   const seen = new Set();
   let list = cands.filter((c) => !ex.has(c.id) && !seen.has(c.id) && seen.add(c.id));
+  // 💰 ট্রান্সপোর্টে সাবস্ক্রিপশন চালু থাকলে — সাবস্ক্রিপশন ছাড়া চালক বাদ (রাইডার/ডেলিভারিম্যান সবসময় ফ্রি)
+  try {
+    const okDrivers = await __billing.driversWithSub(list.filter((c) => c.kind === "driver").map((c) => c.id));
+    if (okDrivers) list = list.filter((c) => c.kind !== "driver" || okDrivers.has(c.id));
+  } catch (e) { console.warn("TRIP_QUEUE_SUB_CHECK_FAILED", String(e && e.message || e)); }
   list.forEach((c) => {
     c.km = (hasPickup && c.loc && c.loc.lat != null) ? haversineKm(p.lat, p.lng, c.loc.lat, c.loc.lng) : null;
   });
@@ -3871,7 +3876,7 @@ async function markTailorLegDone(o) {
 Object.assign(exports, require("./org")({ db, FieldValue, Timestamp, onCall, HttpsError, onSchedule, onDocumentWritten, getStorage }));
 
 /* 💰 আয়ের পথ — ক্রেডিট, সেটিংস, দিনের সারাংশ (আলাদা ফাইল: billing.js) — সব শুরুতে বন্ধ */
-const __billing = require("./billing")({ db, FieldValue, Timestamp, onCall, HttpsError, onDocumentCreated });
+const __billing = require("./billing")({ db, FieldValue, Timestamp, onCall, HttpsError, onDocumentCreated, onDocumentWritten });
 Object.assign(exports, __billing.exports);
 
 /* 💳 ওয়ালেট/পয়েন্ট — যোগ ও ভাড়া কাটা শুধু সার্ভারে (আলাদা ফাইল: wallet.js) */

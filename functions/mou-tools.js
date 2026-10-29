@@ -113,11 +113,20 @@ module.exports = function makeMouTools({ db }) {
       const qs = await db.collection("tailorDesigns").where("published", "==", true).limit(300).get();
       return qs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((d) => d.status === "active" && d.img);
     });
+    // 💰 দর্জির সাবস্ক্রিপশন চালু থাকলে — শুধু সাবস্ক্রিপশন থাকা দর্জির ডিজাইন
+    const subOk = await cached("tlrSub", async () => {
+      const c = await db.collection("billingConfig").doc("main").get().catch(() => null);
+      const x = c && c.exists ? c.data() : {};
+      if (!(x.enabled && x.types && x.types.tailor)) return null;
+      const qs = await db.collection("tailors").where("hbSubUntil", ">", new Date()).limit(500).get();
+      return qs.docs.map((d) => d.id);
+    });
     const words = cleanWords(action.words, action.query).filter((w) => !/^(দর্জি|দর্জির|সেলাই|টেইলার|tailor|ডিজাইন|জামা সেলাই)$/.test(w));
     const max = Number(action.maxPrice) > 0 ? Number(action.maxPrice) : null;
     const cat = CATS.includes(action.category) ? action.category : null;
-    let list = all.filter((d) => (!area.d || d.district === area.d) && (!area.u || d.upazila === area.u));
-    if (!list.length && area.u) list = all.filter((d) => !area.d || d.district === area.d); // থানায় না থাকলে জেলায়
+    const pool = subOk ? all.filter((d) => subOk.includes(d.tailorId)) : all;
+    let list = pool.filter((d) => (!area.d || d.district === area.d) && (!area.u || d.upazila === area.u));
+    if (!list.length && area.u) list = pool.filter((d) => !area.d || d.district === area.d); // থানায় না থাকলে জেলায়
     list = list.filter((d) => (!max || Number(d.price) <= max) && (!cat || d.category === cat));
     if (words.length) {
       const w = list.filter((d) => scoreName((d.title || "") + " " + (d.note || ""), words) > 0);

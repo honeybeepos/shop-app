@@ -26,12 +26,13 @@
    ===================================================================== */
 const crypto = require("crypto");
 
-module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, HttpsError, onDocumentCreated }) {
+module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, HttpsError, onDocumentCreated, onDocumentWritten }) {
 
   const TYPES = ["shop", "pharmacy", "tailor", "restaurant", "driver"];
   const TYPE_BN = { shop: "দোকান", pharmacy: "ফার্মেসি", tailor: "সেলাই ঘর", restaurant: "রেস্টুরেন্ট", driver: "ট্রান্সপোর্ট" };
   const COUNTRIES = ["BD", "SA"];
   const MONTHS = [1, 3, 6, 12];
+  const SUB_ONLY = ["driver", "tailor"]; // 🚑🧵 শুধু সাবস্ক্রিপশন — প্রতি কাজে ক্রেডিট কাটে না
   const mk = (m) => "m" + m;
 
   function defaults() {
@@ -193,6 +194,8 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
       const d = new Date(from); d.setMonth(d.getMonth() + Number(o.months));
       untilMs = d.getTime();
       base.sub = { until: Timestamp.fromMillis(untilMs), months: Number(o.months), lastAt: now };
+      // 🧵 দর্জির সাবস্ক্রিপশন বাজারে দেখা যায় (কার ডিজাইন/নম্বর দেখাবে) — দর্জি নিজে বদলাতে পারেন না (rules)
+      if ((o.bizType || cur.bizType) === "tailor") t.set(db.collection("tailors").doc(ctx.ref.id), { hbSubUntil: Timestamp.fromMillis(untilMs) }, { merge: true });
     }
     t.set(ctx.ref, base, { merge: true });
     if (ctx.dref) t.set(ctx.dref, { at: now, kind: o.kind });
@@ -300,6 +303,19 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
       const r = await billingApply(o);
       await audit("adjust", { bizId, kind, amount: o.amount, months: o.months || null, note: o.note });
       return Object.assign({ info: biz }, r);
+    }
+    // ↩️ অনলাইন অর্ডারের ফি ফেরত — ভুয়া অর্ডার বা গ্রাহকের দোষে বাতিল হলে (একটা খাতা-লাইনে একবারই)
+    if (d.action === "refundOrder") {
+      const bizId = s(d.bizId, 128), ledgerId = s(d.ledgerId, 64);
+      const le = await db.collection("billing").doc(bizId).collection("ledger").doc(ledgerId).get();
+      if (!le.exists || le.data().kind !== "order") throw new HttpsError("not-found", "এটা অনলাইন অর্ডারের ফি নয়");
+      const amt = Math.abs(r2(le.data().amount));
+      const note = s(d.note, 120) || "ভুয়া/বাতিল অর্ডার";
+      const r = await billingApply({ bizId, kind: "refund", amount: amt, dedupeKey: "refund:" + ledgerId, ref: le.data().ref || null,
+        note: "↩️ ফেরত — " + (le.data().note || "অনলাইন অর্ডার") + " (" + note + ")", byUid: me.uid, byName: me.name });
+      if (!r.ok && r.reason === "duplicate") throw new HttpsError("already-exists", "এই অর্ডারের ফি আগেই ফেরত দেওয়া হয়েছে");
+      await audit("refundOrder", { bizId, ledgerId, amount: amt, note });
+      return r;
     }
     // 🎁 গিফট বাতিল — বাকি ক্রেডিট থেকে গিফটের অংশ সরানো
     if (d.action === "giftRevoke") {
@@ -480,7 +496,8 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
       let justGifted = false;
       // 🎁 অটো গিফট — সুইচ চালু, এই ব্যবসা আগে পায়নি, এই ফোন/কম্পিউটার আগে পায়নি, আজকের সীমা বাকি
       const dev = s(d.deviceId, 100);
-      if (on && cfg.gift.on && dev.length >= 8 && Number(cfg.gift.credit[biz.country]) > 0) {
+      // শুধু-সাবস্ক্রিপশনের ব্যবসায় (চালক, দর্জি) ক্রেডিটের কাজ নেই — গিফট দেওয়া হয় না
+      if (on && cfg.gift.on && !SUB_ONLY.includes(biz.type) && dev.length >= 8 && Number(cfg.gift.credit[biz.country]) > 0) {
         const devRef = db.collection("giftDevices").doc(sha(dev));
         const dayRef = db.collection("billingDaily").doc(dayKey());
         justGifted = await db.runTransaction(async (t) => {
@@ -501,7 +518,7 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
       const x = b.exists ? b.data() : {};
       const agent = await agentContact(biz);
       return {
-        ok: true, on, giftOn: on && cfg.gift.on, justGifted, bizId, type: biz.type, country: biz.country,
+        ok: true, on, giftOn: on && cfg.gift.on && !SUB_ONLY.includes(biz.type), subOnly: SUB_ONLY.includes(biz.type), justGifted, bizId, type: biz.type, country: biz.country,
         credit: r2(x.credit), giftCredit: r2(x.giftCredit), giftGiven: !!x.giftGiven,
         subUntil: tsMs(x.sub && x.sub.until) || null, subActive: subActive(x),
         prices: { perSale: pr.perSale, orderFee: pr.orderFee, sub: pr.sub }, agent,
@@ -581,11 +598,18 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
     catch (e) { console.warn(JSON.stringify({ event: "BILLING_SALE_FAILED", shopId: event.params.shopId, error: String(e && e.message || e) })); }
   });
   // 🍽️ রেস্টুরেন্টের দোকানে-বসা বিল (restaurants/{uid}/bills) — প্রতি বিলে একবার
-  const billingOnRestaurantBill = onDocumentCreated("restaurants/{rid}/bills/{billId}", async (event) => {
+  // নথি নতুন হলে, বা একই নম্বরে নতুন বিল বসলে (অর্ডার-নম্বর ঘুরে এলে createdAt বদলায়) — তখনই কাটা।
+  // শুধু অবস্থা বদলালে (রান্না/পরিশোধ) কিছু করে না।
+  const billingOnRestaurantBill = onDocumentWritten("restaurants/{rid}/bills/{billId}", async (event) => {
+    const before = event.data && event.data.before && event.data.before.exists ? (event.data.before.data() || {}) : null;
+    const afterSnap = event.data && event.data.after;
+    if(!afterSnap || !afterSnap.exists) return;
+    const ax = afterSnap.data() || {};
+    if(before && String(before.createdAt || before.date || "") === String(ax.createdAt || ax.date || "")) return;
     try {
       const cfg = await getConfig();
       if (!feeOn(cfg, "restaurant")) return;
-      const x = (event.data && event.data.data()) || {};
+      const x = ax;
       const o = x.o || x;
       const at = Date.parse(o.date || o.createdAt || "") || Date.now();
       if (Date.now() - at > 3 * 86400000) return;
@@ -699,9 +723,20 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
     return res;
   });
 
+  /* 🚑 ট্রান্সপোর্ট — শুধু সাবস্ক্রিপশন: মূল সুইচ + "ট্রান্সপোর্ট" টিক চালু থাকলে যাঁদের
+     সাবস্ক্রিপশন নেই তাঁরা যাত্রীর ডাক পান না। বন্ধ থাকলে null (কাউকে বাদ দেয় না)। */
+  async function driversWithSub(ids) {
+    const cfg = await getConfig();
+    if (!feeOn(cfg, "driver") || !ids.length) return null;
+    const snaps = await db.getAll(...ids.map((id) => db.collection("billing").doc(id)));
+    const ok = new Set();
+    snaps.forEach((d, i) => { if (d.exists && subActive(d.data())) ok.add(ids[i]); });
+    return ok;
+  }
+
   return {
-    exports: { billingAdmin, billingAgent, billingShop, billingOnSale, billingOnRestaurantBill, billingOnOrderCreated, orderAccept },
-    maskOnRelease,
+    exports: { billingAdmin, billingAgent, billingShop, billingOnSale, billingOnRestBill: billingOnRestaurantBill, billingOnOrderCreated, orderAccept },
+    maskOnRelease, driversWithSub,
     _test: { billingApply, getConfig, cleanConfig, defaults, chargeSale, newKey, normKey, sha, maskPhones },
   };
 };
