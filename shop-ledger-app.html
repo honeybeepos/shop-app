@@ -16180,6 +16180,17 @@ function showExitConfirmModal(){
   }
 })();
 
+/* 🔙 Back-এ অ্যাপ বন্ধ না হলে নিচে ছোট লেখা — দোকান, চালক, রাইডার সব মোডে দেখা যায় (নিজস্ব ঘর) */
+function hbBackToast(){
+  let d = document.getElementById("hbBackToast");
+  if(!d){
+    d = document.createElement("div"); d.id = "hbBackToast";
+    d.style.cssText = "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:rgba(20,14,4,.92);color:#ffd166;padding:11px 16px;border-radius:12px;font:600 13.5px 'Noto Sans Bengali',system-ui,sans-serif;z-index:2147483646;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:88vw;text-align:center;transition:opacity .3s;pointer-events:none;";
+    document.body.appendChild(d);
+  }
+  d.textContent = "🐝 বের হতে ফোনের Home বোতাম চাপুন — অ্যাপ পেছনে চালু থাকবে";
+  d.style.opacity = "1"; clearTimeout(d.__t); d.__t = setTimeout(()=>{ d.style.opacity = "0"; }, 2600);
+}
 function initBackButtonHandling(){
   pushBackTrap();
 
@@ -16232,9 +16243,10 @@ function initBackButtonHandling(){
         return;
       }
 
-      // হোম (ড্যাশবোর্ড) বা প্রিন্ট ট্যাবে থাকলে — সরাসরি এক্সিট না করে
-      // "হ্যাঁ/না" পপআপ দেখানো হচ্ছে, ব্যবহারকারী নিশ্চিত করলেই বের হবে
-      showExitConfirmModal();
+      // হোম (ড্যাশবোর্ড) বা প্রিন্ট ট্যাবে থাকলে — অ্যাপ বন্ধ হয় না (বন্ধ হলে আবার খুললে
+      // শুরু থেকে "যাচাই" হতো আর নোটিফিকেশনও থেমে থাকত)। ফোনের Home চাপলে অ্যাপ পেছনে
+      // চালু থাকে; Recents থেকে টেনে সরালে তবেই বন্ধ।
+      hbBackToast();
     }catch(e){
       console.error('ব্যাক বাটন হ্যান্ডলিং-এ সমস্যা হয়েছে (হিস্ট্রি-ট্র্যাপ তবুও বসানো আছে):', e);
     }
@@ -20416,12 +20428,10 @@ function modeBackGuardHandler(){
     }
   }
 
-  const wantExit = confirm("আপনি কি অ্যাপ থেকে বের হতে চান?\n\nOK = হ্যাঁ, বের হন (Online/GPS ট্র্যাকিং বন্ধ হয়ে যাবে)\nCancel = না, এখানেই থাকুন");
-  if(!wantExit){
-    // "থাকতে চান" — আবার একটা এন্ট্রি push করে Back-কে "আটকে" রাখা হচ্ছে
-    history.pushState(null, "", location.href);
-  }
-  // "বের হতে চান" হলে কিছু করার দরকার নেই — ব্রাউজার ইতিমধ্যে এক ধাপ পিছিয়ে গেছে
+  // 🔙 Back-এ অ্যাপ বন্ধ হয় না — চালক/রাইডার অনলাইন থাকেন, ডাক আসতে থাকে।
+  // বের হতে ফোনের Home; পুরো বন্ধ করতে Recents থেকে টেনে সরানো।
+  history.pushState(null, "", location.href);
+  hbBackToast();
 }
 
 /* ==================== 📊 Honey Bee Transport Media Phase 2 — সাপ্তাহিক/মাসিক আয় ====================

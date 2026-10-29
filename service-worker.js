@@ -12,7 +12,7 @@
 // 🔔 পুশ নোটিফিকেশন — এই ফাইলটা একা বসলেও (পুরনো পাতা থেকে) অ্যাপ বন্ধ অবস্থায় পুশ আসবে
 importScripts("sw-push.js");
 
-const CACHE_VERSION = "shop-app-v218";
+const CACHE_VERSION = "shop-app-v219";
 
 const APP_SHELL = [
   "login.html",
@@ -24,6 +24,7 @@ const APP_SHELL = [
   "hb-currency.js",
   "hb-btprint.js",
   "hb-billing.js",
+  "hb-back.js",
   "sw-push.js",
   "hb-qr.js",
   "zatca-qr.js",

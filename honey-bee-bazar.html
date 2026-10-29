@@ -3761,6 +3761,9 @@ function showScreen(id){
   __hbNavigatingViaPopstate = false;
 }
 
+// 🔙 শুরুতেই একটা পাহারা — হোমে প্রথম Back-এই যেন অ্যাপ বন্ধ না হয়
+window.addEventListener("load", ()=>{ try{ history.pushState({ hbScreen: "homeGuard" }, "", location.href); }catch(e){} });
+window.addEventListener("pointerdown", ()=>{ try{ history.pushState({ hbScreen: "homeGuard" }, "", location.href); }catch(e){} }, { once: true, capture: true });
 window.addEventListener("popstate", ()=>{
   __hbNavigatingViaPopstate = true;
 
@@ -3823,7 +3826,10 @@ window.addEventListener("popstate", ()=>{
   const activeScreen = document.querySelector('[id^="screen"].active');
   if(!activeScreen || activeScreen.id === "screenHome"){
     __hbNavigatingViaPopstate = false;
-    return; // হোমে থাকলে স্বাভাবিকভাবে অ্যাপ থেকে বের হতে দেওয়া হয়
+    // 🔙 হোমে Back চাপলে অ্যাপ বন্ধ হয় না (আবার খুললে শুরু থেকে লোড হতো) — পাহারা আবার বসানো
+    try{ history.pushState({ hbScreen: "homeGuard" }, "", location.href); }catch(e){}
+    if(typeof hbToastLite === "function") hbToastLite("🐝 বের হতে ফোনের Home বোতাম চাপুন — অ্যাপ পেছনে চালু থাকবে");
+    return;
   }
   const backBtn = activeScreen.querySelector(".backBtn");
   if(backBtn) backBtn.click();

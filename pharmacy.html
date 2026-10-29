@@ -344,6 +344,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <script src="firebase-init.js"></script>
+<script src="hb-back.js"></script>
 <script src="hb-billing.js"></script>
 <script src="hb-btprint.js"></script>
 <script>
@@ -3108,5 +3109,13 @@ auth.onAuthStateChanged(async (user)=>{
 });
 </script>
 <script>if(window.HBBilling) HBBilling.mount(document.getElementById("hbBillPillSlot"), { inside:true });</script>
+<script>
+/* 🔙 Back: আগে খোলা পপ-আপ বন্ধ, তারপর হোমে ফেরা; হোমে থাকলে অ্যাপ বন্ধ হয় না (hb-back.js) */
+window.hbBackHook = function(){
+  if(document.getElementById("modalRoot") && document.getElementById("modalRoot").innerHTML){ closeModal(); return true; }
+  if(typeof CUR_PAGE !== "undefined" && CUR_PAGE !== "dash" && typeof go === "function"){ go("dash"); return true; }
+  return false;
+};
+</script>
 </body>
 </html>

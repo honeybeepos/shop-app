@@ -505,6 +505,7 @@ button{cursor:pointer;border:0}
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="firebase-init.js"></script>
+<script src="hb-back.js"></script>
 <script src="hb-billing.js"></script>
 <script src="hb-btprint.js"></script>
 <script>
@@ -2428,6 +2429,16 @@ if(!window.__hbTimedPublishUI){
   });
 }
 
+</script>
+<script>
+/* 🔙 Back: খোলা জানালা থাকলে বন্ধ, অন্য পাতায় থাকলে ড্যাশবোর্ডে; সেখানে অ্যাপ বন্ধ হয় না (hb-back.js) */
+window.hbBackHook = function(){
+  const open = (typeof RP_OVERLAYS !== "undefined") && RP_OVERLAYS.some(function(id){ const el = document.getElementById(id); return el && el.style.display && el.style.display !== "none"; });
+  if(open || document.getElementById("chooser")){ rpCloseOverlays(); return true; }
+  const cur = document.querySelector(".page.active");
+  if(cur && cur.id !== "dashboard" && typeof showPage === "function"){ showPage("dashboard"); return true; }
+  return false;
+};
 </script>
 </body>
 </html>
