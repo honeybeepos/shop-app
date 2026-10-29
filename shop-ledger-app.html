@@ -24529,8 +24529,36 @@ function hbThermalPrint(area){
     };
   }
 
+  // ---- 🔎 পণ্যের নাম লিখলে — সেই পণ্যের দাম, স্টক আর বিক্রি (যেমন "আলু", "আলু কত আছে") ----
+  const PSTOP = new Set("কত কি কী আছে আছেন দাম দামে স্টক stock বিক্রি হলো হয়েছে কয়টা কয় টা আজ এই মাসে মাস সপ্তাহে কেজি পিস আমার দোকানে দোকানের".split(" "));
+  function productAnswer(q){
+    const prods = (typeof bccLoadProducts === "function") ? bccLoadProducts() : [];
+    if(!prods.length) return null;
+    const norm = (x)=> String(x || "").toLowerCase().replace(/[?？!।,.]/g, " ").replace(/\s+/g, " ").trim();
+    const words = norm(q).split(" ").filter((w)=> w.length >= 2 && !PSTOP.has(w));
+    if(!words.length) return null;
+    const hits = prods.filter((p)=> { const n = norm(p.name); return words.some((w)=> n.indexOf(w) > -1); }).slice(0, 8);
+    if(!hits.length) return null;
+    const today0 = new Date(); today0.setHours(0,0,0,0);
+    const month0 = new Date(today0.getFullYear(), today0.getMonth(), 1);
+    const sold = {};
+    (typeof retailEntries !== "undefined" ? retailEntries : []).forEach((e)=>{
+      if(!SALE.includes(e.status)) return;
+      const d = new Date(e.date); if(isNaN(d) || d < month0) return;
+      const k = e.item; if(!sold[k]) sold[k] = { t:0, m:0 };
+      sold[k].m += Number(e.qty) || 0; if(d >= today0) sold[k].t += Number(e.qty) || 0;
+    });
+    return hits.map((p)=>{
+      const sq = sold[p.name] || { t:0, m:0 }, qty = Number(p.qty) || 0, unit = p.unit && p.unit !== "pcs" ? p.unit : "টা";
+      return `📦 ${p.name}\n   দাম ${tk(p.sell)} · স্টকে ${qty <= 0 ? "শেষ ⚠️" : bn(qty) + " " + unit}${qty > 0 && qty <= 2 ? " (কম)" : ""}\n   বিক্রি — আজ ${bn(sq.t)}, এই মাসে ${bn(sq.m)}`;
+    }).join("\n") + (hits.length >= 8 ? "\n…আরও আছে, নামটা আরেকটু পুরো লিখুন।" : "");
+  }
+
   // ---- ফোনেই উত্তর (সাধারণ প্রশ্ন) ----
   function localAnswer(q, f){
+    // সাধারণ প্রশ্ন (বাকি, লাভ, খরচ, স্টক কম, বেশি বিক্রি) আগে — নাহলে "কারি পাউডার"-এর মতো নাম "কার কাছে"-তে মিলে যেত
+    const generic = /বাকি|পাওনা|লাভ|মুনাফা|খরচ|ফুরিয়ে|কম আছে|মাল কম|বেশি বিক্রি|বেশি চলে|জনপ্রিয়|কোন পণ্য|কার কাছে|কত বিক্রি|কত টাকা/.test(q);
+    if(!generic){ const pa = productAnswer(q); if(pa) return pa; }
     const t = q.toLowerCase();
     const has = (...w)=> w.some((x)=> t.indexOf(x) > -1);
     const period = has("গতকাল","কাল","yesterday") && !has("আজ") ? ["yesterday","গতকাল"] : has("গত মাস","last month") ? ["lastMonth","গত মাসে"]
@@ -24564,7 +24592,7 @@ function hbThermalPrint(area){
       if(period[0] === "month") a += `\nগত মাসে ছিল ${tk(f.sales.lastMonth.sales)}।`;
       return a;
     }
-    return null;
+    return productAnswer(q);
   }
 
   function bubble(cls, text, src){
@@ -24591,7 +24619,7 @@ function hbThermalPrint(area){
       bubble("mou", (res.data && res.data.reply) || "দুঃখিত, এখন উত্তর দিতে পারলাম না।", "🐝 মৌ (দোকানের হিসাব দেখে)");
     }catch(e){
       wait.remove();
-      bubble("mou", "এই প্রশ্নটা এখন বুঝতে পারলাম না 🐝\nআমি বলতে পারি: আজ/গতকাল/সপ্তাহ/মাসের বিক্রি, লাভ, কার কাছে কত বাকি, কোন পণ্য ফুরিয়ে আসছে, খরচ, আর কোনটা বেশি বিক্রি হলো।");
+      bubble("mou", "এই প্রশ্নটা এখন বুঝতে পারলাম না 🐝\nআমি বলতে পারি: আজ/গতকাল/সপ্তাহ/মাসের বিক্রি, লাভ, কার কাছে কত বাকি, কোন পণ্য ফুরিয়ে আসছে, খরচ, কোনটা বেশি বিক্রি হলো — আর পণ্যের নাম লিখলে (যেমন \"আলু\") তার দাম, স্টক আর বিক্রি।\n(এই নামে কোনো পণ্য আপনার তালিকায় পাইনি।)");
     }
   }
   const CHIPS = ["আজ কত বিক্রি?", "কোন পণ্য ফুরিয়ে আসছে?", "কার কাছে কত বাকি?", "এই মাসে লাভ কত?", "এই সপ্তাহে কোনটা বেশি বিক্রি?", "আজ খরচ কত?", "গতকাল কত বিক্রি?"];
