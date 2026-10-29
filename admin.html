@@ -307,6 +307,15 @@
        বাজারের রিপোর্ট Honey Bee Agent অ্যাপ থেকে দেখেন/হ্যান্ডেল করেন —
        এটা সুপারঅ্যাডমিনের জন্য সব বাজারের catch-all/escalation ভিউ। -->
   <div class="card" data-pane="reports">
+    <h2>📊 বাজারের কোন অংশে গ্রাহক বেশি</h2>
+    <div class="row bil-range" style="margin-top:0;" id="bzStatRange">
+      <button class="btn" data-d="1">আজ</button><button class="btn ghost" data-d="7">৭ দিন</button><button class="btn ghost" data-d="30">৩০ দিন</button><button class="btn ghost" data-d="90">৯০ দিন</button>
+    </div>
+    <div id="bzStatBox" style="margin-top:8px;"><p class="meta">একটা সময় বাছাই করুন।</p></div>
+    <div class="meta">গোনা হয় কতজন অংশটা খুলেছেন (এক বসায় একবার), কতবার চেপেছেন না। কারো নাম/ফোন রাখা হয় না।</div>
+  </div>
+
+  <div class="card" data-pane="reports">
     <h2>📝 মতামত (প্রশ্নপত্র)</h2>
     <div class="meta">লিংক: <b>honeybeebazar.com/feedback.html</b> — দোকানদারের জন্য শেষে <b>?r=shop</b>, ক্রেতা <b>?r=customer</b>, চালক <b>?r=driver</b>, ডেলিভারিম্যান <b>?r=rider</b>। WhatsApp-এ পাঠান।</div>
     <div class="row"><button class="btn secondary" id="fbLoadBtn">📋 উত্তরগুলো দেখুন</button><button class="btn secondary" id="fbCsvBtn">⬇️ Excel (CSV)</button></div>
@@ -508,6 +517,8 @@ function renderTailors(){
         ${blocked
           ? `<button class="btn unblock" data-tl-act="unblock" data-id="${e(t.id)}">✅ আনব্লক</button>`
           : `<button class="btn block" data-tl-act="block" data-id="${e(t.id)}">⛔ ব্লক</button>`}
+        <button class="btn secondary" data-tl-x="pass" data-id="${e(t.id)}">🔑 পাসওয়ার্ড বদলান</button>
+        <button class="btn" style="background:var(--due);" data-tl-x="delete" data-id="${e(t.id)}">🗑️ ডিলিট</button>
       </div>
     </div>`;
   }).join("");
@@ -519,6 +530,12 @@ function renderTailors(){
   }));
 }
 document.getElementById("tailorSearch").addEventListener("input", renderTailors);
+document.getElementById("tailorList").addEventListener("click", (ev)=>{
+  const b = ev.target.closest("[data-tl-x]"); if(!b) return;
+  const t = __tailorsAll.find(x=> x.id === b.dataset.id) || {};
+  if(b.dataset.tlX === "pass") resetPasswordFor(b.dataset.id, "tailor", "সেলাই ঘরের মালিক", t.name || "এই সেলাই ঘর");
+  if(b.dataset.tlX === "delete") deleteAccount(b.dataset.id, "tailor", "সেলাই ঘর");
+});
 
 /* ==================== 👥 Bazar কাস্টমার — শুধু গোনা ====================
    count() প্রতি ১০০০ জনে মাত্র ১টা read খরচ করে — হাজার কাস্টমার হলেও প্যানেল খুলতে খরচ নেই।
@@ -729,6 +746,7 @@ async function loadAgents(){
           : `<button class="btn block" data-agent-act="block" data-id="${agentId}">⛔ ব্লক করুন</button>`}
         <button class="btn secondary" data-agent-act="edit" data-id="${agentId}">✏️ এডিট</button>
         <button class="btn secondary" data-agent-act="stock" data-id="${agentId}">📦 স্টক</button>
+        <button class="btn secondary" data-agent-act="pass" data-id="${agentId}" data-name="${escapeHtmlAdmin(agent.name || "")}">🔑 পাসওয়ার্ড</button>
         <button class="btn" style="background:var(--due);" data-agent-act="delete" data-id="${agentId}">🗑️ ডিলিট</button>
       </div>
     `;
@@ -738,6 +756,7 @@ async function loadAgents(){
   list.querySelectorAll('[data-agent-act="unblock"]').forEach(b=>b.addEventListener("click", ()=>setAgentStatus(b.dataset.id,"active")));
   list.querySelectorAll('[data-agent-act="edit"]').forEach(b=>b.addEventListener("click", ()=>editAgent(b.dataset.id)));
   list.querySelectorAll('[data-agent-act="stock"]').forEach(b=>b.addEventListener("click", ()=>bilOpenAgent(b.dataset.id)));
+  list.querySelectorAll('[data-agent-act="pass"]').forEach(b=>b.addEventListener("click", ()=>resetPasswordFor(b.dataset.id, "agent", "এজেন্ট", b.dataset.name || "এই এজেন্ট")));
   list.querySelectorAll('[data-agent-act="delete"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "agent", "এজেন্ট")));
 }
 
@@ -875,6 +894,7 @@ async function loadShops(){
         <button class="btn secondary" data-act="editshop" data-id="${shopId}">✏️ এডিট</button>
         <button class="btn secondary" data-act="fixemail" data-id="${shopId}">📧 ইমেইল ঠিক করুন</button>
         <button class="btn secondary" data-act="credit" data-id="${shopId}">💳 ক্রেডিট</button>
+        <button class="btn secondary" data-act="pass" data-id="${shopId}">🔑 পাসওয়ার্ড</button>
         <button class="btn" style="background:var(--due);" data-act="deleteshop" data-id="${shopId}">🗑️ ডিলিট</button>
       </div>
     `;
@@ -888,6 +908,7 @@ async function loadShops(){
   list.querySelectorAll('[data-act="editshop"]').forEach(b=>b.addEventListener("click", ()=>editShop(b.dataset.id)));
   list.querySelectorAll('[data-act="fixemail"]').forEach(b=>b.addEventListener("click", ()=>fixShopOwnerEmail(b.dataset.id)));
   list.querySelectorAll('[data-act="credit"]').forEach(b=>b.addEventListener("click", ()=>bilOpenBiz(b.dataset.id)));
+  list.querySelectorAll('[data-act="pass"]').forEach(b=>b.addEventListener("click", ()=>resetPasswordFor(b.dataset.id, "shop", "দোকানের মালিক", "এই দোকান")));
   list.querySelectorAll('[data-act="deleteshop"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "shop", "দোকান")));
 }
 
@@ -946,6 +967,7 @@ async function deleteAccount(uid, accountType, label){
     if(accountType === "shop") await loadShops();
     else if(accountType === "agent") await loadAgents();
     else if(accountType === "rider") await loadAllRiders();
+    // রেস্টুরেন্ট, সেলাই ঘর, ড্রাইভারের তালিকা নিজে থেকেই নতুন হয় (live)
   }catch(e){
     alert("ডিলিট করা যায়নি: " + (e.message || e));
   }
@@ -1006,7 +1028,7 @@ async function resetPasswordFor(uid, accountType, label, name){
   }
   try{
     await adminResetPasswordFn({ targetUid: uid, accountType, newPassword: String(pass).trim() });
-    alert(`✅ পাসওয়ার্ড বদলে গেছে।\n\n${label}: ${name}\nনতুন পাসওয়ার্ড: ${String(pass).trim()}\n\nএটা ${label}-কে জানিয়ে দিন। উনি এখন মোবাইল নম্বর আর এই পাসওয়ার্ড দিয়ে লগইন করতে পারবেন।`);
+    alert(`✅ পাসওয়ার্ড বদলে গেছে।\n\n${label}: ${name}\nনতুন পাসওয়ার্ড: ${String(pass).trim()}\n\nএটা ${label}-কে জানিয়ে দিন। উনি এখন আগের মোবাইল নম্বর বা ইমেইল আর এই নতুন পাসওয়ার্ড দিয়ে লগইন করতে পারবেন।`);
   }catch(e){
     const code = (e && e.code) || "";
     if(code.includes("not-found") || code.includes("internal/not-found")){
@@ -1063,7 +1085,7 @@ function renderRestaurants(){
       <div class="meta">Bazar-এ: ${hidden ? '🙈 লুকানো' : '👁️ দেখা যাচ্ছে'} · দোকান: ${r.isOpen === false ? '🔴 বন্ধ' : '🟢 খোলা'}</div>
       <div class="meta" style="margin-top:6px; font-size:11px; color:#8a7f6c; word-break:break-all">
         🔑 লগইন ইমেইল: <b>${restoAuthEmail(r.phone)}</b><br>
-        পাসওয়ার্ড বদলাতে Firebase Console → Authentication-এ এই ইমেইলটা খুঁজুন।
+        পাসওয়ার্ড বদলাতে নিচের "🔑 পাসওয়ার্ড বদলান" চাপুন।
       </div>
       <div class="row">
         <button class="btn unblock" data-resto-act="pass" data-id="${r.id}">🔑 পাসওয়ার্ড বদলান</button>
@@ -1074,6 +1096,7 @@ function renderRestaurants(){
         ${blocked
           ? `<button class="btn unblock" data-resto-act="unblock" data-id="${r.id}">✅ আনব্লক</button>`
           : `<button class="btn block" data-resto-act="block" data-id="${r.id}">⛔ ব্লক</button>`}
+        <button class="btn" style="background:var(--due);" data-resto-act="delete" data-id="${r.id}">🗑️ ডিলিট</button>
       </div>`;
     list.appendChild(div);
   });
@@ -1091,6 +1114,9 @@ function renderRestaurants(){
   act("hide",    { isActive:false   });
   act("show",    { isActive:true    });
 
+  list.querySelectorAll('[data-resto-act="delete"]').forEach(function(b){
+    b.addEventListener("click", function(){ deleteAccount(b.dataset.id, "restaurant", "রেস্টুরেন্ট"); });
+  });
   list.querySelectorAll('[data-resto-act="pass"]').forEach(function(b){
     b.addEventListener("click", function(){
       const r = __restoAll.find(x => x.id === b.dataset.id) || {};
@@ -1162,6 +1188,7 @@ async function loadAllRiders(){
         ${rider.status === 'blocked'
           ? `<button class="btn unblock" data-rider-act="unblock" data-id="${riderId}">✅ আনব্লক করুন</button>`
           : `<button class="btn block" data-rider-act="block" data-id="${riderId}">⛔ ব্লক করুন</button>`}
+        <button class="btn secondary" data-rider-act="pass" data-id="${riderId}" data-name="${escapeHtmlAdmin(rider.name || "")}">🔑 পাসওয়ার্ড বদলান</button>
         <button class="btn" style="background:var(--due);" data-rider-act="delete" data-id="${riderId}">🗑️ ডিলিট</button>
       </div>
     `;
@@ -1176,6 +1203,7 @@ async function loadAllRiders(){
     loadAllRiders();
   }));
   list.querySelectorAll('[data-rider-act="delete"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "rider", "রাইডার")));
+  list.querySelectorAll('[data-rider-act="pass"]').forEach(b=>b.addEventListener("click", ()=>resetPasswordFor(b.dataset.id, "rider", "রাইডার", b.dataset.name || "এই রাইডার")));
 }
 
 /* ==================== 🚑 সব ট্রান্সপোর্ট ড্রাইভার (Super Admin ভিউ) ==================== */
@@ -1225,6 +1253,7 @@ function startDriversListener(){
           ${d.status === 'blocked'
             ? `<button class="btn unblock" data-driver-act="unblock" data-id="${driverId}">✅ আনব্লক করুন</button>`
             : `<button class="btn block" data-driver-act="block" data-id="${driverId}">⛔ ব্লক করুন</button>`}
+          <button class="btn secondary" data-driver-act="pass" data-id="${driverId}" data-name="${escapeHtmlAdmin(d.name || "")}">🔑 পাসওয়ার্ড বদলান</button>
           <button class="btn" style="background:var(--due);" data-driver-act="delete" data-id="${driverId}">🗑️ ডিলিট</button>
         </div>
       `;
@@ -1237,6 +1266,7 @@ function startDriversListener(){
       await db.collection("transportDrivers").doc(b.dataset.id).set({ status:"active", updatedAt: fbNow() }, { merge:true });
     }));
     list.querySelectorAll('[data-driver-act="delete"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "driver", "ড্রাইভার")));
+    list.querySelectorAll('[data-driver-act="pass"]').forEach(b=>b.addEventListener("click", ()=>resetPasswordFor(b.dataset.id, "transport_driver", "ড্রাইভার", b.dataset.name || "এই ড্রাইভার")));
   }, (err)=> console.warn("drivers listener error:", err));
 }
 
@@ -1666,6 +1696,33 @@ async function bilShowBiz(id){
     run({ action:"refundOrder", ledgerId: b.dataset.refund, note });
   });
 }
+
+/* ---------- 📊 বাজারের অংশ অনুযায়ী গ্রাহক (bazarStats/{দিন}) ---------- */
+const BZ_STAT_LABEL = { market:"🛒 বাজার/দোকান", restaurant:"🍽️ রেস্টুরেন্ট", tailor:"🧵 সেলাই ঘর", transport:"🚕 ট্রান্সপোর্ট", flight:"✈️ ফ্লাইট",
+  pharmacy:"💊 ফার্মেসি", ekadashi:"🛍️ একাদশী", messenger:"💬 মেসেঞ্জার", notebook:"📓 নোটবুক", panchang:"🕉️ পঞ্জিকা", prayer:"🕌 নামাজ",
+  smartwatch:"⌚ স্মার্ট ঘড়ি", jibontori:"🛟 জীবন তরী", bloodbank:"🩸 রক্ত", ambulance:"🚑 অ্যাম্বুলেন্স", calculator:"🧮 ক্যালকুলেটর",
+  mou:"🐝 মৌ", cart:"🛍️ কার্ট/অর্ডার", org:"🤝 Org" };
+async function bzStatLoad(days){
+  document.querySelectorAll("#bzStatRange [data-d]").forEach(b=> b.className = Number(b.dataset.d) === days ? "btn" : "btn ghost");
+  const box = document.getElementById("bzStatBox"); box.textContent = "লোড হচ্ছে...";
+  const to = new Date(Date.now() + 6 * 3600000), from = new Date(to.getTime() - (days - 1) * 86400000);
+  const k = (d)=> d.toISOString().slice(0, 10);
+  try{
+    const FP = firebase.firestore.FieldPath.documentId();
+    const snap = await db.collection("bazarStats").where(FP, ">=", k(from)).where(FP, "<=", k(to)).get();
+    let visits = 0; const sum = {};
+    snap.docs.forEach(d=>{ const x = d.data(); visits += Number(x.u || 0); Object.entries(x.s || {}).forEach(([g, n])=> sum[g] = (sum[g] || 0) + Number(n || 0)); });
+    const rows = Object.entries(sum).sort((a,b)=> b[1] - a[1]);
+    if(!rows.length){ box.innerHTML = `<p class="meta">এই সময়ে কোনো হিসাব নেই (মোট বসা ${bnNum(visits)})।</p>`; return; }
+    const max = rows[0][1];
+    box.innerHTML = `<div class="strip"><div class="s ok"><small>মোট বসা (বাজার খুলেছেন)</small><b>${bnNum(visits)}</b></div><div class="s"><small>সবচেয়ে বেশি</small><b style="font-size:14px;">${BZ_STAT_LABEL[rows[0][0]] || rows[0][0]}</b></div></div>`
+      + rows.map(([g, n])=> `<div style="display:flex; align-items:center; gap:8px; margin:5px 0; font-size:13px;">
+          <span style="flex:0 0 130px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${BZ_STAT_LABEL[g] || bilEsc(g)}</span>
+          <span style="flex:1; background:#efe7d6; border-radius:6px; height:14px; overflow:hidden;"><i style="display:block; height:100%; width:${Math.max(2, n / max * 100)}%; background:var(--paid);"></i></span>
+          <b style="flex:0 0 auto; min-width:70px; text-align:right;">${bnNum(n)}${visits ? ` <small style="color:#8a7f6c; font-weight:400;">(${bnNum(Math.round(n / visits * 100))}%)</small>` : ""}</b></div>`).join("");
+  }catch(e){ box.textContent = "⚠️ " + (e.message || e); }
+}
+document.querySelectorAll("#bzStatRange [data-d]").forEach(b=> b.addEventListener("click", ()=> bzStatLoad(Number(b.dataset.d))));
 
 /* ---------- 📝 মতামত (feedback.html) ---------- */
 let FB_ROWS = [];

@@ -71,7 +71,7 @@
 
   function intl(p){ let d = String(p || "").replace(/[০-৯]/g, x=> BN.indexOf(x)).replace(/[^0-9]/g, ""); if(/^01\d{9}$/.test(d)) d = "88" + d; if(/^05\d{8}$/.test(d)) d = "966" + d.slice(1); return d; }
   function agentHtml(a, why){
-    if(!a) return `<div class="hbbCard"><b class="t">🧑‍💼 আপনার এজেন্ট</b>এখনো কোনো এজেন্ট যুক্ত নেই।${st && st.contact && st.contact.phone ? ` Honey Bee: <b>${esc(st.contact.phone)}</b>` : ""}</div>`;
+    if(!a) return `<div class="hbbCard"><b class="t">🧑‍💼 আপনার এজেন্ট</b>এখনো কোনো এজেন্ট যুক্ত নেই — আপনার এলাকার Honey Bee এজেন্ট যুক্ত হলে তাঁর নাম-নম্বর এখানে দেখা যাবে।</div>`;
     const msg = encodeURIComponent(`আসসালামু আলাইকুম, আমি ${st && st.name ? st.name : "Honey Bee-র দোকান"} থেকে। ${why || "ক্রেডিট/সাবস্ক্রিপশন নিতে চাই।"}`);
     return `<div class="hbbCard"><b class="t">🧑‍💼 আপনার এজেন্ট — ক্রেডিট/সাবস্ক্রিপশন এখানে</b>${esc(a.name)}${a.phone ? " · <b>" + esc(a.phone) + "</b>" : ""}
       <div class="hbbBtns">${a.phone ? `<a href="tel:${esc(a.phone)}">📞 ফোন</a>` : ""}${a.whatsapp ? `<a class="wa" target="_blank" rel="noopener" href="https://wa.me/${intl(a.whatsapp)}?text=${msg}">💬 WhatsApp</a>` : ""}</div></div>`;

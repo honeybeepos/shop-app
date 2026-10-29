@@ -1179,8 +1179,9 @@ service cloud.firestore {
     /* 💰 আয়ের পথ (functions/billing.js) — সব লেখা শুধু সার্ভারে।
        সেটিংস (দাম, bKash নম্বর) লগইন করা সবাই পড়তে পারে; ক্রেডিট আর তার খাতা
        শুধু সেই ব্যবসার মালিক/সদস্য আর সুপার এডমিন; দিনের সারাংশ শুধু সুপার এডমিন। */
+    // main = দাম/সুইচ (লগইন করা সবাই); private = সুপার এডমিনের bKash ও ফোন — শুধু এজেন্ট আর সুপার এডমিন
     match /billingConfig/{docId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (docId != 'private' || isSuperAdmin() || isAgent());
       allow write: if false;
     }
     match /billing/{bizId} {
@@ -1210,6 +1211,14 @@ service cloud.firestore {
         allow read: if isSignedIn() && (isSuperAdmin() || request.auth.uid == agentUid);
         allow write: if false;
       }
+    }
+    // 📊 বাজারের কোন অংশে গ্রাহক বেশি — দিনে একটা নথি; সবাই শুধু গোনা বাড়ায় (s = অংশ, u = বসা), পড়েন সুপার এডমিন
+    match /bazarStats/{day} {
+      allow read: if isSuperAdmin();
+      allow create, update: if isSignedIn() && day.matches('^20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]$') &&
+        request.resource.data.keys().hasOnly(['s', 'u']) &&
+        request.resource.data.s is map && request.resource.data.s.size() <= 40;
+      allow delete: if false;
     }
     // 📝 মতামতের প্রশ্নপত্র (feedback.html) — যে-কেউ (গেস্টও) একবার করে জমা দিতে পারেন, পড়েন শুধু সুপার এডমিন
     match /feedback/{id} {

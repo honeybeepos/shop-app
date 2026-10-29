@@ -1429,7 +1429,9 @@ function acStart(){
   acStockUnsub = db.collection("agentStock").doc(currentAgent.uid).onSnapshot(d=>{ acStock = d.exists ? d.data() : {}; acDrawStock(); }, ()=> acDrawStock());
   acKeysUnsub = db.collection("agentStock").doc(currentAgent.uid).collection("keys").orderBy("createdAt","desc").limit(30)
     .onSnapshot(s=> acDrawKeys(s.docs.map(d=> Object.assign({ id: d.id }, d.data()))), ()=> $("acKeys").innerHTML = '<div class="emptyMsg">এখনো কোনো কি নেই</div>');
-  db.collection("billingConfig").doc("main").get().then(d=>{ acCfg = d.exists ? d.data() : null; acDrawBuy(); }).catch(()=>{});
+  // দাম main-এ, সুপার এডমিনের bKash/ফোন private-এ (শুধু এজেন্ট পড়তে পারেন)
+  Promise.all([db.collection("billingConfig").doc("main").get(), db.collection("billingConfig").doc("private").get().catch(()=> null)])
+    .then(([d, pv])=>{ acCfg = d.exists ? d.data() : null; if(acCfg && pv && pv.exists) Object.assign(acCfg, pv.data()); acDrawBuy(); }).catch(()=>{});
   acLoad();
 }
 function acDrawStock(){

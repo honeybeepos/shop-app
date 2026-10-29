@@ -3695,7 +3695,44 @@ let __nearbyMarketId = null; // 📍 GPS-এ সবচেয়ে কাছে�
 
 let __hbNavigatingViaPopstate = false;
 
+/* ==================== 📊 কোন অংশে গ্রাহক বেশি (সুপার এডমিন দেখেন) ====================
+   প্রতিবার খোলায় লেখা হয় না — এক বসায় (session) কোন কোন অংশ খুলেছেন সেটা মনে রেখে
+   অ্যাপ পেছনে গেলে একবারই bazarStats/{দিন}-এ যোগ হয়। তাই খরচ: এক বসায় ১টা লেখা।
+   গোনা হয় "কতজন খুলেছেন" (এক বসায় একবার), কতবার চেপেছেন না। নাম/ফোন কিছু যায় না। */
+const HB_STAT_GROUP = {
+  screenMarkets:"market", screenMarketFeed:"market", screenShops:"market", screenCategories:"market", screenSubcategories:"market",
+  screenSubSubcategories:"market", screenProducts:"market", screenMarketCategories:"market", screenMarketSubcategories:"market", screenMarketProducts:"market",
+  screenRestaurant:"restaurant", screenRestaurantMenu:"restaurant", screenTailor:"tailor", screenTailorMeasure:"tailor",
+  screenTransport:"transport", screenTransportMedia:"transport", screenSmartFlightInfo:"flight",
+  screenMedicalEquipment:"pharmacy", screenMedEqOrders:"pharmacy", screenEkadashiSpecial:"ekadashi",
+  screenHoneyMessenger:"messenger", screenNotebook:"notebook", screenPanchang:"panchang", screenPrayer:"prayer",
+  screenSmartWatch:"smartwatch", screenSmartWatchMenu:"smartwatch", screenJibonTori:"jibontori", screenBloodBank:"bloodbank",
+  screenAmbulance:"ambulance", screenSmartCalculator:"calculator", screenCalcBasic:"calculator", screenCalcScientific:"calculator",
+  screenCalcWeight:"calculator", screenCalcBusiness:"calculator", screenCalcMoney:"calculator", screenCalcUnit:"calculator",
+  screenCalcConstruction:"calculator", screenCalcUtility:"calculator", screenCalcDatetime:"calculator", screenCalcKids:"calculator"
+};
+const __hbStat = { seen:{}, pending:{}, sessionSent:false };
+function hbStatHit(g){ if(!g || __hbStat.seen[g]) return; __hbStat.seen[g] = 1; __hbStat.pending[g] = 1; }
+function hbStatFlush(){
+  const keys = Object.keys(__hbStat.pending);
+  if(!keys.length && __hbStat.sessionSent) return;
+  try{
+    if(!auth.currentUser) return; // গেস্ট-লগইন হওয়ার আগে কিছু পাঠানো হয় না
+    const inc = firebase.firestore.FieldValue.increment(1), sv = {};
+    keys.forEach(k=> sv[k] = inc);
+    const data = { s: sv };
+    if(!__hbStat.sessionSent){ data.u = inc; __hbStat.sessionSent = true; }
+    __hbStat.pending = {};
+    const day = new Date(Date.now() + 6 * 3600000).toISOString().slice(0, 10);
+    db.collection("bazarStats").doc(day).set(data, { merge:true }).catch(()=>{});
+  }catch(e){}
+}
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "hidden") hbStatFlush(); });
+window.addEventListener("pagehide", hbStatFlush);
+setTimeout(hbStatFlush, 120000); // অনেকক্ষণ খোলা থাকলেও অন্তত একবার
+
 function showScreen(id){
+  hbStatHit(HB_STAT_GROUP[id]);
   ["screenTailor","screenTailorMeasure","screenRestaurant","screenRestaurantMenu","screenNotebook","screenHome","screenSmartWatch","screenSmartWatchMenu","screenPanchang","screenPrayer","screenSmartCalculator","screenCalcBasic","screenCalcScientific","screenCalcWeight","screenCalcBusiness","screenCalcMoney","screenCalcUnit","screenCalcConstruction","screenCalcUtility","screenCalcDatetime","screenCalcKids","screenMarkets","screenMarketFeed","screenShops","screenCategories","screenSubcategories","screenSubSubcategories","screenProducts","screenMarketCategories","screenMarketSubcategories","screenMarketProducts","screenTransport","screenTransportMedia","screenSmartFlightInfo","screenJibonTori","screenBloodBank","screenHoneyMessenger","screenAmbulance","screenMedicalEquipment","screenMedEqOrders","screenEkadashiSpecial"].forEach(s=> $(s).classList.remove("active"));
   $(id).classList.add("active");
   if(id !== "screenMedicalEquipment" && typeof phLock === "function") phLock(); // 🔒 ফার্মেসী থেকে বের হলেই আবার লক
@@ -3879,6 +3916,7 @@ document.querySelectorAll(".serviceCard").forEach(card=>{
       tlrRenderFeed();
       tlrMyOrdersStart();
     }else if(svc === "hborg"){
+      hbStatHit("org");
       // 🤝🐝 Honey Bee Org — নিজের আলাদা পাতা (honey-bee-org.html), একই Google লগইন
       location.href = "honey-bee-org.html";
     }else if(svc === "jibontori"){
@@ -10698,6 +10736,7 @@ function hbStripSuffix(str){
 }
 
 function hbAssistantOpen(){
+  hbStatHit("mou");
   $("hbAssistantScreen").style.display = "flex";
   history.pushState({ hbScreen: "assistantOpen" }, "", location.href);
   if(!$("hbAssistantChatLog").dataset.greeted){
@@ -13682,6 +13721,7 @@ hbCartBadgeUpdate(); // পেজ লোড হওয়ার সাথে স�
 
 /* ---------- 🛒 Cart পুরো স্ক্রিন — নিজস্ব fixed overlay, showScreen()-এর বাইরে ---------- */
 function hbOpenCart(){
+  hbStatHit("cart");
   document.querySelectorAll(".footerNavItem").forEach(i=> i.classList.remove("active"));
   $("footerNavCart").classList.add("active");
   $("hbCartScreen").style.display = "block";
