@@ -26,8 +26,15 @@
   window.hbBackNote = note;
   function start(){
     push(); push(); // দুইটা বাফার — দ্রুত দুবার চাপলেও তলানিতে পৌঁছায় না
-    // Chrome ছোঁয়া ছাড়া বসানো পাহারা Back-এ এড়িয়ে যেতে পারে — প্রথম ছোঁয়ায় আরেকটা বসানো
+    // Chrome ছোঁয়া ছাড়া বসানো পাহারা Back-এ এড়িয়ে যায়। টাচ-ফোনে pointerdown "ছোঁয়া" গণ্য হয় না —
+    // আসল ছোঁয়া গণ্য হয় আঙুল তোলার সময় (pointerup/touchend/click) বা কি-প্রেসে। তাই প্রথম আসল ছোঁয়ার
+    // পরে আরেকটা পাহারা বসানো হয়, যেন তার পর থেকে Back সবসময় সুন্দরভাবে কাজ করে।
+    // (একটাও ছোঁয়ার আগে Back চাপলে ব্রাউজারের নিজের নিয়মে বের হয়ে যেতে পারে — এটা কোড দিয়ে আটকানো যায় না।)
     window.addEventListener("pointerdown", push, { once: true, capture: true });
+    const evs = ["pointerup", "touchend", "click", "keydown"];
+    let armed = false;
+    const arm = ()=>{ if(armed) return; armed = true; evs.forEach(e=> window.removeEventListener(e, arm, true)); push(); push(); };
+    evs.forEach(e=> window.addEventListener(e, arm, { capture: true, passive: true }));
     window.addEventListener("popstate", ()=>{
       push();
       try{ if(typeof window.hbBackHook === "function" && window.hbBackHook()) return; }catch(e){}

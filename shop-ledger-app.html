@@ -16193,6 +16193,14 @@ function hbBackToast(){
 }
 function initBackButtonHandling(){
   pushBackTrap();
+  // ✋ Chrome ছোঁয়া/কি-প্রেস (user activation) ছাড়া বসানো ট্র্যাপ Back-এ এড়িয়ে যায়। আসল ছোঁয়া গণ্য হয়
+  // আঙুল তোলার সময় (pointerup/touchend/click) বা কি-প্রেসে — তাই প্রথম আসল ছোঁয়ার পরে ট্র্যাপ আবার বসানো হয়,
+  // যেন তার পর থেকে Back সবসময় সুন্দরভাবে কাজ করে। (একটাও ছোঁয়ার আগে Back চাপলে ব্রাউজারের নিজের নিয়মে বের হয়ে যেতে পারে।)
+  (function(){
+    const evs = ['pointerup','touchend','click','keydown']; let armed = false;
+    const arm = ()=>{ if(armed) return; armed = true; evs.forEach(e=> window.removeEventListener(e, arm, true)); pushBackTrap(); };
+    evs.forEach(e=> window.addEventListener(e, arm, { capture:true, passive:true }));
+  })();
 
   window.addEventListener('popstate', ()=>{
     // পপস্টেট মানেই ব্রাউজার ঠিক একধাপ পেছনে গেছে — তাই আমাদের নিজের
