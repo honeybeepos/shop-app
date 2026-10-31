@@ -21380,6 +21380,72 @@ async function hbTripAdvance(tripId, reason, me){
     });
   }catch(e){ console.warn("trip advance:", e && e.message); }
 }
+/* ==================== 🧭 ট্রিপ রিকোয়েস্ট কার্ডে রুট-তথ্য ====================
+   ড্রাইভার ভাড়া অফার করার আগেই দেখেন: যাত্রী কোন এলাকায় আছেন (পিকআপ) → কোথায় যাবেন (গন্তব্য),
+   যাত্রী তাঁর থেকে কত দূরে, আর পিকআপ থেকে গন্তব্য আনুমানিক কত কিমি।
+   🔒 যাত্রীর ফোন নম্বর ও সঠিক লোকেশন (ম্যাপ-পিন, বাড়ির নম্বর) এখানে দেখানো হয় না — ওগুলো অফার/নিশ্চিত হওয়ার পরেই খোলে।
+   গন্তব্যের কোনো কোঅর্ডিনেট ট্রিপে নেই, তাই লেখা গন্তব্য OpenStreetMap থেকে খুঁজে আনুমানিক দূরত্ব বের হয়
+   (খুঁজে না পেলে ওই লাইনটা শুধু দেখায় না)। */
+function hbKm(lat1,lng1,lat2,lng2){
+  const R=6371, rad=x=>x*Math.PI/180, dLat=rad(lat2-lat1), dLng=rad(lng2-lng1);
+  const a=Math.sin(dLat/2)**2+Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function hbKmText(d){ return d<1 ? Math.max(50,Math.round(d*1000/50)*50)+" মিটার" : d.toFixed(1)+" কিমি"; }
+function hbPickupAreaText(t){
+  const a=(t.pickupLocation&&t.pickupLocation.address)||"";
+  const parts=a.split(",").map(x=>x.trim()).filter(x=>x && !/[0-9০-৯]/.test(x) && !/বাংলাদেশ|bangladesh/i.test(x));
+  return parts.slice(0,3).join(", ");
+}
+const __hbGeoCache = new Map();
+let __hbGeoQueue = Promise.resolve();
+function hbGeoKey(text,lat,lng){ return String(text||"").trim().toLowerCase()+"|"+(+lat).toFixed(1)+"|"+(+lng).toFixed(1); }
+function hbGeocodeDest(text,lat,lng){
+  const key=hbGeoKey(text,lat,lng); if(!String(text||"").trim()) return Promise.resolve(null);
+  if(__hbGeoCache.has(key)) return Promise.resolve(__hbGeoCache.get(key));
+  __hbGeoQueue = __hbGeoQueue.then(async ()=>{
+    if(__hbGeoCache.has(key)) return;
+    try{
+      const vb=[lng-0.6,lat+0.6,lng+0.6,lat-0.6].join(",");
+      const res=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=bd&viewbox="+vb+"&q="+encodeURIComponent(text),{headers:{"Accept-Language":"bn"}});
+      const j=await res.json();
+      __hbGeoCache.set(key,(j&&j[0])?{lat:+j[0].lat,lng:+j[0].lon}:null);
+    }catch(e){ __hbGeoCache.set(key,null); }
+    await new Promise(r=>setTimeout(r,1100)); // Nominatim: সেকেন্ডে ১টার বেশি নয়
+  });
+  return __hbGeoQueue.then(()=> __hbGeoCache.get(key)||null);
+}
+function hbRouteDistLine(pu,g){
+  if(!g||pu.lat==null||pu.lng==null) return "";
+  return "🛣️ পিকআপ থেকে গন্তব্য প্রায় <b>"+(hbKm(pu.lat,pu.lng,g.lat,g.lng)*1.3).toFixed(1)+" কিমি</b> (আনুমানিক)";
+}
+function hbTripRouteHtml(t,myLatLng,color,showFare){
+  const pu=t.pickupLocation||{}, area=hbPickupAreaText(t), dest=String(t.destination||"").trim();
+  let toMe="";
+  if(pu.lat!=null && pu.lng!=null && myLatLng && myLatLng.length===2){
+    toMe='<div>🧭 যাত্রী আপনার থেকে প্রায় <b>'+hbKmText(hbKm(myLatLng[0],myLatLng[1],pu.lat,pu.lng))+'</b> দূরে</div>';
+  }
+  const g=(pu.lat!=null&&pu.lng!=null)?__hbGeoCache.get(hbGeoKey(dest,pu.lat,pu.lng)):null;
+  const fare=(showFare && t.fareType==="fixed" && t.proposedFare)?'<div>💰 যাত্রী ভাড়া দিতে চান: <b>'+HB_CUR+' '+escapeHtml(String(t.proposedFare))+'</b></div>':"";
+  return '<div class="hbRouteInfo" style="font-size:12px; line-height:1.65; color:'+color+'; margin-bottom:8px;">'
+    +'<div>📍 পিকআপ: <b>'+escapeHtml(area||"লোকেশন পাওয়া যায়নি")+'</b></div>'
+    +'<div style="font-size:13.5px;">🏁 গন্তব্য: <b>'+escapeHtml(dest||"—")+'</b></div>'
+    +toMe
+    +'<div class="hbRouteDist" data-trip="'+escapeHtml(String(t.id))+'">'+hbRouteDistLine(pu,g)+'</div>'
+    +fare
+    +'<div style="opacity:.65; font-size:10.5px; margin-top:2px;">🔒 যাত্রীর নম্বর ও সঠিক লোকেশন অফার দেওয়ার পর দেখা যাবে</div>'
+    +'</div>';
+}
+function hbFillRouteDist(trips){
+  (trips||[]).forEach(t=>{
+    const pu=t.pickupLocation||{}; if(pu.lat==null||pu.lng==null||!t.destination) return;
+    hbGeocodeDest(String(t.destination),pu.lat,pu.lng).then(g=>{
+      if(!g) return;
+      const html=hbRouteDistLine(pu,g);
+      document.querySelectorAll('.hbRouteDist[data-trip="'+t.id+'"]').forEach(el=>{ if(el.innerHTML!==html) el.innerHTML=html; });
+    });
+  });
+}
 function hbTripTurnBadge(t){
   const sec = hbTripSecsLeft(t);
   if(sec == null) return "";
@@ -21500,7 +21566,7 @@ function dmRenderTripRequests(trips){
     if(t.fareType === "fixed"){
       return `
       <div style="background:#173a29; border:1px solid rgba(251,191,36,0.4); border-radius:12px; padding:12px; margin-bottom:10px;">
-        <div style="font-weight:700; font-size:13px; color:#eafff2;">📍 ${escapeHtmlDm(t.destination||"—")}</div>
+        ${hbTripRouteHtml(t, __dmMyLatLng, "#eafff2", false)}
         <div style="font-size:11px; color:#a8d9c0; margin:2px 0 8px;">🚗 ${escapeHtmlDm(t.vehicleType||"")} · 🔒 নির্দিষ্ট ভাড়া</div>
         ${hbTripTurnBadge(t)}${dmAirportBadgeHtml(t)}
         <div style="font-weight:800; color:#fbbf24; font-size:16px; margin-bottom:8px;">${HB_CUR} ${t.proposedFare}</div>
@@ -21514,7 +21580,7 @@ function dmRenderTripRequests(trips){
     const isFull = waitCount >= 3;
     return `
     <div style="background:#173a29; border:1px solid rgba(74,222,128,0.2); border-radius:12px; padding:12px; margin-bottom:10px;">
-      <div style="font-weight:700; font-size:13px; color:#eafff2;">📍 ${escapeHtmlDm(t.destination||"—")}</div>
+      ${hbTripRouteHtml(t, __dmMyLatLng, "#eafff2", false)}
       <div style="font-size:11px; color:#a8d9c0; margin:2px 0 8px;">🚗 ${escapeHtmlDm(t.vehicleType||"")} · ${waitCount}/3 জন ইতিমধ্যে অফার করেছেন</div>
       ${hbTripTurnBadge(t)}${dmAirportBadgeHtml(t)}
       <div style="display:flex; gap:8px;">
@@ -21523,6 +21589,7 @@ function dmRenderTripRequests(trips){
       </div>
     </div>`;
   }).join("");
+  hbFillRouteDist(relevant);
 
   listEl.querySelectorAll(".dmTripRejectBtn").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
@@ -23253,7 +23320,7 @@ function rmRenderTripRequests(trips){
     const isFull = waitCount >= 3;
     return `
     <div style="background:#2b2b2b; border:1px solid rgba(255,193,7,0.25); border-radius:12px; padding:12px; margin-bottom:10px;">
-      <div style="font-weight:700; font-size:13px; color:#fff;">📍 ${escapeHtml(t.destination||"—")}</div>
+      ${hbTripRouteHtml(t, __rmMyLatLng, "#fff", true)}
       <div style="font-size:11px; color:#a8a8a8; margin:2px 0 8px;">🚗 ${escapeHtml(t.vehicleType||"")} · ${waitCount}/3 জন ইতিমধ্যে অফার করেছেন</div>
       ${hbTripTurnBadge(t)}
       <div style="display:flex; gap:8px;">
@@ -23262,6 +23329,7 @@ function rmRenderTripRequests(trips){
       </div>
     </div>`;
   }).join("");
+  hbFillRouteDist(relevant);
 
   listEl.querySelectorAll(".rmTripRejectBtn").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
