@@ -658,13 +658,19 @@ service cloud.firestore {
         && (resource.data.passengerId == request.auth.uid || resource.data.driverId == request.auth.uid);
       // seatsHeld — চালক গ্রহণ করলে পোস্টের আসন কমে; বাতিল হলে চালকের অ্যাপ ফেরত দিয়ে false করে
       allow update: if isSignedIn()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","seatsHeld"])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status","updatedAt","seatsHeld","tripAt","tripKey"])
         && ((request.auth.uid == resource.data.driverId
              && (request.resource.data.status == resource.data.status
                  || (resource.data.status == "pending" && request.resource.data.status in ["accepted","declined"])
-                 || (resource.data.status == "accepted" && request.resource.data.status in ["completed","declined"])))
+                 || (resource.data.status == "accepted" && request.resource.data.status in ["completed","declined"]))
+             // 🗓️ যাত্রার সময় (tripAt/tripKey) — শুধু চালক, আর শুধু একবার; একবার বসলে আর বদলানো যায় না
+             && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["tripAt","tripKey"])
+                 || (!("tripAt" in resource.data)
+                     && request.resource.data.tripAt is timestamp
+                     && request.resource.data.tripKey is string
+                     && request.resource.data.tripKey.size() <= 16)))
             || (request.auth.uid == resource.data.passengerId
-             && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["seatsHeld"])
+             && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["seatsHeld","tripAt","tripKey"])
              && resource.data.status in ["pending","accepted"] && request.resource.data.status == "cancelled"));
       allow delete: if false;
 

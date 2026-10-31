@@ -761,7 +761,7 @@ function listenMyBookings(uid){
     const E=hbEsc, el=document.getElementById('myBookings');
     el.innerHTML=list.length?list.map(b=>{
       const ph=String(b.driverPhone||'').replace(/[^0-9+]/g,''), live=b.status==='pending'||b.status==='accepted';
-      return `<div class="notice" style="margin:10px 0 0"><b>${E(b.from)} → ${E(b.to)}</b><br><small>🕒 ${E(b.when)} · ${E(b.vehicleType)} · ${b.seats>0?E(b.seats)+' আসন':'মালামাল'}${b.fare?' · প্রতি জন ৳'+E(b.fare):''}</small>
+      return `<div class="notice" style="margin:10px 0 0"><b>${E(b.from)} → ${E(b.to)}</b><br><small>🕒 ${E(b.when)} · ${E(b.vehicleType)} · ${b.seats>0?E(b.seats)+' আসন':'মালামাল'}${b.fare?' · প্রতি জন ৳'+E(b.fare):''}</small>${b.tripAt&&b.tripAt.toMillis?`<br><small style="font-weight:800">🗓️ যাত্রার সময়: ${E(new Date(b.tripAt.toMillis()).toLocaleString('bn-BD',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</small>`:''}
         <div style="margin:6px 0;font-weight:800">${BK_LABEL[b.status]||E(b.status)}</div><small>চালক: ${E(b.driverName||'—')}</small>
         ${b.status==='completed'?`<div id="rt_${E(b.id)}" style="margin-top:8px"></div>`:''}
         ${live?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${ph?`<a class="primary" style="text-align:center;text-decoration:none;padding:10px" href="tel:${ph}" target="_top">📞 চালককে কল</a>`:'<span></span>'}<button class="input" onclick="cancelBooking('${E(b.id)}')">✕ বাতিল</button></div>`:''}</div>`;
