@@ -1522,6 +1522,17 @@
       </div>
     </div>
 
+    <div class="card" style="margin-bottom:12px; padding:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:800; font-size:13.5px;">📍 এলাকা বেছে রেস্টুরেন্ট খুঁজুন</div>
+        <button type="button" id="rstAreaClear" style="display:none; border:0; background:transparent; color:var(--amber); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✕ সব এলাকা</button>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+        <select id="rstDist" aria-label="জেলা" style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">জেলা</option></select>
+        <select id="rstUpz" aria-label="থানা" disabled style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">থানা</option></select>
+        <select id="rstMkt" aria-label="বাজার" disabled style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">বাজার</option></select>
+      </div>
+    </div>
     <input type="text" class="searchBox" id="rstSearch" placeholder="🔍 রেস্টুরেন্ট বা খাবারের নাম">
 
     <div id="rstList" style="margin-top:14px;"></div>
@@ -4638,9 +4649,50 @@ async function rstLoad(){
   rstLoaded = true;
 }
 
+/* 📍 রেস্টুরেন্ট — জেলা › থানা › বাজার বেছে খোঁজা (বাছাই এই ফোনে মনে থাকে)।
+   রেস্টুরেন্টের নথিতে district / upazila / marketId থাকলে তবেই এলাকা ধরে মেলে।
+   সেলাই ঘরের (tlrArea) একই ধরন — আলাদা index লাগে না, ছাঁকা ফোনেই হয়। */
+let rstArea = { d:"", u:"", m:"" };
+try{ const a = JSON.parse(localStorage.getItem("hbRstArea")||"null"); if(a) rstArea = Object.assign(rstArea, a); }catch(e){}
+let __rstAreaReady = false;
+async function rstAreaFill(){
+  const dS = $("rstDist"), uS = $("rstUpz"), mS = $("rstMkt");
+  if(!dS || !uS || !mS) return;
+  dS.innerHTML = '<option value="">জেলা</option>' + getAllDistricts().map(d=>`<option value="${d}"${d===rstArea.d?" selected":""}>${d}</option>`).join("");
+  uS.disabled = !rstArea.d;
+  uS.innerHTML = '<option value="">থানা</option>' + (rstArea.d ? getUpazilasForDistrict(rstArea.d).map(u=>`<option value="${u}"${u===rstArea.u?" selected":""}>${u}</option>`).join("") : "");
+  mS.disabled = !rstArea.u;
+  mS.innerHTML = '<option value="">বাজার</option>';
+  if(rstArea.d && rstArea.u){
+    try{
+      const qs = await db.collection("markets").where("district","==",rstArea.d).where("upazila","==",rstArea.u).get();
+      const ms = qs.docs.map(x=>({ id:x.id, name:String(x.data().name||x.id) })).sort((a,b)=> a.name.localeCompare(b.name,"bn"));
+      mS.innerHTML = '<option value="">' + (ms.length ? "বাজার" : "বাজার নেই") + '</option>' + ms.map(m=>`<option value="${escapeHtml(m.id)}"${m.id===rstArea.m?" selected":""}>${escapeHtml(m.name)}</option>`).join("");
+    }catch(e){}
+  }
+  const clr = $("rstAreaClear"); if(clr) clr.style.display = rstArea.d ? "" : "none";
+}
+function rstAreaSet(d,u,m){
+  rstArea = { d:d||"", u:u||"", m:m||"" };
+  try{ localStorage.setItem("hbRstArea", JSON.stringify(rstArea)); }catch(e){}
+  rstAreaFill();
+  rstRender();
+}
+function rstAreaInit(){
+  if(__rstAreaReady) return;
+  const dS = $("rstDist"); if(!dS) return;
+  __rstAreaReady = true;
+  dS.addEventListener("change", e=> rstAreaSet(e.target.value,"",""));
+  $("rstUpz").addEventListener("change", e=> rstAreaSet(rstArea.d, e.target.value, ""));
+  $("rstMkt").addEventListener("change", e=> rstAreaSet(rstArea.d, rstArea.u, e.target.value));
+  $("rstAreaClear").addEventListener("click", ()=> rstAreaSet("","",""));
+  rstAreaFill();
+}
+
 function rstRender(){
   const box = $("rstList");
   if(!box) return;
+  rstAreaInit();
   if(!rstLoaded){
     box.innerHTML = '<div class="loadingMsg">রেস্টুরেন্ট খোঁজা হচ্ছে...</div>';
     rstLoad().then(rstRender);
@@ -4649,14 +4701,17 @@ function rstRender(){
 
   const q = ($("rstSearch") && $("rstSearch").value || "").trim().toLowerCase();
   let list = rstAll;
+  if(rstArea.d) list = list.filter(r => r.district === rstArea.d);
+  if(rstArea.u) list = list.filter(r => r.upazila === rstArea.u);
+  if(rstArea.m) list = list.filter(r => r.marketId === rstArea.m);
   if(q) list = list.filter(r =>
     String(r.name || "").toLowerCase().includes(q) ||
     String(r.area || "").toLowerCase().includes(q) ||
     (Array.isArray(r.tags) && r.tags.some(t => String(t).toLowerCase().includes(q))));
 
   if(!list.length){
-    box.innerHTML = q
-      ? '<div class="emptyMsg">এই নামে কোনো রেস্টুরেন্ট পাওয়া যায়নি।</div>'
+    box.innerHTML = (q || rstArea.d)
+      ? '<div class="emptyMsg">' + (q ? 'এই নামে কোনো রেস্টুরেন্ট পাওয়া যায়নি।' : 'এই এলাকায় এখনো কোনো রেস্টুরেন্ট নেই — অন্য এলাকা বেছে দেখুন, অথবা "সব এলাকা" চাপুন।') + '</div>'
       : '<div class="card" style="text-align:center; padding:26px 18px;">'
         + '<div style="font-size:40px; margin-bottom:8px;">🍽️</div>'
         + '<div style="font-size:15px; font-weight:800; color:#fff8e8; margin-bottom:6px;">'
