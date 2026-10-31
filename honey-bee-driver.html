@@ -60,6 +60,28 @@ select option{background:#173a29;color:#eafff2}
 .trip{border-color:var(--line)}
 .mobile-nav{background:#0b1a12;border-color:var(--line)}.mobile-nav button{color:#8fb9a3}.mobile-nav button.active{color:#4ade80}
 #hbGate{background:#0f2318!important;color:#a8d9c0!important}
+/* 🔘 অনলাইন/অফলাইন সুইচ — চাপলে নব পিছলে যায়, রং বদলায়, ঢেউ ওঠে */
+.status #statusDot{transition:background .35s ease}
+#statusText.hbTxtIn{animation:hbTxtIn .38s ease}
+@keyframes hbTxtIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.hbSw{position:relative;flex:0 0 auto;width:56px;height:32px;padding:0;border:0;border-radius:999px;background:#9aa7a0;cursor:pointer;outline:none;overflow:hidden;-webkit-tap-highlight-color:transparent;transition:background .35s ease;box-shadow:inset 0 1px 3px rgba(0,0,0,.28)}
+.hbSw.on{background:linear-gradient(135deg,#16a34a,#22c55e);animation:hbSwGlow 2.6s ease-in-out infinite}
+.hbSw.busy{background:linear-gradient(135deg,#f59e0b,#fbbf24);animation:none}
+@keyframes hbSwGlow{0%,100%{box-shadow:inset 0 1px 3px rgba(0,0,0,.2),0 0 0 0 rgba(34,197,94,.45)}50%{box-shadow:inset 0 1px 3px rgba(0,0,0,.2),0 0 0 6px rgba(34,197,94,0)}}
+.hbSwKnob{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .5s cubic-bezier(.34,1.56,.64,1),width .18s ease}
+.hbSw.on .hbSwKnob,.hbSw.busy .hbSwKnob{transform:translateX(24px)}
+.hbSw:active .hbSwKnob{width:33px}
+.hbSw.on:active .hbSwKnob,.hbSw.busy:active .hbSwKnob{transform:translateX(17px)}
+.hbSwTxt{position:absolute;top:0;height:100%;line-height:32px;font-size:10.5px;font-weight:800;color:#fff;pointer-events:none;transition:opacity .3s ease,transform .45s ease}
+.hbSwOn{left:9px;opacity:0;transform:translateX(-10px)}
+.hbSwOff{right:8px;opacity:1;transform:none}
+.hbSw.on .hbSwOn,.hbSw.busy .hbSwOn{opacity:1;transform:none}
+.hbSw.on .hbSwOff,.hbSw.busy .hbSwOff{opacity:0;transform:translateX(10px)}
+.hbSw.pop::after{content:"";position:absolute;inset:0;border-radius:999px;background:rgba(255,255,255,.4);animation:hbSwPop .55s ease-out forwards;pointer-events:none}
+@keyframes hbSwPop{from{transform:scale(.15);opacity:.9}to{transform:scale(1.5);opacity:0}}
+.hbSw[disabled]{opacity:.8;cursor:wait}
+.hbSw:focus-visible{outline:3px solid rgba(34,197,94,.45);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.hbSw,.hbSwKnob,.hbSwTxt{transition:none;animation:none}.hbSw.pop::after,#statusText.hbTxtIn{animation:none}}
 </style>
 </head>
 <body>
@@ -79,7 +101,7 @@ select option{background:#173a29;color:#eafff2}
 </aside>
 <main>
   <div class="top"><div><h1 id="pageTitle">ড্রাইভার ড্যাশবোর্ড</h1><div class="sub" id="pageSub">স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।</div></div>
-  <div class="status"><span class="dot" id="statusDot"></span><span><span id="statusText">অনলাইন · বুকিং নিচ্ছেন</span></span><button class="btn secondary" id="toggleOnline" style="padding:7px 9px;font-size:12px">অফলাইন</button></div></div>
+  <div class="status"><span class="dot" id="statusDot"></span><span><span id="statusText">অনলাইন · বুকিং নিচ্ছেন</span></span><button type="button" class="hbSw on" id="toggleOnline" role="switch" aria-checked="true" aria-label="অনলাইন / অফলাইন"><span class="hbSwTxt hbSwOn">অন</span><span class="hbSwTxt hbSwOff">অফ</span><span class="hbSwKnob"></span></button></div></div>
   <section id="home" class="page">
     <div class="grid">
       <div class="card" data-goto="earnings" style="cursor:pointer"><div class="stat-label">আজকের আয়</div><div class="stat" id="stToday">৳০</div><div class="stat-note" id="stTodayNote">০টা যাত্রা</div></div>
@@ -148,7 +170,7 @@ const titles={flight:['যাত্রীর ফ্লাইট','বিমা�
 function go(page){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));document.querySelectorAll('[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));document.getElementById('pageTitle').textContent=titles[page][0];document.getElementById('pageSub').textContent=titles[page][1];window.scrollTo({top:0,behavior:'smooth'})}
 document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.page)));
 document.querySelectorAll('[data-goto]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.goto)));
-let online=true;window.__demoToggle=()=>{online=!online;document.getElementById('statusText').textContent=online?'অনলাইন · বুকিং নিচ্ছেন':'অফলাইন · বুকিং বন্ধ';document.getElementById('statusDot').style.background=online?'#15945b':'#9ca3af';document.getElementById('toggleOnline').textContent=online?'অফলাইন':'অনলাইন'};
+let online=true;window.__demoToggle=()=>{online=!online;document.getElementById('statusText').textContent=online?'অনলাইন · বুকিং নিচ্ছেন':'অফলাইন · বুকিং বন্ধ';document.getElementById('statusDot').style.background=online?'#15945b':'#9ca3af';document.getElementById('toggleOnline').classList.toggle('on',online)};
 function bookingAction(btn,status){const trip=btn.closest('.trip');trip.querySelector('.badge').textContent=status;trip.querySelector('.badge').className='badge '+(status==='গৃহীত'?'':'pending');trip.querySelectorAll('button').forEach(b=>b.disabled=true);alert('ডেমো: বুকিং '+status+' হয়েছে। বাস্তবে এটি সার্ভারে সংরক্ষিত হবে না।')}
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 </script>
@@ -181,9 +203,14 @@ async function drvLogout(){
 
 function drvPaintStatus(st){
   const on = st === "online" || st === "busy";
-  $id("statusText").textContent = st === "busy" ? "ব্যস্ত · যাত্রায় আছেন" : (on ? "অনলাইন · বুকিং নিচ্ছেন" : "অফলাইন · বুকিং বন্ধ");
+  const stEl = $id("statusText");
+  const txt = st === "busy" ? "ব্যস্ত · যাত্রায় আছেন" : (on ? "অনলাইন · বুকিং নিচ্ছেন" : "অফলাইন · বুকিং বন্ধ");
+  if(stEl.textContent !== txt){ stEl.textContent = txt; stEl.classList.remove("hbTxtIn"); void stEl.offsetWidth; stEl.classList.add("hbTxtIn"); }
   $id("statusDot").style.background = st === "busy" ? "#f59e0b" : (on ? "#15945b" : "#9ca3af");
-  $id("toggleOnline").textContent = on ? "অফলাইন" : "অনলাইন";
+  const sw = $id("toggleOnline");
+  sw.classList.toggle("on", st === "online");
+  sw.classList.toggle("busy", st === "busy");
+  sw.setAttribute("aria-checked", on ? "true" : "false");
 }
 $id("toggleOnline").onclick = async ()=>{
   if(!DRV.uid) return;
@@ -192,11 +219,13 @@ $id("toggleOnline").onclick = async ()=>{
   // 💰 ট্রান্সপোর্টে সাবস্ক্রিপশন চালু থাকলে — না থাকলে অনলাইন হওয়া যায় না (hb-billing.js)
   if(next === "online" && window.HBBilling && !(await HBBilling.canGoOnline())) return;
   const btn = $id("toggleOnline"); btn.disabled = true;
+  btn.classList.remove("pop"); void btn.offsetWidth; btn.classList.add("pop"); setTimeout(()=> btn.classList.remove("pop"), 600);
+  drvPaintStatus(next); // সঙ্গে সঙ্গে সরে যায় — সার্ভারে না গেলে নিচে ফিরিয়ে আনা হয়
   try{
     await db.collection("transportDrivers").doc(DRV.uid).update({ driverStatus: next, statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-    DRV.data.driverStatus = next; drvPaintStatus(next);
+    DRV.data.driverStatus = next;
     drvMarkPostsOnline(next === "online");
-  }catch(e){ alert("বদলানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
+  }catch(e){ drvPaintStatus(cur); alert("বদলানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
   btn.disabled = false;
 };
 
