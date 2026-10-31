@@ -278,6 +278,12 @@ body{background:linear-gradient(160deg,#1a1206,#3d2405) fixed!important;color:va
   .nav button{font-size:11px!important;cursor:pointer}
   .nav button .ni{font-size:20px!important}
 }
+/* 🔔 পোস্টের উপরের লেখা — অফ ডিউটি / ব্যস্ত */
+.hbDuty{padding:9px 12px;font-size:13px;font-weight:800;text-align:center;line-height:1.5}
+.hbDuty.off{background:#475569;color:#fff}
+.hbDuty.busy{background:#f59e0b;color:#1f1300}
+.formcard .hbDuty{border-radius:12px;margin:0 0 12px}
+button[disabled].hbOff{opacity:.4;cursor:not-allowed;box-shadow:none}
 </style>
 </head>
 <body>
@@ -367,7 +373,12 @@ function vehicleArt(type){
  return '';
 }
 
-function rideCard(r){return `<article class="ride market-vehicle-card">
+function hbDutyBanner(r){
+  if(r.online===false) return '<div class="hbDuty off">⚪ অফ ডিউটি — চালক এখন অফলাইন</div>';
+  if(r.busy===true) return '<div class="hbDuty busy">🙏 আমি ব্যস্ত আছি, দয়া করে বুকিং লিস্ট দেখুন, বুকিং করে রাখুন</div>';
+  return '';
+}
+function rideCard(r){return `<article class="ride market-vehicle-card">${hbDutyBanner(r)}
  <div class="vehiclepic market-vehicle-photo" onclick="openDetail('${r.id}')" role="button" aria-label="গাড়ির বিস্তারিত দেখুন">
   <span class="badge">${r.verified?'✓ যাচাইকৃত':'চালকের তথ্য দেখুন'}</span>
   ${r.img?`<img src="${r.img}" alt="" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`:`<div class="vehicle-art">${['রিকশা','ইজিবাইক','সিএনজি'].includes(r.type)?vehicleArt(r.type):r.emoji}</div>`}
@@ -410,7 +421,7 @@ function searchRides(){const a=document.getElementById('from').value.trim(),b=do
 function openDetail(id){
  let r=rides.find(x=>x.id===id);
  const history=(r.bookedDates||['তথ্য দেওয়া হয়নি']).map(d=>`<span style="display:inline-block;background:#f3f5f7;border-radius:9px;padding:7px 9px;margin:3px">${d}</span>`).join('');
- document.getElementById('detailContent').innerHTML=`<div class="formcard">
+ document.getElementById('detailContent').innerHTML=`<div class="formcard">${hbDutyBanner(r)}
  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><div style="width:66px;height:66px;border-radius:18px;background:#fff3c4;display:grid;place-items:center;font-size:38px">${r.emoji}</div><div><span style="background:#e4f8e9;color:#187447;border-radius:20px;padding:4px 8px;font-size:11px">✓ ${r.verified?'যাচাইকৃত':'তথ্য যাচাই করুন'}</span><h2 style="margin:7px 0 2px">${r.type}</h2><div class="meta">${r.route}</div></div></div>
  <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0">
  <div style="background:#fff8e2;border-radius:13px;padding:12px"><small class="hint">প্রস্তাবিত ভাড়া</small><div style="font-size:22px;font-weight:800">${r.price?'৳'+r.price:'<span style="font-size:15px">আলোচনা সাপেক্ষ</span>'}</div><small>প্রতি আসন/প্রস্তাবিত</small></div>
@@ -425,11 +436,11 @@ function openDetail(id){
  <p style="margin:10px 0 4px"><b>চালকের বিবরণ</b></p><p class="meta">রুট: ${r.route}<br>লাইসেন্স: ${r.verified?'যাচাই করা হয়েছে':'যাচাইয়ের তথ্য নেই'}</p>
  </div>
  <div class="notice" style="margin:12px 0">🔒 নিরাপত্তা: বুকিং পাঠালে আপনার নম্বর চালক শুধু গ্রহণ করার পরেই দেখেন। আপনার লোকেশন চালকের কাছে যায় না। যাত্রার আগে চালককে কল করে সময় ও জায়গা নিশ্চিত করুন।</div>
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><button class="primary" onclick="callDriver('${r.id}')">📞 চালককে কল</button><button class="input" onclick="openBooking('${r.id}')">🎫 বুক করুন</button></div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px"><button class="primary${r.online===false?' hbOff':''}" ${r.online===false?'disabled':`onclick="callDriver('${r.id}')"`}>📞 চালককে কল</button><button class="input${r.online===false?' hbOff':''}" ${r.online===false?'disabled':`onclick="openBooking('${r.id}')"`}>🎫 বুক করুন</button></div>
  </div>`;
  showPage('detailPage')
 }
-function callDriver(id){const r=rides.find(x=>x.id===id);if(r&&r.phone){const a=document.createElement('a');a.href='tel:'+r.phone;a.target='_top';document.body.appendChild(a);a.click();a.remove()}else{toast('এই পোস্টে ফোন নম্বর দেওয়া নেই')}}
+function callDriver(id){const r=rides.find(x=>x.id===id);if(r&&r.online===false){toast('⚪ চালক এখন অফ ডিউটি');return}if(r&&r.phone){const a=document.createElement('a');a.href='tel:'+r.phone;a.target='_top';document.body.appendChild(a);a.click();a.remove()}else{toast('এই পোস্টে ফোন নম্বর দেওয়া নেই')}}
 
 function showFareAgreement(rideId){
  const ride=(rides||[]).find(x=>x.id===rideId);
@@ -468,7 +479,7 @@ function hbPostToRide(id,d){
   let when=[d.date,d.time].filter(Boolean).join(' ');
   if(!when&&d.createdAt&&d.createdAt.toDate){try{when='পোস্ট: '+d.createdAt.toDate().toLocaleDateString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){}}
   return {id:hbEsc(id),type:hbEsc(type||'গাড়ি'),emoji:HB_TYPE_EMOJI[type]||'🚘',route:hbEsc(route),from:hbEsc(d.from||''),to:hbEsc(d.to||''),
-    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,seatsTotal:Number(d.seatsTotal!=null?d.seatsTotal:d.seats)||0,anywhere:d.anywhere===true,areaD:String(d.district||''),areaU:String(d.upazila||''),areaM:String(d.marketId||''),online:d.driverOnline!==false,tripDate:typeof d.date==='string'?d.date:'',createdMs:(d.createdAt&&d.createdAt.toMillis)?d.createdAt.toMillis():Date.now(),name:hbEsc(d.authorName||'ড্রাইভার'),
+    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,seatsTotal:Number(d.seatsTotal!=null?d.seatsTotal:d.seats)||0,anywhere:d.anywhere===true,areaD:String(d.district||''),areaU:String(d.upazila||''),areaM:String(d.marketId||''),online:d.driverOnline!==false,busy:d.driverBusy===true,tripDate:typeof d.date==='string'?d.date:'',createdMs:(d.createdAt&&d.createdAt.toMillis)?d.createdAt.toMillis():Date.now(),name:hbEsc(d.authorName||'ড্রাইভার'),
     rating:'নতুন',reviews:0,verified:!!d.isVerified,car:hbEsc(d.vehicleModel||d.vehicleLabel||'তথ্য দেওয়া হয়নি'),ac:hbEsc(d.ac||''),
     plate:hbEsc(d.regNumber||''),color:hbEsc(d.vehicleColor||''),note:hbEsc(d.notes||d.text||''),phone:String(d.authorPhone||'').replace(/[^0-9+]/g,''),driverId:typeof d.authorId==='string'?d.authorId:'',
     driverPhoto:(typeof d.driverPhoto==='string'&&/^https:\/\/firebasestorage\.googleapis\.com\//.test(d.driverPhoto))?hbEsc(d.driverPhoto):'',
@@ -613,7 +624,7 @@ async function hbDriverStatus(did,fresh){
   if(!__drvSt) __drvSt={};
   if(!did) return 'online';
   const c=__drvSt[did]; if(!fresh&&c&&Date.now()-c.t<60000) return c.v;
-  try{ const d=await db.collection('transportDrivers').doc(did).get(); const dd=d.exists?d.data():{}; const v=dd.driverStatus||'offline'; __drvSt[did]={v:v==='offline'?'offline':'online',t:Date.now(),area:{d:String(dd.district||''),u:String(dd.upazila||''),m:String(dd.marketId||'')}}; }
+  try{ const d=await db.collection('transportDrivers').doc(did).get(); const dd=d.exists?d.data():{}; const v=dd.driverStatus||'offline'; __drvSt[did]={v:v==='offline'?'offline':'online',t:Date.now(),busy:dd.driverBusy===true,area:{d:String(dd.district||''),u:String(dd.upazila||''),m:String(dd.marketId||'')}}; }
   catch(e){ return c?c.v:'online'; }
   return __drvSt[did].v;
 }
@@ -621,7 +632,7 @@ async function hbRefreshDriverStatus(){
   if(!__drvSt) __drvSt={};
   const ids=[...new Set(rides.map(r=>r.driverId).filter(Boolean))].slice(0,30);
   await Promise.all(ids.map(id=>hbDriverStatus(id,false)));
-  let changed=false; rides.forEach(r=>{ const c=__drvSt[r.driverId]; if(c){ const on=c.v!=='offline'; if(r.online!==on){ r.online=on; changed=true; } } });
+  let changed=false; rides.forEach(r=>{ const c=__drvSt[r.driverId]; if(c){ const on=c.v!=='offline'; if(r.online!==on){ r.online=on; changed=true; } const bz=c.busy===true; if(r.busy!==bz){ r.busy=bz; changed=true; } } });
   if(changed || (typeof hbAreaOn==='function' && hbAreaOn())) render();
 }
 /* ==================== 🎫 সিট / গাড়ি বুকিং (Transport Media) ====================
@@ -644,7 +655,7 @@ async function openBooking(id){
   if(r.seatsTotal>0 && !(r.seats>0)){ toast('🔴 এই গাড়ির সব আসন বুক হয়ে গেছে'); return; }
   // চালকের আসল অবস্থা সরাসরি তার প্রোফাইল থেকে দেখে নেওয়া (পোস্টের পুরনো তথ্যে ভরসা না করে)
   const st=await hbDriverStatus(r.driverId,true);
-  if(st==='offline'){ r.online=false; render(); toast('⚪ চালক এখন অফলাইন — অনলাইন হলে বুক করতে পারবেন, অথবা কল করুন'); return; }
+  if(st==='offline'){ r.online=false; render(); toast('⚪ চালক এখন অফ ডিউটি — অনলাইন হলে বুক করতে পারবেন'); return; }
   r.online=true;
   __bkPost=r;
   document.getElementById('bkRoute').innerHTML=`${r.route}<br><small>🕒 ${r.time} · ${r.type}${r.price?' · প্রতি জন ৳'+r.price:''}</small>`;

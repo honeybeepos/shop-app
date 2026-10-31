@@ -82,6 +82,13 @@ select option{background:#173a29;color:#eafff2}
 .hbSw[disabled]{opacity:.8;cursor:wait}
 .hbSw:focus-visible{outline:3px solid rgba(34,197,94,.45);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.hbSw,.hbSwKnob,.hbSwTxt{transition:none;animation:none}.hbSw.pop::after,#statusText.hbTxtIn{animation:none}}
+/* 🙏 "ব্যস্ত আছি" সুইচ — হোম পাতায় আগের শিরোনামের জায়গায় */
+.top{flex-wrap:wrap}
+.top.isHome .topTitle{display:none}
+.top:not(.isHome) .busyBox{display:none}
+.busyBox{flex:1 1 170px;min-width:0;max-width:340px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#173a29;border:1px solid var(--line);padding:10px 12px;border-radius:14px;font-size:13px;color:var(--ink)}
+.busyTxt{min-width:0}.busyTxt b{display:block;font-size:14px}
+.busyTxt small{display:block;color:var(--muted);font-size:11px;margin-top:2px;line-height:1.4}
 </style>
 </head>
 <body>
@@ -100,8 +107,8 @@ select option{background:#173a29;color:#eafff2}
   <div class="sidefoot">আপনার গাড়ি, আপনার সময়, আপনার আয়।<br>© Honey Bee Transport</div>
 </aside>
 <main>
-  <div class="top"><div><h1 id="pageTitle">ড্রাইভার ড্যাশবোর্ড</h1><div class="sub" id="pageSub">স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।</div></div>
-  <div class="status"><span class="dot" id="statusDot"></span><span><span id="statusText">অনলাইন · বুকিং নিচ্ছেন</span></span><button type="button" class="hbSw on" id="toggleOnline" role="switch" aria-checked="true" aria-label="অনলাইন / অফলাইন"><span class="hbSwTxt hbSwOn">অন</span><span class="hbSwTxt hbSwOff">অফ</span><span class="hbSwKnob"></span></button></div></div>
+  <div class="top isHome" id="topBar"><div class="topTitle"><h1 id="pageTitle">ড্রাইভার ড্যাশবোর্ড</h1><div class="sub" id="pageSub">স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।</div></div>
+  <div class="busyBox"><div class="busyTxt"><b>🙏 ব্যস্ত আছি</b><small id="busySub">চালু করলে পোস্টের উপরে জানানো হবে</small></div><button type="button" class="hbSw" id="toggleBusy" role="switch" aria-checked="false" aria-label="ব্যস্ত আছি"><span class="hbSwTxt hbSwOn">অন</span><span class="hbSwTxt hbSwOff">অফ</span><span class="hbSwKnob"></span></button></div><div class="status"><span class="dot" id="statusDot"></span><span><span id="statusText">অনলাইন · বুকিং নিচ্ছেন</span></span><button type="button" class="hbSw on" id="toggleOnline" role="switch" aria-checked="true" aria-label="অনলাইন / অফলাইন"><span class="hbSwTxt hbSwOn">অন</span><span class="hbSwTxt hbSwOff">অফ</span><span class="hbSwKnob"></span></button></div></div>
   <section id="home" class="page">
     <div class="grid">
       <div class="card" data-goto="earnings" style="cursor:pointer"><div class="stat-label">আজকের আয়</div><div class="stat" id="stToday">৳০</div><div class="stat-note" id="stTodayNote">০টা যাত্রা</div></div>
@@ -167,7 +174,7 @@ select option{background:#173a29;color:#eafff2}
 <nav class="mobile-nav"><button class="active" data-page="home"><span>⌂</span>হোম</button><button data-page="post"><span>＋</span>পোস্ট</button><button data-page="bookings"><span>▣</span>বুকিং</button><button data-page="schedule"><span>▦</span>সময়সূচি</button><button data-page="profile"><span>♙</span>প্রোফাইল</button></nav>
 <script>
 const titles={flight:['যাত্রীর ফ্লাইট','বিমান কখন নামবে — লাইভ খবর।'],home:['ড্রাইভার ড্যাশবোর্ড','স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।'],post:['নতুন যাত্রা পোস্ট','আপনার রুট, সময় ও খালি আসন দিন।'],bookings:['বুকিং অনুরোধ','যাত্রীর অনুরোধ পর্যালোচনা করুন।'],schedule:['সময়সূচি','আপনার আসন্ন যাত্রার পরিকল্পনা।'],vehicle:['আমার গাড়ি','গাড়ির তথ্য যাচাই ও আপডেট করুন।'],earnings:['আয় ও হিসাব','যাত্রা থেকে আয়ের সারসংক্ষেপ।'],profile:['আমার প্রোফাইল','আপনার যোগাযোগ ও পরিচয় তথ্য।']};
-function go(page){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));document.querySelectorAll('[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));document.getElementById('pageTitle').textContent=titles[page][0];document.getElementById('pageSub').textContent=titles[page][1];window.scrollTo({top:0,behavior:'smooth'})}
+function go(page){{const tb=document.getElementById('topBar');if(tb)tb.classList.toggle('isHome',page==='home');}document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));document.querySelectorAll('[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));document.getElementById('pageTitle').textContent=titles[page][0];document.getElementById('pageSub').textContent=titles[page][1];window.scrollTo({top:0,behavior:'smooth'})}
 document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.page)));
 document.querySelectorAll('[data-goto]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.goto)));
 let online=true;window.__demoToggle=()=>{online=!online;document.getElementById('statusText').textContent=online?'অনলাইন · বুকিং নিচ্ছেন':'অফলাইন · বুকিং বন্ধ';document.getElementById('statusDot').style.background=online?'#15945b':'#9ca3af';document.getElementById('toggleOnline').classList.toggle('on',online)};
@@ -229,11 +236,43 @@ $id("toggleOnline").onclick = async ()=>{
   btn.disabled = false;
 };
 
+/* 🙏 "ব্যস্ত আছি" সুইচ — চালু থাকলে যাত্রীরা পোস্টের উপরে লেখা দেখেন:
+   "আমি ব্যস্ত আছি, দয়া করে বুকিং লিস্ট দেখুন, বুকিং করে রাখুন"। transportDrivers/{uid}.driverBusy আর
+   নিজের সক্রিয় পোস্টের driverBusy-তে লেখা হয় (অনলাইন/অফলাইনের মতোই)। */
+function drvPaintBusy(b){
+  const sw = $id("toggleBusy"); if(!sw) return;
+  sw.classList.toggle("busy", !!b);
+  sw.setAttribute("aria-checked", b ? "true" : "false");
+  const t = $id("busySub");
+  if(t) t.textContent = b ? "যাত্রীরা পোস্টের উপরে দেখছেন: আমি ব্যস্ত আছি" : "চালু করলে পোস্টের উপরে জানানো হবে";
+}
+async function drvMarkPostsBusy(b){
+  try{
+    const qs = await db.collection("transportMediaPosts").where("authorId","==",DRV.uid).orderBy("createdAt","desc").limit(20).get();
+    const bt = db.batch(); let n = 0;
+    qs.docs.forEach(d=>{ const x = d.data(); if(x.status !== "active") return; if((x.driverBusy === true) !== b){ bt.update(d.ref, { driverBusy: b }); n++; } });
+    if(n) await bt.commit();
+  }catch(e){}
+}
+$id("toggleBusy").onclick = async ()=>{
+  if(!DRV.uid || !DRV.data) return;
+  const sw = $id("toggleBusy"), next = !(DRV.data.driverBusy === true);
+  sw.disabled = true;
+  sw.classList.remove("pop"); void sw.offsetWidth; sw.classList.add("pop"); setTimeout(()=> sw.classList.remove("pop"), 600);
+  drvPaintBusy(next); // সঙ্গে সঙ্গে সরে যায় — সার্ভারে না গেলে নিচে ফিরিয়ে আনা হয়
+  try{
+    await db.collection("transportDrivers").doc(DRV.uid).update({ driverBusy: next });
+    DRV.data.driverBusy = next;
+    drvMarkPostsBusy(next);
+  }catch(e){ drvPaintBusy(!next); alert("বদলানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
+  sw.disabled = false;
+};
+
 function drvFill(){
   const d = DRV.data, v = d.vehicle || {};
   $id("pageSub").textContent = "স্বাগতম, " + (d.name || "ড্রাইভার") + "! আজকের যাত্রা ও বুকিং দেখুন।";
   titles.home[1] = $id("pageSub").textContent;
-  drvPaintStatus(d.driverStatus || "offline");
+  drvPaintStatus(d.driverStatus || "offline"); drvPaintBusy(d.driverBusy === true);
   $id("vType").value = v.type || "";
   $id("vModel").value = v.model || "";
   $id("vReg").value = v.regNumber || "";
@@ -328,7 +367,7 @@ $id("postForm").addEventListener("submit", async (e)=>{
       vehicleType: d.vehicle, vehicleModel: v.model||null, regNumber: v.regNumber||null, vehicleColor: v.color||null, ac: v.ac||null,
       seats, seatsTotal: seats, fare, notes: (d.notes||"").trim(), text,
       marketId: DRV.data.marketId||null, district: DRV.data.district||null, upazila: DRV.data.upazila||null, // 📍 যাত্রী এলাকা দিয়ে খুঁজতে পারেন
-      imageUrl, vehiclePhotos:[vp.front,vp.inside,vp.side].filter(Boolean), driverPhoto: DRV.data.photoURL||null, likedBy: [], likeCount: 0, status: "active", driverOnline: DRV.data.driverStatus === "online",
+      imageUrl, vehiclePhotos:[vp.front,vp.inside,vp.side].filter(Boolean), driverPhoto: DRV.data.photoURL||null, likedBy: [], likeCount: 0, status: "active", driverOnline: DRV.data.driverStatus === "online", driverBusy: DRV.data.driverBusy === true,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     e.target.reset(); drvPostDefaults();
@@ -781,7 +820,7 @@ async function drvAnyPost(btn){
       vehicleType:vt, vehicleModel:v.model||null, regNumber:v.regNumber||null, vehicleColor:v.color||null, ac:v.ac||null,
       seats, seatsTotal:seats, fare:0, notes:"যেকোনো জায়গায় যেতে প্রস্তুত — ভাড়া আলোচনা সাপেক্ষে", text:`🚐 ${from} থেকে যেকোনো জায়গায় যেতে প্রস্তুত · ${vt}`,
       marketId:DRV.data.marketId||null, district:DRV.data.district||null, upazila:DRV.data.upazila||null, imageUrl:vp.front||vp.side||vp.inside||null, vehiclePhotos:[vp.front,vp.inside,vp.side].filter(Boolean), driverPhoto:DRV.data.photoURL||null,
-      likedBy:[], likeCount:0, status:"active", driverOnline:DRV.data.driverStatus==="online", createdAt:firebase.firestore.FieldValue.serverTimestamp() });
+      likedBy:[], likeCount:0, status:"active", driverOnline:DRV.data.driverStatus==="online", driverBusy:DRV.data.driverBusy===true, createdAt:firebase.firestore.FieldValue.serverTimestamp() });
     alert("✅ পোস্ট হয়ে গেছে! যাত্রীরা দেখছেন আপনি যেকোনো জায়গায় যেতে প্রস্তুত।"+(DRV.data.driverStatus==="online"?"":"\n\n⚠️ আপনি এখন অফলাইন — যাত্রীরা বুক করতে পারবেন না। উপরের \"অনলাইন\" চাপুন।"));
     drvLoadMyPosts();
   }catch(e){ alert("পোস্ট করা যায়নি: "+e.message); }
