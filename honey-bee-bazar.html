@@ -3696,6 +3696,9 @@ function hbEndProductViewTimer(){
 function $(id){ return document.getElementById(id); }
 let allMarkets = [];
 let allShops = [];
+/* 💊 ফার্মেসি দোকান (shops/{id}.shopType === "pharmacy") বাজারের সাধারণ দোকান-তালিকা, পণ্য-ফিড ও খোঁজায় আসে না —
+   ওগুলো শুধু 💊 ফার্মেসী পাতায় দেখায়। allShops নিজে অপরিবর্তিত (ফার্মেসী পাতা আর অর্ডারের লুকআপ এটাই ব্যবহার করে)। */
+function hbMarketShops(){ return (allShops || []).filter(s=> s.shopType !== "pharmacy"); }
 let currentMarketId = null, currentShopId = null;
 let currentShopIsOpen = true; // 🔴 বর্তমানে ব্রাউজ করা দোকানটা খোলা/বন্ধ কিনা — selectShop()-এ সেট হয়
 // 🌍 বর্তমানে খোলা দোকানের মুদ্রা-চিহ্ন — যে দোকান খোলা আছে সেই দোকান অনুযায়ী পরিবর্তন হয়
@@ -10589,8 +10592,8 @@ async function searchProducts(query, options = {}){
   else{
     const marketId = options.marketId || currentMarketId;
     shopIds = marketId
-      ? allShops.filter(s=> s.marketId === marketId).map(s=> s.id)
-      : allShops.map(s=> s.id); // মার্কেট-কনটেক্সট না থাকলে সব দোকান (fallback)
+      ? hbMarketShops().filter(s=> s.marketId === marketId).map(s=> s.id)
+      : hbMarketShops().map(s=> s.id); // মার্কেট-কনটেক্সট না থাকলে সব দোকান (fallback)
   }
   if(shopIds.length === 0) return [];
 
@@ -11291,7 +11294,7 @@ function mfResetFilters(){
 async function loadMarketFeedProducts(){
   const gridEl = $("marketFeedGrid");
   if(!gridEl) return;
-  if(allShops.length === 0){
+  if(hbMarketShops().length === 0){
     marketFeedProducts = [];
     gridEl.innerHTML = '<div class="mfEmpty">এই বাজারে এখনো কোনো সক্রিয় দোকান নেই।</div>';
     $("mfFeaturedSection") && ($("mfFeaturedSection").style.display = "none");
@@ -11301,7 +11304,7 @@ async function loadMarketFeedProducts(){
   }
   gridEl.innerHTML = '<div class="loadingMsg">প্রোডাক্ট লোড হচ্ছে...</div>';
   try{
-    const perShop = await Promise.all(allShops.map(async (shop)=>{
+    const perShop = await Promise.all(hbMarketShops().map(async (shop)=>{
       try{
         const qs = await db.collection("shops").doc(shop.id).collection("publicStock").get();
         const cur = shop.currencySymbol
@@ -11336,7 +11339,7 @@ function mfRenderBanners(){
   if(!wrap || !dotsWrap) return;
   const offerCount = marketFeedProducts.filter(p=> hbGetOfferMeta(p).hasOffer).length;
   const highlightCount = marketFeedProducts.filter(p=> hbGetOfferMeta(p).highlight).length;
-  const shopCount = allShops.length;
+  const shopCount = hbMarketShops().length;
   const banners = [];
   if(offerCount > 0) banners.push({ bg:'linear-gradient(135deg,#e63946,#ff8a5c)', big:`🔥 আজ ${offerCount}টি প্রোডাক্টে অফার চলছে`, small:'এখনই দেখুন, স্টক ফুরানোর আগে', action:'offer' });
   if(highlightCount > 0) banners.push({ bg:'linear-gradient(135deg,#8b5cf6,#c084fc)', big:`⭐ ${highlightCount}টি ফিচার্ড প্রোডাক্ট`, small:'দোকানিদের বাছাই করা সেরা পণ্য', action:'featured' });
@@ -11377,7 +11380,7 @@ $("mfFeaturedSeeAll") && $("mfFeaturedSeeAll").addEventListener("click", ()=>{
 function mfBuildShopTypeChips(){
   const wrap = $("mfShopTypeChips");
   if(!wrap) return;
-  const types = [...new Set(allShops.map(s=> s.category).filter(Boolean))];
+  const types = [...new Set(hbMarketShops().map(s=> s.category).filter(Boolean))];
   if(types.length === 0){
     wrap.innerHTML = '<div style="font-size:11.5px; color:var(--muted);">কোনো দোকানের ধরন পাওয়া যায়নি।</div>';
     return;
@@ -11490,7 +11493,7 @@ async function mfLoadAllBdProducts(){
   __mfBdLoading = true;
   try{
     const shopsSnap = await db.collection("shops").where("status", "==", "active").get();
-    const shops = shopsSnap.docs.map(d=> ({ id:d.id, ...d.data() }));
+    const shops = shopsSnap.docs.map(d=> ({ id:d.id, ...d.data() })).filter(s=> s.shopType !== "pharmacy");
     const perShop = await Promise.all(shops.map(async (shop)=>{
       try{
         const qs = await db.collection("shops").doc(shop.id).collection("publicStock").get();
@@ -12521,7 +12524,7 @@ function loadShops(marketId){
     .onSnapshot((qs)=>{
       allShops = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
       renderShops(getFilteredShops());
-      if(__nearbyMarketId === marketId) renderNearbyMarketShops(marketId, allShops);
+      if(__nearbyMarketId === marketId) renderNearbyMarketShops(marketId, hbMarketShops());
       if($("screenMarketFeed") && $("screenMarketFeed").classList.contains("active")) loadMarketFeedProducts();
     }, (e)=>{
       console.error(e);
@@ -12532,8 +12535,8 @@ function loadShops(marketId){
 
 function getFilteredShops(){
   const q = ($("shopSearch") ? $("shopSearch").value : "").trim().toLowerCase();
-  if(!q) return allShops;
-  return allShops.filter(s => (s.name||s.shopName||"").toLowerCase().includes(q));
+  if(!q) return hbMarketShops();
+  return hbMarketShops().filter(s => (s.name||s.shopName||"").toLowerCase().includes(q));
 }
 
 // 🏪 দোকানের ছবি — POS হেডারের "➕" আইকনে আপলোড করা ছবিটা (shop.logoUrl,
@@ -12707,7 +12710,7 @@ window.toggleFavoriteShop = async function(ev, shopId){
   renderShops(getFilteredShops());
   // 📍 "কাছের বাজার"-এর তালিকাটা আলাদা কন্টেইনারে থাকে — সংরক্ষণ বাটনের
   // অবস্থা (🔖) তাৎক্ষণিকভাবে সেখানেও দেখানোর জন্য এটাও রিফ্রেশ করা হচ্ছে
-  if(__nearbyMarketId) renderNearbyMarketShops(__nearbyMarketId, allShops);
+  if(__nearbyMarketId) renderNearbyMarketShops(__nearbyMarketId, hbMarketShops());
   try{
     await db.collection("customers").doc(currentCustomer.uid).set({ favoriteShops: updated }, { merge: true });
   }catch(e){ console.warn("favorite save failed:", e); }
@@ -12833,7 +12836,7 @@ window.hbShareShop = function(ev, shopId){
 
 $("shopSearch").addEventListener("input", (e)=>{
   const q = e.target.value.trim().toLowerCase();
-  renderShops(allShops.filter(s => (s.name||s.shopName||"").toLowerCase().includes(q)));
+  renderShops(hbMarketShops().filter(s => (s.name||s.shopName||"").toLowerCase().includes(q)));
 });
 
 $("backToShops").addEventListener("click", ()=>{
@@ -13069,7 +13072,7 @@ async function mcLoadMarketCategories(marketId){
   try{
     const shopsQs = await db.collection("shops")
       .where("marketId","==",marketId).where("status","==","active").get();
-    const shops = shopsQs.docs.map(d=> ({ id:d.id, ...d.data() }));
+    const shops = shopsQs.docs.map(d=> ({ id:d.id, ...d.data() })).filter(s=> s.shopType !== "pharmacy");
     if(shops.length === 0){
       __mcMarketId = marketId; __mcCategoryMap = new Map(); marketFeedProducts = [];
       if(gridEl) gridEl.innerHTML = '<div class="mfEmpty">এই বাজারে এখনো কোনো সক্রিয় দোকান নেই।</div>';
