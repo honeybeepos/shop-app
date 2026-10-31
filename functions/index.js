@@ -2623,6 +2623,57 @@ exports.cleanupOldHistory = onSchedule("every 24 hours", async () => {
   console.log(`🗑️ ৭ দিনের পুরনো ${totalDeleted}টা হিস্ট্রি রেকর্ড মুছে ফেলা হয়েছে`);
 });
 
+/* ==================== 📊 বাজারের রিপোর্ট (bazarStats) — ৯০ দিনের পুরনো নিজে থেকে মোছা ====================
+   "কোন অংশে গ্রাহক বেশি" হিসাবের নথির নামই তারিখ (যেমন 2026-10-31, বাংলাদেশ সময়)।
+   তাই নামের তুলনা করেই পুরনোগুলো বেছে নেওয়া যায় — আলাদা index লাগে না।
+   এডমিন প্যানেলে সর্বোচ্চ ৯০ দিনের রিপোর্ট দেখা যায়, তাই ৯০ দিন পর্যন্ত সব থাকে;
+   তার আগেরগুলোই শুধু মোছে। প্রতিদিন একবার চলে, একবারে ৪০০টা করে (বছরের শেষেও দিনে ১টাই মুছবে)।
+   ⚠️ অন্য কোনো কালেকশনে হাত দেয় না। */
+exports.cleanupOldBazarStats = onSchedule("every 24 hours", async () => {
+  const dhakaNow = new Date(Date.now() + 6 * 3600000);
+  const cutoffKey = new Date(dhakaNow.getTime() - 90 * 86400000).toISOString().slice(0, 10);
+  let removed = 0;
+  try {
+    for (let round = 0; round < 10; round++) {
+      const snap = await db.collection("bazarStats")
+        .where("__name__", "<", db.collection("bazarStats").doc(cutoffKey))
+        .limit(400).get();
+      if (snap.empty) break;
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      removed += snap.size;
+      if (snap.size < 400) break;
+    }
+  } catch (e) {
+    console.error("📊 bazarStats পরিষ্কার করা যায়নি:", e.message || e);
+  }
+  if (removed) console.log(`📊 bazarStats: ${cutoffKey}-এর আগের ${removed}টা দিনের হিসাব মুছে ফেলা হয়েছে`);
+});
+
+/* ==================== 📝 মতামত (feedback) — ৯০ দিন পর নিজে থেকে মোছা ====================
+   feedback/{id}-এর createdAt (সার্ভারের সময়) ৯০ দিনের পুরনো হলে মুছে যায়।
+   একটা মাত্র ফিল্ডে "<" খোঁজা, তাই আলাদা index লাগে না। প্রতিদিন একবার, একবারে ৪০০টা করে।
+   ⚠️ শুধু feedback কালেকশনে হাত দেয়। */
+exports.cleanupOldFeedback = onSchedule("every 24 hours", async () => {
+  const cutoff = Timestamp.fromMillis(Date.now() - 90 * 86400000);
+  let removed = 0;
+  try {
+    for (let round = 0; round < 10; round++) {
+      const snap = await db.collection("feedback").where("createdAt", "<", cutoff).limit(400).get();
+      if (snap.empty) break;
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      removed += snap.size;
+      if (snap.size < 400) break;
+    }
+  } catch (e) {
+    console.error("📝 feedback পরিষ্কার করা যায়নি:", e.message || e);
+  }
+  if (removed) console.log(`📝 feedback: ৯০ দিনের পুরনো ${removed}টা উত্তর মুছে ফেলা হয়েছে`);
+});
+
 /* ==================== 🔐 Honey Messenger — প্রাইভেসি মোডের মেসেজ অটো-মুছে ফেলা ====================
    প্রতি মিনিটে চলে — যেসব মেসেজে expiresAt (মেসেজ পাঠানোর ১ মিনিট পর)
    অতিক্রান্ত হয়ে গেছে, সেগুলো স্থায়ীভাবে মুছে ফেলা হয়। collectionGroup
