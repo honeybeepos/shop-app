@@ -4677,13 +4677,24 @@ function rstRender(){
   list.forEach(function(r){
     const card = document.createElement("div");
     card.className = "card";
-    card.style.cssText = "display:flex; gap:12px; align-items:center; margin-bottom:10px; cursor:pointer;";
+    card.style.cssText = "display:flex; flex-direction:column; gap:10px; margin-bottom:10px; cursor:pointer;";
     const open = r.isOpen !== false;
+    /* 🖼️ দোকানের ব্যানার/প্রোফাইল ছবি — রেস্টুরেন্ট POS-এ যে ছবি দেয় (profileImage) সেটা এখানে
+       দেখানো হয়, যাতে গ্রাহক দোকান সহজে চিনতে পারেন। ছবি না থাকলে আগের মতো 🍽️ আইকন। */
+    const rstPic = r.profileImage || r.photoURL || "";
     card.innerHTML =
-      '<div style="flex:0 0 auto; width:54px; height:54px; border-radius:13px; overflow:hidden; '
-      + 'background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:26px;">'
-      + (r.photoURL ? '<img src="' + escapeHtml(r.photoURL) + '" alt="" style="width:100%;height:100%;object-fit:cover;">' : '🍽️')
-      + '</div>'
+      (r.profileImage
+        ? '<div style="width:100%; height:130px; border-radius:12px; overflow:hidden; background:rgba(255,255,255,0.08);">'
+          + '<img src="' + escapeHtml(r.profileImage) + '" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;" '
+          + 'onerror="this.parentElement.style.display=\'none\'">'
+          + '</div>'
+        : '')
+      + '<div style="display:flex; gap:12px; align-items:center;">'
+      + (r.profileImage ? '' :
+        '<div style="flex:0 0 auto; width:54px; height:54px; border-radius:13px; overflow:hidden; '
+        + 'background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:26px;">'
+        + (rstPic ? '<img src="' + escapeHtml(rstPic) + '" alt="" style="width:100%;height:100%;object-fit:cover;">' : '🍽️')
+        + '</div>')
       + '<div style="flex:1; min-width:0;">'
       + '<div style="font-size:15px; font-weight:800; color:#fff8e8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">'
       + escapeHtml(r.name || "রেস্টুরেন্ট") + '</div>'
@@ -4691,6 +4702,7 @@ function rstRender(){
       + escapeHtml(r.area || "") + '</div>'
       + '<div style="font-size:11.5px; margin-top:4px; color:' + (open ? '#4ade80' : '#f59e0b') + ';">● '
       + (open ? 'এখন খোলা' : 'এখন বন্ধ') + '</div>'
+      + '</div>'
       + '</div>';
     card.addEventListener("click", function(){ rmOpen(r); });
     box.appendChild(card);
