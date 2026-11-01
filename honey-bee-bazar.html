@@ -16160,7 +16160,11 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
     $("tripStatusCard").style.display = "block";
     tripWatchTrip(tripRef.id);
   }catch(e){
-    alert("বুক করা যায়নি: " + e.message);
+    // 🔐 অনুমতি না থাকার এরর (লগইন নেই/মেয়াদ শেষ) — কাঁচা ইংরেজি এরর না দেখিয়ে সাইন-ইনের কথা বলা হয়
+    const denied = e && (e.code === "permission-denied" || /permission/i.test(String(e.message || "")));
+    alert(denied
+      ? "🔐 ট্রিপ বুক করতে আগে Sign-in করুন।\n☰ Menu থেকে Google দিয়ে Sign-in করে আবার চেষ্টা করুন।"
+      : "বুক করা যায়নি: " + e.message);
   }finally{
     $("tripSearchBtn").disabled = false; $("tripSearchBtn").textContent = "🔍 ড্রাইভার খুঁজুন";
   }
