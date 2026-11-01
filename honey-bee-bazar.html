@@ -3586,7 +3586,7 @@ auth.onAuthStateChanged(async (user)=>{
   // Auth ব্যবহার হয় (শুধু Firestore-এর isSignedIn() rule পাস করানোর জন্য) —
   // এটাকে সত্যিকারের কাস্টমার লগইন হিসেবে ধরা হবে না (প্রোফাইল তৈরি/UI লগইন-স্টেট
   // কোনোটাই বদলাবে না), তাই এখানেই থামিয়ে দেওয়া হচ্ছে
-  if(user.isAnonymous) return;
+  if(user.isAnonymous){ if(currentCustomer && currentCustomer.uid !== user.uid){ currentCustomer = null; renderAuthArea(); } return; } // অন্য অ্যাপে লগআউট হলে পুরনো লগইনের তথ্য মুছে ফেলা
   try{
     const ref = db.collection("customers").doc(user.uid);
     const doc = await ref.get();
@@ -16126,10 +16126,15 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
   try{
     const pickupLocation = await tripGetPickupLocation();
     $("tripSearchBtn").textContent = "খোঁজা হচ্ছে...";
-    if(typeof hbEnsureVisitorAuth === "function") await hbEnsureVisitorAuth();
+    // 🔒 firestore.rules: passengerId অবশ্যই এই মুহূর্তের Firebase uid-এর সমান হতে হয় — তাই সরাসরি auth থেকেই নেওয়া হয়
+    // (আগে পুরনো লগইনের uid থেকে নিলে, অন্য অ্যাপে লগইন/লগআউটের পর uid না মিলে "permissions" এরর আসত)
+    let __authUid = null;
+    if(typeof hbEnsureVisitorAuth === "function") __authUid = await hbEnsureVisitorAuth();
+    __authUid = __authUid || (auth.currentUser && auth.currentUser.uid) || null;
+    if(!__authUid){ alert("ইন্টারনেট/সংযোগে সমস্যা — একটু পরে আবার চেষ্টা করুন।"); return; }
     const now = Date.now();
     const tripRef = await db.collection("trips").add({
-      passengerId: tripGetUserId(),
+      passengerId: __authUid,
       passengerName: (currentCustomer && currentCustomer.name) || "যাত্রী",
       passengerPhone,
       pickupLocation,
