@@ -161,6 +161,7 @@ select option{background:#173a29;color:#eafff2}
   <section id="trips" class="page hidden">
     <div class="card" id="tripGate" style="display:none;margin-bottom:14px"><div class="notice">🔒 এই সুবিধা এখনো চালু করা হয়নি। আপনার এলাকার এজেন্টের সাথে যোগাযোগ করুন — তারা এক ক্লিকে চালু করে দিতে পারবেন।</div></div>
     <div class="card" style="margin-bottom:14px"><h2 class="section-title">🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট</h2>
+      <button type="button" class="btn" id="tpPushBtn" style="display:none;width:100%;margin-bottom:10px">🔔 অ্যাপ বন্ধ থাকলেও ট্রিপ রিকোয়েস্ট ফোনের স্ট্যাটাস বারে পেতে চালু করুন</button>
       <div class="sub" id="tpGps" style="margin-bottom:8px">📍 অনলাইন হলে লাইভ লোকেশন চালু হবে — যাত্রীর রিকোয়েস্ট কাছের চালকদের একজন একজন করে (৪০ সেকেন্ড করে) আসে।</div>
       <div id="tripReqList" class="sub">অনলাইন থাকলে এখানে যাত্রীদের রিকোয়েস্ট দেখাবে — ভাড়া অফার করতে পারবেন।</div></div>
     <div class="card"><h2 class="section-title">📡 কাছের যাত্রী (রাস্তায় অপেক্ষা)</h2>
@@ -993,6 +994,14 @@ function tpSync(st){
   if(!DRV.uid || !DRV.data) return;
   const gate=$id("tripGate"); if(gate) gate.style.display = tpOk() ? "none" : "block";
   if(st==="online" && tpOk()){ tpStartGps(); tpListen(); } else tpStop(false);
+  const pb=$id("tpPushBtn");
+  if(pb){
+    const need=tpOk() && ("Notification" in window) && Notification.permission!=="granted" && Notification.permission!=="denied";
+    pb.style.display=need?"":"none";
+    pb.onclick=async()=>{ pb.disabled=true; const r=await hbPushSetup("transportDrivers",DRV.uid,true); pb.disabled=false;
+      if(r){ pb.style.display="none"; alert("✅ চালু হয়েছে — অ্যাপ বন্ধ থাকলেও নতুন ট্রিপ/যাত্রীর খবর স্ট্যাটাস বারে আসবে।"); }
+      else alert("চালু করা যায়নি। ফোনের সেটিংসে এই সাইটের নোটিফিকেশন অনুমতি দিন।"); };
+  }
 }
 
 function drvListenBookings(){
@@ -1207,11 +1216,17 @@ async function hbPushSetup(col,uid,ask){
     if(perm!=="granted") return false;
     const reg=await navigator.serviceWorker.register("firebase-messaging-sw.js");
     const token=await firebase.messaging().getToken({vapidKey:HB_VAPID,serviceWorkerRegistration:reg});
-    if(token) await db.collection(col).doc(uid).set({fcmToken:token},{merge:true});
+    if(token) await db.collection(col).doc(uid).set(col==="transportDrivers"?{fcmToken:token,fcmApp:"honey-bee-driver.html"}:{fcmToken:token},{merge:true});
     return !!token;
   }catch(e){ console.warn("push setup",e); return false; }
 }
 
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.addEventListener("message",e=>{
+    const d=e.data&&e.data.hbPushOpen;
+    if(d&&(d.type==="trip-turn"||d.type==="waiting-passenger")&&DRV.uid) go("trips");
+  });
+}
 async function drvPushInit(){
   const btn=$id("pushBtn");
   const ok=await hbPushSetup("transportDrivers",DRV.uid,false);
@@ -1357,6 +1372,7 @@ auth.onAuthStateChanged(async (user)=>{
     drvMarkPostsOnline(DRV.data.driverStatus === "online" || DRV.data.driverStatus === "busy");
     drvPushInit();
     if(location.hash==="#bookings") go("bookings");
+    else if(location.hash==="#trips") go("trips");
     drvNotifAction();
     $id("hbGate").remove();
     if(!(DRV.data.vehicle && DRV.data.vehicle.type)){ go("vehicle"); setTimeout(()=>alert("🚗 শুরুতে আপনার গাড়ির ধরন বেছে নিয়ে সেভ করুন।"), 200); }
