@@ -3581,7 +3581,7 @@ async function tripBuildQueue(trip, exclude) {
   } catch (e) { console.warn("TRIP_QUEUE_RIDERS_FAILED", String(e && e.message || e)); }
   try {
     const ds = await db.collection("transportDrivers").where("driverStatus", "==", "online").get();
-    ds.docs.forEach((d) => { const r = d.data(); if (r.createdByAgent !== true) return; if (r.status === "blocked") return; if (busy(r)) return; cands.push({ id: d.id, kind: "driver", loc: r.liveLocation }); });
+    ds.docs.forEach((d) => { const r = d.data(); if (r.createdByAgent !== true && r.canReceivePassengerRequests !== true) return; if (r.status === "blocked") return; if (busy(r)) return; cands.push({ id: d.id, kind: "driver", loc: r.liveLocation }); });
   } catch (e) { console.warn("TRIP_QUEUE_DRIVERS_FAILED", String(e && e.message || e)); }
   const seen = new Set();
   let list = cands.filter((c) => !ex.has(c.id) && !seen.has(c.id) && seen.add(c.id));
@@ -3598,6 +3598,11 @@ async function tripBuildQueue(trip, exclude) {
   return list.slice(0, TRIP_QUEUE_SIZE);
 }
 
+// 🔗 চালকের টোকেন যে অ্যাপে নেওয়া (fcmApp) সেই অ্যাপেই নোটিফিকেশন খোলে: ড্রাইভার অ্যাপ → "যাত্রী ট্রিপ" পাতা,
+//    নইলে (পুরনো/ডেলিভারি-অ্যাপের ড্রাইভার মোড) আগের মতোই shop-ledger-app
+function tripDriverLink(fcmApp) {
+  return fcmApp === "honey-bee-driver.html" ? `${APP_DOMAIN}/honey-bee-driver.html#trips` : RIDER_MODE_URL;
+}
 async function tripPushTurn(tripId, trip, uid, kinds) {
   const title = `🚕 নতুন যাত্রী — গন্তব্য: ${trip.destination || "—"}`;
   const body = `${trip.fareType === "fixed" ? "নির্দিষ্ট ভাড়া " + (trip.proposedFare || "") + " · " : ""}শুধু আপনাকে পাঠানো হয়েছে — ৪০ সেকেন্ডের মধ্যে অ্যাপ খুলে সাড়া দিন।`;
@@ -3608,13 +3613,55 @@ async function tripPushTurn(tripId, trip, uid, kinds) {
   const token = snap.exists ? snap.data().fcmToken : null;
   if (!token) return false;
   try {
-    await getMessaging().send({ token, data: hubData(Object.assign({ link: RIDER_MODE_URL }, payload)), webpush: { headers: { Urgency: "high" } } });
+    await getMessaging().send({ token, data: hubData(Object.assign({ link: tripDriverLink(snap.data().fcmApp) }, payload)), webpush: { headers: { Urgency: "high" } } });
     return true;
   } catch (e) {
     if (DEAD_TOKEN(e)) await snap.ref.update({ fcmToken: FieldValue.delete() }).catch(() => {});
     return false;
   }
 }
+
+/* ==================== 📡 "I Am Waiting On Road" — কাছের চালকদের ফোনে পুশ ====================
+   বাজার থেকে যাত্রী "রাস্তায় অপেক্ষা" চাপলে (passenger_waiting_queue/{id}, status WAITING) ২ কিমির মধ্যের অনলাইন চালকদের
+   (যাত্রী-রিকোয়েস্ট চালু + সাবস্ক্রিপশন ঠিক + ট্রিপে ব্যস্ত নন) ফোনে খবর যায় — অ্যাপ বন্ধ থাকলেও স্ট্যাটাস বারে দেখা যায়,
+   চাপলে ড্রাইভার অ্যাপের "যাত্রী ট্রিপ" পাতা খোলে। সবচেয়ে কাছের সর্বোচ্চ ১০ জন। ⚠️ যাত্রীর পরিচয়/সঠিক লোকেশন পুশে যায় না। */
+const WAITING_PUSH_KM = 2;
+const WAITING_PUSH_MAX = 10;
+exports.onWaitingPassengerCreated = onDocumentCreated("passenger_waiting_queue/{pid}", async (event) => {
+  try {
+    const p = event.data && event.data.data();
+    if (!p || p.status !== "WAITING" || !p.location) return;
+    const lat = p.location.latitude, lng = p.location.longitude;
+    if (lat == null || lng == null) return;
+    const ds = await db.collection("transportDrivers").where("driverStatus", "==", "online").get();
+    let cands = [];
+    ds.docs.forEach((d) => {
+      const r = d.data();
+      if (r.createdByAgent !== true && r.canReceivePassengerRequests !== true) return;
+      if (r.status === "blocked" || r.currentStatus === "on_trip" || r.currentStatus === "on_waiting") return;
+      if (!r.fcmToken || !r.liveLocation || r.liveLocation.lat == null) return;
+      const km = haversineKm(lat, lng, r.liveLocation.lat, r.liveLocation.lng);
+      if (km <= WAITING_PUSH_KM) cands.push({ id: d.id, ref: d.ref, token: r.fcmToken, km, app: r.fcmApp });
+    });
+    if (!cands.length) return;
+    try {
+      const ok = await __billing.driversWithSub(cands.map((c) => c.id));
+      if (ok) cands = cands.filter((c) => ok.has(c.id));
+    } catch (e) { console.warn("WAITING_PUSH_SUB_CHECK_FAILED", String(e && e.message || e)); }
+    cands.sort((a, b) => a.km - b.km);
+    cands = cands.slice(0, WAITING_PUSH_MAX);
+    await Promise.all(cands.map(async (c) => {
+      const dist = c.km < 1 ? Math.max(50, Math.round(c.km * 1000 / 50) * 50) + " মিটার" : c.km.toFixed(1) + " কিমি";
+      try {
+        await getMessaging().send({
+          token: c.token,
+          data: hubData({ type: "waiting-passenger", tag: `waiting-${event.params.pid}`, title: "📡 কাছে যাত্রী অপেক্ষা করছেন", body: `প্রায় ${dist} দূরে একজন যাত্রী রাস্তায় অপেক্ষা করছেন — অ্যাপ খুলে তুলে নিন।`, link: tripDriverLink(c.app) }),
+          webpush: { headers: { Urgency: "high" } },
+        });
+      } catch (e) { if (DEAD_TOKEN(e)) await c.ref.update({ fcmToken: FieldValue.delete() }).catch(() => {}); }
+    }));
+  } catch (e) { console.warn("WAITING_PUSH_FAILED", String(e && e.message || e)); }
+});
 
 async function tripAdvance(ref, force) {
   return db.runTransaction(async (tx) => {
