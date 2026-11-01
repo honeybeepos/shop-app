@@ -16131,7 +16131,12 @@ $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
     let __authUid = null;
     if(typeof hbEnsureVisitorAuth === "function") __authUid = await hbEnsureVisitorAuth();
     __authUid = __authUid || (auth.currentUser && auth.currentUser.uid) || null;
-    if(!__authUid){ alert("ইন্টারনেট/সংযোগে সমস্যা — একটু পরে আবার চেষ্টা করুন।"); return; }
+    if(!__authUid){
+      alert(navigator.onLine === false
+        ? "ইন্টারনেট নেই — সংযোগ দেখে আবার চেষ্টা করুন।"
+        : "🔐 ট্রিপ বুক করতে আগে Sign-in করুন।\n☰ Menu থেকে Google দিয়ে Sign-in করে আবার চেষ্টা করুন।");
+      return;
+    }
     const now = Date.now();
     const tripRef = await db.collection("trips").add({
       passengerId: __authUid,
