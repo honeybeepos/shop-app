@@ -101,6 +101,7 @@ select option{background:#173a29;color:#eafff2}
   <button class="nav active" data-page="home">⌂ &nbsp; ড্যাশবোর্ড</button>
   <button class="nav" data-page="post">＋ &nbsp; যাত্রা পোস্ট করুন</button>
   <button class="nav" data-page="bookings">▣ &nbsp; বুকিং অনুরোধ</button>
+<button class="nav" data-page="trips">🚕 &nbsp; যাত্রী ট্রিপ</button>
   <button class="nav" data-page="schedule">▦ &nbsp; সময়সূচি</button>
   <button class="nav" data-page="vehicle">🚘 &nbsp; আমার গাড়ি</button>
   <button class="nav" data-page="earnings">৳ &nbsp; আয় ও হিসাব</button>
@@ -123,7 +124,8 @@ select option{background:#173a29;color:#eafff2}
         <button class="action" type="button" id="anyPostHome" style="border-color:rgba(74,222,128,.6)"><span>⚡</span><b>যেকোনো জায়গায় যেতে প্রস্তুত</b><small>এক চাপেই পোস্ট হয়ে যাবে</small></button>
         <button class="action" data-goto="post"><span>🛣️</span><b>নতুন যাত্রা পোস্ট</b><small>রুট, সময় ও খালি আসন দিন</small></button>
         <button class="action" data-goto="bookings"><span>📩</span><b>বুকিং অনুরোধ</b><small>অনুরোধ দেখুন ও উত্তর দিন</small></button>
-        <button class="action" data-goto="flight"><span>✈️</span><b>যাত্রীর ফ্লাইট</b><small>বিমান কখন নামবে দেখুন</small></button>
+        <button class="action" data-goto="trips" id="tripsAction"><span>🚕</span><b>যাত্রী ট্রিপ</b><small id="tripsActionSub">গন্তব্য-ভিত্তিক রিকোয়েস্ট ও কাছের যাত্রী</small></button>
+<button class="action" data-goto="flight"><span>✈️</span><b>যাত্রীর ফ্লাইট</b><small>বিমান কখন নামবে দেখুন</small></button>
         <button class="action" data-goto="schedule"><span>🗓️</span><b>সময়সূচি</b><small>ব্যস্ত ও ফাঁকা সময় রাখুন</small></button>
         <button class="action" data-goto="vehicle"><span>🚘</span><b>গাড়ির তথ্য</b><small>গাড়ি ও আসনের বিবরণ</small></button>
       </div><div class="notice">✅ লগইন, প্রোফাইল, গাড়ির তথ্য আর অনলাইন/অফলাইন এখন আসল — সার্ভারে সেভ হয়।<br>🛣️ যাত্রা পোস্ট এখন আসল — সব যাত্রী দেখেন। 🎫 যাত্রীরা আপনার পোস্ট দেখে সিট/গাড়ি বুক করেন — "বুকিং" পাতায় গ্রহণ করুন। আয়ের হিসাব, রেটিং আর আগাম বুকিংও আসল। </div></div>
@@ -156,6 +158,15 @@ select option{background:#173a29;color:#eafff2}
     <div class="card" style="margin-top:14px"><h2 class="section-title">🗓️ সামনের বুকিং</h2><div id="schedList" class="sub">⏳ আনা হচ্ছে...</div></div>
   </section>
   <section id="vehicle" class="page hidden"><div class="card"><h2 class="section-title">📷 ছবি (একবার দিলেই সব পোস্টে যাবে)</h2><p class="sub">যাত্রীরা আপনার মুখ আর গাড়ি দেখে ভরসা পান। ছবিতে চাপ দিয়ে দিন বা বদলান।</p><div class="formgrid" id="photoGrid" style="grid-template-columns:1fr 1fr"></div></div><div class="card" style="margin-top:14px"><h2 class="section-title">আমার গাড়ি</h2><form id="vehicleForm"><label>গাড়ির ধরন</label><select id="vType" required><option value="">-- গাড়ির ধরন বেছে নিন --</option><option value="bike">🏍️ বাইক</option><option value="cng">🛺 CNG / অটো রিকশা</option><option value="easy_bike">🛺✨ ইজি বাইক</option><option value="sedan">🚗 সেডান / প্রাইভেট কার</option><option value="hiace">🚐 হাইএস</option><option value="microbus">🚐 মাইক্রোবাস</option><option value="pickup">🛻 পিকআপ / ট্রাক</option><option value="ambulance_ac">🚑 অ্যাম্বুলেন্স (AC)</option><option value="ambulance_non_ac">🚑 অ্যাম্বুলেন্স (Non-AC)</option><option value="ambulance_icu">🚑 অ্যাম্বুলেন্স (ICU)</option></select><label>গাড়ির মডেল</label><input id="vModel" placeholder="যেমন: Toyota Hiace (2019)" required><div class="formgrid"><div><label>রেজিস্ট্রেশন নম্বর</label><input id="vReg" placeholder="রেজিস্ট্রেশন নম্বর" required></div><div><label>মোট আসন</label><input id="vSeats" type="number" min="1" placeholder="মোট আসন" required></div><div><label>এসি</label><select id="vAc"><option value="">নির্বাচন করুন</option><option>আছে</option><option>নেই</option></select></div><div><label>জ্বালানি</label><select id="vFuel"><option value="">নির্বাচন করুন</option><option>ডিজেল</option><option>পেট্রোল</option><option>সিএনজি</option><option>ইলেকট্রিক</option></select></div></div><button class="btn" type="submit" style="margin-top:14px">তথ্য সংরক্ষণ করুন</button></form><div class="notice">আপনার প্রকৃত গাড়ির তথ্য পূরণ করুন। গাড়ির ধরন ঠিকভাবে দিন — যাত্রী ও অ্যাম্বুলেন্স খোঁজায় এটা দেখেই আপনাকে দেখানো হয়।</div></div></section>
+  <section id="trips" class="page hidden">
+    <div class="card" id="tripGate" style="display:none;margin-bottom:14px"><div class="notice">🔒 এই সুবিধা এখনো চালু করা হয়নি। আপনার এলাকার এজেন্টের সাথে যোগাযোগ করুন — তারা এক ক্লিকে চালু করে দিতে পারবেন।</div></div>
+    <div class="card" style="margin-bottom:14px"><h2 class="section-title">🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট</h2>
+      <div class="sub" id="tpGps" style="margin-bottom:8px">📍 অনলাইন হলে লাইভ লোকেশন চালু হবে — যাত্রীর রিকোয়েস্ট কাছের চালকদের একজন একজন করে (৪০ সেকেন্ড করে) আসে।</div>
+      <div id="tripReqList" class="sub">অনলাইন থাকলে এখানে যাত্রীদের রিকোয়েস্ট দেখাবে — ভাড়া অফার করতে পারবেন।</div></div>
+    <div class="card"><h2 class="section-title">📡 কাছের যাত্রী (রাস্তায় অপেক্ষা)</h2>
+      <div class="sub" id="radarHint" style="margin-bottom:8px">অনলাইন থাকলে ২ কিমির মধ্যে রাস্তায় অপেক্ষমাণ যাত্রী এখানে দেখাবে।</div>
+      <div id="radarList"></div></div>
+  </section>
   <section id="flight" class="page hidden"><div class="card">
     <h2 class="section-title">✈️ যাত্রীর ফ্লাইট দেখুন</h2>
     <p class="sub">এয়ারপোর্ট থেকে যাত্রী আনতে যাওয়ার আগে দেখে নিন বিমান কখন নামবে, দেরি আছে কিনা, কোন টার্মিনাল। যাত্রী বুকিংয়ে ফ্লাইট নম্বর দিলে বুকিং কার্ড থেকে এক চাপেই খোলে।</p>
@@ -175,7 +186,7 @@ select option{background:#173a29;color:#eafff2}
 </div>
 <nav class="mobile-nav"><button class="active" data-page="home"><span>⌂</span>হোম</button><button data-page="post"><span>＋</span>পোস্ট</button><button data-page="bookings"><span>▣</span>বুকিং</button><button data-page="schedule"><span>▦</span>সময়সূচি</button><button data-page="profile"><span>♙</span>প্রোফাইল</button></nav>
 <script>
-const titles={flight:['যাত্রীর ফ্লাইট','বিমান কখন নামবে — লাইভ খবর।'],home:['ড্রাইভার ড্যাশবোর্ড','স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।'],post:['নতুন যাত্রা পোস্ট','আপনার রুট, সময় ও খালি আসন দিন।'],bookings:['বুকিং অনুরোধ','যাত্রীর অনুরোধ পর্যালোচনা করুন।'],schedule:['সময়সূচি','আপনার আসন্ন যাত্রার পরিকল্পনা।'],vehicle:['আমার গাড়ি','গাড়ির তথ্য যাচাই ও আপডেট করুন।'],earnings:['আয় ও হিসাব','যাত্রা থেকে আয়ের সারসংক্ষেপ।'],profile:['আমার প্রোফাইল','আপনার যোগাযোগ ও পরিচয় তথ্য।']};
+const titles={trips:['যাত্রী ট্রিপ','গন্তব্য-ভিত্তিক রিকোয়েস্ট ও কাছের যাত্রী।'],flight:['যাত্রীর ফ্লাইট','বিমান কখন নামবে — লাইভ খবর।'],home:['ড্রাইভার ড্যাশবোর্ড','স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।'],post:['নতুন যাত্রা পোস্ট','আপনার রুট, সময় ও খালি আসন দিন।'],bookings:['বুকিং অনুরোধ','যাত্রীর অনুরোধ পর্যালোচনা করুন।'],schedule:['সময়সূচি','আপনার আসন্ন যাত্রার পরিকল্পনা।'],vehicle:['আমার গাড়ি','গাড়ির তথ্য যাচাই ও আপডেট করুন।'],earnings:['আয় ও হিসাব','যাত্রা থেকে আয়ের সারসংক্ষেপ।'],profile:['আমার প্রোফাইল','আপনার যোগাযোগ ও পরিচয় তথ্য।']};
 function go(page){{const tb=document.getElementById('topBar');if(tb)tb.classList.toggle('isHome',page==='home');}document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));document.querySelectorAll('[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));document.getElementById('pageTitle').textContent=titles[page][0];document.getElementById('pageSub').textContent=titles[page][1];window.scrollTo({top:0,behavior:'smooth'})}
 document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.page)));
 document.querySelectorAll('[data-goto]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.goto)));
@@ -201,6 +212,7 @@ let DRV = { uid:null, data:null };
 const $id = (x)=>document.getElementById(x);
 function drvToLogin(){ try{ clearSession(); }catch(e){} location.replace("login.html"); }
 async function drvLogout(){
+  try{ tpStop(true); }catch(e){}
   if(!confirm("লগআউট করবেন?")) return;
   try{ if(DRV.uid && DRV.data && DRV.data.driverStatus !== "offline") await db.collection("transportDrivers").doc(DRV.uid).update({ driverStatus:"offline" }); }catch(e){}
   try{ await auth.signOut(); }catch(e){}
@@ -220,6 +232,7 @@ function drvPaintStatus(st){
   sw.classList.toggle("on", st === "online");
   sw.classList.toggle("busy", st === "busy");
   sw.setAttribute("aria-checked", on ? "true" : "false");
+  if(typeof tpSync === "function") tpSync(st);
 }
 $id("toggleOnline").onclick = async ()=>{
   if(!DRV.uid) return;
@@ -621,6 +634,366 @@ function drvAlarmTick(){
 }
 setInterval(drvAlarmTick,10000);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") drvAlarmTick(); });
+
+/* ==================== 🚕 যাত্রী ট্রিপ — গন্তব্য-ভিত্তিক রিকোয়েস্ট + রাস্তায় অপেক্ষমাণ যাত্রী ====================
+   ডেলিভারি/ড্রাইভার-মোডের (shop-ledger-app) একই সুবিধা এখন এই ড্রাইভার অ্যাপেও — সার্ভারের ডেটা আর rules হুবহু একই:
+   • trips/{id} — সার্ভার (onTripDispatch) কাছের ৫ জনের লাইন বানায়; একবারে একজনই দেখেন, ৪০ সেকেন্ড সময় পান।
+     Reject / ভাড়া অফার (waitingList) / নির্দিষ্ট ভাড়ায় "গ্রহণ"। যাত্রী অফার বেছে নিলে সক্রিয় ট্রিপ — যাত্রা শেষ হলে completed।
+   • passenger_waiting_queue — "I Am Waiting On Road" যাত্রী, ২ কিমির মধ্যে; "তুলে নিন" চাপলে PICKED_UP।
+   🔒 যাত্রীর নম্বর/সঠিক লোকেশন অফারের আগে দেখানো হয় না। শুধু যেসব ড্রাইভারের canReceivePassengerRequests চালু (এজেন্ট করেন)।
+   ⚠️ ডেলিভারি-ম্যান মোডের মতো এখানেও অনলাইন থাকলেই রিকোয়েস্ট আসে; অ্যাপ খোলা না থাকলে শুধু পুশ (যদি চালু থাকে)। */
+const TP_TURN_MS = 40000;
+let __tpUnsub=null, __tpRadarUnsub=null, __tpGps=null, __tpMy=null, __tpSent=0;
+let __tpTrips=[], __tpPass=[], __tpTicker=null, __tpRing=null;
+let __tpKnown=new Set(), __tpInit=false, __tpKnownP=new Set(), __tpInitP=false;
+let __tpActiveUnsub=null, __tpCd=null;
+const __tpGeo=new Map(); let __tpGeoQ=Promise.resolve();
+
+function tpOk(){ return !!(DRV.uid && DRV.data && DRV.data.canReceivePassengerRequests === true); }
+function tpKm(a,b,c,d){ const R=6371, r=x=>x*Math.PI/180, dl=r(c-a), dg=r(d-b); const h=Math.sin(dl/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dg/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+function tpKmText(d){ return d<1 ? Math.max(50,Math.round(d*1000/50)*50)+" মিটার" : d.toFixed(1)+" কিমি"; }
+function tpArea(t){
+  const a=(t.pickupLocation&&t.pickupLocation.address)||"";
+  return a.split(",").map(x=>x.trim()).filter(x=>x && !/[0-9০-৯]/.test(x) && !/বাংলাদেশ|bangladesh/i.test(x)).slice(0,3).join(", ");
+}
+function tpVisible(t){
+  const d=t.dispatch; if(!d) return true;
+  if(d.pending || !d.active || !Array.isArray(d.queue)) return false;
+  return d.queue[d.idx]===DRV.uid && Date.now() < (Number(d.untilMs)||0)+2000;
+}
+function tpSecs(t){ const d=t.dispatch; if(!d||!d.untilMs) return null; return Math.max(0,Math.ceil((Number(d.untilMs)-Date.now())/1000)); }
+async function tpAdvance(tripId,reason){
+  try{
+    const ref=db.collection("trips").doc(tripId);
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref); if(!snap.exists) return;
+      const t=snap.data(), d=t.dispatch;
+      if(!d||!d.active||d.pending||!Array.isArray(d.queue)) return;
+      if(t.status!=="searching" && t.status!=="waiting_selection") return;
+      if(reason==="timeout"){ if(Date.now()<(Number(d.untilMs)||0)) return; }
+      else if(d.queue[d.idx]!==DRV.uid) return;
+      const ni=(Number(d.idx)||0)+1;
+      const upd={ "dispatch.idx":ni, "dispatch.untilMs":Date.now()+TP_TURN_MS };
+      if(ni>=d.queue.length || (t.waitingList||[]).length>=3){ upd["dispatch.active"]=false; upd["dispatch.exhausted"]=true; }
+      tx.update(ref,upd);
+    });
+  }catch(e){ console.warn("trip advance:",e&&e.message); }
+}
+/* গন্তব্যের কোঅর্ডিনেট ট্রিপে নেই — লেখা গন্তব্য OpenStreetMap থেকে খুঁজে আনুমানিক দূরত্ব (না পেলে ওই লাইন দেখায় না) */
+function tpGeoKey(text,lat,lng){ return String(text||"").trim().toLowerCase()+"|"+(+lat).toFixed(1)+"|"+(+lng).toFixed(1); }
+function tpGeocode(text,lat,lng){
+  const key=tpGeoKey(text,lat,lng); if(!String(text||"").trim()) return Promise.resolve(null);
+  if(__tpGeo.has(key)) return Promise.resolve(__tpGeo.get(key));
+  __tpGeoQ=__tpGeoQ.then(async()=>{
+    if(__tpGeo.has(key)) return;
+    try{
+      const vb=[lng-0.6,lat+0.6,lng+0.6,lat-0.6].join(",");
+      const res=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=bd&viewbox="+vb+"&q="+encodeURIComponent(text),{headers:{"Accept-Language":"bn"}});
+      const j=await res.json();
+      __tpGeo.set(key,(j&&j[0])?{lat:+j[0].lat,lng:+j[0].lon}:null);
+    }catch(e){ __tpGeo.set(key,null); }
+    await new Promise(r=>setTimeout(r,1100));
+  });
+  return __tpGeoQ.then(()=>__tpGeo.get(key)||null);
+}
+function tpDistLine(pu,g){
+  if(!g||pu.lat==null||pu.lng==null) return "";
+  return "🛣️ পিকআপ থেকে গন্তব্য প্রায় <b>"+(tpKm(pu.lat,pu.lng,g.lat,g.lng)*1.3).toFixed(1)+" কিমি</b> (আনুমানিক)";
+}
+function tpRouteHtml(t,showFare){
+  const pu=t.pickupLocation||{}, area=tpArea(t), dest=String(t.destination||"").trim();
+  let toMe="";
+  if(pu.lat!=null && pu.lng!=null && __tpMy) toMe='<div>🧭 যাত্রী আপনার থেকে প্রায় <b>'+tpKmText(tpKm(__tpMy[0],__tpMy[1],pu.lat,pu.lng))+'</b> দূরে</div>';
+  const g=(pu.lat!=null&&pu.lng!=null)?__tpGeo.get(tpGeoKey(dest,pu.lat,pu.lng)):null;
+  const fare=(showFare && t.fareType==="fixed" && t.proposedFare)?'<div>💰 যাত্রী ভাড়া দিতে চান: <b>'+CUR+' '+esc(String(t.proposedFare))+'</b></div>':"";
+  return '<div style="font-size:12px;line-height:1.65;margin-bottom:8px">'
+    +'<div>📍 পিকআপ: <b>'+esc(area||"লোকেশন পাওয়া যায়নি")+'</b></div>'
+    +'<div style="font-size:13.5px">🏁 গন্তব্য: <b>'+esc(dest||"—")+'</b></div>'
+    +toMe+'<div class="tpDist" data-trip="'+esc(String(t.id))+'">'+tpDistLine(pu,g)+'</div>'+fare
+    +'<div style="opacity:.65;font-size:10.5px;margin-top:2px">🔒 যাত্রীর নম্বর ও সঠিক লোকেশন অফার দেওয়ার পর দেখা যাবে</div></div>';
+}
+function tpFillDist(list){
+  (list||[]).forEach(t=>{
+    const pu=t.pickupLocation||{}; if(pu.lat==null||pu.lng==null||!t.destination) return;
+    tpGeocode(String(t.destination),pu.lat,pu.lng).then(g=>{
+      if(!g) return; const html=tpDistLine(pu,g);
+      document.querySelectorAll('.tpDist[data-trip="'+t.id+'"]').forEach(el=>{ if(el.innerHTML!==html) el.innerHTML=html; });
+    });
+  });
+}
+function tpTurnBadge(t){
+  const sec=tpSecs(t); if(sec==null) return "";
+  return '<div class="tpTurn" data-until="'+(Number(t.dispatch.untilMs)||0)+'" style="background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.45);border-radius:8px;padding:6px 8px;margin-bottom:8px;font-size:11.5px;color:#fbbf24;font-weight:800">⏱️ শুধু আপনাকে পাঠানো হয়েছে — <span class="tpTurnSec">'+sec+'</span> সেকেন্ডের মধ্যে সাড়া দিন</div>';
+}
+function tpBadge(n){ const el=$id("tripsActionSub"); if(el) el.textContent = n>0 ? "🔔 "+n+"টা নতুন রিকোয়েস্ট — এখনই দেখুন!" : "গন্তব্য-ভিত্তিক রিকোয়েস্ট ও কাছের যাত্রী"; }
+function tpStopRing(){ if(__tpRing){ clearInterval(__tpRing); __tpRing=null; } }
+function tpStartRing(){ if(!__tpRing) __tpRing=setInterval(()=>drvBeep(),3500); }
+
+function tpRender(){
+  const box=$id("tripReqList"); if(!box || !DRV.data) return;
+  if(__tpActiveUnsub) return; // সক্রিয়/অপেক্ষারত ট্রিপের কার্ড চলছে
+  const cs=DRV.data.currentStatus;
+  if(cs==="on_waiting"||cs==="on_trip"){ tpStopRing(); return; }
+  const me=DRV.uid;
+  const rel=__tpTrips.filter(t=>tpVisible(t)&&!(t.rejectedDrivers||[]).includes(me)&&!(t.waitingList||[]).some(o=>o.driverId===me));
+  const ids=new Set(rel.map(t=>t.id));
+  if([...ids].some(id=>!__tpKnown.has(id)) && __tpInit) drvBeep();
+  __tpInit=true; __tpKnown=ids;
+  tpBadge(rel.length);
+  if(rel.length) tpStartRing(); else tpStopRing();
+  if(!rel.length){ box.textContent="এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।"; return; }
+  box.innerHTML=rel.map(t=>{
+    const rej='<button type="button" class="btn secondary" data-tp="rej" data-id="'+t.id+'" style="flex:1">❌ Reject</button>';
+    if(t.fareType==="fixed"){
+      return '<div style="background:#173a29;border:1px solid rgba(251,191,36,.4);border-radius:12px;padding:12px;margin-bottom:10px">'+tpRouteHtml(t,false)
+        +'<div style="font-size:11px;color:#a8d9c0;margin:2px 0 8px">🚗 '+esc(t.vehicleType||"")+' · 🔒 নির্দিষ্ট ভাড়া</div>'+tpTurnBadge(t)
+        +'<div style="font-weight:800;color:#fbbf24;font-size:16px;margin-bottom:8px">'+CUR+' '+esc(String(t.proposedFare||""))+'</div>'
+        +'<div style="display:flex;gap:8px">'+rej+'<button type="button" class="btn" data-tp="fix" data-id="'+t.id+'" style="flex:1">✅ গ্রহণ করুন</button></div></div>';
+    }
+    const wc=(t.waitingList||[]).length, full=wc>=3;
+    return '<div style="background:#173a29;border:1px solid rgba(74,222,128,.25);border-radius:12px;padding:12px;margin-bottom:10px">'+tpRouteHtml(t,true)
+      +'<div style="font-size:11px;color:#a8d9c0;margin:2px 0 8px">🚗 '+esc(t.vehicleType||"")+' · '+wc+'/3 জন ইতিমধ্যে অফার করেছেন</div>'+tpTurnBadge(t)
+      +'<div style="display:flex;gap:8px">'+rej+'<button type="button" class="btn" data-tp="offer" data-id="'+t.id+'" '+(full?'disabled':'')+' style="flex:1">💰 ভাড়া অফার করুন</button></div></div>';
+  }).join("");
+  tpFillDist(rel);
+}
+function tpTickerStart(){
+  if(__tpTicker) return;
+  __tpTicker=setInterval(()=>{
+    document.querySelectorAll(".tpTurn").forEach(el=>{
+      const sec=Math.max(0,Math.ceil((Number(el.dataset.until)-Date.now())/1000));
+      const sp=el.querySelector(".tpTurnSec"); if(sp) sp.textContent=sec;
+    });
+    let changed=false;
+    __tpTrips.forEach(t=>{
+      const d=t.dispatch;
+      if(d&&d.active&&Array.isArray(d.queue)&&d.queue[d.idx]===DRV.uid&&Date.now()>(Number(d.untilMs)||0)){
+        if(!t.__adv){ t.__adv=true; tpAdvance(t.id,"timeout"); }
+        changed=true;
+      }
+    });
+    if(changed) tpRender();
+  },1000);
+}
+function tpBindBox(){
+  const box=$id("tripReqList"); if(!box||box.__tpBound) return; box.__tpBound=true;
+  box.addEventListener("click",async e=>{
+    const b=e.target.closest("[data-tp]"); if(!b) return;
+    const id=b.dataset.id, act=b.dataset.tp;
+    if(act==="rej"){
+      try{ await db.collection("trips").doc(id).update({ rejectedDrivers:firebase.firestore.FieldValue.arrayUnion(DRV.uid) }); tpAdvance(id,"reject"); }
+      catch(err){ alert("রিজেক্ট করা যায়নি: "+err.message); }
+    }else if(act==="offer") tpOffer(id);
+    else if(act==="fix") tpAcceptFixed(id,b);
+    else if(act==="cancelwait") tpCancelWait(id);
+    else if(act==="done") tpComplete(id);
+    else if(act==="nav"){
+      const lat=Number(b.dataset.lat), lng=Number(b.dataset.lng);
+      if(isFinite(lat)&&isFinite(lng)&&b.dataset.lat) window.open("https://www.google.com/maps/dir/?api=1&destination="+lat+","+lng,"_blank");
+      else alert("যাত্রীর সঠিক লোকেশন পাওয়া যায়নি।");
+    }else if(act==="call"){
+      if(b.dataset.phone) location.href="tel:"+b.dataset.phone; else alert("যাত্রীর ফোন নম্বর পাওয়া যায়নি।");
+    }
+  });
+}
+function tpDrvInfo(){ const v=DRV.data.vehicle||{}; return { driverId:DRV.uid, driverName:DRV.data.name||"ড্রাইভার", driverPhone:DRV.data.phone||"", vehicleModel:v.model||v.type||"" }; }
+async function tpSetDriver(cs,tripId){
+  DRV.data.currentStatus=cs; DRV.data.activeTripId=tripId||null;
+  try{ await db.collection("transportDrivers").doc(DRV.uid).update({ currentStatus:cs, activeTripId:tripId||null }); }catch(e){}
+}
+async function tpAcceptFixed(tripId,btn){
+  if(btn){ btn.disabled=true; btn.textContent="⏳..."; }
+  try{
+    const ref=db.collection("trips").doc(tripId);
+    await db.runTransaction(async tx=>{
+      const doc=await tx.get(ref); if(!doc.exists) throw new Error("এই ট্রিপটা আর নেই।");
+      const trip=doc.data();
+      if(trip.status!=="searching") throw new Error("দুঃখিত, অন্য একজন ড্রাইভার আগেই এই ট্রিপটা নিয়ে নিয়েছেন।");
+      const i=tpDrvInfo();
+      tx.update(ref,{ status:"confirmed", driverId:DRV.uid, confirmedDriver:{ driverId:i.driverId, finalFare:trip.proposedFare, driverName:i.driverName, driverPhone:i.driverPhone, vehicleModel:i.vehicleModel, confirmedAt:firebase.firestore.FieldValue.serverTimestamp() } });
+    });
+    await tpSetDriver("on_trip",tripId); tpWatchActive(tripId);
+  }catch(e){ alert(e.message||"গ্রহণ করা যায়নি।"); if(btn){ btn.disabled=false; btn.textContent="✅ গ্রহণ করুন"; } }
+}
+async function tpOffer(tripId){
+  const fi=prompt("কত ভাড়া অফার করবেন? ("+CUR+")",""); if(fi===null) return;
+  const fare=Number(fi); if(!fare||fare<=0){ alert("সঠিক ভাড়া দিন।"); return; }
+  const eta=prompt("কত মিনিটে পৌঁছাতে পারবেন? (শুধু সংখ্যা)","5")||"5";
+  let timerExpiresAt=firebase.firestore.Timestamp.now();
+  try{
+    const td=await db.collection("trips").doc(tripId).get();
+    if(!td.exists){ alert("এই ট্রিপটা আর নেই।"); return; }
+    const t=td.data();
+    if((t.waitingList||[]).length>=3){ alert("দুঃখিত, এই ট্রিপে ইতিমধ্যে ৩ জন ড্রাইভার অফার করে ফেলেছেন — যাত্রী এখন তাদের মধ্যে বেছে নিচ্ছেন।"); return; }
+    const master=t.sessionExpiresAt?t.sessionExpiresAt.toMillis():(Date.now()+6*60*1000);
+    timerExpiresAt=firebase.firestore.Timestamp.fromMillis(Math.min(master,Date.now()+6*60*1000));
+  }catch(e){ console.warn("timer হিসাব:",e); }
+  const i=tpDrvInfo();
+  const offer={ driverId:i.driverId, driverName:i.driverName, driverPhone:i.driverPhone, vehicleModel:i.vehicleModel, offeredFare:fare, eta:eta+" min", waitingStartedAt:firebase.firestore.Timestamp.now(), timerExpiresAt };
+  try{
+    await db.collection("trips").doc(tripId).update({ waitingList:firebase.firestore.FieldValue.arrayUnion(offer), status:"waiting_selection" });
+    tpAdvance(tripId,"offer");
+    await tpSetDriver("on_waiting",tripId); tpWatchActive(tripId);
+    alert("✅ আপনার অফার পাঠানো হয়েছে — যাত্রী বেছে নিলে জানানো হবে।");
+  }catch(e){ alert("অফার পাঠানো যায়নি: "+e.message); }
+}
+function tpWatchActive(tripId){
+  if(__tpActiveUnsub) __tpActiveUnsub();
+  __tpActiveUnsub=db.collection("trips").doc(tripId).onSnapshot(doc=>{ if(doc.exists) tpRenderActive(doc.data(),tripId); });
+  tpStopRing();
+}
+async function tpRenderActive(trip,id){
+  const box=$id("tripReqList"); if(!box) return;
+  if(trip.status==="confirmed"){
+    if(trip.confirmedDriver && trip.confirmedDriver.driverId===DRV.uid){
+      if(DRV.data.currentStatus!=="on_trip") await tpSetDriver("on_trip",id);
+      const pu=trip.pickupLocation||{};
+      box.innerHTML='<div style="background:#173a29;border:1px solid #4ade80;border-radius:12px;padding:14px">'
+        +'<div style="font-weight:800;font-size:14px;color:#4ade80">🚗 সক্রিয় ট্রিপ চলছে</div>'
+        +'<div style="font-size:12.5px;margin:6px 0 2px">👤 যাত্রী: '+esc(trip.passengerName||"—")+'</div>'
+        +'<div style="font-size:12.5px;margin:2px 0">📍 পিকআপ: '+esc(pu.address||"জানা নেই")+'</div>'
+        +'<div style="font-size:12.5px;margin:2px 0">🏁 গন্তব্য: '+esc(trip.destination||"—")+'</div>'
+        +'<div style="font-size:12.5px;color:#a8d9c0;margin-bottom:10px">💰 ভাড়া: '+CUR+' '+esc(String(trip.confirmedDriver.finalFare))+'</div>'
+        +'<div class="btnrow" style="margin-bottom:8px"><button type="button" class="btn secondary" data-tp="nav" data-lat="'+(pu.lat!=null?pu.lat:"")+'" data-lng="'+(pu.lng!=null?pu.lng:"")+'">🧭 Navigate</button>'
+        +'<button type="button" class="btn secondary" data-tp="call" data-phone="'+esc(trip.passengerPhone||"")+'">📞 যাত্রীকে কল</button></div>'
+        +'<button type="button" class="btn" data-tp="done" data-id="'+id+'" style="width:100%">✅ ট্রিপ শেষ করুন</button></div>';
+    }else await tpResetActive();
+  }else if(trip.status==="expired"||trip.status==="cancelled"||trip.status==="completed"){
+    await tpResetActive();
+  }else{
+    if(!(trip.waitingList||[]).some(o=>o.driverId===DRV.uid)){ await tpResetActive(); return; }
+    box.innerHTML='<div style="background:#173a29;border:1px solid rgba(74,222,128,.3);border-radius:12px;padding:16px;text-align:center">'
+      +'<span style="background:rgba(255,209,102,.15);color:#FFD166;font-size:11px;padding:4px 10px;border-radius:20px;font-weight:800">🟡 অপেক্ষারত ট্রিপ (Waiting)</span>'
+      +'<div style="font-size:15px;font-weight:800;margin-top:8px">🏁 গন্তব্য: '+esc(trip.destination||"—")+'</div>'
+      +'<div style="background:rgba(0,0,0,.25);border-radius:12px;padding:12px;margin:12px 0"><div style="font-size:11px;color:#a8d9c0;margin-bottom:4px">অবশিষ্ট ওয়েটিং টাইম</div><div id="tpCountdown" style="font-size:30px;font-weight:800;color:#FFD166">—:—</div></div>'
+      +'<button type="button" class="btn secondary" data-tp="cancelwait" data-id="'+id+'" style="width:100%">✕ আমার অফার বাতিল করুন</button></div>';
+    tpCountdown(trip,id);
+  }
+}
+function tpCountdown(trip,id){
+  if(__tpCd) clearInterval(__tpCd);
+  if(!trip.sessionExpiresAt) return;
+  const end=trip.sessionExpiresAt.toMillis();
+  const tick=()=>{
+    const el=$id("tpCountdown"); if(!el){ clearInterval(__tpCd); __tpCd=null; return; }
+    const left=end-Date.now();
+    if(left<=0){ el.textContent="০০:০০"; clearInterval(__tpCd); __tpCd=null; db.collection("trips").doc(id).update({status:"expired"}).catch(()=>{}); tpResetActive(); return; }
+    el.textContent=String(Math.floor(left/60000)).padStart(2,"0")+":"+String(Math.floor((left%60000)/1000)).padStart(2,"0");
+  };
+  tick(); __tpCd=setInterval(tick,1000);
+}
+async function tpCancelWait(tripId){
+  if(__tpCd){ clearInterval(__tpCd); __tpCd=null; }
+  try{
+    const d=await db.collection("trips").doc(tripId).get();
+    if(d.exists){
+      const list=(d.data().waitingList||[]).filter(o=>o.driverId!==DRV.uid);
+      await db.collection("trips").doc(tripId).update({ waitingList:list, status:list.length>0?"waiting_selection":"searching" });
+    }
+  }catch(e){ console.warn("cancel wait:",e); }
+  await tpResetActive();
+}
+async function tpResetActive(){
+  if(__tpActiveUnsub){ __tpActiveUnsub(); __tpActiveUnsub=null; }
+  if(__tpCd){ clearInterval(__tpCd); __tpCd=null; }
+  if(DRV.data) await tpSetDriver("available",null);
+  const box=$id("tripReqList"); if(box) box.textContent="এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
+  tpRender();
+}
+async function tpComplete(tripId){
+  if(!confirm("এই ট্রিপ শেষ করবেন? (যাত্রীকে নামিয়ে দিয়েছেন তো?)")) return;
+  try{ await db.collection("trips").doc(tripId).update({ status:"completed" }); await tpResetActive(); alert("✅ ট্রিপ সম্পন্ন হয়েছে।"); }
+  catch(e){ alert("ট্রিপ শেষ করা যায়নি: "+e.message); }
+}
+/* ---------- 📡 কাছের যাত্রী (রাস্তায় অপেক্ষা) ---------- */
+function tpRadarRender(){
+  const box=$id("radarList"), hint=$id("radarHint"); if(!box||!hint) return;
+  if(!__tpMy){ hint.textContent="📍 আপনার লোকেশন পাওয়ার অপেক্ষা..."; box.innerHTML=""; return; }
+  const near=[];
+  __tpPass.forEach(p=>{
+    if(!p.location) return;
+    const lat=p.location.latitude!=null?p.location.latitude:p.location._lat, lng=p.location.longitude!=null?p.location.longitude:p.location._long;
+    if(lat==null||lng==null) return;
+    const d=tpKm(__tpMy[0],__tpMy[1],lat,lng);
+    if(d<=2) near.push({p,d,lat,lng});
+  });
+  near.sort((a,b)=>a.d-b.d);
+  const ids=new Set(near.map(x=>x.p.id));
+  if([...ids].some(id=>!__tpKnownP.has(id)) && __tpInitP) drvBeep();
+  __tpInitP=true; __tpKnownP=ids;
+  hint.textContent=near.length?"📡 কাছাকাছি "+near.length+" জন যাত্রী অপেক্ষা করছেন":"এই মুহূর্তে ২ কিমির মধ্যে কোনো অপেক্ষমাণ যাত্রী নেই।";
+  const VL={AUTO:"🛺 অটো/সিএনজি",CAR:"🚗 কার",BIKE:"🏍️ বাইক",BUS:"🚌 বাস"};
+  box.innerHTML=near.map(x=>'<div style="background:#173a29;border:1px solid rgba(74,222,128,.25);border-radius:12px;padding:12px;margin-bottom:10px">'
+    +'<div style="font-weight:800">📍 প্রায় '+tpKmText(x.d)+' দূরে</div>'
+    +'<div style="font-size:12px;color:#a8d9c0;margin:2px 0 8px">🚕 চায়: '+esc((x.p.transport_types||[]).map(v=>VL[v]||v).join(", ")||"যেকোনো")+'</div>'
+    +'<div class="btnrow"><button type="button" class="btn" data-pick="'+esc(x.p.id)+'">✅ তুলে নিন</button>'
+    +'<button type="button" class="btn secondary" data-rnav="'+x.lat+','+x.lng+'">🧭 Navigate</button></div></div>').join("");
+}
+function tpBindRadar(){
+  const box=$id("radarList"); if(!box||box.__tpBound) return; box.__tpBound=true;
+  box.addEventListener("click",e=>{
+    const pk=e.target.closest("[data-pick]"); if(pk){ tpPick(pk.dataset.pick); return; }
+    const nv=e.target.closest("[data-rnav]"); if(nv) window.open("https://www.google.com/maps/dir/?api=1&destination="+nv.dataset.rnav,"_blank");
+  });
+}
+async function tpPick(id){
+  const p=__tpPass.find(x=>x.id===id); if(!p) return;
+  const fi=prompt("ভাড়া কত নেবেন? ("+CUR+") — যাত্রীর Wallet-এ ব্যালেন্স থাকলে সেখান থেকে কাটা হবে, না থাকলে নগদ নিন।",""); if(fi===null) return;
+  const fare=Number(fi)||0;
+  try{
+    await db.collection("passenger_waiting_queue").doc(id).update({ status:"PICKED_UP", picked_up_by:DRV.uid, picked_up_at:firebase.firestore.FieldValue.serverTimestamp(), fare:fare||null });
+    const wallet=!!(p.owner_uid&&p.owner_uid===p.user_id&&!String(p.user_id).startsWith("guest_"));
+    if(fare>0&&wallet){
+      alert("✅ Pick Up সম্পন্ন — যাত্রীর ফোনে "+CUR+" "+fare+" দেওয়ার অনুমতি চাওয়া হয়েছে। রাজি হলে Wallet থেকে পাবেন, নইলে নগদ নিন।");
+      let fin=false, unsub=null, tm=null;
+      const end=r=>{ if(fin) return; fin=true; clearTimeout(tm); try{unsub&&unsub();}catch(e){} alert(r==="paid"?"✅ যাত্রী Wallet থেকে "+CUR+" "+fare+" দিয়েছেন।":"💵 Wallet থেকে আসেনি — নগদ "+CUR+" "+fare+" নিন।"); };
+      tm=setTimeout(()=>end("timeout"),120000);
+      unsub=db.collection("passenger_waiting_queue").doc(id).onSnapshot(s=>{ if(!s.exists) return end("gone"); const d=s.data()||{}; if(d.walletCharged) end("paid"); else if(d.fareDeclined) end("declined"); },()=>end("error"));
+    }else if(fare>0) alert("✅ Pick Up সম্পন্ন — যাত্রী লগইন করা নেই (Wallet নেই), নগদ "+CUR+" "+fare+" নিন।");
+    else alert("✅ Pick Up সম্পন্ন।");
+  }catch(e){ alert("Pick Up করা যায়নি: "+e.message); }
+}
+/* ---------- লাইভ GPS + লিসেনার চালু/বন্ধ ---------- */
+function tpStartGps(){
+  if(__tpGps!=null || !navigator.geolocation) return;
+  const g=$id("tpGps"); if(g) g.textContent="📍 লাইভ ট্র্যাকিং চালু";
+  __tpGps=navigator.geolocation.watchPosition(pos=>{
+    __tpMy=[pos.coords.latitude,pos.coords.longitude];
+    const now=Date.now(); if(now-__tpSent<8000) return; __tpSent=now;
+    db.collection("transportDrivers").doc(DRV.uid).update({ liveLocation:{ lat:pos.coords.latitude, lng:pos.coords.longitude, updatedAt:firebase.firestore.FieldValue.serverTimestamp() } }).catch(()=>{});
+    tpRadarRender();
+  },()=>{ const g2=$id("tpGps"); if(g2) g2.textContent="⚠️ GPS পারমিশন লাগবে"; },{ enableHighAccuracy:true, maximumAge:2000, timeout:15000 });
+}
+function tpListen(){
+  tpBindBox(); tpBindRadar();
+  if(!__tpUnsub){
+    __tpUnsub=db.collection("trips").where("status","in",["searching","waiting_selection"]).onSnapshot(qs=>{
+      __tpTrips=qs.docs.map(d=>Object.assign({id:d.id},d.data())); tpTickerStart(); tpRender();
+    },e=>console.warn("trips listener:",e));
+  }
+  if(!__tpRadarUnsub){
+    __tpRadarUnsub=db.collection("passenger_waiting_queue").where("status","==","WAITING").onSnapshot(qs=>{
+      __tpPass=qs.docs.map(d=>Object.assign({id:d.id},d.data())); tpRadarRender();
+    },e=>console.warn("radar listener:",e));
+  }
+  const cs=DRV.data&&DRV.data.currentStatus;
+  if(!__tpActiveUnsub && DRV.data && DRV.data.activeTripId && (cs==="on_waiting"||cs==="on_trip")) tpWatchActive(DRV.data.activeTripId);
+}
+function tpStop(all){
+  if(__tpUnsub){ __tpUnsub(); __tpUnsub=null; }
+  if(__tpRadarUnsub){ __tpRadarUnsub(); __tpRadarUnsub=null; }
+  if(__tpGps!=null){ navigator.geolocation.clearWatch(__tpGps); __tpGps=null; }
+  tpStopRing(); __tpTrips=[]; __tpPass=[]; __tpInit=false; __tpInitP=false; tpBadge(0);
+  if(all && __tpActiveUnsub){ __tpActiveUnsub(); __tpActiveUnsub=null; }
+  const b=$id("tripReqList"); if(b && !__tpActiveUnsub) b.textContent="অনলাইন থাকলে এখানে যাত্রীদের রিকোয়েস্ট দেখাবে — ভাড়া অফার করতে পারবেন।";
+  const r=$id("radarList"); if(r) r.innerHTML="";
+  const g=$id("tpGps"); if(g) g.textContent="📍 অনলাইন হলে লাইভ লোকেশন চালু হবে — যাত্রীর রিকোয়েস্ট কাছের চালকদের একজন একজন করে (৪০ সেকেন্ড করে) আসে।";
+}
+function tpSync(st){
+  if(!DRV.uid || !DRV.data) return;
+  const gate=$id("tripGate"); if(gate) gate.style.display = tpOk() ? "none" : "block";
+  if(st==="online" && tpOk()){ tpStartGps(); tpListen(); } else tpStop(false);
+}
 
 function drvListenBookings(){
   if(__bkUnsub) return;
