@@ -3569,19 +3569,33 @@ const TRIP_TURN_MS = 40 * 1000;
 const TRIP_QUEUE_SIZE = 5;
 const TRIP_MAX_KM = 25;
 
+/* 🚕 গাড়ির ধরন মিলিয়ে ড্রাইভার বাছা — যাত্রী CNG বাছলে শুধু CNG চালকের কাছে, ইজিবাইক বাছলে শুধু ইজিবাইক চালকের কাছে।
+   যাত্রীর ফর্মে ধরন বাছা বাধ্যতামূলক। বাছাইয়ের ধরন (trip.vehicleType) → চালকের vehicle.type (transportDrivers) এর তালিকা।
+   রাইডার (riders) এর vehicleType লেখা-ভিত্তিক, তাই লেখা দেখে ধরন চেনা হয়; চেনা না গেলে রাইডার বাদ। */
+const TRIP_VEHICLE_TYPES = { CNG: ["cng"], EasyBike: ["easy_bike"], Car: ["sedan"], Bike: ["bike"], Bus: ["hiace", "microbus"] };
+const WAIT_VEHICLE_TYPES = { AUTO: ["cng"], EASY: ["easy_bike"], CAR: ["sedan"], BIKE: ["bike"], BUS: ["hiace", "microbus"] };
+function riderTripType(v) {
+  const s = String(v || "").toLowerCase();
+  if (/easy|ইজি/.test(s)) return "easy_bike";
+  if (/bike|motor|বাইক|মোটর/.test(s)) return "bike";
+  if (/cng|auto|সিএনজি|অটো/.test(s)) return "cng";
+  if (/car|sedan|কার/.test(s)) return "sedan";
+  return "";
+}
 async function tripBuildQueue(trip, exclude) {
   const ex = new Set(exclude || []);
   const p = trip.pickupLocation || {};
   const hasPickup = p.lat != null && p.lng != null;
   const cands = [];
+  const allowedTypes = TRIP_VEHICLE_TYPES[trip && trip.vehicleType] || null; // ধরন না থাকলে (পুরনো ট্রিপ) ছাঁকনি নেই
   const busy = (x) => x.currentStatus === "on_trip" || x.currentStatus === "on_waiting";
   try {
     const rs = await db.collection("riders").where("online", "==", true).get(); // 🔀 ডেলিভারি+যাত্রী এক সাথে
-    rs.docs.forEach((d) => { const r = d.data(); if (r.status && r.status !== "active") return; if (busy(r)) return; cands.push({ id: d.id, kind: "rider", loc: r.liveLocation }); });
+    rs.docs.forEach((d) => { const r = d.data(); if (r.status && r.status !== "active") return; if (busy(r)) return; if (allowedTypes && !allowedTypes.includes(riderTripType(r.vehicleType))) return; cands.push({ id: d.id, kind: "rider", loc: r.liveLocation }); });
   } catch (e) { console.warn("TRIP_QUEUE_RIDERS_FAILED", String(e && e.message || e)); }
   try {
     const ds = await db.collection("transportDrivers").where("driverStatus", "==", "online").get();
-    ds.docs.forEach((d) => { const r = d.data(); if (r.createdByAgent !== true && r.canReceivePassengerRequests !== true) return; if (r.status === "blocked") return; if (busy(r)) return; cands.push({ id: d.id, kind: "driver", loc: r.liveLocation }); });
+    ds.docs.forEach((d) => { const r = d.data(); if (r.createdByAgent !== true && r.canReceivePassengerRequests !== true) return; if (r.status === "blocked") return; if (busy(r)) return; if (allowedTypes && !allowedTypes.includes((r.vehicle || {}).type)) return; cands.push({ id: d.id, kind: "driver", loc: r.liveLocation }); });
   } catch (e) { console.warn("TRIP_QUEUE_DRIVERS_FAILED", String(e && e.message || e)); }
   const seen = new Set();
   let list = cands.filter((c) => !ex.has(c.id) && !seen.has(c.id) && seen.add(c.id));
@@ -3633,6 +3647,7 @@ exports.onWaitingPassengerCreated = onDocumentCreated("passenger_waiting_queue/{
     if (!p || p.status !== "WAITING" || !p.location) return;
     const lat = p.location.latitude, lng = p.location.longitude;
     if (lat == null || lng == null) return;
+    const wantTypes = (p.transport_types || []).flatMap((t) => WAIT_VEHICLE_TYPES[t] || []); // কিছু না বাছলে সবাই
     const ds = await db.collection("transportDrivers").where("driverStatus", "==", "online").get();
     let cands = [];
     ds.docs.forEach((d) => {
@@ -3640,6 +3655,7 @@ exports.onWaitingPassengerCreated = onDocumentCreated("passenger_waiting_queue/{
       if (r.createdByAgent !== true && r.canReceivePassengerRequests !== true) return;
       if (r.status === "blocked" || r.currentStatus === "on_trip" || r.currentStatus === "on_waiting") return;
       if (!r.fcmToken || !r.liveLocation || r.liveLocation.lat == null) return;
+      if (wantTypes.length && !wantTypes.includes((r.vehicle || {}).type)) return;
       const km = haversineKm(lat, lng, r.liveLocation.lat, r.liveLocation.lng);
       if (km <= WAITING_PUSH_KM) cands.push({ id: d.id, ref: d.ref, token: r.fcmToken, km, app: r.fcmApp });
     });
