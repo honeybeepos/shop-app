@@ -2402,7 +2402,9 @@
       <input type="text" id="tripPassengerPhone" placeholder="05XXXXXXXX" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
       <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">যানবাহনের ধরন</label>
       <select id="tripVehicleType" style="width:100%; padding:11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:13px; margin-bottom:12px;">
+        <option value="">— যানবাহনের ধরন বেছে নিন (বাধ্যতামূলক) —</option>
         <option value="CNG">🛺 CNG/অটো</option>
+        <option value="EasyBike">🛺✨ ইজিবাইক</option>
         <option value="Car">🚗 কার</option>
         <option value="Bike">🏍️ বাইক</option>
         <option value="Bus">🚌 বাস</option>
@@ -2526,7 +2528,8 @@
 
       <div style="font-size:12px; color:var(--muted); margin-bottom:8px; font-weight:600; text-align:left;">যানবাহনের ধরন বেছে নিন (একাধিক)</div>
       <div id="tpVehicleChips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
-        <div class="tpChip" data-v="AUTO">🛺 অটো/সিএনজি</div>
+        <div class="tpChip" data-v="AUTO">🛺 CNG</div>
+          <div class="tpChip" data-v="EASY">🛺✨ ইজিবাইক</div>
         <div class="tpChip" data-v="CAR">🚗 কার</div>
         <div class="tpChip" data-v="BIKE">🏍️ বাইক</div>
         <div class="tpChip" data-v="BUS">🚌 বাস</div>
@@ -16105,6 +16108,7 @@ $("tripChatInput") && $("tripChatInput").addEventListener("keydown", (e)=>{
 
 $("tripSearchBtn") && $("tripSearchBtn").addEventListener("click", async ()=>{
   const vehicleType = $("tripVehicleType").value;
+  if(!vehicleType){ alert("🚕 আগে যানবাহনের ধরন বেছে নিন — রিকোয়েস্ট শুধু সেই ধরনের ড্রাইভারদের কাছেই যাবে।"); return; }
   const destination = $("tripDestination").value.trim();
   const passengerPhone = $("tripPassengerPhone").value.trim();
   if(!destination){ alert("গন্তব্য লিখুন।"); return; }
@@ -16955,6 +16959,7 @@ document.querySelectorAll(".tpChip").forEach(chip=>{
 $("tpWaitToggleBtn") && $("tpWaitToggleBtn").addEventListener("click", async ()=>{
   if(!tpIsWaiting){
     // ---------- ON করা ----------
+    if(!tpSelectedVehicles.length){ alert("🚕 আগে যানবাহনের ধরন বেছে নিন — শুধু সেই ধরনের ড্রাইভাররা আপনাকে দেখবেন।"); return; }
     if(!navigator.geolocation){
       alert("এই ডিভাইসে GPS সাপোর্ট নেই।");
       return;

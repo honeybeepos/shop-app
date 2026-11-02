@@ -650,6 +650,14 @@ let __tpKnown=new Set(), __tpInit=false, __tpKnownP=new Set(), __tpInitP=false;
 let __tpActiveUnsub=null, __tpCd=null;
 const __tpGeo=new Map(); let __tpGeoQ=Promise.resolve();
 
+/* 🚕 গাড়ির ধরন — যাত্রীর বাছা ধরনের সাথে আমার গাড়ি (vehicle.type) না মিললে রিকোয়েস্ট/যাত্রী দেখানো হয় না (সার্ভারও একই নিয়মে পাঠায়) */
+const TP_TRIP_TYPES={CNG:["cng"],EasyBike:["easy_bike"],Car:["sedan"],Bike:["bike"],Bus:["hiace","microbus"]};
+const TP_WAIT_TYPES={AUTO:["cng"],EASY:["easy_bike"],CAR:["sedan"],BIKE:["bike"],BUS:["hiace","microbus"]};
+const TP_VT_LABEL={CNG:"🛺 CNG/অটো",EasyBike:"🛺✨ ইজিবাইক",Car:"🚗 কার",Bike:"🏍️ বাইক",Bus:"🚌 বাস"};
+function tpVt(v){ return TP_VT_LABEL[v]||v||""; }
+function tpMyType(){ return (DRV.data&&DRV.data.vehicle&&DRV.data.vehicle.type)||""; }
+function tpTripTypeOk(t){ const a=TP_TRIP_TYPES[t.vehicleType]; return !a || a.includes(tpMyType()); }
+function tpWaitTypeOk(p){ const list=(p.transport_types||[]).flatMap(x=>TP_WAIT_TYPES[x]||[]); return !list.length || list.includes(tpMyType()); }
 function tpOk(){ return !!(DRV.uid && DRV.data && DRV.data.canReceivePassengerRequests === true); }
 function tpKm(a,b,c,d){ const R=6371, r=x=>x*Math.PI/180, dl=r(c-a), dg=r(d-b); const h=Math.sin(dl/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dg/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
 function tpKmText(d){ return d<1 ? Math.max(50,Math.round(d*1000/50)*50)+" মিটার" : d.toFixed(1)+" কিমি"; }
@@ -736,7 +744,7 @@ function tpRender(){
   const cs=DRV.data.currentStatus;
   if(cs==="on_waiting"||cs==="on_trip"){ tpStopRing(); return; }
   const me=DRV.uid;
-  const rel=__tpTrips.filter(t=>tpVisible(t)&&!(t.rejectedDrivers||[]).includes(me)&&!(t.waitingList||[]).some(o=>o.driverId===me));
+  const rel=__tpTrips.filter(t=>tpVisible(t)&&tpTripTypeOk(t)&&!(t.rejectedDrivers||[]).includes(me)&&!(t.waitingList||[]).some(o=>o.driverId===me));
   const ids=new Set(rel.map(t=>t.id));
   if([...ids].some(id=>!__tpKnown.has(id)) && __tpInit) drvBeep();
   __tpInit=true; __tpKnown=ids;
@@ -747,13 +755,13 @@ function tpRender(){
     const rej='<button type="button" class="btn secondary" data-tp="rej" data-id="'+t.id+'" style="flex:1">❌ Reject</button>';
     if(t.fareType==="fixed"){
       return '<div style="background:#173a29;border:1px solid rgba(251,191,36,.4);border-radius:12px;padding:12px;margin-bottom:10px">'+tpRouteHtml(t,false)
-        +'<div style="font-size:11px;color:#a8d9c0;margin:2px 0 8px">🚗 '+esc(t.vehicleType||"")+' · 🔒 নির্দিষ্ট ভাড়া</div>'+tpTurnBadge(t)
+        +'<div style="font-size:11px;color:#a8d9c0;margin:2px 0 8px">'+esc(tpVt(t.vehicleType))+' · 🔒 নির্দিষ্ট ভাড়া</div>'+tpTurnBadge(t)
         +'<div style="font-weight:800;color:#fbbf24;font-size:16px;margin-bottom:8px">'+CUR+' '+esc(String(t.proposedFare||""))+'</div>'
         +'<div style="display:flex;gap:8px">'+rej+'<button type="button" class="btn" data-tp="fix" data-id="'+t.id+'" style="flex:1">✅ গ্রহণ করুন</button></div></div>';
     }
     const wc=(t.waitingList||[]).length, full=wc>=3;
     return '<div style="background:#173a29;border:1px solid rgba(74,222,128,.25);border-radius:12px;padding:12px;margin-bottom:10px">'+tpRouteHtml(t,true)
-      +'<div style="font-size:11px;color:#a8d9c0;margin:2px 0 8px">🚗 '+esc(t.vehicleType||"")+' · '+wc+'/3 জন ইতিমধ্যে অফার করেছেন</div>'+tpTurnBadge(t)
+      +'<div style="font-size:11px;color:#a8d9c0;margin:2px 0 8px">'+esc(tpVt(t.vehicleType))+' · '+wc+'/3 জন ইতিমধ্যে অফার করেছেন</div>'+tpTurnBadge(t)
       +'<div style="display:flex;gap:8px">'+rej+'<button type="button" class="btn" data-tp="offer" data-id="'+t.id+'" '+(full?'disabled':'')+' style="flex:1">💰 ভাড়া অফার করুন</button></div></div>';
   }).join("");
   tpFillDist(rel);
@@ -912,7 +920,7 @@ function tpRadarRender(){
   if(!__tpMy){ hint.textContent="📍 আপনার লোকেশন পাওয়ার অপেক্ষা..."; box.innerHTML=""; return; }
   const near=[];
   __tpPass.forEach(p=>{
-    if(!p.location) return;
+    if(!p.location || !tpWaitTypeOk(p)) return;
     const lat=p.location.latitude!=null?p.location.latitude:p.location._lat, lng=p.location.longitude!=null?p.location.longitude:p.location._long;
     if(lat==null||lng==null) return;
     const d=tpKm(__tpMy[0],__tpMy[1],lat,lng);
@@ -923,7 +931,7 @@ function tpRadarRender(){
   if([...ids].some(id=>!__tpKnownP.has(id)) && __tpInitP) drvBeep();
   __tpInitP=true; __tpKnownP=ids;
   hint.textContent=near.length?"📡 কাছাকাছি "+near.length+" জন যাত্রী অপেক্ষা করছেন":"এই মুহূর্তে ২ কিমির মধ্যে কোনো অপেক্ষমাণ যাত্রী নেই।";
-  const VL={AUTO:"🛺 অটো/সিএনজি",CAR:"🚗 কার",BIKE:"🏍️ বাইক",BUS:"🚌 বাস"};
+  const VL={AUTO:"🛺 CNG",EASY:"🛺✨ ইজিবাইক",CAR:"🚗 কার",BIKE:"🏍️ বাইক",BUS:"🚌 বাস"};
   box.innerHTML=near.map(x=>'<div style="background:#173a29;border:1px solid rgba(74,222,128,.25);border-radius:12px;padding:12px;margin-bottom:10px">'
     +'<div style="font-weight:800">📍 প্রায় '+tpKmText(x.d)+' দূরে</div>'
     +'<div style="font-size:12px;color:#a8d9c0;margin:2px 0 8px">🚕 চায়: '+esc((x.p.transport_types||[]).map(v=>VL[v]||v).join(", ")||"যেকোনো")+'</div>'
