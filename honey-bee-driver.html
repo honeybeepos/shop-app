@@ -214,6 +214,7 @@ const $id = (x)=>document.getElementById(x);
 function drvToLogin(){ try{ clearSession(); }catch(e){} location.replace("login.html"); }
 async function drvLogout(){
   try{ tpStop(true); }catch(e){}
+  try{ drvBkRingStop(); }catch(e){}
   if(!confirm("লগআউট করবেন?")) return;
   try{ if(DRV.uid && DRV.data && DRV.data.driverStatus !== "offline") await db.collection("transportDrivers").doc(DRV.uid).update({ driverStatus:"offline" }); }catch(e){}
   try{ await auth.signOut(); }catch(e){}
@@ -532,6 +533,16 @@ document.querySelectorAll('[data-page="profile"]').forEach(x=>x.addEventListener
    যাত্রীর লোকেশন এই অ্যাপে কখনো আসে না (নিরাপত্তার জন্য ইচ্ছা করে)। */
 const CUR="৳";
 let __bkUnsub=null, __bkKnown=null, __audio=null;
+/* 🔔 নতুন বুকিং অনুরোধ এলে আগে একবারই বাজত — এখন গ্রহণ/না করা পর্যন্ত প্রতি ৩.৫ সেকেন্ডে বাজতে থাকে
+   (ট্রিপ রিকোয়েস্টের মতোই)। ১৫ মিনিটের পুরনো অনুরোধে বাজে না; একটানা সর্বোচ্চ ~৩.৫ মিনিট, নতুন অনুরোধ এলে আবার শুরু। */
+let __bkRing=null, __bkRingN=0;
+function drvBkRingStop(){ if(__bkRing){ clearInterval(__bkRing); __bkRing=null; } }
+function drvBkRingSync(n,reset){
+  if(reset) __bkRingN=0;
+  if(n>0){
+    if(!__bkRing) __bkRing=setInterval(()=>{ if(++__bkRingN>60){ drvBkRingStop(); return; } drvBeep(); },3500);
+  }else drvBkRingStop();
+}
 function drvUnlockAudio(){ try{ if(!__audio) __audio=new (window.AudioContext||window.webkitAudioContext)(); if(__audio.state==="suspended") __audio.resume(); }catch(e){} }
 document.addEventListener("click", drvUnlockAudio, { once:true });
 document.addEventListener("pointerdown", drvUnlockAudio, { once:true });
@@ -1018,8 +1029,10 @@ function drvListenBookings(){
   __bkUnsub=db.collection("transportBookings").where("driverId","==",DRV.uid).limit(60).onSnapshot(qs=>{
     const all=qs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>((b.createdAt&&b.createdAt.toMillis&&b.createdAt.toMillis())||Date.now())-((a.createdAt&&a.createdAt.toMillis&&a.createdAt.toMillis())||Date.now()));
     const pend=all.filter(b=>b.status==="pending"), acc=all.filter(b=>b.status==="accepted");
-    if(__bkKnown && pend.some(b=>!__bkKnown.has(b.id))) drvBeep();
+    const isNewBk = !!(__bkKnown && pend.some(b=>!__bkKnown.has(b.id)));
+    if(isNewBk) drvBeep();
     __bkKnown=new Set(pend.map(b=>b.id));
+    drvBkRingSync(pend.filter(b=>{ const ms=(b.createdAt&&b.createdAt.toMillis)?b.createdAt.toMillis():Date.now(); return Date.now()-ms < 15*60000; }).length, isNewBk);
     $id("stReq").textContent=pend.length; $id("stReqNote").textContent=pend.length?"👉 এখনই দেখুন":"নতুন অনুরোধ নেই";
     $id("stActive").textContent=acc.length||"—"; $id("stActiveNote").textContent=acc.length?"নিশ্চিত বুকিং আছে":"নিশ্চিত বুকিং নেই";
     drvRenderBookings(pend,acc,all.filter(b=>b.status!=="pending"&&b.status!=="accepted").slice(0,10));
