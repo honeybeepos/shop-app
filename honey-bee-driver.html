@@ -537,12 +537,13 @@ document.addEventListener("click", drvUnlockAudio, { once:true });
 document.addEventListener("pointerdown", drvUnlockAudio, { once:true });
 document.addEventListener("touchstart", drvUnlockAudio, { once:true, passive:true });
 function drvBeep(){
-  if(navigator.vibrate) navigator.vibrate([200,100,200]);
+  if(navigator.vibrate) navigator.vibrate([300,120,300,120,300]);
+  // 🔊 জোরালো সংকেত — তিন টোকা, চৌকো তরঙ্গ (কানে বেশি লাগে), সর্বোচ্চ ভলিউমের কাছাকাছি
   try{ drvUnlockAudio(); const c=__audio, t=c.currentTime;
-    [0,0.3].forEach(o=>{ const g=c.createGain(), a=c.createOscillator();
-      a.type="sine"; a.frequency.setValueAtTime(660,t+o);
-      g.gain.setValueAtTime(0.0001,t+o); g.gain.exponentialRampToValueAtTime(0.25,t+o+0.03); g.gain.exponentialRampToValueAtTime(0.0001,t+o+0.25);
-      a.connect(g); g.connect(c.destination); a.start(t+o); a.stop(t+o+0.26); });
+    [0,0.3,0.6].forEach((o,i)=>{ const g=c.createGain(), a=c.createOscillator();
+      a.type="square"; a.frequency.setValueAtTime(i%2?784:988,t+o);
+      g.gain.setValueAtTime(0.0001,t+o); g.gain.exponentialRampToValueAtTime(0.85,t+o+0.02); g.gain.setValueAtTime(0.85,t+o+0.18); g.gain.exponentialRampToValueAtTime(0.0001,t+o+0.27);
+      a.connect(g); g.connect(c.destination); a.start(t+o); a.stop(t+o+0.28); });
   }catch(e){}
 }
 const BK_TXT={pending:"⏳ নতুন",accepted:"✅ নিশ্চিত",declined:"❌ না করেছেন",cancelled:"✕ যাত্রী বাতিল করেছেন",completed:"🏁 শেষ"};
@@ -600,7 +601,7 @@ function drvAlarmSound(){
   try{ drvUnlockAudio(); const c=__audio, t=c.currentTime;
     [0,0.35,0.7,1.05].forEach((o,i)=>{ const g=c.createGain(), a=c.createOscillator();
       a.type="square"; a.frequency.setValueAtTime(i%2?740:988,t+o);
-      g.gain.setValueAtTime(0.0001,t+o); g.gain.exponentialRampToValueAtTime(0.3,t+o+0.03); g.gain.exponentialRampToValueAtTime(0.0001,t+o+0.3);
+      g.gain.setValueAtTime(0.0001,t+o); g.gain.exponentialRampToValueAtTime(0.9,t+o+0.02); g.gain.setValueAtTime(0.9,t+o+0.2); g.gain.exponentialRampToValueAtTime(0.0001,t+o+0.32);
       a.connect(g); g.connect(c.destination); a.start(t+o); a.stop(t+o+0.32); });
   }catch(e){}
 }

@@ -467,16 +467,21 @@ function beep(){
   try{
     unlockAudio();
     if(!audioCtx) return;
-    const t = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(880, t);
-    osc.frequency.setValueAtTime(660, t + 0.18);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.32, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
-    osc.connect(g); g.connect(audioCtx.destination);
-    osc.start(t); osc.stop(t + 0.42);
+    // 🔊 জোরালো সংকেত — চৌকো তরঙ্গ, দুই ধাপের "ট্রিং-ট্রিং", সর্বোচ্চ ভলিউমের কাছাকাছি
+    const t0 = audioCtx.currentTime;
+    [0, 0.55].forEach(function(o){
+      const t = t0 + o;
+      const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(880, t);
+      osc.frequency.setValueAtTime(660, t + 0.2);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.85, t + 0.02);
+      g.gain.setValueAtTime(0.85, t + 0.34);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      osc.connect(g); g.connect(audioCtx.destination);
+      osc.start(t); osc.stop(t + 0.52);
+    });
   }catch(e){}
 }
 let alertRepeat = null;
