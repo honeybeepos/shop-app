@@ -565,8 +565,11 @@ document.querySelectorAll(".tabBtn").forEach(btn=>{
 
 /* ---------- ড্যাশবোর্ড লোড ---------- */
 async function loadDashboard(){
-  // মার্কেটের নাম
-  try{
+  // মার্কেটের নাম — বিদেশের এজেন্টের বাজার নেই, তাই দেশের নাম দেখানো হয়
+  if(!currentAgent.marketId){
+    const cn = currentAgent.countryName || currentAgent.country || "বিদেশ";
+    $("marketNameLbl").textContent = "🌍 " + cn; $("ovMarket").textContent = cn;
+  }else try{
     const marketDoc = await db.collection("markets").doc(currentAgent.marketId).get();
     const marketName = marketDoc.exists ? (marketDoc.data().name || currentAgent.marketId) : currentAgent.marketId;
     $("marketNameLbl").textContent = "🐝 " + marketName;
@@ -578,7 +581,7 @@ async function loadDashboard(){
   }
 
   // 💰 ডেলিভারি চার্জের সেটিং লোড
-  dpLoad();
+  if(currentAgent.marketId) dpLoad(); // বাজারভিত্তিক ডেলিভারি চার্জ — বিদেশের এজেন্টের জন্য নয়
 
   listenRiders();
   listenShops();
@@ -690,7 +693,7 @@ $("saveRiderBtn").addEventListener("click", async ()=>{
       zone, vehicleType: vehicle,
       guarantorDetails: guarantor,
       assignedAgentId: currentAgent.uid,
-      marketId: currentAgent.marketId,
+      marketId: currentAgent.marketId || null,
       cashHoldLimit: cashLimit,
       currentCashHeld: 0,
       status: "active",
@@ -722,6 +725,7 @@ const VEHICLE_LABELS = {
 };
 
 function listenDrivers(){
+  if(!currentAgent.marketId){ $("driversList").innerHTML = '<div class="emptyMsg">বিদেশের এজেন্টের বাজার নেই — ড্রাইভার তালিকা এখানে নেই।</div>'; $("statMyDrivers").textContent = "0"; return; }
   driversUnsub = db.collection("transportDrivers").where("marketId", "==", currentAgent.marketId)
     .onSnapshot((qs)=>{
       if(qs.empty){
@@ -780,6 +784,7 @@ function listenDrivers(){
 let docVerifyUnsub = null;
 let docVerifyTargetId = null;
 function listenDocVerifyPending(){
+  if(!currentAgent.marketId) return;
   // দুইটা equality filter (marketId, verificationStatus), কোনো orderBy
   // নেই — তাই নতুন কম্পোজিট ইনডেক্স লাগবে না।
   docVerifyUnsub = db.collection("transportDrivers")
@@ -918,6 +923,7 @@ const TM_REASON_LABEL = {
 };
 
 function listenTmReportsPending(){
+  if(!currentAgent.marketId) return;
   tmReportUnsub = db.collection("transportMediaReports")
     .where("driverMarketId", "==", currentAgent.marketId)
     .where("status", "==", "pending")
@@ -1197,6 +1203,7 @@ function dpRunTest(){
 
 async function dpLoad(){
   const mid = currentAgent.marketId;
+  if(!mid) return;
   try{
     const snap = await db.collection("deliveryPricing").doc(mid).get();
     dpCurrent = snap.exists ? snap.data() : null;
@@ -1220,6 +1227,7 @@ function dpShowMeta(){
 }
 
 async function dpLoadHistory(){
+  if(!currentAgent.marketId) return;
   try{
     const qs = await db.collection("deliveryPricing").doc(currentAgent.marketId)
       .collection("history").orderBy("at","desc").limit(5).get();
@@ -1256,6 +1264,7 @@ $("saveChargeBtn").addEventListener("click", async ()=>{
   if(dpCurrent && summary === "কোনো অঙ্ক বদলায়নি"){ alert("কিছুই বদলানো হয়নি।"); return; }
   const version = ((dpCurrent && dpCurrent.version) || 0) + 1;
   const mid = currentAgent.marketId;
+  if(!mid){ alert("বিদেশের এজেন্টের বাজার নেই — ডেলিভারি চার্জ সেট করা যাবে না।"); return; }
   const ref = db.collection("deliveryPricing").doc(mid);
   const now = firebase.firestore.FieldValue.serverTimestamp();
   $("saveChargeBtn").disabled = true;

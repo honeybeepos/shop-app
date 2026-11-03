@@ -110,7 +110,7 @@
       <select id="suAgent" disabled><option value="">-- বাজার নির্বাচন করুন --</option></select>
       <p class="msg" style="font-size:11.5px; color:#a89e8c; margin-top:-6px;">⚠️ উপজেলা/বাজার নির্বাচন না করলে দোকানটি শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে কাজ করবে — Honey Bee Bazar-এ কাস্টমাররা অনলাইনে দেখতে/অর্ডার করতে পারবে না।</p>
     </div>
-    <p class="msg" id="suNonBdNotice" style="display:none; font-size:11.5px; color:#a89e8c; margin-top:-6px;">🌍 বাংলাদেশের বাইরের দোকান — এটি শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে কাজ করবে, Honey Bee Bazar এখনো শুধু বাংলাদেশে চালু আছে।</p>
+    <p class="msg" id="suNonBdNotice" style="display:none; font-size:11.5px; color:#a89e8c; margin-top:-6px;">🌍 বাংলাদেশের বাইরের দোকান — এটি শুধু POS (অফলাইন হিসাব-নিকাশ) হিসেবে কাজ করবে, Honey Bee Bazar এখনো শুধু বাংলাদেশে চালু আছে। আপনার দেশের Honey Bee এজেন্ট থাকলে তিনি স্বয়ংক্রিয়ভাবে যুক্ত হবেন — সাবস্ক্রিপশনের জন্য তাঁর নাম, ফোন ও WhatsApp "আমার হিসাব"-এ দেখা যাবে।</p>
 
     <button class="btn" id="signupBtn">দোকান তৈরি করুন</button>
     <div class="msg" id="signupMsg"></div>
@@ -939,7 +939,7 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   const district = isBdShop ? document.getElementById("suDistrict").value : "";
   const upazila = isBdShop ? document.getElementById("suUpazila").value : "";
   const marketId = isBdShop ? document.getElementById("suMarket").value : "";
-  const assignedAgentId = isBdShop ? (document.getElementById("suAgent").value || null) : null;
+  let assignedAgentId = isBdShop ? (document.getElementById("suAgent").value || null) : null;
 
   if(!shopName || !name || !email || pass.length < 6){
     showMsg("signupMsg","সব ঘর সঠিকভাবে পূরণ করুন (পাসওয়ার্ড কমপক্ষে ৬ অক্ষর)",false); return;
@@ -966,6 +966,14 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
   try{
     const cred = await auth.createUserWithEmailAndPassword(email, pass);
     const uid = cred.user.uid;
+    // 🌍 বাংলাদেশের বাইরের দোকান — ওই দেশের সক্রিয় এজেন্ট থাকলে (সুপার-অ্যাডমিন দেশ ধরে দেন) স্বয়ংক্রিয়ভাবে যুক্ত;
+    // একাধিক এজেন্ট থাকলে ভাগ করে (এলোমেলো)। না থাকলে আগের মতোই এজেন্টহীন (এজেন্ট যোগ হলে অ্যাডমিন যুক্ত করে দেন)।
+    if(!isBdShop){
+      try{
+        const aq = await db.collection("agents").where("country", "==", countryCode).where("status", "==", "active").get();
+        if(!aq.empty) assignedAgentId = aq.docs[Math.floor(Math.random() * aq.size)].id;
+      }catch(e){ console.warn("দেশের এজেন্ট খোঁজা যায়নি:", e); }
+    }
     await db.collection("shops").doc(uid).set({
       shopId: uid, ownerUid: uid, shopName, ownerName: name, ownerEmail: email, phone: shopPhone,
       status: "active",

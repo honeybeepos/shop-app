@@ -87,6 +87,7 @@
   @media (min-width:1000px){ #bilBizBox .sum-row{font-size:13.5px;} .bil-subgrid{grid-template-columns:120px 1fr 1fr 120px;max-width:720px;} }
 </style>
 <script src="bd-locations.js"></script>
+<script src="hb-currency.js"></script>
 </head>
 <body>
 
@@ -252,9 +253,12 @@
     <div class="strip" id="strip-agents"></div>
     <input type="text" id="newAgentName" placeholder="এজেন্টের নাম">
     <input type="email" id="newAgentEmail" placeholder="ইমেইল (লগইনের জন্য)">
-    <input type="tel" id="newAgentPhone" inputmode="tel" placeholder="ফোন / WhatsApp নম্বর (দোকানদাররা দেখবেন)">
+    <input type="tel" id="newAgentPhone" inputmode="tel" placeholder="ফোন নম্বর (দোকানদাররা দেখবেন)">
+    <input type="tel" id="newAgentWhatsapp" inputmode="tel" placeholder="WhatsApp নম্বর — বিদেশের জন্য দেশের কোডসহ, যেমনঃ +966501234567 (ক্লিক করলে WhatsApp খুলবে)">
     <input type="text" id="newAgentPass" placeholder="পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)">
+    <select id="newAgentCountry" title="এজেন্টের দেশ"></select>
     <select id="newAgentMarket"><option value="">-- বাজার নির্বাচন করুন --</option></select>
+    <p id="newAgentCountryHint" class="meta" style="display:none;margin:2px 0 6px;">🌍 বিদেশের এজেন্টের বাজার লাগে না — ওই দেশের সব দোকান তাঁর অধীনে আসবে; দোকানদাররা তাঁর নাম, ফোন ও WhatsApp দেখবেন।</p>
     <input type="number" id="newAgentCommission" placeholder="কমিশন % (যেমনঃ 20)" value="20">
     <button class="btn" id="addAgentBtn">➕ নতুন এজেন্ট যোগ করুন</button>
     <p id="agentAddMsg" style="display:none; font-size:12.5px; margin:4px 0 0;"></p>
@@ -713,6 +717,85 @@ document.getElementById("addMarketBtn").addEventListener("click", async ()=>{
 });
 
 /* ==================== 🧑‍💼 এজেন্ট ম্যানেজমেন্ট ==================== */
+/* ==================== 🌍 দেশভিত্তিক এজেন্ট (বাংলাদেশের বাইরে) ====================
+   বাংলাদেশে এজেন্ট বাজারের অধীনে; বিদেশে বাজার নেই, তাই সুপার-অ্যাডমিন দেশ ধরে এজেন্ট দেন (agents/{id}.country).
+   এজেন্ট ↔ দোকান সম্পর্ক আগের মতোই shops/{id}.assignedAgentId — তাই দোকানদারের "আপনার এজেন্ট" কার্ড (নাম, ফোন,
+   WhatsApp), এজেন্টের দোকান-তালিকা আর ক্রেডিট/কি দেওয়া কোনো বাড়তি বদল ছাড়াই কাজ করে।
+   ওই দেশের এখনো-এজেন্টহীন দোকানগুলো এজেন্ট যোগ/দেশ বদলের সময় তাঁর অধীনে আসে; নতুন দোকান সাইনআপের সময় আসে। */
+function agCountryName(code){ const c = (window.HB_COUNTRIES || []).find(x => x.code === code); return c ? c.name : code; }
+function agShopCC(x){ return x.countryCode || "BD"; } // পুরনো দোকানে countryCode নেই = বাংলাদেশ
+async function agBatchUpdate(refs, data){
+  for(let i = 0; i < refs.length; i += 400){
+    const b = db.batch(); refs.slice(i, i + 400).forEach(r => b.update(r, data)); await b.commit();
+  }
+}
+async function agAssignCountryShops(uid, code){
+  const snap = await db.collection("shops").where("countryCode", "==", code).get();
+  const todo = snap.docs.filter(d => !d.data().assignedAgentId);
+  await agBatchUpdate(todo.map(d => d.ref), { assignedAgentId: uid });
+  return todo.length;
+}
+function agApplyCountryUi(){
+  const code = document.getElementById("newAgentCountry").value || "BD";
+  const bd = code === "BD";
+  document.getElementById("newAgentMarket").style.display = bd ? "" : "none";
+  document.getElementById("newAgentCountryHint").style.display = bd ? "none" : "block";
+}
+(function initAgentCountrySelect(){
+  const sel = document.getElementById("newAgentCountry"); if(!sel) return;
+  const list = window.HB_COUNTRIES || [{ code:"BD", name:"বাংলাদেশ" }];
+  sel.innerHTML = list.map(c => `<option value="${c.code}">${c.code === "BD" ? "🇧🇩 বাংলাদেশ — বাজারসহ" : "🌍 " + c.name}</option>`).join("");
+  sel.value = "BD"; sel.addEventListener("change", agApplyCountryUi); agApplyCountryUi();
+})();
+/* সুপার-অ্যাডমিন এজেন্টের দেশ বদলান (বাংলাদেশ ↔ বিদেশ, বা এক বিদেশ থেকে আরেক বিদেশ) */
+async function changeAgentCountry(agentId){
+  const doc = await db.collection("agents").doc(agentId).get(); if(!doc.exists) return;
+  const agent = doc.data(), oldCode = agent.country || "BD";
+  const old = document.getElementById("agCountryModal"); if(old) old.remove();
+  const el = document.createElement("div"); el.id = "agCountryModal";
+  el.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px";
+  const list = window.HB_COUNTRIES || [{ code:"BD", name:"বাংলাদেশ" }];
+  el.innerHTML = `<div style="background:#fff;color:#2b2308;border-radius:16px;padding:18px;max-width:420px;width:100%">
+    <h3 style="margin:0 0 4px">🌍 ${escapeHtmlAdmin(agent.name || "এজেন্ট")} — দেশ বদলান</h3>
+    <p class="meta" style="margin:0 0 10px">এখন: <b>${escapeHtmlAdmin(agent.countryName || (oldCode === "BD" ? "বাংলাদেশ" : oldCode))}</b></p>
+    <select id="agcCountry" style="width:100%;margin-bottom:8px">${list.map(c => `<option value="${c.code}"${c.code === oldCode ? " selected" : ""}>${c.code === "BD" ? "🇧🇩 বাংলাদেশ — বাজারসহ" : "🌍 " + c.name}</option>`).join("")}</select>
+    <select id="agcMarket" style="width:100%;margin-bottom:8px"><option value="">-- বাজার নির্বাচন করুন --</option>${(__marketsCache || []).map(m => `<option value="${m.id}"${m.id === agent.marketId ? " selected" : ""}>${escapeHtmlAdmin(m.name || m.id)}</option>`).join("")}</select>
+    <p id="agcMsg" style="font-size:12.5px;margin:0 0 8px;color:var(--due);min-height:16px"></p>
+    <div class="row"><button class="btn" id="agcSave" type="button">✅ সেভ করুন</button><button class="btn secondary" id="agcCancel" type="button">বাতিল</button></div>
+    <p class="meta" style="margin-top:8px">দেশ বদলালে আগের দেশের দোকানগুলো থেকে এই এজেন্ট সরে যাবেন; নতুন বিদেশি দেশে এজেন্টহীন দোকানগুলো তাঁর অধীনে আসবে।</p></div>`;
+  document.body.appendChild(el);
+  const mk = () => { document.getElementById("agcMarket").style.display = document.getElementById("agcCountry").value === "BD" ? "" : "none"; };
+  document.getElementById("agcCountry").addEventListener("change", mk); mk();
+  document.getElementById("agcCancel").onclick = () => el.remove();
+  el.addEventListener("click", e => { if(e.target === el) el.remove(); });
+  document.getElementById("agcSave").onclick = async () => {
+    const msg = document.getElementById("agcMsg"), btn = document.getElementById("agcSave");
+    const code = document.getElementById("agcCountry").value, bd = code === "BD";
+    const marketId = bd ? document.getElementById("agcMarket").value : null;
+    if(bd && !marketId){ msg.textContent = "বাংলাদেশের এজেন্টের জন্য বাজার বেছে নিন।"; return; }
+    if(!bd){
+      const wa = String(agent.whatsapp || agent.phone || "");
+      if(!/^\+[0-9][0-9\s-]{7,18}$/.test(wa)){ msg.textContent = "আগে ✏️ এডিটে গিয়ে এই এজেন্টের WhatsApp নম্বর দেশের কোডসহ দিন (যেমনঃ +966501234567), তারপর দেশ বদলান।"; return; }
+    }
+    if(code === oldCode && (bd ? marketId === agent.marketId : true)){ el.remove(); return; }
+    if(bd && marketId !== agent.marketId){
+      const ex = await db.collection("agents").where("marketId", "==", marketId).where("status", "==", "active").get();
+      if(ex.docs.filter(d => d.id !== agentId).length >= 2){ msg.textContent = "এই বাজারে ইতিমধ্যে ২ জন এজেন্ট আছে।"; return; }
+    }
+    btn.disabled = true; btn.textContent = "সেভ হচ্ছে...";
+    try{
+      const mine = (await db.collection("shops").where("assignedAgentId", "==", agentId).get()).docs;
+      const toRemove = mine.filter(d => agShopCC(d.data()) !== code);
+      if(toRemove.length && !confirm(`এই এজেন্টের ${toRemove.length}টা দোকান (অন্য দেশের) থেকে তাঁকে সরানো হবে — ঠিক আছে?`)){ btn.disabled = false; btn.textContent = "✅ সেভ করুন"; return; }
+      await db.collection("agents").doc(agentId).set({ country: code, countryName: bd ? "বাংলাদেশ" : agCountryName(code), marketId: marketId || null, updatedAt: fbNow() }, { merge: true });
+      await agBatchUpdate(toRemove.map(d => d.ref), { assignedAgentId: firebase.firestore.FieldValue.delete() });
+      let added = 0; if(!bd) added = await agAssignCountryShops(agentId, code);
+      el.remove(); alert(`✅ হয়ে গেছে।${toRemove.length ? ` ${toRemove.length}টা পুরনো দোকান সরানো হয়েছে।` : ""}${added ? ` ${added}টা দোকান নতুন করে যুক্ত হয়েছে।` : ""}`);
+      await loadAgents();
+    }catch(e){ msg.textContent = "করা যায়নি: " + e.message; btn.disabled = false; btn.textContent = "✅ সেভ করুন"; }
+  };
+}
+
 async function loadAgents(){
   const snap = await db.collection("agents").orderBy("createdAt","desc").get();
   document.getElementById("agentCount").textContent = snap.size;
@@ -732,6 +815,7 @@ async function loadAgents(){
     const agent = doc.data();
     const agentId = doc.id;
     const market = __marketsCache.find(m => m.id === agent.marketId);
+    const isForeign = !!agent.country && agent.country !== "BD";
     const div = document.createElement("div");
     div.className = "shop";
     div.innerHTML = `
@@ -739,12 +823,13 @@ async function loadAgents(){
         <span class="shop-name">${agent.name || "(নামহীন এজেন্ট)"}</span>
         <span class="chip ${agent.status === 'blocked' ? 'blocked' : 'active'}">${agent.status === 'blocked' ? 'ব্লকড' : 'সক্রিয়'}</span>
       </div>
-      <div class="meta">${agent.email || ''}${agent.phone ? ' · 📞 ' + agent.phone : ''} · বাজার: ${market ? (market.name || market.id) : (agent.marketId || '—')} · কমিশন: ${agent.commissionPercent != null ? agent.commissionPercent : '—'}%</div>
+      <div class="meta">${agent.email || ''}${agent.phone ? ' · 📞 ' + agent.phone : ''} · ${isForeign ? '🌍 দেশ: ' + escapeHtmlAdmin(agent.countryName || agent.country) : 'বাজার: ' + (market ? (market.name || market.id) : (agent.marketId || '—'))} · কমিশন: ${agent.commissionPercent != null ? agent.commissionPercent : '—'}%</div>
       <div class="row">
         ${agent.status === 'blocked'
           ? `<button class="btn unblock" data-agent-act="unblock" data-id="${agentId}">✅ আনব্লক করুন</button>`
           : `<button class="btn block" data-agent-act="block" data-id="${agentId}">⛔ ব্লক করুন</button>`}
         <button class="btn secondary" data-agent-act="edit" data-id="${agentId}">✏️ এডিট</button>
+        <button class="btn secondary" data-agent-act="country" data-id="${agentId}">🌍 দেশ</button>
         <button class="btn secondary" data-agent-act="stock" data-id="${agentId}">📦 স্টক</button>
         <button class="btn secondary" data-agent-act="pass" data-id="${agentId}" data-name="${escapeHtmlAdmin(agent.name || "")}">🔑 পাসওয়ার্ড</button>
         <button class="btn" style="background:var(--due);" data-agent-act="delete" data-id="${agentId}">🗑️ ডিলিট</button>
@@ -755,6 +840,7 @@ async function loadAgents(){
   list.querySelectorAll('[data-agent-act="block"]').forEach(b=>b.addEventListener("click", ()=>setAgentStatus(b.dataset.id,"blocked")));
   list.querySelectorAll('[data-agent-act="unblock"]').forEach(b=>b.addEventListener("click", ()=>setAgentStatus(b.dataset.id,"active")));
   list.querySelectorAll('[data-agent-act="edit"]').forEach(b=>b.addEventListener("click", ()=>editAgent(b.dataset.id)));
+  list.querySelectorAll('[data-agent-act="country"]').forEach(b=>b.addEventListener("click", ()=>changeAgentCountry(b.dataset.id)));
   list.querySelectorAll('[data-agent-act="stock"]').forEach(b=>b.addEventListener("click", ()=>bilOpenAgent(b.dataset.id)));
   list.querySelectorAll('[data-agent-act="pass"]').forEach(b=>b.addEventListener("click", ()=>resetPasswordFor(b.dataset.id, "agent", "এজেন্ট", b.dataset.name || "এই এজেন্ট")));
   list.querySelectorAll('[data-agent-act="delete"]').forEach(b=>b.addEventListener("click", ()=>deleteAccount(b.dataset.id, "agent", "এজেন্ট")));
@@ -768,12 +854,15 @@ async function editAgent(agentId){
   if(newName === null) return;
   const newCommission = prompt("কমিশন %:", agent.commissionPercent != null ? agent.commissionPercent : "20");
   if(newCommission === null) return;
-  const newPhone = prompt("ফোন / WhatsApp নম্বর (দোকানদাররা দেখবেন):", agent.phone || "");
+  const newPhone = prompt("ফোন নম্বর (দোকানদাররা দেখবেন):", agent.phone || "");
   if(newPhone === null) return;
+  const newWa = prompt("WhatsApp নম্বর (বিদেশের জন্য দেশের কোডসহ, যেমনঃ +966501234567 — ফাঁকা রাখলে ফোন নম্বরই):", (agent.whatsapp && agent.whatsapp !== agent.phone) ? agent.whatsapp : "");
+  if(newWa === null) return;
+  if(agent.country && agent.country !== "BD" && !/^\+[0-9][0-9\s-]{7,18}$/.test((newWa.trim() || newPhone.trim()))){ alert("বিদেশের এজেন্টের WhatsApp নম্বর দেশের কোডসহ দিন, যেমনঃ +966501234567"); return; }
   try{
     await db.collection("agents").doc(agentId).set({
       name: newName.trim(), commissionPercent: Number(newCommission) || 0,
-      phone: newPhone.trim().slice(0, 20), whatsapp: (agent.whatsapp && agent.whatsapp !== agent.phone ? agent.whatsapp : newPhone.trim().slice(0, 20)), updatedAt: fbNow()
+      phone: newPhone.trim().slice(0, 20), whatsapp: (newWa.trim() || newPhone.trim()).slice(0, 20), updatedAt: fbNow()
     }, { merge: true });
     await loadAgents();
   }catch(e){ alert("এডিট করা যায়নি: " + e.message); }
@@ -791,11 +880,19 @@ document.getElementById("addAgentBtn").addEventListener("click", async ()=>{
   const marketId = document.getElementById("newAgentMarket").value;
   const commission = Number(document.getElementById("newAgentCommission").value) || 0;
   const phone = document.getElementById("newAgentPhone").value.trim();
+  const country = document.getElementById("newAgentCountry").value || "BD";
+  const isBd = country === "BD";
+  const waIn = document.getElementById("newAgentWhatsapp").value.trim();
   const msgEl = document.getElementById("agentAddMsg");
   msgEl.style.display = "none";
 
-  if(!name || !email || !pass || !marketId){
-    msgEl.textContent = "⚠️ নাম, ইমেইল, পাসওয়ার্ড ও বাজার — সবগুলো দিন।";
+  if(!name || !email || !pass || (isBd && !marketId)){
+    msgEl.textContent = isBd ? "⚠️ নাম, ইমেইল, পাসওয়ার্ড ও বাজার — সবগুলো দিন।" : "⚠️ নাম, ইমেইল ও পাসওয়ার্ড দিন।";
+    msgEl.style.color = "var(--due)"; msgEl.style.display = "block";
+    return;
+  }
+  if(!isBd && !/^\+[0-9][0-9\s-]{7,18}$/.test(waIn)){
+    msgEl.textContent = "⚠️ বিদেশের এজেন্টের WhatsApp নম্বর দেশের কোডসহ দিন, যেমনঃ +966501234567 (দোকানদাররা ক্লিক করলে সরাসরি WhatsApp খুলবে)।";
     msgEl.style.color = "var(--due)"; msgEl.style.display = "block";
     return;
   }
@@ -808,10 +905,10 @@ document.getElementById("addAgentBtn").addEventListener("click", async ()=>{
   // Agent Cap: একটা বাজারে সর্বোচ্চ ২ জন এজেন্ট — ভুলবশত অনির্দিষ্টসংখ্যক
   // এজেন্ট একই বাজারে যুক্ত হওয়া ঠেকাতে
   const MAX_AGENTS_PER_MARKET = 2;
-  const existingSnap = await db.collection("agents")
+  const existingSnap = isBd ? await db.collection("agents")
     .where("marketId", "==", marketId)
     .where("status", "==", "active")
-    .get();
+    .get() : { size: 0 };
   if(existingSnap.size >= MAX_AGENTS_PER_MARKET){
     const marketLabel = (__marketsCache.find(m=>m.id===marketId) || {}).name || marketId;
     msgEl.textContent = `⚠️ "${marketLabel}" বাজারে ইতিমধ্যে সর্বোচ্চ ${MAX_AGENTS_PER_MARKET} জন এজেন্ট আছে। নতুন এজেন্ট যোগ করতে হলে আগে একজনকে ব্লক/সরাতে হবে।`;
@@ -830,19 +927,24 @@ document.getElementById("addAgentBtn").addEventListener("click", async ()=>{
 
     await db.collection("users").doc(newUid).set({ role: "agent", email, createdAt: fbNow() });
     await db.collection("agents").doc(newUid).set({
-      name, email, marketId, phone, whatsapp: phone,
+      name, email, marketId: isBd ? marketId : null, phone, whatsapp: waIn || phone,
+      country, countryName: isBd ? "বাংলাদেশ" : agCountryName(country),
       commissionPercent: commission,
       status: "active",
       createdAt: fbNow()
     });
+    let assignedNote = "";
+    if(!isBd){ try{ const n = await agAssignCountryShops(newUid, country); assignedNote = ` ${agCountryName(country)}-এর ${n}টা দোকান এখন তাঁর অধীনে।`; }catch(e){ assignedNote = " (দোকান যুক্ত করা যায়নি — 🌍 দেশ বাটনে আবার চাপুন)"; } }
 
     document.getElementById("newAgentName").value = "";
     document.getElementById("newAgentEmail").value = "";
     document.getElementById("newAgentPhone").value = "";
+    document.getElementById("newAgentWhatsapp").value = "";
     document.getElementById("newAgentPass").value = "";
     document.getElementById("newAgentMarket").value = "";
+    document.getElementById("newAgentCountry").value = "BD"; agApplyCountryUi();
     document.getElementById("newAgentCommission").value = "20";
-    msgEl.textContent = "✅ এজেন্ট তৈরি হয়েছে — এখন এই ইমেইল/পাসওয়ার্ড দিয়ে Honey Bee Agent অ্যাপে লগইন করতে পারবেন।";
+    msgEl.textContent = "✅ এজেন্ট তৈরি হয়েছে — এখন এই ইমেইল/পাসওয়ার্ড দিয়ে Honey Bee Agent অ্যাপে লগইন করতে পারবেন।" + assignedNote;
     msgEl.style.color = "var(--paid)"; msgEl.style.display = "block";
     await loadAgents();
   }catch(e){
