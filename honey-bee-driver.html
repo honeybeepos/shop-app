@@ -550,12 +550,16 @@ document.addEventListener("pointerdown", drvUnlockAudio, { once:true });
 document.addEventListener("touchstart", drvUnlockAudio, { once:true, passive:true });
 function drvBeep(){
   if(navigator.vibrate) navigator.vibrate([300,120,300,120,300]);
-  // 🔊 জোরালো সংকেত — তিন টোকা, চৌকো তরঙ্গ (কানে বেশি লাগে), সর্বোচ্চ ভলিউমের কাছাকাছি
+  // 🎶 মিষ্টি ঘণ্টার সুর "ডিং-ডং ডিং-ডং" — নরম সাইন তরঙ্গ + হালকা উপরের সুর; আগের ক্যাচক্যাচে চৌকো তরঙ্গ ও উঁচু সুর সরানো
   try{ drvUnlockAudio(); const c=__audio, t=c.currentTime;
-    [0,0.3,0.6].forEach((o,i)=>{ const g=c.createGain(), a=c.createOscillator();
-      a.type="square"; a.frequency.setValueAtTime(i%2?784:988,t+o);
-      g.gain.setValueAtTime(0.0001,t+o); g.gain.exponentialRampToValueAtTime(0.85,t+o+0.02); g.gain.setValueAtTime(0.85,t+o+0.18); g.gain.exponentialRampToValueAtTime(0.0001,t+o+0.27);
-      a.connect(g); g.connect(c.destination); a.start(t+o); a.stop(t+o+0.28); });
+    [[0,659],[0.3,523],[0.7,659],[1.0,523]].forEach(function(n){
+      [[n[1],0.75],[n[1]*2,0.2]].forEach(function(p){
+        const g=c.createGain(), a=c.createOscillator();
+        a.type="sine"; a.frequency.setValueAtTime(p[0],t+n[0]);
+        g.gain.setValueAtTime(0.0001,t+n[0]); g.gain.exponentialRampToValueAtTime(p[1],t+n[0]+0.015); g.gain.exponentialRampToValueAtTime(0.0001,t+n[0]+0.65);
+        a.connect(g); g.connect(c.destination); a.start(t+n[0]); a.stop(t+n[0]+0.7);
+      });
+    });
   }catch(e){}
 }
 const BK_TXT={pending:"⏳ নতুন",accepted:"✅ নিশ্চিত",declined:"❌ না করেছেন",cancelled:"✕ যাত্রী বাতিল করেছেন",completed:"🏁 শেষ"};
@@ -610,11 +614,16 @@ function drvAlarmDoneList(){ try{ return JSON.parse(localStorage.getItem("hbTrip
 function drvAlarmMark(id){ try{ const a=drvAlarmDoneList(); if(!a.includes(id)){ a.push(id); localStorage.setItem("hbTripAlarmDone",JSON.stringify(a.slice(-100))); } }catch(e){} }
 function drvAlarmSound(){
   if(navigator.vibrate) navigator.vibrate([400,200,400,200,400]);
+  // 🎶 যাত্রার সময়ের অ্যালার্ম — মিষ্টি ঘণ্টা, চার ধাপ (৭৮৪/৬৫৯ Hz), নরম সাইন তরঙ্গ
   try{ drvUnlockAudio(); const c=__audio, t=c.currentTime;
-    [0,0.35,0.7,1.05].forEach((o,i)=>{ const g=c.createGain(), a=c.createOscillator();
-      a.type="square"; a.frequency.setValueAtTime(i%2?740:988,t+o);
-      g.gain.setValueAtTime(0.0001,t+o); g.gain.exponentialRampToValueAtTime(0.9,t+o+0.02); g.gain.setValueAtTime(0.9,t+o+0.2); g.gain.exponentialRampToValueAtTime(0.0001,t+o+0.32);
-      a.connect(g); g.connect(c.destination); a.start(t+o); a.stop(t+o+0.32); });
+    [[0,784],[0.4,659],[0.8,784],[1.2,659]].forEach(function(n){
+      [[n[1],0.8],[n[1]*2,0.22]].forEach(function(p){
+        const g=c.createGain(), a=c.createOscillator();
+        a.type="sine"; a.frequency.setValueAtTime(p[0],t+n[0]);
+        g.gain.setValueAtTime(0.0001,t+n[0]); g.gain.exponentialRampToValueAtTime(p[1],t+n[0]+0.015); g.gain.exponentialRampToValueAtTime(0.0001,t+n[0]+0.7);
+        a.connect(g); g.connect(c.destination); a.start(t+n[0]); a.stop(t+n[0]+0.75);
+      });
+    });
   }catch(e){}
 }
 function drvAlarmClose(){

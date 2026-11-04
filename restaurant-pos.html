@@ -1342,15 +1342,13 @@ function ooPlayChime(force){
 
 function ooRingBell(ctx){
   const now = ctx.currentTime;
-  // দুইটা টোকা, প্রতিটায় মূল সুর + তার উপরের সুর — ধাতব ঘণ্টার মতো শোনায়
-  // 🔊 জোরালো — তিন টোকা, তিনকোনা তরঙ্গ (সাইনের চেয়ে কানে বেশি লাগে), ভলিউম আগের প্রায় তিন গুণ
-  [0, 0.42, 0.84].forEach(function(start){
-    [[988, 0.6], [1319, 0.3]].forEach(function(pair){
+  // 🎶 মিষ্টি কাউন্টার-ঘণ্টা — তিন টোকা, মূল সুর ৬৫৯ Hz (আগে ৯৮৮) + তার দ্বিগুণ সুর, নরম সাইন তরঙ্গ
+  [0, 0.5, 1.0].forEach(function(start){
+    [[659, 0.7], [1318, 0.2]].forEach(function(pair){
       const freq = pair[0], vol = pair[1];
       const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.type = "triangle";
+      osc.type = "sine";
       osc.frequency.setValueAtTime(freq, now + start);
-      // ঘণ্টার মতো করে শুরুতে জোরে, তারপর আস্তে আস্তে মিলিয়ে যাওয়া
       gain.gain.setValueAtTime(0.0001, now + start);
       gain.gain.exponentialRampToValueAtTime(vol, now + start + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + start + 0.95);

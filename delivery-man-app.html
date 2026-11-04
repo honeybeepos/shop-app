@@ -468,20 +468,15 @@ function beep(){
   try{
     unlockAudio();
     if(!audioCtx) return;
-    // 🔊 জোরালো সংকেত — চৌকো তরঙ্গ, দুই ধাপের "ট্রিং-ট্রিং", সর্বোচ্চ ভলিউমের কাছাকাছি
+    // 🎶 মিষ্টি ঘণ্টার সুর "ডিং-ডং ডিং-ডং" — নরম সাইন তরঙ্গ + হালকা উপরের সুর (আগের কর্কশ চৌকো তরঙ্গ ও উঁচু সুর সরানো)
     const t0 = audioCtx.currentTime;
-    [0, 0.55].forEach(function(o){
-      const t = t0 + o;
-      const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
-      osc.type = "square";
-      osc.frequency.setValueAtTime(880, t);
-      osc.frequency.setValueAtTime(660, t + 0.2);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.85, t + 0.02);
-      g.gain.setValueAtTime(0.85, t + 0.34);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-      osc.connect(g); g.connect(audioCtx.destination);
-      osc.start(t); osc.stop(t + 0.52);
+    [[0,659],[0.35,523],[0.85,659],[1.2,523]].forEach(function(n){
+      [[n[1],0.75],[n[1]*2,0.2]].forEach(function(p){
+        const g = audioCtx.createGain(), o = audioCtx.createOscillator();
+        o.type = "sine"; o.frequency.setValueAtTime(p[0], t0 + n[0]);
+        g.gain.setValueAtTime(0.0001, t0 + n[0]); g.gain.exponentialRampToValueAtTime(p[1], t0 + n[0] + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t0 + n[0] + 0.65);
+        o.connect(g); g.connect(audioCtx.destination); o.start(t0 + n[0]); o.stop(t0 + n[0] + 0.7);
+      });
     });
   }catch(e){}
 }

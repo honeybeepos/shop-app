@@ -508,7 +508,7 @@ function phOrdersListen(shopId){
       if(more){
         try{ toast("🛍️ Bazar থেকে নতুন অর্ডার এসেছে — উপরের 🛍️ চাপুন"); }catch(e){}
         if(CUR_PAGE === "orders" && ORD_TAB === "pending"){ const t = document.querySelector('[data-ot="pending"]'); if(t) t.textContent = "🆕 নতুন (" + bn(n) + ")"; }
-        try{ const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.type = "square"; o.frequency.value = 880; g.gain.value = 0.9; o.start(); setTimeout(()=>{ o.frequency.value = 1180; }, 180); setTimeout(()=>{ o.frequency.value = 880; }, 360); setTimeout(()=>{ o.frequency.value = 1180; }, 540); setTimeout(()=>{ o.stop(); a.close(); }, 760); }catch(e){}
+        try{ const a = new (window.AudioContext || window.webkitAudioContext)(), t0 = a.currentTime; [[0,523],[0.25,659],[0.5,784]].forEach(function(n){ [[n[1],0.75],[n[1]*2,0.2]].forEach(function(p){ const o = a.createOscillator(), g = a.createGain(); o.type = "sine"; o.frequency.setValueAtTime(p[0], t0 + n[0]); g.gain.setValueAtTime(0.0001, t0 + n[0]); g.gain.exponentialRampToValueAtTime(p[1], t0 + n[0] + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t0 + n[0] + 0.6); o.connect(g); g.connect(a.destination); o.start(t0 + n[0]); o.stop(t0 + n[0] + 0.65); }); }); setTimeout(()=>{ try{ a.close(); }catch(e){} }, 1500); }catch(e){}
       }
     }, err=>{ console.warn("orders listen", err); __phOrdUnsub = null; });
 }

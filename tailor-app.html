@@ -586,7 +586,16 @@ function when(x){ try{ return bn(new Date(ms(x)).toLocaleString("bn-BD",{ day:"n
 function beep(){
   try{
     const C = window.AudioContext || window.webkitAudioContext; if(!C) return;
-    const c = new C(); [0, .3, .6].forEach(t=>{ const o = c.createOscillator(), g = c.createGain(); o.type = "square"; o.frequency.value = 880; o.connect(g); g.connect(c.destination); g.gain.setValueAtTime(.9, c.currentTime+t); g.gain.setValueAtTime(.9, c.currentTime+t+.15); g.gain.exponentialRampToValueAtTime(.001, c.currentTime+t+.26); o.start(c.currentTime+t); o.stop(c.currentTime+t+.28); });
+    // 🎶 মিষ্টি ঘণ্টার সুর — ওঠা-ক্রমে তিন সুর (৫২৩ → ৬৫৯ → ৭৮৪ Hz), নরম সাইন তরঙ্গ
+    const c = new C(), t0 = c.currentTime;
+    [[0,523],[0.25,659],[0.5,784]].forEach(function(n){
+      [[n[1],0.75],[n[1]*2,0.2]].forEach(function(p){
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = "sine"; o.frequency.setValueAtTime(p[0], t0 + n[0]);
+        g.gain.setValueAtTime(0.0001, t0 + n[0]); g.gain.exponentialRampToValueAtTime(p[1], t0 + n[0] + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t0 + n[0] + 0.6);
+        o.connect(g); g.connect(c.destination); o.start(t0 + n[0]); o.stop(t0 + n[0] + 0.65);
+      });
+    });
   }catch(e){}
   try{ navigator.vibrate && navigator.vibrate([300,120,300]); }catch(e){}
 }
