@@ -4,8 +4,8 @@
    ব্যবহার: "৩০ মিনিট / ১ ঘণ্টা / চালু না করা পর্যন্ত" নিঃশব্দ। নিঃশব্দে শুধু কাঁপুনি হয়; সময় শেষে নিজে থেকে আবার চালু।
    সব অ্যাপে একই সেটিং চলে (localStorage hbSilentUntil)। বিপগুলোর কোড বদলানো লাগে না: AudioNode.connect-এ আটকে দেওয়া হয়।
    কোথায় দেখা যায়:
-   • যে পাতায় নোটিফিকেশন-প্যানেল আছে (POS): প্যানেলের ভেতর [data-hb-silent-mount] জায়গায় একটা ছোট সারি, আর
-     [data-hb-silent-icon] দেওয়া 🔔 বাটন নিঃশব্দ থাকলে 🔕 দেখায় — আলাদা ভাসমান বাটন লাগে না (window.HB_SILENT_FLOAT=false)।
+   • যে পাতায় সেটিংস আছে (POS): সেটিংসের ভেতর [data-hb-silent-mount] জায়গায় একটা ছোট সারি — আলাদা ভাসমান বাটন
+     লাগে না (window.HB_SILENT_FLOAT=false)। কোনো বাটনের আইকন বা লেখা বদলানো হয় না।
    • অন্য অ্যাপে (ড্রাইভার, ডেলিভারি, রেস্টুরেন্ট, ফার্মেসি, টেইলর): আগের মতো নিচের-বাঁয়ে একটা ছোট ভাসমান 🔔 বাটন। */
 (function(){
   "use strict";
@@ -50,11 +50,6 @@
   var btn = null, menu = null, panels = [];
   var OPTS = [["🔔 চালু", 0], ["🕌 ৩০ মি.", 30], ["🕌 ১ ঘণ্টা", 60], ["🔕 সবসময়", -1]];
 
-  function setBellIcon(el, silent){
-    for(var n = el.firstChild; n; n = n.nextSibling){
-      if(n.nodeType === 3 && /[🔔🔕]/.test(n.nodeValue)){ n.nodeValue = n.nodeValue.replace(/[🔔🔕]/, silent ? "🔕" : "🔔"); return; }
-    }
-  }
   function paint(){
     var s = isSilent();
     var stText = s ? "🔕 এখন নিঃশব্দ — " + leftText() : "🔔 আওয়াজ চালু আছে";
@@ -65,8 +60,6 @@
       var st = menu && menu.querySelector("[data-st]"); if(st) st.textContent = stText;
     }
     panels.forEach(function(p){ var st = p.querySelector("[data-st]"); if(st) st.textContent = stText; });
-    var icons = document.querySelectorAll("[data-hb-silent-icon]");
-    for(var i = 0; i < icons.length; i++) setBellIcon(icons[i], s);
   }
   window.__hbSilentPaint = paint;
 
