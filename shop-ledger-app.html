@@ -6789,10 +6789,12 @@ function hbNbRender(){
 
     const delBtn = document.createElement('button');
     delBtn.className = 'danger';
-    delBtn.textContent = (hbNbConfirmId === n.id) ? '🗑️ নিশ্চিত?' : '🗑️ মুছুন';
+    delBtn.textContent = '🗑️ মুছুন';
     delBtn.addEventListener('click', async function(){
-      if(!(await hbNbAllowChange(n))) return;
-      if(hbNbConfirmId !== n.id){ hbNbConfirmId = n.id; hbNbRender(); return; }
+      // 🔐 নোট মুছতে সবসময় পাসওয়ার্ড (তালা দেওয়া হোক বা না হোক) — অন্য সব ডিলিটের মতোই; পাসওয়ার্ডই নিশ্চিতকরণ
+      const entered = await openPinModal('পাসওয়ার্ড দিন', 'এই নোটটা ডিলিট করার জন্য পাসওয়ার্ড দিন।');
+      if(entered === null) return;
+      if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, ডিলিট হয়নি'); return; }
       hbNbConfirmId = null;
       hbNbSave(hbNbLoad().filter(x => x.id !== n.id));
       hbNbRender();
