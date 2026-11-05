@@ -6633,6 +6633,9 @@ function hbNbMigrate(){
   }catch(e){}
 }
 let hbNbEditingId = null;
+let hbNbAutoCreatedId = null;  // এই এডিটর-সেশনে নিজে থেকে সেভ হয়ে তৈরি হওয়া নতুন নোট (বাতিল করলে মুছে যাবে)
+let hbNbOrig = null;           // আগের নোট এডিট করার সময় শুরুর লেখা (বাতিল করলে ফিরিয়ে দেওয়া হবে)
+let hbNbAutoTimer = null;
 let hbNbConfirmId = null;      // এখন কোন নোটের মোছা "নিশ্চিত?" অবস্থায় আছে
 let hbNbOpenIds = {};          // কোন কোন নোট এখন খোলা আছে
 let hbNbRevealed = {};         // তালা দেওয়া কোন নোট এইবার পাসওয়ার্ড দিয়ে দেখা হচ্ছে (বন্ধ করলেই আবার লুকায়)
@@ -7051,6 +7054,8 @@ function hbNbOpenEditor(id){
   const existing = id ? hbNbLoad().find(x => x.id === id) : null;
   ta.value = existing ? (existing.text || '') : '';
   ti.value = existing ? (existing.title || '') : '';
+  hbNbOrig = existing ? { title: existing.title || '', text: existing.text || '' } : null;
+  hbNbAutoCreatedId = null;
   hbNbHideSuggest(); hbNbHideDup();
   wrap.classList.add('show');
   document.getElementById('nbAddBtn').style.display = 'none';
@@ -7058,12 +7063,56 @@ function hbNbOpenEditor(id){
 }
 
 function hbNbCloseEditor(){
+  if(hbNbAutoTimer){ clearTimeout(hbNbAutoTimer); hbNbAutoTimer = null; }
+  hbNbAutoCreatedId = null; hbNbOrig = null;
   hbNbEditingId = null;
   document.getElementById('nbEditWrap').classList.remove('show');
   document.getElementById('nbAddBtn').style.display = '';
   document.getElementById('nbEditText').value = '';
   document.getElementById('nbEditTitle').value = '';
   hbNbHideSuggest(); hbNbHideDup();
+}
+
+/* 💾 নোট নিজে নিজে সেভ — আগে "সেভ করুন" না চাপলে রিফ্রেশ/Back/অ্যাপ বন্ধে সব লেখা মুছে যেত।
+   এখন লেখার সময় (থামলে ০.৭ সেকেন্ডে), আর অ্যাপ লুকালে/বন্ধ হলে/পাতা ছাড়লে সঙ্গে সঙ্গে নোটটা আসল তালিকায় সেভ হয়ে যায়।
+   নতুন নোট প্রথমবার সেভ হলে তার আইডি বসে যায়, তাই পরে "সেভ করুন" চাপলে একই নোট আপডেট হয় (দুইবার তৈরি হয় না)।
+   ✖ "বাতিল" চাপলে: এই সেশনে নিজে-তৈরি নতুন নোট মুছে যায়; আগের নোট হলে শুরুর লেখা ফিরে আসে — মানে বাতিল মানে বাতিলই। */
+function hbNbAutoCommit(){
+  try{
+    const wrap = document.getElementById('nbEditWrap');
+    if(!wrap || !wrap.classList.contains('show')) return;
+    const text = document.getElementById('nbEditText').value.trim();
+    const title = document.getElementById('nbEditTitle').value.trim();
+    if(!text) return; // শুধু নাম থাকলে বা খালি — নোট বানানো হয় না
+    const all = hbNbLoad();
+    const now = new Date().toISOString();
+    const me = hbNbMe();
+    if(hbNbEditingId){
+      const it = all.find(x => x.id === hbNbEditingId);
+      if(it){ it.title = title; it.text = text; it.updatedAt = now; it.updatedBy = me.uid; it.updatedByName = me.name; hbNbSave(all); return; }
+    }
+    const id = (typeof genLineId === 'function' ? genLineId() : String(Date.now()));
+    all.unshift({ id: id, title: title, text: text, pinned: false, createdAt: now, updatedAt: now, createdBy: me.uid, createdByName: me.name });
+    hbNbSave(all);
+    hbNbEditingId = id; hbNbAutoCreatedId = id;
+  }catch(e){}
+}
+function hbNbAutoSaveSoon(){
+  if(hbNbAutoTimer) clearTimeout(hbNbAutoTimer);
+  hbNbAutoTimer = setTimeout(hbNbAutoCommit, 700);
+}
+function hbNbCancelEditor(){
+  try{
+    if(hbNbAutoCreatedId){
+      hbNbSave(hbNbLoad().filter(x => x.id !== hbNbAutoCreatedId));
+      hbNbRender();
+    }else if(hbNbEditingId && hbNbOrig){
+      const all = hbNbLoad();
+      const it = all.find(x => x.id === hbNbEditingId);
+      if(it && (it.text !== hbNbOrig.text || (it.title || '') !== hbNbOrig.title)){ it.title = hbNbOrig.title; it.text = hbNbOrig.text; hbNbSave(all); hbNbRender(); }
+    }
+  }catch(e){}
+  hbNbCloseEditor();
 }
 
 /* ---------- একই কথা দুইবার যেন না লেখা হয় ----------
@@ -7193,7 +7242,14 @@ function hbNbDropDupes(text){
     closeMiniProgram('program-notebook');
   });
   document.getElementById('nbAddBtn').addEventListener('click', function(){ hbNbOpenEditor(null); });
-  document.getElementById('nbCancelBtn').addEventListener('click', hbNbCloseEditor);
+  document.getElementById('nbCancelBtn').addEventListener('click', hbNbCancelEditor);
+  ['nbEditText', 'nbEditTitle'].forEach(function(id){ document.getElementById(id).addEventListener('input', hbNbAutoSaveSoon); });
+  if(!window.__hbNbAutoBound){
+    window.__hbNbAutoBound = true;
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'hidden') hbNbAutoCommit(); });
+    window.addEventListener('pagehide', hbNbAutoCommit);
+    window.addEventListener('beforeunload', hbNbAutoCommit);
+  }
   document.getElementById('nbSearch').addEventListener('input', function(){ hbNbConfirmId = null; hbNbRender(); });
 
   document.getElementById('nbZoomIn').addEventListener('click', function(){
@@ -12671,6 +12727,8 @@ document.getElementById('bccLowStockNoteBtn').addEventListener('click', ()=>{
     hbNbOpenEditor(null);
     document.getElementById('nbEditTitle').value = 'Reorder – ' + dateStr;
     const ta = document.getElementById('nbEditText'); ta.value = text; ta.focus();
+    try{ ta.dispatchEvent(new Event('input')); }catch(e){}   // লেখা সঙ্গে সঙ্গে নিজে-সেভের আওতায়
+    try{ window.scrollTo(0, 0); const pn = document.getElementById('program-notebook'); if(pn) pn.scrollTop = 0; document.getElementById('nbEditWrap').scrollIntoView({block:'start'}); }catch(e){}  // নিচে পড়ে না থেকে ওপরেই দেখা যাক
     toast('📓 নোটবুকে এসেছে — প্রতিটা লাইনের শেষের সংখ্যাটা বদলে কত পিস অর্ডার করবেন লিখুন, তারপর সেভ করুন');
   }, 200);
 });
