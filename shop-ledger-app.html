@@ -14419,7 +14419,46 @@ async function bccDeleteProduct(id){
 }
 
 // --- quick add modal ---
+/* ⚡ ক্যাটাগরি পাতা থেকে সাব-ক্যাটাগরিতে ট্যাপ করলে সরাসরি Quick Add খোলে: ক্যাটাগরি + সাব-ক্যাটাগরি আগে থেকেই বসানো,
+   তাই ওই দুটো বাছাইয়ের ঘর লুকানো থাকে (শুধু "🏷️ Samsung › Battery org" লেখা দেখায়); Quick Save করলে ক্যাটাগরি পাতাতেই
+   ফেরা যায়, যাতে একের পর এক প্রোডাক্ট যোগ করা যায়। */
+let bccQuickFromCat = null; // {catId, subId, catName, subName} — প্রি-সেট থাকলে
+function bccQuickSetPreset(preset){
+  bccQuickFromCat = preset || null;
+  const catSel = document.getElementById('bccQCat'), subSel = document.getElementById('bccQSub');
+  [catSel, subSel].forEach(sel=>{
+    sel.style.display = preset ? 'none' : '';
+    if(sel.previousElementSibling) sel.previousElementSibling.style.display = preset ? 'none' : '';
+  });
+  let tag = document.getElementById('bccQPreset');
+  if(!tag){
+    tag = document.createElement('div'); tag.id = 'bccQPreset';
+    tag.style.cssText = 'margin:8px 0 2px;padding:9px 12px;border-radius:12px;background:rgba(99,102,241,.2);color:#c7d2fe;font-size:13.5px;font-weight:800;';
+    const anchorEl = catSel.previousElementSibling || catSel;
+    anchorEl.parentNode.insertBefore(tag, anchorEl);
+  }
+  if(preset){ tag.style.display = ''; tag.textContent = '🏷️ ' + preset.catName + ' › ' + preset.subName; }
+  else tag.style.display = 'none';
+}
+function bccBackToCategories(){
+  const panel = document.getElementById('btab-categories');
+  if(panel && panel.style.display === 'none'){ const t = document.querySelector('[data-btab="categories"]'); if(t) t.click(); }
+}
+function bccOpenQuickFromSub(catId, subId){
+  const cats = bccLoadCategories();
+  const c = cats.find(x=>x.id===catId);
+  const sub = c ? (c.subs||[]).find(x=>x.id===subId) : null;
+  if(!c || !sub) return;
+  bccPopulateCategorySelect(document.getElementById('bccQCat'), catId);
+  bccPopulateSubSelect(document.getElementById('bccQSub'), catId, subId);
+  ['bccQName','bccQCode','bccQBuy','bccQSell','bccQQty'].forEach(id=> document.getElementById(id).value = '');
+  document.getElementById('bccQNameResults').classList.remove('show');
+  bccQuickSetPreset({ catId, subId, catName: c.name, subName: sub.name });
+  document.getElementById('bccQuickModalOverlay').classList.add('show');
+  setTimeout(()=>{ try{ document.getElementById('bccQName').focus(); }catch(e){} }, 200);
+}
 document.getElementById('bccQuickAddBtn').addEventListener('click', ()=>{
+  bccQuickSetPreset(null);
   bccPopulateCategorySelect(document.getElementById('bccQCat'), '');
   bccPopulateSubSelect(document.getElementById('bccQSub'), '', '');
   document.getElementById('bccQName').value='';
@@ -14456,6 +14495,7 @@ document.getElementById('bccQuickSaveBtn').addEventListener('click', ()=>{
     document.getElementById('bccQuickModalOverlay').classList.remove('show');
     toast('একই প্রোডাক্ট পাওয়া গেছে — ডুপ্লিকেট না করে স্টক আপডেট করা হলো ✅');
     bccRenderProducts(); bccRenderOverview();
+    if(bccQuickFromCat) bccBackToCategories();
     return;
   }
 
@@ -14471,8 +14511,9 @@ document.getElementById('bccQuickSaveBtn').addEventListener('click', ()=>{
   });
   bccSaveProducts(prods);
   document.getElementById('bccQuickModalOverlay').classList.remove('show');
-  toast('প্রোডাক্ট কুইক-অ্যাড হয়েছে ⚡');
+  toast(bccQuickFromCat ? ('⚡ যোগ হয়েছে — ' + bccQuickFromCat.catName + ' › ' + bccQuickFromCat.subName) : 'প্রোডাক্ট কুইক-অ্যাড হয়েছে ⚡');
   bccRenderProducts(); bccRenderOverview();
+  if(bccQuickFromCat) bccBackToCategories(); // ক্যাটাগরি পাতাতেই ফেরা — পরের সাব-ক্যাটাগরিতে ট্যাপ করা যাবে
 });
 
 // --- categories ---
@@ -14493,7 +14534,7 @@ function bccRenderCategories(){
       <div class="subList" id="subList-${c.id}">
         ${c.subs.map(s=>`
           <div class="bccSubChipWrap">
-            <span class="bccSubChip" data-cat="${c.id}" data-sub="${s.id}">🏷️ ${escapeHtml(s.name)}${(s.subs&&s.subs.length)?` <b style="opacity:.65;">(${s.subs.length})</b>`:''} <button data-delsub="${c.id}|${s.id}">✕</button></span>
+            <span class="bccSubChip" data-cat="${c.id}" data-sub="${s.id}">🏷️ ${escapeHtml(s.name)}${(s.subs&&s.subs.length)?` <b style="opacity:.65;">(${s.subs.length})</b> <button data-togglesub="${c.id}-${s.id}" title="নেস্টেড ক্যাটাগরি দেখুন" style="color:#a5b4fc;font-size:13px;">▾</button>`:''} <button data-delsub="${c.id}|${s.id}">✕</button></span>
             <div class="subSubList" id="subSubList-${c.id}-${s.id}">
               ${(s.subs||[]).map(ss=>`<span class="bccSubSubChip">↳ ${escapeHtml(ss.name)} <button data-delsubsub="${c.id}|${s.id}|${ss.id}">✕</button></span>`).join('') || '<div class="bccSubChipHint">কোনো নেস্টেড ক্যাটাগরি নেই — এই সাব-ক্যাটাগরিটা চেপে ধরে রাখুন (long-press) নতুন যোগ করতে</div>'}
             </div>
@@ -14515,7 +14556,7 @@ function bccRenderCategories(){
   listEl.querySelectorAll('.bccSubChip[data-sub]').forEach(chip=>{
     let pressTimer = null, longPressed = false;
     const start = (e)=>{
-      if(e.target.closest('[data-delsub]')) return; // ✕ বাটনে চাপ ধরলে long-press ট্রিগার হবে না
+      if(e.target.closest('[data-delsub]') || e.target.closest('[data-togglesub]')) return; // ✕/▾ বাটনে চাপ ধরলে long-press ট্রিগার হবে না
       longPressed = false;
       pressTimer = setTimeout(()=>{
         longPressed = true;
@@ -14532,8 +14573,11 @@ function bccRenderCategories(){
     chip.addEventListener('click', (e)=>{
       if(e.target.closest('[data-delsub]')) return;
       if(longPressed){ longPressed = false; return; } // long-press শেষে যে click ইভেন্টও ফায়ার হয়, সেটা এড়ানো হচ্ছে
-      const subSubEl = document.getElementById('subSubList-'+chip.dataset.cat+'-'+chip.dataset.sub);
-      if(subSubEl) subSubEl.classList.toggle('open');
+      // ▾ চাপলে শুধু নেস্টেড (সাব-সাব) লিস্ট খোলে/বন্ধ হয়
+      const tg = e.target.closest('[data-togglesub]');
+      if(tg){ const el = document.getElementById('subSubList-'+tg.dataset.togglesub); if(el) el.classList.toggle('open'); return; }
+      // ⚡ সাব-ক্যাটাগরিতে ট্যাপ = সরাসরি Quick Add (ক্যাটাগরি/সাব-ক্যাটাগরি আগে থেকেই বসানো)
+      bccOpenQuickFromSub(chip.dataset.cat, chip.dataset.sub);
     });
   });
 }
