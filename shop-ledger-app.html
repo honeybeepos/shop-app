@@ -5437,6 +5437,7 @@ window.hbLoadLib = function(name){
       <p style="color:#8b94b8; font-size:11.5px; margin:0 0 10px;">যেসব প্রোডাক্টের স্টক ২ পিসের সমান বা তার কম, শুধু সেগুলোই এই শিটে দেখানো হচ্ছে।</p>
       <div id="bccLowStockList"></div>
       <div id="bccLowStockActions">
+        <button id="bccLowStockNoteBtn" style="grid-column:1 / -1;">📓 নোটবুকে নিন — কত পিস অর্ডার লিখুন (ইংরেজিতে)</button>
         <button id="bccLowStockPrintBtn">🖨️ Print</button>
         <button id="bccLowStockWaBtn">💬 WhatsApp</button>
         <button id="bccLowStockSmsBtn">📩 SMS</button>
@@ -12645,6 +12646,25 @@ document.getElementById('bccLowStockModalClose').addEventListener('click', ()=>{
 });
 document.getElementById('bccLowStockModalOverlay').addEventListener('click', (ev)=>{
   if(ev.target.id === 'bccLowStockModalOverlay') document.getElementById('bccLowStockModalOverlay').classList.remove('show');
+});
+
+/* 📓 লো স্টক তালিকা নোটবুকে — বিদেশি সাপ্লায়ার বাংলা বোঝে না, আর এই শিটে "কত পিস অর্ডার" লেখা থাকে না।
+   তাই ইংরেজিতে সাজানো খসড়া নোটবুকের এডিটরে খোলে, প্রতিটা লাইনে "Order qty: ___ pcs" — বসিয়ে সেভ করে নোট থেকেই শেয়ার করা যায়। */
+document.getElementById('bccLowStockNoteBtn').addEventListener('click', ()=>{
+  const items = bccGetLowStockProducts();
+  if(!items.length){ toast('রিঅর্ডার করার মতো কোনো প্রোডাক্ট নেই'); return; }
+  document.getElementById('bccLowStockModalOverlay').classList.remove('show');
+  const dateStr = new Date().toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || '';
+  const lines = items.map((p,i)=> `${i+1}. ${p.name}${p.code ? ' ('+p.code+')' : ''} — Current stock: ${p.qty||0} pcs — Order qty: ___ pcs`).join('\n');
+  const text = `Reorder Request${shopName ? ' — ' + shopName : ''}\nDate: ${dateStr}\n\n${lines}\n\nPlease confirm availability and price. Thank you.`;
+  document.getElementById('headerNoteShortcut').click();
+  setTimeout(()=>{
+    hbNbOpenEditor(null);
+    document.getElementById('nbEditTitle').value = 'Reorder – ' + dateStr;
+    const ta = document.getElementById('nbEditText'); ta.value = text; ta.focus();
+    toast('📓 নোটবুকে এসেছে — প্রতিটা লাইনে ___ জায়গায় কত পিস অর্ডার করবেন লিখুন, তারপর সেভ করুন');
+  }, 200);
 });
 
 document.getElementById('bccLowStockPrintBtn').addEventListener('click', ()=>{
