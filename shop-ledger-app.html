@@ -9522,6 +9522,13 @@ document.getElementById('opsSupplierHistoryModal').addEventListener('click', (ev
   if(ev.target === document.getElementById('opsSupplierHistoryModal')) document.getElementById('opsSupplierHistoryModal').classList.remove('show');
 });
 
+// 🏪 বর্তমান দোকানের নাম — প্রিন্ট/WhatsApp/SMS বার্তার সই। আগে কিছু বার্তায় "Mumen Electronics" নাম সরাসরি লেখা ছিল,
+// তাই যে দোকানই পাঠাক ওই নামই যেত। এখন সবখানে এই ফাংশন (দোকানের নাম না থাকলে "Our Shop")।
+function hbShopNameSafe(){
+  const el = document.getElementById('shopTitle');
+  const n = (el && el.textContent ? el.textContent.trim() : '');
+  return n || 'Our Shop';
+}
 // -------- সাপ্লায়ার স্টেটমেন্ট (English invoice-style) : build/print/download/share --------
 function opsGetShopName(){
   return (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || 'Shop';
@@ -12480,7 +12487,7 @@ let __hbZatcaForMessage = null;
 let __hbZatcaLastError = null;
 
 function buildSalesInvoiceMessage({name, phone, billItems, billTotalPrice, paid, previousDue, previousDueItems, currentDue, isCleared, invoiceNo, saleTime}){
-  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || 'Mumen Electronics';
+  const shopName = (document.getElementById('shopTitle') && document.getElementById('shopTitle').textContent.trim()) || hbShopNameSafe();
   const shopSubtitle = (document.getElementById('shopSubtitle') && document.getElementById('shopSubtitle').textContent.trim()) || '';
   const now = saleTime ? new Date(saleTime) : new Date();
   const dateStr = formatInvoiceDate(now);
@@ -16558,10 +16565,10 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     const isCleared = isCustomerFullyPaid(name, phone);
     let msg = "";
     if(isCleared) {
-      msg = `Dear ${name},\n\nYour returned item (${item}) has been processed.\n\nYour balance has been fully paid (Previous Due: ${HB_CUR} ${previousDue}). Thank you so much for doing business with us. Have a great day! — Mumen Electronics.`;
+      msg = `Dear ${name},\n\nYour returned item (${item}) has been processed.\n\nYour balance has been fully paid (Previous Due: ${HB_CUR} ${previousDue}). Thank you so much for doing business with us. Have a great day! — ${hbShopNameSafe()}.`;
     } else {
       const currentDue = getCustomerTotalDue(name, phone);
-      msg = `Dear ${name},\n\nYour returned item (${item}) has been processed.\n\nPrevious Due: ${HB_CUR} ${previousDue}\nTotal Due Now: ${HB_CUR} ${currentDue}\n\nPlease clear your due balance soon. Thank you — Mumen Electronics.`;
+      msg = `Dear ${name},\n\nYour returned item (${item}) has been processed.\n\nPrevious Due: ${HB_CUR} ${previousDue}\nTotal Due Now: ${HB_CUR} ${currentDue}\n\nPlease clear your due balance soon. Thank you — ${hbShopNameSafe()}.`;
     }
     await finishAndMaybeShare(name, phone, msg);
 
@@ -16597,10 +16604,10 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     const changeBack = Math.max(amount - previousDue, 0);
     let msg = "";
     if(isCleared) {
-      msg = `Dear ${name},\n\nWe have received your payment of ${HB_CUR} ${amount}.\n\nYour balance has been fully paid (Previous Due: ${HB_CUR} ${previousDue}).` + (changeBack > 0 ? `\n\nExcess amount refunded/payable to you: ${HB_CUR} ${changeBack}` : '') + `\n\nThank you so much for doing business with us. Have a great day! — Mumen Electronics.`;
+      msg = `Dear ${name},\n\nWe have received your payment of ${HB_CUR} ${amount}.\n\nYour balance has been fully paid (Previous Due: ${HB_CUR} ${previousDue}).` + (changeBack > 0 ? `\n\nExcess amount refunded/payable to you: ${HB_CUR} ${changeBack}` : '') + `\n\nThank you so much for doing business with us. Have a great day! — ${hbShopNameSafe()}.`;
     } else {
       const currentDue = getCustomerTotalDue(name, phone);
-      msg = `Dear ${name},\n\nWe have received your payment of ${HB_CUR} ${amount}.\n\nPrevious Due: ${HB_CUR} ${previousDue}\nRemaining Due: ${HB_CUR} ${currentDue}\n\nThank you — Mumen Electronics.`;
+      msg = `Dear ${name},\n\nWe have received your payment of ${HB_CUR} ${amount}.\n\nPrevious Due: ${HB_CUR} ${previousDue}\nRemaining Due: ${HB_CUR} ${currentDue}\n\nThank you — ${hbShopNameSafe()}.`;
     }
     await finishAndMaybeShare(name, phone, msg);
   }
@@ -17693,7 +17700,7 @@ function renderStatement(name, list){
   // জায়গাটা সবসময় হার্ডকোড করা "হিসাব খাতা প্রো" দেখাতো, দোকানের আসল নাম বসতো না।
   const shopNameEl = document.getElementById('shopTitle');
   const shopSubtitleEl2 = document.getElementById('shopSubtitle');
-  const shopName = (shopNameEl && shopNameEl.textContent.trim()) || 'Mumen Electronics';
+  const shopName = (shopNameEl && shopNameEl.textContent.trim()) || hbShopNameSafe();
   const shopSubtitle = (shopSubtitleEl2 && shopSubtitleEl2.textContent.trim()) || '';
   document.getElementById('stmtShopName').textContent = '📱 ' + shopName;
   document.getElementById('stmtShopSubtitle').textContent = shopSubtitle;
@@ -17714,7 +17721,7 @@ function renderStatement(name, list){
   if(phone) {
     waPrintBtn.style.display = 'block';
     let digits = phone.replace(/\D/g,'');
-    waPrintBtn.href = `https://wa.me/${digits}?text=${encodeURIComponent(`Dear ${name},\nYour total balance due is: ${HB_CUR} ${totalDue}. Thank you — Mumen Electronics.`)}`;
+    waPrintBtn.href = `https://wa.me/${digits}?text=${encodeURIComponent(`Dear ${name},\nYour total balance due is: ${HB_CUR} ${totalDue}. Thank you — ${hbShopNameSafe()}.`)}`;
   } else { waPrintBtn.style.display = 'none'; }
 }
 
@@ -18124,10 +18131,10 @@ function handleWaMiniClick(id) {
   let text;
   if(e.status === 'ফেরত'){
     const qtyText = e.qty && e.qty>1 ? ` (${e.qty} pcs)` : '';
-    text = `Dear ${e.name},\nYour returned item has been recorded.\nItem: ${e.item}${qtyText}\nTotal Due Balance: ${HB_CUR} ${currentDue}\n— Mumen Electronics`;
+    text = `Dear ${e.name},\nYour returned item has been recorded.\nItem: ${e.item}${qtyText}\nTotal Due Balance: ${HB_CUR} ${currentDue}\n— ${hbShopNameSafe()}`;
   } else if(e.status === 'বদলি'){
     const qtyLine = e.qty && e.qty>1 ? `\nQty: ${e.qty} pcs x ${HB_CUR} ${getUnitPrice(e)}/pc = ${HB_CUR} ${e.price}` : '';
-    text = `Dear ${e.name},\nYour item exchange has been recorded.\nNew Item: ${e.item}${qtyLine}\nTotal Price: ${HB_CUR} ${e.price}\nReceived: ${HB_CUR} ${e.paid}\nTotal Due Balance: ${HB_CUR} ${currentDue}\n— Mumen Electronics`;
+    text = `Dear ${e.name},\nYour item exchange has been recorded.\nNew Item: ${e.item}${qtyLine}\nTotal Price: ${HB_CUR} ${e.price}\nReceived: ${HB_CUR} ${e.paid}\nTotal Due Balance: ${HB_CUR} ${currentDue}\n— ${hbShopNameSafe()}`;
   } else {
     const qtyLine = e.qty && e.qty>1 ? `\nQty: ${e.qty} pcs x ${HB_CUR} ${getUnitPrice(e)}/pc = ${HB_CUR} ${e.price}` : '';
     text = `Dear ${e.name},\nYour statement summary:\nItem: ${e.item}${qtyLine}\nTotal Price: ${HB_CUR} ${e.price}\nReceived: ${HB_CUR} ${e.paid}\nTotal Due Balance: ${HB_CUR} ${currentDue}`;
@@ -18183,7 +18190,7 @@ function render(showSecureInfo = false){
     let waIcon = '';
     if(ph) {
       let digits = ph.replace(/\D/g,'');
-      waIcon = `<a href="https://wa.me/${digits}?text=${encodeURIComponent(`Dear ${nm},\nYour total balance due is: ${HB_CUR} ${amt}. Thank you — Mumen Electronics.`)}" target="_blank" style="text-decoration:none; font-size:16px; margin-left:6px;">💬</a>`;
+      waIcon = `<a href="https://wa.me/${digits}?text=${encodeURIComponent(`Dear ${nm},\nYour total balance due is: ${HB_CUR} ${amt}. Thank you — ${hbShopNameSafe()}.`)}" target="_blank" style="text-decoration:none; font-size:16px; margin-left:6px;">💬</a>`;
     }
     const items = getCustomerDueItems(nm, ph);
     const detailHtml = items.length
@@ -18565,7 +18572,7 @@ function getInactiveCustomers(minDays){
 }
 
 function buildInactiveCustomerMessage(name){
-  return `প্রিয় ${name},\n\nঅনেকদিন হলো আপনি আমাদের দোকান থেকে কোনো কেনাকাটা করেননি। আশা করি আপনি ভালো আছেন।\n\nআপনার কি আমাদের সার্ভিস বা পণ্য নিয়ে কোনো অসুবিধা হয়েছে? যদি এমন কিছু থাকে তাহলে দয়া করে আমাদের জানাবেন, আমরা তা সমাধানের চেষ্টা করবো।\n\nএছাড়া আপনি এই মুহূর্তে কোন পণ্যটি নিতে চান, একটু জানালে আমরা সেটার ব্যবস্থা করার চেষ্টা করবো ইনশাআল্লাহ।\n\nধন্যবাদান্তে —\nMumen Electronics`;
+  return `প্রিয় ${name},\n\nঅনেকদিন হলো আপনি আমাদের দোকান থেকে কোনো কেনাকাটা করেননি। আশা করি আপনি ভালো আছেন।\n\nআপনার কি আমাদের সার্ভিস বা পণ্য নিয়ে কোনো অসুবিধা হয়েছে? যদি এমন কিছু থাকে তাহলে দয়া করে আমাদের জানাবেন, আমরা তা সমাধানের চেষ্টা করবো।\n\nএছাড়া আপনি এই মুহূর্তে কোন পণ্যটি নিতে চান, একটু জানালে আমরা সেটার ব্যবস্থা করার চেষ্টা করবো ইনশাআল্লাহ।\n\nধন্যবাদান্তে —\n${hbShopNameSafe()}`;
 }
 
 function renderInactiveCustList(){
@@ -18634,7 +18641,7 @@ function buildDamagedStockText(items){
     const d = new Date(e.date).toLocaleDateString('bn-BD', {day:'numeric', month:'short', year:'numeric'});
     text += `${i+1}. ${e.item} — ${e.qty||1} pcs (কাস্টমারঃ ${e.name}, তারিখঃ ${d})\n`;
   });
-  text += `\nমোট: ${items.length}টি নষ্ট মাল — Mumen Electronics`;
+  text += `\nমোট: ${items.length}টি নষ্ট মাল — ${hbShopNameSafe()}`;
   return text;
 }
 
@@ -19068,7 +19075,7 @@ function buildDetailShareMessage(){
   const labelMap = { sales: 'Sales Summary', today: "Today's Sales List" };
   const label = labelMap[mode] || 'Full Account Summary';
   const itemsBlock = (shareLines && shareLines.length) ? shareLines.join('\n\n') + '\n\n' : '';
-  return `Dear ${name},\n\n${label}\n\n${itemsBlock}Total Price: ${HB_CUR} ${totalPrice}\nTotal Received: ${HB_CUR} ${totalPaid}\nTotal Due: ${HB_CUR} ${totalDue}\n\nPlease clear your due balance soon. Thank you — Mumen Electronics.`;
+  return `Dear ${name},\n\n${label}\n\n${itemsBlock}Total Price: ${HB_CUR} ${totalPrice}\nTotal Received: ${HB_CUR} ${totalPaid}\nTotal Due: ${HB_CUR} ${totalDue}\n\nPlease clear your due balance soon. Thank you — ${hbShopNameSafe()}.`;
 }
 
 document.getElementById('cdWhatsapp').addEventListener('click', ()=>{
