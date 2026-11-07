@@ -1819,6 +1819,63 @@ exports.flightFollowups = onSchedule({ schedule: "every 5 minutes", secrets: [av
   }
 });
 
+/* 👥 দোকানের স্টাফ (সাব-ইউজার) — মালিক ব্লক / আনব্লক / ডিলিট করতে পারেন।
+   স্টাফ চলে গেলে তাঁর লগইন যেন আর কাজ না করে: ব্লকে Firebase লগইন বন্ধ + সেশন বাতিল + users/members ডকে blocked চিহ্ন
+   (firestore.rules-এর myShopId() blocked দেখলে খালি ফেরায়, তাই বৈধ টোকেন থাকলেও দোকানের ডেটা পড়া-লেখা বন্ধ)।
+   ডিলিটে members + users ডক আর Firebase লগইন মুছে যায়। দোকানের আগের বিক্রি/খাতা অক্ষত থাকে।
+   শুধু ওই দোকানের নিজের মালিক (বা সুপার-অ্যাডমিন) পারেন; মালিক নিজেকে বা অন্য রোলের কাউকে পারেন না। */
+exports.shopStaffAction = onCall(async (request) => {
+  try {
+    const callerUid = request.auth && request.auth.uid;
+    if (!callerUid) throw new HttpsError("unauthenticated", "লগইন করা নেই।");
+    const { targetUid, action } = request.data || {};
+    if (!targetUid || !["block", "unblock", "delete"].includes(action)) {
+      throw new HttpsError("invalid-argument", "targetUid ও action (block/unblock/delete) দিতে হবে।");
+    }
+    if (targetUid === callerUid) throw new HttpsError("permission-denied", "নিজের অ্যাকাউন্টে এটা করা যাবে না।");
+
+    const isSuper = (await db.collection("superadmins").doc(callerUid).get()).exists;
+    const cu = await db.collection("users").doc(callerUid).get();
+    const c = cu.exists ? cu.data() : {};
+    if (!isSuper && !(c.role === "admin" && c.shopId)) throw new HttpsError("permission-denied", "শুধু দোকানের মালিক এটা করতে পারবেন।");
+
+    const tu = await db.collection("users").doc(targetUid).get();
+    const t = tu.exists ? tu.data() : null;
+    const shopId = isSuper ? (t && t.shopId) : c.shopId;
+    if (!shopId) throw new HttpsError("not-found", "দোকান পাওয়া যায়নি।");
+    const memRef = db.collection("shops").doc(shopId).collection("members").doc(targetUid);
+    const mem = await memRef.get();
+    const isStaff = (t && t.role === "subuser" && t.shopId === shopId) || (mem.exists && mem.data().role === "subuser");
+    if (!isStaff) throw new HttpsError("permission-denied", "এটা আপনার দোকানের কোনো স্টাফ নন।");
+
+    const auth = getAuth();
+    if (action === "block") {
+      const mark = { blocked: true, blockedAt: FieldValue.serverTimestamp(), blockedBy: callerUid };
+      await db.collection("users").doc(targetUid).set(mark, { merge: true });
+      await memRef.set(mark, { merge: true });
+      try { await auth.updateUser(targetUid, { disabled: true }); await auth.revokeRefreshTokens(targetUid); }
+      catch (e) { if (e.code !== "auth/user-not-found") throw e; }
+    } else if (action === "unblock") {
+      const clear = { blocked: false, blockedAt: FieldValue.delete(), blockedBy: FieldValue.delete() };
+      await db.collection("users").doc(targetUid).set(clear, { merge: true });
+      await memRef.set(clear, { merge: true });
+      try { await auth.updateUser(targetUid, { disabled: false }); }
+      catch (e) { if (e.code !== "auth/user-not-found") throw e; }
+    } else {
+      await memRef.delete().catch(() => {});
+      await db.collection("users").doc(targetUid).delete().catch(() => {});
+      try { await auth.deleteUser(targetUid); }
+      catch (e) { if (e.code !== "auth/user-not-found") throw new HttpsError("internal", "ডেটা মুছেছে, কিন্তু লগইন মুছতে সমস্যা: " + e.message); }
+    }
+    await db.collection("adminAudit").add({ action: "staff_" + action, byUid: callerUid, targetUid, shopId, at: FieldValue.serverTimestamp() }).catch(() => {});
+    return { success: true, action, targetUid };
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    console.error("shopStaffAction ব্যর্থ:", err);
+    throw new HttpsError("internal", "করা যায়নি — " + (err && err.message ? err.message : String(err)));
+  }
+});
+
 exports.deleteAccount = onCall(async (request) => {
   try {
     const callerUid = request.auth && request.auth.uid;
