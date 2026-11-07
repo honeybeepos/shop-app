@@ -10,7 +10,12 @@ service cloud.firestore {
     function myUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
-    function myShopId() { return myUserData().shopId; }
+    // 🚫 ব্লক করা স্টাফের জন্য খালি (null) — তাই "myShopId() == shopId" দিয়ে বাঁধা দোকানের সব ডেটা তাঁর জন্য বন্ধ।
+    //    blocked বসায় শুধু সার্ভারের shopStaffAction ফাংশন (Admin SDK); স্টাফ নিজে বদলাতে পারে না (নিচে users নিয়ম)।
+    function myShopId() {
+      let u = myUserData();
+      return u.get('blocked', false) == true ? null : u.shopId;
+    }
     function myRole() { return myUserData().role; }
     function isAgent() { return isSignedIn() && myRole() == 'agent'; }
     // 🍽️ রেস্টুরেন্ট কোন বাজারের — "ডেলিভারি ম্যান" পাতায় নিজের বাজারের
@@ -64,7 +69,7 @@ service cloud.firestore {
       // নিজের ডক বদলানো যাবে, কিন্তু role/shopId নয় — ওগুলো শুধু সুপারঅ্যাডমিন
       allow update: if isSignedIn() && (isSuperAdmin() ||
         (request.auth.uid == uid &&
-         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','shopId'])));
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','shopId','blocked','blockedAt','blockedBy'])));
       allow delete: if isSuperAdmin();
     }
 

@@ -1060,7 +1060,7 @@ window.hbLoadLib = function(name){
 <div id="cloudTopBar">
   <div class="left"><span id="cloudSyncDot"></span><span id="cloudShopLabel"></span><span id="cloudNetLabel" style="margin-left:6px;font-weight:700;"></span></div>
   <div class="left">
-    <button id="subUserBtn" style="display:none;">+ সাব-ইউজার</button>
+    <button id="subUserBtn" style="display:none;">👥 স্টাফ</button>
     <button id="pharmaModeBtn" style="display:none;" title="ফার্মেসি মোড চালু করুন">💊 ফার্মেসি মোড</button>
     <button id="shopSettingsBtn" title="সেটিং" style="padding:6px 10px; font-size:15px;">⚙️</button>
     <span id="hbBillPillSlot"></span>
@@ -2661,6 +2661,7 @@ window.hbLoadLib = function(name){
       <button class="mini-btn" id="empSalesDownloadBtn">⬇️ Download</button>
       <button class="mini-btn" id="empSalesWaBtn">💬 WhatsApp</button>
     </div>
+    <button class="mini-btn" id="empSalesStaffMgrBtn" type="button" style="width:100%; margin-bottom:10px;">👥 স্টাফ অ্যাকাউন্ট — ব্লক / ডিলিট / কী কী করতে পারবে</button>
     <div style="font-size:13px; font-weight:800; color:var(--ink); margin:6px 0;">🧾 বিক্রির তালিকা (মনিটরিং)</div>
     <div id="empSalesHistory" style="overflow-y:auto; flex:1; min-height:60px; border-top:1px solid var(--line);"></div>
     <button class="mini-btn" id="empSalesDetailCloseBtn" style="width:100%; margin-top:12px;">বন্ধ করুন</button>
@@ -20556,6 +20557,131 @@ async function createSubUser(shopId){
   }
 }
 
+/* ==================== 👥 স্টাফ ম্যানেজমেন্ট ====================
+   স্টাফ চলে গেলে তাঁর অ্যাকাউন্ট দিয়ে টাকা-পয়সার ঝুঁকি থাকে — তাই মালিক এখান থেকে:
+   • 🚫 ব্লক / ✅ আনব্লক — ব্লক হলে লগইন বন্ধ, চলতি সেশন বন্ধ, দোকানের ডেটাও আর পড়া-লেখা যায় না (সার্ভারে আটকানো)
+   • 🗑️ ডিলিট — অ্যাকাউন্ট ও লগইন পুরো মুছে যায় (পাসওয়ার্ড লাগে); আগের বিক্রি/খাতা অক্ষত থাকে
+   • ☑️ কী কী করতে পারবেন — সেল, সব হিসাব, প্রিন্ট/ইনভয়েস, প্রোডাক্ট/স্টক। শুধু সেল করলে শুধু সেলে টিক রাখুন।
+   টিকের তথ্য shops/{id}/members/{uid}.features-এ; ব্লক/ডিলিট সার্ভারের shopStaffAction ফাংশনে। */
+const STAFF_PERMS = [
+  { k:'sale',     label:'🛒 সেল করা' },
+  { k:'list',     label:'📋 সব হিসাব দেখা' },
+  { k:'print',    label:'🖨️ প্রিন্ট / ইনভয়েস' },
+  { k:'products', label:'📦 প্রোডাক্ট / স্টক ম্যানেজ' }
+];
+let __staffMgrShopId = null, __staffSelfUnsub = null;
+const STAFF_BTN_STYLE = 'background:#2b2415;color:#fff8e8;border:1px solid rgba(255,209,102,.35);border-radius:10px;padding:10px;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;';
+
+// স্টাফের নিজের স্ক্রিনে: কোন কোন ট্যাব/কার্ড দেখাবে
+function applyMemberFeatures(f){
+  f = f || {};
+  const tabMap = { sale:'add', list:'list', print:'print' };
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    const k = Object.keys(tabMap).find(x => tabMap[x] === btn.dataset.tab);
+    if(k) btn.classList.toggle('subuser-hide', f[k] === false);
+  });
+  const bcc = document.getElementById('bizBccCard');
+  if(bcc) bcc.classList.toggle('subuser-hide', f.products === false);
+}
+// স্টাফ নিজে: ব্লক/ডিলিট হলে সঙ্গে সঙ্গে লগআউট; টিক বদলালে সঙ্গে সঙ্গে ট্যাব বদলে যায়
+function watchMyStaffStatus(shopId, uid){
+  if(!shopId || !uid) return;
+  if(__staffSelfUnsub){ try{ __staffSelfUnsub(); }catch(e){} __staffSelfUnsub = null; }
+  let kicked = false;
+  const kick = (msg)=>{
+    if(kicked) return; kicked = true;
+    try{ if(__staffSelfUnsub){ __staffSelfUnsub(); __staffSelfUnsub = null; } }catch(e){}
+    try{ disableAutoSync(); }catch(e){}
+    alert(msg);
+    try{ clearSession(); }catch(e){}
+    auth.signOut().catch(()=>{}).finally(()=>{ window.location.href = 'login.html'; });
+  };
+  __staffSelfUnsub = db.collection('shops').doc(shopId).collection('members').doc(uid).onSnapshot(snap=>{
+    if(!snap.exists){ kick('এই অ্যাকাউন্টটি মুছে ফেলা হয়েছে। দোকানের মালিকের সাথে যোগাযোগ করুন।'); return; }
+    const d = snap.data() || {};
+    if(d.blocked === true){ kick('আপনার অ্যাকাউন্ট ব্লক করা হয়েছে। দোকানের মালিকের সাথে যোগাযোগ করুন।'); return; }
+    applyMemberFeatures(d.features);
+  }, err=>{
+    if(err && err.code === 'permission-denied') kick('আপনার অ্যাকাউন্ট আর সক্রিয় নেই। দোকানের মালিকের সাথে যোগাযোগ করুন।');
+  });
+}
+
+function staffMgrEnsure(){
+  let ov = document.getElementById('staffMgrModal');
+  if(ov) return ov;
+  ov = document.createElement('div'); ov.id = 'staffMgrModal'; ov.className = 'modal-overlay';
+  ov.innerHTML = '<div class="modal-box" style="max-width:440px;text-align:left;max-height:88vh;overflow-y:auto;background:#17120a;color:#fff8e8;border:1px solid rgba(255,209,102,.4);">'
+    + '<h3 style="margin:0 0 4px;color:#ffd166;">👥 স্টাফ ম্যানেজমেন্ট</h3>'
+    + '<p style="margin:0 0 12px;font-size:12.5px;line-height:1.6;color:rgba(255,248,232,.7);">স্টাফ চলে গেলে <b>ব্লক</b> বা <b>ডিলিট</b> করুন — ব্লক করলে সে আর লগইন করতে পারবে না, দোকানের কোনো ডেটাও দেখতে পারবে না। কে কোন কাজ করতে পারবে, টিক দিয়ে ঠিক করুন।</p>'
+    + '<div id="staffMgrList" style="font-size:13px;">লোড হচ্ছে...</div>'
+    + '<button id="staffMgrAddBtn" type="button" style="width:100%;margin-top:6px;' + STAFF_BTN_STYLE + 'background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#2a1503;font-weight:800;">➕ নতুন স্টাফ যোগ করুন</button>'
+    + '<button id="staffMgrCloseBtn" type="button" style="width:100%;margin-top:8px;' + STAFF_BTN_STYLE + '">বন্ধ করুন</button></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e=>{ if(e.target === ov) ov.classList.remove('show'); });
+  document.getElementById('staffMgrCloseBtn').addEventListener('click', ()=> ov.classList.remove('show'));
+  document.getElementById('staffMgrAddBtn').addEventListener('click', async ()=>{ await createSubUser(__staffMgrShopId); await staffMgrRender(); });
+  const list = document.getElementById('staffMgrList');
+  list.addEventListener('change', async e=>{
+    const cb = e.target.closest('[data-sperm]'); if(!cb) return;
+    const parts = cb.dataset.sperm.split('|'), uid = parts[0], key = parts[1];
+    try{
+      await db.collection('shops').doc(__staffMgrShopId).collection('members').doc(uid).set({ features: { [key]: cb.checked } }, { merge: true });
+      toast('✅ সেভ হয়েছে — স্টাফের স্ক্রিনে সঙ্গে সঙ্গে বদলে যাবে');
+    }catch(err){ cb.checked = !cb.checked; alert('সেভ করা যায়নি: ' + (err.message || err)); }
+  });
+  list.addEventListener('click', async e=>{
+    const bb = e.target.closest('[data-sblock]'), db2 = e.target.closest('[data-sdel]');
+    if(bb){
+      const uid = bb.dataset.sblock, isBlocked = bb.dataset.blocked === '1';
+      if(!isBlocked && !confirm('এই স্টাফকে ব্লক করবেন? সে আর লগইন করতে পারবে না, আর এখন লগইন থাকলেও বের হয়ে যাবে। পরে চাইলে আনব্লক করা যাবে।')) return;
+      bb.disabled = true;
+      try{ await firebase.functions().httpsCallable('shopStaffAction')({ targetUid: uid, action: isBlocked ? 'unblock' : 'block' }); toast(isBlocked ? '✅ আনব্লক হয়েছে' : '🚫 ব্লক হয়েছে'); }
+      catch(err){ alert('করা যায়নি: ' + (err.message || err)); }
+      await staffMgrRender();
+    }else if(db2){
+      const uid = db2.dataset.sdel;
+      const entered = await openPinModal('পাসওয়ার্ড দিন', 'এই স্টাফের অ্যাকাউন্ট ডিলিট করার জন্য পাসওয়ার্ড দিন।');
+      if(entered === null) return;
+      if(entered !== systemMasterPin){ toast('ভুল পাসওয়ার্ড, ডিলিট হয়নি'); return; }
+      if(!confirm('অ্যাকাউন্টটা পুরোপুরি মুছে যাবে — আর ফেরানো যাবে না। (আগের বিক্রি/খাতা থেকে যাবে।) ঠিক আছে?')) return;
+      db2.disabled = true;
+      try{ await firebase.functions().httpsCallable('shopStaffAction')({ targetUid: uid, action: 'delete' }); toast('🗑️ স্টাফ ডিলিট হয়েছে'); }
+      catch(err){ alert('ডিলিট করা যায়নি: ' + (err.message || err)); }
+      await staffMgrRender();
+    }
+  });
+  return ov;
+}
+async function staffMgrRender(){
+  const list = document.getElementById('staffMgrList'); if(!list) return;
+  try{
+    const qs = await db.collection('shops').doc(__staffMgrShopId).collection('members').where('role', '==', 'subuser').get();
+    if(qs.empty){ list.innerHTML = '<div style="padding:8px 0;color:rgba(255,248,232,.7);">এখনো কোনো স্টাফ নেই — নিচের বাটনে যোগ করুন।</div>'; return; }
+    list.innerHTML = qs.docs.map(d=>{
+      const m = d.data(), f = m.features || {}, blocked = m.blocked === true;
+      return '<div style="border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:10px;margin-bottom:10px;' + (blocked ? 'background:rgba(185,28,28,.14);' : '') + '">'
+        + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><div style="min-width:0;"><b>👤 ' + escapeHtml(m.name || 'স্টাফ') + '</b><div style="font-size:11.5px;color:#cbbf9f;overflow-wrap:anywhere;">' + escapeHtml(m.email || '') + '</div></div>'
+        + '<span style="flex:0 0 auto;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;color:#fff;background:' + (blocked ? '#7f1d1d' : '#14532d') + ';">' + (blocked ? '🔴 ব্লক' : '🟢 সক্রিয়') + '</span></div>'
+        + '<div style="margin:8px 0 2px;font-size:12px;color:#ffd166;font-weight:800;">কী কী করতে পারবেন:</div>'
+        + STAFF_PERMS.map(p => '<label style="display:flex;align-items:center;gap:9px;padding:5px 0;font-size:13px;color:#fff8e8;"><input type="checkbox" data-sperm="' + d.id + '|' + p.k + '"' + (f[p.k] === false ? '' : ' checked') + ' style="width:18px;height:18px;margin:0;accent-color:#f59e0b;"> ' + p.label + '</label>').join('')
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">'
+        + '<button type="button" data-sblock="' + d.id + '" data-blocked="' + (blocked ? 1 : 0) + '" style="' + STAFF_BTN_STYLE + '">' + (blocked ? '✅ আনব্লক করুন' : '🚫 ব্লক করুন') + '</button>'
+        + '<button type="button" data-sdel="' + d.id + '" style="' + STAFF_BTN_STYLE + 'color:#fca5a5;border-color:#7f1d1d;">🗑️ ডিলিট</button></div></div>';
+    }).join('');
+  }catch(err){ list.innerHTML = '<div style="color:#fca5a5;">লোড করা যায়নি: ' + escapeHtml(err.message || String(err)) + '</div>'; }
+}
+function openStaffManager(shopId){
+  __staffMgrShopId = shopId || (typeof getSession === 'function' && getSession() ? getSession().shopId : null);
+  if(!__staffMgrShopId) return;
+  const ov = staffMgrEnsure();
+  ov.classList.add('show');
+  staffMgrRender();
+}
+document.getElementById('empSalesStaffMgrBtn').addEventListener('click', ()=>{
+  const m = document.getElementById('empSalesDetailModal'); if(m) m.classList.remove('show');
+  openStaffManager();
+});
+
 document.getElementById("cloudLogoutBtn").addEventListener("click", async ()=>{
   if(!confirm("লগআউট করতে চান? এই ডিভাইস থেকে লোকাল ডেটা মুছে যাবে (সার্ভারে সেভ করা আছে)।")) return;
   disableAutoSync(); // এটা stopWatchingAppDataChanges()-ও ডেকে দেয়
@@ -23906,7 +24032,7 @@ auth.onAuthStateChanged(async (user)=>{
   if(session.role === "admin"){
     const btn = document.getElementById("subUserBtn");
     btn.style.display = "inline-block";
-    btn.addEventListener("click", ()=>createSubUser(session.shopId));
+    btn.addEventListener("click", ()=>openStaffManager(session.shopId));
     watchShopMembers(session.shopId); // স্টাফ সেলিং Overview-এর জন্য — নতুন স্টাফ যোগ হলেই লাইভ আপডেট হবে
   }
 
@@ -24066,6 +24192,7 @@ auth.onAuthStateChanged(async (user)=>{
     showSyncToast();
   });
   applyRoleRestrictions(session.role);
+  if(session.role === "subuser" && typeof watchMyStaffStatus === "function") watchMyStaffStatus(session.shopId, session.uid);
   initBackButtonHandling();
   if(typeof ordStartNotificationListener === 'function') ordStartNotificationListener();
   if(typeof shopPushSetup === 'function'){ shopPushSetup(false); shopPushDeepLink(); }
