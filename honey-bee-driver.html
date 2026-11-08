@@ -135,13 +135,14 @@ select option{background:#173a29;color:#eafff2}
   </section>
   <section id="post" class="page hidden">
     <div class="card" style="margin-bottom:14px;border-color:rgba(74,222,128,.5)"><h2 class="section-title">⚡ এক চাপে পোস্ট</h2><p class="sub">কোনো নির্দিষ্ট রুট নেই? এক চাপেই জানিয়ে দিন — আপনি যেকোনো জায়গায় যেতে প্রস্তুত। আপনার এলাকা, গাড়ি, আসন আর ছবি নিজে থেকে বসবে, আজকের দিন শেষে পোস্ট নিজে থেকে লুকিয়ে যাবে।</p><button class="btn" type="button" id="anyPostBtn" style="width:100%;font-size:15px;padding:14px">🚐 আমি যেকোনো জায়গায় যেতে প্রস্তুত — পোস্ট করুন</button></div>
-    <div class="card"><h2 class="section-title">নতুন যাত্রা পোস্ট করুন</h2><p class="sub">আপনার রুট ও খালি আসনের তথ্য দিন। পোস্ট করলেই Honey Bee Transport-এ সব যাত্রী দেখতে পাবেন। মালামাল নিলে খালি আসন ০ দিন।</p>
+    <div class="card"><h2 class="section-title" id="postToggle" role="button" aria-expanded="false" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none;margin:0"><span>নতুন যাত্রা পোস্ট করুন</span><span id="postArrow" style="font-size:15px;opacity:.85">▼</span></h2>
+      <div id="postBody" style="display:none;margin-top:8px"><p class="sub">আপনার রুট ও খালি আসনের তথ্য দিন। পোস্ট করলেই Honey Bee Transport-এ সব যাত্রী দেখতে পাবেন। মালামাল নিলে খালি আসন ০ দিন।</p>
       <form id="postForm"><div class="formgrid"><div><label>কোথা থেকে</label><input required name="from" placeholder="যেমন: ঢাকা, মিরপুর"></div><div><label>কোথায় যাবেন</label><input required name="to" placeholder="যেমন: কক্সবাজার"></div>
       <div><label>যাত্রার তারিখ</label><input required type="date" name="date"></div><div><label>সময়</label><input required type="time" name="time"></div>
       <div><label>গাড়ির ধরন</label><select name="vehicle" id="postVehicle"><option>মোটরসাইকেল</option><option>বাইসাইকেল</option><option>রিকশা</option><option>ইজিবাইক</option><option>সিএনজি</option><option>প্রাইভেট কার</option><option>পিকআপ / মালবাহী গাড়ি</option><option>ট্রাক / কাভার্ড ভ্যান</option><option>মাইক্রোবাস</option><option>মিনিবাস / বাস</option><option>অ্যাম্বুলেন্স</option></select></div><div><label>খালি আসন</label><input required type="number" min="0" max="60" value="3" name="seats"></div>
       <div><label>প্রতি যাত্রীর ভাড়া (৳)</label><input required type="number" min="0" name="fare" placeholder="যেমন: 500"></div><div><label>যোগাযোগ নম্বর</label><input required type="tel" name="phone" id="postPhone" placeholder="মোবাইল নম্বর"></div></div>
       <label>অতিরিক্ত তথ্য</label><input name="notes" placeholder="পিকআপ পয়েন্ট বা শর্ত (ঐচ্ছিক)"><div class="notice" id="postPhotoHint" style="margin-top:12px">📷 পোস্টে আপনার প্রোফাইলের ছবি আর গাড়ির ছবি নিজে থেকেই যাবে। ছবি বদলাতে "আমার গাড়ি" পাতায় যান।</div>
-      <div class="btnrow"><button class="btn" type="submit">যাত্রা পোস্ট করুন</button><button class="btn secondary" type="reset">ফর্ম মুছুন</button></div></form>
+      <div class="btnrow"><button class="btn" type="submit">যাত্রা পোস্ট করুন</button><button class="btn secondary" type="reset">ফর্ম মুছুন</button></div></form></div>
     </div><div class="card" style="margin-top:14px"><h2 class="section-title">আপনার পোস্ট</h2><div id="postsList" class="sub">এখনো কোনো নতুন পোস্ট তৈরি হয়নি।</div></div>
   </section>
   <section id="bookings" class="page hidden"><div class="card" id="activeTripCard" style="display:none;margin-bottom:14px"></div><div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h2 class="section-title" style="margin:0">📩 যাত্রীর বুকিং অনুরোধ</h2></div><div class="sub" id="reqList" style="margin-top:12px">⏳ আনা হচ্ছে...</div></div></section>
@@ -354,6 +355,16 @@ function drvPostDefaults(){
   if(!f.date.value) f.date.value=new Date().toISOString().slice(0,10);
   if(v.seatCount) f.seats.value=v.seatCount;
 }
+/* 🛣️ "নতুন যাত্রা পোস্ট করুন" — শিরোনামে চাপলে ফর্ম খোলে/লুকায়। শুরুতে বন্ধ; পোস্ট বা এডিট শেষে আবার বন্ধ হয়ে নিচের "আপনার পোস্ট" তালিকা
+   দেখায়; ✏️ এডিটে চাপলে নিজে খুলে যায় (নইলে ফর্ম চোখে পড়ত না)। */
+(function(){
+  const h = document.getElementById("postToggle"), b = document.getElementById("postBody"), a = document.getElementById("postArrow");
+  if(!h || !b || !a) return;
+  function setOpen(open){ b.style.display = open ? "" : "none"; a.textContent = open ? "▲" : "▼"; h.setAttribute("aria-expanded", open ? "true" : "false"); }
+  h.addEventListener("click", ()=> setOpen(b.style.display === "none"));
+  window.drvPostOpen = setOpen;
+  setOpen(false);
+})();
 $id("postForm").addEventListener("submit", async (e)=>{
   e.preventDefault();
   if(!DRV.uid) return;
@@ -390,6 +401,7 @@ $id("postForm").addEventListener("submit", async (e)=>{
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
     e.target.reset(); drvPostDefaults();
+    if(window.drvPostOpen) window.drvPostOpen(false);
     alert("✅ পোস্ট হয়ে গেছে! যাত্রীরা এখন দেখতে পাচ্ছেন।");
     drvLoadMyPosts();
   }catch(err){ alert((__editPost?"সেভ করা যায়নি: ":"পোস্ট করা যায়নি: ")+(err&&err.message||err)); }
@@ -400,6 +412,7 @@ let __editPost=null, __myPosts=[];
 function drvStartEdit(id){
   const p=__myPosts.find(x=>x.id===id); if(!p) return;
   __editPost=p; const f=$id("postForm");
+  if(window.drvPostOpen) window.drvPostOpen(true);
   f.from.value=p.from||""; f.to.value=p.to||""; f.date.value=p.date||""; f.time.value=p.time||"";
   if(p.vehicleType) $id("postVehicle").value=p.vehicleType;
   f.seats.value=(p.seatsTotal!=null?p.seatsTotal:p.seats)||0; f.fare.value=p.fare||""; f.phone.value=p.authorPhone||""; f.notes.value=p.notes||"";
@@ -409,6 +422,7 @@ function drvStartEdit(id){
 }
 function drvCancelEdit(){
   __editPost=null; const f=$id("postForm"); f.reset(); drvPostDefaults();
+  if(window.drvPostOpen) window.drvPostOpen(false);
   f.querySelector("button[type=submit]").textContent="যাত্রা পোস্ট করুন";
   f.querySelector("button[type=reset]").textContent="ফর্ম মুছুন";
 }
