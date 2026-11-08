@@ -146,16 +146,17 @@ select option{background:#173a29;color:#eafff2}
   </section>
   <section id="bookings" class="page hidden"><div class="card" id="activeTripCard" style="display:none;margin-bottom:14px"></div><div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h2 class="section-title" style="margin:0">📩 যাত্রীর বুকিং অনুরোধ</h2></div><div class="sub" id="reqList" style="margin-top:12px">⏳ আনা হচ্ছে...</div></div></section>
   <section id="schedule" class="page hidden">
-    <div class="card"><h2 class="section-title">📅 আগাম বুকিং যোগ করুন</h2><p class="sub">ফোনে বা সামনাসামনি কেউ আগে থেকে গাড়ি ঠিক করলে এখানে লিখে রাখুন। একই সময়ে দুইটা বুকিং হলে অ্যাপ সতর্ক করবে।</p>
+    <div class="card"><h2 class="section-title" id="schedToggle" role="button" aria-expanded="false" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none;margin:0"><span>📅 আগাম বুকিং যোগ করুন</span><span id="schedArrow" style="font-size:15px;opacity:.85">▼</span></h2>
+      <div id="schedBody" style="display:none;margin-top:8px"><p class="sub">ফোনে বা সামনাসামনি কেউ আগে থেকে গাড়ি ঠিক করলে এখানে লিখে রাখুন। একই সময়ে দুইটা বুকিং হলে অ্যাপ সতর্ক করবে।</p>
       <form id="schedForm"><div class="formgrid">
         <div><label>যাত্রীর নাম</label><input name="name" required placeholder="নাম"></div><div><label>ফোন</label><input name="phone" type="tel" required placeholder="মোবাইল নম্বর"></div>
-        <div><label>তারিখ</label><select name="date" required></select></div><div><label>সময়</label><select name="time" required></select></div>
+        <div><label>তারিখ</label><input name="date" type="date" required></div><div><label>সময়</label><input name="time" type="time" required></div>
         <div><label>আনুমানিক কতক্ষণ</label><select name="dur"><option value="30">৩০ মিনিট</option><option value="60" selected>১ ঘণ্টা</option><option value="120">২ ঘণ্টা</option><option value="180">৩ ঘণ্টা</option><option value="360">৬ ঘণ্টা</option><option value="720">১২ ঘণ্টা</option></select></div>
         <div><label>যাত্রী কয়জন</label><input name="pax" type="number" min="1" placeholder="ঐচ্ছিক"></div>
         <div><label>কোথা থেকে</label><input name="from" placeholder="ঐচ্ছিক"></div><div><label>কোথায়</label><input name="to" placeholder="ঐচ্ছিক"></div>
         <div><label>মোট ভাড়া (৳)</label><input name="amount" type="number" min="0" placeholder="ঐচ্ছিক"></div><div><label>অগ্রিম পেয়েছেন (৳)</label><input name="adv" type="number" min="0" placeholder="ঐচ্ছিক"></div>
       </div><label>নোট</label><input name="notes" placeholder="ঐচ্ছিক">
-      <div class="btnrow"><button class="btn" type="submit">💾 বুকিং সেভ করুন</button><button class="btn secondary" type="button" id="blockDayBtn">⛔ এই তারিখে কাজ বন্ধ রাখুন</button></div></form></div>
+      <div class="btnrow"><button class="btn" type="submit">💾 বুকিং সেভ করুন</button><button class="btn secondary" type="button" id="blockDayBtn">⛔ এই তারিখে কাজ বন্ধ রাখুন</button></div></form></div></div>
     <div class="card" style="margin-top:14px"><h2 class="section-title">🗓️ সামনের বুকিং</h2><div id="schedList" class="sub">⏳ আনা হচ্ছে...</div></div>
   </section>
   <section id="vehicle" class="page hidden"><div class="card"><h2 class="section-title">📷 ছবি (একবার দিলেই সব পোস্টে যাবে)</h2><p class="sub">যাত্রীরা আপনার মুখ আর গাড়ি দেখে ভরসা পান। ছবিতে চাপ দিয়ে দিন বা বদলান।</p><div class="formgrid" id="photoGrid" style="grid-template-columns:1fr 1fr"></div></div><div class="card" style="margin-top:14px"><h2 class="section-title">আমার গাড়ি</h2><form id="vehicleForm"><label>গাড়ির ধরন</label><select id="vType" required><option value="">-- গাড়ির ধরন বেছে নিন --</option><option value="bike">🏍️ বাইক</option><option value="cng">🛺 CNG / অটো রিকশা</option><option value="easy_bike">🛺✨ ইজি বাইক</option><option value="sedan">🚗 সেডান / প্রাইভেট কার</option><option value="hiace">🚐 হাইএস</option><option value="microbus">🚐 মাইক্রোবাস</option><option value="pickup">🛻 পিকআপ / ট্রাক</option><option value="ambulance_ac">🚑 অ্যাম্বুলেন্স (AC)</option><option value="ambulance_non_ac">🚑 অ্যাম্বুলেন্স (Non-AC)</option><option value="ambulance_icu">🚑 অ্যাম্বুলেন্স (ICU)</option></select><label>গাড়ির মডেল</label><input id="vModel" placeholder="যেমন: Toyota Hiace (2019)" required><div class="formgrid"><div><label>রেজিস্ট্রেশন নম্বর</label><input id="vReg" placeholder="রেজিস্ট্রেশন নম্বর" required></div><div><label>মোট আসন</label><input id="vSeats" type="number" min="1" placeholder="মোট আসন" required></div><div><label>এসি</label><select id="vAc"><option value="">নির্বাচন করুন</option><option>আছে</option><option>নেই</option></select></div><div><label>জ্বালানি</label><select id="vFuel"><option value="">নির্বাচন করুন</option><option>ডিজেল</option><option>পেট্রোল</option><option>সিএনজি</option><option>ইলেকট্রিক</option></select></div></div><button class="btn" type="submit" style="margin-top:14px">তথ্য সংরক্ষণ করুন</button></form><div class="notice">আপনার প্রকৃত গাড়ির তথ্য পূরণ করুন। গাড়ির ধরন ঠিকভাবে দিন — যাত্রী ও অ্যাম্বুলেন্স খোঁজায় এটা দেখেই আপনাকে দেখানো হয়।</div></div></section>
@@ -189,7 +190,7 @@ select option{background:#173a29;color:#eafff2}
 <nav class="mobile-nav"><button class="active" data-page="home"><span>⌂</span>হোম</button><button data-page="post"><span>＋</span>পোস্ট</button><button data-page="bookings"><span>▣</span>বুকিং</button><button data-page="schedule"><span>▦</span>সময়সূচি</button><button data-page="profile"><span>♙</span>প্রোফাইল</button></nav>
 <script>
 const titles={trips:['যাত্রী ট্রিপ','গন্তব্য-ভিত্তিক রিকোয়েস্ট ও কাছের যাত্রী।'],flight:['যাত্রীর ফ্লাইট','বিমান কখন নামবে — লাইভ খবর।'],home:['ড্রাইভার ড্যাশবোর্ড','স্বাগতম! আজকের যাত্রা ও বুকিং দেখুন।'],post:['নতুন যাত্রা পোস্ট','আপনার রুট, সময় ও খালি আসন দিন।'],bookings:['বুকিং অনুরোধ','যাত্রীর অনুরোধ পর্যালোচনা করুন।'],schedule:['সময়সূচি','আপনার আসন্ন যাত্রার পরিকল্পনা।'],vehicle:['আমার গাড়ি','গাড়ির তথ্য যাচাই ও আপডেট করুন।'],earnings:['আয় ও হিসাব','যাত্রা থেকে আয়ের সারসংক্ষেপ।'],profile:['আমার প্রোফাইল','আপনার যোগাযোগ ও পরিচয় তথ্য।']};
-function go(page){{const tb=document.getElementById('topBar');if(tb)tb.classList.toggle('isHome',page==='home');if(page==='schedule'&&typeof drvBuildSchedPickers==='function')drvBuildSchedPickers();}document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));document.querySelectorAll('[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));document.getElementById('pageTitle').textContent=titles[page][0];document.getElementById('pageSub').textContent=titles[page][1];window.scrollTo({top:0,behavior:'smooth'})}
+function go(page){{const tb=document.getElementById('topBar');if(tb)tb.classList.toggle('isHome',page==='home');}document.querySelectorAll('.page').forEach(x=>x.classList.toggle('hidden',x.id!==page));document.querySelectorAll('[data-page]').forEach(x=>x.classList.toggle('active',x.dataset.page===page));document.getElementById('pageTitle').textContent=titles[page][0];document.getElementById('pageSub').textContent=titles[page][1];window.scrollTo({top:0,behavior:'smooth'})}
 document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.page)));
 document.querySelectorAll('[data-goto]').forEach(x=>x.addEventListener('click',()=>go(x.dataset.goto)));
 let online=true;window.__demoToggle=()=>{online=!online;document.getElementById('statusText').textContent=online?'অনলাইন · বুকিং নিচ্ছেন':'অফলাইন · বুকিং বন্ধ';document.getElementById('statusDot').style.background=online?'#15945b':'#9ca3af';document.getElementById('toggleOnline').classList.toggle('on',online)};
@@ -1208,34 +1209,15 @@ async function drvSchedWrite(id,data){
   const ref=db.collection("trips").doc(id);
   await db.runTransaction(async tx=>{ const s=await tx.get(ref); if(s.exists) throw new Error("SLOT"); tx.set(ref,data); });
 }
-/* 🔽 আগাম বুকিংয়ের তারিখ ও সময় — ড্রপ-ডাউন তালিকা (ক্যালেন্ডার/ঘড়ির বদলে)।
-   তারিখ: আজ থেকে ৯০ দিন; সময়: ১৫ মিনিট পরপর, সারা দিন। মান আগের মতোই "YYYY-MM-DD" ও "HH:MM", তাই সেভ/সতর্কতার কোড অপরিবর্তিত।
-   পেজ খুললে নতুন করে সাজানো হয় (রাত পেরিয়ে "আজ" বদলে গেলেও ঠিক থাকে); আগে বাছা মান থাকলে সেটাই ধরে রাখে। */
-function drvBuildSchedPickers(){
-  const f = document.getElementById("schedForm"); if(!f) return;
-  const dSel = f.elements["date"], tSel = f.elements["time"]; if(!dSel || !tSel) return;
-  const keepD = dSel.value, keepT = tSel.value;
-  const names = ["আজ", "কাল", "পরশু"];
-  let dh = "";
-  for(let i = 0; i < 90; i++){
-    const v = drvDayStr(i);
-    let lab = "";
-    try{ lab = new Date(v + "T12:00:00").toLocaleDateString("bn-BD", { weekday:"short", day:"numeric", month:"long", year:"numeric" }); }catch(e){ lab = v; }
-    dh += '<option value="' + v + '">' + (i < 3 ? names[i] + " — " : "") + lab + '</option>';
-  }
-  dSel.innerHTML = dh;
-  let th = '<option value="">— সময় বেছে নিন —</option>';
-  for(let m = 0; m < 24 * 60; m += 15){
-    const hh = String(Math.floor(m / 60)).padStart(2, "0"), mm = String(m % 60).padStart(2, "0");
-    let lab = hh + ":" + mm;
-    try{ lab = new Date(2000, 0, 1, Math.floor(m / 60), m % 60).toLocaleTimeString("bn-BD", { hour:"numeric", minute:"2-digit", hour12:true }); }catch(e){}
-    th += '<option value="' + hh + ":" + mm + '">' + lab + '</option>';
-  }
-  tSel.innerHTML = th;
-  dSel.value = keepD && dSel.querySelector('option[value="' + keepD + '"]') ? keepD : drvDayStr(0);
-  tSel.value = keepT && tSel.querySelector('option[value="' + keepT + '"]') ? keepT : "";
-}
-drvBuildSchedPickers();
+/* 📅 "আগাম বুকিং যোগ করুন" — শিরোনামে চাপলে ফর্ম খোলে/লুকায় (ড্রপ-ডাউনের মতো)। শুরুতে বন্ধ, সেভের পর আবার বন্ধ হয়ে নিচের তালিকায় নতুন বুকিং দেখায়। */
+(function(){
+  const h = document.getElementById("schedToggle"), b = document.getElementById("schedBody"), a = document.getElementById("schedArrow");
+  if(!h || !b || !a) return;
+  function setOpen(open){ b.style.display = open ? "" : "none"; a.textContent = open ? "▲" : "▼"; h.setAttribute("aria-expanded", open ? "true" : "false"); }
+  h.addEventListener("click", ()=> setOpen(b.style.display === "none"));
+  window.drvSchedOpen = setOpen;
+  setOpen(false);
+})();
 
 $id("schedForm").addEventListener("submit", async e=>{
   e.preventDefault(); const f=Object.fromEntries(new FormData(e.target)), btn=e.target.querySelector("button[type=submit]");
@@ -1252,7 +1234,7 @@ $id("schedForm").addEventListener("submit", async e=>{
       customerName:f.name.trim(), customerPhone:f.phone.trim(), pickupAddress:f.from.trim()||null, destination:f.to.trim()||null,
       passengerCount:Number(f.pax)||null, amount:Number(f.amount)||null, advancePayment:Number(f.adv)||null, notes:f.notes.trim()||null,
       status:"confirmed", createdAt:firebase.firestore.FieldValue.serverTimestamp() });
-    e.target.reset(); e.target.date.value=drvDayStr(0); alert("✅ বুকিং সেভ হয়েছে।"); drvLoadSched();
+    e.target.reset(); e.target.date.value=drvDayStr(0); alert("✅ বুকিং সেভ হয়েছে।"); drvLoadSched(); if(window.drvSchedOpen) window.drvSchedOpen(false);
   }catch(err){ alert(err.message==="SLOT"?"এই একই সময়ে আগেই একটা বুকিং আছে।":err.message); }
   btn.disabled=false; btn.textContent="💾 বুকিং সেভ করুন";
 });
