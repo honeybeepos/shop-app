@@ -620,7 +620,7 @@ function drvOpenSched(id,b){
     }catch(e){}
     try{
       await db.collection("transportBookings").doc(id).update({ tripAt:firebase.firestore.Timestamp.fromDate(d), tripKey:key, updatedAt:firebase.firestore.FieldValue.serverTimestamp() });
-      drvCloseSched(); alert("✅ যাত্রার সময় ঠিক হয়েছে।\n🗓️ "+drvFmtTrip(d.getTime())+"\nসময় হলে অ্যালার্ম বাজবে (অ্যাপ খোলা থাকলে)।");
+      drvCloseSched(); alert("✅ যাত্রার সময় ঠিক হয়েছে।\n🗓️ "+drvFmtTrip(d.getTime())+"\nএখন থেকে এটা 'সময়সূচি' পাতায় থাকবে (সামনের পাতা পরিষ্কার থাকবে); যাওয়ার ৩০ মিনিট আগে আবার সামনে আসবে। সময় হলে অ্যালার্ম বাজবে (অ্যাপ খোলা থাকলে)।");
     }catch(e){ err.textContent="সময় বসানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"; ok.disabled=false; }
   };
 }
@@ -1070,19 +1070,35 @@ function drvBkCard(b,btns){
     ${b.flightNo?`<div class="meta">✈️ ফ্লাইট: <b>${esc(b.flightNo)}</b> <button type="button" class="btn secondary" style="padding:4px 10px;font-size:12px" data-fl="${esc(b.flightNo)}">ফ্লাইট দেখুন</button></div>`:""}
     <div class="meta" id="ph_${esc(b.id)}"></div>${btns?`<div class="btnrow">${btns}</div>`:""}</div>`;
 }
+/* 📞 নিশ্চিত বুকিংয়ের যাত্রীর নম্বর/লোকেশন (গ্রহণের পরেই পড়া যায়) — "ph_<id>" ঘরে বসে; সামনের কার্ড আর সময়সূচি — দুই জায়গাতেই */
+async function drvFillContact(b){ try{ const c=await db.collection("transportBookings").doc(b.id).collection("private").doc("contact").get();
+    const el=$id("ph_"+b.id); if(el&&c.exists){ const ph=String(c.data().phone||"").replace(/[^0-9+]/g,""); const cd=c.data(), ll=(typeof cd.lat==="number"&&typeof cd.lng==="number")?cd.lat+","+cd.lng:"";
+      el.innerHTML=`📞 <a href="tel:${ph}" style="color:#4ade80;font-weight:800">${esc(cd.phone)}</a> — কল করে সময় ও জায়গা ঠিক করুন`+(ll?`<br>📍 <a href="https://www.google.com/maps?q=${ll}" target="_blank" rel="noopener" style="color:#4ade80;font-weight:800">যাত্রীর লোকেশন ম্যাপে দেখুন</a>${cd.acc?` <small>(±${esc(cd.acc)} মি.)</small>`:""}`:""); } }catch(e){} }
+const DRV_SCHED_LEAD = 30*60000;
+let __lastBkArgs = null, __frontSig = "";
+// সময় পেরোতে পেরোতে কোনো বুকিং ৩০ মিনিটের সীমায় ঢুকলে (নতুন তথ্য না এলেও) সামনে চলে আসে
+setInterval(()=>{
+  try{
+    if(!__lastBkArgs) return;
+    const sig = __lastBkArgs[1].filter(b=>!(drvTripMs(b)>Date.now()+DRV_SCHED_LEAD)).map(b=>b.id).join(",");
+    if(sig !== __frontSig) drvRenderBookings.apply(null, __lastBkArgs);
+  }catch(e){}
+}, 30000);
 function drvRenderBookings(pend,acc,old){
   acc=acc.slice().sort((a,b)=>(drvTripMs(a)||9e15)-(drvTripMs(b)||9e15)); __accList=acc; setTimeout(drvAlarmTick,300);
   const box=$id("reqList"), act=$id("activeTripCard");
-  act.style.display=acc.length?"":"none";
-  act.innerHTML=`<h2 class="section-title" style="color:#4ade80">✅ নিশ্চিত বুকিং</h2>`+acc.map(b=>drvBkCard(b,
+  // 🧹 সামনের পাতা পরিষ্কার: যাত্রার সময় বসানো আর ৩০ মিনিটের বেশি দূরের বুকিং এখন সময়সূচি পাতায়; যাওয়ার ৩০ মিনিট আগে আবার এখানে ফিরে আসে
+  const front=acc.filter(b=>!(drvTripMs(b)>Date.now()+DRV_SCHED_LEAD));
+  __lastBkArgs=[pend,acc,old]; __frontSig=front.map(b=>b.id).join(",");
+  act.style.display=front.length?"":"none";
+  act.innerHTML=`<h2 class="section-title" style="color:#4ade80">✅ নিশ্চিত বুকিং</h2>`+front.map(b=>drvBkCard(b,
     `<button class="btn" type="button" data-done="${esc(b.id)}">🏁 যাত্রা শেষ</button><button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ বাতিল</button>${b.tripAt?"":`<button class="btn secondary" type="button" data-sched="${esc(b.id)}" style="border-color:#fbbf24;color:#fbbf24">🗓️ সময় ঠিক করুন</button>`}`)).join("");
   box.className=pend.length||old.length?"":"sub";
   box.innerHTML=(pend.length?pend.map(b=>drvBkCard(b,`<button class="btn" type="button" data-yes="${esc(b.id)}">✅ গ্রহণ করুন</button><button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ না</button>`)).join(""):"<div class='sub'>এখন নতুন কোনো বুকিং অনুরোধ নেই। যাত্রীরা আপনার পোস্ট দেখে বুক করলে এখানে আসবে।</div>")
     +(old.length?`<div class="sub" style="margin-top:14px">আগের বুকিং</div>`+old.map(b=>drvBkCard(b,"")).join(""):"");
   // নিশ্চিত বুকিংয়ের যাত্রীর নম্বর — গ্রহণের পরেই পড়া যায়
-  acc.forEach(async b=>{ try{ const c=await db.collection("transportBookings").doc(b.id).collection("private").doc("contact").get();
-    const el=$id("ph_"+b.id); if(el&&c.exists){ const ph=String(c.data().phone||"").replace(/[^0-9+]/g,""); const cd=c.data(), ll=(typeof cd.lat==="number"&&typeof cd.lng==="number")?cd.lat+","+cd.lng:"";
-      el.innerHTML=`📞 <a href="tel:${ph}" style="color:#4ade80;font-weight:800">${esc(cd.phone)}</a> — কল করে সময় ও জায়গা ঠিক করুন`+(ll?`<br>📍 <a href="https://www.google.com/maps?q=${ll}" target="_blank" rel="noopener" style="color:#4ade80;font-weight:800">যাত্রীর লোকেশন ম্যাপে দেখুন</a>${cd.acc?` <small>(±${esc(cd.acc)} মি.)</small>`:""}`:""); } }catch(e){} });
+  drvRenderSched();
+  acc.forEach(drvFillContact);
   document.querySelectorAll("[data-yes]").forEach(x=>x.onclick=()=>drvAcceptBooking(x.dataset.yes,x));
   document.querySelectorAll("[data-sched]").forEach(x=>x.onclick=()=>drvOpenSched(x.dataset.sched, acc.find(p=>p.id===x.dataset.sched)));
   document.querySelectorAll("[data-no]").forEach(x=>x.onclick=()=>{ if(confirm("এই বুকিং নিতে পারছেন না?")) drvSetBooking(x.dataset.no,"declined",x); });
@@ -1206,16 +1222,28 @@ function drvMin(t){ const [h,m]=String(t||"0:0").split(":").map(Number); return 
 async function drvLoadSched(){
   try{ const qs=await db.collection("trips").where("driverId","==",DRV.uid).where("hasSchedule","==",true).limit(300).get();
     __sched=qs.docs.map(d=>({id:d.id,...d.data()})); }catch(e){ __sched=[]; }
+  drvRenderSched();
+}
+function drvRenderSched(){
   const today=drvDayStr(0);
   const up=__sched.filter(x=>(x.scheduledDate||"")>=today).sort((a,b)=>((a.scheduledDate||"")+(a.scheduledTime||"")).localeCompare((b.scheduledDate||"")+(b.scheduledTime||"")));
-  const box=$id("schedList");
-  if(!up.length){ box.className="sub"; box.textContent="সামনে কোনো বুকিং নেই।"; return; }
+  const bks=(__accList||[]).filter(b=>drvTripMs(b)>Date.now()+DRV_SCHED_LEAD);   // যাত্রার সময় বসানো নিশ্চিত বুকিং
+  const box=$id("schedList"); if(!box) return;
+  if(!up.length && !bks.length){ box.className="sub"; box.textContent="সামনে কোনো বুকিং নেই।"; return; }
   box.className="";
-  box.innerHTML=up.map(x=> x.bookingSource==="blocked"
+  const htmlFor=(x)=> x.bookingSource==="blocked"
     ? `<div class="trip"><div class="trip-head"><span>⛔ ${esc(x.scheduledDate)} — কাজ বন্ধ</span><button class="btn secondary" type="button" data-del="${esc(x.id)}" style="padding:6px 10px;font-size:12px">তুলে নিন</button></div></div>`
     : `<div class="trip"><div class="trip-head"><span>📅 ${esc(x.scheduledDate)} · ${esc(x.scheduledTime||"")}</span><span class="badge">${x.durationMinutes?esc(x.durationMinutes)+" মি":""}</span></div>
        <div class="meta">👤 ${esc(x.customerName||"—")} · 📞 ${esc(x.customerPhone||"")}${x.destination?"<br>🏁 "+esc((x.pickupAddress?x.pickupAddress+" → ":"")+x.destination):""}${x.amount?"<br>💰 ভাড়া "+CUR+esc(x.amount)+(x.advancePayment?" · অগ্রিম "+CUR+esc(x.advancePayment):""):""}${x.notes?"<br>📝 "+esc(x.notes):""}</div>
-       <div class="btnrow">${x.customerPhone?`<a class="btn secondary" style="text-decoration:none;padding:6px 10px;font-size:12px" href="tel:${esc(String(x.customerPhone).replace(/[^0-9+]/g,""))}">📞 কল</a>`:""}<button class="btn secondary" type="button" data-del="${esc(x.id)}" style="padding:6px 10px;font-size:12px">🗑️ মুছুন</button></div></div>`).join("");
+       <div class="btnrow">${x.customerPhone?`<a class="btn secondary" style="text-decoration:none;padding:6px 10px;font-size:12px" href="tel:${esc(String(x.customerPhone).replace(/[^0-9+]/g,""))}">📞 কল</a>`:""}<button class="btn secondary" type="button" data-del="${esc(x.id)}" style="padding:6px 10px;font-size:12px">🗑️ মুছুন</button></div></div>`;
+  const keyMs=(x)=>{ const t=new Date((x.scheduledDate||"")+"T"+(x.scheduledTime||"00:00")).getTime(); return isNaN(t)?0:t; };
+  const items=up.map(x=>({ ms:keyMs(x), html:htmlFor(x) })).concat(bks.map(b=>({ ms:drvTripMs(b),
+    html:'<div style="border-left:3px solid #4ade80;padding-left:8px;margin-bottom:6px">'+drvBkCard(b,`<button class="btn secondary" type="button" data-bkno="${esc(b.id)}">❌ বাতিল</button>`)+'</div>' })));
+  items.sort((x,y)=>x.ms-y.ms);
+  box.innerHTML=items.map(i=>i.html).join("");
+  box.querySelectorAll("[data-bkno]").forEach(x=>x.onclick=()=>{ if(confirm("এই বুকিং নিতে পারছেন না?")) drvSetBooking(x.dataset.bkno,"declined",x); });
+  box.querySelectorAll("[data-fl]").forEach(x=>x.onclick=()=>drvOpenFlight(x.dataset.fl));
+  bks.forEach(drvFillContact);
   box.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{ if(!confirm("মুছে ফেলবেন?")) return; b.disabled=true;
     try{ await db.collection("trips").doc(b.dataset.del).delete(); drvLoadSched(); }catch(e){ alert("মোছা যায়নি: "+e.message); b.disabled=false; } });
 }
