@@ -2299,7 +2299,7 @@ window.hbLoadLib = function(name){
     <div class="panel">
       <h2><span class="num">≡</span> সব হিসাব</h2>
       <div style="position:relative;">
-        <input class="search" id="searchBox" type="text" placeholder="🌐 নাম, নাম্বার বা প্রোডাক্ট দিয়ে খুঁজুন...">
+        <input class="search" id="searchBox" type="text" placeholder="🔎 এই হিসাবের ভেতরে খুঁজুন — নাম, নাম্বার বা প্রোডাক্ট...">
         <div class="smartSuggestBox" id="listGlobalBox"></div>
       </div>
       <div id="entryList"></div>
@@ -15896,7 +15896,7 @@ function setupGlobalSearchDropdown(cfg){
 }
 
 setupGlobalSearchDropdown({inputId:'dueSearchBox', boxId:'dueGlobalBox', context:'due'});
-setupGlobalSearchDropdown({inputId:'searchBox', boxId:'listGlobalBox', context:'list'});
+// 🔎 সব হিসাবের সার্চে আলাদা ড্রপডাউন (স্টক প্রোডাক্ট/কাস্টমার তালিকা) বন্ধ — টাইপ করলে শুধু এই তালিকার হিসাবগুলোই ছাঁকা হয় (নাম, নাম্বার, প্রোডাক্ট, ইনভয়েস নম্বর)
 setupGlobalSearchDropdown({inputId:'printName', boxId:'printGlobalBox', context:'print'});
 
 /* ---- Cart system: add multiple items one-by-one, then save the whole bill at once ---- */
@@ -17394,6 +17394,47 @@ function handleWaMiniClickBill(billKey){
 // থেকেই billItems পুনর্গঠন করে buildSalesInvoiceMessage দিয়ে ঠিক সেল করার সময়ের মতোই ইনভয়েস
 // বানানো হয়, তারপর openShareModal খুলে যায় (সেখান থেকে থার্মাল প্রিন্ট/WhatsApp/SMS করা যায়) —
 // এভাবে যেকোনো পুরনো সেল (Unknown/walk-in কাস্টমার সহ) পরে আবার প্রিন্ট করা যাবে।
+/* ↩️ "সব হিসাব"-এর যেকোনো বিক্রির কার্ড থেকে এক চাপে ফেরত: নতুন এন্ট্রি → কাস্টমার ঠিক করা → "ফেরত" ফর্ম, সঙ্গে মাল, সংখ্যা, মূল্য ভরা।
+   (Unknown/নগদ কাস্টমার হোক বা নিয়মিত — যার নামে বিক্রি, তারই নামে ফেরত।) বাকি বা ভালো/খারাপ মাল ঠিক করে "সেভ" চাপলেই শেষ —
+   ভালো মাল স্টকে ফিরে আসে, ভুল সেল ঠিক করে আগের অবস্থায় ফেরানো যায়। বিলে একাধিক মাল থাকলে কোনটা ফেরত তা জিজ্ঞেস করে। */
+function returnFromBill(billKey){
+  const items = retailEntries.filter(e => (e.billId||e.id) === billKey && e.status !== 'ফেরত' && (e.price||0) > 0);
+  if(!items.length){ toast('এই বিলে ফেরত নেওয়ার মতো কিছু নেই'); return; }
+  let e = items[0];
+  if(items.length > 1){
+    const list = items.map((x,i)=> (i+1) + '. ' + x.item + ' × ' + (x.qty||1)).join('\n');
+    const pick = prompt('কোন মালটা ফেরত নিচ্ছেন? নম্বর লিখুন:\n' + list, '1');
+    if(pick === null) return;
+    const idx = parseInt(pick, 10) - 1;
+    if(!(idx >= 0 && idx < items.length)){ toast('ঠিক নম্বর দিন'); return; }
+    e = items[idx];
+  }
+  const bought = Math.max(parseInt(e.qty, 10) || 1, 1);
+  let qty = 1;
+  if(bought > 1){
+    const q = prompt('কয়টা ফেরত নিচ্ছেন? (সর্বোচ্চ ' + bought + ')', String(bought));
+    if(q === null) return;
+    qty = Math.min(Math.max(parseInt(q, 10) || 1, 1), bought);
+  }
+  const billDue = retailEntries.filter(x => (x.billId||x.id) === billKey).reduce((s,x)=> s + Math.max((x.price||0) - (x.paid||0), 0), 0);
+  // নতুন এন্ট্রি ট্যাব → পুরাতন কাস্টমার (নাম/নম্বর সহ) → "ফেরত"
+  document.querySelector('.tab-btn[data-tab="add"]').click();
+  const modeOld = document.querySelector('#customerModeGroup .status-chip[data-m="old"]');
+  if(modeOld) modeOld.click();
+  selectOldCustomer(e.name || '', e.phone || '');
+  const retChip = document.querySelector('#statusGroup .status-chip[data-s="ফেরত"]') || document.querySelector('.status-chip[data-s="ফেরত"]');
+  if(retChip) retChip.click();
+  setTimeout(()=>{
+    const it = document.getElementById('rtItem'); it.value = e.item || ''; it.dataset.productId = e.productId || '';
+    document.getElementById('rtQty').value = String(qty);
+    document.getElementById('rtValue').value = String(Math.round((e.price||0) * qty / bought));
+    const cashChip = document.querySelector('#rtCashGroup .status-chip[data-rc="' + (billDue > 0 ? 'no' : 'yes') + '"]');
+    if(cashChip) cashChip.click();
+    toast('↩️ ফেরতের ফর্ম ভরা হয়েছে — মাল ভালো না খারাপ বেছে "সেভ" চাপুন');
+    try{ it.scrollIntoView({block:'center'}); }catch(err){}
+  }, 150);
+}
+
 function reprintBill(billKey){
   const items = retailEntries.filter(e => (e.billId||e.id) === billKey);
   if(!items.length){ toast('বিলটি খুঁজে পাওয়া যায়নি'); return; }
@@ -18336,7 +18377,7 @@ function render(showSecureInfo = false){
     const waAction = multi ? `handleWaMiniClickBill('${key}')` : `handleWaMiniClick('${first.id}')`;
     const payAction = multi ? `markPaidBill('${key}')` : `markPaid('${first.id}')`;
     const printAction = `reprintBill('${key}')`;
-    return `<div class="entry ${statusClass}"><div class="entry-top"><div><div class="who">${first.invoiceNo?`<span style="color:#8a7f6c; font-weight:700; font-size:11.5px; font-family:'Space Mono',monospace;">#${escapeHtml(first.invoiceNo.replace('INV-',''))}</span> `:''}${escapeHtml(first.name)}</div><div class="item">${itemsHtml}${first.phone?`<div>${escapeHtml(first.phone)}</div>`:''}</div></div><span class="badge">${first.status}</span></div><div class="entry-nums"><span><b>দাম</b>${fmt(totalPrice)}</span><span class="paid-amt"><b>জমা</b>${fmt(totalPaid)}</span><span class="due-amt"><b>বাকি</b>${fmt(totalDue)}</span></div><div class="entry-actions">${totalDue>0?`<button class="mini-btn pay" onclick="${payAction}">সম্পূর্ণ জমা</button>`:''}<button class="mini-btn" onclick="${printAction}">🖨️ প্রিন্ট</button>${first.phone?`<button class="mini-btn wa-mini" onclick="${waAction}">💬 WhatsApp</button>`:''}<button class="mini-btn" onclick="${editAction}">✏️ ঠিক করুন</button><button class="mini-btn danger" onclick="${deleteAction}">মুছুন</button></div></div>`;
+    return `<div class="entry ${statusClass}"><div class="entry-top"><div><div class="who">${first.invoiceNo?`<span style="color:#8a7f6c; font-weight:700; font-size:11.5px; font-family:'Space Mono',monospace;">#${escapeHtml(first.invoiceNo.replace('INV-',''))}</span> `:''}${escapeHtml(first.name)}</div><div class="item">${itemsHtml}${first.phone?`<div>${escapeHtml(first.phone)}</div>`:''}</div></div><span class="badge">${first.status}</span></div><div class="entry-nums"><span><b>দাম</b>${fmt(totalPrice)}</span><span class="paid-amt"><b>জমা</b>${fmt(totalPaid)}</span><span class="due-amt"><b>বাকি</b>${fmt(totalDue)}</span></div><div class="entry-actions">${totalDue>0?`<button class="mini-btn pay" onclick="${payAction}">সম্পূর্ণ জমা</button>`:''}<button class="mini-btn" onclick="${printAction}">🖨️ প্রিন্ট</button>${first.phone?`<button class="mini-btn wa-mini" onclick="${waAction}">💬 WhatsApp</button>`:''}${(first.status !== 'ফেরত' && totalPrice > 0) ? `<button class="mini-btn" style="color:#b45309;border-color:#d97706;" onclick="returnFromBill('${first.billId||first.id}')">↩️ ফেরত</button>` : ''}<button class="mini-btn" onclick="${editAction}">✏️ ঠিক করুন</button><button class="mini-btn danger" onclick="${deleteAction}">মুছুন</button></div></div>`;
   }).join('') : '<div class="empty">কোনো হিসাব নেই।</div>';
 
   const dueIcon = document.getElementById('dueHeaderIcon');
