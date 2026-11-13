@@ -16656,7 +16656,14 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
     let extraNote = (cashBack==='yes' ? `Cash return: ${HB_CUR} ${value}` : `${HB_CUR} ${value} deducted from balance.`) + (condition==='bad' ? ' [খারাপ/নষ্ট মাল — স্টকে যোগ হয়নি]' : ' [ভালো মাল — স্টকে যোগ হয়েছে]');
     if(cashBack === 'no' && value>0){ allocateDuePayment(name, phone, value); }
 
-    const rtNewEntry = { id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, returnValue: value, cashBack, returnReason, note: (note ? note+' — ' : '')+extraNote, status, condition, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() };
+    // ↩️ "ফেরত" বাটন থেকে এলে এবং ফর্মের কাস্টমার/মাল/সংখ্যা বদলানো না হলে মূল বিলের সাথে জোড়া; নইলে সাধারণ ফেরত
+    let retLink = {};
+    const retCtx = window.__hbReturnCtx;
+    if(retCtx && (Date.now() - retCtx.t) < 15*60*1000 && retCtx.item === item.trim() && retCtx.qty === rtQty && retCtx.name === String(name || '').trim()){
+      retLink = { returnOfBill: retCtx.billKey, returnFull: !!retCtx.full };
+    }
+    window.__hbReturnCtx = null;
+    const rtNewEntry = Object.assign({ id: Date.now().toString(36), name, item, productId: rtProductId, phone, cost:0, price:0, paid:0, qty: rtQty, returnValue: value, cashBack, returnReason, note: (note ? note+' — ' : '')+extraNote, status, condition, invoiceNo: nextInvoiceNumber(), date: new Date().toISOString(), soldBy: currentSalesPersonName() }, retLink);
     retailEntries.unshift(rtNewEntry);
     backupRecentSaleEntries([rtNewEntry]);
     // ফেরত দেওয়া মাল "ভালো" হলে স্টকে ফেরত যোগ হবে, "খারাপ/নষ্ট" হলে স্টকে যোগ হবে না
@@ -17416,6 +17423,8 @@ function returnFromBill(billKey){
     if(q === null) return;
     qty = Math.min(Math.max(parseInt(q, 10) || 1, 1), bought);
   }
+  // কোন বিল থেকে ফেরত — সেভের সময় এই ফেরত এন্ট্রিতে বিলের চিহ্ন বসে (পুরো বিল ফেরত হলে "সব হিসাব"-এ শুধু ফেরতের কার্ড থাকে)
+  window.__hbReturnCtx = { billKey: billKey, item: (e.item || '').trim(), qty: qty, name: (e.name || '').trim(), full: (items.length === 1 && qty === bought), t: Date.now() };
   const billDue = retailEntries.filter(x => (x.billId||x.id) === billKey).reduce((s,x)=> s + Math.max((x.price||0) - (x.paid||0), 0), 0);
   // নতুন এন্ট্রি ট্যাব → পুরাতন কাস্টমার (নাম/নম্বর সহ) → "ফেরত"
   document.querySelector('.tab-btn[data-tab="add"]').click();
@@ -18291,10 +18300,12 @@ function handleWaMiniClick(id) {
 function render(showSecureInfo = false){
   const q = document.getElementById('searchBox').value.trim().toLowerCase();
   const qDigits = q.replace(/[^0-9]/g, '');
-  const filtered = retailEntries.filter(e =>
+  // ↩️ পুরো ফেরত হয়ে যাওয়া বিলের মূল কার্ড তালিকায় আর দেখানো হয় না — শুধু "ফেরত" কার্ড থাকে। (হিসাব/মোট/স্টক অক্ষত; ফেরত এন্ট্রি মুছলে মূল কার্ড আবার আসে)
+  const hiddenBills = new Set(retailEntries.filter(x => x.returnFull && x.returnOfBill).map(x => x.returnOfBill));
+  const filtered = retailEntries.filter(e => !hiddenBills.has(e.billId||e.id) && (
     e.name.toLowerCase().includes(q) || e.item.toLowerCase().includes(q) || (e.phone && e.phone.includes(q)) ||
     (qDigits.length >= 4 && e.invoiceNo && (()=>{ const d = e.invoiceNo.replace(/[^0-9]/g,''); return d === qDigits || d.endsWith(qDigits); })())
-  );
+  ));
   const dueQ = document.getElementById('dueSearchBox').value.trim().toLowerCase();
   
   let totalDue = 0, totalPaid = 0, totalProfit = 0, dueByCustomer = {}, todayCustomers = new Set(), todaySaleCount = 0, todayStr = new Date().toDateString();
