@@ -19049,12 +19049,14 @@ function getProductSaleData(mode){
   const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate()-6); weekAgo.setHours(0,0,0,0);
   const map = {};
   retailEntries.forEach(e=>{
-    if(!SALE_STATUSES.includes(e.status)) return;
+    const isRet = e.status === 'ফেরত';
+    if(!isRet && !SALE_STATUSES.includes(e.status)) return;
     const d = new Date(e.date);
     const inRange = mode === 'today' ? (d.toDateString() === todayStr) : (d >= weekAgo);
-    if(inRange) map[e.item] = (map[e.item]||0) + (e.qty||0);
+    // ↩️ ফেরত নেওয়া মাল বিক্রি নয় — সংখ্যা থেকে বাদ; নেট ০ বা কম হলে লিস্টে আসে না
+    if(inRange) map[e.item] = (map[e.item]||0) + (isRet ? -(Number(e.qty)||0) : (e.qty||0));
   });
-  return Object.entries(map).sort((a,b)=>b[1]-a[1]);
+  return Object.entries(map).filter(([nm,q]) => q > 0).sort((a,b)=>b[1]-a[1]);
 }
 
 function buildProductSaleText(mode, data){
@@ -19662,7 +19664,22 @@ function monRenderAll(){
     totalPaidAll += (e.paid||0);
     totalDueAll += due;
     if(e.status !== 'ফেরত') totalProfitAll += ((e.price||0)-(e.cost||0));
-    if(e.status === 'ফেরত') returnsList.push(e);
+    if(e.status === 'ফেরত'){
+      returnsList.push(e);
+      // ↩️ ফেরত নেওয়া মাল আর "বিক্রি" নয়: সেল-মোট, প্রোডাক্ট সংখ্যা, লাভ আর (নগদ ফেরত দিলে) ক্যাশ থেকে বাদ — ফেরতের তারিখের হিসাবে
+      const rq = Number(e.qty) || 0, rv = Number(e.returnValue) || 0;
+      const rToday = d.toDateString() === todayStr, rWeek = d >= weekAgo, rMonth = d >= monthStart;
+      totalProductSold -= rq;
+      itemSoldMap[e.item] = (itemSoldMap[e.item]||0) - rq;
+      if(rToday) itemSoldTodayMap[e.item] = (itemSoldTodayMap[e.item]||0) - rq;
+      if(rWeek) itemSoldWeekMap[e.item] = (itemSoldWeekMap[e.item]||0) - rq;
+      allTimeSales -= rv; if(rToday) todaySales -= rv; if(rWeek) weeklySales -= rv; if(rMonth) monthlySales -= rv;
+      if(e.cashBack === 'yes'){ allTimeCash -= rv; if(rToday) todayCash -= rv; if(rWeek) weeklyCash -= rv; }
+      try{
+        const prod = (bccLoadProducts() || []).find(pp => (e.productId && pp.id === e.productId) || (pp.name === e.item));
+        if(prod) totalProfitAll -= (rv - (Number(prod.buy)||0) * rq);
+      }catch(err){}
+    }
     if(SALE_STATUSES.includes(e.status)){
       totalProductSold += (e.qty||0);
       itemSoldMap[e.item] = (itemSoldMap[e.item]||0) + (e.qty||0);
@@ -19731,6 +19748,8 @@ function monRenderAll(){
   document.getElementById('monOutOfStockList').innerHTML = oosHtml;
   document.getElementById('monAlertOutOfStock').innerHTML = oosHtml;
 
+  [itemSoldMap, itemSoldTodayMap, itemSoldWeekMap].forEach(mp => Object.keys(mp).forEach(k => { if(mp[k] <= 0) delete mp[k]; }));
+  if(totalProductSold < 0) totalProductSold = 0;
   const todayProductQty = Object.values(itemSoldTodayMap).reduce((s,q)=>s+q,0);
   monItemSoldTodayData = Object.entries(itemSoldTodayMap).sort((a,b)=>b[1]-a[1]);
   document.getElementById('monTodayProductSaleCount').textContent = todayProductQty + ' pcs';
@@ -20287,10 +20306,14 @@ async function renderWeeklySalesChart(){
     d.setDate(d.getDate()-i);
     const dStr = d.toDateString();
     labels.push(d.toLocaleDateString('bn-BD', {weekday:'short'}));
-    const daySales = retailEntries
+    const daySalesGross = retailEntries
       .filter(e => SALE_STATUSES.includes(e.status) && new Date(e.date).toDateString() === dStr)
       .reduce((s,e)=> s + (e.price||0), 0);
-    data.push(daySales);
+    // ↩️ ফেরত নেওয়া মালের মূল্য ফেরতের দিনের বিক্রি থেকে বাদ
+    const dayReturns = retailEntries
+      .filter(e => e.status === 'ফেরত' && new Date(e.date).toDateString() === dStr)
+      .reduce((s,e)=> s + (Number(e.returnValue)||0), 0);
+    data.push(daySalesGross - dayReturns);
   }
 
   // 📦 চার্ট লাইব্রেরি এখন দরকারের সময় লোড হয়
