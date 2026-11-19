@@ -91,6 +91,16 @@ select option{background:#173a29;color:#eafff2}
 .busyTxt small{display:block;color:var(--muted);font-size:11px;margin-top:2px;line-height:1.4}
 /* ⏰ যাত্রার সময় হলে অ্যালার্মের ঘণ্টা কাঁপে */
 @keyframes hbRing{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg)}40%{transform:rotate(14deg)}60%{transform:rotate(-10deg)}80%{transform:rotate(10deg)}}
+/* 🔔 অপেক্ষমাণ অনুরোধ এলে কার্ডটা জ্বলজ্বল করে, সংখ্যা ধুকপুক করে, নতুন এলে একবার কাঁপে */
+@keyframes reqGlow{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.55);border-color:rgba(251,191,36,.9)}50%{box-shadow:0 0 0 9px rgba(251,191,36,0);border-color:rgba(251,191,36,.35)}}
+@keyframes reqBeat{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+@keyframes reqShake{0%,100%{transform:translateX(0)}15%{transform:translateX(-7px) rotate(-1.5deg)}30%{transform:translateX(7px) rotate(1.5deg)}45%{transform:translateX(-5px)}60%{transform:translateX(5px)}75%{transform:translateX(-2px)}}
+@keyframes reqNudge{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+#stReqCard.reqAlert{border:1px solid rgba(251,191,36,.9);animation:reqGlow 1.4s ease-in-out infinite}
+#stReqCard.reqAlert #stReq{display:inline-block;animation:reqBeat 1.1s ease-in-out infinite;color:#fbbf24}
+#stReqCard.reqAlert #stReqNote{display:inline-block;font-weight:800;animation:reqNudge 1s ease-in-out infinite}
+#stReqCard.reqShake{animation:reqShake .6s ease-in-out 1,reqGlow 1.4s ease-in-out .6s infinite}
+@media (prefers-reduced-motion:reduce){#stReqCard.reqAlert,#stReqCard.reqAlert #stReq,#stReqCard.reqAlert #stReqNote,#stReqCard.reqShake{animation:none}}
 </style>
 <script src="hb-silent.js"></script>
 </head>
@@ -117,7 +127,7 @@ select option{background:#173a29;color:#eafff2}
     <div class="grid">
       <div class="card" data-goto="earnings" style="cursor:pointer"><div class="stat-label">আজকের আয়</div><div class="stat" id="stToday">৳০</div><div class="stat-note" id="stTodayNote">০টা যাত্রা</div></div>
       <div class="card" data-goto="bookings" style="cursor:pointer"><div class="stat-label">নিশ্চিত বুকিং</div><div class="stat" id="stActive">—</div><div class="stat-note" id="stActiveNote">নিশ্চিত বুকিং নেই</div></div>
-      <div class="card" data-goto="bookings" style="cursor:pointer"><div class="stat-label">অপেক্ষমাণ অনুরোধ</div><div class="stat" id="stReq">০</div><div class="stat-note" id="stReqNote" style="color:#fbbf24">নতুন অনুরোধ নেই</div></div>
+      <div class="card" id="stReqCard" data-goto="bookings" style="cursor:pointer"><div class="stat-label">অপেক্ষমাণ অনুরোধ</div><div class="stat" id="stReq">০</div><div class="stat-note" id="stReqNote" style="color:#fbbf24">নতুন অনুরোধ নেই</div></div>
       <div class="card" data-goto="earnings" style="cursor:pointer"><div class="stat-label">এই মাসের আয়</div><div class="stat" id="stMonth">৳০</div><div class="stat-note" id="stRating">⭐ এখনো রেটিং নেই</div></div>
     </div>
     <div class="columns">
@@ -1059,6 +1069,10 @@ function drvListenBookings(){
     __bkKnown=new Set(pend.map(b=>b.id));
     drvBkRingSync(pend.filter(b=>{ const ms=(b.createdAt&&b.createdAt.toMillis)?b.createdAt.toMillis():Date.now(); return Date.now()-ms < 15*60000; }).length, isNewBk);
     $id("stReq").textContent=pend.length; $id("stReqNote").textContent=pend.length?"👉 এখনই দেখুন":"নতুন অনুরোধ নেই";
+    { const rc=$id("stReqCard"); if(rc){ const prev=Number(rc.dataset.n||0);
+      rc.classList.toggle("reqAlert",pend.length>0);
+      if(pend.length>prev && rc.dataset.n!==undefined){ rc.classList.remove("reqShake"); void rc.offsetWidth; rc.classList.add("reqShake"); setTimeout(()=>rc.classList.remove("reqShake"),700); }
+      rc.dataset.n=String(pend.length); } }
     $id("stActive").textContent=acc.length||"—"; $id("stActiveNote").textContent=acc.length?"নিশ্চিত বুকিং আছে":"নিশ্চিত বুকিং নেই";
     drvRenderBookings(pend,acc,all.filter(b=>b.status!=="pending"&&b.status!=="accepted").slice(0,10));
     drvRestoreSeats(all);
