@@ -1027,6 +1027,43 @@ window.hbLoadLib = function(name){
 <script>window.HB_SILENT_FLOAT = false; // POS-এ ভাসমান বাটন নয় — ওপরের 🔔 নোটিফিকেশন প্যানেলের ভেতরে নিঃশব্দ সারি</script>
 <script src="hb-silent.js"></script>
 <script src="hb-contrast.js"></script>
+<script>
+/* সেভ করা পাসওয়ার্ডের পপআপ বন্ধ: ইনপুটে টাইপ করতে গেলে Chrome যেন পাসওয়ার্ড সাজেশন না দেখায় */
+(function(){
+  var SKIP={checkbox:1,radio:1,button:1,submit:1,reset:1,file:1,range:1,color:1,hidden:1,image:1};
+  function fix(el){
+    try{
+      if(!el||el.nodeType!==1)return;
+      var tag=el.tagName;
+      if(tag==='INPUT'){
+        var t=(el.getAttribute('type')||'text').toLowerCase();
+        if(SKIP[t])return;
+        if(t==='password'){
+          if(el.getAttribute('autocomplete')!=='new-password')el.setAttribute('autocomplete','new-password');
+        }else if(!el.hasAttribute('autocomplete')){
+          el.setAttribute('autocomplete','off');
+        }
+      }else if(tag==='TEXTAREA'){
+        if(!el.hasAttribute('autocomplete'))el.setAttribute('autocomplete','off');
+      }
+    }catch(e){}
+  }
+  function scan(root){
+    if(!root||root.nodeType!==1)return;
+    fix(root);
+    var list=root.querySelectorAll?root.querySelectorAll('input,textarea'):[];
+    for(var i=0;i<list.length;i++)fix(list[i]);
+  }
+  document.addEventListener('focusin',function(e){fix(e.target);},true);
+  new MutationObserver(function(ms){
+    for(var i=0;i<ms.length;i++){
+      var a=ms[i].addedNodes;
+      for(var j=0;j<a.length;j++)scan(a[j]);
+    }
+  }).observe(document.documentElement,{childList:true,subtree:true});
+  document.addEventListener('DOMContentLoaded',function(){scan(document.documentElement);});
+})();
+</script>
 </head>
 <body>
 
