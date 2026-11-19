@@ -104,7 +104,11 @@ select option{background:#173a29;color:#eafff2}
 #tripsAction.reqAlert span{display:inline-block;animation:reqBeat 1.1s ease-in-out infinite}
 #tripsAction.reqAlert small{display:inline-block;color:#fbbf24;font-weight:800;animation:reqNudge 1s ease-in-out infinite}
 #tripsAction.reqShake{animation:reqShake .6s ease-in-out 1,reqGlow 1.4s ease-in-out .6s infinite}
-@media (prefers-reduced-motion:reduce){#tripsAction.reqAlert,#tripsAction.reqAlert span,#tripsAction.reqAlert small,#tripsAction.reqShake,#stReqCard.reqAlert,#stReqCard.reqAlert #stReq,#stReqCard.reqAlert #stReqNote,#stReqCard.reqShake{animation:none}}
+#radarCard.reqAlert{border:1px solid rgba(251,191,36,.9);animation:reqGlow 1.4s ease-in-out infinite}
+#radarCard.reqAlert #radarHint{display:inline-block;color:#fbbf24;font-weight:800;animation:reqNudge 1s ease-in-out infinite}
+.radarItem{animation:reqGlow 1.4s ease-in-out infinite}
+.radarItem.reqShake{animation:reqShake .6s ease-in-out 1,reqGlow 1.4s ease-in-out .6s infinite}
+@media (prefers-reduced-motion:reduce){#radarCard.reqAlert,#radarCard.reqAlert #radarHint,.radarItem,.radarItem.reqShake,#tripsAction.reqAlert,#tripsAction.reqAlert span,#tripsAction.reqAlert small,#tripsAction.reqShake,#stReqCard.reqAlert,#stReqCard.reqAlert #stReq,#stReqCard.reqAlert #stReqNote,#stReqCard.reqShake{animation:none}}
 </style>
 <script src="hb-silent.js"></script>
 </head>
@@ -181,7 +185,7 @@ select option{background:#173a29;color:#eafff2}
       <button type="button" class="btn" id="tpPushBtn" style="display:none;width:100%;margin-bottom:10px">🔔 অ্যাপ বন্ধ থাকলেও ট্রিপ রিকোয়েস্ট ফোনের স্ট্যাটাস বারে পেতে চালু করুন</button>
       <div class="sub" id="tpGps" style="margin-bottom:8px">📍 অনলাইন হলে লাইভ লোকেশন চালু হবে — যাত্রীর রিকোয়েস্ট কাছের চালকদের একজন একজন করে (৪০ সেকেন্ড করে) আসে।</div>
       <div id="tripReqList" class="sub">অনলাইন থাকলে এখানে যাত্রীদের রিকোয়েস্ট দেখাবে — ভাড়া অফার করতে পারবেন।</div></div>
-    <div class="card"><h2 class="section-title">📡 কাছের যাত্রী (রাস্তায় অপেক্ষা)</h2>
+    <div class="card" id="radarCard"><h2 class="section-title">📡 কাছের যাত্রী (রাস্তায় অপেক্ষা)</h2>
       <div class="sub" id="radarHint" style="margin-bottom:8px">অনলাইন থাকলে ২ কিমির মধ্যে রাস্তায় অপেক্ষমাণ যাত্রী এখানে দেখাবে।</div>
       <div id="radarList"></div></div>
   </section>
@@ -785,11 +789,14 @@ function tpTurnBadge(t){
   const sec=tpSecs(t); if(sec==null) return "";
   return '<div class="tpTurn" data-until="'+(Number(t.dispatch.untilMs)||0)+'" style="background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.45);border-radius:8px;padding:6px 8px;margin-bottom:8px;font-size:11.5px;color:#fbbf24;font-weight:800">⏱️ শুধু আপনাকে পাঠানো হয়েছে — <span class="tpTurnSec">'+sec+'</span> সেকেন্ডের মধ্যে সাড়া দিন</div>';
 }
-function tpBadge(n){ const el=$id("tripsActionSub"); if(el) el.textContent = n>0 ? "🔔 "+n+"টা নতুন রিকোয়েস্ট — এখনই দেখুন!" : "গন্তব্য-ভিত্তিক রিকোয়েস্ট ও কাছের যাত্রী";
+let __tpReqN=0, __tpNearN=0;
+function tpBadge(n){ __tpReqN=n; tpBadgeDraw(); }
+function tpBadgeDraw(){ const n=__tpReqN, near=__tpNearN, total=n+near;
+  const el=$id("tripsActionSub"); if(el) el.textContent = n>0 ? "🔔 "+n+"টা নতুন রিকোয়েস্ট — এখনই দেখুন!" : (near>0 ? "📡 "+near+" জন যাত্রী কাছে অপেক্ষা করছেন — এখনই দেখুন!" : "গন্তব্য-ভিত্তিক রিকোয়েস্ট ও কাছের যাত্রী");
   const card=$id("tripsAction"); if(card){ const prev=Number(card.dataset.n||0);
-    card.classList.toggle("reqAlert",n>0);
-    if(n>prev && card.dataset.n!==undefined){ card.classList.remove("reqShake"); void card.offsetWidth; card.classList.add("reqShake"); setTimeout(()=>card.classList.remove("reqShake"),700); }
-    card.dataset.n=String(n); } }
+    card.classList.toggle("reqAlert",total>0);
+    if(total>prev && card.dataset.n!==undefined){ card.classList.remove("reqShake"); void card.offsetWidth; card.classList.add("reqShake"); setTimeout(()=>card.classList.remove("reqShake"),700); }
+    card.dataset.n=String(total); } }
 function tpStopRing(){ if(__tpRing){ clearInterval(__tpRing); __tpRing=null; } }
 function tpStartRing(){ if(!__tpRing) __tpRing=setInterval(()=>drvBeep(),3500); }
 
@@ -972,7 +979,7 @@ async function tpComplete(tripId){
 /* ---------- 📡 কাছের যাত্রী (রাস্তায় অপেক্ষা) ---------- */
 function tpRadarRender(){
   const box=$id("radarList"), hint=$id("radarHint"); if(!box||!hint) return;
-  if(!__tpMy){ hint.textContent="📍 আপনার লোকেশন পাওয়ার অপেক্ষা..."; box.innerHTML=""; return; }
+  if(!__tpMy){ hint.textContent="📍 আপনার লোকেশন পাওয়ার অপেক্ষা..."; box.innerHTML=""; __tpNearN=0; tpBadgeDraw(); const rc0=$id("radarCard"); if(rc0) rc0.classList.remove("reqAlert"); return; }
   const near=[];
   __tpPass.forEach(p=>{
     if(!p.location || !tpWaitTypeOk(p)) return;
@@ -983,11 +990,14 @@ function tpRadarRender(){
   });
   near.sort((a,b)=>a.d-b.d);
   const ids=new Set(near.map(x=>x.p.id));
-  if([...ids].some(id=>!__tpKnownP.has(id)) && __tpInitP) drvBeep();
+  const fresh=new Set(__tpInitP?[...ids].filter(id=>!__tpKnownP.has(id)):[]);
+  if(fresh.size) drvBeep();
   __tpInitP=true; __tpKnownP=ids;
+  __tpNearN=near.length; tpBadgeDraw();
+  const rcard=$id("radarCard"); if(rcard) rcard.classList.toggle("reqAlert",near.length>0);
   hint.textContent=near.length?"📡 কাছাকাছি "+near.length+" জন যাত্রী অপেক্ষা করছেন":"এই মুহূর্তে ২ কিমির মধ্যে কোনো অপেক্ষমাণ যাত্রী নেই।";
   const VL={AUTO:"🛺 CNG",EASY:"🛺✨ ইজিবাইক",CAR:"🚗 কার",BIKE:"🏍️ বাইক",BUS:"🚌 বাস"};
-  box.innerHTML=near.map(x=>'<div style="background:#173a29;border:1px solid rgba(74,222,128,.25);border-radius:12px;padding:12px;margin-bottom:10px">'
+  box.innerHTML=near.map(x=>'<div class="radarItem'+(fresh.has(x.p.id)?' reqShake':'')+'" style="background:#173a29;border:1px solid rgba(74,222,128,.25);border-radius:12px;padding:12px;margin-bottom:10px">'
     +'<div style="font-weight:800">📍 প্রায় '+tpKmText(x.d)+' দূরে</div>'
     +'<div style="font-size:12px;color:#a8d9c0;margin:2px 0 8px">🚕 চায়: '+esc((x.p.transport_types||[]).map(v=>VL[v]||v).join(", ")||"যেকোনো")+'</div>'
     +'<div class="btnrow"><button type="button" class="btn" data-pick="'+esc(x.p.id)+'">✅ তুলে নিন</button>'
@@ -1047,7 +1057,7 @@ function tpStop(all){
   if(__tpUnsub){ __tpUnsub(); __tpUnsub=null; }
   if(__tpRadarUnsub){ __tpRadarUnsub(); __tpRadarUnsub=null; }
   if(__tpGps!=null){ navigator.geolocation.clearWatch(__tpGps); __tpGps=null; }
-  tpStopRing(); __tpTrips=[]; __tpPass=[]; __tpInit=false; __tpInitP=false; tpBadge(0);
+  tpStopRing(); __tpTrips=[]; __tpPass=[]; __tpInit=false; __tpInitP=false; __tpNearN=0; tpBadge(0); { const rc1=$id("radarCard"); if(rc1) rc1.classList.remove("reqAlert"); }
   if(all && __tpActiveUnsub){ __tpActiveUnsub(); __tpActiveUnsub=null; }
   const b=$id("tripReqList"); if(b && !__tpActiveUnsub) b.textContent="অনলাইন থাকলে এখানে যাত্রীদের রিকোয়েস্ট দেখাবে — ভাড়া অফার করতে পারবেন।";
   const r=$id("radarList"); if(r) r.innerHTML="";
