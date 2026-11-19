@@ -709,6 +709,7 @@ async function afterLoginRoute(uid){
       await auth.signOut();
       return;
     }
+    await hbLogLogin(uid, "transport_driver", doc.data().name || doc.data().phone || "");
     saveSession({ uid, role: "transport_driver", name: doc.data().name || "" });
     // 🚑 নিজে নিবন্ধন করা → নতুন অ্যাপ; এজেন্টের খোলা অ্যাকাউন্ট → পুরনো অ্যাপ (দোকানের POS-এর Driver Mode)
     window.location.href = doc.data().createdByAgent === true ? "shop-ledger-app.html" : "honey-bee-driver.html";
@@ -725,6 +726,7 @@ async function afterLoginRoute(uid){
       await auth.signOut();
       return;
     }
+    await hbLogLogin(uid, "rider", doc.data().name || doc.data().phone || "");
     saveSession({ uid, role: "rider", name: doc.data().name || "" });
     window.location.href = "shop-ledger-app.html";
     return;
@@ -740,6 +742,7 @@ async function afterLoginRoute(uid){
       await auth.signOut();
       return;
     }
+    await hbLogLogin(uid, "tailor", doc.data().name || doc.data().phone || "");
     saveSession({ uid, role: "tailor", name: doc.data().name || "" });
     window.location.href = "tailor-app.html";
     return;
@@ -752,6 +755,7 @@ async function afterLoginRoute(uid){
       await auth.signOut();
       return;
     }
+    await hbLogLogin(uid, "restaurant", doc.data().name || doc.data().phone || "");
     saveSession({ uid, role: "restaurant", name: doc.data().name || "" });
     window.location.href = "restaurant-pos.html";
     return;
@@ -792,6 +796,7 @@ async function afterLoginRoute(uid){
     await auth.signOut();
     return;
   }
+  await hbLogLogin(uid, "shop", (shop.shopName || "") + (userDoc.name ? " — " + userDoc.name : ""));
   saveSession({
     uid, role: userDoc.role, shopId: userDoc.shopId,
     name: userDoc.name || "", email: userDoc.email || "", shopName: shop.shopName || "",

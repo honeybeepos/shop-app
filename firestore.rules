@@ -1231,12 +1231,32 @@ service cloud.firestore {
         request.resource.data.s is map && request.resource.data.s.size() <= 40;
       allow delete: if false;
     }
+    // 🔑 লগইন রিপোর্ট — দিনে একজনের একটা নথি ({দিন}_{uid}); নিজের নথিতে শুধু count ১ করে বাড়াতে পারেন; পড়া/মোছা শুধু সুপার এডমিন
+    match /loginLogs/{id} {
+      allow create: if isSignedIn() &&
+        request.resource.data.keys().hasOnly(['uid', 'role', 'name', 'day', 'count', 'lastAt']) &&
+        request.resource.data.uid == request.auth.uid &&
+        id == request.resource.data.day + '_' + request.auth.uid &&
+        request.resource.data.role in ['shop', 'rider', 'restaurant', 'transport_driver', 'tailor'] &&
+        request.resource.data.count == 1 &&
+        request.resource.data.name is string && request.resource.data.name.size() <= 80 &&
+        request.resource.data.lastAt == request.time;
+      allow update: if isSignedIn() &&
+        resource.data.uid == request.auth.uid &&
+        request.resource.data.keys().hasOnly(['uid', 'role', 'name', 'day', 'count', 'lastAt']) &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.day == resource.data.day &&
+        request.resource.data.count == resource.data.count + 1 &&
+        request.resource.data.name is string && request.resource.data.name.size() <= 80 &&
+        request.resource.data.lastAt == request.time;
+      allow read, delete: if isSuperAdmin();
+    }
     // 📝 মতামতের প্রশ্নপত্র (feedback.html) — যে-কেউ (গেস্টও) একবার করে জমা দিতে পারেন, পড়েন শুধু সুপার এডমিন
     match /feedback/{id} {
       allow create: if isSignedIn() &&
         request.resource.data.keys().hasOnly(['role', 'answers', 'uid', 'page', 'createdAt']) &&
         request.resource.data.uid == request.auth.uid &&
-        request.resource.data.role in ['shop', 'customer', 'driver', 'rider', 'agent', 'restaurant', 'tailor'] &&
+        request.resource.data.role in ['shop', 'customer', 'driver', 'rider'] &&
         request.resource.data.answers is map && request.resource.data.answers.size() <= 12 &&
         request.resource.data.createdAt == request.time;
       allow read, delete: if isSuperAdmin();

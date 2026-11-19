@@ -45,6 +45,21 @@ function fbNow() {
   return firebase.firestore.FieldValue.serverTimestamp();
 }
 
+/* 🔑 লগইন রিপোর্ট — কে কতবার লগইন করেছেন (সুপার-এডমিন প্যানেলের "লগইন রিপোর্ট")।
+   দিনে একজনের একটা নথি: loginLogs/{দিন}_{uid}, প্রতি লগইনে count ১ বাড়ে। ৭ দিন পর নিজে থেকে মুছে যায়।
+   রিডাইরেক্টে লেখা কেটে না যায়, তাই সর্বোচ্চ ১.৫ সেকেন্ড অপেক্ষা করে; ব্যর্থ হলে লগইন আটকায় না। */
+function hbLogLogin(uid, role, name) {
+  try {
+    const day = new Date(Date.now() + 6 * 3600000).toISOString().slice(0, 10); // ঢাকার তারিখ
+    const w = db.collection("loginLogs").doc(day + "_" + uid).set({
+      uid, role, name: String(name || "").slice(0, 80), day,
+      count: firebase.firestore.FieldValue.increment(1),
+      lastAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(() => {});
+    return Promise.race([w, new Promise((r) => setTimeout(r, 1500))]);
+  } catch (e) { return Promise.resolve(); }
+}
+
 async function getMyUserDoc(uid) {
   const snap = await db.collection("users").doc(uid).get();
   return snap.exists ? snap.data() : null;

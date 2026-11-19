@@ -320,8 +320,17 @@
   </div>
 
   <div class="card" data-pane="reports">
+    <h2>🔑 লগইন রিপোর্ট — কে কতবার লগইন করেছেন</h2>
+    <div class="row bil-range" style="margin-top:0;" id="lgRange">
+      <button class="btn" data-d="1">আজ</button><button class="btn ghost" data-d="3">৩ দিন</button><button class="btn ghost" data-d="7">৭ দিন</button>
+    </div>
+    <div id="lgBox" style="margin-top:8px;"><p class="meta">একটা সময় বাছাই করুন।</p></div>
+    <div class="meta">রাইডার, দোকান, রেস্টুরেন্ট, সেলাই ঘর আর ট্রান্সপোর্ট ড্রাইভারের প্রতিটি সফল লগইন গোনা হয়। ৭ দিনের পুরনো হিসাব নিজে থেকে মুছে যায়।</div>
+  </div>
+
+  <div class="card" data-pane="reports">
     <h2>📝 মতামত (প্রশ্নপত্র)</h2>
-    <div class="meta">লিংক: <b>honeybeebazar.com/feedback.html</b> — দোকানের জন্য শেষে <b>?r=shop</b>, রাইডার <b>?r=rider</b>, এজেন্ট <b>?r=agent</b>, রেস্টুরেন্ট <b>?r=restaurant</b>, সেলাই ঘর <b>?r=tailor</b>, ট্রান্সপোর্ট ড্রাইভার <b>?r=driver</b>, ক্রেতা <b>?r=customer</b>। WhatsApp-এ পাঠান। ৭ দিন পর উত্তরগুলো নিজে থেকে মুছে যায় — দরকারি হলে আগেই <b>Excel (CSV)</b> নামিয়ে রাখুন।</div>
+    <div class="meta">লিংক: <b>honeybeebazar.com/feedback.html</b> — দোকানদারের জন্য শেষে <b>?r=shop</b>, ক্রেতা <b>?r=customer</b>, চালক <b>?r=driver</b>, ডেলিভারিম্যান <b>?r=rider</b>। WhatsApp-এ পাঠান। ৯০ দিন পর উত্তরগুলো নিজে থেকে মুছে যায় — দরকারি হলে আগেই <b>Excel (CSV)</b> নামিয়ে রাখুন।</div>
     <div class="row"><button class="btn secondary" id="fbLoadBtn">📋 উত্তরগুলো দেখুন</button><button class="btn secondary" id="fbCsvBtn">⬇️ Excel (CSV)</button></div>
     <div id="fbBox" style="margin-top:8px;"></div>
   </div>
@@ -1826,9 +1835,32 @@ async function bzStatLoad(days){
 }
 document.querySelectorAll("#bzStatRange [data-d]").forEach(b=> b.addEventListener("click", ()=> bzStatLoad(Number(b.dataset.d))));
 
+/* ---------- 🔑 লগইন রিপোর্ট (loginLogs/{দিন}_{uid}) ---------- */
+const LG_ROLE = { rider:"🛵 রাইডার", shop:"🏪 দোকান", restaurant:"🍽️ রেস্টুরেন্ট", transport_driver:"🚑 ট্রান্সপোর্ট ড্রাইভার", tailor:"🧵 সেলাই ঘর" };
+async function lgLoad(days){
+  document.querySelectorAll("#lgRange [data-d]").forEach(b=> b.className = Number(b.dataset.d) === days ? "btn" : "btn ghost");
+  const box = document.getElementById("lgBox"); box.textContent = "লোড হচ্ছে...";
+  const to = new Date(Date.now() + 6 * 3600000), from = new Date(to.getTime() - (days - 1) * 86400000);
+  const k = (d)=> d.toISOString().slice(0, 10);
+  try{
+    const snap = await db.collection("loginLogs").where("day", ">=", k(from)).where("day", "<=", k(to)).limit(5000).get();
+    const people = {}; // uid → { role, name, n, days }
+    snap.docs.forEach(d=>{ const x = d.data(); const p = people[x.uid] = people[x.uid] || { role:x.role, name:x.name, n:0, days:0, last:null };
+      p.n += Number(x.count || 0); p.days++; if(x.name) p.name = x.name;
+      const t = x.lastAt && x.lastAt.toMillis ? x.lastAt.toMillis() : 0; if(t > (p.last || 0)) p.last = t; });
+    const list = Object.values(people);
+    if(!list.length){ box.innerHTML = "<p class='meta'>এই সময়ে কেউ লগইন করেননি</p>"; return; }
+    const by = {}; list.forEach(p=>{ const r = by[p.role] = by[p.role] || { people:0, n:0 }; r.people++; r.n += p.n; });
+    box.innerHTML = `<div class="strip">${Object.keys(LG_ROLE).filter(r=> by[r]).map(r=> `<div class="s"><small>${LG_ROLE[r]}</small><b style="font-size:14px;">${bnNum(by[r].people)} জন · ${bnNum(by[r].n)} বার</b></div>`).join("")}</div>`
+      + list.sort((a,b)=> b.n - a.n).slice(0, 200).map(p=> `<div class="sum-row" style="display:block;"><b>${LG_ROLE[p.role] || bilEsc(p.role)} · ${bilEsc(p.name || "(নাম নেই)")}</b>
+        <span style="float:right; font-weight:800;">${bnNum(p.n)} বার</span><br><small style="color:#8a7f6c">${bnNum(p.days)} দিন লগইন · শেষবার ${p.last ? new Date(p.last).toLocaleString("bn-BD") : "—"}</small></div>`).join("");
+  }catch(e){ box.textContent = "⚠️ " + (e.message || e); }
+}
+document.querySelectorAll("#lgRange [data-d]").forEach(b=> b.addEventListener("click", ()=> lgLoad(Number(b.dataset.d))));
+
 /* ---------- 📝 মতামত (feedback.html) ---------- */
 let FB_ROWS = [];
-const FB_ROLE = { shop:"🏪 দোকান", customer:"🛒 ক্রেতা", driver:"🚑 ট্রান্সপোর্ট ড্রাইভার", rider:"🛵 রাইডার", agent:"🧑‍💼 এজেন্ট", restaurant:"🍽️ রেস্টুরেন্ট", tailor:"🧵 সেলাই ঘর" };
+const FB_ROLE = { shop:"🏪 দোকানদার", customer:"🛒 ক্রেতা", driver:"🚑 চালক", rider:"🛵 ডেলিভারিম্যান" };
 async function fbLoad(){
   const box = document.getElementById("fbBox"); box.textContent = "লোড হচ্ছে...";
   try{
