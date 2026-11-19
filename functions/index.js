@@ -2708,12 +2708,12 @@ exports.cleanupOldBazarStats = onSchedule("every 24 hours", async () => {
   if (removed) console.log(`📊 bazarStats: ${cutoffKey}-এর আগের ${removed}টা দিনের হিসাব মুছে ফেলা হয়েছে`);
 });
 
-/* ==================== 📝 মতামত (feedback) — ৯০ দিন পর নিজে থেকে মোছা ====================
-   feedback/{id}-এর createdAt (সার্ভারের সময়) ৯০ দিনের পুরনো হলে মুছে যায়।
+/* ==================== 📝 মতামত (feedback) — ৭ দিন পর নিজে থেকে মোছা ====================
+   feedback/{id}-এর createdAt (সার্ভারের সময়) ৭ দিনের পুরনো হলে মুছে যায়।
    একটা মাত্র ফিল্ডে "<" খোঁজা, তাই আলাদা index লাগে না। প্রতিদিন একবার, একবারে ৪০০টা করে।
    ⚠️ শুধু feedback কালেকশনে হাত দেয়। */
 exports.cleanupOldFeedback = onSchedule("every 24 hours", async () => {
-  const cutoff = Timestamp.fromMillis(Date.now() - 90 * 86400000);
+  const cutoff = Timestamp.fromMillis(Date.now() - 7 * 86400000);
   let removed = 0;
   try {
     for (let round = 0; round < 10; round++) {
@@ -2728,7 +2728,7 @@ exports.cleanupOldFeedback = onSchedule("every 24 hours", async () => {
   } catch (e) {
     console.error("📝 feedback পরিষ্কার করা যায়নি:", e.message || e);
   }
-  if (removed) console.log(`📝 feedback: ৯০ দিনের পুরনো ${removed}টা উত্তর মুছে ফেলা হয়েছে`);
+  if (removed) console.log(`📝 feedback: ৭ দিনের পুরনো ${removed}টা উত্তর মুছে ফেলা হয়েছে`);
 });
 
 /* ==================== 🔐 Honey Messenger — প্রাইভেসি মোডের মেসেজ অটো-মুছে ফেলা ====================
