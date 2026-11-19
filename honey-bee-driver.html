@@ -181,13 +181,17 @@ select option{background:#173a29;color:#eafff2}
   <section id="vehicle" class="page hidden"><div class="card"><h2 class="section-title">📷 ছবি (একবার দিলেই সব পোস্টে যাবে)</h2><p class="sub">যাত্রীরা আপনার মুখ আর গাড়ি দেখে ভরসা পান। ছবিতে চাপ দিয়ে দিন বা বদলান।</p><div class="formgrid" id="photoGrid" style="grid-template-columns:1fr 1fr"></div></div><div class="card" style="margin-top:14px"><h2 class="section-title">আমার গাড়ি</h2><form id="vehicleForm"><label>গাড়ির ধরন</label><select id="vType" required><option value="">-- গাড়ির ধরন বেছে নিন --</option><option value="bike">🏍️ বাইক</option><option value="cng">🛺 CNG / অটো রিকশা</option><option value="easy_bike">🛺✨ ইজি বাইক</option><option value="sedan">🚗 সেডান / প্রাইভেট কার</option><option value="hiace">🚐 হাইএস</option><option value="microbus">🚐 মাইক্রোবাস</option><option value="pickup">🛻 পিকআপ / ট্রাক</option><option value="ambulance_ac">🚑 অ্যাম্বুলেন্স (AC)</option><option value="ambulance_non_ac">🚑 অ্যাম্বুলেন্স (Non-AC)</option><option value="ambulance_icu">🚑 অ্যাম্বুলেন্স (ICU)</option></select><label>গাড়ির মডেল</label><input id="vModel" placeholder="যেমন: Toyota Hiace (2019)" required><div class="formgrid"><div><label>রেজিস্ট্রেশন নম্বর</label><input id="vReg" placeholder="রেজিস্ট্রেশন নম্বর" required></div><div><label>মোট আসন</label><input id="vSeats" type="number" min="1" placeholder="মোট আসন" required></div><div><label>এসি</label><select id="vAc"><option value="">নির্বাচন করুন</option><option>আছে</option><option>নেই</option></select></div><div><label>জ্বালানি</label><select id="vFuel"><option value="">নির্বাচন করুন</option><option>ডিজেল</option><option>পেট্রোল</option><option>সিএনজি</option><option>ইলেকট্রিক</option></select></div></div><button class="btn" type="submit" style="margin-top:14px">তথ্য সংরক্ষণ করুন</button></form><div class="notice">আপনার প্রকৃত গাড়ির তথ্য পূরণ করুন। গাড়ির ধরন ঠিকভাবে দিন — যাত্রী ও অ্যাম্বুলেন্স খোঁজায় এটা দেখেই আপনাকে দেখানো হয়।</div></div></section>
   <section id="trips" class="page hidden">
     <div class="card" id="tripGate" style="display:none;margin-bottom:14px"><div class="notice">🔒 এই সুবিধা এখনো চালু করা হয়নি। আপনার এলাকার এজেন্টের সাথে যোগাযোগ করুন — তারা এক ক্লিকে চালু করে দিতে পারবেন।</div></div>
-    <div class="card" style="margin-bottom:14px"><h2 class="section-title">🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট</h2>
+    <div class="card" style="margin-bottom:14px"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h2 class="section-title" style="margin:0">🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট</h2><button type="button" id="tpToggleReq" class="btn secondary" style="width:auto;flex:none;padding:6px 12px;font-size:12px;margin:0">🔕 বন্ধ করুন</button></div>
+      <div class="sub" id="tpReqOffNote" style="display:none;margin-top:8px">🔕 বন্ধ আছে — ট্রিপ রিকোয়েস্ট, শব্দ বা নড়াচড়া কিছু আসবে না। দরকার হলে ডানের বোতামে চালু করুন।</div>
+      <div id="tpReqBody" style="margin-top:10px">
       <button type="button" class="btn" id="tpPushBtn" style="display:none;width:100%;margin-bottom:10px">🔔 অ্যাপ বন্ধ থাকলেও ট্রিপ রিকোয়েস্ট ফোনের স্ট্যাটাস বারে পেতে চালু করুন</button>
       <div class="sub" id="tpGps" style="margin-bottom:8px">📍 অনলাইন হলে লাইভ লোকেশন চালু হবে — যাত্রীর রিকোয়েস্ট কাছের চালকদের একজন একজন করে (৪০ সেকেন্ড করে) আসে।</div>
-      <div id="tripReqList" class="sub">অনলাইন থাকলে এখানে যাত্রীদের রিকোয়েস্ট দেখাবে — ভাড়া অফার করতে পারবেন।</div></div>
-    <div class="card" id="radarCard"><h2 class="section-title">📡 কাছের যাত্রী (রাস্তায় অপেক্ষা)</h2>
+      <div id="tripReqList" class="sub">অনলাইন থাকলে এখানে যাত্রীদের রিকোয়েস্ট দেখাবে — ভাড়া অফার করতে পারবেন।</div></div></div>
+    <div class="card" id="radarCard"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><h2 class="section-title" style="margin:0">📡 কাছের যাত্রী (রাস্তায় অপেক্ষা)</h2><button type="button" id="tpToggleRadar" class="btn secondary" style="width:auto;flex:none;padding:6px 12px;font-size:12px;margin:0">🔕 বন্ধ করুন</button></div>
+      <div class="sub" id="radarOffNote" style="display:none;margin-top:8px">🔕 বন্ধ আছে — কাছের যাত্রী দেখাবে না, শব্দ বা নড়াচড়াও হবে না। দরকার হলে ডানের বোতামে চালু করুন।</div>
+      <div id="radarBody" style="margin-top:10px">
       <div class="sub" id="radarHint" style="margin-bottom:8px">অনলাইন থাকলে ২ কিমির মধ্যে রাস্তায় অপেক্ষমাণ যাত্রী এখানে দেখাবে।</div>
-      <div id="radarList"></div></div>
+      <div id="radarList"></div></div></div>
   </section>
   <section id="flight" class="page hidden"><div class="card">
     <h2 class="section-title">✈️ যাত্রীর ফ্লাইট দেখুন</h2>
@@ -789,6 +793,24 @@ function tpTurnBadge(t){
   const sec=tpSecs(t); if(sec==null) return "";
   return '<div class="tpTurn" data-until="'+(Number(t.dispatch.untilMs)||0)+'" style="background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.45);border-radius:8px;padding:6px 8px;margin-bottom:8px;font-size:11.5px;color:#fbbf24;font-weight:800">⏱️ শুধু আপনাকে পাঠানো হয়েছে — <span class="tpTurnSec">'+sec+'</span> সেকেন্ডের মধ্যে সাড়া দিন</div>';
 }
+/* 🔕 দুটো অংশের আলাদা চালু/বন্ধ বোতাম — ড্রাইভার নিজে বন্ধ রাখতে পারেন (এই ফোনে মনে থাকে) */
+function tpOff(k){ try{ return localStorage.getItem("hbTpOff_"+k)==="1"; }catch(e){ return false; } }
+function tpSetOff(k,v){ try{ if(v) localStorage.setItem("hbTpOff_"+k,"1"); else localStorage.removeItem("hbTpOff_"+k); }catch(e){} }
+function tpApplyToggles(){
+  const rq=tpOff("req"), rd=tpOff("radar");
+  const b1=$id("tpToggleReq"), b2=$id("tpToggleRadar");
+  if(b1) b1.textContent = rq ? "🔔 চালু করুন" : "🔕 বন্ধ করুন";
+  if(b2) b2.textContent = rd ? "🔔 চালু করুন" : "🔕 বন্ধ করুন";
+  const hideReq = rq && !__tpActiveUnsub; // সক্রিয় ট্রিপ চললে তার কার্ড কখনো লুকাবে না
+  const body1=$id("tpReqBody"), note1=$id("tpReqOffNote"); if(body1) body1.style.display = hideReq ? "none" : ""; if(note1) note1.style.display = hideReq ? "" : "none";
+  const body2=$id("radarBody"), note2=$id("radarOffNote"); if(body2) body2.style.display = rd ? "none" : ""; if(note2) note2.style.display = rd ? "" : "none";
+}
+function tpBindToggles(){
+  const b1=$id("tpToggleReq"), b2=$id("tpToggleRadar");
+  if(b1 && !b1.__tpB){ b1.__tpB=true; b1.addEventListener("click",()=>{ const off=!tpOff("req"); tpSetOff("req",off); tpApplyToggles(); if(off){ tpStopRing(); tpBadge(0); } else { __tpInit=false; tpRender(); } }); }
+  if(b2 && !b2.__tpB){ b2.__tpB=true; b2.addEventListener("click",()=>{ const off=!tpOff("radar"); tpSetOff("radar",off); tpApplyToggles(); if(off){ __tpNearN=0; tpBadgeDraw(); const rc=$id("radarCard"); if(rc) rc.classList.remove("reqAlert"); } else { __tpInitP=false; tpRadarRender(); } }); }
+  tpApplyToggles();
+}
 let __tpReqN=0, __tpNearN=0;
 function tpBadge(n){ __tpReqN=n; tpBadgeDraw(); }
 function tpBadgeDraw(){ const n=__tpReqN, near=__tpNearN, total=n+near;
@@ -802,9 +824,11 @@ function tpStartRing(){ if(!__tpRing) __tpRing=setInterval(()=>drvBeep(),3500); 
 
 function tpRender(){
   const box=$id("tripReqList"); if(!box || !DRV.data) return;
+  tpApplyToggles();
   if(__tpActiveUnsub) return; // সক্রিয়/অপেক্ষারত ট্রিপের কার্ড চলছে
   const cs=DRV.data.currentStatus;
   if(cs==="on_waiting"||cs==="on_trip"){ tpStopRing(); return; }
+  if(tpOff("req")){ tpStopRing(); tpBadge(0); return; } // 🔕 ড্রাইভার বন্ধ রেখেছেন — শব্দ/অ্যানিমেশন/গণনা কিছু না
   const me=DRV.uid;
   const rel=__tpTrips.filter(t=>tpVisible(t)&&tpTripTypeOk(t)&&!(t.rejectedDrivers||[]).includes(me)&&!(t.waitingList||[]).some(o=>o.driverId===me));
   const ids=new Set(rel.map(t=>t.id));
@@ -979,6 +1003,7 @@ async function tpComplete(tripId){
 /* ---------- 📡 কাছের যাত্রী (রাস্তায় অপেক্ষা) ---------- */
 function tpRadarRender(){
   const box=$id("radarList"), hint=$id("radarHint"); if(!box||!hint) return;
+  if(tpOff("radar")){ __tpNearN=0; tpBadgeDraw(); const rc2=$id("radarCard"); if(rc2) rc2.classList.remove("reqAlert"); return; } // 🔕 ড্রাইভার বন্ধ রেখেছেন
   if(!__tpMy){ hint.textContent="📍 আপনার লোকেশন পাওয়ার অপেক্ষা..."; box.innerHTML=""; __tpNearN=0; tpBadgeDraw(); const rc0=$id("radarCard"); if(rc0) rc0.classList.remove("reqAlert"); return; }
   const near=[];
   __tpPass.forEach(p=>{
@@ -1039,7 +1064,7 @@ function tpStartGps(){
   },()=>{ const g2=$id("tpGps"); if(g2) g2.textContent="⚠️ GPS পারমিশন লাগবে"; },{ enableHighAccuracy:true, maximumAge:2000, timeout:15000 });
 }
 function tpListen(){
-  tpBindBox(); tpBindRadar();
+  tpBindBox(); tpBindRadar(); tpBindToggles();
   if(!__tpUnsub){
     __tpUnsub=db.collection("trips").where("status","in",["searching","waiting_selection"]).onSnapshot(qs=>{
       __tpTrips=qs.docs.map(d=>Object.assign({id:d.id},d.data())); tpTickerStart(); tpRender();
