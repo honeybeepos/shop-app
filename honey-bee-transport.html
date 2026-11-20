@@ -388,7 +388,7 @@ function rideCard(r){return `<article class="ride market-vehicle-card">${hbDutyB
   <div class="ridehead"><strong>${r.type}</strong><button class="heart" onclick="event.stopPropagation();toast('পছন্দের তালিকায় যোগ করতে লগইন করুন')">♡</button></div>
   <div class="routeText">📍 ${r.route}</div>
   <div class="meta" style="display:flex;align-items:center;gap:6px;margin:2px 0 4px">${r.driverPhoto?`<img src="${r.driverPhoto}" alt="" style="width:26px;height:26px;border-radius:50%;object-fit:cover">`:'👤'} ${r.name}${r.verified?' <span style="color:#6ee7a8">✓</span>':''}</div>
-  <div class="meta">🕒 ${r.time} · ${r.seats>0?'💺 '+r.seats+' আসন খালি':(r.standing?'🚖 যেকোনো সময় কল বা বুকিং করুন':(r.seatsTotal>0?'🔴 আসন পূর্ণ':'📦 মালামাল পরিবহন'))}${r.online?'':' · ⚪ চালক এখন অফলাইন'}</div>
+  <div class="meta">🕒 ${r.time} · ${r.seats>0?'💺 '+r.seats+' আসন খালি':(r.standing?(r.statusNote?'📝 '+r.statusNote:'⏳ যাত্রীর জন্য অপেক্ষা'):(r.seatsTotal>0?'🔴 আসন পূর্ণ':'📦 মালামাল পরিবহন'))}${r.online?'':' · ⚪ চালক এখন অফলাইন'}</div>
   <div class="vehicle-spec-row"><span>❄️ ${r.ac||'এসি তথ্য নেই'}</span><span>⭐ ${r.rating||'নতুন'}</span></div>
   <div class="market-vehicle-bottom"><div><small>প্রস্তাবিত ভাড়া</small><strong>${r.price?'৳'+r.price:'<span style="font-size:15px">আলোচনা সাপেক্ষ</span>'}</strong></div><button class="primary vehicle-detail-btn" onclick="openDetail('${r.id}')">বিস্তারিত দেখুন ›</button></div>
  </div></article>`}
@@ -480,9 +480,9 @@ function hbPostToRide(id,d){
   let when=[d.date,d.time].filter(Boolean).join(' ');
   if(!when&&d.createdAt&&d.createdAt.toDate){try{when='পোস্ট: '+d.createdAt.toDate().toLocaleDateString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){}}
   return {id:hbEsc(id),type:hbEsc(type||'গাড়ি'),emoji:HB_TYPE_EMOJI[type]||'🚘',route:hbEsc(route),from:hbEsc(d.from||''),to:hbEsc(d.to||''),
-    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,seatsTotal:Number(d.seatsTotal!=null?d.seatsTotal:d.seats)||0,anywhere:d.anywhere===true,standing:d.kind==='standing',areaD:String(d.district||''),areaU:String(d.upazila||''),areaM:String(d.marketId||''),online:d.driverOnline!==false,busy:d.driverBusy===true,tripDate:typeof d.date==='string'?d.date:'',createdMs:(d.createdAt&&d.createdAt.toMillis)?d.createdAt.toMillis():Date.now(),name:hbEsc(d.authorName||'ড্রাইভার'),
+    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,seatsTotal:Number(d.seatsTotal!=null?d.seatsTotal:d.seats)||0,anywhere:d.anywhere===true,standing:d.kind==='standing',statusNote:(d.kind==='standing'&&typeof d.statusNote==='string')?hbEsc(d.statusNote.slice(0,140)):'',areaD:String(d.district||''),areaU:String(d.upazila||''),areaM:String(d.marketId||''),online:d.driverOnline!==false,busy:d.driverBusy===true,tripDate:typeof d.date==='string'?d.date:'',createdMs:(d.createdAt&&d.createdAt.toMillis)?d.createdAt.toMillis():Date.now(),name:hbEsc(d.authorName||'ড্রাইভার'),
     rating:'নতুন',reviews:0,verified:!!d.isVerified,car:hbEsc(d.vehicleModel||d.vehicleLabel||'তথ্য দেওয়া হয়নি'),ac:hbEsc(d.ac||''),
-    plate:hbEsc(d.regNumber||''),color:hbEsc(d.vehicleColor||''),note:hbEsc(d.notes||d.text||''),phone:String(d.authorPhone||'').replace(/[^0-9+]/g,''),driverId:typeof d.authorId==='string'?d.authorId:'',
+    plate:hbEsc(d.regNumber||''),color:hbEsc(d.vehicleColor||''),note:(d.kind==='standing'&&typeof d.statusNote==='string'&&d.statusNote.trim())?hbEsc(d.statusNote.slice(0,140)):hbEsc(d.notes||d.text||''),phone:String(d.authorPhone||'').replace(/[^0-9+]/g,''),driverId:typeof d.authorId==='string'?d.authorId:'',
     driverPhoto:(typeof d.driverPhoto==='string'&&/^https:\/\/firebasestorage\.googleapis\.com\//.test(d.driverPhoto))?hbEsc(d.driverPhoto):'',
     photos:Array.isArray(d.vehiclePhotos)?d.vehiclePhotos.filter(u=>typeof u==='string'&&/^https:\/\/firebasestorage\.googleapis\.com\//.test(u)).slice(0,3).map(hbEsc):[],
     img:(typeof d.imageUrl==='string'&&/^https:\/\/firebasestorage\.googleapis\.com\//.test(d.imageUrl))?hbEsc(d.imageUrl):''};

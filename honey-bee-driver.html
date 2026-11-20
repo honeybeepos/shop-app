@@ -140,7 +140,7 @@ select option{background:#173a29;color:#eafff2}
     </div>
     <div class="columns">
       <div class="card"><button class="btn" type="button" id="pushBtn" style="width:100%;margin-bottom:12px;display:none">🔔 নতুন বুকিংয়ের খবর ফোনে পেতে চাপুন</button><h2 class="section-title">দ্রুত কাজ</h2><div class="actions">
-        <button class="action" type="button" id="anyPostHome" style="border-color:rgba(74,222,128,.6)"><span>⚡</span><b>যেকোনো জায়গায় যেতে প্রস্তুত</b><small>এক চাপেই পোস্ট হয়ে যাবে</small></button>
+        <button class="action" type="button" id="anyPostHome" style="border-color:rgba(74,222,128,.6)"><span>📝</span><b>আমার অবস্থা লিখুন</b><small id="anyPostHomeSub">এখন: ⏳ যাত্রীর জন্য অপেক্ষা</small></button>
         <button class="action" data-goto="post"><span>🛣️</span><b>নতুন যাত্রা পোস্ট</b><small>রুট, সময় ও খালি আসন দিন</small></button>
         <button class="action" data-goto="bookings"><span>📩</span><b>বুকিং অনুরোধ</b><small>অনুরোধ দেখুন ও উত্তর দিন</small></button>
         <button class="action" data-goto="trips" id="tripsAction"><span>🚕</span><b>যাত্রী ট্রিপ</b><small id="tripsActionSub">গন্তব্য-ভিত্তিক রিকোয়েস্ট ও কাছের যাত্রী</small></button>
@@ -152,7 +152,7 @@ select option{background:#173a29;color:#eafff2}
     </div>
   </section>
   <section id="post" class="page hidden">
-    <div class="card" style="margin-bottom:14px;border-color:rgba(74,222,128,.5)"><h2 class="section-title">⚡ এক চাপে পোস্ট</h2><p class="sub">কোনো নির্দিষ্ট রুট নেই? এক চাপেই জানিয়ে দিন — আপনি যেকোনো জায়গায় যেতে প্রস্তুত। আপনার এলাকা, গাড়ি, আসন আর ছবি নিজে থেকে বসবে, আজকের দিন শেষে পোস্ট নিজে থেকে লুকিয়ে যাবে।</p><button class="btn" type="button" id="anyPostBtn" style="width:100%;font-size:15px;padding:14px">🚐 আমি যেকোনো জায়গায় যেতে প্রস্তুত — পোস্ট করুন</button></div>
+    <div class="card" style="margin-bottom:14px;border-color:rgba(74,222,128,.5)"><h2 class="section-title">📝 আমার অবস্থা লিখুন</h2><p class="sub">আপনার সব সময়ের কার্ডে নিজের অবস্থা লিখে দিন — যেমন "ঢাকা এয়ারপোর্টে আছি, চাঁদপুর যেতে চাইলে বুকিং বা কল করুন"। নতুন পোস্ট হয় না, একই কার্ডের লেখা বদলায়। যাত্রী পেলে বা অবস্থা বদলালে আবার লিখুন; মুছে দিলে "যাত্রীর জন্য অপেক্ষা" দেখাবে।</p><div class="sub" id="anyPostBtnSub" style="margin:0 0 8px;font-weight:700"></div><button class="btn" type="button" id="anyPostBtn" style="width:100%;font-size:15px;padding:14px">✏️ অবস্থা লিখুন / বদলান</button></div>
     <div class="card"><h2 class="section-title" id="postToggle" role="button" aria-expanded="false" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none;margin:0"><span>নতুন যাত্রা পোস্ট করুন</span><span id="postArrow" style="font-size:15px;opacity:.85">▼</span></h2>
       <div id="postBody" style="display:none;margin-top:8px"><p class="sub">আপনার রুট ও খালি আসনের তথ্য দিন। পোস্ট করলেই Honey Bee Transport-এ সব যাত্রী দেখতে পাবেন। মালামাল নিলে খালি আসন ০ দিন।</p>
       <form id="postForm"><div class="formgrid"><div><label>কোথা থেকে</label><input required name="from" placeholder="যেমন: ঢাকা, মিরপুর"></div><div><label>কোথায় যাবেন</label><input required name="to" placeholder="যেমন: কক্সবাজার"></div>
@@ -484,6 +484,7 @@ async function drvEnsureStandingPost(){
       return;
     }
     const old=snap.data();
+    DRV.statNote=typeof old.statusNote==="string"?old.statusNote:""; drvStatusSubUpdate();
     if(old.status!=="active" && old.reviewedBy) return; // মডারেটর সরিয়েছেন — সম্মান করা হয়
     const upd={}; Object.keys(common).forEach(k=>{ if(JSON.stringify(old[k]===undefined?null:old[k])!==JSON.stringify(common[k])) upd[k]=common[k]; });
     if(old.status!=="active") upd.status="active";
@@ -1515,8 +1516,56 @@ async function drvAnyPost(btn){
   }catch(e){ alert("পোস্ট করা যায়নি: "+e.message); }
   if(btn) btn.disabled=false;
 }
-$id("anyPostBtn").onclick=function(){ drvAnyPost(this); };
-$id("anyPostHome").onclick=function(){ drvAnyPost(this); };
+/* 📝 আমার অবস্থা — স্থায়ী কার্ডে ড্রাইভারের নিজের লেখা (যেমন "ঢাকা এয়ারপোর্টে আছি, চাঁদপুর যেতে চাইলে বুকিং বা কল করুন")।
+   নতুন পোস্ট হয় না — একই কার্ডের লেখা বদলায়। লেখা মুছে দিলে কার্ডে "যাত্রীর জন্য অপেক্ষা" দেখায়। */
+function drvStatusSubUpdate(){
+  const t=(DRV.statNote||"").trim(), txt=t?("📝 "+(t.length>45?t.slice(0,45)+"…":t)):"এখন: ⏳ যাত্রীর জন্য অপেক্ষা";
+  ["anyPostHomeSub","anyPostBtnSub"].forEach(id=>{ const el=$id(id); if(el) el.textContent=txt; });
+}
+async function drvStatusNote(){
+  if(!DRV.uid||!DRV.data) return;
+  const v=DRV.data.vehicle||{};
+  if(!v.type){ alert("আগে \"গাড়ি\" পাতায় গাড়ির তথ্য দিন — তারপর আপনার কার্ড তৈরি হবে।"); return; }
+  await drvEnsureStandingPost();
+  const old=document.getElementById("stNoteOv"); if(old) old.remove();
+  const ov=document.createElement("div"); ov.id="stNoteOv";
+  ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:flex;align-items:flex-end;justify-content:center;padding:12px";
+  const chip='style="background:#1d3a2a;border:1px solid rgba(74,222,128,.4);color:#d1fae5;border-radius:999px;padding:7px 12px;font-size:12.5px;cursor:pointer"';
+  ov.innerHTML=`<div style="background:#12261b;border:1px solid rgba(74,222,128,.55);border-radius:18px;padding:16px;width:100%;max-width:480px;max-height:92vh;overflow:auto">
+    <div style="font-size:17px;font-weight:800;margin-bottom:4px">📝 আমার অবস্থা</div>
+    <div style="font-size:13px;opacity:.8;margin-bottom:10px">যাত্রীরা আপনার কার্ডে এটা দেখবে। মুছে দিলে কার্ডে "⏳ যাত্রীর জন্য অপেক্ষা" দেখাবে।</div>
+    <textarea id="stNoteTxt" maxlength="140" rows="3" placeholder="যেমন: ঢাকা এয়ারপোর্টে আছি, চাঁদপুর যেতে চাইলে বুকিং বা কল করুন" style="width:100%;box-sizing:border-box;background:#0c1a12;color:inherit;border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:10px;font-size:15px;font-family:inherit"></textarea>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0">
+      <button type="button" data-chip="যাত্রী পেয়েছি, রওনা হচ্ছি" ${chip}>যাত্রী পেয়েছি, রওনা হচ্ছি</button>
+      <button type="button" data-chip="এখন যাত্রী নেই, অপেক্ষায় আছি" ${chip}>এখন যাত্রী নেই</button>
+      <button type="button" data-chip="কিছুক্ষণ বিরতিতে আছি" ${chip}>বিরতিতে আছি</button>
+    </div>
+    <div id="stNoteErr" style="color:#f87171;font-size:13px;min-height:16px"></div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn" type="button" id="stNoteSave" style="flex:1">✅ সেভ করুন</button>
+      <button class="btn secondary" type="button" id="stNoteClear" style="flex:none">🗑️ মুছুন</button>
+      <button class="btn secondary" type="button" id="stNoteClose" style="flex:none">বন্ধ</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  const ta=$id("stNoteTxt"); ta.value=DRV.statNote||""; ta.focus();
+  ov.querySelectorAll("[data-chip]").forEach(b=>b.onclick=()=>{ ta.value=b.dataset.chip; });
+  ov.addEventListener("click",e=>{ if(e.target===ov) ov.remove(); });
+  $id("stNoteClose").onclick=()=>ov.remove();
+  const save=async(text)=>{
+    const err=$id("stNoteErr"), b1=$id("stNoteSave"), b2=$id("stNoteClear"); err.textContent=""; b1.disabled=b2.disabled=true;
+    try{
+      await db.collection("transportMediaPosts").doc("standing_"+DRV.uid).update({
+        statusNote: text ? text : firebase.firestore.FieldValue.delete(),
+        statusNoteAt: firebase.firestore.FieldValue.serverTimestamp() });
+      DRV.statNote=text; drvStatusSubUpdate(); ov.remove();
+    }catch(e){ err.textContent="সেভ হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"; b1.disabled=b2.disabled=false; }
+  };
+  $id("stNoteSave").onclick=()=>save(ta.value.trim().slice(0,140));
+  $id("stNoteClear").onclick=()=>save("");
+}
+$id("anyPostBtn").onclick=drvStatusNote;
+$id("anyPostHome").onclick=drvStatusNote;
+drvStatusSubUpdate();
 
 /* ==================== ✈️ যাত্রীর ফ্লাইট (অক্টোবর ২০২৬) ====================
    Bazar-এর Smart Flight-এর একই সার্ভার ফাংশন (searchFlight) — চাবি সার্ভারে থাকে।
