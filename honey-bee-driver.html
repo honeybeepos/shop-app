@@ -464,12 +464,15 @@ async function drvEnsureStandingPost(){
     const from=[DRV.data.upazila,DRV.data.district].filter(Boolean).join(", ")||"আমার এলাকা";
     const on=(DRV.data.driverStatus==="online"||DRV.data.driverStatus==="busy");
     const label=[vt,v.model,v.regNumber].filter(Boolean).join(" · ");
+    // 📍 গন্তব্যের জায়গায় ড্রাইভারের বাজারের নাম — ঠিকানা স্পষ্ট থাকলে যাত্রীর বুকিং করা সহজ হয়
+    let mName=""; try{ if(DRV.data.marketId){ const mk=await db.collection("markets").doc(DRV.data.marketId).get(); if(mk.exists) mName=String(mk.data().name||"").trim(); } }catch(e){}
+    const toTxt=mName||"যেকোনো জায়গা";
     const common={
       authorName:DRV.data.name||"ড্রাইভার", authorPhone:DRV.data.phone||"", isVerified:!!DRV.data.isVerified,
       vehicleLabel:label, vehicleType:vt, vehicleModel:v.model||null, regNumber:v.regNumber||null, vehicleColor:v.color||null, ac:v.ac||null,
-      from, to:"যেকোনো জায়গা", marketId:DRV.data.marketId||null, district:DRV.data.district||null, upazila:DRV.data.upazila||null,
+      from, to:toTxt, marketId:DRV.data.marketId||null, district:DRV.data.district||null, upazila:DRV.data.upazila||null,
       imageUrl:vp.front||vp.side||vp.inside||null, vehiclePhotos:[vp.front,vp.inside,vp.side].filter(Boolean), driverPhoto:DRV.data.photoURL||null,
-      text:"🚖 "+label+" — "+from+" থেকে যেকোনো জায়গায় যেতে প্রস্তুত",
+      text:"🚖 "+label+" — "+from+" → "+toTxt+" · যেকোনো জায়গায় যেতে প্রস্তুত",
       driverOnline:on, driverBusy:DRV.data.driverBusy===true
     };
     const ref=db.collection("transportMediaPosts").doc("standing_"+DRV.uid);
