@@ -388,13 +388,14 @@ function rideCard(r){return `<article class="ride market-vehicle-card">${hbDutyB
   <div class="ridehead"><strong>${r.type}</strong><button class="heart" onclick="event.stopPropagation();toast('পছন্দের তালিকায় যোগ করতে লগইন করুন')">♡</button></div>
   <div class="routeText">📍 ${r.route}</div>
   <div class="meta" style="display:flex;align-items:center;gap:6px;margin:2px 0 4px">${r.driverPhoto?`<img src="${r.driverPhoto}" alt="" style="width:26px;height:26px;border-radius:50%;object-fit:cover">`:'👤'} ${r.name}${r.verified?' <span style="color:#6ee7a8">✓</span>':''}</div>
-  <div class="meta">🕒 ${r.time} · ${r.seats>0?'💺 '+r.seats+' আসন খালি':(r.seatsTotal>0?'🔴 আসন পূর্ণ':'📦 মালামাল পরিবহন')}${r.online?'':' · ⚪ চালক এখন অফলাইন'}</div>
+  <div class="meta">🕒 ${r.time} · ${r.seats>0?'💺 '+r.seats+' আসন খালি':(r.standing?'🚖 যেকোনো সময় কল বা বুকিং করুন':(r.seatsTotal>0?'🔴 আসন পূর্ণ':'📦 মালামাল পরিবহন'))}${r.online?'':' · ⚪ চালক এখন অফলাইন'}</div>
   <div class="vehicle-spec-row"><span>❄️ ${r.ac||'এসি তথ্য নেই'}</span><span>⭐ ${r.rating||'নতুন'}</span></div>
   <div class="market-vehicle-bottom"><div><small>প্রস্তাবিত ভাড়া</small><strong>${r.price?'৳'+r.price:'<span style="font-size:15px">আলোচনা সাপেক্ষ</span>'}</strong></div><button class="primary vehicle-detail-btn" onclick="openDetail('${r.id}')">বিস্তারিত দেখুন ›</button></div>
  </div></article>`}
 
 function toggleHomeSearch(){const box=document.getElementById('homeSearchBox');const btn=document.getElementById('homeSearchToggle');const collapsed=box.classList.toggle('collapsed');btn.setAttribute('aria-expanded',String(!collapsed));}
-function render(){let list=rides.filter(r=>filtered==='সব'||r.type===filtered).filter(r=>typeof hbMatchQ!=='function'||hbMatchQ(r)).filter(r=>typeof hbMatchArea!=='function'||hbMatchArea(r));document.getElementById('homeRides').innerHTML=list.slice(0,3).map(rideCard).join('')||'<div class="empty">'+(window.__ridesLoaded?'এখনো কোনো ড্রাইভারের পোস্ট নেই — ড্রাইভাররা পোস্ট করলে এখানে দেখা যাবে।':'⏳ পোস্ট আনা হচ্ছে...')+'</div>';document.getElementById('searchRides').innerHTML=list.map(rideCard).join('')||'<div class="empty">এই ধরনের গাড়ি পাওয়া যায়নি। অন্য ধরন নির্বাচন করুন।</div>';document.getElementById('postsRides').innerHTML=rides.filter(r=>typeof hbMatchArea!=='function'||hbMatchArea(r)).map(rideCard).join('')||'<div class="empty">'+(typeof hbAreaOn==='function'&&hbAreaOn()?'এই এলাকায় এখন কোনো গাড়ির পোস্ট নেই — উপরে "সব এলাকা" চাপুন।':'এখনো কোনো পোস্ট নেই।')+'</div>';document.getElementById('searchSummary').textContent=`${document.getElementById('from').value} থেকে ${document.getElementById('to').value} · ${list.length}টি পোস্ট`;if(document.getElementById('bookingList'))document.getElementById('bookingList').innerHTML=bookings.length?bookings.map(b=>`<div class="ride" style="margin-bottom:10px"><div class="vehiclepic">${b.emoji||'🚘'}</div><div><b>${b.route||((b.from||'')+' → '+(b.to||''))}</b><p class="meta">${b.name||b.type||'যাত্রার অনুরোধ'} · ${b.time||b.date||'তারিখ দেওয়া হয়নি'}</p><div class="rating">${b.status||'বুকিং অনুরোধ পাঠানো হয়েছে'}</div><button class="book" onclick="showPage('trackingPage')">যাত্রার তথ্য</button></div></div>`).join(''):'<div class="empty">এখনো কোনো বুকিং নেই।<br>গন্তব্যের গাড়ি খুঁজে বুকিং দিন।</div>';const rh=null;if(rh)rh.innerHTML=requests.length?'<h3>আপনার সংরক্ষিত অনুরোধ</h3>'+requests.map(q=>`<div class="notice" style="margin:8px 0"><b>${q.from} → ${q.to}</b><br><span>${q.type} · ${q.date||'তারিখ নেই'} · ${q.count||1} জন</span><br><small>${q.status||'ডেমো অনুরোধ'}</small></div>`).join(''):''}
+function hbRideOrder(a,b){ return (a.online===false)-(b.online===false); } /* অনলাইন উপরে, অফলাইন নিচে (একই দলে আগের ক্রম বজায় থাকে) */
+function render(){rides.sort(hbRideOrder);let list=rides.filter(r=>filtered==='সব'||r.type===filtered).filter(r=>typeof hbMatchQ!=='function'||hbMatchQ(r)).filter(r=>typeof hbMatchArea!=='function'||hbMatchArea(r));document.getElementById('homeRides').innerHTML=list.slice(0,3).map(rideCard).join('')||'<div class="empty">'+(window.__ridesLoaded?'এখনো কোনো ড্রাইভারের পোস্ট নেই — ড্রাইভাররা পোস্ট করলে এখানে দেখা যাবে।':'⏳ পোস্ট আনা হচ্ছে...')+'</div>';document.getElementById('searchRides').innerHTML=list.map(rideCard).join('')||'<div class="empty">এই ধরনের গাড়ি পাওয়া যায়নি। অন্য ধরন নির্বাচন করুন।</div>';document.getElementById('postsRides').innerHTML=rides.filter(r=>typeof hbMatchArea!=='function'||hbMatchArea(r)).map(rideCard).join('')||'<div class="empty">'+(typeof hbAreaOn==='function'&&hbAreaOn()?'এই এলাকায় এখন কোনো গাড়ির পোস্ট নেই — উপরে "সব এলাকা" চাপুন।':'এখনো কোনো পোস্ট নেই।')+'</div>';document.getElementById('searchSummary').textContent=`${document.getElementById('from').value} থেকে ${document.getElementById('to').value} · ${list.length}টি পোস্ট`;if(document.getElementById('bookingList'))document.getElementById('bookingList').innerHTML=bookings.length?bookings.map(b=>`<div class="ride" style="margin-bottom:10px"><div class="vehiclepic">${b.emoji||'🚘'}</div><div><b>${b.route||((b.from||'')+' → '+(b.to||''))}</b><p class="meta">${b.name||b.type||'যাত্রার অনুরোধ'} · ${b.time||b.date||'তারিখ দেওয়া হয়নি'}</p><div class="rating">${b.status||'বুকিং অনুরোধ পাঠানো হয়েছে'}</div><button class="book" onclick="showPage('trackingPage')">যাত্রার তথ্য</button></div></div>`).join(''):'<div class="empty">এখনো কোনো বুকিং নেই।<br>গন্তব্যের গাড়ি খুঁজে বুকিং দিন।</div>';const rh=null;if(rh)rh.innerHTML=requests.length?'<h3>আপনার সংরক্ষিত অনুরোধ</h3>'+requests.map(q=>`<div class="notice" style="margin:8px 0"><b>${q.from} → ${q.to}</b><br><span>${q.type} · ${q.date||'তারিখ নেই'} · ${q.count||1} জন</span><br><small>${q.status||'ডেমো অনুরোধ'}</small></div>`).join(''):''}
 function showPage(id,btn){if(id==='requestPage')id='postsPage';if(id==='profilePage'&&typeof hbFillProfile==='function')setTimeout(hbFillProfile,0);if(id==='homePage')window.__q=null;document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));let page=document.getElementById(id);if(page)page.classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));let navbtn=btn||document.querySelector(`.nav button[data-page="${id}"]`);if(!navbtn){const fallback=id==='requestPage'?'searchPage':(id==='detailPage'||id==='trackingPage'?'bookingsPage':'homePage');navbtn=document.querySelector(`.nav button[data-page="${fallback}"]`)}if(navbtn)navbtn.classList.add('active');if(id==='searchPage')render();window.scrollTo({top:0,behavior:'smooth'})}
 function filterType(type,btn){filtered=type;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));if(btn)btn.classList.add('active');render()}
 function useCurrentLocation(){
@@ -479,7 +480,7 @@ function hbPostToRide(id,d){
   let when=[d.date,d.time].filter(Boolean).join(' ');
   if(!when&&d.createdAt&&d.createdAt.toDate){try{when='পোস্ট: '+d.createdAt.toDate().toLocaleDateString('bn-BD',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){}}
   return {id:hbEsc(id),type:hbEsc(type||'গাড়ি'),emoji:HB_TYPE_EMOJI[type]||'🚘',route:hbEsc(route),from:hbEsc(d.from||''),to:hbEsc(d.to||''),
-    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,seatsTotal:Number(d.seatsTotal!=null?d.seatsTotal:d.seats)||0,anywhere:d.anywhere===true,areaD:String(d.district||''),areaU:String(d.upazila||''),areaM:String(d.marketId||''),online:d.driverOnline!==false,busy:d.driverBusy===true,tripDate:typeof d.date==='string'?d.date:'',createdMs:(d.createdAt&&d.createdAt.toMillis)?d.createdAt.toMillis():Date.now(),name:hbEsc(d.authorName||'ড্রাইভার'),
+    time:hbEsc(when||'সময় দেওয়া নেই'),price:Number(d.fare)||0,seats:Number(d.seats)||0,seatsTotal:Number(d.seatsTotal!=null?d.seatsTotal:d.seats)||0,anywhere:d.anywhere===true,standing:d.kind==='standing',areaD:String(d.district||''),areaU:String(d.upazila||''),areaM:String(d.marketId||''),online:d.driverOnline!==false,busy:d.driverBusy===true,tripDate:typeof d.date==='string'?d.date:'',createdMs:(d.createdAt&&d.createdAt.toMillis)?d.createdAt.toMillis():Date.now(),name:hbEsc(d.authorName||'ড্রাইভার'),
     rating:'নতুন',reviews:0,verified:!!d.isVerified,car:hbEsc(d.vehicleModel||d.vehicleLabel||'তথ্য দেওয়া হয়নি'),ac:hbEsc(d.ac||''),
     plate:hbEsc(d.regNumber||''),color:hbEsc(d.vehicleColor||''),note:hbEsc(d.notes||d.text||''),phone:String(d.authorPhone||'').replace(/[^0-9+]/g,''),driverId:typeof d.authorId==='string'?d.authorId:'',
     driverPhoto:(typeof d.driverPhoto==='string'&&/^https:\/\/firebasestorage\.googleapis\.com\//.test(d.driverPhoto))?hbEsc(d.driverPhoto):'',
@@ -488,14 +489,25 @@ function hbPostToRide(id,d){
 }
 try{
   db.collection('transportMediaPosts').where('status','==','active').orderBy('createdAt','desc').limit(30)
-    .onSnapshot(qs=>{window.__ridesLoaded=true;rides=qs.docs.map(x=>hbPostToRide(x.id,x.data())).filter(hbNotExpired);render();hbRefreshDriverStatus();},
+    .onSnapshot(qs=>{__rTrip=qs.docs.map(x=>hbPostToRide(x.id,x.data())).filter(hbNotExpired);hbSetRides();},
       err=>{console.warn('posts',err);window.__ridesLoaded=true;render();toast('পোস্ট আনা যায়নি — ইন্টারনেট দেখুন');});
+}catch(e){console.warn(e)}
+/* 📌 স্থায়ী পোস্ট — যে ড্রাইভারের গাড়ির তথ্য দেওয়া আছে, তার একটা পোস্ট সব সময় থাকে (ড্রাইভার অ্যাপ নিজে বানায়)।
+   নতুন পোস্টের ভিড়ে ৩০টার সীমায় হারিয়ে না যায়, তাই আলাদা প্রশ্ন। অফলাইন হলে কার্ডের মাথায় "অফ ডিউটি" লেখা আসে আর তালিকায় নিচে নামে। */
+let __rTrip=[], __rStand=[];
+function hbSetRides(){
+  const m=new Map(); __rTrip.concat(__rStand).forEach(r=>{ if(!m.has(r.id)) m.set(r.id,r); });
+  rides=[...m.values()]; window.__ridesLoaded=true; render(); hbRefreshDriverStatus();
+}
+try{
+  db.collection('transportMediaPosts').where('kind','==','standing').where('status','==','active').limit(80)
+    .onSnapshot(qs=>{__rStand=qs.docs.map(x=>hbPostToRide(x.id,x.data()));hbSetRides();},err=>console.warn('standing',err));
 }catch(e){console.warn(e)}
 
 
 /* 🗓️ পুরনো পোস্ট লুকানো: যাত্রার তারিখ পেরিয়ে গেলে (গতকাল বা আগে), আর তারিখ ছাড়া পোস্ট ৭ দিন পরে */
 function hbToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-function hbNotExpired(r){ if(/^\d{4}-\d{2}-\d{2}$/.test(r.tripDate)) return r.tripDate>=hbToday(); return Date.now()-r.createdMs < 7*86400000; }
+function hbNotExpired(r){ if(r.standing) return true; /* 📌 স্থায়ী পোস্ট কখনো পুরনো হয় না */ if(/^\d{4}-\d{2}-\d{2}$/.test(r.tripDate)) return r.tripDate>=hbToday(); return Date.now()-r.createdMs < 7*86400000; }
 /* 🔎 জায়গার নাম দিয়ে খোঁজা — গন্তব্যের যেকোনো শব্দ পোস্টের রুটে থাকলেই দেখায় */
 function hbWords(x){ return hbUnesc(String(x||'')).toLowerCase().replace(/[,।.\-–→()]/g,' ').split(/\s+/).filter(w=>w.length>=2); }
 function hbMatchQ(r){
@@ -663,7 +675,7 @@ async function openBooking(id){
   document.getElementById('bkSeatsWrap').style.display=goods?'none':'';
   document.getElementById('bkSeats').max=r.seats||1; document.getElementById('bkSeats').value=1;
   document.getElementById('bkSeatsHint').textContent=goods?'':`খালি আসন: ${r.seats}`;
-  document.getElementById('bkNote').placeholder=goods?'কী মালামাল, কতটুকু — লিখুন':'যেমন: কোথা থেকে উঠবেন (ঐচ্ছিক)';
+  document.getElementById('bkNote').placeholder=(goods&&!r.standing)?'কী মালামাল, কতটুকু — লিখুন':(r.standing?'কোথা থেকে কোথায় যাবেন, কয়জন — লিখুন':'যেমন: কোথা থেকে উঠবেন (ঐচ্ছিক)');
   const c=hbParentCustomer();
   if(!document.getElementById('bkName').value&&c&&c.name) document.getElementById('bkName').value=c.name;
   try{ const ph=localStorage.getItem('hbPassengerPhone'); if(ph&&!document.getElementById('bkPhone').value) document.getElementById('bkPhone').value=ph; }catch(e){}

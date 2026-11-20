@@ -241,6 +241,7 @@ async function drvLogout(){
   try{ tpStop(true); }catch(e){}
   try{ drvBkRingStop(); }catch(e){}
   if(!confirm("লগআউট করবেন?")) return;
+  try{ await drvMarkPostsOnline(false); }catch(e){} // পোস্টে "অফ ডিউটি" দেখানোর জন্য
   try{ if(DRV.uid && DRV.data && DRV.data.driverStatus !== "offline") await db.collection("transportDrivers").doc(DRV.uid).update({ driverStatus:"offline" }); }catch(e){}
   try{ await auth.signOut(); }catch(e){}
   drvToLogin();
@@ -289,6 +290,7 @@ function drvPaintBusy(b){
   if(t) t.textContent = b ? "যাত্রীরা পোস্টের উপরে দেখছেন: আমি ব্যস্ত আছি" : "চালু করলে পোস্টের উপরে জানানো হবে";
 }
 async function drvMarkPostsBusy(b){
+  drvStandingFlag("driverBusy",!!b);
   try{
     const qs = await db.collection("transportMediaPosts").where("authorId","==",DRV.uid).orderBy("createdAt","desc").limit(20).get();
     const bt = db.batch(); let n = 0;
@@ -344,6 +346,7 @@ $id("vehicleForm").addEventListener("submit", async (e)=>{
     const v = DRV.data.vehicle = DRV.data.vehicle || {};
     v.type = upd["vehicle.type"]; v.model = upd["vehicle.model"]; v.regNumber = upd["vehicle.regNumber"]; v.seatCount = upd["vehicle.seatCount"]; v.ac = upd["vehicle.ac"]; v.fuel = upd["vehicle.fuel"];
     alert("✅ গাড়ির তথ্য সেভ হয়েছে।");
+    drvEnsureStandingPost();
   }catch(err){ alert("সেভ করা যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"); }
   btn.disabled = false;
 });
@@ -449,8 +452,46 @@ function drvCancelEdit(){
   f.querySelector("button[type=reset]").textContent="ফর্ম মুছুন";
 }
 $id("postForm").addEventListener("reset", ()=>{ if(__editPost) setTimeout(drvCancelEdit,0); });
+/* 📌 সব সময়ের পোস্ট — গাড়ির তথ্য (ধরন) দেওয়া থাকলে যাত্রী পাতায় ড্রাইভারের একটা পোস্ট সব সময় থাকে।
+   নিজে বানায়/হালনাগাদ করে (ID: standing_{uid}), তাই ড্রাইভারের আলাদা কিছু করতে হয় না।
+   অফলাইন বা লগআউট হলে যাত্রী পাতায় কার্ডের মাথায় "অফ ডিউটি" লেখা আসে আর তালিকায় নিচে নামে।
+   ⚠️ এজেন্ট/সুপারঅ্যাডমিন সরিয়ে দিলে (reviewedBy আছে) আর জোর করে ফেরানো হয় না। */
+async function drvEnsureStandingPost(){
+  try{
+    if(!DRV.uid || !DRV.data || DRV.data.status==="blocked") return;
+    const v=DRV.data.vehicle||{}; if(!v.type) return;
+    const vp=v.photos||{}, vt=DRV_TYPE_MAP[v.type]||"গাড়ি";
+    const from=[DRV.data.upazila,DRV.data.district].filter(Boolean).join(", ")||"আমার এলাকা";
+    const on=(DRV.data.driverStatus==="online"||DRV.data.driverStatus==="busy");
+    const label=[vt,v.model,v.regNumber].filter(Boolean).join(" · ");
+    const common={
+      authorName:DRV.data.name||"ড্রাইভার", authorPhone:DRV.data.phone||"", isVerified:!!DRV.data.isVerified,
+      vehicleLabel:label, vehicleType:vt, vehicleModel:v.model||null, regNumber:v.regNumber||null, vehicleColor:v.color||null, ac:v.ac||null,
+      from, to:"যেকোনো জায়গা", marketId:DRV.data.marketId||null, district:DRV.data.district||null, upazila:DRV.data.upazila||null,
+      imageUrl:vp.front||vp.side||vp.inside||null, vehiclePhotos:[vp.front,vp.inside,vp.side].filter(Boolean), driverPhoto:DRV.data.photoURL||null,
+      text:"🚖 "+label+" — "+from+" থেকে যেকোনো জায়গায় যেতে প্রস্তুত",
+      driverOnline:on, driverBusy:DRV.data.driverBusy===true
+    };
+    const ref=db.collection("transportMediaPosts").doc("standing_"+DRV.uid);
+    const snap=await ref.get();
+    if(!snap.exists){
+      await ref.set({ ...common, authorId:DRV.uid, kind:"standing", anywhere:true, date:"", time:"যেকোনো সময়",
+        seats:0, seatsTotal:0, fare:0, notes:"গাড়ির তথ্য দেখে কল বা বুকিং করুন — ভাড়া আলোচনা সাপেক্ষে",
+        likedBy:[], likeCount:0, status:"active", createdAt:firebase.firestore.FieldValue.serverTimestamp() });
+      return;
+    }
+    const old=snap.data();
+    if(old.status!=="active" && old.reviewedBy) return; // মডারেটর সরিয়েছেন — সম্মান করা হয়
+    const upd={}; Object.keys(common).forEach(k=>{ if(JSON.stringify(old[k]===undefined?null:old[k])!==JSON.stringify(common[k])) upd[k]=common[k]; });
+    if(old.status!=="active") upd.status="active";
+    if(Object.keys(upd).length) await ref.update(upd);
+  }catch(e){ console.warn("standing post",e); }
+}
+function drvStandingFlag(k,val){ try{ if(DRV.uid) db.collection("transportMediaPosts").doc("standing_"+DRV.uid).update({[k]:val}).catch(()=>{}); }catch(e){} }
+
 /* ⚪ অফলাইনে থাকলে যাত্রীরা পোস্টে "চালক অফলাইন" দেখেন, বুক করতে পারেন না */
 async function drvMarkPostsOnline(on){
+  drvStandingFlag("driverOnline",!!on);
   try{
     const qs=await db.collection("transportMediaPosts").where("authorId","==",DRV.uid).orderBy("createdAt","desc").limit(20).get();
     const b=db.batch(); let n=0;
@@ -474,6 +515,7 @@ async function drvLoadMyPosts(){
     box.innerHTML=list.map(p=>`<div class="trip"><div class="trip-head"><span>${esc(p.from&&p.to?p.from+" → "+p.to:(p.text||"").split("\n")[0])}</span><span class="badge ${/^\d{4}-\d{2}-\d{2}$/.test(p.date||"")&&p.date<drvDayStr(0)?"pending":""}">${/^\d{4}-\d{2}-\d{2}$/.test(p.date||"")&&p.date<drvDayStr(0)?"তারিখ পেরিয়েছে":"চালু"}</span></div>
       <div class="meta">${esc([p.date,p.time].filter(Boolean).join(" "))}${p.vehicleType?" · "+esc(p.vehicleType):""}${p.seatsTotal>0||p.seats>0?" · 💺 "+esc(p.seats||0)+"/"+esc(p.seatsTotal!=null?p.seatsTotal:p.seats)+" আসন খালি":""}${p.fare?" · প্রতি জন ৳"+esc(p.fare):""}</div>
       <div class="btnrow"><button class="btn secondary" type="button" data-ed="${esc(p.id)}" style="padding:7px 11px;font-size:12px">✏️ এডিট</button><button class="btn secondary" type="button" data-rm="${esc(p.id)}" style="padding:7px 11px;font-size:12px">🗑️ ডিলেট</button></div></div>`).join("");
+    { const b0=box.querySelector('[data-ed="standing_'+DRV.uid+'"]'); if(b0&&b0.parentElement) b0.parentElement.innerHTML='<span class="sub" style="font-size:12px">📌 সব সময়ের পোস্ট — গাড়ির তথ্য থেকে নিজে থেকেই থাকে। বদলাতে "গাড়ি" পাতায় তথ্য বদলান।</span>'; }
     box.querySelectorAll("[data-ed]").forEach(b=>b.onclick=()=>drvStartEdit(b.dataset.ed));
     box.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{
       let warn="";
@@ -1512,6 +1554,7 @@ auth.onAuthStateChanged(async (user)=>{
     drvListenBookings();
     drvRenderPhotos();
     drvMarkPostsOnline(DRV.data.driverStatus === "online" || DRV.data.driverStatus === "busy");
+    drvEnsureStandingPost();
     drvPushInit();
     if(location.hash==="#bookings") go("bookings");
     else if(location.hash==="#trips") go("trips");
