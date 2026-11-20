@@ -687,7 +687,7 @@ function drvOpenSched(id,b){
     }catch(e){}
     try{
       await db.collection("transportBookings").doc(id).update({ tripAt:firebase.firestore.Timestamp.fromDate(d), tripKey:key, updatedAt:firebase.firestore.FieldValue.serverTimestamp() });
-      drvCloseSched(); alert("✅ যাত্রার সময় ঠিক হয়েছে।\n🗓️ "+drvFmtTrip(d.getTime())+"\nএখন থেকে এটা 'সময়সূচি' পাতায় থাকবে (সামনের পাতা পরিষ্কার থাকবে); যাওয়ার ৩০ মিনিট আগে আবার সামনে আসবে। সময় হলে অ্যালার্ম বাজবে (অ্যাপ খোলা থাকলে)।");
+      drvCloseSched(); alert("✅ যাত্রার সময় ঠিক হয়েছে।\n🗓️ "+drvFmtTrip(d.getTime())+"\nএখন থেকে এটা 'সময়সূচি' পাতার 'সামনের বুকিং'-এ কত সময় বাকি দেখাবে (সামনের পাতা পরিষ্কার থাকবে); যাওয়ার ৩০ মিনিট আগে আবার সামনেও আসবে। সময় হলে অ্যালার্ম বাজবে (অ্যাপ খোলা থাকলে)।");
     }catch(e){ err.textContent="সময় বসানো যায়নি — ইন্টারনেট দেখে আবার চেষ্টা করুন।"; ok.disabled=false; }
   };
 }
@@ -1347,7 +1347,7 @@ async function drvLoadSched(){
 function drvRenderSched(){
   const today=drvDayStr(0);
   const up=__sched.filter(x=>(x.scheduledDate||"")>=today).sort((a,b)=>((a.scheduledDate||"")+(a.scheduledTime||"")).localeCompare((b.scheduledDate||"")+(b.scheduledTime||"")));
-  const bks=(__accList||[]).filter(b=>drvTripMs(b)>Date.now()+DRV_SCHED_LEAD);   // যাত্রার সময় বসানো নিশ্চিত বুকিং
+  const bks=(__accList||[]).filter(b=>drvTripMs(b)>Date.now());   // যাত্রার সময় বসানো নিশ্চিত বুকিং — সময় আসা পর্যন্ত এখানে থাকে (৩০ মিনিটের ভেতরে ঢুকলেও, সামনের পাতার পাশাপাশি)
   const box=$id("schedList"); if(!box) return;
   if(!up.length && !bks.length){ box.className="sub"; box.textContent="সামনে কোনো বুকিং নেই।"; return; }
   box.className="";
