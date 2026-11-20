@@ -1166,9 +1166,24 @@ function drvListenBookings(){
     drvRestoreSeats(all);
   },()=>{ $id("reqList").textContent="বুকিং আনা যায়নি — ইন্টারনেট দেখুন।"; });
 }
+/* ⏳ যাত্রার সময় পর্যন্ত কত বাকি — "২ ঘণ্টা ১৫ মিনিট বাকি" */
+function drvBn(n){ return String(n).replace(/\d/g,d=>"০১২৩৪৫৬৭৮৯"[d]); }
+function drvLeftTxt(ms){
+  const m=Math.max(0,Math.ceil((ms-Date.now())/60000)); if(m<=0) return "";
+  const d=Math.floor(m/1440), h=Math.floor((m%1440)/60), mm=m%60;
+  if(d>0) return drvBn(d)+" দিন "+(h?drvBn(h)+" ঘণ্টা ":"")+"বাকি";
+  if(h>0) return drvBn(h)+" ঘণ্টা "+(mm?drvBn(mm)+" মিনিট ":"")+"বাকি";
+  return drvBn(mm)+" মিনিট বাকি";
+}
+// প্রতি ২০ সেকেন্ডে "বাকি" লেখা নতুন হয়; সময় হয়ে গেলে কার্ড আবার আঁকা হয় (তখন "যাত্রা শেষ" চালু হয়)
+setInterval(()=>{ try{
+  let again=false;
+  document.querySelectorAll(".bkLeft").forEach(el=>{ const ms=Number(el.dataset.ms); if(ms<=Date.now()) again=true; else el.textContent=" · ⏳ "+drvLeftTxt(ms); });
+  if(again && __lastBkArgs) drvRenderBookings.apply(null,__lastBkArgs);
+}catch(e){} },20000);
 function drvBkCard(b,btns){
   return `<div class="trip"><div class="trip-head"><span>${esc(b.from)} → ${esc(b.to)}</span><span class="badge ${b.status==="pending"?"pending":""}">${BK_TXT[b.status]||esc(b.status)}</span></div>
-    <div class="meta">👤 ${esc(b.passengerName||"যাত্রী")} · ${b.seats>0?esc(b.seats)+" আসন":"মালামাল"}${b.fare?` · ${CUR}${esc(b.fare*(b.seats||1))}`:""}<br>🕒 ${esc(b.when||"")}${b.tripAt&&b.tripAt.toMillis?`<br><b style="color:#fbbf24">🗓️ যাত্রার সময়: ${esc(drvFmtTrip(b.tripAt.toMillis()))}</b>`:""}${b.note?"<br>📝 "+esc(b.note):""}</div>
+    <div class="meta">👤 ${esc(b.passengerName||"যাত্রী")} · ${b.seats>0?esc(b.seats)+" আসন":"মালামাল"}${b.fare?` · ${CUR}${esc(b.fare*(b.seats||1))}`:""}<br>🕒 ${esc(b.when||"")}${b.tripAt&&b.tripAt.toMillis?`<br><b style="color:#fbbf24">🗓️ যাত্রার সময়: ${esc(drvFmtTrip(b.tripAt.toMillis()))}</b>${b.tripAt.toMillis()>Date.now()?`<span class="bkLeft" data-ms="${b.tripAt.toMillis()}" style="color:#4ade80;font-weight:800"> · ⏳ ${esc(drvLeftTxt(b.tripAt.toMillis()))}</span>`:""}`:""}${b.note?"<br>📝 "+esc(b.note):""}</div>
     ${b.flightNo?`<div class="meta">✈️ ফ্লাইট: <b>${esc(b.flightNo)}</b> <button type="button" class="btn secondary" style="padding:4px 10px;font-size:12px" data-fl="${esc(b.flightNo)}">ফ্লাইট দেখুন</button></div>`:""}
     <div class="meta" id="ph_${esc(b.id)}"></div>${btns?`<div class="btnrow">${btns}</div>`:""}</div>`;
 }
@@ -1194,7 +1209,7 @@ function drvRenderBookings(pend,acc,old){
   __lastBkArgs=[pend,acc,old]; __frontSig=front.map(b=>b.id).join(",");
   act.style.display=front.length?"":"none";
   act.innerHTML=`<h2 class="section-title" style="color:#4ade80">✅ নিশ্চিত বুকিং</h2>`+front.map(b=>drvBkCard(b,
-    `<button class="btn" type="button" data-done="${esc(b.id)}">🏁 যাত্রা শেষ</button><button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ বাতিল</button>${b.tripAt?"":`<button class="btn secondary" type="button" data-sched="${esc(b.id)}" style="border-color:#fbbf24;color:#fbbf24">🗓️ সময় ঠিক করুন</button>`}`)).join("");
+    `${drvTripMs(b)>Date.now()?`<button class="btn" type="button" disabled data-wait="${esc(b.id)}" style="opacity:.45;cursor:not-allowed">🏁 যাত্রা শেষ</button>`:`<button class="btn" type="button" data-done="${esc(b.id)}">🏁 যাত্রা শেষ</button>`}<button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ বাতিল</button>${b.tripAt?"":`<button class="btn secondary" type="button" data-sched="${esc(b.id)}" style="border-color:#fbbf24;color:#fbbf24">🗓️ সময় ঠিক করুন</button>`}`)).join("");
   box.className=pend.length||old.length?"":"sub";
   box.innerHTML=(pend.length?pend.map(b=>drvBkCard(b,`<button class="btn" type="button" data-yes="${esc(b.id)}">✅ গ্রহণ করুন</button><button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ না</button>`)).join(""):"<div class='sub'>এখন নতুন কোনো বুকিং অনুরোধ নেই। যাত্রীরা আপনার পোস্ট দেখে বুক করলে এখানে আসবে।</div>")
     +(old.length?`<div class="sub" style="margin-top:14px">আগের বুকিং</div>`+old.map(b=>drvBkCard(b,"")).join(""):"");
@@ -1267,10 +1282,13 @@ async function drvSetBooking(id,status,btn){
   catch(e){ alert("হয়নি: "+e.message); btn.disabled=false; }
 }
 async function drvDoneBooking(id,btn){
+  const bk0=(__accList||[]).find(x=>x.id===id);
+  if(bk0 && drvTripMs(bk0)>Date.now()){ alert("⏳ যাত্রার সময় হয়নি ("+drvLeftTxt(drvTripMs(bk0))+")।\nসময় হলে \"যাত্রা শেষ\" চালু হবে।"); return; }
   if(!confirm("যাত্রা শেষ হয়েছে? ভাড়া বুঝে পেয়েছেন?")) return;
   btn.disabled=true;
   try{
     const ref=db.collection("transportBookings").doc(id), d=(await ref.get()).data()||{};
+    if(drvTripMs(d)>Date.now()){ alert("⏳ যাত্রার সময় এখনো হয়নি।"); btn.disabled=false; return; }
     await ref.update({status:"completed",updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
     const amt=(Number(d.fare)||0)*(Number(d.seats)||1);
     await db.collection("transportDrivers").doc(DRV.uid).collection("dailyEarnings").doc(drvDayStr(0)).set({
