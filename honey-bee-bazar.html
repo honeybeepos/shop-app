@@ -2575,10 +2575,10 @@
        (honey-bee-transport.html) হুবহু বসানো — iframe-এর ভিতরে, যাতে ওর CSS
        Bazar-এর বাকি পাতার সাথে না মেশে। উপরে শুধু একটা পাতলা "ফিরে যান" বার। -->
   <div id="screenTransportMedia" style="padding:0;">
-    <div style="position:fixed; top:0; left:0; right:0; height:40px; z-index:10001; display:flex; align-items:center; padding:0 10px; background:#171717;">
-      <button class="backBtn" id="backToTransportFromMedia" style="margin:0; padding:5px 12px; font-size:13px;">← Bazar-এ ফিরে যান</button>
-    </div>
-    <iframe id="hbTransportFrame" title="Honey Bee Transport" style="position:fixed; top:40px; left:0; width:100%; height:calc(100% - 40px); border:0; z-index:10000; background:#f3f4f6;" allow="geolocation"></iframe>
+    <!-- উপরের "Bazar-এ ফিরে যান" বার সরানো হয়েছে — যাত্রী পাতার "Honey Bee" হেডারে চাপলেই Bazar-এ ফেরা যায়।
+         নিচের লুকানো বোতামটা ফোনের Back বোতামের জন্য (সক্রিয় স্ক্রিনের .backBtn-এ ক্লিক করানো হয়) — মুছবেন না। -->
+    <button class="backBtn" id="backToTransportFromMedia" style="display:none" aria-hidden="true" tabindex="-1">← Bazar-এ ফিরে যান</button>
+    <iframe id="hbTransportFrame" title="Honey Bee Transport" style="position:fixed; top:0; left:0; width:100%; height:100%; border:0; z-index:10000; background:#f3f4f6;" allow="geolocation"></iframe>
     <div id="tmFeedList" style="display:none;"></div>
   </div>
 
@@ -10044,6 +10044,8 @@ $("menuProfileSaveBtn").addEventListener("click", async ()=>{
 
 document.getElementById("backToHomeFromTransport") && document.getElementById("backToHomeFromTransport").addEventListener("click", ()=> showScreen("screenHome"));
 document.getElementById("backToTransportFromMedia") && document.getElementById("backToTransportFromMedia").addEventListener("click", ()=> showScreen("screenTransport"));
+/* 🐝 যাত্রী পাতার (iframe) "Honey Bee" হেডারে চাপলে এখানে বার্তা আসে — Transport স্ক্রিনে ফেরা */
+window.addEventListener("message", (e)=>{ try{ if(e.origin===location.origin && e.data && e.data.hb==="backToBazar") showScreen("screenTransport"); }catch(err){} });
 document.getElementById("smartFlightInfoBtn") && document.getElementById("smartFlightInfoBtn").addEventListener("click", ()=>{ showScreen("screenSmartFlightInfo"); sfiApplyGate(); });
 /* 🔒 Smart Flight — লগইন ছাড়া খোলে না (অতিথির কাছে শুধু লগইনের বাক্স) */
 function sfiApplyGate(){
