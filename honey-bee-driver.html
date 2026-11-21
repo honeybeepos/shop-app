@@ -108,7 +108,8 @@ select option{background:#173a29;color:#eafff2}
 #radarCard.reqAlert #radarHint{display:inline-block;color:#fbbf24;font-weight:800;animation:reqNudge 1s ease-in-out infinite}
 .radarItem{animation:reqGlow 1.4s ease-in-out infinite}
 .radarItem.reqShake{animation:reqShake .6s ease-in-out 1,reqGlow 1.4s ease-in-out .6s infinite}
-@media (prefers-reduced-motion:reduce){#radarCard.reqAlert,#radarCard.reqAlert #radarHint,.radarItem,.radarItem.reqShake,#tripsAction.reqAlert,#tripsAction.reqAlert span,#tripsAction.reqAlert small,#tripsAction.reqShake,#stReqCard.reqAlert,#stReqCard.reqAlert #stReq,#stReqCard.reqAlert #stReqNote,#stReqCard.reqShake{animation:none}}
+#tpChatBtn.chatNew{border:1px solid rgba(251,191,36,.9);color:#fbbf24;font-weight:800;animation:reqGlow 1.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){#tpChatBtn.chatNew,#radarCard.reqAlert,#radarCard.reqAlert #radarHint,.radarItem,.radarItem.reqShake,#tripsAction.reqAlert,#tripsAction.reqAlert span,#tripsAction.reqAlert small,#tripsAction.reqShake,#stReqCard.reqAlert,#stReqCard.reqAlert #stReq,#stReqCard.reqAlert #stReqNote,#stReqCard.reqShake{animation:none}}
 </style>
 <script src="hb-silent.js"></script>
 </head>
@@ -752,7 +753,7 @@ const TP_TURN_MS = 40000;
 let __tpUnsub=null, __tpRadarUnsub=null, __tpGps=null, __tpMy=null, __tpSent=0;
 let __tpTrips=[], __tpPass=[], __tpTicker=null, __tpRing=null;
 let __tpKnown=new Set(), __tpInit=false, __tpKnownP=new Set(), __tpInitP=false;
-let __tpActiveUnsub=null, __tpCd=null;
+let __tpActiveUnsub=null, __tpCd=null, __tpActiveTrip=null;
 const __tpGeo=new Map(); let __tpGeoQ=Promise.resolve();
 
 /* 🚕 গাড়ির ধরন — যাত্রীর বাছা ধরনের সাথে আমার গাড়ি (vehicle.type) না মিললে রিকোয়েস্ট/যাত্রী দেখানো হয় না (সার্ভারও একই নিয়মে পাঠায়) */
@@ -928,6 +929,7 @@ function tpBindBox(){
     else if(act==="fix") tpAcceptFixed(id,b);
     else if(act==="cancelwait") tpCancelWait(id);
     else if(act==="done") tpComplete(id);
+    else if(act==="chat") tpChatOpen(id);
     else if(act==="nav"){
       const lat=Number(b.dataset.lat), lng=Number(b.dataset.lng);
       if(isFinite(lat)&&isFinite(lng)&&b.dataset.lat) window.open("https://www.google.com/maps/dir/?api=1&destination="+lat+","+lng,"_blank");
@@ -936,6 +938,72 @@ function tpBindBox(){
       if(b.dataset.phone) location.href="tel:"+b.dataset.phone; else alert("যাত্রীর ফোন নম্বর পাওয়া যায়নি।");
     }
   });
+}
+/* 💬 যাত্রীর সাথে চ্যাট — যাত্রীর অ্যাপের "ড্রাইভারের সাথে চ্যাট"-এর সাথে একই জায়গা (trips/{id}/chat)।
+   শুধু নিশ্চিত হওয়া ট্রিপের ড্রাইভার ও যাত্রী পড়তে/লিখতে পারে (rules আগে থেকেই আছে)। যাত্রী লিখলে এখানে বোতামে নতুন মেসেজের সংখ্যা + শব্দ আসে। */
+let __tpChatUnsub=null, __tpChatTrip=null, __tpChatMsgs=[], __tpChatSeen=0, __tpChatP=0, __tpChatOpened=false, __tpChatInit=false;
+function tpChatBadge(){
+  const b=$id("tpChatBtn"); if(!b) return;
+  const n=Math.max(0,__tpChatP-__tpChatSeen);
+  b.textContent = n>0 ? "💬 যাত্রীর সাথে চ্যাট — "+drvBn(n)+"টা নতুন মেসেজ" : "💬 যাত্রীর সাথে চ্যাট";
+  b.classList.toggle("chatNew", n>0);
+}
+function tpChatWatch(id){
+  if(__tpChatTrip===id && __tpChatUnsub){ tpChatBadge(); return; }
+  tpChatStop(); __tpChatTrip=id; __tpChatInit=false;
+  __tpChatUnsub=db.collection("trips").doc(id).collection("chat").orderBy("sentAt","asc").onSnapshot(qs=>{
+    __tpChatMsgs=qs.docs.map(d=>d.data());
+    const pc=__tpChatMsgs.filter(m=>m.senderId!==DRV.uid).length;
+    if(__tpChatOpened) __tpChatSeen=pc;
+    else if(__tpChatInit && pc>__tpChatP){ try{ drvBeep(); }catch(e){} }
+    __tpChatP=pc; __tpChatInit=true;
+    if(__tpChatOpened) tpChatRender();
+    tpChatBadge();
+  }, err=>console.warn("trip chat",err));
+}
+function tpChatStop(){
+  if(__tpChatUnsub){ __tpChatUnsub(); __tpChatUnsub=null; }
+  __tpChatTrip=null; __tpChatMsgs=[]; __tpChatSeen=0; __tpChatP=0; __tpChatOpened=false; __tpChatInit=false;
+  const ov=document.getElementById("tpChatOv"); if(ov) ov.remove();
+}
+function tpChatRender(){
+  const el=document.getElementById("tpChatList"); if(!el) return;
+  if(!__tpChatMsgs.length){ el.innerHTML='<div style="text-align:center;opacity:.7;font-size:13px;margin-top:24px">এখনো কোনো মেসেজ নেই — যাত্রীকে কিছু লিখুন।</div>'; return; }
+  el.innerHTML=__tpChatMsgs.map(m=>{
+    const mine=m.senderId===DRV.uid;
+    const t=m.sentAt&&m.sentAt.toDate?m.sentAt.toDate().toLocaleTimeString("bn-BD",{hour:"2-digit",minute:"2-digit"}):"";
+    return '<div style="display:flex;justify-content:'+(mine?"flex-end":"flex-start")+';margin-bottom:8px"><div style="max-width:78%;padding:9px 13px;border-radius:14px;'
+      +(mine?"background:#4ade80;color:#06240f;border-bottom-right-radius:4px":"background:rgba(255,255,255,.1);border-bottom-left-radius:4px")+'">'
+      +'<div style="font-size:14px;word-wrap:break-word;white-space:pre-wrap">'+esc(m.text||"")+'</div>'
+      +'<div style="font-size:10px;opacity:.65;margin-top:3px;text-align:right">'+t+'</div></div></div>';
+  }).join("");
+  el.scrollTop=el.scrollHeight;
+}
+function tpChatOpen(id){
+  if(!id) return; tpChatWatch(id);
+  const old=document.getElementById("tpChatOv"); if(old) old.remove();
+  __tpChatOpened=true; __tpChatSeen=__tpChatP; tpChatBadge();
+  const ov=document.createElement("div"); ov.id="tpChatOv";
+  ov.style.cssText="position:fixed;inset:0;background:#0f1f16;z-index:99999;display:flex;flex-direction:column";
+  ov.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.12)">'
+    +'<button type="button" id="tpChatBack" class="btn secondary" style="width:auto;flex:none;padding:6px 12px;margin:0">←</button>'
+    +'<div style="font-weight:800;font-size:15px">💬 যাত্রী: '+esc((__tpActiveTrip&&__tpActiveTrip.passengerName)||"যাত্রী")+'</div></div>'
+    +'<div id="tpChatList" style="flex:1;overflow:auto;padding:14px"></div>'
+    +'<div style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.12)">'
+    +'<input id="tpChatInput" type="text" maxlength="500" placeholder="মেসেজ লিখুন..." autocomplete="off" style="flex:1;min-width:0;background:#0c1a12;color:inherit;border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:11px;font-size:15px;font-family:inherit">'
+    +'<button type="button" id="tpChatSend" class="btn" style="width:auto;flex:none;padding:10px 18px;margin:0">পাঠান</button></div>';
+  document.body.appendChild(ov); tpChatRender();
+  const close=()=>{ __tpChatOpened=false; ov.remove(); tpChatBadge(); };
+  document.getElementById("tpChatBack").onclick=close;
+  const inp=document.getElementById("tpChatInput");
+  const send=async()=>{
+    const text=inp.value.trim(); if(!text) return; inp.value="";
+    try{ await db.collection("trips").doc(id).collection("chat").add({ senderId:DRV.uid, senderRole:"driver", text, sentAt:firebase.firestore.FieldValue.serverTimestamp() }); }
+    catch(e){ alert("মেসেজ পাঠানো যায়নি — আবার চেষ্টা করুন।"); inp.value=text; }
+  };
+  document.getElementById("tpChatSend").onclick=send;
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); send(); } });
+  inp.focus();
 }
 function tpDrvInfo(){ const v=DRV.data.vehicle||{}; return { driverId:DRV.uid, driverName:DRV.data.name||"ড্রাইভার", driverPhone:DRV.data.phone||"", vehicleModel:v.model||v.type||"" }; }
 async function tpSetDriver(cs,tripId){
@@ -997,7 +1065,9 @@ async function tpRenderActive(trip,id){
         +'<div style="font-size:12.5px;color:#a8d9c0;margin-bottom:10px">💰 ভাড়া: '+CUR+' '+esc(String(trip.confirmedDriver.finalFare))+'</div>'
         +'<div class="btnrow" style="margin-bottom:8px"><button type="button" class="btn secondary" data-tp="nav" data-lat="'+(pu.lat!=null?pu.lat:"")+'" data-lng="'+(pu.lng!=null?pu.lng:"")+'">🧭 Navigate</button>'
         +'<button type="button" class="btn secondary" data-tp="call" data-phone="'+esc(trip.passengerPhone||"")+'">📞 যাত্রীকে কল</button></div>'
+        +'<button type="button" class="btn secondary" id="tpChatBtn" data-tp="chat" data-id="'+id+'" style="width:100%;margin-bottom:8px">💬 যাত্রীর সাথে চ্যাট</button>'
         +'<button type="button" class="btn" data-tp="done" data-id="'+id+'" style="width:100%">✅ ট্রিপ শেষ করুন</button></div>';
+      __tpActiveTrip=trip; tpChatWatch(id); tpChatBadge();
     }else await tpResetActive();
   }else if(trip.status==="expired"||trip.status==="cancelled"||trip.status==="completed"){
     await tpResetActive();
@@ -1035,6 +1105,7 @@ async function tpCancelWait(tripId){
   await tpResetActive();
 }
 async function tpResetActive(){
+  tpChatStop(); __tpActiveTrip=null;
   if(__tpActiveUnsub){ __tpActiveUnsub(); __tpActiveUnsub=null; }
   if(__tpCd){ clearInterval(__tpCd); __tpCd=null; }
   if(DRV.data) await tpSetDriver("available",null);

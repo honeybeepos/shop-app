@@ -16220,6 +16220,11 @@ function tripWatchTrip(tripId){
     Promise.resolve(__tripLast).then(trip=>{
       if(!trip) return;
       tripDispatchTick(tripId, trip);
+      // ✅ ড্রাইভার নিশ্চিত/ট্রিপ চলছে/শেষ — খোঁজার সময়ের কাউন্টডাউন আর দেখানো হয় না
+      if(trip.status !== "searching" && trip.status !== "waiting_selection"){
+        const ct = $("tripCountdownTxt"); if(ct && ct.textContent) ct.textContent = "";
+        return;
+      }
       if(!trip.sessionExpiresAt) return;
       const msLeft = trip.sessionExpiresAt.toMillis() - Date.now();
       if(msLeft <= 0){
@@ -16238,6 +16243,8 @@ function tripWatchTrip(tripId){
 
 function tripRenderStatus(trip){
   const list = trip.waitingList || [];
+  // ✅ খোঁজা শেষ (ড্রাইভার নিশ্চিত/চলছে/শেষ/বাতিল) — সময়ের কাউন্টডাউন সাথে সাথে মুছে যায়
+  if(trip.status !== "searching" && trip.status !== "waiting_selection"){ const ct0 = $("tripCountdownTxt"); if(ct0) ct0.textContent = ""; }
   // ⭐ Phase 8 — "completed" ছাড়া বাকি সব স্ট্যাটাসে রেটিং বক্স লুকানো,
   // বাতিল বাটন দেখানো থাকে (নিচে "completed" ব্রাঞ্চেই উল্টোটা করা হয়)
   $("tripRatingBox").style.display = "none";
