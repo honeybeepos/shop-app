@@ -2382,6 +2382,11 @@ async function dispatchTripToNearestDriver(tripId, tripData, excludeDriverIds) {
   candidates.forEach((d) => {
     d.distanceKm = haversineKm(tripData.pickupLat, tripData.pickupLng, d.liveLocation.lat, d.liveLocation.lng);
   });
+  candidates = candidates.filter((d) => d.distanceKm <= TRIP_MAX_KM); // 📏 ৪ কিমির বেশি দূরের চালক বাদ
+  if (candidates.length === 0) {
+    console.log(`পিকআপ থেকে ${TRIP_MAX_KM} কিমির মধ্যে কোনো অনলাইন ড্রাইভার নেই`);
+    return null;
+  }
   candidates.sort((a, b) => a.distanceKm - b.distanceKm);
   const nearest = candidates[0];
 
@@ -3647,7 +3652,7 @@ exports.onDeliveryCallAnswered = onDocumentUpdated("shops/{shopId}/deliveryCalls
    "আবার খুঁজুন" চাপলে আগের জনদের বাদ দিয়ে নতুন ৫ জন। */
 const TRIP_TURN_MS = 40 * 1000;
 const TRIP_QUEUE_SIZE = 5;
-const TRIP_MAX_KM = 25;
+const TRIP_MAX_KM = 4; // 📏 যাত্রীর পিকআপ থেকে ৪ কিমির বেশি দূরের চালক/রাইডার এই ট্রিপের অফার পাবে না (আগে ২৫ ছিল)
 
 /* 🚕 গাড়ির ধরন মিলিয়ে ড্রাইভার বাছা — যাত্রী CNG বাছলে শুধু CNG চালকের কাছে, ইজিবাইক বাছলে শুধু ইজিবাইক চালকের কাছে।
    যাত্রীর ফর্মে ধরন বাছা বাধ্যতামূলক। বাছাইয়ের ধরন (trip.vehicleType) → চালকের vehicle.type (transportDrivers) এর তালিকা।
