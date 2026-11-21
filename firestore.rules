@@ -679,6 +679,24 @@ service cloud.firestore {
              && resource.data.status in ["pending","accepted"] && request.resource.data.status == "cancelled"));
       allow delete: if false;
 
+      // 💬 বুকিং চ্যাট (লেখা + 🎤 ভয়েস) — শুধু এই বুকিংয়ের যাত্রী ও চালক; লেখা যায় শুধু "accepted" অবস্থায়, পড়া যায় accepted/completed-এ
+      match /chat/{messageId} {
+        allow read: if isSignedIn()
+          && get(/databases/$(database)/documents/transportBookings/$(bid)).data.status in ["accepted","completed"]
+          && (get(/databases/$(database)/documents/transportBookings/$(bid)).data.passengerId == request.auth.uid
+              || get(/databases/$(database)/documents/transportBookings/$(bid)).data.driverId == request.auth.uid);
+        allow create: if isSignedIn()
+          && get(/databases/$(database)/documents/transportBookings/$(bid)).data.status == "accepted"
+          && request.resource.data.keys().hasOnly(["senderId","senderRole","text","audio","audioSec","sentAt"])
+          && request.resource.data.senderId == request.auth.uid
+          && ((request.resource.data.senderRole == "passenger" && request.auth.uid == get(/databases/$(database)/documents/transportBookings/$(bid)).data.passengerId)
+              || (request.resource.data.senderRole == "driver" && request.auth.uid == get(/databases/$(database)/documents/transportBookings/$(bid)).data.driverId))
+          && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
+          && (!("audio" in request.resource.data) || (request.resource.data.audio is string && request.resource.data.audio.size() <= 900000))
+          && request.resource.data.sentAt == request.time;
+        allow update, delete: if false;
+      }
+
       match /private/{docId} {
         allow create: if isSignedIn()
           && getAfter(/databases/$(database)/documents/transportBookings/$(bid)).data.passengerId == request.auth.uid

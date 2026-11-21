@@ -109,7 +109,8 @@ select option{background:#173a29;color:#eafff2}
 .radarItem{animation:reqGlow 1.4s ease-in-out infinite}
 .radarItem.reqShake{animation:reqShake .6s ease-in-out 1,reqGlow 1.4s ease-in-out .6s infinite}
 #tpChatBtn.chatNew{border:1px solid rgba(251,191,36,.9);color:#fbbf24;font-weight:800;animation:reqGlow 1.4s ease-in-out infinite}
-@media (prefers-reduced-motion:reduce){#tpChatBtn.chatNew,#radarCard.reqAlert,#radarCard.reqAlert #radarHint,.radarItem,.radarItem.reqShake,#tripsAction.reqAlert,#tripsAction.reqAlert span,#tripsAction.reqAlert small,#tripsAction.reqShake,#stReqCard.reqAlert,#stReqCard.reqAlert #stReq,#stReqCard.reqAlert #stReqNote,#stReqCard.reqShake{animation:none}}
+[data-bkc].chatNew{border:1px solid rgba(251,191,36,.9)!important;color:#fbbf24;font-weight:800;animation:reqGlow 1.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){[data-bkc].chatNew,#tpChatBtn.chatNew,#radarCard.reqAlert,#radarCard.reqAlert #radarHint,.radarItem,.radarItem.reqShake,#tripsAction.reqAlert,#tripsAction.reqAlert span,#tripsAction.reqAlert small,#tripsAction.reqShake,#stReqCard.reqAlert,#stReqCard.reqAlert #stReq,#stReqCard.reqAlert #stReqNote,#stReqCard.reqShake{animation:none}}
 </style>
 <script src="hb-silent.js"></script>
 </head>
@@ -1338,6 +1339,114 @@ setInterval(()=>{
     if(sig !== __frontSig) drvRenderBookings.apply(null, __lastBkArgs);
   }catch(e){}
 }, 30000);
+/* 💬 বুকিং চ্যাট (লেখা + 🎤 ভয়েস) — transportBookings/{id}/chat।
+   যাত্রীর ফোনে ব্যালেন্স না থাকলেও কথা বলা যায়। শুধু "চালক গ্রহণ করেছেন" অবস্থার বুকিংয়ে চালু।
+   রঙ: ড্রাইভার = সবুজ, যাত্রী = সোনালি; নিজের মেসেজ ডানে। পাশ ঠিক হয় senderRole দিয়ে। */
+const BKC = { subs:{}, msgs:{}, init:{}, open:null, role:"", uid:"", onNew:null };
+function bkcEsc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function bkcRole(m){ return m.senderRole || (m.senderId===BKC.uid ? BKC.role : (BKC.role==="driver"?"passenger":"driver")); }
+function bkcOther(id){ return (BKC.msgs[id]||[]).filter(m=>bkcRole(m)!==BKC.role).length; }
+function bkcSeenN(id){ try{ return Number(localStorage.getItem("hbBkcSeen_"+id)||0); }catch(e){ return 0; } }
+function bkcSetSeen(id,n){ try{ localStorage.setItem("hbBkcSeen_"+id,String(n)); }catch(e){} }
+function bkcBadges(){
+  document.querySelectorAll("[data-bkc]").forEach(b=>{
+    const id=b.dataset.bkc, n=Math.max(0,bkcOther(id)-bkcSeenN(id)), base=b.dataset.base||"💬 চ্যাট";
+    b.textContent = n>0 ? base+" — "+vcBn(n)+"টা নতুন মেসেজ" : base;
+    b.classList.toggle("chatNew", n>0);
+  });
+}
+function bkcSync(ids){
+  ids.forEach(id=>{
+    if(BKC.subs[id]) return;
+    BKC.msgs[id]=[]; BKC.init[id]=false;
+    BKC.subs[id]=db.collection("transportBookings").doc(id).collection("chat").orderBy("sentAt","asc").onSnapshot(qs=>{
+      const prev=bkcOther(id);
+      BKC.msgs[id]=qs.docs.map(d=>({ id:d.id, ...d.data() }));
+      const now=bkcOther(id);
+      if(BKC.open===id) bkcSetSeen(id,now);
+      else if(BKC.init[id] && now>prev && BKC.onNew){ try{ BKC.onNew(id); }catch(e){} }
+      BKC.init[id]=true;
+      if(BKC.open===id) bkcRender();
+      bkcBadges();
+    }, err=>console.warn("booking chat",err));
+  });
+  Object.keys(BKC.subs).forEach(id=>{
+    if(ids.indexOf(id)<0){ BKC.subs[id](); delete BKC.subs[id]; delete BKC.msgs[id]; delete BKC.init[id]; if(BKC.open===id) bkcClose(); }
+  });
+}
+function bkcBubble(m){
+  const role=bkcRole(m), mine=role===BKC.role, isDrv=role==="driver";
+  const t=m.sentAt&&m.sentAt.toDate?m.sentAt.toDate().toLocaleTimeString("bn-BD",{hour:"2-digit",minute:"2-digit"}):"";
+  const bg=isDrv?"background:#34d399;color:#05261a;":"background:#f6d27a;color:#2a1a00;";
+  const body=vcSafe(m.audio)
+    ? '<audio controls preload="metadata" src="'+m.audio+'" style="width:100%;min-width:200px;max-width:240px;height:38px"></audio><div style="font-size:11px;margin-top:2px">🎤 ভয়েস মেসেজ'+(m.audioSec?" · "+vcFmt(Number(m.audioSec)||0):"")+'</div>'
+    : '<div style="font-size:14px;word-wrap:break-word;white-space:pre-wrap">'+bkcEsc(m.text||"")+'</div>';
+  return '<div data-mid="'+bkcEsc(m.id)+'" style="display:flex;justify-content:'+(mine?"flex-end":"flex-start")+';margin-bottom:10px"><div style="max-width:80%;padding:8px 12px 7px;border-radius:14px;'+bg
+    +(mine?"border-bottom-right-radius:4px":"border-bottom-left-radius:4px")+'">'
+    +'<div style="font-size:10.5px;font-weight:800;opacity:.75;margin-bottom:3px">'+(isDrv?"🚕 ড্রাইভার":"👤 যাত্রী")+'</div>'+body
+    +'<div class="vcTime" style="font-size:9.5px;opacity:.7;margin-top:3px;text-align:right">'+t+'</div></div></div>';
+}
+function bkcRender(){
+  const el=document.getElementById("bkcList"); if(!el) return;
+  const msgs=BKC.msgs[BKC.open]||[];
+  if(!msgs.length){ el.innerHTML='<div data-empty="1" style="text-align:center;opacity:.75;font-size:13px;margin-top:24px;line-height:1.7">এখনো কোনো মেসেজ নেই — কিছু লিখুন।<br>🎤 লিখতে না পারলে সবুজ মাইক চেপে কথা বলুন।</div>'; return; }
+  if(el.querySelector("[data-empty]")) el.innerHTML="";
+  const have={}; el.querySelectorAll("[data-mid]").forEach(x=>{ have[x.dataset.mid]=x; });
+  // নতুন মেসেজই শুধু যোগ হয় — চলতে থাকা ভয়েস প্লেয়ার মাঝপথে থেমে যায় না
+  msgs.forEach(m=>{
+    if(have[m.id]){
+      const tt=have[m.id].querySelector(".vcTime");
+      if(tt && !tt.textContent && m.sentAt && m.sentAt.toDate) tt.textContent=m.sentAt.toDate().toLocaleTimeString("bn-BD",{hour:"2-digit",minute:"2-digit"});
+    }else el.insertAdjacentHTML("beforeend",bkcBubble(m));
+  });
+  el.scrollTop=el.scrollHeight;
+}
+function bkcClose(){
+  vcStop(false);
+  const ov=document.getElementById("bkcOv"); if(ov) ov.remove();
+  BKC.open=null; bkcBadges();
+}
+function bkcOpen(id,title){
+  if(!id) return;
+  bkcSync(Object.keys(BKC.subs).indexOf(id)<0 ? Object.keys(BKC.subs).concat([id]) : Object.keys(BKC.subs));
+  const old=document.getElementById("bkcOv"); if(old) old.remove();
+  BKC.open=id; bkcSetSeen(id,bkcOther(id)); bkcBadges();
+  const ov=document.createElement("div"); ov.id="bkcOv";
+  ov.style.cssText="position:fixed;inset:0;background:#15110a;color:#fff8e8;z-index:99999;display:flex;flex-direction:column;font-family:inherit";
+  ov.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.14)">'
+    +'<button type="button" id="bkcBack" style="flex:none;padding:7px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:inherit;font-size:16px;cursor:pointer">←</button>'
+    +'<div style="font-weight:800;font-size:15px">💬 '+bkcEsc(title||"চ্যাট")+'</div></div>'
+    +'<div id="bkcList" style="flex:1;overflow:auto;padding:14px"></div>'
+    +'<div id="bkcRow" style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.14)">'
+    +'<input id="bkcInput" type="text" maxlength="500" placeholder="মেসেজ লিখুন..." autocomplete="off" style="flex:1;min-width:0;background:rgba(255,255,255,.08);color:inherit;border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:11px 14px;font-size:15px;font-family:inherit">'
+    +'<button type="button" id="bkcMic" aria-label="ভয়েস মেসেজ" title="কথা বলে পাঠান" style="width:46px;height:46px;border-radius:50%;border:none;background:#34d399;color:#05261a;font-size:21px;cursor:pointer;flex:none">🎤</button>'
+    +'<button type="button" id="bkcSend" aria-label="পাঠান" style="width:46px;height:46px;border-radius:50%;border:none;background:#f6d27a;color:#2a1a00;font-size:18px;cursor:pointer;flex:none">➤</button></div>'
+    +'<div id="bkcRec" style="display:none;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.14)">'
+    +'<button type="button" id="bkcRecCancel" aria-label="বাতিল" style="width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:inherit;font-size:18px;cursor:pointer;flex:none">🗑️</button>'
+    +'<div style="flex:1;color:#f87171;font-weight:800;font-size:16px">🔴 রেকর্ড হচ্ছে <span id="bkcRecTime">০:০০</span></div>'
+    +'<button type="button" id="bkcRecSend" aria-label="পাঠান" style="width:52px;height:52px;border-radius:50%;border:none;background:#34d399;color:#05261a;font-size:20px;cursor:pointer;flex:none">➤</button></div>';
+  document.body.appendChild(ov); bkcRender();
+  document.getElementById("bkcBack").onclick=bkcClose;
+  const inp=document.getElementById("bkcInput"), col=db.collection("transportBookings").doc(id).collection("chat");
+  const send=async()=>{
+    const text=inp.value.trim(); if(!text) return; inp.value="";
+    try{ await col.add({ senderId:BKC.uid, senderRole:BKC.role, text, sentAt:firebase.firestore.FieldValue.serverTimestamp() }); }
+    catch(e){ alert("মেসেজ পাঠানো যায়নি — আবার চেষ্টা করুন।"); inp.value=text; }
+  };
+  document.getElementById("bkcSend").onclick=send;
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); send(); } });
+  const ui={
+    onStart(){ document.getElementById("bkcRow").style.display="none"; document.getElementById("bkcRec").style.display="flex"; },
+    onTick(sec){ const el=document.getElementById("bkcRecTime"); if(el) el.textContent=vcFmt(sec)+" / "+vcFmt(VC_MAX_SEC); },
+    onEnd(){ const r=document.getElementById("bkcRec"), w=document.getElementById("bkcRow"); if(r) r.style.display="none"; if(w) w.style.display="flex"; },
+    onDone:async(url,sec)=>{ try{ await col.add({ senderId:BKC.uid, senderRole:BKC.role, text:"🎤 ভয়েস মেসেজ", audio:url, audioSec:sec, sentAt:firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){ alert("ভয়েস পাঠানো যায়নি — আবার চেষ্টা করুন।"); } }
+  };
+  document.getElementById("bkcMic").onclick=()=>vcStart(ui);
+  document.getElementById("bkcRecSend").onclick=()=>vcStop(true);
+  document.getElementById("bkcRecCancel").onclick=()=>vcStop(false);
+  inp.focus();
+}
+
 function drvRenderBookings(pend,acc,old){
   acc=acc.slice().sort((a,b)=>(drvTripMs(a)||9e15)-(drvTripMs(b)||9e15)); __accList=acc; setTimeout(drvAlarmTick,300);
   const box=$id("reqList"), act=$id("activeTripCard");
@@ -1346,7 +1455,7 @@ function drvRenderBookings(pend,acc,old){
   __lastBkArgs=[pend,acc,old]; __frontSig=front.map(b=>b.id).join(",");
   act.style.display=front.length?"":"none";
   act.innerHTML=`<h2 class="section-title" style="color:#4ade80">✅ নিশ্চিত বুকিং</h2>`+front.map(b=>drvBkCard(b,
-    `${drvTripMs(b)>Date.now()?`<button class="btn" type="button" disabled data-wait="${esc(b.id)}" style="opacity:.45;cursor:not-allowed">🏁 যাত্রা শেষ</button>`:`<button class="btn" type="button" data-done="${esc(b.id)}">🏁 যাত্রা শেষ</button>`}<button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ বাতিল</button>${b.tripAt?"":`<button class="btn secondary" type="button" data-sched="${esc(b.id)}" style="border-color:#fbbf24;color:#fbbf24">🗓️ সময় ঠিক করুন</button>`}`)).join("");
+    `${drvTripMs(b)>Date.now()?`<button class="btn" type="button" disabled data-wait="${esc(b.id)}" style="opacity:.45;cursor:not-allowed">🏁 যাত্রা শেষ</button>`:`<button class="btn" type="button" data-done="${esc(b.id)}">🏁 যাত্রা শেষ</button>`}<button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ বাতিল</button><button class="btn secondary" type="button" data-chat="${esc(b.id)}" data-bkc="${esc(b.id)}" data-base="💬 যাত্রীর সাথে চ্যাট">💬 যাত্রীর সাথে চ্যাট</button>${b.tripAt?"":`<button class="btn secondary" type="button" data-sched="${esc(b.id)}" style="border-color:#fbbf24;color:#fbbf24">🗓️ সময় ঠিক করুন</button>`}`)).join("");
   box.className=pend.length||old.length?"":"sub";
   box.innerHTML=(pend.length?pend.map(b=>drvBkCard(b,`<button class="btn" type="button" data-yes="${esc(b.id)}">✅ গ্রহণ করুন</button><button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ না</button>`)).join(""):"<div class='sub'>এখন নতুন কোনো বুকিং অনুরোধ নেই। যাত্রীরা আপনার পোস্ট দেখে বুক করলে এখানে আসবে।</div>")
     +(old.length?`<div class="sub" style="margin-top:14px">আগের বুকিং</div>`+old.map(b=>drvBkCard(b,"")).join(""):"");
@@ -1358,6 +1467,12 @@ function drvRenderBookings(pend,acc,old){
   document.querySelectorAll("[data-no]").forEach(x=>x.onclick=()=>{ if(confirm("এই বুকিং নিতে পারছেন না?")) drvSetBooking(x.dataset.no,"declined",x); });
   document.querySelectorAll("[data-done]").forEach(x=>x.onclick=()=>drvDoneBooking(x.dataset.done,x));
   document.querySelectorAll("[data-fl]").forEach(x=>x.onclick=()=>drvOpenFlight(x.dataset.fl));
+  // 💬 বুকিং চ্যাট — নিশ্চিত বুকিংগুলোর মেসেজ শোনা + নতুন মেসেজের সংখ্যা/শব্দ
+  BKC.role="driver"; BKC.uid=DRV.uid; BKC.onNew=()=>{ try{ drvBeep(); }catch(e){} };
+  bkcSync(acc.map(b=>b.id)); bkcBindChat(acc); bkcBadges();
+}
+function bkcBindChat(acc){
+  document.querySelectorAll("[data-chat]").forEach(x=>x.onclick=()=>{ const b=(acc||[]).find(p=>p.id===x.dataset.chat)||{}; bkcOpen(x.dataset.chat, b.passengerName||"যাত্রী"); });
 }
 /* 💺 গ্রহণ করলে পোস্টের খালি আসন কমে (transaction — একই আসন দুইজনকে যায় না)।
    গ্রহণ করা বুকিং পরে বাতিল/না হলে আসন আবার ফেরত যায় (seatsHeld দেখে)। */
@@ -1495,11 +1610,12 @@ function drvRenderSched(){
        <div class="btnrow">${x.customerPhone?`<a class="btn secondary" style="text-decoration:none;padding:6px 10px;font-size:12px" href="tel:${esc(String(x.customerPhone).replace(/[^0-9+]/g,""))}">📞 কল</a>`:""}<button class="btn secondary" type="button" data-del="${esc(x.id)}" style="padding:6px 10px;font-size:12px">🗑️ মুছুন</button></div></div>`;
   const keyMs=(x)=>{ const t=new Date((x.scheduledDate||"")+"T"+(x.scheduledTime||"00:00")).getTime(); return isNaN(t)?0:t; };
   const items=up.map(x=>({ ms:keyMs(x), html:htmlFor(x) })).concat(bks.map(b=>({ ms:drvTripMs(b),
-    html:'<div style="border-left:3px solid #4ade80;padding-left:8px;margin-bottom:6px">'+drvBkCard(b,`<button class="btn secondary" type="button" data-bkno="${esc(b.id)}">❌ বাতিল</button>`)+'</div>' })));
+    html:'<div style="border-left:3px solid #4ade80;padding-left:8px;margin-bottom:6px">'+drvBkCard(b,`<button class="btn secondary" type="button" data-bkno="${esc(b.id)}">❌ বাতিল</button><button class="btn secondary" type="button" data-chat="${esc(b.id)}" data-bkc="${esc(b.id)}" data-base="💬 যাত্রীর সাথে চ্যাট">💬 যাত্রীর সাথে চ্যাট</button>`)+'</div>' })));
   items.sort((x,y)=>x.ms-y.ms);
   box.innerHTML=items.map(i=>i.html).join("");
   box.querySelectorAll("[data-bkno]").forEach(x=>x.onclick=()=>{ if(confirm("এই বুকিং নিতে পারছেন না?")) drvSetBooking(x.dataset.bkno,"declined",x); });
   box.querySelectorAll("[data-fl]").forEach(x=>x.onclick=()=>drvOpenFlight(x.dataset.fl));
+  bkcBindChat(__accList); bkcBadges();
   bks.forEach(drvFillContact);
   box.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{ if(!confirm("মুছে ফেলবেন?")) return; b.disabled=true;
     try{ await db.collection("trips").doc(b.dataset.del).delete(); drvLoadSched(); }catch(e){ alert("মোছা যায়নি: "+e.message); b.disabled=false; } });
