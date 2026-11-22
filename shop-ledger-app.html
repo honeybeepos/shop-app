@@ -10977,7 +10977,9 @@ function getBccPassword(){
 function bccIsPasswordEnabled(){
   return localStorage.getItem('bcc-password-enabled') !== 'false';
 }
+let __bccReturnMain = false, __bccAfterAuth = null; // 📦 ড্যাশবোর্ডের প্রোডাক্ট-পপআপ থেকে এডিটে আসার প্রসঙ্গ
 function bccOpenAfterAuth(){
+  if(__bccAfterAuth){ const cb = __bccAfterAuth; __bccAfterAuth = null; cb(); return; } // পাসওয়ার্ড ঠিক হলে ড্যাশবোর্ড থেকে চাওয়া কাজটা চলে
   switchProgram('program-bizmgmt', 'program-bcc');
   bccRenderOverview(); bccRenderProducts(); bccRenderCategories();
 }
@@ -10986,6 +10988,7 @@ const bccPasswordInput = document.getElementById('bccPasswordInput');
 const bccPasswordError = document.getElementById('bccPasswordError');
 
 document.getElementById('bizBccCard').addEventListener('click', ()=>{
+  __bccReturnMain = false; __bccAfterAuth = null;
   if(!bccIsPasswordEnabled()){
     bccOpenAfterAuth();
     return;
@@ -10997,6 +11000,7 @@ document.getElementById('bizBccCard').addEventListener('click', ()=>{
 });
 document.getElementById('bccCancelBtn').addEventListener('click', ()=>{
   bccModalOverlay.style.display = 'none';
+  __bccAfterAuth = null;
 });
 function bccTrySubmit(){
   if(bccPasswordInput.value === getBccPassword()){
@@ -11009,7 +11013,11 @@ function bccTrySubmit(){
 document.getElementById('bccSubmitBtn').addEventListener('click', bccTrySubmit);
 bccPasswordInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') bccTrySubmit(); });
 
-document.getElementById('backFromBcc').addEventListener('click', ()=> switchProgram('program-bcc', 'program-bizmgmt'));
+document.getElementById('backFromBcc').addEventListener('click', ()=>{
+  // ড্যাশবোর্ডের পপআপ থেকে এসে থাকলে ← চাপলে সোজা ড্যাশবোর্ডে ফেরে, নইলে আগের মতো Business Management মেনুতে
+  if(__bccReturnMain){ __bccReturnMain = false; closeMiniProgram('program-bcc'); }
+  else switchProgram('program-bcc', 'program-bizmgmt');
+});
 
 const bccSettingsOverlay = document.getElementById('bccSettingsOverlay');
 function bccRefreshPwEnabledLabel(){
@@ -15871,6 +15879,64 @@ function handleGlobalCustomerPick(context, name){
   }
 }
 
+/* 📦 খোঁজার ফলাফলে প্রোডাক্টে চাপলে পপআপ: "সেল করবেন, না প্রোডাক্ট আপডেট করবেন?" — বেছে নিলে সোজা সেই জায়গায় নিয়ে যায়।
+   • সেল: "🛒 সেল" ট্যাবের ⚡ কুইক ফর্মে প্রোডাক্টটা (নাম, কেনা/বেচা দাম) বসে যায় — সাজেশন থেকে বাছলে যেমন হয়।
+   • আপডেট: Edit Product ফর্ম খোলে। Business Control Center পাসওয়ার্ডে সুরক্ষিত হলে আগে পাসওয়ার্ড চায় (আগের মতোই)। */
+function hbProdActionPopup(prod){
+  const old = document.getElementById('hbProdActOv'); if(old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'hbProdActOv';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,12,25,.62);z-index:99998;display:flex;align-items:center;justify-content:center;padding:18px;';
+  const qty = Number(prod.qty)||0;
+  const btn = 'display:block;width:100%;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;margin-bottom:9px;';
+  ov.innerHTML = `<div style="background:#fff;color:#1d2b2a;border-radius:18px;padding:18px;width:100%;max-width:340px;box-shadow:0 18px 50px rgba(0,0,0,.45);">
+    <div style="font-size:12px;color:#6b7a78;font-weight:700;">📦 প্রোডাক্ট</div>
+    <div style="font-size:17px;font-weight:800;margin:2px 0 4px;word-break:break-word;">${escapeHtml(prod.name||'')}</div>
+    <div style="font-size:12.5px;color:#6b7a78;margin-bottom:14px;">স্টক: <b>${qty}</b> · বেচা দাম: <b>${Number(prod.sell)>0 ? fmt(prod.sell) : '—'}</b></div>
+    <div style="font-size:13.5px;font-weight:700;margin-bottom:10px;">কী করতে চান?</div>
+    <button type="button" id="hbPASale" style="${btn}background:#1f6f6b;color:#fff;">🛒 সেল করবেন</button>
+    <button type="button" id="hbPAEdit" style="${btn}background:#f4b63e;color:#2a1a00;">✏️ প্রোডাক্ট আপডেট করবেন</button>
+    <button type="button" id="hbPAClose" style="${btn}background:#eef1f0;color:#4a5856;margin-bottom:0;">বন্ধ</button>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', (e)=>{ if(e.target === ov) ov.remove(); });
+  document.getElementById('hbPAClose').onclick = ()=> ov.remove();
+  document.getElementById('hbPASale').onclick = ()=>{ ov.remove(); hbProdStartSale(prod); };
+  document.getElementById('hbPAEdit').onclick = ()=>{ ov.remove(); hbProdStartEdit(prod); };
+}
+function hbProdStartSale(prod){
+  const tab = document.querySelector('.tab-btn[data-tab="add"]');
+  if(!tab){ toast('সেল ট্যাব পাওয়া যায়নি'); return; }
+  tab.click();
+  const chip = document.querySelector('#customerModeGroup [data-m="quick"]');
+  if(chip) chip.click();
+  // মোড/ট্যাব বদলের পর ফর্ম নিজের মতো সাফ হয় — তাই একটু পরে প্রোডাক্ট বসানো হচ্ছে
+  setTimeout(()=>{
+    const it = document.getElementById('qsItem'); if(!it) return;
+    it.value = prod.name; it.dataset.productId = prod.id;
+    const c = document.getElementById('qsCost'); if(c) c.value = prod.buy || '';
+    const pr = document.getElementById('qsPrice'); if(pr) pr.value = prod.sell || '';
+    try{ bccToggleWeightUI('qsQty', prod); bccToggleSerialUI('qsQty', prod); bccToggleVariantUI('qsQty', prod); }catch(e){}
+    try{ updateTotalPreview('qsQty','qsPrice','qsTotalPreview'); }catch(e){}
+    const box = document.getElementById('qsSuggestBox'); if(box){ box.classList.remove('show'); box.innerHTML = ''; }
+    try{ it.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
+    const q = document.getElementById('qsQty'); if(q) q.focus();
+  }, 90);
+}
+function hbProdStartEdit(prod){
+  const go = ()=>{
+    __bccReturnMain = true;
+    openMiniProgram('program-bcc');
+    try{ bccRenderOverview(); bccRenderProducts(); bccRenderCategories(); }catch(e){}
+    setTimeout(()=> bccOpenProductModal(prod.id), 30);
+  };
+  if(bccIsPasswordEnabled()){
+    __bccAfterAuth = go;
+    bccPasswordInput.value = ''; bccPasswordError.style.display = 'none';
+    bccModalOverlay.style.display = 'flex';
+    setTimeout(()=> bccPasswordInput.focus(), 50);
+  } else go();
+}
+
 function setupGlobalSearchDropdown(cfg){
   const inputEl = document.getElementById(cfg.inputId);
   const boxEl = document.getElementById(cfg.boxId);
@@ -15920,7 +15986,7 @@ function setupGlobalSearchDropdown(cfg){
       item.addEventListener('click', ()=>{
         const prod = bccLoadProducts().find(p=>p.id===item.dataset.id);
         boxEl.classList.remove('show'); boxEl.innerHTML='';
-        if(prod) toast(`📦 ${prod.name} — বিক্রয় মূল্য: ${fmt(prod.sell)} • স্টক: ${prod.qty||0}`);
+        if(prod) hbProdActionPopup(prod);
       });
     });
   }
