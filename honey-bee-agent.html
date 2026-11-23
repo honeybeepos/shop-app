@@ -300,6 +300,8 @@
 
   <!-- 💰 ডেলিভারি চার্জ — ক্রেতার চার্জ + রাইডারের পাওনা (deliveryPricing/{marketId}) -->
   <div class="tabPanel" id="tabCharge">
+    <div class="card" id="dpMarketRow" style="display:none;"><h2>🏪 কোন বাজারের চার্জ বদলাবেন?</h2><select id="dpMarketSel"></select>
+      <p style="font-size:11px;color:var(--muted);margin:8px 0 0;">প্রতিটা বাজারের চার্জ আলাদা। বাজার বদলালে নিচের সংখ্যাগুলো ওই বাজারের হয়ে যাবে।</p></div>
     <p style="font-size:11.5px; color:var(--muted); margin:0 0 12px; line-height:1.6;">
       আপনার বাজারের সব দোকান এই নিয়মে চলবে। দূরত্ব মাপা হয় দোকান থেকে ক্রেতা পর্যন্ত, রাস্তা ধরে।
       বদলালে শুধু <b>নতুন অর্ডারে</b> লাগবে — আগের অর্ডারের চার্জ বদলাবে না।
@@ -385,6 +387,7 @@
     <input type="text" id="riderNid" placeholder="আইডি নম্বর">
     <label for="riderZone">কাজের জোন/এলাকা</label>
     <input type="text" id="riderZone" placeholder="যেমনঃ আল-মদিনা এলাকা">
+    <div id="riderMarketWrap" style="display:none;"><label style="font-size:12px;color:var(--muted);">কোন বাজারের রাইডার?</label><select id="riderMarket"></select></div>
     <label for="riderVehicle">যানবাহনের ধরন</label>
     <select id="riderVehicle">
       <option value="bike">🏍️ বাইক</option>
@@ -564,16 +567,49 @@ document.querySelectorAll(".tabBtn").forEach(btn=>{
 });
 
 /* ---------- ড্যাশবোর্ড লোড ---------- */
+/* 🏪 একজন এজেন্টের একাধিক বাজার/দেশ — agents/{uid}.marketIds[] (+ পুরনো marketId) আর countries[] (+ পুরনো country)।
+   পুরনো এজেন্টদের (শুধু marketId) জন্যও একই কাজ করে। */
+function agentMarkets(){
+  const a = currentAgent || {}, set = [];
+  if(a.marketId) set.push(a.marketId);
+  (Array.isArray(a.marketIds) ? a.marketIds : []).forEach(m=>{ if(m && set.indexOf(m) < 0) set.push(m); });
+  return set;
+}
+let __mkNames = null;
+async function agentMarketNames(){
+  if(__mkNames) return __mkNames;
+  const ids = agentMarkets(), out = {};
+  await Promise.all(ids.map(id=> db.collection("markets").doc(id).get().then(d=>{ out[id] = d.exists ? (d.data().name || id) : id; }).catch(()=>{ out[id] = id; })));
+  return (__mkNames = out);
+}
+/* কয়েক বাজারের জন্য আলাদা আলাদা কোয়েরি চালিয়ে ফল জুড়ে একটা snapshot-এর মতো ফেরত দেয় (সব বাজারের প্রথম উত্তর আসার পর)।
+   এক বাজারে "==" থাকায় Firestore rules-এ নিরাপদ। extra(q) দিয়ে বাড়তি where যোগ করা যায়। */
+function mmSnap(col, field, markets, extra, cb, errCb){
+  const parts = {}, unsubs = [];
+  const fire = ()=>{
+    if(!markets.every(m=> parts[m])) return;
+    const docs = [].concat.apply([], markets.map(m=> parts[m]));
+    cb({ docs, empty: docs.length === 0, size: docs.length, forEach: f=> docs.forEach(f) });
+  };
+  markets.forEach(m=>{
+    let q = db.collection(col).where(field, "==", m);
+    if(extra) q = extra(q);
+    unsubs.push(q.onSnapshot(qs=>{ parts[m] = qs.docs; fire(); }, errCb || (e=> console.error(col, e))));
+  });
+  return ()=> unsubs.forEach(u=> u());
+}
+
 async function loadDashboard(){
   // মার্কেটের নাম — বিদেশের এজেন্টের বাজার নেই, তাই দেশের নাম দেখানো হয়
-  if(!currentAgent.marketId){
+  if(!agentMarkets().length){
     const cn = currentAgent.countryName || currentAgent.country || "বিদেশ";
     $("marketNameLbl").textContent = "🌍 " + cn; $("ovMarket").textContent = cn;
   }else try{
-    const marketDoc = await db.collection("markets").doc(currentAgent.marketId).get();
-    const marketName = marketDoc.exists ? (marketDoc.data().name || currentAgent.marketId) : currentAgent.marketId;
-    $("marketNameLbl").textContent = "🐝 " + marketName;
-    $("ovMarket").textContent = marketName;
+    const names = await agentMarketNames();
+    const mlist = agentMarkets().map(id=> names[id] || id).join(", ");
+    const extraC = Object.keys(currentAgent.countryNames || {}).filter(c=> c !== "BD").map(c=> currentAgent.countryNames[c]);
+    $("marketNameLbl").textContent = "🐝 " + mlist;
+    $("ovMarket").textContent = mlist + (extraC.length ? " · 🌍 " + extraC.join(", ") : "");
   }catch(e){ $("marketNameLbl").textContent = "🐝 Honey Bee Agent"; }
 
   if(currentAgent.commissionPercent){
@@ -581,7 +617,7 @@ async function loadDashboard(){
   }
 
   // 💰 ডেলিভারি চার্জের সেটিং লোড
-  if(currentAgent.marketId) dpLoad(); // বাজারভিত্তিক ডেলিভারি চার্জ — বিদেশের এজেন্টের জন্য নয়
+  if(agentMarkets().length) dpLoad(); // বাজারভিত্তিক ডেলিভারি চার্জ — বিদেশের এজেন্টের জন্য নয়
 
   listenRiders();
   listenShops();
@@ -649,7 +685,15 @@ window.resetRiderCash = async function(riderId){
 };
 
 /* ---------- নতুন রাইডার মোডাল ---------- */
-$("addRiderBtn").addEventListener("click", ()=> $("riderModal").style.display = "flex");
+$("addRiderBtn").addEventListener("click", async ()=>{
+  $("riderModal").style.display = "flex";
+  const mks = agentMarkets(), wrap = $("riderMarketWrap");
+  if(mks.length > 1){ // একাধিক বাজার — কোনটার রাইডার সেটা বেছে নিতে হবে
+    const names = await agentMarketNames();
+    $("riderMarket").innerHTML = mks.map(id=> `<option value="${id}">${String(names[id] || id).replace(/[<>&"]/g, "")}</option>`).join("");
+    wrap.style.display = "block";
+  } else wrap.style.display = "none";
+});
 $("closeRiderModal").addEventListener("click", ()=> $("riderModal").style.display = "none");
 $("saveRiderBtn").addEventListener("click", async ()=>{
   const name = $("riderName").value.trim();
@@ -693,7 +737,7 @@ $("saveRiderBtn").addEventListener("click", async ()=>{
       zone, vehicleType: vehicle,
       guarantorDetails: guarantor,
       assignedAgentId: currentAgent.uid,
-      marketId: currentAgent.marketId || null,
+      marketId: (agentMarkets().length > 1 ? $("riderMarket").value : agentMarkets()[0]) || null,
       cashHoldLimit: cashLimit,
       currentCashHeld: 0,
       status: "active",
@@ -725,9 +769,8 @@ const VEHICLE_LABELS = {
 };
 
 function listenDrivers(){
-  if(!currentAgent.marketId){ $("driversList").innerHTML = '<div class="emptyMsg">বিদেশের এজেন্টের বাজার নেই — ড্রাইভার তালিকা এখানে নেই।</div>'; $("statMyDrivers").textContent = "0"; return; }
-  driversUnsub = db.collection("transportDrivers").where("marketId", "==", currentAgent.marketId)
-    .onSnapshot((qs)=>{
+  if(!agentMarkets().length){ $("driversList").innerHTML = '<div class="emptyMsg">বিদেশের এজেন্টের বাজার নেই — ড্রাইভার তালিকা এখানে নেই।</div>'; $("statMyDrivers").textContent = "0"; return; }
+  driversUnsub = mmSnap("transportDrivers", "marketId", agentMarkets(), null, (qs)=>{
       if(qs.empty){
         $("driversList").innerHTML = '<div class="emptyMsg">এখনো কোনো ড্রাইভার যোগ করা হয়নি।</div>';
         $("statMyDrivers").textContent = "0";
@@ -784,13 +827,10 @@ function listenDrivers(){
 let docVerifyUnsub = null;
 let docVerifyTargetId = null;
 function listenDocVerifyPending(){
-  if(!currentAgent.marketId) return;
+  if(!agentMarkets().length) return;
   // দুইটা equality filter (marketId, verificationStatus), কোনো orderBy
-  // নেই — তাই নতুন কম্পোজিট ইনডেক্স লাগবে না।
-  docVerifyUnsub = db.collection("transportDrivers")
-    .where("marketId", "==", currentAgent.marketId)
-    .where("verificationStatus", "==", "pending")
-    .onSnapshot((qs)=>{
+  // নেই — তাই নতুন কম্পোজিট ইনডেক্স লাগবে না। (একাধিক বাজার হলে প্রতিটার জন্য আলাদা কোয়েরি)
+  docVerifyUnsub = mmSnap("transportDrivers", "marketId", agentMarkets(), (q)=> q.where("verificationStatus", "==", "pending"), (qs)=>{
       const wrap = $("docVerifyPendingWrap");
       if(qs.empty){
         wrap.style.display = "none";
@@ -923,11 +963,8 @@ const TM_REASON_LABEL = {
 };
 
 function listenTmReportsPending(){
-  if(!currentAgent.marketId) return;
-  tmReportUnsub = db.collection("transportMediaReports")
-    .where("driverMarketId", "==", currentAgent.marketId)
-    .where("status", "==", "pending")
-    .onSnapshot((qs)=>{
+  if(!agentMarkets().length) return;
+  tmReportUnsub = mmSnap("transportMediaReports", "driverMarketId", agentMarkets(), (q)=> q.where("status", "==", "pending"), (qs)=>{
       const wrap = $("tmReportPendingWrap");
       if(qs.empty){
         wrap.style.display = "none";
@@ -1201,9 +1238,23 @@ function dpRunTest(){
 ["dpExtraPerKm","dpMinCharge","dpMaxKm","dpNightOn","dpNightAmt","dpTestKm","dpTestNight",
  "baseChargeInput","perKmInput"].forEach(id=> $(id).addEventListener("input", dpRunTest));
 
+let __dpMid = null;
+function dpMarketId(){ const m = agentMarkets(); if(!__dpMid || m.indexOf(__dpMid) < 0) __dpMid = m[0] || null; return __dpMid; }
+async function dpInitMarketSel(){
+  const m = agentMarkets(), row = $("dpMarketRow"); if(!row) return;
+  if(m.length < 2){ row.style.display = "none"; return; }
+  const sel = $("dpMarketSel");
+  if(sel.options.length !== m.length){
+    const names = await agentMarketNames();
+    sel.innerHTML = m.map(id=> `<option value="${id}">${dpEsc(names[id] || id)}</option>`).join("");
+    sel.onchange = ()=>{ __dpMid = sel.value; dpLoad(); };
+  }
+  sel.value = dpMarketId(); row.style.display = "block";
+}
 async function dpLoad(){
-  const mid = currentAgent.marketId;
+  const mid = dpMarketId();
   if(!mid) return;
+  dpInitMarketSel();
   try{
     const snap = await db.collection("deliveryPricing").doc(mid).get();
     dpCurrent = snap.exists ? snap.data() : null;
@@ -1227,9 +1278,9 @@ function dpShowMeta(){
 }
 
 async function dpLoadHistory(){
-  if(!currentAgent.marketId) return;
+  if(!dpMarketId()) return;
   try{
-    const qs = await db.collection("deliveryPricing").doc(currentAgent.marketId)
+    const qs = await db.collection("deliveryPricing").doc(dpMarketId())
       .collection("history").orderBy("at","desc").limit(5).get();
     if(qs.empty){ $("dpHistory").innerHTML = '<div class="emptyMsg">এখনো কোনো পরিবর্তন নেই।</div>'; return; }
     $("dpHistory").innerHTML = qs.docs.map(d=>{
@@ -1263,7 +1314,7 @@ $("saveChargeBtn").addEventListener("click", async ()=>{
   const summary = dpCurrent ? dpDiffSummary(before, r.cfg) : "প্রথমবার সেভ";
   if(dpCurrent && summary === "কোনো অঙ্ক বদলায়নি"){ alert("কিছুই বদলানো হয়নি।"); return; }
   const version = ((dpCurrent && dpCurrent.version) || 0) + 1;
-  const mid = currentAgent.marketId;
+  const mid = dpMarketId();
   if(!mid){ alert("বিদেশের এজেন্টের বাজার নেই — ডেলিভারি চার্জ সেট করা যাবে না।"); return; }
   const ref = db.collection("deliveryPricing").doc(mid);
   const now = firebase.firestore.FieldValue.serverTimestamp();

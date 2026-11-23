@@ -251,6 +251,21 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="firebase-init.js"></script>
 <script>
+/* 🏪 একজন এজেন্টের একাধিক বাজার/দেশ: পুরনো marketId/country অথবা নতুন marketIds[]/countries[] — দুই ভাবেই এজেন্ট খোঁজা (জুড়ে, সক্রিয়গুলো) */
+async function hbAgentsFor(field, arrField, value){
+  const col = db.collection("agents");
+  const [a, b] = await Promise.all([
+    col.where(field, "==", value).where("status", "==", "active").get(),
+    col.where(arrField, "array-contains", value).get().catch(()=>({docs:[]}))
+  ]);
+  const m = new Map();
+  a.docs.forEach(d=> m.set(d.id, d));
+  b.docs.forEach(d=>{ if(d.data().status === "active") m.set(d.id, d); });
+  const docs = [...m.values()];
+  return { docs, empty: docs.length === 0, size: docs.length };
+}
+</script>
+<script>
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("firebase-messaging-sw.js") /* 🔔 একটাই সার্ভিস ওয়ার্কার — পুশ + অফলাইন দুইটাই */.catch(()=>{});
 }
@@ -377,7 +392,7 @@ document.getElementById("suMarket").addEventListener("change", async (e)=>{
   }
   agentSel.innerHTML = '<option value="">লোড হচ্ছে...</option>'; agentSel.disabled = true;
   try{
-    const qs = await db.collection("agents").where("marketId","==",marketId).where("status","==","active").get();
+    const qs = await hbAgentsFor("marketId","marketIds",marketId);
     if(qs.empty){
       agentSel.innerHTML = '<option value="">এই বাজারে এখনো কোনো এজেন্ট নেই (ঐচ্ছিক, খালি রাখতে পারেন)</option>';
       agentSel.disabled = true;
@@ -450,7 +465,7 @@ document.getElementById("pvMarket").addEventListener("change", async (e)=>{
   }
   agentSel.innerHTML = '<option value="">লোড হচ্ছে...</option>'; agentSel.disabled = true;
   try{
-    const qs = await db.collection("agents").where("marketId","==",marketId).where("status","==","active").get();
+    const qs = await hbAgentsFor("marketId","marketIds",marketId);
     if(qs.empty){
       agentSel.innerHTML = '<option value="">⚠️ এই বাজারে এখনো কোনো এজেন্ট নেই</option>';
       agentSel.disabled = true;
@@ -975,7 +990,7 @@ document.getElementById("signupBtn").addEventListener("click", async ()=>{
     // একাধিক এজেন্ট থাকলে ভাগ করে (এলোমেলো)। না থাকলে আগের মতোই এজেন্টহীন (এজেন্ট যোগ হলে অ্যাডমিন যুক্ত করে দেন)।
     if(!isBdShop){
       try{
-        const aq = await db.collection("agents").where("country", "==", countryCode).where("status", "==", "active").get();
+        const aq = await hbAgentsFor("country","countries",countryCode);
         if(!aq.empty) assignedAgentId = aq.docs[Math.floor(Math.random() * aq.size)].id;
       }catch(e){ console.warn("দেশের এজেন্ট খোঁজা যায়নি:", e); }
     }

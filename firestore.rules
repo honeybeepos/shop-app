@@ -26,6 +26,12 @@ service cloud.firestore {
     function myAgentMarketId() {
       return get(/databases/$(database)/documents/agents/$(request.auth.uid)).data.marketId;
     }
+    // 🏪 একজন এজেন্টের একাধিক বাজার: পুরনো marketId (প্রধান) অথবা marketIds[] তালিকার যেকোনো একটায় মিললেই চলবে।
+    // শুধু সুপার-এডমিন agents নথিতে marketIds লিখতে পারে (এজেন্ট নিজে লিখতে পারে না)।
+    function agentHasMarket(m) {
+      let a = get(/databases/$(database)/documents/agents/$(request.auth.uid)).data;
+      return m != null && (a.marketId == m || ('marketIds' in a && a.marketIds is list && m in a.marketIds));
+    }
 
     match /superadmins/{uid} {
       allow read: if isSignedIn();
@@ -500,7 +506,7 @@ service cloud.firestore {
        বদলানো বা মোছা যায় না, তাই কে কখন কী বদলাল সেটা মুছে ফেলা যায় না। */
     function isMarketAgent(marketId) {
       return isSignedIn() && exists(/databases/$(database)/documents/agents/$(request.auth.uid))
-             && myAgentMarketId() == marketId;
+             && agentHasMarket(marketId);
     }
     /* 🧾 অর্ডারের সিল করা ডেলিভারি চার্জ — শুধু সার্ভার লেখে (releaseHeldOrders)।
        পড়তে পারেন: ওই অর্ডারের ক্রেতা, অর্ডারের দোকান/রেস্টুরেন্ট, এজেন্ট, সুপার-অ্যাডমিন। */
@@ -573,7 +579,7 @@ service cloud.firestore {
       // সেট করতে পারবে (নিজেকে "verified" বানাতে পারবে না)।
       allow update: if isSignedIn() &&
         (isSuperAdmin() ||
-         (isAgent() && resource.data.marketId == myAgentMarketId()) ||
+         (isAgent() && agentHasMarket(resource.data.marketId)) ||
          (request.auth.uid == id &&
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isVerified','verifiedAt','verifiedBy','createdByAgent','canReceivePassengerRequests']) &&
           (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['verificationStatus']) ||
@@ -586,7 +592,7 @@ service cloud.firestore {
       match /dailyEarnings/{dateId} {
         allow read: if isSignedIn() &&
           (request.auth.uid == id || isSuperAdmin() ||
-           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId == myAgentMarketId()));
+           (isAgent() && agentHasMarket(get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId)));
         allow write: if isSignedIn() && request.auth.uid == id;
       }
 
@@ -625,14 +631,14 @@ service cloud.firestore {
       match /verification/{docId} {
         allow read: if isSignedIn() &&
           (request.auth.uid == id || isSuperAdmin() ||
-           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId == myAgentMarketId()));
+           (isAgent() && agentHasMarket(get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId)));
         allow create: if isSignedIn() && request.auth.uid == id;
         // ড্রাইভার নিজে আবার জমা দিলে status ফিরে "pending"-ই হতে হবে —
         // নিজেকে "verified" বানানো যাবে না। এজেন্ট/সুপারঅ্যাডমিন approve/
         // reject করতে পারবে (status যেকোনো মান হতে পারে)।
         allow update: if isSignedIn() &&
           (isSuperAdmin() ||
-           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId == myAgentMarketId()) ||
+           (isAgent() && agentHasMarket(get(/databases/$(database)/documents/transportDrivers/$(id)).data.marketId)) ||
            (request.auth.uid == id && request.resource.data.status == 'pending'));
         allow delete: if false;
       }
@@ -730,7 +736,7 @@ service cloud.firestore {
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likedBy','likeCount']) ||
          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy']) &&
           (isSuperAdmin() ||
-           (isAgent() && get(/databases/$(database)/documents/transportDrivers/$(resource.data.authorId)).data.marketId == myAgentMarketId()))));
+           (isAgent() && agentHasMarket(get(/databases/$(database)/documents/transportDrivers/$(resource.data.authorId)).data.marketId)))));
       allow delete: if false;
 
       match /comments/{commentId} {
@@ -753,7 +759,7 @@ service cloud.firestore {
       allow read: if isSignedIn() &&
         (request.auth.uid == resource.data.reporterUid ||
          isSuperAdmin() ||
-         (isAgent() && resource.data.driverMarketId == myAgentMarketId()));
+         (isAgent() && agentHasMarket(resource.data.driverMarketId)));
       allow create: if isSignedIn()
         && request.resource.data.reporterUid == request.auth.uid
         && request.resource.data.postId is string
@@ -761,7 +767,7 @@ service cloud.firestore {
         && reportId == (request.resource.data.postId + "_" + request.auth.uid);
       allow update: if isSignedIn() &&
         (isSuperAdmin() ||
-         (isAgent() && resource.data.driverMarketId == myAgentMarketId()));
+         (isAgent() && agentHasMarket(resource.data.driverMarketId)));
       allow delete: if false;
     }
 
