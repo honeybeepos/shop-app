@@ -6,7 +6,9 @@
    কোথায় দেখা যায়:
    • যে পাতায় সেটিংস আছে (POS): সেটিংসের ভেতর [data-hb-silent-mount] জায়গায় একটা ছোট সারি — আলাদা ভাসমান বাটন
      লাগে না (window.HB_SILENT_FLOAT=false)। কোনো বাটনের আইকন বা লেখা বদলানো হয় না।
-   • অন্য অ্যাপে (ড্রাইভার, ডেলিভারি, রেস্টুরেন্ট, ফার্মেসি, টেইলর): আগের মতো নিচের-বাঁয়ে একটা ছোট ভাসমান 🔔 বাটন। */
+   • অন্য অ্যাপে (ডেলিভারি, রেস্টুরেন্ট, ফার্মেসি, টেইলর): আগের মতো নিচের-বাঁয়ে একটা ছোট ভাসমান 🔔 বাটন।
+   • ড্রাইভার অ্যাপ: পাতায় [data-hb-silent-btn] নামে ফাঁকা জায়গা (অনলাইন বারের পাশে) থাকলে 🔔 বাটন ভাসে না — ওই জায়গাতেই বসে;
+     মেনু বাটনের ঠিক নিচে খোলে। জায়গা না থাকলে আগের মতো ভাসমান। */
 (function(){
   "use strict";
   var KEY = "hbSilentUntil"; // মিলিসেকেন্ড (শেষ সময়); -1 = চালু না করা পর্যন্ত; ০/নেই = আওয়াজ চালু
@@ -85,16 +87,27 @@
   // ভাসমান বাটন (শুধু যেসব অ্যাপে প্যানেল নেই)
   function buildFloat(){
     if(btn || window.HB_SILENT_FLOAT === false || !document.body) return;
+    var anchor = document.querySelector("[data-hb-silent-btn]");
     btn = document.createElement("button");
     btn.type = "button";
-    btn.style.cssText = "position:fixed;left:10px;bottom:96px;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);color:#fff;font-size:19px;line-height:1;z-index:2147483000;box-shadow:0 2px 10px rgba(0,0,0,.45);cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent";
+    btn.style.cssText = anchor
+      ? "width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.3);color:#fff;font-size:20px;line-height:1;box-shadow:0 2px 8px rgba(0,0,0,.35);cursor:pointer;padding:0;margin:0;flex:none;-webkit-tap-highlight-color:transparent"
+      : "position:fixed;left:10px;bottom:96px;width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.25);color:#fff;font-size:19px;line-height:1;z-index:2147483000;box-shadow:0 2px 10px rgba(0,0,0,.45);cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent";
     menu = document.createElement("div");
     menu.style.cssText = "position:fixed;left:10px;bottom:146px;z-index:2147483001;background:#1b1b1b;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:8px;min-width:230px;display:none;box-shadow:0 6px 22px rgba(0,0,0,.6);font-family:inherit";
     var items = [["🔔 আওয়াজ চালু", 0], ["🕌 ৩০ মিনিট নিঃশব্দ", 30], ["🕌 ১ ঘণ্টা নিঃশব্দ", 60], ["🔕 চালু না করা পর্যন্ত নিঃশব্দ", -1]];
     menu.innerHTML = '<div data-st style="font-size:12.5px;font-weight:800;padding:4px 8px 6px;color:#fbbf24"></div>'
       + items.map(function(it){ return '<button type="button" data-m="' + it[1] + '" style="display:block;width:100%;text-align:left;background:transparent;color:#fff;border:0;border-radius:8px;padding:9px 8px;font-size:13.5px;cursor:pointer;font-family:inherit">' + it[0] + '</button>'; }).join("")
       + '<div style="font-size:11px;color:#a3a3a3;padding:4px 8px 2px">নিঃশব্দে শুধু কাঁপুনি হবে — নোটিফিকেশন ঠিকই আসবে।</div>';
-    btn.addEventListener("click", function(e){ e.stopPropagation(); paint(); menu.style.display = menu.style.display === "block" ? "none" : "block"; });
+    btn.addEventListener("click", function(e){
+      e.stopPropagation(); paint();
+      if(anchor){ // বাটনের ঠিক নিচে মেনু খোলা (স্ক্রিনের ডানে-বাঁয়ে কেটে না যায়)
+        var r = btn.getBoundingClientRect();
+        menu.style.bottom = "auto"; menu.style.top = (r.bottom + 8) + "px";
+        menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 246)) + "px";
+      }
+      menu.style.display = menu.style.display === "block" ? "none" : "block";
+    });
     menu.addEventListener("click", function(e){
       e.stopPropagation();
       var b = e.target.closest("[data-m]"); if(!b) return;
@@ -102,7 +115,8 @@
       menu.style.display = "none";
     });
     document.addEventListener("click", function(){ if(menu) menu.style.display = "none"; });
-    document.body.appendChild(btn); document.body.appendChild(menu);
+    if(anchor) anchor.appendChild(btn); else document.body.appendChild(btn);
+    document.body.appendChild(menu);
   }
   function build(){
     if(!document.body) return;
