@@ -4171,9 +4171,12 @@ async function tlrRenderFeed(){
   box.querySelectorAll("[data-tlr-order]").forEach(b=> b.addEventListener("click", ()=>
     tlrOpenOrder(b.dataset.tlrOrder)));
   // 🤏 দর্জির ডিজাইনের ছবিতে চাপলে ফুল-স্ক্রিনে খোলে, দুই আঙুলে জুম করা যায়
-  box.querySelectorAll("[data-tlr-zoom]").forEach(im=> im.addEventListener("click", ()=>{
-    tlrLogView(im.dataset.tlrDid);
-    if(typeof hbOpenImageZoom === "function") hbOpenImageZoom(im.dataset.tlrZoom);
+  // 🃏 কার্ডের ছবিতে বা ফাঁকা জায়গায় চাপলে আগে কার্ড (ডিটেইল শিট) খোলে — সেখানে অর্ডার বোতাম আছে,
+  //    আর শিটের ছবিতে চাপলে তবেই ছবি ফুল-স্ক্রিনে বড় হয়। বোতাম/লিংক/শিরোনামের নিজের কাজ আগের মতোই।
+  box.querySelectorAll(".hbXCard").forEach(card=> card.addEventListener("click", (e)=>{
+    if(e.target.closest("button, a, select, input, [onclick]")) return;
+    const im = card.querySelector("[data-tlr-did]"); if(!im) return;
+    tlrOpenSharedDesign(im.dataset.tlrDid, true);
   }));
 }
 /* ==================== 🧵 সেলাই ঘর — ধাপ ৩: অর্ডার (অক্টোবর ২০২৬) ====================
@@ -4251,8 +4254,8 @@ function tlrLogView(designId){
 }
 /* 🔗 দর্জির শেয়ার করা লিংক (/d/{designId}) খুললে — সেলাই ঘর পাতা খুলে ডিজাইনটা
    একটা শিটে দেখায় (ছবি, বিবরণ, মজুরি, YouTube/Facebook), সেখান থেকেই অর্ডার। */
-async function tlrOpenSharedDesign(designId){
-  try{ showScreen("screenTailor"); tlrAreaInit(); tlrRenderFeed(); }catch(e){}
+async function tlrOpenSharedDesign(designId, fromFeed){
+  if(!fromFeed){ try{ showScreen("screenTailor"); tlrAreaInit(); tlrRenderFeed(); }catch(e){} } // ফিড থেকে খুললে পাতা আবার সাজানো লাগে না
   const sheet = tlrSheetEl(), body = sheet.querySelector("#tlrOrdBody");
   body.innerHTML = `<div style="text-align:center; padding:24px; color:var(--muted);">⏳ ডিজাইন আনা হচ্ছে…</div>`;
   sheet.style.display = "flex";
