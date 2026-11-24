@@ -575,6 +575,17 @@ function agentMarkets(){
   (Array.isArray(a.marketIds) ? a.marketIds : []).forEach(m=>{ if(m && set.indexOf(m) < 0) set.push(m); });
   return set;
 }
+/* 🛡️ ভেরিফাই নিয়ম — বাংলাদেশের সবার জন্য বাধ্যতামূলক; অন্য দেশের দোকানের জন্য ভেরিফাই লাগবে না।
+   countryCode না থাকলে (পুরনো ডাটা / রাইডার / ড্রাইভার) বাংলাদেশ ধরা হয়। */
+function isForeignAcct(x){
+  const c = String((x && x.countryCode) || "").trim().toUpperCase();
+  return !!c && c !== "BD";
+}
+function verifyBlock(x, type, id, fallbackName){
+  if(x.isVerified) return '<span class="badge active">🛡️ Verified</span>';
+  if(isForeignAcct(x)) return '<span class="badge" style="background:rgba(255,255,255,0.08); color:var(--muted);">🌍 ভেরিফাই লাগবে না</span>';
+  return `<button class="btn small ok" onclick="openVerifyModal('${type}','${id}','${escapeHtml(x.name || x.shopName || fallbackName).replace(/'/g,"")}')">🛡️ ভেরিফাই করুন</button> <span class="badge pending" style="font-size:10.5px;">⚠️ বাধ্যতামূলক</span>`;
+}
 let __mkNames = null;
 async function agentMarketNames(){
   if(__mkNames) return __mkNames;
@@ -660,7 +671,7 @@ function listenRiders(){
           <div class="rowActions" style="margin:-6px 0 10px;">
             <button class="btn small ${toggleClass}" onclick="toggleRiderStatus('${doc.id}','${r.status}')">${toggleLabel}</button>
             <button class="btn small secondary" onclick="resetRiderCash('${doc.id}')">🔄 ক্যাশ রিসেট</button>
-            ${r.isVerified ? '<span class="badge active">🛡️ Verified</span>' : `<button class="btn small ok" onclick="openVerifyModal('rider','${doc.id}','${escapeHtml(r.name || 'রাইডার').replace(/'/g,"")}')">🛡️ ভেরিফাই করুন</button>`}
+            ${verifyBlock(r, 'rider', doc.id, 'রাইডার')}
           </div>`;
       }).join("");
     }, (err)=>{
@@ -803,7 +814,7 @@ function listenDrivers(){
           </div>
           <div class="rowActions" style="margin:-6px 0 10px;">
             <button class="btn small ${toggleClass}" onclick="toggleDriverStatus('${doc.id}','${d.status}')">${toggleLabel}</button>
-            ${d.isVerified ? '<span class="badge active">🛡️ Verified</span>' : `<button class="btn small ok" onclick="openVerifyModal('driver','${doc.id}','${escapeHtml(d.name || 'ড্রাইভার').replace(/'/g,"")}')">🛡️ ভেরিফাই করুন</button>`}
+            ${verifyBlock(d, 'driver', doc.id, 'ড্রাইভার')}
           </div>
           <div class="rowActions" style="margin:-6px 0 14px;">
             <button class="btn small ${d.canReceivePassengerRequests ? 'danger' : 'ok'}" onclick="togglePassengerAccess('${doc.id}', ${!!d.canReceivePassengerRequests})">
@@ -1105,7 +1116,7 @@ function listenShops(){
           </div>
           <div class="rowActions" style="margin:-6px 0 10px;">
             <button class="btn small ${toggleClass}" onclick="toggleShopStatus('${doc.id}','${s.status}')">${toggleLabel}</button>
-            ${s.isVerified ? '<span class="badge active">🛡️ Verified</span>' : `<button class="btn small ok" onclick="openVerifyModal('shop','${doc.id}','${escapeHtml(s.name || s.shopName || 'দোকান').replace(/'/g,"")}')">🛡️ ভেরিফাই করুন</button>`}
+            ${verifyBlock(s, 'shop', doc.id, 'দোকান')}
           </div>`;
       }).join("");
     }, (err)=>{
