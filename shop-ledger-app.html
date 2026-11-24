@@ -1813,12 +1813,6 @@ window.hbLoadLib = function(name){
     <div id="rmTripRequestsList" style="font-size:12px; color:#a8a8a8;"></div>
   </div>
 
-  <div class="rmCard" id="rmRadarCard" style="display:none;">
-    <h3 style="margin:0 0 10px; font-size:14px;">📡 কাছের যাত্রী</h3>
-    <div id="rmRadarMapEl" style="width:100%; height:240px; border-radius:12px; overflow:hidden; background:#111;"></div>
-    <p id="rmRadarHint" style="font-size:11px; color:#a8a8a8; margin:8px 0 0;"></p>
-  </div>
-
   <div class="rmStatsGrid">
     <div class="rmStatBox"><div class="num" id="rmStatTotal">0</div><div class="lbl">📦 আজকের মোট ডেলিভারি</div></div>
     <div class="rmStatBox"><div class="num" id="rmStatTransit">0</div><div class="lbl">🚚 চলমান</div></div>
@@ -23124,7 +23118,6 @@ async function initRiderMode(uid){
   rmTransportModeOn = true;
   if(rmCurrentRider.transportModeOn !== true){ rmCurrentRider.transportModeOn = true; db.collection("riders").doc(rmCurrentRider.uid).update({ transportModeOn: true }).catch(()=>{}); }
   document.getElementById("rmTransportModeSwitch").classList.toggle("on", rmTransportModeOn);
-  document.getElementById("rmRadarCard").style.display = rmTransportModeOn ? "block" : "none";
   document.getElementById("rmTripRequestsCard").style.display = rmTransportModeOn ? "block" : "none";
   rmRefreshModeLabel();
   if(rmTransportModeOn && rmIsOnline){
@@ -23696,7 +23689,6 @@ document.getElementById("rmTransportModeSwitch").addEventListener("click", async
   unlockBeeAudio();
   rmTransportModeOn = !rmTransportModeOn;
   document.getElementById("rmTransportModeSwitch").classList.toggle("on", rmTransportModeOn);
-  document.getElementById("rmRadarCard").style.display = rmTransportModeOn ? "block" : "none";
   document.getElementById("rmTripRequestsCard").style.display = rmTransportModeOn ? "block" : "none";
   rmRefreshModeLabel();
   try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ transportModeOn: rmTransportModeOn }); }catch(e){}
@@ -24001,6 +23993,8 @@ async function rmTmInitMap(){
 }
 
 async function rmTmStartRadar(){
+  // 🚫 ডেলিভারি অ্যাপে "📡 কাছের যাত্রী" আর আসে না — এটা শুধু Transport অ্যাপে (honey-bee-driver.html)।
+  return;
   // ম্যাপ তৈরি না হওয়া পর্যন্ত অপেক্ষা — নাহলে নিচের লিসেনার পিন বসাতে গিয়ে
   // ম্যাপ খুঁজে পাবে না
   await rmTmInitMap();
