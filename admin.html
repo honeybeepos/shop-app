@@ -779,14 +779,21 @@ async function changeAgentCountry(agentId){
   el.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px";
   const list = window.HB_COUNTRIES || [{ code:"BD", name:"বাংলাদেশ" }];
   const box = "max-height:170px;overflow:auto;border:1px solid #e3d9bd;border-radius:10px;padding:6px 10px;margin-bottom:10px";
-  const row = "display:flex;align-items:center;gap:8px;padding:6px 0;font-size:14px";
+  const row = "display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:7px 0;font-size:14px;text-align:left;margin:0";
+  const cb = 'style="width:20px;height:20px;min-width:20px;flex:none;margin:0;padding:0"'; // সাধারণ input-এর "width:100%" স্টাইল চেকবক্সকে ছিটকে না দেয়
   el.innerHTML = `<div style="background:#fff;color:#2b2308;border-radius:16px;padding:18px;max-width:440px;width:100%;max-height:92vh;overflow:auto">
     <h3 style="margin:0 0 4px">🌍 ${escapeHtmlAdmin(agent.name || "এজেন্ট")} — দেশ ও বাজার</h3>
     <p class="meta" style="margin:0 0 10px">একজন এজেন্টকে একাধিক দেশ (বাংলাদেশসহ) আর বাংলাদেশের একাধিক বাজার দেওয়া যায়।</p>
     <div style="font-weight:700;font-size:13px;margin-bottom:4px">দেশ</div>
-    <div style="${box}">${list.map(c => `<label style="${row}"><input type="checkbox" class="agcC" value="${c.code}"${oldCodes.indexOf(c.code) >= 0 ? " checked" : ""}> ${c.code === "BD" ? "🇧🇩 বাংলাদেশ — বাজারসহ" : "🌍 " + escapeHtmlAdmin(c.name)}</label>`).join("")}</div>
-    <div id="agcMarketWrap"><div style="font-weight:700;font-size:13px;margin-bottom:4px">বাংলাদেশের বাজার</div>
-    <div style="${box}">${(__marketsCache || []).map(m => `<label style="${row}"><input type="checkbox" class="agcM" value="${m.id}"${oldMids.indexOf(m.id) >= 0 ? " checked" : ""}> ${escapeHtmlAdmin(m.name || m.id)}</label>`).join("") || '<span class="meta">কোনো বাজার নেই</span>'}</div></div>
+    <div style="${box}">${list.map(c => `<label style="${row}"><input type="checkbox" class="agcC" ${cb} value="${c.code}"${oldCodes.indexOf(c.code) >= 0 ? " checked" : ""}> <span>${c.code === "BD" ? "🇧🇩 বাংলাদেশ — বাজারসহ" : "🌍 " + escapeHtmlAdmin(c.name)}</span></label>`).join("")}</div>
+    <div id="agcMarketWrap"><div style="font-weight:700;font-size:13px;margin-bottom:6px">বাংলাদেশের বাজার</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <select id="agcDist" style="flex:1;min-width:0"><option value="">সব জেলা</option>${[...new Set((__marketsCache || []).map(m => m.district).filter(Boolean))].sort().map(d => `<option value="${escapeHtmlAdmin(d)}">${escapeHtmlAdmin(d)}</option>`).join("")}</select>
+      <select id="agcUpz" style="flex:1;min-width:0" disabled><option value="">সব থানা</option></select>
+    </div>
+    <input id="agcSearch" type="search" placeholder="🔎 বাজারের নাম লিখে খুঁজুন" style="width:100%;margin-bottom:6px;box-sizing:border-box">
+    <div id="agcMarketList" style="${box}">${(__marketsCache || []).map(m => `<label class="agcRow" data-d="${escapeHtmlAdmin(m.district || "")}" data-u="${escapeHtmlAdmin(m.upazila || "")}" data-n="${escapeHtmlAdmin((m.name || m.id).toLowerCase())}" style="${row}"><input type="checkbox" class="agcM" ${cb} value="${m.id}"${oldMids.indexOf(m.id) >= 0 ? " checked" : ""}> <span>${escapeHtmlAdmin(m.name || m.id)}<small style="display:block;color:#8a7f6c;font-size:11.5px">${escapeHtmlAdmin([m.upazila, m.district].filter(Boolean).join(", "))}</small></span></label>`).join("") || '<span class="meta">কোনো বাজার নেই</span>'}<div id="agcNone" class="meta" style="display:none;padding:8px 0">এই জেলা/থানায় কোনো বাজার পাওয়া যায়নি।</div></div>
+    <div id="agcPicked" class="meta" style="margin:-4px 0 10px"></div></div>
     <p id="agcMsg" style="font-size:12.5px;margin:0 0 8px;color:var(--due);min-height:16px"></p>
     <div class="row"><button class="btn" id="agcSave" type="button">✅ সেভ করুন</button><button class="btn secondary" id="agcCancel" type="button">বাতিল</button></div>
     <p class="meta" style="margin-top:8px">বাদ দেওয়া দেশ/বাজারের দোকান থেকে এই এজেন্ট সরে যাবেন; নতুন বিদেশি দেশে এজেন্টহীন দোকানগুলো তাঁর অধীনে আসবে। এক বাজারে সর্বোচ্চ ২ জন সক্রিয় এজেন্ট।</p></div>`;
@@ -794,6 +801,30 @@ async function changeAgentCountry(agentId){
   const bdBox = () => el.querySelector('.agcC[value="BD"]');
   const mk = () => { document.getElementById("agcMarketWrap").style.display = (bdBox() && bdBox().checked) ? "" : "none"; };
   el.querySelectorAll(".agcC").forEach(c => c.addEventListener("change", mk)); mk();
+  // 🔎 জেলা → থানা → নাম দিয়ে বাজার ছেঁকে খোঁজা (লুকিয়ে থাকা টিক দেওয়া বাজারগুলো টিকই থাকে)
+  const distSel = document.getElementById("agcDist"), upzSel = document.getElementById("agcUpz"), srch = document.getElementById("agcSearch");
+  const filt = () => {
+    const d = distSel.value, u = upzSel.value, q = srch.value.trim().toLowerCase();
+    let shown = 0;
+    el.querySelectorAll(".agcRow").forEach(r => {
+      const ok = (!d || r.dataset.d === d) && (!u || r.dataset.u === u) && (!q || r.dataset.n.indexOf(q) >= 0);
+      r.style.display = ok ? "flex" : "none"; if(ok) shown++;
+    });
+    document.getElementById("agcNone").style.display = (shown === 0 && (__marketsCache || []).length) ? "block" : "none";
+  };
+  const picked = () => {
+    const names = [...el.querySelectorAll(".agcM:checked")].map(x => (x.closest("label").dataset.n || "").trim());
+    const labels = [...el.querySelectorAll(".agcM:checked")].map(x => x.closest("label").querySelector("span").firstChild.textContent);
+    document.getElementById("agcPicked").textContent = labels.length ? `✓ বাছা আছে (${labels.length}টা): ` + labels.join("، ") : "কোনো বাজার বাছা হয়নি";
+  };
+  distSel.addEventListener("change", () => {
+    const d = distSel.value;
+    const ups = [...new Set((__marketsCache || []).filter(m => !d || m.district === d).map(m => m.upazila).filter(Boolean))].sort();
+    upzSel.innerHTML = '<option value="">সব থানা</option>' + ups.map(x => `<option value="${escapeHtmlAdmin(x)}">${escapeHtmlAdmin(x)}</option>`).join("");
+    upzSel.disabled = !d; filt();
+  });
+  upzSel.addEventListener("change", filt); srch.addEventListener("input", filt);
+  el.querySelectorAll(".agcM").forEach(c => c.addEventListener("change", picked)); picked();
   document.getElementById("agcCancel").onclick = () => el.remove();
   el.addEventListener("click", e => { if(e.target === el) el.remove(); });
   document.getElementById("agcSave").onclick = async () => {
