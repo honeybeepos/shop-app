@@ -1809,8 +1809,14 @@ window.hbLoadLib = function(name){
   <p class="rmGpsStatus" id="rmGpsStatusTxt" style="margin-bottom:14px;">📍 GPS বন্ধ আছে</p>
 
   <div class="rmCard" id="rmTripRequestsCard" style="display:none;">
-    <h3 style="margin:0 0 10px; font-size:14px;">🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট</h3>
-    <div id="rmTripRequestsList" style="font-size:12px; color:#a8a8a8;"></div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <h3 style="margin:0; font-size:14px;">🚕 গন্তব্য-ভিত্তিক ট্রিপ রিকোয়েস্ট</h3>
+      <button type="button" id="rmToggleTrips" style="flex:none; padding:6px 12px; font-size:12px; border-radius:20px; border:1px solid rgba(255,209,102,0.35); background:transparent; color:inherit; font-weight:700;">🔕 বন্ধ করুন</button>
+    </div>
+    <div id="rmTripOffNote" style="display:none; margin-top:8px; font-size:11.5px; color:#a8a8a8;">🔕 বন্ধ আছে — ট্রিপ রিকোয়েস্ট, শব্দ বা নড়াচড়া কিছু আসবে না। দরকার হলে ডানের বোতামে চালু করুন।</div>
+    <div id="rmTripBody" style="margin-top:10px;">
+      <div id="rmTripRequestsList" style="font-size:12px; color:#a8a8a8;"></div>
+    </div>
   </div>
 
   <div class="rmCard" id="rmRadarCard">
@@ -23753,11 +23759,36 @@ function rmStopTripRequests(){
 
 let __rmKnownTripIds = new Set();
 let __rmTripReqInitialized = false;
+/* 🔕 ট্রিপ রিকোয়েস্ট বন্ধ/চালু — ট্রান্সপোর্ট অ্যাপের মতো; বন্ধ থাকলে রিকোয়েস্ট, শব্দ কিছুই আসে না (সক্রিয় ট্রিপ চললে কার্ড লুকায় না) */
+function rmTripOff(){ try{ return localStorage.getItem("hbRmTripOff") === "1"; }catch(e){ return false; } }
+function rmTripApplyToggle(){
+  const off = rmTripOff();
+  const active = !!(rmCurrentRider && (rmCurrentRider.currentStatus === "on_waiting" || rmCurrentRider.currentStatus === "on_trip"));
+  const hide = off && !active;
+  const btn = document.getElementById("rmToggleTrips"), body = document.getElementById("rmTripBody"), note = document.getElementById("rmTripOffNote");
+  if(btn) btn.textContent = off ? "🔔 চালু করুন" : "🔕 বন্ধ করুন";
+  if(body) body.style.display = hide ? "none" : "";
+  if(note) note.style.display = hide ? "" : "none";
+}
+(function(){
+  const btn = document.getElementById("rmToggleTrips");
+  if(!btn) return;
+  btn.addEventListener("click", ()=>{
+    const off = !rmTripOff();
+    try{ if(off) localStorage.setItem("hbRmTripOff","1"); else localStorage.removeItem("hbRmTripOff"); }catch(e){}
+    rmTripApplyToggle();
+    if(off){ rmStopRingRepeat(); }
+    else { __rmTripReqInitialized = false; if(typeof __rmLastTrips !== "undefined" && __rmLastTrips) rmRenderTripRequests(__rmLastTrips); }
+  });
+  rmTripApplyToggle();
+})();
 function rmRenderTripRequests(trips){
+  rmTripApplyToggle();
   if(rmCurrentRider.currentStatus === "on_waiting" || rmCurrentRider.currentStatus === "on_trip"){
     rmStopRingRepeat();
     return;
   }
+  if(rmTripOff()){ rmStopRingRepeat(); return; }
 
   const relevant = trips.filter(t=>
     hbTripVisibleTo(t, rmCurrentRider.uid) &&
