@@ -2685,15 +2685,15 @@ exports.cleanupOldHistory = onSchedule("every 24 hours", async () => {
   console.log(`🗑️ ৭ দিনের পুরনো ${totalDeleted}টা হিস্ট্রি রেকর্ড মুছে ফেলা হয়েছে`);
 });
 
-/* ==================== 📊 বাজারের রিপোর্ট (bazarStats) — ৯০ দিনের পুরনো নিজে থেকে মোছা ====================
+/* ==================== 📊 বাজারের রিপোর্ট (bazarStats) — ৭ দিনের পুরনো নিজে থেকে মোছা ====================
    "কোন অংশে গ্রাহক বেশি" হিসাবের নথির নামই তারিখ (যেমন 2026-10-31, বাংলাদেশ সময়)।
    তাই নামের তুলনা করেই পুরনোগুলো বেছে নেওয়া যায় — আলাদা index লাগে না।
-   এডমিন প্যানেলে সর্বোচ্চ ৯০ দিনের রিপোর্ট দেখা যায়, তাই ৯০ দিন পর্যন্ত সব থাকে;
+   এডমিন প্যানেলে "আজ" ও "৭ দিন" রিপোর্ট দেখা যায়, তাই ৭ দিন পর্যন্ত সব থাকে;
    তার আগেরগুলোই শুধু মোছে। প্রতিদিন একবার চলে, একবারে ৪০০টা করে (বছরের শেষেও দিনে ১টাই মুছবে)।
    ⚠️ অন্য কোনো কালেকশনে হাত দেয় না। */
 exports.cleanupOldBazarStats = onSchedule("every 24 hours", async () => {
   const dhakaNow = new Date(Date.now() + 6 * 3600000);
-  const cutoffKey = new Date(dhakaNow.getTime() - 90 * 86400000).toISOString().slice(0, 10);
+  const cutoffKey = new Date(dhakaNow.getTime() - 7 * 86400000).toISOString().slice(0, 10);
   let removed = 0;
   try {
     for (let round = 0; round < 10; round++) {
@@ -2734,6 +2734,54 @@ exports.cleanupOldLoginLogs = onSchedule("every 24 hours", async () => {
     console.error("🔑 loginLogs পরিষ্কার করা যায়নি:", e.message || e);
   }
   if (removed) console.log(`🔑 loginLogs: ${cutoffKey}-এর আগের ${removed}টা এন্ট্রি মুছে ফেলা হয়েছে`);
+});
+
+/* ==================== 🧹 ট্রিপ ও বুকিং হিস্ট্রি — ৭ দিন পর নিজে থেকে মোছা ====================
+   যাত্রীর "আমার ট্রিপ হিস্ট্রি" (trips), "আমার বুকিং" (transportBookings) আর ড্রাইভার অ্যাপের "আগের বুকিং" — সবই এই দুই কালেকশন থেকে আসে।
+   • trips: শেষ হওয়া (completed/cancelled/expired) আর ৭ দিনের পুরনো searching/waiting_selection মোছা হয়।
+     ⚠️ হিসেবে যায় না: ড্রাইভারের আগাম-বুকিং/সময়সূচির এন্ট্রি (hasSchedule:true)।
+   • transportBookings: শেষ হওয়া (completed/declined/cancelled) মোছা হয় শেষ বদলানোর ৭ দিন পর; পুরনো pending মোছা হয়;
+     accepted হলে — যাত্রার সময় বসানো থাকলে সেই সময়ের ৭ দিন পর, না থাকলে বুকিংয়ের ৭ দিন পর। ভবিষ্যতের বুকিং কখনো মোছা হয় না।
+   • চ্যাট (লেখা/ভয়েস) আর private নম্বর সাবকালেকশনসহ পুরোটা মোছে (recursiveDelete)।
+   • আয়ের হিসাব (dailyEarnings) আর রেটিং আলাদা জায়গায় — এগুলোতে হাত পড়ে না। */
+const HISTORY_KEEP_DAYS = 7;
+exports.cleanupOldTripAndBookingHistory = onSchedule("every 24 hours", async () => {
+  const cutoffMs = Date.now() - HISTORY_KEEP_DAYS * 86400000;
+  const cutoff = Timestamp.fromMillis(cutoffMs);
+  const ms = (v) => (v && typeof v.toMillis === "function") ? v.toMillis() : 0;
+  const TRIP_DONE = new Set(["completed", "cancelled", "expired"]);
+  const TRIP_STALE = new Set(["searching", "waiting_selection"]);
+  const BK_DONE = new Set(["completed", "declined", "cancelled"]);
+  const tripGone = (d) => d.hasSchedule !== true &&
+    (TRIP_DONE.has(d.status) ? Math.max(ms(d.updatedAt), ms(d.createdAt)) < cutoffMs : TRIP_STALE.has(d.status));
+  const bookingGone = (d) => {
+    if (BK_DONE.has(d.status)) return Math.max(ms(d.updatedAt), ms(d.createdAt)) < cutoffMs;
+    if (d.status === "accepted") return d.tripAt ? ms(d.tripAt) < cutoffMs : ms(d.createdAt) < cutoffMs;
+    return d.status === "pending"; // পুরনো (createdAt কাটঅফের আগের — নিচের কোয়েরিতেই সীমা)
+  };
+  async function sweep(col, gone) {
+    let removed = 0, last = null;
+    for (let page = 0; page < 10; page++) {
+      let q = db.collection(col).where("createdAt", "<", cutoff).orderBy("createdAt").limit(300);
+      if (last) q = q.startAfter(last);
+      const snap = await q.get();
+      if (snap.empty) break;
+      for (const d of snap.docs) {
+        try { if (gone(d.data())) { await db.recursiveDelete(d.ref); removed++; } }
+        catch (e) { console.error(`🧹 ${col}/${d.id} মোছা যায়নি:`, e.message || e); }
+      }
+      last = snap.docs[snap.docs.length - 1];
+      if (snap.size < 300) break;
+    }
+    return removed;
+  }
+  try {
+    const t = await sweep("trips", tripGone);
+    const b = await sweep("transportBookings", bookingGone);
+    if (t || b) console.log(`🧹 ${HISTORY_KEEP_DAYS} দিনের পুরনো হিস্ট্রি মোছা হয়েছে — ট্রিপ ${t}টা, বুকিং ${b}টা`);
+  } catch (e) {
+    console.error("🧹 ট্রিপ/বুকিং হিস্ট্রি পরিষ্কার করা যায়নি:", e.message || e);
+  }
 });
 
 /* ==================== 📝 মতামত (feedback) — ৯০ দিন পর নিজে থেকে মোছা ====================
