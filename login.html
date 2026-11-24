@@ -700,6 +700,28 @@ document.getElementById("restaurantSignupBtn").addEventListener("click", async (
   btn.disabled = false; btn.textContent = "✅ নিবন্ধন করুন";
 });
 
+/* 🛡️ বাংলাদেশের রাইডার/ট্রান্সপোর্ট ড্রাইভার/দোকান — এজেন্ট ভেরিফাই না করা পর্যন্ত অ্যাপ চলবে না।
+   অন্য দেশের অ্যাকাউন্টের (countryCode ≠ BD) ভেরিফাই লাগে না। countryCode না থাকলে বাংলাদেশ ধরা হয়।
+   এজেন্ট যুক্ত না থাকলে (assignedAgentId নেই) আটকানো হয় না — কারণ ভেরিফাই করার মতো কেউ নেই, আটকে গেলে চিরতরে বন্ধ হয়ে যেত।
+   এজেন্টের নিজে খোলা ড্রাইভার (createdByAgent) আটকানো হয় না। */
+const HB_VERIFY_MSG = "🛡️ আপনার অ্যাকাউন্ট এখনো ভেরিফাই হয়নি। আপনার এজেন্টের কাছে গিয়ে ভেরিফাই করান — ভেরিফাই হলে আবার লগইন করুন।";
+function hbNeedsVerify(d){
+  if (!d || d.isVerified === true || d.createdByAgent === true) return false;
+  const c = String(d.countryCode || "").trim().toUpperCase();
+  if (c && c !== "BD") return false;
+  return !!d.assignedAgentId;
+}
+async function hbSessionBlocked(session){
+  try{
+    let snap = null;
+    if (session.role === "rider") snap = await db.collection("riders").doc(session.uid).get();
+    else if (session.role === "transport_driver") snap = await db.collection("transportDrivers").doc(session.uid).get();
+    else if (session.shopId && session.role !== "restaurant" && session.role !== "tailor" && session.role !== "superadmin")
+      snap = await db.collection("shops").doc(session.shopId).get();
+    return !!(snap && snap.exists && hbNeedsVerify(snap.data()));
+  }catch(e){ return false; } // পড়া না গেলে আটকানো হয় না — অ্যাপ যেন না ভাঙে
+}
+
 async function afterLoginRoute(uid){
   const superAdmin = await isSuperAdmin(uid);
   if (superAdmin) {
@@ -724,6 +746,11 @@ async function afterLoginRoute(uid){
       await auth.signOut();
       return;
     }
+    if (hbNeedsVerify(doc.data())) {
+      showMsg("loginMsg", HB_VERIFY_MSG, false);
+      await auth.signOut();
+      return;
+    }
     await hbLogLogin(uid, "transport_driver", doc.data().name || doc.data().phone || "");
     saveSession({ uid, role: "transport_driver", name: doc.data().name || "" });
     // 🚑 নিজে নিবন্ধন করা → নতুন অ্যাপ; এজেন্টের খোলা অ্যাকাউন্ট → পুরনো অ্যাপ (দোকানের POS-এর Driver Mode)
@@ -738,6 +765,11 @@ async function afterLoginRoute(uid){
     const doc = await db.collection("riders").doc(uid).get();
     if (!doc.exists || doc.data().status === "blocked") {
       showMsg("loginMsg", "আপনার অ্যাকাউন্টটি ব্লক করা আছে অথবা প্রোফাইল পাওয়া যায়নি।", false);
+      await auth.signOut();
+      return;
+    }
+    if (hbNeedsVerify(doc.data())) {
+      showMsg("loginMsg", HB_VERIFY_MSG, false);
       await auth.signOut();
       return;
     }
@@ -808,6 +840,11 @@ async function afterLoginRoute(uid){
   const shop = await getShopDoc(userDoc.shopId);
   if (!shop || shop.status === "blocked") {
     showMsg("loginMsg", "আপনার একাউন্টটি ব্লক করা হয়েছে। দোকানের এডমিনের সাথে যোগাযোগ করুন।", false);
+    await auth.signOut();
+    return;
+  }
+  if (hbNeedsVerify(shop)) {
+    showMsg("loginMsg", HB_VERIFY_MSG, false);
     await auth.signOut();
     return;
   }
@@ -1162,6 +1199,12 @@ auth.onAuthStateChanged(async (user)=>{
   if (__authFlowInProgress) return;
   const session = getSession();
   if (user && session && session.uid === user.uid) {
+    if (await hbSessionBlocked(session)) {
+      clearSession();
+      await auth.signOut();
+      showMsg("loginMsg", HB_VERIFY_MSG, false);
+      return;
+    }
     window.location.href = routeByRole(session.role);
   }
 });

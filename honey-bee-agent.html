@@ -575,7 +575,7 @@ function agentMarkets(){
   (Array.isArray(a.marketIds) ? a.marketIds : []).forEach(m=>{ if(m && set.indexOf(m) < 0) set.push(m); });
   return set;
 }
-/* 🛡️ ভেরিফাই নিয়ম — বাংলাদেশের সবার জন্য বাধ্যতামূলক; অন্য দেশের দোকানের জন্য ভেরিফাই লাগবে না।
+/* 🛡️ ভেরিফাই নিয়ম — বাংলাদেশের সবার জন্য বাধ্যতামূলক (ভেরিফাই ছাড়া অ্যাপ চলবে না, login.html-এ আটকায়); অন্য দেশের জন্য ঐচ্ছিক — বাটন সবার জন্যই থাকে।
    countryCode না থাকলে (পুরনো ডাটা / রাইডার / ড্রাইভার) বাংলাদেশ ধরা হয়। */
 function isForeignAcct(x){
   const c = String((x && x.countryCode) || "").trim().toUpperCase();
@@ -583,8 +583,10 @@ function isForeignAcct(x){
 }
 function verifyBlock(x, type, id, fallbackName){
   if(x.isVerified) return '<span class="badge active">🛡️ Verified</span>';
-  if(isForeignAcct(x)) return '<span class="badge" style="background:rgba(255,255,255,0.08); color:var(--muted);">🌍 ভেরিফাই লাগবে না</span>';
-  return `<button class="btn small ok" onclick="openVerifyModal('${type}','${id}','${escapeHtml(x.name || x.shopName || fallbackName).replace(/'/g,"")}')">🛡️ ভেরিফাই করুন</button> <span class="badge pending" style="font-size:10.5px;">⚠️ বাধ্যতামূলক</span>`;
+  const tag = isForeignAcct(x)
+    ? '<span class="badge" style="background:rgba(255,255,255,0.08); color:var(--muted);">🌍 ঐচ্ছিক</span>'
+    : '<span class="badge pending">⚠️ বাধ্যতামূলক</span>';
+  return `<button class="btn small ok" onclick="openVerifyModal('${type}','${id}','${escapeHtml(x.name || x.shopName || fallbackName).replace(/'/g,"")}')">🛡️ ভেরিফাই করুন</button> ${tag}`;
 }
 let __mkNames = null;
 async function agentMarketNames(){
