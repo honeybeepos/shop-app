@@ -1813,6 +1813,18 @@ window.hbLoadLib = function(name){
     <div id="rmTripRequestsList" style="font-size:12px; color:#a8a8a8;"></div>
   </div>
 
+  <div class="rmCard" id="rmRadarCard">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <h3 style="margin:0; font-size:14px;">📡 কাছের যাত্রী (রাস্তায় অপেক্ষা)</h3>
+      <button type="button" id="rmToggleRadar" style="flex:none; padding:6px 12px; font-size:12px; border-radius:20px; border:1px solid rgba(255,209,102,0.35); background:transparent; color:inherit; font-weight:700;">🔕 বন্ধ করুন</button>
+    </div>
+    <div id="rmRadarOffNote" style="display:none; margin-top:8px; font-size:11.5px; color:#a8a8a8;">🔕 বন্ধ আছে — কাছের যাত্রী দেখাবে না, শব্দও হবে না। দরকার হলে ডানের বোতামে চালু করুন।</div>
+    <div id="rmRadarBody" style="margin-top:10px;">
+      <p id="rmRadarHint" style="font-size:11.5px; color:#a8a8a8; margin:0 0 8px;">অনলাইন থাকলে ২ কিমির মধ্যে রাস্তায় অপেক্ষমাণ যাত্রী এখানে দেখাবে।</p>
+      <div id="rmRadarList"></div>
+    </div>
+  </div>
+
   <div class="rmStatsGrid">
     <div class="rmStatBox"><div class="num" id="rmStatTotal">0</div><div class="lbl">📦 আজকের মোট ডেলিভারি</div></div>
     <div class="rmStatBox"><div class="num" id="rmStatTransit">0</div><div class="lbl">🚚 চলমান</div></div>
@@ -23456,7 +23468,8 @@ function rmStartGps(){
   let lastSent = 0, firstFix = true;
   rmGpsWatchId = navigator.geolocation.watchPosition((pos)=>{
     __rmMyLatLng = [pos.coords.latitude, pos.coords.longitude];
-    if(firstFix){ firstFix = false; if(rmTransportModeOn) rmTmLoadHotspots(); }
+    if(firstFix){ firstFix = false; }
+    if(rmTransportModeOn && rmTmUnsub) rmTmRenderRadar(__rmPassCache);
     const now = Date.now();
     if(now - lastSent < 7000) return;
     lastSent = now;
@@ -23992,23 +24005,42 @@ async function rmTmInitMap(){
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap', maxZoom:19 }).addTo(rmTmMap);
 }
 
+/* ---------- 📡 কাছের যাত্রী (রাস্তায় অপেক্ষা) — ট্রান্সপোর্ট অ্যাপের "যাত্রী ট্রিপ"-এর মতো তালিকা ---------- */
+let __rmPassCache = [];
+function rmRadarOff(){ try{ return localStorage.getItem("hbRmRadarOff") === "1"; }catch(e){ return false; } }
+function rmRadarApplyToggle(){
+  const off = rmRadarOff();
+  const btn = document.getElementById("rmToggleRadar"), body = document.getElementById("rmRadarBody"), note = document.getElementById("rmRadarOffNote");
+  if(btn) btn.textContent = off ? "🔔 চালু করুন" : "🔕 বন্ধ করুন";
+  if(body) body.style.display = off ? "none" : "";
+  if(note) note.style.display = off ? "" : "none";
+}
+(function(){
+  const btn = document.getElementById("rmToggleRadar");
+  if(!btn) return;
+  btn.addEventListener("click", ()=>{
+    const off = !rmRadarOff();
+    try{ if(off) localStorage.setItem("hbRmRadarOff","1"); else localStorage.removeItem("hbRmRadarOff"); }catch(e){}
+    rmRadarApplyToggle();
+    if(!off){ __rmRadarInitialized = false; rmTmRenderRadar(__rmPassCache); }
+  });
+  rmRadarApplyToggle();
+})();
 async function rmTmStartRadar(){
-  // 🚫 ডেলিভারি অ্যাপে "📡 কাছের যাত্রী" আর আসে না — এটা শুধু Transport অ্যাপে (honey-bee-driver.html)।
-  return;
-  // ম্যাপ তৈরি না হওয়া পর্যন্ত অপেক্ষা — নাহলে নিচের লিসেনার পিন বসাতে গিয়ে
-  // ম্যাপ খুঁজে পাবে না
-  await rmTmInitMap();
-  document.getElementById("rmRadarHint").textContent = "📡 লাইভ — কাছের অপেক্ষমাণ যাত্রী খোঁজা হচ্ছে...";
-  if(__rmMyLatLng) rmTmLoadHotspots();
+  rmRadarApplyToggle();
+  rmTmRenderRadar(__rmPassCache);
   if(rmTmUnsub) return;
   rmTmUnsub = db.collection("passenger_waiting_queue").where("status","==","WAITING")
     .onSnapshot((qs)=>{
-      const passengers = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
-      rmTmRenderRadar(passengers);
-    }, (err)=> console.warn("rm tm radar error:", err));
+      __rmPassCache = qs.docs.map(d=> ({ id: d.id, ...d.data() }));
+      rmTmRenderRadar(__rmPassCache);
+    }, (err)=> console.warn("rm radar error:", err));
 }
 function rmTmStopRadar(){
   if(rmTmUnsub){ rmTmUnsub(); rmTmUnsub = null; }
+  __rmPassCache = []; __rmKnownPassengerIds = new Set(); __rmRadarInitialized = false;
+  { const l = document.getElementById("rmRadarList"); if(l) l.innerHTML = ""; }
+  { const h = document.getElementById("rmRadarHint"); if(h) h.textContent = "অনলাইন থাকলে ২ কিমির মধ্যে রাস্তায় অপেক্ষমাণ যাত্রী এখানে দেখাবে।"; }
   rmTmMarkers.forEach(m=> rmTmMap && rmTmMap.removeLayer(m)); rmTmMarkers = [];
   rmTmHotspotMarkers.forEach(m=> rmTmMap && rmTmMap.removeLayer(m)); rmTmHotspotMarkers = [];
 }
@@ -24034,54 +24066,52 @@ async function rmTmLoadHotspots(){
 
 let __rmKnownPassengerIds = new Set();
 let __rmRadarInitialized = false;
-async function rmTmRenderRadar(passengers){
-  if(!rmTmMap) return;   // ম্যাপ এখনো তৈরি হয়নি
-  rmTmMarkers.forEach(m=> rmTmMap.removeLayer(m)); rmTmMarkers = [];
-  if(!__rmMyLatLng) return;
-  const nearby = passengers.filter(p=>{
-    if(!p.location) return false;
+function rmTmRenderRadar(passengers){
+  const box = document.getElementById("rmRadarList"), hint = document.getElementById("rmRadarHint");
+  if(!box || !hint) return;
+  if(rmRadarOff()){ box.innerHTML = ""; return; }
+  if(!rmTmUnsub){ return; } // অফলাইন — কিছু দেখানো হয় না
+  if(!__rmMyLatLng){ hint.textContent = "📍 আপনার লোকেশন পাওয়ার অপেক্ষা..."; box.innerHTML = ""; return; }
+  const near = [];
+  (passengers || []).forEach(p=>{
+    if(!p.location) return;
     const lat = p.location.latitude != null ? p.location.latitude : p.location._lat;
     const lng = p.location.longitude != null ? p.location.longitude : p.location._long;
-    if(lat == null || lng == null) return false;
-    p.__lat = lat; p.__lng = lng;
-    p.__dist = dmHaversineKm(__rmMyLatLng[0], __rmMyLatLng[1], lat, lng);
-    return p.__dist <= 2;
+    if(lat == null || lng == null) return;
+    const d = dmHaversineKm(__rmMyLatLng[0], __rmMyLatLng[1], lat, lng);
+    if(d <= 2) near.push({ p, d, lat, lng });
   });
+  near.sort((a,b)=> a.d - b.d);
 
-  const currentPassengerIds = new Set(nearby.map(p=> p.id));
-  const hasNewPassenger = [...currentPassengerIds].some(id=> !__rmKnownPassengerIds.has(id));
-  if(hasNewPassenger && __rmRadarInitialized) playBeeAlert();
+  const ids = new Set(near.map(x=> x.p.id));
+  const hasNew = [...ids].some(id=> !__rmKnownPassengerIds.has(id));
+  if(hasNew && __rmRadarInitialized) playBeeAlert();
   __rmRadarInitialized = true;
-  __rmKnownPassengerIds = currentPassengerIds;
+  __rmKnownPassengerIds = ids;
 
-  const clusters = {};
-  nearby.forEach(p=>{
-    const key = p.__lat.toFixed(3) + "," + p.__lng.toFixed(3);
-    (clusters[key] = clusters[key] || []).push(p);
-  });
-  for(const key in clusters){
-    const group = clusters[key];
-    const cLat = group.reduce((s,p)=>s+p.__lat,0)/group.length;
-    const cLng = group.reduce((s,p)=>s+p.__lng,0)/group.length;
-    const label = await dmReverseGeocode(cLat, cLng);
-    const icon = L.divIcon({
-      html: `<div class="radarBadge">📍 ${label} — ${group.length} জন</div>`,
-      className: '', iconSize: null, iconAnchor: [40,15]
-    });
-    const marker = L.marker([cLat, cLng], { icon }).addTo(rmTmMap);
-    marker.bindPopup(rmTmBuildPopup(group));
-    marker.on("click", ()=> rmTmFocusFullscreen([cLat, cLng]));
-    rmTmMarkers.push(marker);
-  }
-  document.getElementById("rmRadarHint").textContent = nearby.length > 0
-    ? `📡 কাছাকাছি ${nearby.length} জন যাত্রী অপেক্ষা করছেন`
-    : "এই মুহূর্তে ২ কিমির মধ্যে কোনো অপেক্ষমাণ যাত্রী নেই।";
-
-  if(nearby.length > 0 && !rmTmFullscreen){
-    const nearest = nearby.reduce((a,b)=> (a.__dist < b.__dist ? a : b));
-    rmTmMap.fitBounds([__rmMyLatLng, [nearest.__lat, nearest.__lng]], { padding:[40,40], maxZoom:16 });
-  }
+  hint.textContent = near.length ? `📡 কাছাকাছি ${near.length} জন যাত্রী অপেক্ষা করছেন` : "এই মুহূর্তে ২ কিমির মধ্যে কোনো অপেক্ষমাণ যাত্রী নেই।";
+  const VL = { AUTO:"🛺 CNG", EASY:"🛺✨ ইজিবাইক", CAR:"🚗 কার", BIKE:"🏍️ বাইক", BUS:"🚌 বাস" };
+  const kmTxt = (d)=> d < 1 ? Math.max(50, Math.round(d*1000/50)*50) + " মিটার" : d.toFixed(1) + " কিমি";
+  box.innerHTML = near.map(x=>
+    `<div style="background:#173a29; border:1px solid rgba(74,222,128,.25); border-radius:12px; padding:12px; margin-bottom:10px;">
+      <div style="font-weight:800;">📍 প্রায় ${kmTxt(x.d)} দূরে</div>
+      <div style="font-size:12px; color:#a8d9c0; margin:2px 0 8px;">🚕 চায়: ${escapeHtml((x.p.transport_types||[]).map(v=> VL[v]||v).join(", ") || "যেকোনো")}</div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" data-rm-pick="${escapeHtml(x.p.id)}" style="flex:1; padding:10px; border:none; border-radius:10px; background:linear-gradient(135deg,#4ade80,#16a34a); color:#05260f; font-weight:800;">✅ তুলে নিন</button>
+        <button type="button" data-rm-nav="${x.lat},${x.lng}" style="flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,209,102,0.35); background:transparent; color:inherit; font-weight:700;">🧭 Navigate</button>
+      </div>
+    </div>`).join("");
 }
+(function(){
+  const box = document.getElementById("rmRadarList");
+  if(!box) return;
+  box.addEventListener("click", (e)=>{
+    const pk = e.target.closest("[data-rm-pick]");
+    if(pk){ const p = __rmPassCache.find(x=> x.id === pk.dataset.rmPick); if(p) rmDoPickUp(p); return; }
+    const nv = e.target.closest("[data-rm-nav]");
+    if(nv) window.open("https://www.google.com/maps/dir/?api=1&destination=" + nv.dataset.rmNav, "_blank");
+  });
+})();
 
 function rmTmFocusFullscreen(latLng){
   const mapEl = document.getElementById("rmRadarMapEl");
@@ -24124,7 +24154,7 @@ async function rmDoPickUp(p){
     }else if(fare > 0){
       alert(`✅ Pick Up সম্পন্ন — নগদ ${HB_CUR} ${fare} নিন।`);
     }
-    rmTmMap.closePopup();
+    if(rmTmMap) rmTmMap.closePopup();
   }catch(e){ alert("Pick Up করা যায়নি: " + e.message); }
 }
 
