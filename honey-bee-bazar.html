@@ -202,6 +202,9 @@
   .hbXCard.hbXOpen{ grid-column:1 / -1; }
   .mfHRow .pCard.hbXCard.hbXOpen{ flex-basis:280px; }
   .hbXOpen .hbXDesc{ display:block; animation:hbXDrop .22s ease both; }
+  /* 📝 লম্বা বিবরণ: প্রথমে ৪ লাইন, নিচে "আরও দেখুন" — চাপলে পুরোটা, আবার চাপলে "কম দেখুন" */
+  .hbXDesc.hbClampOn:not(.hbMoreOpen) .hbDescTxt{ display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+  .hbMoreBtn{ display:block; margin:6px 0 0 auto; background:none; border:none; color:var(--amber, #f6c453); font:inherit; font-weight:800; font-size:13px; cursor:pointer; padding:5px 2px; }
   .hbXOpen .hbXClamp, .hbXOpen .pCardName{ display:block; -webkit-line-clamp:unset; min-height:0; overflow:visible; }
   .hbXOpen .hbXChev{ transform:rotate(180deg); }
   .hbXOpen .pCardImgWrap{ aspect-ratio:4/3; }
@@ -2546,6 +2549,7 @@
       <span id="tripHistoryBackBtn" style="font-size:22px; cursor:pointer; color:var(--muted);">←</span>
       <div style="font-weight:800; font-size:16px;">📜 আমার ট্রিপ হিস্ট্রি</div>
     </div>
+    <div style="font-size:11px; color:var(--muted); margin:0 0 10px;">🧹 ৭ দিন পর পুরনো ট্রিপ নিজে থেকে মুছে যায়।</div>
     <div id="tripHistoryList"><div class="loadingMsg">লোড হচ্ছে...</div></div>
   </div>
 
@@ -10552,7 +10556,15 @@ function hbToggleCard(el, ev){
 // বিবরণের ড্রপডাউন অংশ (খালি থাকলে কিছুই না)
 function hbDescBlock(text){
   const t = String(text || "").trim();
-  return t ? `<div class="hbXDesc">📝 ${escapeHtml(t)}</div>` : "";
+  if(!t) return "";
+  const long = t.length > 140 || (t.match(/\n/g) || []).length >= 3;   // লম্বা হলে "আরও দেখুন" বোতাম
+  return `<div class="hbXDesc${long ? " hbClampOn" : ""}"><span class="hbDescTxt">📝 ${escapeHtml(t)}</span>${long ? '<button type="button" class="hbMoreBtn" onclick="hbToggleDesc(this,event)">আরও দেখুন ▼</button>' : ""}</div>`;
+}
+function hbToggleDesc(btn, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const box = btn.closest(".hbXDesc"); if(!box) return;
+  const open = box.classList.toggle("hbMoreOpen");
+  btn.textContent = open ? "কম দেখুন ▲" : "আরও দেখুন ▼";
 }
 function hbChev(text){ return String(text || "").trim() ? '<span class="hbXChev">▼</span>' : ""; }
 
