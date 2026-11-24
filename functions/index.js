@@ -3724,7 +3724,7 @@ async function tripBuildQueue(trip, exclude) {
   const busy = (x) => x.currentStatus === "on_trip" || x.currentStatus === "on_waiting";
   try {
     const rs = await db.collection("riders").where("online", "==", true).get(); // 🔀 ডেলিভারি+যাত্রী এক সাথে
-    rs.docs.forEach((d) => { const r = d.data(); if (r.status && r.status !== "active") return; if (busy(r)) return; if (allowedTypes && !allowedTypes.includes(riderTripType(r.vehicleType))) return; cands.push({ id: d.id, kind: "rider", loc: r.liveLocation }); });
+    rs.docs.forEach((d) => { const r = d.data(); if (r.status && r.status !== "active") return; if (r.passengerOff === true) return; if (busy(r)) return; if (allowedTypes && !allowedTypes.includes(riderTripType(r.vehicleType))) return; cands.push({ id: d.id, kind: "rider", loc: r.liveLocation }); });
   } catch (e) { console.warn("TRIP_QUEUE_RIDERS_FAILED", String(e && e.message || e)); }
   try {
     const ds = await db.collection("transportDrivers").where("driverStatus", "==", "online").get();
@@ -3732,10 +3732,10 @@ async function tripBuildQueue(trip, exclude) {
   } catch (e) { console.warn("TRIP_QUEUE_DRIVERS_FAILED", String(e && e.message || e)); }
   const seen = new Set();
   let list = cands.filter((c) => !ex.has(c.id) && !seen.has(c.id) && seen.add(c.id));
-  // 💰 ট্রান্সপোর্টে সাবস্ক্রিপশন চালু থাকলে — সাবস্ক্রিপশন ছাড়া চালক বাদ (রাইডার/ডেলিভারিম্যান সবসময় ফ্রি)
+  // 💰 ট্রান্সপোর্টে সাবস্ক্রিপশন চালু থাকলে — সাবস্ক্রিপশন ছাড়া চালক ও রাইডার বাদ (ডেলিভারি সবসময় ফ্রি, শুধু যাত্রী ট্রিপে সাবস্ক্রিপশন লাগে)
   try {
-    const okDrivers = await __billing.driversWithSub(list.filter((c) => c.kind === "driver").map((c) => c.id));
-    if (okDrivers) list = list.filter((c) => c.kind !== "driver" || okDrivers.has(c.id));
+    const okDrivers = await __billing.driversWithSub(list.map((c) => c.id));
+    if (okDrivers) list = list.filter((c) => okDrivers.has(c.id));
   } catch (e) { console.warn("TRIP_QUEUE_SUB_CHECK_FAILED", String(e && e.message || e)); }
   list.forEach((c) => {
     c.km = (hasPickup && c.loc && c.loc.lat != null) ? haversineKm(p.lat, p.lng, c.loc.lat, c.loc.lng) : null;
