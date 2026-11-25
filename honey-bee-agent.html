@@ -1495,7 +1495,7 @@ const AC_BN = "০১২৩৪৫৬৭৮৯";
 const acBn = (n)=> String(n).replace(/[0-9]/g, d=> AC_BN[d]);
 const acR2 = (n)=> Math.round(Number(n || 0) * 100) / 100;
 const acEsc = (v)=> String(v == null ? "" : v).replace(/[&<>"]/g, c=> ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
-const AC_TYPE = { shop:"🏪 দোকান", pharmacy:"💊 ফার্মেসি", tailor:"🧵 সেলাই ঘর", restaurant:"🍽️ রেস্টুরেন্ট", driver:"🚑 ট্রান্সপোর্ট" };
+const AC_TYPE = { shop:"🏪 দোকান", pharmacy:"💊 ফার্মেসি", tailor:"🧵 সেলাই ঘর", restaurant:"🍽️ রেস্টুরেন্ট", driver:"🚑 ট্রান্সপোর্ট", rider:"🛵 রাইডার (যাত্রী ট্রিপ)" };
 let acItems = [], acStock = {}, acCfg = null, acStockUnsub = null, acKeysUnsub = null, acStarted = false;
 
 function acStart(){
@@ -1512,17 +1512,21 @@ function acStart(){
 function acDrawStock(){
   const s = acStock.subs || {};
   $("acStock").innerHTML = `<div class="s main"><b>${acBn(acR2(acStock.credit))}</b><small>ক্রেডিট</small></div>`
-    + AC_M.map(m=> `<div class="s"><b>${acBn(Number(s["m"+m] || 0))}</b><small>📅 ${acBn(m)} মাস</small></div>`).join("");
+    + AC_M.map(m=> `<div class="s"><b>${acBn(Number(s["m"+m] || 0))}</b><small>📅 ${acBn(m)} মাস</small></div>`).join("")
+    + `<div class="s main"><b style="font-size:15px;">🛵</b><small>যাত্রী ট্রিপ</small></div>`
+    + AC_M.map(m=> `<div class="s"><b>${acBn(Number((acStock.subsRider || {})["m"+m] || 0))}</b><small>🛵 ${acBn(m)} মাস</small></div>`).join("");
 }
 function acDrawBuy(){
   const c = acCfg; if(!c){ $("acBuyInfo").textContent = "সুপার এডমিনের সাথে যোগাযোগ করুন।"; return; }
   const cc = acStock.country === "SA" ? "SA" : "BD", p = (c.prices || {})[cc] || {}, cur = cc === "SA" ? "রিয়াল" : "৳";
-  const pay = c.pay || {}, sub = p.sub || {}, ag = p.agentSub || {};
+  const pay = c.pay || {}, sub = p.sub || {}, ag = p.agentSub || {}, subR = p.subRider || {}, agR = p.agentSubRider || {};
   const nums = cc === "SA" ? [pay.saMethod && pay.saNumber ? `${acEsc(pay.saMethod)}: <b>${acEsc(pay.saNumber)}</b>` : ""]
     : [pay.bkash ? `bKash (${acEsc(pay.bkashType || "personal")}): <b>${acEsc(pay.bkash)}</b>` : "", pay.nagad ? `Nagad: <b>${acEsc(pay.nagad)}</b>` : "", pay.rocket ? `Rocket: <b>${acEsc(pay.rocket)}</b>` : ""];
   $("acBuyInfo").innerHTML = `💳 ক্রেডিট: ১০০ ক্রেডিট = <b>${acBn(p.agentCreditPct || 100)} ${cur}</b>
     <br>📅 সাবস্ক্রিপশন (আপনার কেনা দাম → দোকানদারের দাম):<br>`
     + AC_M.map(m=> `&nbsp;&nbsp;${acBn(m)} মাস: <b>${acBn(ag["m"+m] || 0)}</b> → ${acBn(sub["m"+m] || 0)} ${cur} <span style="color:var(--ok)">(লাভ ${acBn((sub["m"+m] || 0) - (ag["m"+m] || 0))})</span>`).join("<br>")
+    + `<br><br>🛵 যাত্রী ট্রিপ সাবস্ক্রিপশন — রাইডারের জন্য আলাদা দাম (আপনার কেনা দাম → রাইডারের দাম):<br>`
+    + AC_M.map(m=> `&nbsp;&nbsp;${acBn(m)} মাস: <b>${acBn(agR["m"+m] || 0)}</b> → ${acBn(subR["m"+m] || 0)} ${cur} <span style="color:var(--ok)">(লাভ ${acBn((subR["m"+m] || 0) - (agR["m"+m] || 0))})</span>`).join("<br>")
     + `<br><br>📲 টাকা পাঠান: ${nums.filter(Boolean).join(" · ") || "—"}`
     + (pay.note ? `<br>📝 ${acEsc(pay.note)}` : "")
     + `<br>টাকা পাঠিয়ে সুপার এডমিনকে জানান${c.contact && c.contact.phone ? ` (📞 <b>${acEsc(c.contact.phone)}</b>)` : ""} — তিনি আপনার আইডিতে স্টক বসিয়ে দেবেন।`;
@@ -1569,29 +1573,41 @@ function acOpen(item, mode){
   // mode: give | key | keyfree
   const isKey = mode !== "give";
   $("acMTitle").textContent = mode === "give" ? `➕ ${item.name || "ব্যবসা"}-কে দিন` : mode === "key" ? `🔑 ${item.name || "ব্যবসা"}-এর জন্য কি` : "🔑 নতুন দোকানের জন্য কি";
-  const s = acStock.subs || {};
+  let pool = item && item.type === "rider" ? "rider" : "normal"; // 🛵 রাইডার = আলাদা স্টক ও আলাদা দাম
+  const poolStock = ()=> (pool === "rider" ? acStock.subsRider : acStock.subs) || {};
+  const monthBtns = ()=> AC_M.map(m=> `<button data-m="${m}" ${Number(poolStock()["m"+m] || 0) ? "" : "disabled style='opacity:.4'"}>${acBn(m)} মাস<br><small>(${acBn(Number(poolStock()["m"+m] || 0))}টা)</small></button>`).join("");
+  const s = poolStock();
   $("acMBody").innerHTML = `
     ${isKey ? `<p style="font-size:12px; color:var(--muted); margin:0 0 10px;">${mode === "key" ? "এই কি শুধু এই দোকানেই চলবে।" : "যে দোকান আগে বসাবে সে পাবে।"} বানানো মাত্র আপনার স্টক থেকে কমবে; ব্যবহার না হলে বাতিল করে ফেরত নিতে পারবেন।</p>` : ""}
     <div class="acSeg" id="acKind"><button data-k="credit" class="on">💳 ক্রেডিট</button><button data-k="sub">📅 সাবস্ক্রিপশন</button></div>
     <div id="acKCredit"><label>কত ক্রেডিট? (আপনার কাছে ${acBn(acR2(acStock.credit))})</label><input type="number" id="acAmt" min="1" step="1" inputmode="numeric" placeholder="যেমন 200">
       <div class="acSeg" style="margin-top:-4px;">${[50,100,200,500].map(v=> `<button data-q="${v}">${acBn(v)}</button>`).join("")}</div></div>
-    <div id="acKSub" style="display:none;"><label>কত মাস?</label>
-      <div class="acSeg" id="acMon">${AC_M.map(m=> `<button data-m="${m}" ${Number(s["m"+m] || 0) ? "" : "disabled style='opacity:.4'"}>${acBn(m)} মাস<br><small>(${acBn(Number(s["m"+m] || 0))}টা)</small></button>`).join("")}</div>
-      <p style="font-size:11.5px; color:var(--muted); margin:-4px 0 10px;">সাবস্ক্রিপশন চললে দোকানে বিক্রিতে কিছু কাটে না। অনলাইন অর্ডারে ক্রেডিট লাগবেই।</p></div>
+    <div id="acKSub" style="display:none;">
+      ${mode === "keyfree" ? `<label>কোন সাবস্ক্রিপশন?</label><div class="acSeg" id="acPool"><button data-p="normal" class="on">🏪 দোকান / 🚑 ট্রান্সপোর্ট</button><button data-p="rider">🛵 রাইডার (যাত্রী ট্রিপ)</button></div>` : (pool === "rider" ? `<p style="font-size:12px; color:var(--muted); margin:0 0 8px;">🛵 যাত্রী ট্রিপ সাবস্ক্রিপশন (আলাদা স্টক)।</p>` : "")}
+      <label>কত মাস?</label>
+      <div class="acSeg" id="acMon">${monthBtns()}</div>
+      <p id="acSubNote" style="font-size:11.5px; color:var(--muted); margin:-4px 0 10px;">${pool === "rider" ? "ডেলিভারি সবসময় ফ্রি। সাবস্ক্রিপশন থাকলে রাইডার যাত্রী ট্রিপ ও কাছের যাত্রী পাবেন।" : "সাবস্ক্রিপশন চললে দোকানে বিক্রিতে কিছু কাটে না। অনলাইন অর্ডারে ক্রেডিট লাগবেই।"}</p></div>
     <button class="btn" id="acGo">${isKey ? "🔑 কি বানান" : "✅ দিন"}</button>
     <p id="acMMsg" style="display:none; font-size:12.5px; margin:8px 0 0;"></p>`;
   let kind = "credit", months = 0;
   $("acKind").querySelectorAll("button").forEach(b=> b.onclick = ()=>{ kind = b.dataset.k; $("acKind").querySelectorAll("button").forEach(x=> x.classList.toggle("on", x === b));
     $("acKCredit").style.display = kind === "credit" ? "" : "none"; $("acKSub").style.display = kind === "sub" ? "" : "none"; });
   $("acKCredit").querySelectorAll("[data-q]").forEach(b=> b.onclick = ()=> $("acAmt").value = b.dataset.q);
-  $("acMon").querySelectorAll("[data-m]").forEach(b=> b.onclick = ()=>{ if(b.disabled) return; months = Number(b.dataset.m); $("acMon").querySelectorAll("button").forEach(x=> x.classList.toggle("on", x === b)); });
+  const bindMon = ()=> $("acMon").querySelectorAll("[data-m]").forEach(b=> b.onclick = ()=>{ if(b.disabled) return; months = Number(b.dataset.m); $("acMon").querySelectorAll("button").forEach(x=> x.classList.toggle("on", x === b)); });
+  bindMon();
+  if($("acPool")) $("acPool").querySelectorAll("button").forEach(b=> b.onclick = ()=>{
+    pool = b.dataset.p; months = 0;
+    $("acPool").querySelectorAll("button").forEach(x=> x.classList.toggle("on", x === b));
+    $("acMon").innerHTML = monthBtns(); bindMon();
+    $("acSubNote").textContent = pool === "rider" ? "ডেলিভারি সবসময় ফ্রি। সাবস্ক্রিপশন থাকলে রাইডার যাত্রী ট্রিপ ও কাছের যাত্রী পাবেন।" : "সাবস্ক্রিপশন চললে দোকানে বিক্রিতে কিছু কাটে না। অনলাইন অর্ডারে ক্রেডিট লাগবেই।";
+  });
   $("acGo").onclick = async ()=>{
     const msg = $("acMMsg"); msg.style.display = "none";
     const data = { action: isKey ? "makeKey" : "give", kind };
     if(item) data.bizId = item.id;
     if(kind === "credit"){ data.amount = Number(String($("acAmt").value).replace(/[০-৯]/g, x=> AC_BN.indexOf(x))); if(!(data.amount > 0)){ msg.textContent = "কত ক্রেডিট লিখুন"; msg.style.color = "var(--danger)"; msg.style.display = "block"; return; } }
-    else { if(!months){ msg.textContent = "মাস বাছাই করুন"; msg.style.color = "var(--danger)"; msg.style.display = "block"; return; } data.months = months; }
-    const what = kind === "credit" ? acBn(data.amount) + " ক্রেডিট" : acBn(months) + " মাসের সাবস্ক্রিপশন";
+    else { if(!months){ msg.textContent = "মাস বাছাই করুন"; msg.style.color = "var(--danger)"; msg.style.display = "block"; return; } data.months = months; if(pool === "rider") data.pool = "rider"; }
+    const what = kind === "credit" ? acBn(data.amount) + " ক্রেডিট" : acBn(months) + " মাসের " + (pool === "rider" ? "যাত্রী ট্রিপ " : "") + "সাবস্ক্রিপশন";
     if(!isKey && !confirm(`${item.name || "ব্যবসা"}-কে ${what} দেবেন?`)) return;
     const btn = $("acGo"); btn.disabled = true; btn.textContent = "হচ্ছে...";
     try{
@@ -1619,14 +1635,14 @@ function acDrawKeys(keys){
   if(!keys.length){ $("acKeys").innerHTML = '<div class="emptyMsg">এখনো কোনো কি নেই</div>'; return; }
   const st = { new:"⏳ পাঠানো হয়েছে", used:"✅ ব্যবহার হয়েছে", void:"↩️ বাতিল" };
   $("acKeys").innerHTML = keys.map(k=>{
-    const what = k.months ? acBn(k.months) + " মাস" : acBn(k.amount) + " ক্রেডিট";
+    const what = k.months ? (k.pool === "rider" ? "🛵 " : "") + acBn(k.months) + " মাস" : acBn(k.amount) + " ক্রেডিট";
     const t = k.createdAt && k.createdAt.toDate ? k.createdAt.toDate().toLocaleDateString("bn-BD", { day:"numeric", month:"short" }) : "";
     return `<div class="acKey"><div class="c"><code>${k.status === "new" ? acEsc(k.code) : "…" + acEsc(String(k.code).slice(-4))}</code> · <b>${what}</b><br>
       <small style="color:var(--muted)">${st[k.status] || k.status} · ${t}${k.usedByName ? " · " + acEsc(k.usedByName) : k.bizName ? " · " + acEsc(k.bizName) : ""}</small></div>
       ${k.status === "new" ? `<button class="btn secondary small" data-ks="${k.id}">📤</button><button class="btn danger small" data-kv="${k.id}">✖</button>` : ""}</div>`;
   }).join("");
   $("acKeys").querySelectorAll("[data-ks]").forEach(b=> b.onclick = ()=>{ const k = keys.find(x=> x.id === b.dataset.ks); const it = acItems.find(x=> x.id === k.bizId);
-    acShowCode(k.code, k.months ? acBn(k.months) + " মাসের সাবস্ক্রিপশন" : acBn(k.amount) + " ক্রেডিট", it || (k.bizName ? { name: k.bizName } : null)); $("acModal").style.display = "flex"; });
+    acShowCode(k.code, k.months ? acBn(k.months) + " মাসের " + (k.pool === "rider" ? "যাত্রী ট্রিপ " : "") + "সাবস্ক্রিপশন" : acBn(k.amount) + " ক্রেডিট", it || (k.bizName ? { name: k.bizName } : null)); $("acModal").style.display = "flex"; });
   $("acKeys").querySelectorAll("[data-kv]").forEach(b=> b.onclick = async ()=>{
     if(!confirm("এই কি বাতিল করবেন? স্টক আপনার কাছে ফেরত আসবে, কি আর কাজ করবে না।")) return;
     b.disabled = true;

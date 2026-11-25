@@ -1604,7 +1604,7 @@ function startAnalyticsListener(){
    সব লেখা functions/billing.js-এর billingAdmin দিয়ে (সার্ভার যাচাই করে)।
    পড়া সরাসরি Firestore থেকে (rules: সুপার এডমিন)। */
 const billingAdminFn = cloudFunctions.httpsCallable("billingAdmin");
-const BIL_TYPES = [["shop","🏪 দোকান (POS)"],["pharmacy","💊 ফার্মেসি"],["restaurant","🍽️ রেস্টুরেন্ট"],["driver","🚑 ট্রান্সপোর্ট (শুধু সাবস্ক্রিপশন)"],["tailor","🧵 সেলাই ঘর (শুধু সাবস্ক্রিপশন)"]];
+const BIL_TYPES = [["shop","🏪 দোকান (POS)"],["pharmacy","💊 ফার্মেসি"],["restaurant","🍽️ রেস্টুরেন্ট"],["driver","🚑 ট্রান্সপোর্ট (শুধু সাবস্ক্রিপশন)"],["tailor","🧵 সেলাই ঘর (শুধু সাবস্ক্রিপশন)"],["rider","🛵 যাত্রী ট্রিপ — রাইডার (শুধু সাবস্ক্রিপশন, ডেলিভারি ফ্রি)"]];
 const BIL_M = [1,3,6,12];
 const BIL_KIND = { agent:"🧑‍💼 এজেন্ট দিলেন", key:"🔑 কি দিয়ে", gift:"🎁 গিফট", correction:"✏️ সংশোধন", sale:"🧾 বিক্রি", order:"🛒 অনলাইন অর্ডার", refund:"↩️ ফেরত", sub:"📅 সাবস্ক্রিপশন",
   recharge:"💵 রিচার্জ", package:"📅 প্যাকেজ" };
@@ -1658,9 +1658,16 @@ function bilDrawPrices(){
         <input data-pk="sub.m${m}" type="number" step="1" min="0" value="${p.sub["m"+m]}">
         <input data-pk="agentSub.m${m}" type="number" step="1" min="0" value="${p.agentSub["m"+m]}">
         <div class="bil-sl" data-profit="${m}">${bilMoney(p.sub["m"+m] - p.agentSub["m"+m], bilCC)}</div>`).join("")}
+    </div>
+    <div class="bil-subgrid" style="margin-top:14px;">
+      <div class="bil-sh"><b>🛵 যাত্রী ট্রিপ সাবস্ক্রিপশন</b><small>(রাইডার — আলাদা দাম)</small></div><div class="bil-sh"><small>রাইডারের দাম (${cur})</small></div><div class="bil-sh"><small>এজেন্টের কেনা দাম (${cur})</small></div><div class="bil-sh"><small>এজেন্টের লাভ</small></div>
+      ${BIL_M.map(m=> `<div class="bil-sl">${mL[m]}</div>
+        <input data-pk="subRider.m${m}" type="number" step="1" min="0" value="${p.subRider["m"+m]}">
+        <input data-pk="agentSubRider.m${m}" type="number" step="1" min="0" value="${p.agentSubRider["m"+m]}">
+        <div class="bil-sl" data-profitr="${m}">${bilMoney(p.subRider["m"+m] - p.agentSubRider["m"+m], bilCC)}</div>`).join("")}
     </div>`;
   document.querySelectorAll("#bilPriceBox input").forEach(i=> i.addEventListener("input", ()=>{
-    bilReadPrices(); BIL_M.forEach(m=>{ const el = document.querySelector(`[data-profit="${m}"]`); if(el) el.textContent = bilMoney(p.sub["m"+m] - p.agentSub["m"+m], bilCC); });
+    bilReadPrices(); BIL_M.forEach(m=>{ const el = document.querySelector(`[data-profit="${m}"]`); if(el) el.textContent = bilMoney(p.sub["m"+m] - p.agentSub["m"+m], bilCC); const er = document.querySelector(`[data-profitr="${m}"]`); if(er) er.textContent = bilMoney(p.subRider["m"+m] - p.agentSubRider["m"+m], bilCC); });
   }));
 }
 document.querySelectorAll("#bilCountryTabs [data-cc]").forEach(b=> b.addEventListener("click", ()=>{ if(!BIL) return; bilReadPrices(); bilCC = b.dataset.cc; bilDrawPrices(); }));
@@ -1745,10 +1752,10 @@ document.getElementById("bilOutBtn").addEventListener("click", async ()=>{
     const [b, s] = await Promise.all([db.collection("billing").get(), db.collection("agentStock").get()]);
     const t = { BD:{ c:0, n:0, sub:0 }, SA:{ c:0, n:0, sub:0 } }, now = Date.now();
     b.docs.forEach(d=>{ const x = d.data(), k = x.country === "SA" ? "SA" : "BD"; t[k].c += Number(x.credit || 0); t[k].n++; if(x.sub && x.sub.until && x.sub.until.toMillis() > now) t[k].sub++; });
-    const ag = { c:0, subs:{ m1:0, m3:0, m6:0, m12:0 } }; s.docs.forEach(d=>{ const x = d.data(); ag.c += Number(x.credit || 0); BIL_M.forEach(m=> ag.subs["m"+m] += Number((x.subs || {})["m"+m] || 0)); });
+    const ag = { c:0, subs:{ m1:0, m3:0, m6:0, m12:0 }, subsR:{ m1:0, m3:0, m6:0, m12:0 } }; s.docs.forEach(d=>{ const x = d.data(); ag.c += Number(x.credit || 0); BIL_M.forEach(m=>{ ag.subs["m"+m] += Number((x.subs || {})["m"+m] || 0); ag.subsR["m"+m] += Number((x.subsRider || {})["m"+m] || 0); }); });
     box.innerHTML = `🇧🇩 ${bnNum(t.BD.n)}টা ব্যবসায় বাকি ${bilMoney(t.BD.c,"BD")} · চালু সাবস্ক্রিপশন ${bnNum(t.BD.sub)}টা<br>`
       + (t.SA.n ? `🇸🇦 ${bnNum(t.SA.n)}টা ব্যবসায় বাকি ${bilMoney(t.SA.c,"SA")} · চালু সাবস্ক্রিপশন ${bnNum(t.SA.sub)}টা<br>` : "")
-      + `🧑‍💼 এজেন্টদের হাতে: ক্রেডিট ${bnNum(bilR2(ag.c))} · সাবস্ক্রিপশন ${BIL_M.map(m=> bnNum(m) + " মাস " + bnNum(ag.subs["m"+m])).join(", ")}`;
+      + `🧑‍💼 এজেন্টদের হাতে: ক্রেডিট ${bnNum(bilR2(ag.c))} · সাবস্ক্রিপশন ${BIL_M.map(m=> bnNum(m) + " মাস " + bnNum(ag.subs["m"+m])).join(", ")}<br>🛵 যাত্রী ট্রিপ সাবস্ক্রিপশন (এজেন্টদের হাতে): ${BIL_M.map(m=> bnNum(m) + " মাস " + bnNum(ag.subsR["m"+m])).join(", ")}`;
   }catch(e){ box.textContent = "⚠️ " + (e.message || e); }
 });
 
@@ -1770,18 +1777,23 @@ async function bilShowAgent(id){
   const box = document.getElementById("bilAgentBox");
   if(!id){ box.innerHTML = ""; return; }
   const a = bilAgents.find(x=> x.id === id); if(!a){ box.innerHTML = ""; return; }
-  const cc = a.stock.country || a.country || "BD", p = BIL.prices[cc], subs = a.stock.subs || {};
+  const cc = a.stock.country || a.country || "BD", p = BIL.prices[cc], subs = a.stock.subs || {}, subsR = a.stock.subsRider || {};
   const led = await db.collection("agentStock").doc(id).collection("ledger").orderBy("at","desc").limit(25).get().catch(()=> ({ docs:[] }));
   const mL = (m)=> bnNum(m) + " মাস";
   box.innerHTML = `<div class="shop">
     <div class="strip" style="margin:4px 0 8px;">
       <div class="s ok"><small>হাতে ক্রেডিট</small><b>${bnNum(bilR2(a.stock.credit))}</b></div>
       ${BIL_M.map(m=> `<div class="s"><small>📅 ${mL(m)}</small><b>${bnNum(Number(subs["m"+m] || 0))}</b></div>`).join("")}
+      ${BIL_M.map(m=> `<div class="s"><small>🛵 ${mL(m)}</small><b>${bnNum(Number(subsR["m"+m] || 0))}</b></div>`).join("")}
       <div class="s ok"><small>মোট দিয়েছেন</small><b style="font-size:14px;">${bilMoney(a.stock.totals && a.stock.totals.money, cc)}</b></div>
     </div>
     <div class="row" style="margin-top:0;">
       <div class="bil-f"><small>ক্রেডিট দিন</small><input id="bilAgC" type="number" step="1" placeholder="যেমন 2000"></div>
       ${BIL_M.map(m=> `<div class="bil-f bil-sm"><small>${mL(m)} (টা)</small><input id="bilAgS${m}" type="number" step="1" min="0" placeholder="0"></div>`).join("")}
+    </div>
+    <div class="row" style="margin-top:0;">
+      <div class="bil-f"><small>🛵 যাত্রী ট্রিপ সাবস্ক্রিপশন (রাইডার — আলাদা দাম)</small></div>
+      ${BIL_M.map(m=> `<div class="bil-f bil-sm"><small>🛵 ${mL(m)} (টা)</small><input id="bilAgR${m}" type="number" step="1" min="0" placeholder="0"></div>`).join("")}
     </div>
     <div class="row" style="margin-top:0;">
       <div class="bil-f"><small>এজেন্ট কত টাকা দিয়েছেন (${cc === "SA" ? "রিয়াল" : "৳"})</small><input id="bilAgMoney" type="number" step="0.01" min="0"></div>
@@ -1791,25 +1803,25 @@ async function bilShowAgent(id){
     <div class="meta" id="bilAgHint">হিসাবে দাম: —</div>
     <div class="row"><button class="btn unblock" id="bilAgGo">📦 স্টক দিন</button><button class="btn secondary" id="bilAgFix">✏️ কমানো/সংশোধন</button></div>
     <div style="margin-top:10px; font-size:12.5px;">${led.docs.length ? led.docs.map(d=>{ const l = d.data();
-      const what = [l.credit ? "ক্রেডিট " + (l.credit > 0 ? "+" : "") + bnNum(l.credit) : (l.amount ? "ক্রেডিট " + bnNum(l.amount) : ""), ...BIL_M.map(m=> l.subs && l.subs["m"+m] ? mL(m) + " " + (l.subs["m"+m] > 0 ? "+" : "") + bnNum(l.subs["m"+m]) : ""), l.months ? mL(l.months) : ""].filter(Boolean).join(", ");
+      const what = [l.credit ? "ক্রেডিট " + (l.credit > 0 ? "+" : "") + bnNum(l.credit) : (l.amount ? "ক্রেডিট " + bnNum(l.amount) : ""), ...BIL_M.map(m=> l.subs && l.subs["m"+m] ? mL(m) + " " + (l.subs["m"+m] > 0 ? "+" : "") + bnNum(l.subs["m"+m]) : ""), ...BIL_M.map(m=> l.subsRider && l.subsRider["m"+m] ? "🛵 " + mL(m) + " " + (l.subsRider["m"+m] > 0 ? "+" : "") + bnNum(l.subsRider["m"+m]) : ""), l.months ? (l.pool === "rider" ? "🛵 " : "") + mL(l.months) : ""].filter(Boolean).join(", ");
       const lab = { stock:"📦 আপনি দিলেন", give:"➡️ দোকানে দিলেন", key:"🔑 কি বানালেন", void:"↩️ কি বাতিল" }[l.kind] || l.kind;
       return `<div class="sum-row"><span>${lab}${l.bizName ? " — " + bilEsc(l.bizName) : ""}${l.last4 ? " (…" + bilEsc(l.last4) + ")" : ""}${l.note ? " — " + bilEsc(l.note) : ""}<br><small style="color:#8a7f6c">${l.at && l.at.toDate ? l.at.toDate().toLocaleString("bn-BD") : ""}</small></span>
         <span style="text-align:right;">${bilEsc(what)}${l.money ? "<br><b style='color:var(--paid)'>" + bilMoney(l.money, cc) + "</b>" : ""}</span></div>`; }).join("") : "<p class='meta'>এখনো কোনো লেনদেন নেই</p>"}</div>
   </div>`;
-  const read = ()=> ({ credit: Number(document.getElementById("bilAgC").value || 0), subs: Object.fromEntries(BIL_M.map(m=> ["m"+m, Number(document.getElementById("bilAgS"+m).value || 0)])) });
-  const hint = ()=>{ const v = read(); const due = v.credit * p.agentCreditPct / 100 + BIL_M.reduce((s,m)=> s + v.subs["m"+m] * p.agentSub["m"+m], 0);
-    document.getElementById("bilAgHint").textContent = "হিসাবে দাম: " + bilMoney(due, cc) + ` (ক্রেডিট ${p.agentCreditPct}% + সাবস্ক্রিপশন এজেন্ট-দামে)`; return due; };
+  const read = ()=> ({ credit: Number(document.getElementById("bilAgC").value || 0), subs: Object.fromEntries(BIL_M.map(m=> ["m"+m, Number(document.getElementById("bilAgS"+m).value || 0)])), subsRider: Object.fromEntries(BIL_M.map(m=> ["m"+m, Number(document.getElementById("bilAgR"+m).value || 0)])) });
+  const hint = ()=>{ const v = read(); const due = v.credit * p.agentCreditPct / 100 + BIL_M.reduce((s,m)=> s + v.subs["m"+m] * p.agentSub["m"+m] + v.subsRider["m"+m] * p.agentSubRider["m"+m], 0);
+    document.getElementById("bilAgHint").textContent = "হিসাবে দাম: " + bilMoney(due, cc) + ` (ক্রেডিট ${p.agentCreditPct}% + সাবস্ক্রিপশন এজেন্ট-দামে; 🛵 যাত্রী ট্রিপ আলাদা দামে)`; return due; };
   box.querySelectorAll("input[type=number]").forEach(i=> i.addEventListener("input", ()=>{ const d = hint(); const mi = document.getElementById("bilAgMoney"); if(!mi.dataset.touched) mi.value = bilR2(d) || ""; }));
   document.getElementById("bilAgMoney").addEventListener("input", (e)=> e.target.dataset.touched = "1");
   const send = async (neg)=>{
     const v = read(); let money = Number(document.getElementById("bilAgMoney").value || 0), note = document.getElementById("bilAgNote").value.trim();
-    if(neg){ v.credit = -Math.abs(v.credit); BIL_M.forEach(m=> v.subs["m"+m] = -Math.abs(v.subs["m"+m])); money = 0;
+    if(neg){ v.credit = -Math.abs(v.credit); BIL_M.forEach(m=>{ v.subs["m"+m] = -Math.abs(v.subs["m"+m]); v.subsRider["m"+m] = -Math.abs(v.subsRider["m"+m]); }); money = 0;
       if(!note){ note = prompt("কমানোর কারণ লিখুন:", "") || ""; if(!note) return; } }
-    const what = [v.credit ? "ক্রেডিট " + v.credit : "", ...BIL_M.map(m=> v.subs["m"+m] ? m + " মাস × " + v.subs["m"+m] : "")].filter(Boolean).join(", ");
+    const what = [v.credit ? "ক্রেডিট " + v.credit : "", ...BIL_M.map(m=> v.subs["m"+m] ? m + " মাস × " + v.subs["m"+m] : ""), ...BIL_M.map(m=> v.subsRider["m"+m] ? "🛵 যাত্রী ট্রিপ " + m + " মাস × " + v.subsRider["m"+m] : "")].filter(Boolean).join(", ");
     if(!what){ alert("কিছু লিখুন — ক্রেডিট বা সাবস্ক্রিপশন"); return; }
     if(!confirm(`${a.name || "এজেন্ট"}: ${what}${money ? "\nপাওয়া টাকা: " + money : ""}\nনিশ্চিত?`)) return;
     const ccSel = document.getElementById("bilAgCC");
-    try{ await billingAdminFn({ action:"agentStock", agentUid: id, country: ccSel ? ccSel.value : cc, credit: v.credit, subs: v.subs, money, note }); await bilLoadAgents(); bilLoadReport(); }
+    try{ await billingAdminFn({ action:"agentStock", agentUid: id, country: ccSel ? ccSel.value : cc, credit: v.credit, subs: v.subs, subsRider: v.subsRider, money, note }); await bilLoadAgents(); bilLoadReport(); }
     catch(e){ alert("⚠️ " + (e.message || e)); }
   };
   document.getElementById("bilAgGo").onclick = ()=> send(false);

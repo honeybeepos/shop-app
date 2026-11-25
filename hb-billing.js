@@ -149,10 +149,12 @@
         ${st.subOnly ? "" : `<div class="hbbS ${st.credit <= 0 ? "bad" : "ok"}"><small>বাকি ক্রেডিট</small><b>${bn(r2(st.credit))}</b></div>`}
         <div class="hbbS ${st.subActive ? "ok" : "bad"}"${st.subOnly ? ' style="grid-column:1 / -1;"' : ""}><small>📅 সাবস্ক্রিপশন</small><b style="font-size:${st.subActive ? 14 : 16}px;">${st.subActive ? until + "<br><small>" + bn(days) + " দিন বাকি</small>" : "নেই"}</b></div>
       </div>
-      ${st.on && (st.type === "driver" || st.type === "tailor") ? `<div class="hbbCard"><b class="t">📋 নিয়ম</b>
+      ${st.on && (st.type === "driver" || st.type === "tailor" || st.type === "rider") ? `<div class="hbbCard"><b class="t">📋 নিয়ম</b>
         ${st.type === "tailor"
           ? "🧵 সাবস্ক্রিপশন চালু থাকলে Honey Bee Bazar-এ আপনার ডিজাইন, নম্বর আর অনলাইন অর্ডার গ্রাহকরা দেখবেন। নিজের খাতা আর মাপ সবসময় ফ্রি।" + (st.subActive ? "" : "<br><b style='color:#b42318'>🔴 এখন সাবস্ক্রিপশন নেই — বাজারে আপনার ডিজাইন দেখা যাচ্ছে না।</b>")
-          : "🚑 সাবস্ক্রিপশন চালু থাকলে অনলাইন হয়ে যাত্রীর ডাক পাবেন — প্রতি ট্রিপে কিছু কাটে না।"}<br>
+          : st.type === "rider"
+            ? "🛵 ডেলিভারি সবসময় ফ্রি। যাত্রী ট্রিপ ও কাছের যাত্রী নিতে চাইলে এই সাবস্ক্রিপশন লাগবে — প্রতি ট্রিপে কিছু কাটে না।"
+            : "🚑 সাবস্ক্রিপশন চালু থাকলে অনলাইন হয়ে যাত্রীর ডাক পাবেন — প্রতি ট্রিপে কিছু কাটে না।"}<br>
         📅 ${[1,3,6,12].map(m=> bn(m) + " মাস " + bn((p.sub || {})["m"+m] || 0) + " " + cur).join(" · ")}</div>`
       : st.on ? `<div class="hbbCard"><b class="t">📋 কীভাবে কাটে</b>
         🧾 দোকানে প্রতি বিক্রিতে: <b>${bn(p.perSale)} ক্রেডিট</b>${st.subActive ? " — <b style='color:#11734b'>এখন ফ্রি (সাবস্ক্রিপশন চালু)</b>" : ""}<br>

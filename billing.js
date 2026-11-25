@@ -28,12 +28,15 @@ const crypto = require("crypto");
 
 module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, HttpsError, onDocumentCreated, onDocumentWritten }) {
 
-  const TYPES = ["shop", "pharmacy", "tailor", "restaurant", "driver"];
-  const TYPE_BN = { shop: "দোকান", pharmacy: "ফার্মেসি", tailor: "সেলাই ঘর", restaurant: "রেস্টুরেন্ট", driver: "ট্রান্সপোর্ট" };
+  const TYPES = ["shop", "pharmacy", "tailor", "restaurant", "driver", "rider"];
+  const TYPE_BN = { shop: "দোকান", pharmacy: "ফার্মেসি", tailor: "সেলাই ঘর", restaurant: "রেস্টুরেন্ট", driver: "ট্রান্সপোর্ট", rider: "যাত্রী ট্রিপ (রাইডার)" };
   const COUNTRIES = ["BD", "SA"];
   const MONTHS = [1, 3, 6, 12];
-  const SUB_ONLY = ["driver", "tailor"]; // 🚑🧵 শুধু সাবস্ক্রিপশন — প্রতি কাজে ক্রেডিট কাটে না
+  const SUB_ONLY = ["driver", "tailor", "rider"]; // 🚑🧵 শুধু সাবস্ক্রিপশন — প্রতি কাজে ক্রেডিট কাটে না
   const mk = (m) => "m" + m;
+  // 🛵 রাইডারের যাত্রী-ট্রিপ সাবস্ক্রিপশনের নিজস্ব দাম (subRider/agentSubRider) ও নিজস্ব স্টক (subsRider)
+  const poolOf = (type) => (type === "rider" ? "subsRider" : "subs");
+  const poolFromKey = (k) => (k && k.pool === "rider" ? "subsRider" : "subs");
 
   function defaults() {
     const types = {}; TYPES.forEach((t) => { types[t] = false; });
@@ -41,8 +44,8 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
       enabled: false, // 🔒 মূল সুইচ
       types,
       prices: {
-        BD: { perSale: 0.25, orderFee: 2, sub: { m1: 100, m3: 280, m6: 500, m12: 900 }, agentSub: { m1: 80, m3: 230, m6: 420, m12: 750 }, agentCreditPct: 90 },
-        SA: { perSale: 0.05, orderFee: 0.5, sub: { m1: 10, m3: 28, m6: 50, m12: 90 }, agentSub: { m1: 8, m3: 23, m6: 42, m12: 75 }, agentCreditPct: 90 },
+        BD: { perSale: 0.25, orderFee: 2, sub: { m1: 100, m3: 280, m6: 500, m12: 900 }, agentSub: { m1: 80, m3: 230, m6: 420, m12: 750 }, subRider: { m1: 100, m3: 280, m6: 500, m12: 900 }, agentSubRider: { m1: 80, m3: 230, m6: 420, m12: 750 }, agentCreditPct: 90 },
+        SA: { perSale: 0.05, orderFee: 0.5, sub: { m1: 10, m3: 28, m6: 50, m12: 90 }, agentSub: { m1: 8, m3: 23, m6: 42, m12: 75 }, subRider: { m1: 10, m3: 28, m6: 50, m12: 90 }, agentSubRider: { m1: 8, m3: 23, m6: 42, m12: 75 }, agentCreditPct: 90 },
       },
       gift: { on: false, credit: { BD: 50, SA: 5 }, dailyMax: 20 },
       pay: { bkash: "", bkashType: "personal", nagad: "", rocket: "", saMethod: "", saNumber: "", note: "" },
@@ -93,6 +96,9 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
         o.sub[mk(m)] = num(((src.sub || {})[mk(m)]) ?? o.sub[mk(m)], 0, 1000000, `${m} মাসের দাম`);
         o.agentSub[mk(m)] = num(((src.agentSub || {})[mk(m)]) ?? o.agentSub[mk(m)], 0, 1000000, `${m} মাসের এজেন্ট দাম`);
         if (o.agentSub[mk(m)] > o.sub[mk(m)]) throw new HttpsError("invalid-argument", `${m} মাস: এজেন্টের দাম খুচরা দামের চেয়ে বেশি হতে পারে না`);
+        o.subRider[mk(m)] = num(((src.subRider || {})[mk(m)]) ?? o.subRider[mk(m)], 0, 1000000, `যাত্রী ট্রিপ ${m} মাসের দাম`);
+        o.agentSubRider[mk(m)] = num(((src.agentSubRider || {})[mk(m)]) ?? o.agentSubRider[mk(m)], 0, 1000000, `যাত্রী ট্রিপ ${m} মাসের এজেন্ট দাম`);
+        if (o.agentSubRider[mk(m)] > o.subRider[mk(m)]) throw new HttpsError("invalid-argument", `যাত্রী ট্রিপ ${m} মাস: এজেন্টের দাম খুচরা দামের চেয়ে বেশি হতে পারে না`);
       });
     });
     const g = c.gift || {};
@@ -118,7 +124,7 @@ module.exports = function makeBilling({ db, FieldValue, Timestamp, onCall, Https
 
   /* ---------- ব্যবসা চেনা ---------- */
   // 🛵 riders — ডেলিভারি রাইডার যাত্রী ট্রিপ নিতে চাইলে চালকের মতোই (type "driver") সাবস্ক্রিপশন লাগে; ডেলিভারি সবসময় ফ্রি
-const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", "tailor"], ["transportDrivers", "driver"], ["riders", "driver"]];
+const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", "tailor"], ["transportDrivers", "driver"], ["riders", "rider"]];
   async function findBiz(bizId, tx) {
     for (const [col, type] of BIZ_COLS) {
       const ref = db.collection(col).doc(bizId);
@@ -347,10 +353,11 @@ const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", 
       if (!a.exists) throw new HttpsError("not-found", "এজেন্ট পাওয়া যায়নি");
       const credit = num(d.credit || 0, -1000000, 1000000, "ক্রেডিট");
       const subs = {}; MONTHS.forEach((m) => { subs[mk(m)] = Math.round(num((d.subs || {})[mk(m)] || 0, -10000, 10000, `${m} মাস`)); });
+      const subsR = {}; MONTHS.forEach((m) => { subsR[mk(m)] = Math.round(num((d.subsRider || {})[mk(m)] || 0, -10000, 10000, `যাত্রী ট্রিপ ${m} মাস`)); });
       const money = num(d.money || 0, 0, 100000000, "পাওয়া টাকা");
       const note = s(d.note, 200);
-      const anyNeg = credit < 0 || MONTHS.some((m) => subs[mk(m)] < 0);
-      if (!credit && MONTHS.every((m) => !subs[mk(m)])) throw new HttpsError("invalid-argument", "কিছু দিন — ক্রেডিট বা সাবস্ক্রিপশন");
+      const anyNeg = credit < 0 || MONTHS.some((m) => subs[mk(m)] < 0 || subsR[mk(m)] < 0);
+      if (!credit && MONTHS.every((m) => !subs[mk(m)] && !subsR[mk(m)])) throw new HttpsError("invalid-argument", "কিছু দিন — ক্রেডিট বা সাবস্ক্রিপশন");
       if (anyNeg && note.length < 3) throw new HttpsError("invalid-argument", "কমানোর কারণ লিখুন");
       const cc = d.country === "SA" ? "SA" : "BD";
       const ref = db.collection("agentStock").doc(agentUid);
@@ -361,18 +368,20 @@ const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", 
         if (nextCredit < 0) throw new HttpsError("failed-precondition", "এজেন্টের ক্রেডিট মাইনাস হয়ে যাবে");
         const nextSubs = {};
         MONTHS.forEach((m) => { nextSubs[mk(m)] = Math.round(Number(((cur.subs || {})[mk(m)]) || 0) + subs[mk(m)]); if (nextSubs[mk(m)] < 0) throw new HttpsError("failed-precondition", `${m} মাসের স্টক মাইনাস হয়ে যাবে`); });
+        const nextSubsR = {};
+        MONTHS.forEach((m) => { nextSubsR[mk(m)] = Math.round(Number(((cur.subsRider || {})[mk(m)]) || 0) + subsR[mk(m)]); if (nextSubsR[mk(m)] < 0) throw new HttpsError("failed-precondition", `যাত্রী ট্রিপ ${m} মাসের স্টক মাইনাস হয়ে যাবে`); });
         const now = FieldValue.serverTimestamp();
-        t.set(ref, { agentUid, name: a.data().name || "", country: cur.country || cc, credit: nextCredit, subs: nextSubs, updatedAt: now,
+        t.set(ref, { agentUid, name: a.data().name || "", country: cur.country || cc, credit: nextCredit, subs: nextSubs, subsRider: nextSubsR, updatedAt: now,
           totals: { money: FieldValue.increment(money), creditIn: FieldValue.increment(credit) } }, { merge: true });
-        t.set(ref.collection("ledger").doc(), { kind: "stock", credit, subs, money, note, byUid: me.uid, byName: me.name, creditAfter: nextCredit, subsAfter: nextSubs, at: now });
+        t.set(ref.collection("ledger").doc(), { kind: "stock", credit, subs, subsRider: subsR, money, note, byUid: me.uid, byName: me.name, creditAfter: nextCredit, subsAfter: nextSubs, subsRiderAfter: nextSubsR, at: now });
         const inc = { day: dayKey(), updatedAt: now, [cc]: {} };
         if (money) { inc[cc].income = FieldValue.increment(money); inc[cc].agentPays = FieldValue.increment(1); }
         if (credit) inc[cc].stockCredit = FieldValue.increment(credit);
-        MONTHS.forEach((m) => { if (subs[mk(m)]) inc[cc]["stockSub" + m] = FieldValue.increment(subs[mk(m)]); });
+        MONTHS.forEach((m) => { if (subs[mk(m)]) inc[cc]["stockSub" + m] = FieldValue.increment(subs[mk(m)]); if (subsR[mk(m)]) inc[cc]["stockSubRider" + m] = FieldValue.increment(subsR[mk(m)]); });
         t.set(db.collection("billingDaily").doc(dayKey()), inc, { merge: true });
-        return { credit: nextCredit, subs: nextSubs };
+        return { credit: nextCredit, subs: nextSubs, subsRider: nextSubsR };
       });
-      await audit("agentStock", { agentUid, credit, subs, money, note });
+      await audit("agentStock", { agentUid, credit, subs, subsRider: subsR, money, note });
       return Object.assign({ ok: true }, res);
     }
     throw new HttpsError("invalid-argument", "অজানা কাজ");
@@ -388,19 +397,21 @@ const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", 
     const amount = kind === "credit" ? num(d.amount, 1, 100000, "ক্রেডিট") : 0;
     const sref = db.collection("agentStock").doc(agent.uid);
     const code = mode === "key" ? newKey() : null;
+    // 🛵 রাইডারের যাত্রী-ট্রিপ সাবস্ক্রিপশন আলাদা স্টক থেকে কাটে (আলাদা দামে কেনা)
+    const pool = biz ? poolOf(biz.type) : (d.pool === "rider" ? "subsRider" : "subs");
     const out = await db.runTransaction(async (t) => {
       const st = await t.get(sref);
       const cur = st.exists ? st.data() : {};
       let ctx = null;
       if (mode === "give") ctx = await readBiz(t, biz.id);
       if (kind === "credit" && r2(cur.credit) < amount) throw new HttpsError("failed-precondition", `আপনার ক্রেডিট স্টক যথেষ্ট নেই (আছে ${r2(cur.credit)})`);
-      if (kind === "sub" && Number(((cur.subs || {})[mk(months)]) || 0) < 1) throw new HttpsError("failed-precondition", `আপনার কাছে ${months} মাসের সাবস্ক্রিপশন স্টক নেই`);
+      if (kind === "sub" && Number(((cur[pool] || {})[mk(months)]) || 0) < 1) throw new HttpsError("failed-precondition", `আপনার কাছে ${pool === "subsRider" ? "যাত্রী ট্রিপের " : ""}${months} মাসের সাবস্ক্রিপশন স্টক নেই`);
       const now = FieldValue.serverTimestamp();
       const upd = { updatedAt: now };
       if (kind === "credit") upd.credit = r2(r2(cur.credit) - amount);
-      else upd.subs = Object.assign({}, cur.subs || {}, { [mk(months)]: Number(cur.subs[mk(months)]) - 1 });
+      else upd[pool] = Object.assign({}, cur[pool] || {}, { [mk(months)]: Number(cur[pool][mk(months)]) - 1 });
       t.set(sref, upd, { merge: true });
-      const what = kind === "credit" ? { amount } : { months };
+      const what = kind === "credit" ? { amount } : (pool === "subsRider" ? { months, pool: "rider" } : { months });
       let res = {};
       if (mode === "give") {
         res = writeBiz(t, ctx, Object.assign({ bizId: biz.id, bizType: biz.type, country: biz.country, name: biz.name, agentUid: agent.uid,
@@ -414,7 +425,7 @@ const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", 
         t.set(sref.collection("ledger").doc(), Object.assign({ kind: "key", keyId: keyRef.id, last4: code.slice(-4), at: now }, what));
         res = { keyId: keyRef.id };
       }
-      return Object.assign(res, { stockCredit: upd.credit ?? r2(cur.credit), stockSubs: upd.subs || cur.subs || {} });
+      return Object.assign(res, { stockCredit: upd.credit ?? r2(cur.credit), stockSubs: upd.subs || cur.subs || {}, stockSubsRider: upd.subsRider || cur.subsRider || {} });
     });
     return Object.assign({ ok: true, code }, out);
   }
@@ -442,7 +453,7 @@ const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", 
       lists[1].docs.forEach((x) => push("transportDrivers", "driver", x));
       if (lists[2]) lists[2].docs.forEach((x) => push("restaurants", "restaurant", x));
       if (lists[3]) lists[3].docs.forEach((x) => push("tailors", "tailor", x));
-      if (lists[4]) lists[4].docs.forEach((x) => push("riders", "driver", x));
+      if (lists[4]) lists[4].docs.forEach((x) => push("riders", "rider", x));
       const bills = items.length ? await db.getAll(...items.map((i) => db.collection("billing").doc(i.id))) : [];
       const now = Date.now();
       items.forEach((i, n) => {
@@ -478,7 +489,7 @@ const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", 
         const now = FieldValue.serverTimestamp();
         t.update(lref, { status: "void", voidAt: now });
         t.update(kref, { status: "void", voidAt: now });
-        if (kd.months) t.set(sref, { subs: Object.assign({}, cur.subs || {}, { [mk(kd.months)]: Number(((cur.subs || {})[mk(kd.months)]) || 0) + 1 }), updatedAt: now }, { merge: true });
+        if (kd.months) { const pk = poolFromKey(kd); t.set(sref, { [pk]: Object.assign({}, cur[pk] || {}, { [mk(kd.months)]: Number(((cur[pk] || {})[mk(kd.months)]) || 0) + 1 }), updatedAt: now }, { merge: true }); }
         else t.set(sref, { credit: r2(r2(cur.credit) + r2(kd.amount)), updatedAt: now }, { merge: true });
         t.set(sref.collection("ledger").doc(), { kind: "void", keyId, last4: String(kd.code).slice(-4), amount: kd.amount || null, months: kd.months || null, at: now });
         return { ok: true };
@@ -527,7 +538,7 @@ const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", 
         ok: true, on, giftOn: on && cfg.gift.on && !SUB_ONLY.includes(biz.type), subOnly: SUB_ONLY.includes(biz.type), justGifted, bizId, type: biz.type, country: biz.country,
         credit: r2(x.credit), giftCredit: r2(x.giftCredit), giftGiven: !!x.giftGiven,
         subUntil: tsMs(x.sub && x.sub.until) || null, subActive: subActive(x),
-        prices: { perSale: pr.perSale, orderFee: pr.orderFee, sub: pr.sub }, agent,
+        prices: { perSale: pr.perSale, orderFee: pr.orderFee, sub: biz.type === "rider" ? pr.subRider : pr.sub }, agent,
         onlineOrdersOff: biz.onlineOrdersOff,
       };
     }
@@ -551,6 +562,7 @@ const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", 
         const k = l.data();
         if (k.bizId && k.bizId !== bizId) return { other: true };
         if ((k.country || "BD") !== biz.country) return { country: true };
+        if (k.months && (k.pool === "rider") !== (biz.type === "rider")) return { pool: k.pool === "rider" };
         const ctx = await readBiz(t, bizId);
         const kref = db.collection("agentStock").doc(k.agentUid).collection("keys").doc(k.agentKeyId);
         const r = writeBiz(t, ctx, Object.assign({ bizId, bizType: biz.type, country: biz.country, name: biz.name, agentUid: k.agentUid,
@@ -564,6 +576,7 @@ const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", 
       if (res.bad) return bad();
       if (res.other) throw new HttpsError("permission-denied", "এই কি অন্য একটা ব্যবসার জন্য বানানো");
       if (res.country) throw new HttpsError("failed-precondition", "এই কি অন্য দেশের জন্য");
+      if (res.pool !== undefined) throw new HttpsError("failed-precondition", res.pool ? "এই কি শুধু রাইডারের যাত্রী-ট্রিপ সাবস্ক্রিপশনের জন্য" : "এই কি রাইডারের যাত্রী-ট্রিপের জন্য নয়");
       return res;
     }
     throw new HttpsError("invalid-argument", "অজানা কাজ");
@@ -740,9 +753,19 @@ const BIZ_COLS = [["shops", "shop"], ["restaurants", "restaurant"], ["tailors", 
     return ok;
   }
 
+  /* 🛵 রাইডারের যাত্রী ট্রিপ — "যাত্রী ট্রিপ (রাইডার)" টিক চালু থাকলে সাবস্ক্রিপশনহীন রাইডার যাত্রীর ডাক পায় না। */
+  async function ridersWithSub(ids) {
+    const cfg = await getConfig();
+    if (!feeOn(cfg, "rider") || !ids.length) return null;
+    const snaps = await db.getAll(...ids.map((id) => db.collection("billing").doc(id)));
+    const ok = new Set();
+    snaps.forEach((d, i) => { if (d.exists && subActive(d.data())) ok.add(ids[i]); });
+    return ok;
+  }
+
   return {
     exports: { billingAdmin, billingAgent, billingShop, billingOnSale, billingOnRestBill: billingOnRestaurantBill, billingOnOrderCreated, orderAccept },
-    maskOnRelease, driversWithSub,
+    maskOnRelease, driversWithSub, ridersWithSub,
     _test: { billingApply, getConfig, cleanConfig, defaults, chargeSale, newKey, normKey, sha, maskPhones },
   };
 };
