@@ -2257,8 +2257,15 @@ exports.adminResetPassword = onCall(async (request) => {
     }
 
     const superAdminDoc = await db.collection("superadmins").doc(callerUid).get();
-    if (!superAdminDoc.exists) {
-      throw new HttpsError("permission-denied", "শুধু সুপার অ্যাডমিন এই কাজ করতে পারবেন।");
+    const isSuper = superAdminDoc.exists;
+    // 🧑‍💼 সুপার এডমিন না হলে — শুধু সক্রিয় এজেন্ট, এবং শুধু নিজের অধীনের রাইডার/ড্রাইভার/রেস্টুরেন্ট/সেলাই ঘরের জন্য
+    let agentDoc = null;
+    if (!isSuper) {
+      const ad = await db.collection("agents").doc(callerUid).get();
+      if (!ad.exists || (ad.data().status && ad.data().status !== "active")) {
+        throw new HttpsError("permission-denied", "শুধু সুপার অ্যাডমিন বা এজেন্ট এই কাজ করতে পারবেন।");
+      }
+      agentDoc = ad.data();
     }
 
     const { targetUid, accountType, newPassword } = request.data || {};
@@ -2287,6 +2294,18 @@ exports.adminResetPassword = onCall(async (request) => {
       throw new HttpsError("not-found", "এই একাউন্ট খুঁজে পাওয়া যায়নি।");
     }
 
+    // 🧑‍💼 এজেন্ট: নিজের অধীনের (assignedAgentId, না থাকলে একই বাজারের) রাইডার/ড্রাইভার/রেস্টুরেন্ট/সেলাই ঘর ছাড়া কারো না
+    if (!isSuper) {
+      if (!["rider", "transport_driver", "restaurant", "tailor"].includes(accountType)) {
+        throw new HttpsError("permission-denied", "এজেন্ট শুধু রাইডার, ড্রাইভার, রেস্টুরেন্ট আর সেলাই ঘরের পাসওয়ার্ড বদলাতে পারেন।");
+      }
+      const t = snap.data() || {};
+      const mine = t.assignedAgentId === callerUid || (!t.assignedAgentId && t.marketId && t.marketId === agentDoc.marketId);
+      if (!mine) {
+        throw new HttpsError("permission-denied", "এই একাউন্ট আপনার অধীনে নয়।");
+      }
+    }
+
     // দোকানের ক্ষেত্রে মালিকের uid আলাদা হতে পারে
     const authUid = (col === "shops" && snap.data().ownerUid) ? snap.data().ownerUid : targetUid;
 
@@ -2296,6 +2315,7 @@ exports.adminResetPassword = onCall(async (request) => {
     // কোথাও লেখা হয় না, শুধু ঘটনাটা লেখা হয়।
     await db.collection("adminAudit").add({
       action: "resetPassword",
+      byRole: isSuper ? "superadmin" : "agent",
       byUid: callerUid,
       targetUid: authUid,
       accountType,
