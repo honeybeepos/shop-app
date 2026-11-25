@@ -1243,9 +1243,15 @@ window.hbLoadLib = function(name){
       </div>
     </div>
     <div id="rmTripChatMessages" style="flex:1; overflow-y:auto; padding:16px 14px;"></div>
-    <div style="display:flex; gap:8px; padding:12px 14px; border-top:1px solid rgba(255,193,7,0.25); flex-shrink:0;">
+    <div id="rmTripChatInputRow" style="display:flex; gap:8px; padding:12px 14px; border-top:1px solid rgba(255,193,7,0.25); flex-shrink:0;">
       <input type="text" id="rmTripChatInput" placeholder="মেসেজ লিখুন..." style="flex:1; padding:11px; border-radius:20px; border:1px solid rgba(255,193,7,0.3); background:rgba(255,255,255,0.06); color:#fff; font-family:inherit; font-size:13.5px;">
+      <button id="rmTripChatMicBtn" title="ভয়েস মেসেজ" style="width:42px; height:42px; border-radius:50%; border:none; background:#34d399; color:#05261a; font-size:18px; cursor:pointer; font-family:inherit; flex-shrink:0;">🎤</button>
       <button id="rmTripChatSendBtn" style="width:42px; height:42px; border-radius:50%; border:none; background:#FFC107; color:#1a1a1a; font-size:16px; cursor:pointer; font-family:inherit; flex-shrink:0;">➤</button>
+    </div>
+    <div id="rmTripChatRecBar" style="display:none; align-items:center; gap:10px; padding:12px 14px; border-top:1px solid rgba(255,193,7,0.25); flex-shrink:0;">
+      <button id="rmTripChatRecCancel" style="width:42px; height:42px; border-radius:50%; border:none; background:rgba(255,255,255,0.1); color:#fff; font-size:16px; cursor:pointer; flex-shrink:0;">✕</button>
+      <div style="flex:1; color:#fff; font-size:14px; font-weight:700;">🔴 রেকর্ড হচ্ছে… <span id="rmTripChatRecTime">০:০০ / ১:০০</span></div>
+      <button id="rmTripChatRecSend" style="width:42px; height:42px; border-radius:50%; border:none; background:#FFC107; color:#1a1a1a; font-size:16px; cursor:pointer; flex-shrink:0;">➤</button>
     </div>
   </div>
 
@@ -24056,38 +24062,104 @@ function rmOpenTripChat(tripId, trip){
 function rmCloseTripChat(){
   const ov = document.getElementById("rmTripChatOverlay");
   if(ov) ov.style.display = "none";
+  if(typeof rmVcStop === "function") rmVcStop(false); // 🎤 চলতে থাকা রেকর্ডিং বাতিল
   if(rmTripChatUnsub){ rmTripChatUnsub(); rmTripChatUnsub = null; }
   rmTripChatTripId = null;
+}
+
+// 🎤 ভয়েস মেসেজ প্লেয়ারসহ দেখানো হয় (শুধু নিরাপদ data:audio লিংক), নাহলে সাধারণ লেখা
+function rmChatBody(m){
+  if(rmVcSafe(m.audio)){
+    return `<audio controls preload="metadata" src="${m.audio}" style="width:100%; min-width:200px; max-width:240px; height:38px;"></audio><div style="font-size:11px; margin-top:2px;">🎤 ভয়েস মেসেজ${m.audioSec ? " · " + rmVcFmt(Number(m.audioSec)||0) : ""}</div>`;
+  }
+  return `<div style="font-size:14px; word-wrap:break-word; white-space:pre-wrap;">${escapeHtml(m.text||"")}</div>`;
+}
+
+/* 💬 চ্যাটের বুদবুদ — পাশ ঠিক হয় senderRole দিয়ে (একই অ্যাকাউন্টে দুই দিক পরীক্ষা করলেও ঠিক থাকে):
+   ড্রাইভার (আমি) = সোনালি, ডানে; যাত্রী = ধূসর, বামে। */
+function rmChatBubble(id, m){
+  const role = m.senderRole || (m.senderId === rmCurrentRider.uid ? "driver" : "passenger");
+  const mine = role === "driver";
+  const time = m.sentAt && m.sentAt.toDate ? m.sentAt.toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'}) : "";
+  const bg = mine ? "background:#FFC107; color:#1a1a1a; border-bottom-right-radius:4px;" : "background:rgba(255,255,255,0.1); color:#fff; border-bottom-left-radius:4px;";
+  const tag = mine ? "🚕 ড্রাইভার" : "👤 যাত্রী";
+  return `<div data-mid="${id}" style="display:flex; justify-content:${mine ? "flex-end" : "flex-start"}; margin-bottom:10px;">
+    <div style="max-width:80%; padding:8px 12px 7px; border-radius:14px; ${bg}">
+      <div style="font-size:10.5px; font-weight:800; opacity:0.75; margin-bottom:3px;">${tag}</div>
+      ${rmChatBody(m)}
+      <div class="rmVcTime" style="font-size:9.5px; opacity:0.7; margin-top:3px; text-align:right;">${time}</div>
+    </div></div>`;
 }
 
 function rmRenderTripChatMessages(qs){
   const el = document.getElementById("rmTripChatMessages");
   if(qs.empty){
-    el.innerHTML = '<div style="text-align:center; color:#a8a8a8; font-size:12px; margin-top:20px;">এখনো কোনো মেসেজ নেই — যাত্রীকে কিছু লিখুন।</div>';
+    el.innerHTML = '<div data-empty="1" style="text-align:center; color:#a8a8a8; font-size:12px; margin-top:20px; line-height:1.7;">এখনো কোনো মেসেজ নেই — যাত্রীকে কিছু লিখুন।<br>🎤 লিখতে না চাইলে সবুজ মাইক চেপে কথা বলুন।</div>';
     return;
   }
-  el.innerHTML = qs.docs.map(d=>{
+  if(el.querySelector("[data-empty]") || !el.querySelector("[data-mid]")) el.innerHTML = "";
+  const have = {}; el.querySelectorAll("[data-mid]").forEach(x=>{ have[x.dataset.mid] = x; });
+  // নতুন মেসেজই শুধু যোগ হয় — চলতে থাকা ভয়েস প্লেয়ার মাঝপথে থেমে যায় না
+  qs.docs.forEach(d=>{
     const m = d.data();
-    const mine = m.senderId === rmCurrentRider.uid;
-    const time = m.sentAt ? m.sentAt.toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'}) : "";
-    return `
-      <div style="display:flex; justify-content:${mine ? "flex-end" : "flex-start"}; margin-bottom:8px;">
-        <div style="max-width:75%; padding:9px 13px; border-radius:14px; ${mine ? "background:#FFC107; color:#1a1a1a; border-bottom-right-radius:4px;" : "background:rgba(255,255,255,0.08); color:#fff; border-bottom-left-radius:4px;"}">
-          ${rmChatBody(m)}
-          <div style="font-size:9.5px; opacity:0.7; margin-top:3px; text-align:right;">${time}</div>
-        </div>
-      </div>`;
-  }).join("");
+    if(have[d.id]){
+      const t = have[d.id].querySelector(".rmVcTime");
+      if(t && !t.textContent && m.sentAt && m.sentAt.toDate) t.textContent = m.sentAt.toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'});
+    }else el.insertAdjacentHTML("beforeend", rmChatBubble(d.id, m));
+  });
   el.scrollTop = el.scrollHeight;
 }
 
-// 🎤 যাত্রী ভয়েস মেসেজ পাঠালে সেটা প্লেয়ারসহ দেখানো হয় (শুধু নিরাপদ data:audio লিংক)
-function rmChatBody(m){
-  const ok = typeof m.audio === "string" && m.audio.length < 900000 && /^data:audio\/[a-z0-9.+-]+(?:;[a-z0-9=.+-]+)*;base64,[a-z0-9+\/=]+$/i.test(m.audio);
-  if(ok){
-    return `<audio controls preload="metadata" src="${m.audio}" style="width:100%; min-width:200px; max-width:240px; height:38px;"></audio><div style="font-size:11px; margin-top:2px;">🎤 ভয়েস মেসেজ${m.audioSec ? " · " + Number(m.audioSec) + "s" : ""}</div>`;
-  }
-  return `<div style="font-size:13.5px; word-wrap:break-word; white-space:pre-wrap;">${escapeHtml(m.text||"")}</div>`;
+// 🎤 ভয়েস মেসেজ — যাত্রীর অ্যাপের মতোই (সর্বোচ্চ ৬০ সেকেন্ড, কম বিটরেট, মেসেজের ভেতরেই থাকে)
+const RM_VC_MAX_SEC = 60;
+let __rmVc = null;
+function rmVcBn(n){ return String(n).replace(/\d/g,d=>"০১২৩৪৫৬৭৮৯"[d]); }
+function rmVcFmt(s){ return rmVcBn(Math.floor(s/60))+":"+rmVcBn(String(s%60).padStart(2,"0")); }
+function rmVcSafe(u){ return typeof u==="string" && u.length<900000 && /^data:audio\/[a-z0-9.+-]+(?:;[a-z0-9=.+-]+)*;base64,[a-z0-9+\/=]+$/i.test(u); }
+async function rmVcStart(ui){
+  if(__rmVc) return;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){ alert("এই ফোনে ভয়েস রেকর্ড করা যাচ্ছে না — লিখে পাঠান।"); return; }
+  let stream;
+  try{ stream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
+  catch(e){ alert("🎤 মাইক্রোফোনের অনুমতি দিন।\nঅ্যাপ/ব্রাউজারের সেটিংসে মাইক চালু করে আবার চেষ্টা করুন।"); return; }
+  const types=["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"];
+  const mt=(MediaRecorder.isTypeSupported ? types.find(t=>MediaRecorder.isTypeSupported(t)) : "")||"";
+  let rec; try{ rec=new MediaRecorder(stream, mt?{mimeType:mt,audioBitsPerSecond:24000}:{audioBitsPerSecond:24000}); }catch(e){ rec=new MediaRecorder(stream); }
+  const st={ rec, stream, chunks:[], t0:Date.now(), send:false, timer:null };
+  __rmVc=st;
+  rec.ondataavailable=e=>{ if(e.data && e.data.size) st.chunks.push(e.data); };
+  rec.onstop=()=>{
+    clearInterval(st.timer); stream.getTracks().forEach(t=>t.stop()); __rmVc=null; ui.onEnd();
+    const sec=Math.round((Date.now()-st.t0)/1000);
+    if(!st.send || !st.chunks.length) return;
+    if(sec<1) return;
+    const blob=new Blob(st.chunks,{ type: rec.mimeType || mt || "audio/webm" });
+    const fr=new FileReader();
+    fr.onload=()=>{ const url=String(fr.result||""); if(!rmVcSafe(url)){ alert("ভয়েস অনেক বড় হয়ে গেছে — ছোট করে আবার বলুন।"); return; } ui.onDone(url,Math.min(sec,RM_VC_MAX_SEC)); };
+    fr.readAsDataURL(blob);
+  };
+  rec.start(); ui.onStart(); ui.onTick(0);
+  st.timer=setInterval(()=>{ const sc=Math.floor((Date.now()-st.t0)/1000); ui.onTick(sc); if(sc>=RM_VC_MAX_SEC) rmVcStop(true); },250);
+}
+function rmVcStop(send){ if(!__rmVc) return; __rmVc.send=!!send; try{ if(__rmVc.rec.state!=="inactive") __rmVc.rec.stop(); }catch(e){} }
+
+async function rmSendTripVoice(url, sec){
+  if(!rmTripChatTripId) return;
+  try{
+    await db.collection("trips").doc(rmTripChatTripId).collection("chat").add({
+      senderId: rmCurrentRider.uid, senderRole: "driver",
+      text: "🎤 ভয়েস মেসেজ", audio: url, audioSec: sec,
+      sentAt: fbNow()
+    });
+  }catch(e){ console.error("rider voice send failed:", e); alert("ভয়েস পাঠানো যায়নি — আবার চেষ্টা করুন।"); }
+}
+function rmVoiceUi(){
+  return {
+    onStart(){ document.getElementById("rmTripChatInputRow").style.display="none"; document.getElementById("rmTripChatRecBar").style.display="flex"; },
+    onTick(sec){ document.getElementById("rmTripChatRecTime").textContent = rmVcFmt(sec) + " / " + rmVcFmt(RM_VC_MAX_SEC); },
+    onEnd(){ document.getElementById("rmTripChatRecBar").style.display="none"; document.getElementById("rmTripChatInputRow").style.display="flex"; },
+    onDone(url, sec){ rmSendTripVoice(url, sec); }
+  };
 }
 
 async function rmSendTripChatMessage(){
@@ -24111,6 +24183,9 @@ async function rmSendTripChatMessage(){
 
 document.getElementById("rmCloseTripChatBtn").addEventListener("click", rmCloseTripChat);
 document.getElementById("rmTripChatSendBtn").addEventListener("click", rmSendTripChatMessage);
+document.getElementById("rmTripChatMicBtn").addEventListener("click", ()=> rmVcStart(rmVoiceUi()));
+document.getElementById("rmTripChatRecSend").addEventListener("click", ()=> rmVcStop(true));
+document.getElementById("rmTripChatRecCancel").addEventListener("click", ()=> rmVcStop(false));
 document.getElementById("rmTripChatInput").addEventListener("keydown", (e)=>{
   if(e.key === "Enter"){ e.preventDefault(); rmSendTripChatMessage(); }
 });
