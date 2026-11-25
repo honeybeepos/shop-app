@@ -3734,8 +3734,10 @@ async function tripBuildQueue(trip, exclude) {
   let list = cands.filter((c) => !ex.has(c.id) && !seen.has(c.id) && seen.add(c.id));
   // 💰 ট্রান্সপোর্টে সাবস্ক্রিপশন চালু থাকলে — সাবস্ক্রিপশন ছাড়া চালক ও রাইডার বাদ (ডেলিভারি সবসময় ফ্রি, শুধু যাত্রী ট্রিপে সাবস্ক্রিপশন লাগে)
   try {
-    const okDrivers = await __billing.driversWithSub(list.map((c) => c.id));
-    if (okDrivers) list = list.filter((c) => okDrivers.has(c.id));
+    const okDrivers = await __billing.driversWithSub(list.filter((c) => c.kind === "driver").map((c) => c.id));
+    if (okDrivers) list = list.filter((c) => c.kind !== "driver" || okDrivers.has(c.id));
+    const okRiders = await __billing.ridersWithSub(list.filter((c) => c.kind === "rider").map((c) => c.id));
+    if (okRiders) list = list.filter((c) => c.kind !== "rider" || okRiders.has(c.id));
   } catch (e) { console.warn("TRIP_QUEUE_SUB_CHECK_FAILED", String(e && e.message || e)); }
   list.forEach((c) => {
     c.km = (hasPickup && c.loc && c.loc.lat != null) ? haversineKm(p.lat, p.lng, c.loc.lat, c.loc.lng) : null;
