@@ -3744,7 +3744,7 @@ async function tripBuildQueue(trip, exclude) {
   const busy = (x) => x.currentStatus === "on_trip" || x.currentStatus === "on_waiting";
   try {
     const rs = await db.collection("riders").where("online", "==", true).get(); // 🔀 ডেলিভারি+যাত্রী এক সাথে
-    rs.docs.forEach((d) => { const r = d.data(); if (r.status && r.status !== "active") return; if (r.passengerOff === true) return; if (busy(r)) return; if (allowedTypes && !allowedTypes.includes(riderTripType(r.vehicleType))) return; cands.push({ id: d.id, kind: "rider", loc: r.liveLocation }); });
+    rs.docs.forEach((d) => { const r = d.data(); if (r.status && r.status !== "active") return; if (r.passengerOff !== false) return; /* 🛵 রাইডার নিজে যাত্রী-রিকোয়েস্ট চালু না করলে (ডিফল্ট বন্ধ) ট্রিপ যায় না */ if (busy(r)) return; if (allowedTypes && !allowedTypes.includes(riderTripType(r.vehicleType))) return; cands.push({ id: d.id, kind: "rider", loc: r.liveLocation }); });
   } catch (e) { console.warn("TRIP_QUEUE_RIDERS_FAILED", String(e && e.message || e)); }
   try {
     const ds = await db.collection("transportDrivers").where("driverStatus", "==", "online").get();
