@@ -675,6 +675,7 @@ function listenRiders(){
           <div class="rowActions" style="margin:-6px 0 10px;">
             <button class="btn small ${toggleClass}" onclick="toggleRiderStatus('${doc.id}','${r.status}')">${toggleLabel}</button>
             <button class="btn small secondary" onclick="resetRiderCash('${doc.id}')">🔄 ক্যাশ রিসেট</button>
+            <button class="btn small secondary" onclick="agentResetPassword('${doc.id}','rider','${escapeHtml(r.name || 'রাইডার').replace(/'/g,"")}')">🔑 পাসওয়ার্ড</button>
             ${verifyBlock(r, 'rider', doc.id, 'রাইডার')}
           </div>`;
       }).join("");
@@ -819,6 +820,7 @@ function listenDrivers(){
           <div class="rowActions" style="margin:-6px 0 10px;">
             <button class="btn small ${toggleClass}" onclick="toggleDriverStatus('${doc.id}','${d.status}')">${toggleLabel}</button>
             ${verifyBlock(d, 'driver', doc.id, 'ড্রাইভার')}
+            ${(isMine || !d.assignedAgentId) ? `<button class="btn small secondary" onclick="agentResetPassword('${doc.id}','transport_driver','${escapeHtml(d.name || 'ড্রাইভার').replace(/'/g,"")}')">🔑 পাসওয়ার্ড</button>` : ""}
           </div>
           <div class="rowActions" style="margin:-6px 0 14px;">
             <button class="btn small ${d.canReceivePassengerRequests ? 'danger' : 'ok'}" onclick="togglePassengerAccess('${doc.id}', ${!!d.canReceivePassengerRequests})">
@@ -1489,6 +1491,19 @@ $("approveVerifyBtn").addEventListener("click", async ()=>{
    • সরাসরি দোকানের আইডিতে দিন (দোকানে গিয়ে বা ফোনে কথা বলে)
    • দূরে থাকলে একবারের "কি" বানিয়ে WhatsApp/SMS-এ পাঠান — লিংকে চাপলে অ্যাপে নিজে বসে যায়
    সব হিসাব সার্ভারে (functions/billing.js → billingAgent)। */
+/* 🔑 এজেন্ট নিজের অধীনের রাইডার/ড্রাইভার/রেস্টুরেন্ট/সেলাই ঘরের পাসওয়ার্ড বদলে দেন (ওরা নিজে পারে না; সার্ভার মিলিয়ে দেখে ওরা আপনার অধীনে কিনা) */
+window.agentResetPassword = async function(uid, accountType, name){
+  const t = { rider:"রাইডার", driver:"ড্রাইভার", transport_driver:"ড্রাইভার", restaurant:"রেস্টুরেন্ট", tailor:"সেলাই ঘর" };
+  const accType = accountType === "driver" ? "transport_driver" : accountType;
+  const pass = prompt(`${t[accountType] || "একাউন্ট"} "${name || ""}" — নতুন পাসওয়ার্ড লিখুন (কমপক্ষে ৬ অক্ষর):`, "");
+  if(pass === null) return;
+  if(String(pass).trim().length < 6){ alert("⚠️ পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।"); return; }
+  if(!confirm(`${name || "এই একাউন্ট"}-এর পাসওয়ার্ড বদলে "${String(pass).trim()}" করবেন?`)) return;
+  try{
+    await firebase.functions().httpsCallable("adminResetPassword")({ targetUid: uid, accountType: accType, newPassword: String(pass).trim() });
+    alert(`✅ পাসওয়ার্ড বদলে গেছে।\n\nনতুন পাসওয়ার্ড: ${String(pass).trim()}\n\nএটা ${name || "তাঁকে"} জানিয়ে দিন। আগের মোবাইল নম্বর আর এই নতুন পাসওয়ার্ড দিয়ে লগইন করবেন।`);
+  }catch(e){ alert("⚠️ পাসওয়ার্ড বদলানো যায়নি — " + (e && e.message ? e.message : e)); }
+};
 const acFn = firebase.functions().httpsCallable("billingAgent");
 const AC_M = [1,3,6,12];
 const AC_BN = "০১২৩৪৫৬৭৮৯";
@@ -1559,10 +1574,11 @@ function acDraw(){
       <div class="acBtns">
         <button class="btn small" data-ac="give" data-id="${acEsc(i.id)}">➕ দিন</button>
         <button class="btn secondary small" data-ac="key" data-id="${acEsc(i.id)}">🔑 কি পাঠান</button>
+        ${(i.type === "restaurant" || i.type === "tailor") ? `<button class="btn secondary small" data-ac="pass" data-id="${acEsc(i.id)}">🔑 পাসওয়ার্ড</button>` : ""}
         ${i.phone ? `<a class="btn secondary small" style="text-decoration:none; text-align:center;" href="${acWa(i.phone, "আসসালামু আলাইকুম, Honey Bee থেকে বলছি — আপনার ক্রেডিট " + acBn(i.credit) + "।")}" target="_blank" rel="noopener">💬</a>` : ""}
       </div></div>`;
   }).join("");
-  $("acList").querySelectorAll("[data-ac]").forEach(b=> b.onclick = ()=> acOpen(acItems.find(x=> x.id === b.dataset.id), b.dataset.ac));
+  $("acList").querySelectorAll("[data-ac]").forEach(b=> b.onclick = ()=>{ const it = acItems.find(x=> x.id === b.dataset.id); if(b.dataset.ac === "pass") agentResetPassword(it.id, it.type, it.name || ""); else acOpen(it, b.dataset.ac); });
 }
 function acIntl(p){ let d = String(p || "").replace(/[০-৯]/g, x=> AC_BN.indexOf(x)).replace(/[^0-9]/g, ""); if(/^01\d{9}$/.test(d)) d = "88" + d; if(/^05\d{8}$/.test(d)) d = "966" + d.slice(1); return d; }
 function acWa(phone, text){ return `https://wa.me/${acIntl(phone)}?text=${encodeURIComponent(text)}`; }
