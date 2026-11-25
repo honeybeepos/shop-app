@@ -99,3 +99,16 @@ const BD_LOCATIONS = {
 };
 
 if (typeof module !== "undefined" && module.exports) module.exports = BD_LOCATIONS;
+
+/* 📱 Android অ্যাপ (Capacitor)-এর ভেতরে খুললে নেটিভ পুশের ফাইল টেনে আনে।
+   ব্রাউজারে/Chrome-এ এটা কিছুই করে না। (এই ফাইল বেশ কয়েকটা পাতা আগে থেকেই লোড করে,
+   তাই পাতাগুলোর HTML না ছুঁয়েই এখান থেকে চালু করা হলো।) */
+(function () {
+  try {
+    var C = window.Capacitor;
+    if (!C || typeof C.isNativePlatform !== "function" || !C.isNativePlatform()) return;
+    var s = document.createElement("script");
+    s.src = "hb-native-push.js";
+    document.head.appendChild(s);
+  } catch (e) {}
+})();
