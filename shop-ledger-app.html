@@ -1487,6 +1487,22 @@ window.hbLoadLib = function(name){
     </div>
   </div>
 
+  <!-- 💬 রাইডার-প্যাসেঞ্জার ইন-অ্যাপ চ্যাট — trips/{tripId}/chat (ড্রাইভার অ্যাপের চ্যাটের মতোই, একই ডেটা-শেপ) -->
+  <div id="rmTripChatOverlay" style="display:none; position:fixed; inset:0; z-index:650; background:#1e1e1e; flex-direction:column;">
+    <div style="display:flex; align-items:center; gap:10px; padding:16px 14px; border-bottom:1px solid rgba(255,193,7,0.25); flex-shrink:0;">
+      <span id="rmCloseTripChatBtn" style="font-size:20px; cursor:pointer; color:#FFC107;">←</span>
+      <div>
+        <h3 style="margin:0; font-size:14.5px; color:#fff;" id="rmTripChatPassengerName">যাত্রী</h3>
+        <div style="font-size:10.5px; color:#a8a8a8;">এই ট্রিপ চলাকালীন চ্যাট</div>
+      </div>
+    </div>
+    <div id="rmTripChatMessages" style="flex:1; overflow-y:auto; padding:16px 14px;"></div>
+    <div style="display:flex; gap:8px; padding:12px 14px; border-top:1px solid rgba(255,193,7,0.25); flex-shrink:0;">
+      <input type="text" id="rmTripChatInput" placeholder="মেসেজ লিখুন..." style="flex:1; padding:11px; border-radius:20px; border:1px solid rgba(255,193,7,0.3); background:rgba(255,255,255,0.06); color:#fff; font-family:inherit; font-size:13.5px;">
+      <button id="rmTripChatSendBtn" style="width:42px; height:42px; border-radius:50%; border:none; background:#FFC107; color:#1a1a1a; font-size:16px; cursor:pointer; font-family:inherit; flex-shrink:0;">➤</button>
+    </div>
+  </div>
+
   <div id="dmDocVerifyOverlay" style="display:none; position:fixed; inset:0; z-index:600; background:#0f2318; overflow-y:auto; padding:16px 14px 90px;">
     <div style="display:flex; align-items:center; margin-bottom:16px;">
       <h3 style="margin:0; font-size:15px; color:#eafff2;">🪪 ডকুমেন্ট ভেরিফিকেশন</h3>
@@ -23927,6 +23943,7 @@ async function rmRenderActiveTripStatus(trip, tripId){
             <button id="rmNavigateBtn" style="flex:1; padding:10px; border:none; border-radius:9px; background:#2563eb; color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">🧭 Navigate</button>
             <button id="rmCallPassengerBtn" style="flex:1; padding:10px; border:none; border-radius:9px; background:#FFC107; color:#1a1a1a; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">📞 Call Passenger</button>
           </div>
+          <button id="rmOpenTripChatBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:rgba(255,255,255,0.08); color:#fff; font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; margin-bottom:8px;">💬 যাত্রীর সাথে চ্যাট</button>
           <button id="rmCompleteTripBtn" style="width:100%; padding:10px; border:none; border-radius:9px; background:#16a34a; color:#fff; font-weight:800; font-size:12.5px; cursor:pointer; font-family:inherit;">✅ ট্রিপ শেষ করুন</button>
         </div>`;
       attachHoldToConfirm(document.getElementById("rmCompleteTripBtn"), ()=> rmCompleteTrip(tripId));
@@ -23939,6 +23956,7 @@ async function rmRenderActiveTripStatus(trip, tripId){
         if(trip.passengerPhone) window.location.href = "tel:" + trip.passengerPhone;
         else alert("যাত্রীর ফোন নম্বর পাওয়া যায়নি।");
       });
+      document.getElementById("rmOpenTripChatBtn").addEventListener("click", ()=> rmOpenTripChat(tripId, trip));
       rmDrawTripRoute(trip);
     }else{
       await rmResetActiveTripStatus();
@@ -24008,10 +24026,85 @@ async function rmCancelWait(tripId){
 async function rmResetActiveTripStatus(){
   if(rmActiveTripUnsub){ rmActiveTripUnsub(); rmActiveTripUnsub = null; }
   if(rmWaitCountdownInterval){ clearInterval(rmWaitCountdownInterval); rmWaitCountdownInterval = null; }
+  rmCloseTripChat(); // 💬 আগের ট্রিপের চ্যাট লিসেনার/স্ক্রিন খোলা থাকলে বন্ধ করা হচ্ছে
   rmCurrentRider.currentStatus = "available"; rmCurrentRider.activeTripId = null;
   try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ currentStatus: "available", activeTripId: null }); }catch(e){}
   document.getElementById("rmTripRequestsList").innerHTML = "এই মুহূর্তে কোনো নতুন ট্রিপ রিকোয়েস্ট নেই।";
 }
+
+/* ==================== 💬 রাইডার-প্যাসেঞ্জার ইন-অ্যাপ চ্যাট ====================
+   trips/{tripId}/chat — ড্রাইভার অ্যাপের (dm) চ্যাটের মতোই, একই ডেটা-শেপ
+   ({senderId, senderRole, text, sentAt}); যাত্রীর অ্যাপের "ড্রাইভারের সাথে চ্যাট"-এর সাথে একই জায়গা। */
+let rmTripChatUnsub = null;
+let rmTripChatTripId = null;
+
+function rmOpenTripChat(tripId, trip){
+  rmTripChatTripId = tripId;
+  document.getElementById("rmTripChatPassengerName").textContent = trip.passengerName || "যাত্রী";
+  document.getElementById("rmTripChatMessages").innerHTML = '<div style="text-align:center; color:#a8a8a8; font-size:12px; margin-top:20px;">লোড হচ্ছে...</div>';
+  document.getElementById("rmTripChatOverlay").style.display = "flex";
+
+  if(rmTripChatUnsub) rmTripChatUnsub();
+  rmTripChatUnsub = db.collection("trips").doc(tripId).collection("chat")
+    .orderBy("sentAt","asc")
+    .onSnapshot((qs)=>{ rmRenderTripChatMessages(qs); }, (err)=>{
+      console.error("rider trip chat listener error:", err);
+      document.getElementById("rmTripChatMessages").innerHTML = '<div style="text-align:center; color:#a8a8a8; font-size:12px; margin-top:20px;">চ্যাট লোড করা যায়নি।</div>';
+    });
+}
+
+function rmCloseTripChat(){
+  const ov = document.getElementById("rmTripChatOverlay");
+  if(ov) ov.style.display = "none";
+  if(rmTripChatUnsub){ rmTripChatUnsub(); rmTripChatUnsub = null; }
+  rmTripChatTripId = null;
+}
+
+function rmRenderTripChatMessages(qs){
+  const el = document.getElementById("rmTripChatMessages");
+  if(qs.empty){
+    el.innerHTML = '<div style="text-align:center; color:#a8a8a8; font-size:12px; margin-top:20px;">এখনো কোনো মেসেজ নেই — যাত্রীকে কিছু লিখুন।</div>';
+    return;
+  }
+  el.innerHTML = qs.docs.map(d=>{
+    const m = d.data();
+    const mine = m.senderId === rmCurrentRider.uid;
+    const time = m.sentAt ? m.sentAt.toDate().toLocaleTimeString('bn-BD', {hour:'2-digit', minute:'2-digit'}) : "";
+    return `
+      <div style="display:flex; justify-content:${mine ? "flex-end" : "flex-start"}; margin-bottom:8px;">
+        <div style="max-width:75%; padding:9px 13px; border-radius:14px; ${mine ? "background:#FFC107; color:#1a1a1a; border-bottom-right-radius:4px;" : "background:rgba(255,255,255,0.08); color:#fff; border-bottom-left-radius:4px;"}">
+          <div style="font-size:13.5px; word-wrap:break-word;">${escapeHtml(m.text||"")}</div>
+          <div style="font-size:9.5px; opacity:0.7; margin-top:3px; text-align:right;">${time}</div>
+        </div>
+      </div>`;
+  }).join("");
+  el.scrollTop = el.scrollHeight;
+}
+
+async function rmSendTripChatMessage(){
+  const input = document.getElementById("rmTripChatInput");
+  const text = input.value.trim();
+  if(!text || !rmTripChatTripId) return;
+  input.value = "";
+  try{
+    await db.collection("trips").doc(rmTripChatTripId).collection("chat").add({
+      senderId: rmCurrentRider.uid,
+      senderRole: "driver",
+      text,
+      sentAt: fbNow()
+    });
+  }catch(e){
+    console.error("rider chat send failed:", e);
+    alert("মেসেজ পাঠানো যায়নি — আবার চেষ্টা করুন।");
+    input.value = text;
+  }
+}
+
+document.getElementById("rmCloseTripChatBtn").addEventListener("click", rmCloseTripChat);
+document.getElementById("rmTripChatSendBtn").addEventListener("click", rmSendTripChatMessage);
+document.getElementById("rmTripChatInput").addEventListener("keydown", (e)=>{
+  if(e.key === "Enter"){ e.preventDefault(); rmSendTripChatMessage(); }
+});
 
 let rmTripRouteMap = null;
 async function rmDrawTripRoute(trip){
