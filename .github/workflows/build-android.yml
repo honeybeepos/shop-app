@@ -1,0 +1,100 @@
+name: Build Android APK
+
+# হাতে চালাতে হয়: GitHub → Actions → "Build Android APK" → Run workflow
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Capacitor প্রজেক্টের ফাইল বানানো
+        run: |
+          mkdir -p native-app/www
+          cd native-app
+          cat > package.json <<'EOF2'
+          {
+            "name": "honey-bee-native",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/android": "^7.0.0",
+              "@capacitor/cli": "^7.0.0",
+              "@capacitor/core": "^7.0.0",
+              "@capacitor/push-notifications": "^7.0.0"
+            }
+          }
+          EOF2
+          cat > capacitor.config.json <<'EOF2'
+          {
+            "appId": "com.honeybeebazar.app",
+            "appName": "Honey Bee Bazar",
+            "webDir": "www",
+            "server": {
+              "url": "https://honeybeebazar.com/honey-bee-bazar.html",
+              "allowNavigation": ["honeybeebazar.com", "*.honeybeebazar.com", "*.firebaseapp.com", "*.googleapis.com", "*.gstatic.com", "accounts.google.com"]
+            }
+          }
+          EOF2
+          cat > www/index.html <<'EOF2'
+          <!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=https://honeybeebazar.com/honey-bee-bazar.html"><title>Honey Bee Bazar</title>
+          EOF2
+
+      - name: Android প্রজেক্ট তৈরি
+        working-directory: native-app
+        run: |
+          npm install
+          npx cap add android
+          cp ../google-services.json android/app/google-services.json
+
+      - name: আইকন, নোটিফিকেশন আইকন আর অনুমতি বসানো
+        working-directory: native-app
+        run: |
+          RES=android/app/src/main/res
+          rm -rf $RES/mipmap-anydpi-v26
+          for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            n=${d%%:*}; s=${d##*:}
+            mkdir -p $RES/mipmap-$n
+            convert ../bazar-icon-512.png -resize ${s}x${s} $RES/mipmap-$n/ic_launcher.png
+            cp $RES/mipmap-$n/ic_launcher.png $RES/mipmap-$n/ic_launcher_round.png
+            rm -f $RES/mipmap-$n/ic_launcher_foreground.png
+          done
+          mkdir -p $RES/drawable
+          cat > $RES/drawable/ic_stat_hb.xml <<'EOF2'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+            <path android:fillColor="#FFFFFFFF" android:pathData="M12,22c1.1,0 2,-0.9 2,-2h-4c0,1.1 0.89,2 2,2zM18,16v-5c0,-3.07 -1.64,-5.64 -4.5,-6.32V4c0,-0.83 -0.67,-1.5 -1.5,-1.5s-1.5,0.67 -1.5,1.5v0.68C7.63,5.36 6,7.92 6,11v5l-2,2v1h16v-1l-2,-2z"/>
+          </vector>
+          EOF2
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#</application>#    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_hb" />\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="hb_default" />\n    </application>#' $M
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />\n</manifest>#' $M
+          cat $M
+
+      - name: APK বানানো
+        working-directory: native-app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: APK ডাউনলোডের লিংক বানানো (Releases)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp native-app/android/app/build/outputs/apk/debug/app-debug.apk honey-bee-bazar.apk
+          gh release create "apk-${{ github.run_number }}" honey-bee-bazar.apk \
+            --title "Android APK #${{ github.run_number }}" \
+            --notes "ফোনে বসানোর APK — নিচের honey-bee-bazar.apk চাপুন।"
