@@ -241,6 +241,19 @@
     return false;
   }
 
+  /* 🛵 ডেলিভারি রাইডার "যাত্রী-রিকোয়েস্ট চালু" করার আগে — সাবস্ক্রিপশন লাগলে আর না থাকলে false (পাতা খুলে দেখায়)। ডেলিভারি সবসময় ফ্রি। */
+  async function canTakePassengers(){
+    try{ await start(); }catch(e){}
+    try{ await refresh(); }catch(e){}
+    if(!st || !st.on || st.type !== "rider" || st.subActive) return true;
+    await open();
+    const box = document.getElementById("hbbBox");
+    if(box){ const n = document.createElement("div"); n.className = "hbbCard"; n.style.cssText = "background:#fde8e4;border-color:#f3b8ad;";
+      n.innerHTML = "🔴 যাত্রী-রিকোয়েস্ট চালু করতে সাবস্ক্রিপশন লাগবে। ডেলিভারি সবসময় ফ্রি — সাবস্ক্রিপশন ছাড়াই চলবে। এজেন্টের কাছ থেকে নিন, বা এজেন্টের পাঠানো কি নিচে বসান।";
+      box.insertBefore(n, box.children[1] || null); }
+    return false;
+  }
+
   function mount(anchor, opt){
     if(!anchor) return;
     addCss();
@@ -252,6 +265,6 @@
     return b;
   }
 
-  window.HBBilling = { mount, open, acceptOrders, hiddenLine, refresh, canGoOnline, state: ()=> st, _whenAuthed: whenAuthed };
+  window.HBBilling = { mount, open, acceptOrders, hiddenLine, refresh, canGoOnline, canTakePassengers, state: ()=> st, _whenAuthed: whenAuthed };
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", whenAuthed); else whenAuthed();
 })();

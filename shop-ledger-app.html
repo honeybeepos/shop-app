@@ -1810,7 +1810,7 @@ window.hbLoadLib = function(name){
 
   <div id="rmPassengerBar" style="margin-bottom:12px;">
     <button type="button" id="rmPassengerToggle" style="width:100%; padding:11px 12px; border-radius:12px; border:1px solid rgba(255,209,102,0.35); background:transparent; color:inherit; font-weight:800; font-size:13px;">🔒 যাত্রী-রিকোয়েস্ট বন্ধ করুন</button>
-    <div id="rmPassengerOffNote" style="display:none; margin-top:8px; font-size:11.5px; color:#a8a8a8;">🔒 যাত্রী-রিকোয়েস্ট বন্ধ আছে — আপনি শুধু ডেলিভারি পাবেন (ডেলিভারির জন্য সাবস্ক্রিপশন লাগে না)।</div>
+    <div id="rmPassengerOffNote" style="display:none; margin-top:8px; font-size:11.5px; color:#a8a8a8;">🔒 যাত্রী-রিকোয়েস্ট বন্ধ আছে — আপনি শুধু ডেলিভারি পাবেন (ডেলিভারির জন্য সাবস্ক্রিপশন লাগে না)। যাত্রীর ট্রিপ নিতে চাইলে ওপরের বাটনে চালু করুন — সাবস্ক্রিপশন লাগলে সেটা দেখাবে।</div>
   </div>
 
   <div class="rmCard" id="rmSubLockCard" style="display:none;">
@@ -24053,7 +24053,8 @@ async function rmTmInitMap(){
 /* ---------- 🔒 যাত্রী-রিকোয়েস্ট বন্ধ/চালু + 📅 সাবস্ক্রিপশন ----------
    ডেলিভারি সবসময় ফ্রি। যাত্রী ট্রিপ (গন্তব্য-ভিত্তিক + কাছের যাত্রী) নিতে চাইলে সাবস্ক্রিপশন লাগে —
    সুপার এডমিন ট্রান্সপোর্টের সাবস্ক্রিপশন চালু রাখলে। বন্ধ রাখলে (passengerOff) যাত্রীর কিছুই আসে না। */
-function rmPassengerOffFlag(){ return !!(rmCurrentRider && rmCurrentRider.passengerOff === true); }
+// ডিফল্টে বন্ধ — শুধু ডেলিভারি চলে। রাইডার নিজে চালু করলে (passengerOff === false) তবেই যাত্রী আসে
+function rmPassengerOffFlag(){ return !(rmCurrentRider && rmCurrentRider.passengerOff === false); }
 function rmSubLocked(){
   try{
     const b = window.HBBilling && HBBilling.state && HBBilling.state();
@@ -24083,6 +24084,11 @@ function rmPassengerUi(){
   if(btn) btn.addEventListener("click", async ()=>{
     if(!rmCurrentRider) return;
     const off = !rmPassengerOffFlag();
+    if(!off){ // চালু করতে চাইলে — সাবস্ক্রিপশন লাগলে আর না থাকলে "আমার হিসাব" পাতা খুলে দেখাবে, চালু হবে না
+      let ok = true;
+      try{ if(window.HBBilling && HBBilling.canTakePassengers) ok = await HBBilling.canTakePassengers(); }catch(e){ ok = true; }
+      if(!ok) return;
+    }
     rmCurrentRider.passengerOff = off;
     try{ await db.collection("riders").doc(rmCurrentRider.uid).update({ passengerOff: off }); }catch(e){ console.warn(e); }
     rmPassengerUi();
