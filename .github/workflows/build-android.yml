@@ -96,12 +96,20 @@ jobs:
         run: |
           mkdir -p ~/.android
           cp hb-debug.keystore ~/.android/debug.keystore
+          # জোর করে এই চাবিই ব্যবহার করানো (ফোল্ডার যেখানেই থাক)
+          sed -i '0,/^android {/s//android {\n    signingConfigs {\n        debug {\n            storeFile file("..\/..\/..\/hb-debug.keystore")\n            storePassword "android"\n            keyAlias "androiddebugkey"\n            keyPassword "android"\n        }\n    }/' native-app/android/app/build.gradle
+          sed -n 1,25p native-app/android/app/build.gradle
 
       - name: APK বানানো
         working-directory: native-app/android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
+
+      - name: APK-র আসল সাইনিং SHA-1 দেখানো
+        run: |
+          echo "আশা করা : DD:89:11:98:B1:76:0F:F1:EC:1F:40:9F:BB:D4:77:38:73:66:6F:B4"
+          keytool -printcert -jarfile native-app/android/app/build/outputs/apk/debug/app-debug.apk | grep -E "SHA1|Owner"
 
       - name: APK ডাউনলোডের লিংক বানানো (Releases)
         env:
