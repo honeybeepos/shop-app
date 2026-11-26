@@ -119,6 +119,19 @@
     onBackgroundMessage: function () { return function () {}; },
     requestPermission: function () { return NotifShim.requestPermission(); }
   };
+  /* ---- ফোনের Back বোতাম ----
+     ওয়েব-ভিউয়ের নিজস্ব হিস্ট্রির উপর ভরসা না করে Back চাপলে পাতার নিজের
+     popstate-লজিক (খোলা পপ-আপ/স্ক্রিন বন্ধ, "← ফিরে যান" বাটন) সরাসরি চালানো হয়।
+     হোমে Back চাপলে অ্যাপ বন্ধ হয় না — পাতা নিজেই ছোট বার্তা দেখায় (Home বোতামে বের হতে হয়)। */
+  var AppP = C.Plugins && C.Plugins.App;
+  if (AppP && AppP.addListener) {
+    AppP.addListener("backButton", function () {
+      var ev;
+      try { ev = new PopStateEvent("popstate", { state: window.history.state }); } catch (e) { ev = new Event("popstate"); }
+      window.dispatchEvent(ev);
+    });
+  }
+
   /* ---- Google লগইন: ওয়েব-ভিউয়ে popup/redirect চলে না (Google 400 দেয়) —
           তাই অ্যাপের ভেতরে নেটিভ Google লগইন চালিয়ে সেই টোকেন Firebase-এ দেওয়া হয়।
           পাতার কোড একই থাকে: auth.signInWithPopup(googleProvider) ডাকলেই এটা চলে। ---- */
