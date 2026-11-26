@@ -48,6 +48,31 @@ const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
+// 🔔 অ্যান্ড্রয়েড অ্যাপ বন্ধ থাকলেও পুশ দেখানোর জন্য — সব send-এ android ব্লক জুড়ে দেয়
+function hbAndroid(m) {
+  if (!m || m.android) return m;
+  const d = m.data || {};
+  const n = m.notification || {};
+  return Object.assign({}, m, {
+    android: {
+      priority: "high",
+      ttl: 3600 * 1000,
+      notification: {
+        title: n.title || d.title || "Honey Bee",
+        body: n.body || d.body || "",
+        channelId: "hb_default",
+        tag: d.tag || undefined,
+      },
+    },
+  });
+}
+function hbMessaging() {
+  const m = getMessaging();
+  return {
+    send: (msg, dry) => m.send(hbAndroid(msg), dry),
+    sendEachForMulticast: (msg, dry) => m.sendEachForMulticast(hbAndroid(msg), dry),
+  };
+}
 const { getAuth } = require("firebase-admin/auth");
 const { getStorage } = require("firebase-admin/storage"); // 🖼️ Step 6 — orphan image cleanup-এর জন্য
 
@@ -179,7 +204,7 @@ async function notifyLegacyDevices(shopId, shopName) {
     tokens,
   };
 
-  const response = await getMessaging().sendEachForMulticast(message);
+  const response = await hbMessaging().sendEachForMulticast(message);
   const deadTokens = [];
   response.responses.forEach((r, idx) => {
     if (!r.success && r.error && r.error.code === "messaging/registration-token-not-registered") {
@@ -202,7 +227,7 @@ async function sendFcmToRider(riderId, title, body, data) {
     const token = riderDoc.exists ? riderDoc.data().fcmToken : null;
     if (!token) return false;
 
-    await getMessaging().send({
+    await hbMessaging().send({
       token,
       notification: { title, body },
       data: Object.assign({ type: "delivery-offer" }, data || {}),
@@ -229,7 +254,7 @@ async function sendFcmToTransportDriver(driverId, title, body, data) {
     const token = driverDoc.exists ? driverDoc.data().fcmToken : null;
     if (!token) return false;
 
-    await getMessaging().send({
+    await hbMessaging().send({
       token,
       notification: { title, body },
       data: Object.assign({ type: "trip-update" }, data || {}),
@@ -252,7 +277,7 @@ async function sendFcmToCustomer(customerUid, title, body, data) {
     const token = custDoc.exists ? custDoc.data().fcmToken : null;
     if (!token) return false;
 
-    await getMessaging().send({
+    await hbMessaging().send({
       token,
       notification: { title, body },
       data: Object.assign({ type: "trip-update" }, data || {}),
@@ -297,7 +322,7 @@ async function sendOrderPushToCustomer(uid, title, body, data) {
     } catch (e) { continue; }
     if (!token) continue;
     try {
-      await getMessaging().send({
+      await hbMessaging().send({
         token,
         notification: { title, body },
         data: Object.assign({ type: "order-status" }, data || {}),
@@ -341,7 +366,7 @@ async function sendFcmToMessengerUser(uid, title, body, data) {
     const token = userDoc.exists ? userDoc.data().fcmToken : null;
     if (!token) return false;
 
-    await getMessaging().send({
+    await hbMessaging().send({
       token,
       notification: { title, body },
       data: Object.assign({ type: "messenger-message" }, data || {}),
@@ -2210,7 +2235,7 @@ exports.notifyRestaurantNewOrder = onDocumentWritten(
       const item = after.productName || "খাবার";
       const qty = Number(after.qty) || 1;
 
-      await getMessaging().send({
+      await hbMessaging().send({
         token,
         notification: {
           title: "🔔 নতুন অর্ডার এসেছে!",
@@ -3486,7 +3511,7 @@ async function tmPush(col, uid, title, body, data, link, withActions) {
     // "✅ গ্রহণ করুন / ❌ বাতিল করুন" বোতামসহ নোটিফিকেশন দেখাতে পারে
     // সবসময় শুধু data পাঠানো হয় — firebase-messaging-sw.js নিজে নোটিফিকেশন দেখায়,
     // তাই ডাবল নোটিফিকেশন হয় না আর চাপ দিলে ঠিক পাতাটাই খোলে
-    await getMessaging().send({
+    await hbMessaging().send({
       token,
       data: Object.assign({}, data, { link, title, body }, withActions ? { actions: "1" } : {}),
       webpush: { headers: { Urgency: "high" } },
@@ -3558,7 +3583,7 @@ async function pushToShop(shopId, payload) {
   const docs = snap.docs.filter((d) => d.data() && d.data().token);
   if (!docs.length) return false;
   const tokens = docs.map((d) => d.data().token);
-  const res = await getMessaging().sendEachForMulticast({
+  const res = await hbMessaging().sendEachForMulticast({
     tokens, data: hubData(Object.assign({ link: SHOP_POS_URL }, payload)), webpush: { headers: { Urgency: "high" } },
   });
   await Promise.all(res.responses.map((r, i) => (!r.success && DEAD_TOKEN(r.error)) ? docs[i].ref.delete().catch(() => {}) : null));
@@ -3569,7 +3594,7 @@ async function pushToRestaurant(rid, payload) {
   const token = snap.exists ? snap.data().fcmToken : null;
   if (!token) return false;
   try {
-    await getMessaging().send({ token, data: hubData(Object.assign({ link: RESTAURANT_POS_URL }, payload)), webpush: { headers: { Urgency: "high" } } });
+    await hbMessaging().send({ token, data: hubData(Object.assign({ link: RESTAURANT_POS_URL }, payload)), webpush: { headers: { Urgency: "high" } } });
     return true;
   } catch (e) {
     if (DEAD_TOKEN(e)) await snap.ref.update({ fcmToken: FieldValue.delete() }).catch(() => {});
@@ -3581,7 +3606,7 @@ async function pushToRiderHub(riderId, payload) {
   const token = snap.exists ? snap.data().fcmToken : null;
   if (!token) return false;
   try {
-    await getMessaging().send({ token, data: hubData(Object.assign({ link: riderAppUrl(snap.data()) }, payload)), webpush: { headers: { Urgency: "high" } } });
+    await hbMessaging().send({ token, data: hubData(Object.assign({ link: riderAppUrl(snap.data()) }, payload)), webpush: { headers: { Urgency: "high" } } });
     return true;
   } catch (e) {
     if (DEAD_TOKEN(e)) await snap.ref.update({ fcmToken: FieldValue.delete() }).catch(() => {});
@@ -3782,7 +3807,7 @@ async function tripPushTurn(tripId, trip, uid, kinds) {
   const token = snap.exists ? snap.data().fcmToken : null;
   if (!token) return false;
   try {
-    await getMessaging().send({ token, data: hubData(Object.assign({ link: tripDriverLink(snap.data().fcmApp) }, payload)), webpush: { headers: { Urgency: "high" } } });
+    await hbMessaging().send({ token, data: hubData(Object.assign({ link: tripDriverLink(snap.data().fcmApp) }, payload)), webpush: { headers: { Urgency: "high" } } });
     return true;
   } catch (e) {
     if (DEAD_TOKEN(e)) await snap.ref.update({ fcmToken: FieldValue.delete() }).catch(() => {});
@@ -3824,7 +3849,7 @@ exports.onWaitingPassengerCreated = onDocumentCreated("passenger_waiting_queue/{
     await Promise.all(cands.map(async (c) => {
       const dist = c.km < 1 ? Math.max(50, Math.round(c.km * 1000 / 50) * 50) + " মিটার" : c.km.toFixed(1) + " কিমি";
       try {
-        await getMessaging().send({
+        await hbMessaging().send({
           token: c.token,
           data: hubData({ type: "waiting-passenger", tag: `waiting-${event.params.pid}`, title: "📡 কাছে যাত্রী অপেক্ষা করছেন", body: `প্রায় ${dist} দূরে একজন যাত্রী রাস্তায় অপেক্ষা করছেন — অ্যাপ খুলে তুলে নিন।`, link: tripDriverLink(c.app) }),
           webpush: { headers: { Urgency: "high" } },
@@ -3924,7 +3949,7 @@ async function pushToTailor(tailorId, payload) {
     const token = snap.exists ? snap.data().token : null;
     if (!token) return false;
     try {
-      await getMessaging().send({ token, data: hubData(Object.assign({ link: TAILOR_APP_URL }, payload)), webpush: { headers: { Urgency: "high" } } });
+      await hbMessaging().send({ token, data: hubData(Object.assign({ link: TAILOR_APP_URL }, payload)), webpush: { headers: { Urgency: "high" } } });
       return true;
     } catch (e) {
       if (DEAD_TOKEN(e)) await ref.delete().catch(() => {});
