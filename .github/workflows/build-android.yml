@@ -126,14 +126,20 @@ jobs:
           cat > $F <<EOF2
           package $APP_ID;
 
+          import android.content.ActivityNotFoundException;
+          import android.content.Intent;
           import android.graphics.Color;
+          import android.net.Uri;
           import android.os.Bundle;
           import android.view.View;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebView;
           import androidx.core.graphics.Insets;
           import androidx.core.view.ViewCompat;
           import androidx.core.view.WindowCompat;
           import androidx.core.view.WindowInsetsCompat;
           import com.getcapacitor.BridgeActivity;
+          import com.getcapacitor.BridgeWebViewClient;
 
           public class MainActivity extends BridgeActivity {
             @Override
@@ -149,6 +155,27 @@ jobs:
                 Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
                 v.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
                 return WindowInsetsCompat.CONSUMED;
+              });
+              // 🖨️ RawBT প্রিন্ট: "intent:" লিংক Chrome নিজে খোলে, কিন্তু অ্যাপের WebView খোলে না — তাই এখানে হাতে খোলা
+              getBridge().getWebView().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                  String url = request.getUrl().toString();
+                  if (url.startsWith("intent:")) {
+                    try {
+                      Intent it = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                      if (!"ru.a402d.rawbtprinter".equals(it.getPackage())) return true;
+                      it.addCategory(Intent.CATEGORY_BROWSABLE);
+                      it.setComponent(null);
+                      it.setSelector(null);
+                      startActivity(it);
+                    } catch (ActivityNotFoundException e) {
+                      try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=ru.a402d.rawbtprinter"))); } catch (Exception e2) {}
+                    } catch (Exception e) {}
+                    return true;
+                  }
+                  return super.shouldOverrideUrlLoading(view, request);
+                }
               });
             }
           }
