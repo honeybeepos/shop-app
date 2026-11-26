@@ -16,8 +16,25 @@
   if (window.__hbNativePush) return;
   window.__hbNativePush = true;
 
+  /* 🔎 পর্দায় ছোট বার্তা (সমস্যা ধরার জন্য) */
+  function hbToast(msg, ms) {
+    try {
+      var el = document.getElementById("hbNativeToast");
+      if (!el) {
+        el = document.createElement("div"); el.id = "hbNativeToast";
+        el.style.cssText = "position:fixed;left:10px;right:10px;bottom:70px;z-index:2147483647;background:#000c;color:#fff;border:1px solid #ffd166;border-radius:10px;padding:10px 12px;font:13px/1.5 sans-serif;word-break:break-word;pointer-events:none";
+        (document.body || document.documentElement).appendChild(el);
+      }
+      el.textContent = msg; el.style.display = "block";
+      clearTimeout(el.__t); el.__t = setTimeout(function () { el.style.display = "none"; }, ms || 4000);
+    } catch (e) {}
+  }
   var P = C.Plugins && C.Plugins.PushNotifications;
-  if (!P) { console.warn("[hb-native-push] PushNotifications প্লাগিন পাওয়া যায়নি"); return; }
+  try {
+    var have = Object.keys(C.Plugins || {}).join(",");
+    hbToast("📱 নেটিভ মোড চালু — প্লাগিন: " + (have || "নেই"), 5000);
+  } catch (e) {}
+  if (!P) { hbToast("⚠️ PushNotifications প্লাগিন পাওয়া যায়নি", 8000); return; }
 
   var perm = "default";
   function mapPerm(r) { return r === "granted" ? "granted" : (r === "denied" ? "denied" : "default"); }
@@ -111,6 +128,8 @@
           পাতার কোড একই থাকে: auth.signInWithPopup(googleProvider) ডাকলেই এটা চলে। ---- */
   function nativeGoogleSignIn(authSelf) {
     var A = C.Plugins && C.Plugins.FirebaseAuthentication;
+    hbToast("🔵 Google লগইন শুরু হচ্ছে…", 3000);
+    if (!A) hbToast("⚠️ Google লগইনের প্লাগিন অ্যাপে নেই — নতুন APK বানাতে হবে", 9000);
     if (!A) return Promise.reject(Object.assign(new Error("native-auth-plugin-missing"), { code: "auth/operation-not-supported-in-this-environment" }));
     return A.signInWithGoogle({ skipNativeAuth: true }).then(function (res) {
       var c = res && res.credential;
@@ -119,7 +138,8 @@
       return authSelf.signInWithCredential(cred);
     }).catch(function (e) {
       var msg = String((e && (e.message || e.code)) || "");
-      if (/cancel/i.test(msg) || /12501|16/.test(msg)) e = Object.assign(new Error("cancelled"), { code: "auth/popup-closed-by-user" });
+      if (/cancel/i.test(msg) || /12501|\b16\b/.test(msg)) e = Object.assign(new Error("cancelled"), { code: "auth/popup-closed-by-user" });
+      else hbToast("❌ Google লগইন ব্যর্থ: " + msg.slice(0, 220), 12000);
       throw e;
     });
   }
