@@ -30,10 +30,6 @@
     } catch (e) {}
   }
   var P = C.Plugins && C.Plugins.PushNotifications;
-  try {
-    var have = Object.keys(C.Plugins || {}).join(",");
-    hbToast("📱 নেটিভ মোড চালু — প্লাগিন: " + (have || "নেই"), 5000);
-  } catch (e) {}
   if (!P) { hbToast("⚠️ PushNotifications প্লাগিন পাওয়া যায়নি", 8000); return; }
 
   var perm = "default";
@@ -128,7 +124,6 @@
           পাতার কোড একই থাকে: auth.signInWithPopup(googleProvider) ডাকলেই এটা চলে। ---- */
   function nativeGoogleSignIn(authSelf) {
     var A = C.Plugins && C.Plugins.FirebaseAuthentication;
-    hbToast("🔵 Google লগইন শুরু হচ্ছে…", 3000);
     if (!A) hbToast("⚠️ Google লগইনের প্লাগিন অ্যাপে নেই — নতুন APK বানাতে হবে", 9000);
     if (!A) return Promise.reject(Object.assign(new Error("native-auth-plugin-missing"), { code: "auth/operation-not-supported-in-this-environment" }));
     /* নতুন Credential Manager-এ "No credentials available" এলে পুরনো Google সাইন-ইন পদ্ধতিতে আবার চেষ্টা */
