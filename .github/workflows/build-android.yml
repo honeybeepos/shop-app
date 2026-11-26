@@ -35,7 +35,8 @@ jobs:
               "@capacitor/android": "^7.0.0",
               "@capacitor/cli": "^7.0.0",
               "@capacitor/core": "^7.0.0",
-              "@capacitor/push-notifications": "^7.0.0"
+              "@capacitor/push-notifications": "^7.0.0",
+              "@capacitor-firebase/authentication": "^7.0.0"
             }
           }
           EOF2
@@ -47,6 +48,12 @@ jobs:
             "server": {
               "url": "https://honeybeebazar.com/honey-bee-bazar.html",
               "allowNavigation": ["honeybeebazar.com", "*.honeybeebazar.com", "*.firebaseapp.com", "*.googleapis.com", "*.gstatic.com", "accounts.google.com"]
+            },
+            "plugins": {
+              "FirebaseAuthentication": {
+                "skipNativeAuth": true,
+                "providers": ["google.com"]
+              }
             }
           }
           EOF2
@@ -84,6 +91,11 @@ jobs:
           sed -i 's#</application>#    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_hb" />\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="hb_default" />\n    </application>#' $M
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />\n</manifest>#' $M
           cat $M
+
+      - name: স্থায়ী সাইনিং চাবি বসানো (Google লগইনের SHA-1 যাতে বদলে না যায়)
+        run: |
+          mkdir -p ~/.android
+          cp hb-debug.keystore ~/.android/debug.keystore
 
       - name: APK বানানো
         working-directory: native-app/android
