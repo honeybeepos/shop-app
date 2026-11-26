@@ -13976,17 +13976,30 @@ async function hbCartEnsureQuote(){
   if(!__hbCartPickup) $("hbCartDeliveryMsg").innerHTML = '<span style="color:var(--muted);">⏳ ডেলিভারি চার্জ হিসাব হচ্ছে...</span>';
   const p = (async ()=>{
     try{
-      const res = await functionsInstance.httpsCallable("quoteDelivery")({ sourceIds: ids, lat: c.lat, lng: c.lng });
+      // সার্ভার লগইন ছাড়া চার্জ বলে না — anonymous লগইন শেষ হওয়া পর্যন্ত অপেক্ষা
+      if(!auth.currentUser){ await hbEnsureVisitorAuth(); }
+      if(!auth.currentUser){ const er = new Error("no-auth"); er.code = "unauthenticated"; throw er; }
+      let res;
+      try{
+        res = await functionsInstance.httpsCallable("quoteDelivery", { timeout: 30000 })({ sourceIds: ids, lat: c.lat, lng: c.lng });
+      }catch(e1){
+        // নেট/কোল্ড-স্টার্টের সাময়িক ঝামেলায় একবার নিঃশব্দে আবার চেষ্টা
+        if(e1 && (e1.code === "functions/unavailable" || e1.code === "functions/deadline-exceeded" || e1.code === "functions/internal")){
+          await new Promise(r=> setTimeout(r, 1200));
+          res = await functionsInstance.httpsCallable("quoteDelivery", { timeout: 30000 })({ sourceIds: ids, lat: c.lat, lng: c.lng });
+        }else throw e1;
+      }
       if(hbCartQuoteKey() !== key) return null;   // এর মধ্যে কার্ট/লোকেশন বদলেছে
       __hbQuote = res.data; __hbQuoteKey = key;
       hbCartShowTotals();
       return __hbQuote;
     }catch(e){
-      console.warn("quoteDelivery failed:", e);
+      console.warn("quoteDelivery failed:", e && e.code, e && e.message, e);
+      window.__hbLastQuoteError = (e && (e.code || e.message)) || "unknown";
       __hbQuote = null; __hbQuoteKey = null;
       if(__hbCartPickup){ hbCartShowTotals(); return null; }
       $("hbCartDeliveryRows").innerHTML = "";
-      $("hbCartDeliveryMsg").innerHTML = '<span style="color:#f87171;">⚠️ ডেলিভারি চার্জ জানা যায়নি।</span> '
+      $("hbCartDeliveryMsg").innerHTML = '<span style="color:#f87171;">⚠️ ডেলিভারি চার্জ জানা যায়নি। <small style="opacity:.7;">(' + String(window.__hbLastQuoteError||"").replace(/[<>&"]/g,"") + ')</small></span> '
         + '<a href="#" id="hbQuoteRetry" style="color:var(--amber);">আবার চেষ্টা</a>';
       const r = $("hbQuoteRetry"); if(r) r.onclick = (ev)=>{ ev.preventDefault(); hbCartRequestQuote(true); };
       $("hbCartTotalTxt").textContent = HB_CUR + " " + __hbCartItemsTotal + " + ডেলিভারি";
