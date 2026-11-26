@@ -93,6 +93,42 @@ jobs:
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />\n    <uses-feature android:name="android.hardware.microphone" android:required="false" />\n    <uses-feature android:name="android.hardware.location" android:required="false" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="false" />\n</manifest>#' $M
           cat $M
 
+      - name: অ্যাপের পর্দা স্ট্যাটাস বারের নিচে আনা (MainActivity)
+        working-directory: native-app
+        run: |
+          F=android/app/src/main/java/com/honeybeebazar/app/MainActivity.java
+          ls -la $(dirname $F)
+          cat > $F <<'EOF2'
+          package com.honeybeebazar.app;
+
+          import android.graphics.Color;
+          import android.os.Bundle;
+          import android.view.View;
+          import androidx.core.graphics.Insets;
+          import androidx.core.view.ViewCompat;
+          import androidx.core.view.WindowCompat;
+          import androidx.core.view.WindowInsetsCompat;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+            @Override
+            public void onCreate(Bundle savedInstanceState) {
+              super.onCreate(savedInstanceState);
+              // স্ট্যাটাস বার (সময়/ওয়াইফাই/ব্যাটারি) আর নিচের নেভিগেশন বারের নিচে অ্যাপের পর্দা যাতে ঢুকে না যায়
+              getWindow().getDecorView().setBackgroundColor(Color.parseColor("#14100A"));
+              WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightStatusBars(false);
+              WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightNavigationBars(false);
+              View content = findViewById(android.R.id.content);
+              ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
+                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+                v.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
+                return WindowInsetsCompat.CONSUMED;
+              });
+            }
+          }
+          EOF2
+
       - name: স্থায়ী সাইনিং চাবি বসানো (Google লগইনের SHA-1 যাতে বদলে না যায়)
         run: |
           mkdir -p ~/.android
