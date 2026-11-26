@@ -877,3 +877,17 @@ function hbAskShopPhone(shopId, shop, role){
     }
   };
 }
+
+
+/* 📱 Android অ্যাপ (Capacitor)-এর ভেতরে খুললে নেটিভ পুশ/লগইন/Back-এর ফাইল টেনে আনে।
+   ব্রাউজারে/Chrome-এ এটা কিছুই করে না। */
+(function () {
+  try {
+    var C = window.Capacitor;
+    if (!C || typeof C.isNativePlatform !== "function" || !C.isNativePlatform()) return;
+    if (window.__hbNativePush || document.querySelector('script[src="hb-native-push.js"]')) return;
+    var s = document.createElement("script");
+    s.src = "hb-native-push.js";
+    document.head.appendChild(s);
+  } catch (e) {}
+})();
