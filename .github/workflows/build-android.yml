@@ -3,6 +3,14 @@ name: Build Android APK
 # হাতে চালাতে হয়: GitHub → Actions → "Build Android APK" → Run workflow
 on:
   workflow_dispatch:
+    inputs:
+      app:
+        description: "কোন অ্যাপ বানাবেন"
+        type: choice
+        options:
+          - bazar
+          - pos
+        default: bazar
 
 permissions:
   contents: write
@@ -21,6 +29,23 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+
+      - name: কোন অ্যাপ — নাম, Package ID, শুরুর পাতা ঠিক করা
+        run: |
+          case "${{ inputs.app }}" in
+            pos)
+              echo "APP_ID=com.honeybeebazar.pos" >> $GITHUB_ENV
+              echo "APP_NAME=Honey Bee POS" >> $GITHUB_ENV
+              echo "START_URL=https://honeybeebazar.com/login.html" >> $GITHUB_ENV
+              echo "ICON=icon-512.png" >> $GITHUB_ENV
+              echo "APK_NAME=honey-bee-pos" >> $GITHUB_ENV ;;
+            *)
+              echo "APP_ID=com.honeybeebazar.app" >> $GITHUB_ENV
+              echo "APP_NAME=Honey Bee Bazar" >> $GITHUB_ENV
+              echo "START_URL=https://honeybeebazar.com/honey-bee-bazar.html" >> $GITHUB_ENV
+              echo "ICON=bazar-icon-512.png" >> $GITHUB_ENV
+              echo "APK_NAME=honey-bee-bazar" >> $GITHUB_ENV ;;
+          esac
 
       - name: Capacitor প্রজেক্টের ফাইল বানানো
         run: |
@@ -41,13 +66,13 @@ jobs:
             }
           }
           EOF2
-          cat > capacitor.config.json <<'EOF2'
+          cat > capacitor.config.json <<EOF2
           {
-            "appId": "com.honeybeebazar.app",
-            "appName": "Honey Bee Bazar",
+            "appId": "$APP_ID",
+            "appName": "$APP_NAME",
             "webDir": "www",
             "server": {
-              "url": "https://honeybeebazar.com/honey-bee-bazar.html",
+              "url": "$START_URL",
               "allowNavigation": ["honeybeebazar.com", "*.honeybeebazar.com", "*.firebaseapp.com", "*.googleapis.com", "*.gstatic.com", "accounts.google.com"]
             },
             "plugins": {
@@ -58,8 +83,8 @@ jobs:
             }
           }
           EOF2
-          cat > www/index.html <<'EOF2'
-          <!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=https://honeybeebazar.com/honey-bee-bazar.html"><title>Honey Bee Bazar</title>
+          cat > www/index.html <<EOF2
+          <!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=$START_URL"><title>$APP_NAME</title>
           EOF2
 
       - name: Android প্রজেক্ট তৈরি
@@ -78,7 +103,7 @@ jobs:
           for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
             n=${d%%:*}; s=${d##*:}
             mkdir -p $RES/mipmap-$n
-            convert ../bazar-icon-512.png -resize ${s}x${s} $RES/mipmap-$n/ic_launcher.png
+            convert ../$ICON -resize ${s}x${s} $RES/mipmap-$n/ic_launcher.png
             cp $RES/mipmap-$n/ic_launcher.png $RES/mipmap-$n/ic_launcher_round.png
             rm -f $RES/mipmap-$n/ic_launcher_foreground.png
           done
@@ -96,10 +121,10 @@ jobs:
       - name: অ্যাপের পর্দা স্ট্যাটাস বারের নিচে আনা (MainActivity)
         working-directory: native-app
         run: |
-          F=android/app/src/main/java/com/honeybeebazar/app/MainActivity.java
+          F=android/app/src/main/java/${APP_ID//.//}/MainActivity.java
           ls -la $(dirname $F)
-          cat > $F <<'EOF2'
-          package com.honeybeebazar.app;
+          cat > $F <<EOF2
+          package $APP_ID;
 
           import android.graphics.Color;
           import android.os.Bundle;
@@ -152,7 +177,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp native-app/android/app/build/outputs/apk/debug/app-debug.apk honey-bee-bazar.apk
-          gh release create "apk-${{ github.run_number }}" honey-bee-bazar.apk \
-            --title "Android APK #${{ github.run_number }}" \
-            --notes "ফোনে বসানোর APK — নিচের honey-bee-bazar.apk চাপুন।"
+          cp native-app/android/app/build/outputs/apk/debug/app-debug.apk $APK_NAME.apk
+          gh release create "apk-${{ inputs.app }}-${{ github.run_number }}" $APK_NAME.apk \
+            --title "$APP_NAME APK #${{ github.run_number }}" \
+            --notes "ফোনে বসানোর APK — নিচের $APK_NAME.apk চাপুন।"
