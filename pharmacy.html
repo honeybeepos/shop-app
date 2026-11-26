@@ -344,6 +344,55 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
+<script>
+/* 🩹 FIX: Functions SDK প্রতি কলে messaging.getToken() চালায় → অ্যাপে (Capacitor) service worker ফাঁকা {} থাকায়
+   "reading 'getSubscription'" এরর। তাই httpsCallable সরাসরি fetch করে, messaging ছোঁয় না। */
+(function(){
+  if(!window.firebase || !firebase.functions || firebase.functions.__hbPatched) return;
+  var orig = firebase.functions;
+  function patch(inst, region){
+    if(!inst || inst.__hbPatched) return inst;
+    inst.__hbPatched = true;
+    inst.httpsCallable = function(name, opts){
+      var timeout = (opts && opts.timeout) || 70000;
+      return async function(data){
+        var headers = { "Content-Type": "application/json" };
+        try{
+          var a = firebase.auth(inst.app), u = a && a.currentUser;
+          if(u) headers["Authorization"] = "Bearer " + (await u.getIdToken());
+        }catch(e){}
+        var ctrl = new AbortController(), tm = setTimeout(function(){ ctrl.abort(); }, timeout), resp;
+        try{
+          resp = await fetch("https://" + (region || "us-central1") + "-honeybee-984dd.cloudfunctions.net/" + name, {
+            method: "POST", headers: headers, body: JSON.stringify({ data: data === undefined ? null : data }), signal: ctrl.signal
+          });
+        }catch(e){
+          clearTimeout(tm);
+          var er = new Error(e && e.name === "AbortError" ? "deadline-exceeded" : "unavailable");
+          er.code = e && e.name === "AbortError" ? "functions/deadline-exceeded" : "functions/unavailable";
+          throw er;
+        }
+        clearTimeout(tm);
+        var body = null; try{ body = await resp.json(); }catch(e){}
+        if(body && body.error){
+          var st = String(body.error.status || "INTERNAL").toLowerCase().replace(/_/g, "-");
+          var e2 = new Error(body.error.message || st); e2.code = "functions/" + st; e2.details = body.error.details; throw e2;
+        }
+        if(!resp.ok || !body){ var e3 = new Error("internal"); e3.code = "functions/internal"; throw e3; }
+        return { data: ("result" in body) ? body.result : body.data };
+      };
+    };
+    return inst;
+  }
+  var wrapped = function(a, b){
+    var region = (typeof a === "string") ? a : (typeof b === "string" ? b : null);
+    return patch(orig.apply(firebase, arguments), region);
+  };
+  for(var k in orig){ try{ wrapped[k] = orig[k]; }catch(e){} }
+  wrapped.__hbPatched = true;
+  firebase.functions = wrapped;
+})();
+</script>
 <script src="firebase-init.js"></script>
 <script src="hb-back.js"></script>
 <script src="hb-billing.js"></script>

@@ -3504,6 +3504,48 @@ const db = firebase.firestore();
 const auth = firebase.auth();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 const functionsInstance = firebase.functions(); // 🤖 Step 5 — Gemini AI Cloud Function কল করার জন্য
+/* 🩹 FIX: Functions SDK 9.23 প্রতিটা কলে messaging.getToken() চালায় → registration.pushManager না থাকলে
+   "Cannot read properties of undefined (reading 'getSubscription')" দিয়ে কল ভেঙে যায়।
+   তাই httpsCallable নিজেই সরাসরি callable endpoint-এ fetch করে (Auth ID token সহ), messaging ছোঁয় না। */
+(function(){
+  const REGION = "us-central1";
+  functionsInstance.httpsCallable = function(name, opts){
+    const timeout = (opts && opts.timeout) || 70000;
+    return async function(data){
+      const headers = { "Content-Type": "application/json" };
+      try{
+        const u = firebase.auth().currentUser;
+        if(u) headers["Authorization"] = "Bearer " + (await u.getIdToken());
+      }catch(e){}
+      const ctrl = new AbortController();
+      const tm = setTimeout(()=> ctrl.abort(), timeout);
+      let resp;
+      try{
+        resp = await fetch("https://" + REGION + "-" + firebaseConfig.projectId + ".cloudfunctions.net/" + name, {
+          method: "POST", headers, body: JSON.stringify({ data: data === undefined ? null : data }), signal: ctrl.signal
+        });
+      }catch(e){
+        clearTimeout(tm);
+        const er = new Error(e && e.name === "AbortError" ? "deadline-exceeded" : "unavailable");
+        er.code = e && e.name === "AbortError" ? "functions/deadline-exceeded" : "functions/unavailable";
+        throw er;
+      }
+      clearTimeout(tm);
+      let body = null;
+      try{ body = await resp.json(); }catch(e){}
+      if(body && body.error){
+        const st = String(body.error.status || "INTERNAL").toLowerCase().replace(/_/g, "-");
+        const er = new Error(body.error.message || st);
+        er.code = "functions/" + st; er.details = body.error.details;
+        throw er;
+      }
+      if(!resp.ok || !body){
+        const er = new Error("internal"); er.code = "functions/internal"; throw er;
+      }
+      return { data: ("result" in body) ? body.result : body.data };
+    };
+  };
+})();
 
 let currentCustomer = null; // { uid, name, email, photoURL, favoriteShops:[], addresses:[] }
 
