@@ -106,15 +106,57 @@
     onBackgroundMessage: function () { return function () {}; },
     requestPermission: function () { return NotifShim.requestPermission(); }
   };
+  /* ---- Google লগইন: ওয়েব-ভিউয়ে popup/redirect চলে না (Google 400 দেয়) —
+          তাই অ্যাপের ভেতরে নেটিভ Google লগইন চালিয়ে সেই টোকেন Firebase-এ দেওয়া হয়।
+          পাতার কোড একই থাকে: auth.signInWithPopup(googleProvider) ডাকলেই এটা চলে। ---- */
+  function nativeGoogleSignIn(authSelf) {
+    var A = C.Plugins && C.Plugins.FirebaseAuthentication;
+    if (!A) return Promise.reject(Object.assign(new Error("native-auth-plugin-missing"), { code: "auth/operation-not-supported-in-this-environment" }));
+    return A.signInWithGoogle({ skipNativeAuth: true }).then(function (res) {
+      var c = res && res.credential;
+      if (!c || !c.idToken) throw Object.assign(new Error("no-id-token"), { code: "auth/internal-error" });
+      var cred = window.firebase.auth.GoogleAuthProvider.credential(c.idToken, c.accessToken || null);
+      return authSelf.signInWithCredential(cred);
+    }).catch(function (e) {
+      var msg = String((e && (e.message || e.code)) || "");
+      if (/cancel/i.test(msg) || /12501|16/.test(msg)) e = Object.assign(new Error("cancelled"), { code: "auth/popup-closed-by-user" });
+      throw e;
+    });
+  }
+  function patchAuth() {
+    var fb = window.firebase;
+    if (!fb || !fb.auth || !fb.auth.Auth || !fb.auth.Auth.prototype || !fb.auth.GoogleAuthProvider) return false;
+    if (fb.__hbAuthPatched) return true;
+    var proto = fb.auth.Auth.prototype;
+    ["signInWithPopup", "signInWithRedirect"].forEach(function (name) {
+      var orig = proto[name];
+      proto[name] = function (provider) {
+        if (provider && provider.providerId === "google.com") {
+          var self = this;
+          return nativeGoogleSignIn(self).then(function (r) { return name === "signInWithRedirect" ? undefined : r; });
+        }
+        return orig.apply(this, arguments);
+      };
+    });
+    fb.__hbAuthPatched = true;
+    return true;
+  }
+
   function patch() {
     var fb = window.firebase;
-    if (!fb || typeof fb.messaging !== "function") return false;
-    if (fb.__hbNativePatched) return true;
-    var fn = function () { return shim; };
-    fn.isSupported = function () { return true; };
-    try { fb.messaging = fn; } catch (e) { try { Object.defineProperty(fb, "messaging", { value: fn, configurable: true }); } catch (e2) { return false; } }
-    fb.__hbNativePatched = true;
-    return true;
+    var a = patchAuth();
+    var m = false;
+    if (fb && typeof fb.messaging === "function") {
+      if (fb.__hbNativePatched) m = true;
+      else {
+        var fn = function () { return shim; };
+        fn.isSupported = function () { return true; };
+        try { fb.messaging = fn; m = true; }
+        catch (e) { try { Object.defineProperty(fb, "messaging", { value: fn, configurable: true }); m = true; } catch (e2) {} }
+        if (m) fb.__hbNativePatched = true;
+      }
+    }
+    return a && m;
   }
   if (!patch()) {
     var tries = 0, iv = setInterval(function () { if (patch() || ++tries > 200) clearInterval(iv); }, 50);
