@@ -131,7 +131,14 @@
     hbToast("🔵 Google লগইন শুরু হচ্ছে…", 3000);
     if (!A) hbToast("⚠️ Google লগইনের প্লাগিন অ্যাপে নেই — নতুন APK বানাতে হবে", 9000);
     if (!A) return Promise.reject(Object.assign(new Error("native-auth-plugin-missing"), { code: "auth/operation-not-supported-in-this-environment" }));
-    return A.signInWithGoogle({ skipNativeAuth: true }).then(function (res) {
+    /* নতুন Credential Manager-এ "No credentials available" এলে পুরনো Google সাইন-ইন পদ্ধতিতে আবার চেষ্টা */
+    return A.signInWithGoogle({ skipNativeAuth: true }).catch(function (e) {
+      if (/no credentials|NoCredential/i.test(String((e && (e.message || e.code)) || ""))) {
+        hbToast("🔁 অন্য পদ্ধতিতে চেষ্টা হচ্ছে…", 3000);
+        return A.signInWithGoogle({ skipNativeAuth: true, useCredentialManager: false });
+      }
+      throw e;
+    }).then(function (res) {
       var c = res && res.credential;
       if (!c || !c.idToken) throw Object.assign(new Error("no-id-token"), { code: "auth/internal-error" });
       var cred = window.firebase.auth.GoogleAuthProvider.credential(c.idToken, c.accessToken || null);
