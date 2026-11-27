@@ -11790,6 +11790,20 @@ function mfAreaTitle(){
   const parts = [mfArea.d, mfArea.u, mName].filter(Boolean);
   return "📍 " + parts.join(" › ") + "-এর পণ্য";
 }
+/* 📍 উপরের বাটনে এখন যে এলাকা/বাজার দেখা হচ্ছে সেটার নাম দেখায়; কিছু না বাছলে নিজের বাজারের নাম */
+function mfSyncPill(){
+  const el = $("mfMarketName"); if(!el) return;
+  let name = "";
+  if(mfAreaOn()){
+    const mSel = $("mfAreaMkt");
+    const mName = (mfArea.m && mSel && mSel.selectedOptions[0] && mSel.value) ? mSel.selectedOptions[0].textContent : "";
+    name = mName || mfArea.u || mfArea.d;
+  }else{
+    const m = (typeof allMarkets !== "undefined" && allMarkets) ? allMarkets.find(x=> x.id === currentMarketId) : null;
+    name = m ? (m.name || currentMarketId) : (currentMarketId || "");
+  }
+  if(name) el.textContent = name;
+}
 let __mfAreaFillTok = 0;
 async function mfAreaFill(){
   const dS = $("mfAreaDist"), uS = $("mfAreaUpz"), mS = $("mfAreaMkt");
@@ -11807,6 +11821,7 @@ async function mfAreaFill(){
       if(tok !== __mfAreaFillTok) return; // এর মধ্যে বাছাই বদলে গেছে
       const ms = qs.docs.map(x=>({ id:x.id, name:String(x.data().name||x.id) })).sort((a,b)=> a.name.localeCompare(b.name,"bn"));
       mS.innerHTML = '<option value="">' + (ms.length ? "বাজার" : "বাজার নেই") + '</option>' + ms.map(m=>`<option value="${escapeHtml(m.id)}"${m.id===mfArea.m?" selected":""}>${escapeHtml(m.name)}</option>`).join("");
+      mfSyncPill();
       if(mfAreaOn()) mfUpdateFilterNote(); // বাজারের নাম এখন জানা গেল — শিরোনামে বসবে
     }catch(e){ console.warn("এলাকার বাজার আনা যায়নি", e); }
   }
@@ -11832,6 +11847,7 @@ async function mfAreaApply(){
 }
 function mfAreaSet(d,u,m){
   mfArea = { d:d||"", u:u||"", m:m||"" };
+  mfSyncPill();
   mfAreaFill();
   mfAreaApply();
 }
@@ -11840,6 +11856,7 @@ function mfAreaReset(){
   mfArea = { d:"", u:"", m:"" };
   __mfBdMode = false;
   if(was && $("mfAreaDist")) mfAreaFill();
+  mfSyncPill();
 }
 if($("mfAreaDist")){
   $("mfAreaDist").addEventListener("change", e=> mfAreaSet(e.target.value,"",""));
