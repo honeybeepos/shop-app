@@ -348,6 +348,10 @@
   #hdrRstAreaBtn{ display:none; width:100%; text-align:left; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-weight:800; font-size:12.5px; padding:9px 12px; border-radius:12px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   body.rstActive #appHeaderTitle, body.rstActive #appHeaderTagline{ display:none; }
   body.rstActive #hdrRstAreaBtn{ display:block; }
+  #hdrRstShopBtn{ display:none; position:absolute; left:50%; top:calc(100% + 5px); transform:translateX(-50%); width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.05); font-size:14px; cursor:pointer; align-items:center; justify-content:center; padding:0; }
+  body.rstActive #hdrRstShopBtn{ display:flex; }
+  #rstShopPanel{ display:none; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409; border:1px solid var(--amber); border-radius:14px; box-shadow:0 14px 34px rgba(0,0,0,0.6); padding:10px; max-height:60vh; overflow-y:auto; }
+  #rstShopPanel.open{ display:block; }
   #rstAreaPanel{ display:none; }
   #rstAreaPanel.open{ display:block; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409 !important; box-shadow:0 14px 34px rgba(0,0,0,0.6); border:1px solid var(--amber); margin:0 !important; }
 
@@ -826,7 +830,10 @@
       <p id="appHeaderTagline">আপনার এলাকার সবকিছু, এক জায়গায়</p>
       <button type="button" id="hdrRstAreaBtn">📍 এলাকা বেছে রেস্টুরেন্ট খুঁজুন ▾</button>
     </div>
+    <div style="position:relative; flex-shrink:0;">
     <button type="button" id="headerNotifBtn" title="Notification" style="flex-shrink:0; width:38px; height:38px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:#fff8e8; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center;">🔔</button>
+      <button type="button" id="hdrRstShopBtn" title="রেস্টুরেন্ট খুঁজুন" aria-label="রেস্টুরেন্ট খুঁজুন">🏪</button>
+    </div>
   </header>
 
   <!-- ==================== 🏠 হোমস্ক্রিন — ৬টা সার্ভিস কার্ড + ফিল্টার + বাজার তালিকা ==================== -->
@@ -1534,6 +1541,7 @@
   <div id="screenRestaurant" style="padding:20px 16px;">
     <button class="backBtn" id="backToHomeFromRestaurant">← হোমে ফিরে যান</button>
 
+    <div id="rstShopPanel"></div>
     <div class="card" id="rstAreaPanel" style="margin-bottom:12px; padding:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <div style="font-weight:800; font-size:13.5px;">জেলা › থানা › বাজার</div>
@@ -4769,8 +4777,47 @@ function rstAreaPanelToggle(open){
   const pnl = $("rstAreaPanel"); if(!pnl) return;
   const willOpen = typeof open === "boolean" ? open : !pnl.classList.contains("open");
   pnl.classList.toggle("open", willOpen);
-  if(willOpen){ const h = document.querySelector("header"); pnl.style.top = ((h ? h.getBoundingClientRect().bottom : 70) + 6) + "px"; }
+  if(willOpen){ const sp = $("rstShopPanel"); if(sp) sp.classList.remove("open"); const h = document.querySelector("header"); pnl.style.top = ((h ? h.getBoundingClientRect().bottom : 70) + 6) + "px"; }
 }
+// 🏪 হেডারের দোকান আইকন — এই এলাকার রেস্টুরেন্টের তালিকা, চাপলে সেই রেস্টুরেন্টের মেনু
+function rstShopPanelRender(){
+  const pnl = $("rstShopPanel"); if(!pnl) return;
+  if(!rstLoaded){ pnl.innerHTML = '<div class="loadingMsg">রেস্টুরেন্ট খোঁজা হচ্ছে...</div>'; rstLoad().then(rstShopPanelRender); return; }
+  let list = rstAll;
+  if(rstArea.d) list = list.filter(r => r.district === rstArea.d);
+  if(rstArea.u) list = list.filter(r => r.upazila === rstArea.u);
+  if(rstArea.m) list = list.filter(r => r.marketId === rstArea.m);
+  list = list.slice().sort((a,b)=> (b.isOpen !== false ? 1 : 0) - (a.isOpen !== false ? 1 : 0));
+  if(!list.length){ pnl.innerHTML = '<div class="emptyMsg" style="padding:14px;">এই এলাকায় কোনো রেস্টুরেন্ট নেই।</div>'; return; }
+  pnl.innerHTML = '<div style="font-weight:800; font-size:13px; margin:2px 4px 8px; color:#fff8e8;">🏪 রেস্টুরেন্ট (' + list.length + ')</div>'
+    + list.map(r=>{
+      const open = r.isOpen !== false;
+      return '<div data-rstshop="' + escapeHtml(String(r.id)) + '" style="display:flex; gap:10px; align-items:center; padding:9px; border-radius:11px; margin-bottom:6px; background:rgba(255,255,255,0.05); cursor:pointer;">'
+        + '<div style="flex:0 0 auto; width:42px; height:42px; border-radius:10px; overflow:hidden; background:rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; font-size:20px;">'
+        + ((r.profileImage || r.photoURL) ? '<img src="' + escapeHtml(r.profileImage || r.photoURL) + '" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent=\'🍽️\'">' : '🍽️') + '</div>'
+        + '<div style="flex:1; min-width:0;"><div style="font-size:13.5px; font-weight:800; color:#fff8e8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(r.name || "রেস্টুরেন্ট") + '</div>'
+        + '<div style="font-size:11.5px; color:var(--muted);">' + escapeHtml(r.area || "") + '</div></div>'
+        + '<div style="font-size:11px; color:' + (open ? '#4ade80' : '#f59e0b') + '; white-space:nowrap;">● ' + (open ? 'খোলা' : 'বন্ধ') + '</div></div>';
+    }).join("");
+}
+function rstShopPanelToggle(open){
+  const pnl = $("rstShopPanel"); if(!pnl) return;
+  const willOpen = typeof open === "boolean" ? open : !pnl.classList.contains("open");
+  pnl.classList.toggle("open", willOpen);
+  if(willOpen){
+    rstAreaPanelToggle(false);
+    const h = document.querySelector("header"); pnl.style.top = ((h ? h.getBoundingClientRect().bottom : 70) + 40) + "px";
+    rstShopPanelRender();
+  }
+}
+document.addEventListener("click", (e)=>{
+  const pnl = $("rstShopPanel");
+  if(!pnl) return;
+  if(e.target.closest("#hdrRstShopBtn")){ rstShopPanelToggle(); return; }
+  const it = e.target.closest("[data-rstshop]");
+  if(it && pnl.contains(it)){ pnl.classList.remove("open"); window.rstOpenById(it.getAttribute("data-rstshop")); return; }
+  if(pnl.classList.contains("open") && !pnl.contains(e.target)) pnl.classList.remove("open");
+});
 // প্যানেলের বাইরে চাপলে বন্ধ
 document.addEventListener("click", (e)=>{
   const pnl = $("rstAreaPanel");
