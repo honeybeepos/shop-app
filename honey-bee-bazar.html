@@ -1374,29 +1374,20 @@
        নামের কিওয়ার্ড মিলিয়ে ফিল্টার করা হয়) — কোনো প্রোডাক্ট আলাদাভাবে/নকল করে
        বানানো হয়নি -->
   <div id="screenEkadashiSpecial" style="padding:20px 16px 90px;">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-      <button class="backBtn" id="backFromEkadashiSpecial">← ফিরে যান</button>
+    <!-- 📍 পছন্দের বাজারের মতো টপ বার: ← | এলাকা-পিল (চাপলে জেলা/থানা নামে) | ☰ -->
+    <div class="mfTopBar2">
+      <button class="mfTopIconBtn" id="backFromEkadashiSpecial" title="ফিরে যান" aria-label="ফিরে যান">←</button>
+      <button class="mfLocationPill" id="hbEkaAreaPill" type="button"><span>📍</span><span class="mfLocTxt" id="hbEkaAreaPillTxt">আপনার এলাকা</span><span class="mfChev">▾</span></button>
+      <div class="mfAreaBox" id="hbEkaAreaBox">
+        <div class="mfAreaHead"><span>📍 আপনার এলাকা</span><button type="button" class="mfAreaClear" id="hbEkaAreaClear">✕ মুছুন</button></div>
+        <div class="mfAreaRow" style="grid-template-columns:1fr 1fr;">
+          <select id="hbEkaDist" aria-label="জেলা"><option value="">জেলা</option></select>
+          <select id="hbEkaUpz" aria-label="থানা"><option value="">থানা</option></select>
+        </div>
+        <div id="hbEkaAreaNote" style="font-size:11px; color:var(--muted); margin-top:7px;"></div>
+      </div>
       <!-- ☰ একাদশী ও পূজার সব ঘরের তালিকা — ডান পাশ থেকে খোলে -->
-      <button type="button" id="hbEkaMenuBtn" aria-label="ক্যাটাগরি মেনু" style="flex-shrink:0; display:flex; align-items:center; gap:6px; border:1px solid rgba(255,183,3,0.55); background:linear-gradient(135deg,rgba(249,115,22,0.25),rgba(190,24,93,0.2)); color:#ffd166; font-family:inherit; font-weight:800; font-size:13px; padding:9px 13px; border-radius:12px; cursor:pointer; box-shadow:0 0 14px rgba(249,115,22,0.25);">☰ মেনু</button>
-    </div>
-    <div style="display:flex; align-items:center; margin-bottom:4px; gap:10px;">
-      <span style="font-size:26px;">🌸</span>
-      <h2 style="margin:0; font-size:19px; color:#ffb703;">একাদশী স্পেশাল</h2>
-    </div>
-    <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">পবিত্র দিনের প্রয়োজনীয় পণ্য একসাথে</div>
-
-    <!-- 📍 এলাকা বাছাই — বাজার বাছতে হয় না, জেলা + থানা দিলেই সেই থানার সব দোকানের
-         একাদশী পণ্য দেখায়। বাছাইটা ফোনে মনে থাকে। -->
-    <div class="card" style="padding:12px; margin-bottom:12px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <div style="font-weight:800; font-size:13.5px;">📍 আপনার এলাকা</div>
-        <button type="button" id="hbEkaAreaClear" style="display:none; border:0; background:transparent; color:var(--amber); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✕ মুছুন</button>
-      </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-        <select id="hbEkaDist" aria-label="জেলা" style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">জেলা</option></select>
-        <select id="hbEkaUpz" aria-label="থানা" style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">থানা</option></select>
-      </div>
-      <div id="hbEkaAreaNote" style="font-size:11px; color:var(--muted); margin-top:7px;"></div>
+      <button class="mfTopIconBtn" type="button" id="hbEkaMenuBtn" title="মেনু" aria-label="ক্যাটাগরি মেনু">☰</button>
     </div>
 
     <div style="display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;">
@@ -7938,6 +7929,8 @@ function hbEkaAreaFill(){
   uS.disabled = !hbEkaArea.d;
   uS.innerHTML = '<option value="">থানা</option>' + (hbEkaArea.d ? getUpazilasForDistrict(hbEkaArea.d).map(u=>`<option value="${u}"${u===hbEkaArea.u?" selected":""}>${u}</option>`).join("") : "");
   document.getElementById("hbEkaAreaClear").style.display = hbEkaArea.d ? "" : "none";
+  const pt = document.getElementById("hbEkaAreaPillTxt");
+  if(pt) pt.textContent = hbEkaArea.d ? [hbEkaArea.d, hbEkaArea.u].filter(Boolean).join(" › ") : "আপনার এলাকা";
 }
 function hbEkaAreaSet(d, u){
   hbEkaArea = { d:d||"", u:u||"" };
@@ -7948,9 +7941,12 @@ function hbEkaAreaSet(d, u){
 function hbEkaAreaInit(){
   if(!__hbEkaAreaReady){
     __hbEkaAreaReady = true;
+    const box = document.getElementById("hbEkaAreaBox");
     document.getElementById("hbEkaDist").addEventListener("change", e=> hbEkaAreaSet(e.target.value, ""));
-    document.getElementById("hbEkaUpz").addEventListener("change", e=> hbEkaAreaSet(hbEkaArea.d, e.target.value));
-    document.getElementById("hbEkaAreaClear").addEventListener("click", ()=> hbEkaAreaSet("", ""));
+    document.getElementById("hbEkaUpz").addEventListener("change", e=>{ hbEkaAreaSet(hbEkaArea.d, e.target.value); if(e.target.value && box) box.classList.remove("open"); });
+    document.getElementById("hbEkaAreaClear").addEventListener("click", ()=>{ hbEkaAreaSet("", ""); if(box) box.classList.remove("open"); });
+    document.getElementById("hbEkaAreaPill").addEventListener("click", (e)=>{ e.stopPropagation(); if(box) box.classList.toggle("open"); });
+    if(box){ box.addEventListener("click", e=> e.stopPropagation()); document.addEventListener("click", ()=> box.classList.remove("open")); }
   }
   hbEkaAreaFill();
 }
