@@ -7818,7 +7818,10 @@ function hbEkaAreaInit(){
   hbEkaAreaFill();
 }
 async function hbEkaAreaShops(){
-  const qs = await db.collection("shops").where("upazila","==",hbEkaArea.u).limit(150).get();
+  // থানা বাছা থাকলে সেই থানার সব দোকান; শুধু জেলা বাছা থাকলে সেই জেলার সব থানার দোকান
+  const qs = hbEkaArea.u
+    ? await db.collection("shops").where("upazila","==",hbEkaArea.u).limit(150).get()
+    : await db.collection("shops").where("district","==",hbEkaArea.d).limit(300).get();
   return qs.docs.map(d=> ({ id:d.id, ...d.data() }))
     .filter(sh=> sh.status === "active" && sh.marketId && (!hbEkaArea.d || sh.district === hbEkaArea.d) && (!sh.countryCode || sh.countryCode === "BD"));
 }
@@ -7830,27 +7833,25 @@ async function hbEkaLoadProducts(){
   const mySeq = ++__hbEkaLoadSeq;
   const noteEl = document.getElementById("hbEkaAreaNote");
   let shops = [];
-  if(hbEkaArea.u){
+  if(hbEkaArea.d || hbEkaArea.u){
     gridEl.innerHTML = "<div class='loadingMsg'>এলাকার দোকান খোঁজা হচ্ছে...</div>";
     try{ shops = await hbEkaAreaShops(); if(mySeq !== __hbEkaLoadSeq) return; }
     catch(e){ console.error(e); gridEl.innerHTML = "<div class='mfEmpty'>📶 দোকানের তালিকা আনা যায়নি — ইন্টারনেট দেখে আবার খুলুন।</div>"; return; }
-    if(noteEl) noteEl.textContent = shops.length ? `🏪 ${hbEkaArea.u}-এর ${shops.length}টা দোকান থেকে দেখানো হচ্ছে` : "";
+    const areaName = hbEkaArea.u || hbEkaArea.d;
+    if(noteEl) noteEl.textContent = shops.length ? `🏪 ${areaName}-এর ${shops.length}টা দোকান থেকে দেখানো হচ্ছে` : "";
     if(!shops.length){
       __hbEkaProducts = [];
-      gridEl.innerHTML = "<div class='mfEmpty'>এই থানায় এখনো কোনো সক্রিয় দোকান নেই।<br>পাশের থানা বেছে দেখুন।</div>";
+      gridEl.innerHTML = hbEkaArea.u
+        ? "<div class='mfEmpty'>এই থানায় এখনো কোনো সক্রিয় দোকান নেই।<br>পাশের থানা বেছে দেখুন।</div>"
+        : "<div class='mfEmpty'>এই জেলায় এখনো কোনো সক্রিয় দোকান নেই।<br>অন্য জেলা বেছে দেখুন।</div>";
       return;
     }
-  }else if(hbEkaArea.d){
-    __hbEkaProducts = [];
-    if(noteEl) noteEl.textContent = "";
-    gridEl.innerHTML = "<div class='mfEmpty'>এবার থানা বেছে নিন — সেই থানার সব দোকানের একাদশী পণ্য দেখাবে।</div>";
-    return;
   }else{
     shops = allShops || [];
-    if(noteEl) noteEl.textContent = shops.length ? "জেলা আর থানা বাছলে আপনার এলাকার সব দোকানের পণ্য দেখবেন।" : "";
+    if(noteEl) noteEl.textContent = shops.length ? "জেলা বা থানা বাছলে আপনার এলাকার সব দোকানের পণ্য দেখবেন।" : "";
     if(!shops.length){
       __hbEkaProducts = [];
-      gridEl.innerHTML = "<div class='mfEmpty'>উপরে আপনার জেলা আর থানা বেছে নিন — বাজার বাছতে হবে না।</div>";
+      gridEl.innerHTML = "<div class='mfEmpty'>উপরে আপনার জেলা বেছে নিন (চাইলে থানাও) — বাজার বাছতে হবে না।</div>";
       return;
     }
   }
