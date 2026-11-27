@@ -349,7 +349,7 @@
   body.rstActive #appHeaderTitle, body.rstActive #appHeaderTagline{ display:none; }
   body.rstActive #hdrRstAreaBtn{ display:block; }
   #rstAreaPanel{ display:none; }
-  #rstAreaPanel.open{ display:block; }
+  #rstAreaPanel.open{ display:block; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409 !important; box-shadow:0 14px 34px rgba(0,0,0,0.6); border:1px solid var(--amber); margin:0 !important; }
 
   .mfTopBar2{ display:flex; align-items:center; gap:8px; margin-bottom:14px; position:relative; }
   .mfTopBar2 .mfAreaBox{ display:none; position:absolute; top:48px; left:0; right:0; z-index:60; margin:0; background:#2a1d08; box-shadow:0 10px 24px rgba(0,0,0,0.5); }
@@ -4767,8 +4767,15 @@ function rstAreaBtnLabel(){
 }
 function rstAreaPanelToggle(open){
   const pnl = $("rstAreaPanel"); if(!pnl) return;
-  pnl.classList.toggle("open", typeof open === "boolean" ? open : !pnl.classList.contains("open"));
+  const willOpen = typeof open === "boolean" ? open : !pnl.classList.contains("open");
+  pnl.classList.toggle("open", willOpen);
+  if(willOpen){ const h = document.querySelector("header"); pnl.style.top = ((h ? h.getBoundingClientRect().bottom : 70) + 6) + "px"; }
 }
+// প্যানেলের বাইরে চাপলে বন্ধ
+document.addEventListener("click", (e)=>{
+  const pnl = $("rstAreaPanel");
+  if(pnl && pnl.classList.contains("open") && !pnl.contains(e.target) && !e.target.closest("#hdrRstAreaBtn")) pnl.classList.remove("open");
+});
 function rstAreaSet(d,u,m){
   rstArea = { d:d||"", u:u||"", m:m||"" };
   try{ localStorage.setItem("hbRstArea", JSON.stringify(rstArea)); }catch(e){}
