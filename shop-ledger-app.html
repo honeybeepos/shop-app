@@ -17660,7 +17660,11 @@ function reprintBill(billKey){
 const shareModal = document.getElementById('shareModal');
 function openShareModal(name, phone, message){
   document.getElementById('shareMsgPreview').textContent = message;
-  document.getElementById('sharePrint').onclick = ()=> printSaleReceipt(name, phone, message);
+  // 📱 অ্যান্ড্রয়েড অ্যাপের ভেতরে window.print() চলে না — তাই সেখানে এই বোতামও ব্লুটুথ (RawBT) দিয়ে ছাপবে
+  document.getElementById('sharePrint').onclick = ()=>{
+    const hbNative = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+    if(hbNative){ btPrintReceipt(name, phone, message); } else { printSaleReceipt(name, phone, message); }
+  };
   document.getElementById('shareBtPrint').onclick = ()=> btPrintReceipt(name, phone, message);
   const waBtn = document.getElementById('shareWhatsapp');
   const smsBtn = document.getElementById('shareSms');
