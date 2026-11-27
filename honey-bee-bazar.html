@@ -376,13 +376,13 @@
   .mfSectionHead{ display:flex; align-items:center; justify-content:space-between; margin:6px 0 10px; }
   .mfSectionHead span:first-child{ font-size:14px; font-weight:800; }
   .mfSeeAll{ font-size:11.5px; font-weight:700; color:var(--muted); cursor:pointer; }
-  /* 🇧🇩 "সব বাজার একসাথে" — .mfSeeAll-এর ধূসর লেখাটা এই বাদামি পটভূমিতে
-     প্রায় দেখাই যেত না, অথচ এটা চেপে দেখার মতো জিনিস। তাই সোনালি চিপ,
-     আর আঙুলে চাপার মতো যথেষ্ট বড় (৬px+১২px প্যাডিং)। */
-  .mfBdBtn{ font-size:11.5px; font-weight:800; color:var(--gold); cursor:pointer;
-            background:rgba(255,183,3,0.13); border:1px solid rgba(255,183,3,0.42);
-            padding:6px 12px; border-radius:999px; white-space:nowrap; flex-shrink:0; }
-  .mfBdBtn:active{ background:rgba(255,183,3,0.26); }
+  /* 📍 এলাকা দিয়ে খোঁজা — জেলা › থানা › বাজার (সেলাই ঘরের মতোই) */
+  .mfAreaBox{ border:1px solid rgba(255,183,3,0.35); background:rgba(255,183,3,0.07); border-radius:14px; padding:10px; margin:0 0 12px; }
+  .mfAreaHead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-weight:800; font-size:12.5px; }
+  .mfAreaClear{ display:none; border:0; background:transparent; color:var(--gold); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit; }
+  .mfAreaRow{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+  .mfAreaRow select{ padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0; }
+  .mfAreaRow select:disabled{ opacity:.5; }
 
   .mfHRow{ display:flex; gap:12px; overflow-x:auto; padding-bottom:6px; margin-bottom:6px; -webkit-overflow-scrolling:touch; }
   .mfHRow::-webkit-scrollbar{ display:none; }
@@ -2189,7 +2189,15 @@
       <div id="mfFeaturedRow" class="mfHRow"></div>
     </div>
 
-    <div class="mfSectionHead"><span id="mfAllProductsTitle">🛍️ সব পণ্য</span><span class="mfBdBtn" id="mfAllBdBtn">🇧🇩 সব বাজার একসাথে</span></div>
+    <div class="mfAreaBox">
+      <div class="mfAreaHead"><span>📍 এলাকা বেছে পণ্য দেখুন</span><button type="button" class="mfAreaClear" id="mfAreaClear">✕ আমার বাজারে ফিরুন</button></div>
+      <div class="mfAreaRow">
+        <select id="mfAreaDist" aria-label="জেলা"><option value="">জেলা</option></select>
+        <select id="mfAreaUpz" aria-label="থানা" disabled><option value="">থানা</option></select>
+        <select id="mfAreaMkt" aria-label="বাজার" disabled><option value="">বাজার</option></select>
+      </div>
+    </div>
+    <div class="mfSectionHead"><span id="mfAllProductsTitle">🛍️ সব পণ্য</span></div>
     <div id="marketFeedGrid" class="pGrid"><div class="loadingMsg">প্রোডাক্ট লোড হচ্ছে...</div></div>
   </div>
 
@@ -11368,6 +11376,7 @@ function mfResetFilters(){
   mfQuickFilter = "";
   mfCatPath = { cat:"", sub:"", ss:"" }; __mfCatOpen = { cat:"", sub:"" };
   $("mfAllProductsTitle") && ($("mfAllProductsTitle").textContent = "🛍️ সব পণ্য");
+  if(typeof mfAreaReset === "function") mfAreaReset(); // বাজার বদলালে এলাকার বাছাই মুছে যায়
   const note = $("mfActiveFilterNote");
   if(note){ note.style.display = "none"; note.textContent = ""; }
   const quickWrap = $("mfQuickChips");
@@ -11377,9 +11386,9 @@ function mfResetFilters(){
 async function loadMarketFeedProducts(){
   const gridEl = $("marketFeedGrid");
   if(!gridEl) return;
-  if(hbMarketShops().length === 0){
+  if(hbMarketShops().length === 0 && !__mfBdMode){
     marketFeedProducts = [];
-    gridEl.innerHTML = '<div class="mfEmpty">এই বাজারে এখনো কোনো সক্রিয় দোকান নেই।</div>';
+    gridEl.innerHTML = '<div class="mfEmpty">এই বাজারে এখনো কোনো সক্রিয় দোকান নেই।<br>উপরে জেলা › থানা › বাজার বেছে অন্য এলাকার পণ্য দেখুন।</div>';
     $("mfFeaturedSection") && ($("mfFeaturedSection").style.display = "none");
     $("mfBannerCarousel") && ($("mfBannerCarousel").innerHTML = "");
     $("mfBannerDots") && ($("mfBannerDots").innerHTML = "");
@@ -11517,7 +11526,7 @@ function mfUpdateFilterNote(){
       </div>`;
     return;
   }
-  if(titleEl) titleEl.textContent = "🛍️ সব পণ্য";
+  if(titleEl) titleEl.textContent = mfAreaOn() ? mfAreaTitle() : "🛍️ সব পণ্য";
   if(parts.length){ note.style.display = "block"; note.textContent = "ফিল্টার: " + parts.join(" · ") + " (মুছতে ☰ মেনু → সব)"; }
   else{ note.style.display = "none"; note.textContent = ""; }
 }
@@ -11570,9 +11579,14 @@ function mfSortList(list){
 let __mfBdMode = false;
 let __mfBdProducts = null;
 let __mfBdLoading = false;
-
-async function mfLoadAllBdProducts(){
-  if(__mfBdProducts || __mfBdLoading) return;
+let __mfBdPromise = null;
+// একই সময়ে দুইবার ডাকলেও একটাই লোড চলে, আর দুই ডাকই শেষ হওয়া পর্যন্ত অপেক্ষা করে
+function mfLoadAllBdProducts(){
+  if(__mfBdProducts) return Promise.resolve();
+  if(!__mfBdPromise) __mfBdPromise = mfLoadAllBdProductsInner().finally(()=>{ __mfBdPromise = null; });
+  return __mfBdPromise;
+}
+async function mfLoadAllBdProductsInner(){
   __mfBdLoading = true;
   try{
     const shopsSnap = await db.collection("shops").where("status", "==", "active").get();
@@ -11591,6 +11605,8 @@ async function mfLoadAllBdProducts(){
           __shopArea: shop.upazila || shop.district || "",
           __shopIsOpen: shop.isShopOpen !== false,
           __marketId: shop.marketId || null,
+          __district: shop.district || ((allMarkets.find(m=> m.id === shop.marketId)||{}).district) || "",
+          __upazila: shop.upazila || ((allMarkets.find(m=> m.id === shop.marketId)||{}).upazila) || "",
           __cur: cur
         }));
       }catch(e){ console.warn("সব বাজার: দোকানের স্টক পড়া যায়নি", shop.id, e); return []; }
@@ -11612,6 +11628,7 @@ function mfGetFilteredSortedList(){
   // 🇧🇩 মোড চালু থাকলে দেশের সব পণ্য, নাহলে আগের মতোই এই বাজারের
   const source = (__mfBdMode && __mfBdProducts) ? __mfBdProducts : marketFeedProducts;
   let list = source.slice();
+  if(__mfBdMode && mfAreaOn()) list = list.filter(mfAreaMatch);
   // 🗂️ ক্যাটাগরি বাছা থাকলে — সেই জিনিসের দর তুলনা: কম দাম আগে
   if(mfCatPath.cat && __mcAllProducts){
     list = __mcAllProducts.filter(mfCatMatch);
@@ -11754,35 +11771,81 @@ function mfCardHTML(p, idx){
     </div>`;
 }
 
-/* 🇧🇩 বাটনটা একটা সুইচ — একবার চাপলে সারা দেশ, আবার চাপলে নিজের বাজার।
-   আলাদা স্ক্রিন বানাইনি, কারণ ফিল্টার/সাজানো/কার্ট সবই এই পাতায় আগে
-   থেকেই কাজ করে — নতুন স্ক্রিনে সেগুলো আবার লিখতে হতো। */
-async function mfSetBdMode(on){
-  const btn = $("mfAllBdBtn"), title = $("mfAllProductsTitle"), grid = $("marketFeedGrid");
-  if(!btn) return;
-  if(on){
+/* 📍 এলাকা দিয়ে পণ্য খোঁজা — জেলা › থানা › বাজার (আগের "🇧🇩 সব বাজার একসাথে" বাটনের জায়গায়)।
+     • কিছুই না বাছলে      → নিজের বাজারের পণ্য (আগের মতোই)
+     • শুধু জেলা বাছলে      → সেই জেলার সব থানা/বাজারের পণ্য
+     • জেলা + থানা বাছলে   → সেই থানার সব বাজারের পণ্য
+     • জেলা + থানা + বাজার → শুধু সেই বাজারের পণ্য
+   আলাদা স্ক্রিন বানাইনি — ফিল্টার/সাজানো/কার্ট সবই এই পাতায় আগে থেকেই কাজ করে। */
+let mfArea = { d:"", u:"", m:"" };
+function mfAreaOn(){ return !!(mfArea.d || mfArea.u || mfArea.m); }
+function mfAreaMatch(p){
+  return (!mfArea.d || p.__district === mfArea.d) && (!mfArea.u || p.__upazila === mfArea.u) && (!mfArea.m || p.__marketId === mfArea.m);
+}
+function mfAreaTitle(){
+  const mSel = $("mfAreaMkt");
+  const mName = (mfArea.m && mSel && mSel.selectedOptions[0]) ? mSel.selectedOptions[0].textContent : "";
+  const parts = [mfArea.d, mfArea.u, mName].filter(Boolean);
+  return "📍 " + parts.join(" › ") + "-এর পণ্য";
+}
+let __mfAreaFillTok = 0;
+async function mfAreaFill(){
+  const dS = $("mfAreaDist"), uS = $("mfAreaUpz"), mS = $("mfAreaMkt");
+  if(!dS || !uS || !mS) return;
+  const tok = ++__mfAreaFillTok;
+  dS.innerHTML = '<option value="">জেলা</option>' + getAllDistricts().map(d=>`<option value="${d}"${d===mfArea.d?" selected":""}>${d}</option>`).join("");
+  uS.disabled = !mfArea.d;
+  uS.innerHTML = '<option value="">থানা</option>' + (mfArea.d ? getUpazilasForDistrict(mfArea.d).map(u=>`<option value="${u}"${u===mfArea.u?" selected":""}>${u}</option>`).join("") : "");
+  mS.disabled = !mfArea.u;
+  mS.innerHTML = '<option value="">বাজার</option>';
+  $("mfAreaClear").style.display = mfAreaOn() ? "" : "none";
+  if(mfArea.d && mfArea.u){
+    try{
+      const qs = await db.collection("markets").where("district","==",mfArea.d).where("upazila","==",mfArea.u).get();
+      if(tok !== __mfAreaFillTok) return; // এর মধ্যে বাছাই বদলে গেছে
+      const ms = qs.docs.map(x=>({ id:x.id, name:String(x.data().name||x.id) })).sort((a,b)=> a.name.localeCompare(b.name,"bn"));
+      mS.innerHTML = '<option value="">' + (ms.length ? "বাজার" : "বাজার নেই") + '</option>' + ms.map(m=>`<option value="${escapeHtml(m.id)}"${m.id===mfArea.m?" selected":""}>${escapeHtml(m.name)}</option>`).join("");
+      if(mfAreaOn()) mfUpdateFilterNote(); // বাজারের নাম এখন জানা গেল — শিরোনামে বসবে
+    }catch(e){ console.warn("এলাকার বাজার আনা যায়নি", e); }
+  }
+}
+async function mfAreaApply(){
+  const grid = $("marketFeedGrid");
+  if(mfAreaOn()){
     if(!__mfBdProducts){
-      btn.textContent = "লোড হচ্ছে...";
-      if(grid) grid.innerHTML = '<div class="loadingMsg">সারা বাংলাদেশের পণ্য আনা হচ্ছে...</div>';
-      try{
-        await mfLoadAllBdProducts();
-      }catch(e){
-        btn.textContent = "🇧🇩 সব বাজার একসাথে";
-        if(grid) grid.innerHTML = '<div class="mfEmpty">সব বাজারের পণ্য আনা যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।</div>';
+      if(grid) grid.innerHTML = '<div class="loadingMsg">এলাকার পণ্য আনা হচ্ছে...</div>';
+      try{ await mfLoadAllBdProducts(); }
+      catch(e){
+        if(grid) grid.innerHTML = '<div class="mfEmpty">এলাকার পণ্য আনা যায়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।</div>';
         return;
       }
+      if(!mfAreaOn()) return; // লোড চলার সময় গ্রাহক ✕ চেপে ফিরে গেছেন
     }
     __mfBdMode = true;
-    if(title) title.textContent = "🇧🇩 সারা বাংলাদেশের পণ্য";
-    btn.textContent = "🏪 শুধু এই বাজার";
   }else{
     __mfBdMode = false;
-    if(title) title.textContent = "🛍️ সব পণ্য";
-    btn.textContent = "🇧🇩 সব বাজার একসাথে";
   }
+  mfUpdateFilterNote();
   renderMarketFeed();
 }
-$("mfAllBdBtn") && $("mfAllBdBtn").addEventListener("click", ()=> mfSetBdMode(!__mfBdMode));
+function mfAreaSet(d,u,m){
+  mfArea = { d:d||"", u:u||"", m:m||"" };
+  mfAreaFill();
+  mfAreaApply();
+}
+function mfAreaReset(){
+  const was = mfAreaOn() || __mfBdMode;
+  mfArea = { d:"", u:"", m:"" };
+  __mfBdMode = false;
+  if(was && $("mfAreaDist")) mfAreaFill();
+}
+if($("mfAreaDist")){
+  $("mfAreaDist").addEventListener("change", e=> mfAreaSet(e.target.value,"",""));
+  $("mfAreaUpz").addEventListener("change", e=> mfAreaSet(mfArea.d, e.target.value, ""));
+  $("mfAreaMkt").addEventListener("change", e=> mfAreaSet(mfArea.d, mfArea.u, e.target.value));
+  $("mfAreaClear").addEventListener("click", ()=>{ mfAreaSet("","",""); });
+  mfAreaFill();
+}
 
 /* 🛍️ দোকানের পাতার নিচের অংশ — এই বাজারের বাকি পণ্য।
    নিজের দোকানের পণ্য বাদ দেওয়া হয়, নাহলে উপরে-নিচে একই জিনিস দুইবার
@@ -11816,7 +11879,9 @@ function renderMarketFeed(){
   if(!gridEl) return;
   const list = mfGetFilteredSortedList();
   if(list.length === 0){
-    gridEl.innerHTML = '<div class="mfEmpty">😕 কোনো প্রোডাক্ট পাওয়া যায়নি।</div>';
+    gridEl.innerHTML = (__mfBdMode && mfAreaOn())
+      ? '<div class="mfEmpty">😕 এই এলাকায় এখনো কোনো পণ্য নেই।<br>অন্য এলাকা বাছুন, অথবা "✕ আমার বাজারে ফিরুন" চাপুন।</div>'
+      : '<div class="mfEmpty">😕 কোনো প্রোডাক্ট পাওয়া যায়নি।</div>';
     return;
   }
   gridEl.innerHTML = list.map((p,i)=> mfCardHTML(p,i)).join("");
