@@ -344,6 +344,12 @@
      থিমই #screenMarkets ও #screenMarketFeed-এ থাকছে, শুধু "Honey Bee Bazar"
      টাইটেল বার এই দুই স্ক্রিনে লুকানো থাকে (body.mfLight, showScreen() দ্রষ্টব্য)। */
   body.mfLight header{ display:none; }
+  /* 🍽️ রেস্টুরেন্ট পাতায় হেডারের লেখার জায়গায় এলাকা-বাছাই বাটন */
+  #hdrRstAreaBtn{ display:none; width:100%; text-align:left; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-weight:800; font-size:12.5px; padding:9px 12px; border-radius:12px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  body.rstActive #appHeaderTitle, body.rstActive #appHeaderTagline{ display:none; }
+  body.rstActive #hdrRstAreaBtn{ display:block; }
+  #rstAreaPanel{ display:none; }
+  #rstAreaPanel.open{ display:block; }
 
   .mfTopBar2{ display:flex; align-items:center; gap:8px; margin-bottom:14px; position:relative; }
   .mfTopBar2 .mfAreaBox{ display:none; position:absolute; top:48px; left:0; right:0; z-index:60; margin:0; background:#2a1d08; box-shadow:0 10px 24px rgba(0,0,0,0.5); }
@@ -818,6 +824,7 @@
     <div style="overflow:hidden; flex:1;" id="appHeaderTextWrap">
       <h1 class="slideText" id="appHeaderTitle">Honey Bee Bazar</h1>
       <p id="appHeaderTagline">আপনার এলাকার সবকিছু, এক জায়গায়</p>
+      <button type="button" id="hdrRstAreaBtn">📍 এলাকা বেছে রেস্টুরেন্ট খুঁজুন ▾</button>
     </div>
     <button type="button" id="headerNotifBtn" title="Notification" style="flex-shrink:0; width:38px; height:38px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:#fff8e8; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center;">🔔</button>
   </header>
@@ -1527,9 +1534,9 @@
   <div id="screenRestaurant" style="padding:20px 16px;">
     <button class="backBtn" id="backToHomeFromRestaurant">← হোমে ফিরে যান</button>
 
-    <div class="card" style="margin-bottom:12px; padding:12px;">
+    <div class="card" id="rstAreaPanel" style="margin-bottom:12px; padding:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <div style="font-weight:800; font-size:13.5px;">📍 এলাকা বেছে রেস্টুরেন্ট খুঁজুন</div>
+        <div style="font-weight:800; font-size:13.5px;">জেলা › থানা › বাজার</div>
         <button type="button" id="rstAreaClear" style="display:none; border:0; background:transparent; color:var(--amber); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✕ সব এলাকা</button>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
@@ -3860,7 +3867,8 @@ function showScreen(id){
   // 🐝 Market Feed / Market তালিকা — হালকা (লাইট) থিম, "Honey Bee Bazar" টাইটেল
   // বার লুকানো থাকে শুধু এই দুটো স্ক্রিনে (নিচের header/footer toggle এর
   // display:"" রিসেট এই CSS ক্লাসকেই কাজ করতে দেয়, override করে না)
-  document.body.classList.toggle("mfLight", id === "screenMarketFeed" || id === "screenMarkets" || id === "screenRestaurant");
+  document.body.classList.toggle("mfLight", id === "screenMarketFeed" || id === "screenMarkets");
+  document.body.classList.toggle("rstActive", id === "screenRestaurant");
 
   // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
   // খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন লুকিয়ে যায়, যাতে
@@ -4749,6 +4757,17 @@ async function rstAreaFill(){
     }catch(e){}
   }
   const clr = $("rstAreaClear"); if(clr) clr.style.display = rstArea.d ? "" : "none";
+  rstAreaBtnLabel();
+}
+function rstAreaBtnLabel(){
+  const b = $("hdrRstAreaBtn"); if(!b) return;
+  const mName = (rstArea.m && $("rstMkt") && $("rstMkt").selectedOptions[0]) ? $("rstMkt").selectedOptions[0].textContent : "";
+  const parts = [rstArea.d, rstArea.u, mName && mName !== "বাজার" ? mName : ""].filter(Boolean);
+  b.textContent = "📍 " + (parts.length ? parts.join(" › ") : "এলাকা বেছে রেস্টুরেন্ট খুঁজুন") + " ▾";
+}
+function rstAreaPanelToggle(open){
+  const pnl = $("rstAreaPanel"); if(!pnl) return;
+  pnl.classList.toggle("open", typeof open === "boolean" ? open : !pnl.classList.contains("open"));
 }
 function rstAreaSet(d,u,m){
   rstArea = { d:d||"", u:u||"", m:m||"" };
@@ -4762,8 +4781,9 @@ function rstAreaInit(){
   __rstAreaReady = true;
   dS.addEventListener("change", e=> rstAreaSet(e.target.value,"",""));
   $("rstUpz").addEventListener("change", e=> rstAreaSet(rstArea.d, e.target.value, ""));
-  $("rstMkt").addEventListener("change", e=> rstAreaSet(rstArea.d, rstArea.u, e.target.value));
-  $("rstAreaClear").addEventListener("click", ()=> rstAreaSet("","",""));
+  $("rstMkt").addEventListener("change", e=>{ rstAreaSet(rstArea.d, rstArea.u, e.target.value); if(e.target.value) rstAreaPanelToggle(false); });
+  $("rstAreaClear").addEventListener("click", ()=>{ rstAreaSet("","",""); rstAreaPanelToggle(false); });
+  const hb = $("hdrRstAreaBtn"); if(hb) hb.addEventListener("click", ()=> rstAreaPanelToggle());
   rstAreaFill();
 }
 
