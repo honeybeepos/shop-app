@@ -345,7 +345,9 @@
      টাইটেল বার এই দুই স্ক্রিনে লুকানো থাকে (body.mfLight, showScreen() দ্রষ্টব্য)। */
   body.mfLight header{ display:none; }
 
-  .mfTopBar2{ display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+  .mfTopBar2{ display:flex; align-items:center; gap:8px; margin-bottom:14px; position:relative; }
+  .mfTopBar2 .mfAreaBox{ display:none; position:absolute; top:48px; left:0; right:0; z-index:60; margin:0; background:#2a1d08; box-shadow:0 10px 24px rgba(0,0,0,0.5); }
+  .mfTopBar2 .mfAreaBox.open{ display:block; }
   .mfTopIconBtn{
     width:42px; height:42px; flex-shrink:0; border-radius:50%; border:1px solid var(--border);
     background:var(--card); color:#fff8e8; display:flex; align-items:center; justify-content:center; font-size:17px;
@@ -2176,17 +2178,17 @@
       <button class="mfTopIconBtn" id="mfSearchBtn" title="খুঁজুন">🔍</button>
       <button class="mfTopIconBtn" id="mfOfferBtn" title="অফার">🎁<span class="mfOfferDot" id="mfOfferDot" style="display:none;"></span></button>
       <button class="mfLocationPill" id="mfChangeAreaBtn"><span>📍</span><span class="mfLocTxt" id="mfMarketName">—</span><span class="mfChev">▾</span></button>
-      <button class="mfTopIconBtn" id="mfMenuBtn" title="মেনু">☰</button>
-    </div>
-
     <div class="mfAreaBox">
-      <div class="mfAreaHead"><span>📍 এলাকা বেছে পণ্য দেখুন</span><button type="button" class="mfAreaClear" id="mfAreaClear">✕ আমার বাজারে ফিরুন</button></div>
+      <div class="mfAreaHead"><span>📍 এলাকা বেছে নিন</span><button type="button" class="mfAreaClear" id="mfAreaClear">✕ আমার বাজারে ফিরুন</button></div>
       <div class="mfAreaRow">
         <select id="mfAreaDist" aria-label="জেলা"><option value="">জেলা</option></select>
         <select id="mfAreaUpz" aria-label="থানা" disabled><option value="">থানা</option></select>
         <select id="mfAreaMkt" aria-label="বাজার" disabled><option value="">বাজার</option></select>
       </div>
     </div>
+      <button class="mfTopIconBtn" id="mfMenuBtn" title="মেনু">☰</button>
+    </div>
+
     <div id="mfBannerCarousel" class="mfBannerCarousel"></div>
     <div id="mfBannerDots" class="mfBannerDots"></div>
 
@@ -12536,10 +12538,21 @@ function mfCloseAllSheets(){
   $("mfMenuSheet") && $("mfMenuSheet").classList.remove("show");
 }
 
-$("mfChangeAreaBtn") && $("mfChangeAreaBtn").addEventListener("click", ()=>{
-  mfCloseAllSheets();
-  showScreen("screenMarkets");
+$("mfChangeAreaBtn") && $("mfChangeAreaBtn").addEventListener("click", (e)=>{
+  e.stopPropagation();
+  const box = document.querySelector(".mfTopBar2 .mfAreaBox");
+  if(box) box.classList.toggle("open");
 });
+(function(){
+  const box = document.querySelector(".mfTopBar2 .mfAreaBox");
+  if(!box) return;
+  box.addEventListener("click", e=> e.stopPropagation());
+  document.addEventListener("click", ()=> box.classList.remove("open"));
+  const m = document.getElementById("mfAreaMkt");
+  if(m) m.addEventListener("change", ()=>{ if(m.value) box.classList.remove("open"); });
+  const c = document.getElementById("mfAreaClear");
+  if(c) c.addEventListener("click", ()=> box.classList.remove("open"));
+})();
 $("mfMenuChangeAreaBtn") && $("mfMenuChangeAreaBtn").addEventListener("click", ()=>{
   mfCloseAllSheets();
   showScreen("screenMarkets");
