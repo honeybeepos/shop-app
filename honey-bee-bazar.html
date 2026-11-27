@@ -348,11 +348,14 @@
   #hdrRstAreaBtn{ display:none; width:100%; text-align:left; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-weight:800; font-size:12.5px; padding:9px 12px; border-radius:12px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   body.rstActive #appHeaderTitle, body.rstActive #appHeaderTagline{ display:none; }
   body.rstActive #hdrRstAreaBtn{ display:block; }
-  #hdrRstShopBtn{ display:none; position:absolute; left:50%; top:calc(100% + 10px); transform:translateX(-50%); width:44px; height:44px; border-radius:50%; border:1.5px solid var(--amber); background:linear-gradient(135deg, rgba(255,183,3,0.32), rgba(230,126,34,0.22)); box-shadow:0 0 14px rgba(255,183,3,0.35); font-size:22px; line-height:1; cursor:pointer; align-items:center; justify-content:center; padding:0; }
-  #hdrRstShopBtn:active{ transform:translateX(-50%) scale(0.93); }
-  body.rstActive #hdrRstShopBtn{ display:flex; }
+  #hdrRstTools{ display:none; position:absolute; right:0; top:calc(100% + 10px); gap:8px; }
+  body.rstActive #hdrRstTools{ display:flex; }
+  #hdrRstShopBtn, #hdrRstCatBtn{ width:44px; height:44px; border-radius:50%; border:1.5px solid var(--amber); background:linear-gradient(135deg, rgba(255,183,3,0.32), rgba(230,126,34,0.22)); box-shadow:0 0 14px rgba(255,183,3,0.35); font-size:22px; line-height:1; color:#ffd166; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; position:relative; }
+  #hdrRstShopBtn:active, #hdrRstCatBtn:active{ transform:scale(0.93); }
+  #hdrRstCatBtn.on::after{ content:""; position:absolute; top:2px; right:2px; width:10px; height:10px; border-radius:50%; background:#ef4444; border:1.5px solid #1c1409; }
   #rstShopPanel{ display:none; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409; border:1px solid var(--amber); border-radius:14px; box-shadow:0 14px 34px rgba(0,0,0,0.6); padding:10px; max-height:60vh; overflow-y:auto; }
-  #rstShopPanel.open{ display:block; }
+  #rstShopPanel.open, #rstCatPanel.open{ display:block; }
+  #rstCatPanel{ display:none; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409; border:1px solid var(--amber); border-radius:14px; box-shadow:0 14px 34px rgba(0,0,0,0.6); padding:10px; max-height:60vh; overflow-y:auto; }
   #rstAreaPanel{ display:none; }
   #rstAreaPanel.open{ display:block; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409 !important; box-shadow:0 14px 34px rgba(0,0,0,0.6); border:1px solid var(--amber); margin:0 !important; }
 
@@ -833,7 +836,7 @@
     </div>
     <div style="position:relative; flex-shrink:0;">
     <button type="button" id="headerNotifBtn" title="Notification" style="flex-shrink:0; width:38px; height:38px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:#fff8e8; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center;">🔔</button>
-      <button type="button" id="hdrRstShopBtn" title="রেস্টুরেন্ট খুঁজুন" aria-label="রেস্টুরেন্ট খুঁজুন">🏪</button>
+      <div id="hdrRstTools"><button type="button" id="hdrRstCatBtn" title="খাবারের ক্যাটাগরি" aria-label="খাবারের ক্যাটাগরি">☰</button><button type="button" id="hdrRstShopBtn" title="রেস্টুরেন্ট খুঁজুন" aria-label="রেস্টুরেন্ট খুঁজুন">🏪</button></div>
     </div>
   </header>
 
@@ -1543,6 +1546,7 @@
     <button class="backBtn" id="backToHomeFromRestaurant">← হোমে ফিরে যান</button>
 
     <div id="rstShopPanel"></div>
+    <div id="rstCatPanel"></div>
     <div class="card" id="rstAreaPanel" style="margin-bottom:12px; padding:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <div style="font-weight:800; font-size:13.5px;">জেলা › থানা › বাজার</div>
@@ -4780,6 +4784,37 @@ function rstAreaPanelToggle(open){
   pnl.classList.toggle("open", willOpen);
   if(willOpen){ const sp = $("rstShopPanel"); if(sp) sp.classList.remove("open"); const h = document.querySelector("header"); pnl.style.top = ((h ? h.getBoundingClientRect().bottom : 70) + 6) + "px"; }
 }
+// ☰ হেডারের মেনু আইকন — রেস্টুরেন্টগুলো যে খাবারের ক্যাটাগরি দিয়েছে (মাংস, ভেজিটেবল, ইত্যাদি) সেগুলোর তালিকা
+window.rstCatSet = function(c){ rstCat = c || ""; const p = $("rstCatPanel"); if(p) p.classList.remove("open"); rstRender(); };
+function rstCatPanelRender(){
+  const pnl = $("rstCatPanel"); if(!pnl) return;
+  const counts = {};
+  rstFoodsAll.forEach(f=>{ const c = f.cat || "অন্যান্য"; counts[c] = (counts[c] || 0) + 1; });
+  const cats = Object.keys(counts).sort((a,b)=> counts[b] - counts[a] || a.localeCompare(b, "bn"));
+  const row = (key, label, n)=> '<div data-rstcat="' + escapeHtml(key) + '" style="display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:11px; margin-bottom:6px; cursor:pointer; border:1px solid ' + (rstCat === key ? 'rgba(255,183,3,0.6)' : 'rgba(255,255,255,0.08)') + '; background:' + (rstCat === key ? 'rgba(230,126,34,0.22)' : 'rgba(255,255,255,0.05)') + '; color:' + (rstCat === key ? '#ffd166' : '#fff8e8') + ';">'
+    + '<span style="flex:1; font-weight:700; font-size:13.5px;">' + label + '</span>'
+    + '<span style="font-size:11px; font-weight:800; min-width:22px; text-align:center; padding:2px 7px; border-radius:10px; background:rgba(255,183,3,0.2); color:#ffd166;">' + n + '</span></div>';
+  pnl.innerHTML = '<div style="font-weight:800; font-size:13px; margin:2px 4px 8px; color:#fff8e8;">🍴 খাবারের ক্যাটাগরি</div>'
+    + (cats.length ? row("", "🍽️ সব খাবার", rstFoodsAll.length) + cats.map(c=> row(c, escapeHtml(c), counts[c])).join("")
+                   : '<div class="emptyMsg" style="padding:14px;">এখনো কোনো ক্যাটাগরি নেই।</div>');
+}
+function rstCatPanelToggle(open){
+  const pnl = $("rstCatPanel"); if(!pnl) return;
+  const willOpen = typeof open === "boolean" ? open : !pnl.classList.contains("open");
+  pnl.classList.toggle("open", willOpen);
+  if(willOpen){
+    ["rstShopPanel","rstAreaPanel"].forEach(id=>{ const x = $(id); if(x) x.classList.remove("open"); });
+    const h = document.querySelector("header"); pnl.style.top = ((h ? h.getBoundingClientRect().bottom : 70) + 62) + "px";
+    rstCatPanelRender();
+  }
+}
+document.addEventListener("click", (e)=>{
+  const pnl = $("rstCatPanel"); if(!pnl) return;
+  if(e.target.closest("#hdrRstCatBtn")){ rstCatPanelToggle(); return; }
+  const it = e.target.closest("[data-rstcat]");
+  if(it && pnl.contains(it)){ window.rstCatSet(it.getAttribute("data-rstcat")); return; }
+  if(pnl.classList.contains("open") && !pnl.contains(e.target)) pnl.classList.remove("open");
+});
 // 🏪 হেডারের দোকান আইকন — এই এলাকার রেস্টুরেন্টের তালিকা, চাপলে সেই রেস্টুরেন্টের মেনু
 function rstShopPanelRender(){
   const pnl = $("rstShopPanel"); if(!pnl) return;
@@ -4806,7 +4841,7 @@ function rstShopPanelToggle(open){
   const willOpen = typeof open === "boolean" ? open : !pnl.classList.contains("open");
   pnl.classList.toggle("open", willOpen);
   if(willOpen){
-    rstAreaPanelToggle(false);
+    rstAreaPanelToggle(false); const cp = $("rstCatPanel"); if(cp) cp.classList.remove("open");
     const h = document.querySelector("header"); pnl.style.top = ((h ? h.getBoundingClientRect().bottom : 70) + 62) + "px";
     rstShopPanelRender();
   }
@@ -4826,6 +4861,7 @@ document.addEventListener("click", (e)=>{
 });
 function rstAreaSet(d,u,m){
   rstArea = { d:d||"", u:u||"", m:m||"" };
+  rstCat = "";
   try{ localStorage.setItem("hbRstArea", JSON.stringify(rstArea)); }catch(e){}
   rstAreaFill();
   rstRender();
@@ -4885,17 +4921,19 @@ function rstRender(){
     const foods = [];
     list.forEach(r => (rstFoodCache[r.id] || []).forEach(f => foods.push(Object.assign({}, f, { __rst:r }))));
     rstFoodsAll = foods;
-    const shown = foods.filter(f => !q ||
+    const cb = $("hdrRstCatBtn"); if(cb) cb.classList.toggle("on", !!rstCat);
+    const shown = foods.filter(f => (!rstCat || (f.cat || "অন্যান্য") === rstCat) && (!q ||
       String(f.name || "").toLowerCase().includes(q) || String(f.cat || "").toLowerCase().includes(q) ||
       String(f.__rst.name || "").toLowerCase().includes(q) ||
-      (Array.isArray(f.__rst.tags) && f.__rst.tags.some(t => String(t).toLowerCase().includes(q))))
+      (Array.isArray(f.__rst.tags) && f.__rst.tags.some(t => String(t).toLowerCase().includes(q)))))
       .sort((a,b)=> (b.__rst.isOpen !== false ? 1 : 0) - (a.__rst.isOpen !== false ? 1 : 0));
     if(!shown.length){
       box.innerHTML = q ? '<div class="mfEmpty">😕 এই নামে কোনো খাবার পাওয়া যায়নি।</div>'
                         : '<div class="mfEmpty">এই এলাকার রেস্টুরেন্টগুলো এখনো কোনো খাবার দেখায়নি।</div>';
       return;
     }
-    box.innerHTML = '<div class="pGrid">' + shown.map((f, i)=> rmFoodCardHTML(f, i)).join("") + '</div>';
+    box.innerHTML = (rstCat ? '<div style="margin-bottom:10px;"><span style="display:inline-flex; align-items:center; gap:8px; background:rgba(230,126,34,0.22); color:#ffb703; border:1px solid rgba(255,183,3,0.45); border-radius:20px; padding:6px 12px; font-weight:800; font-size:12px;">🍴 ' + escapeHtml(rstCat) + ' <button type="button" onclick="rstCatSet(\'\')" style="border:0; background:transparent; color:#ffd166; font-weight:800; cursor:pointer; font-family:inherit; padding:0;">✕</button></span></div>' : '')
+      + '<div class="pGrid">' + shown.map((f, i)=> rmFoodCardHTML(f, i)).join("") + '</div>';
   };
   if(!need.length){ paint(); return; }
   box.innerHTML = '<div class="loadingMsg">খাবার আনা হচ্ছে...</div>';
@@ -4908,7 +4946,7 @@ function rstRender(){
   })).then(function(){ if(seq === __rstFoodSeq) paint(); });
 }
 
-let rstFoodsAll = [], rstFoodCache = {}, __rstFoodSeq = 0;
+let rstFoodsAll = [], rstFoodCache = {}, __rstFoodSeq = 0, rstCat = "";
 window.rstOpenById = function(id){ const r = rstAll.find(x => x.id === id); if(r) rmOpen(r); };
 
 /* ==================== 🍽️ একটা রেস্টুরেন্টের মেনু ====================
