@@ -7793,6 +7793,7 @@ function phRender(){
 let hbEkaArea = { d:"", u:"" };
 try{ const a = JSON.parse(localStorage.getItem("hbEkaArea")||"null"); if(a) hbEkaArea = Object.assign(hbEkaArea, a); }catch(e){}
 if(!hbEkaArea.d){ try{ const t = JSON.parse(localStorage.getItem("hbTlrArea")||"null"); if(t && t.d){ hbEkaArea = { d:t.d, u:t.u||"" }; } }catch(e){} }
+if(!hbEkaArea.d){ try{ const a = JSON.parse(localStorage.getItem("hb-area")||"null"); if(a && a.d){ hbEkaArea = { d:a.d, u:a.u||"" }; } }catch(e){} }
 let __hbEkaAreaReady = false;
 function hbEkaAreaFill(){
   const dS = document.getElementById("hbEkaDist"), uS = document.getElementById("hbEkaUpz");
@@ -7847,7 +7848,20 @@ async function hbEkaLoadProducts(){
       return;
     }
   }else{
+    // allShops শুধু সেশনে কোনো বাজারে ঢুকলে ভরে, রিফ্রেশে খালি — তাই খালি থাকলে
+    // শেষ ঢোকা (পছন্দের) বাজারের দোকান, না থাকলে সব সক্রিয় দোকান সরাসরি আনা হয়
     shops = allShops || [];
+    if(!shops.length){
+      gridEl.innerHTML = "<div class='loadingMsg'>দোকান খোঁজা হচ্ছে...</div>";
+      try{
+        let lastId = ""; try{ lastId = localStorage.getItem("hb-last-market-id") || ""; }catch(e){}
+        let q = db.collection("shops").where("status","==","active");
+        if(lastId) q = q.where("marketId","==",lastId);
+        const qs = await q.limit(150).get();
+        if(mySeq !== __hbEkaLoadSeq) return;
+        shops = qs.docs.map(d=> ({ id:d.id, ...d.data() })).filter(sh=> !sh.countryCode || sh.countryCode === "BD");
+      }catch(e){ console.warn("Ekadashi special: default shops load failed", e); if(mySeq !== __hbEkaLoadSeq) return; }
+    }
     if(noteEl) noteEl.textContent = shops.length ? "জেলা বা থানা বাছলে আপনার এলাকার সব দোকানের পণ্য দেখবেন।" : "";
     if(!shops.length){
       __hbEkaProducts = [];
