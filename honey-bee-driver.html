@@ -1533,7 +1533,7 @@ function drvRenderBookings(pend,acc,old){
   act.innerHTML=`<h2 class="section-title" style="color:#4ade80">✅ নিশ্চিত বুকিং</h2>`+front.map(b=>drvBkCard(b,
     `${drvTripMs(b)>Date.now()?`<button class="btn" type="button" disabled data-wait="${esc(b.id)}" style="opacity:.45;cursor:not-allowed">🏁 যাত্রা শেষ</button>`:`<button class="btn" type="button" data-done="${esc(b.id)}">🏁 যাত্রা শেষ</button>`}<button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ বাতিল</button><button class="btn secondary" type="button" data-chat="${esc(b.id)}" data-bkc="${esc(b.id)}" data-base="💬 যাত্রীর সাথে চ্যাট">💬 যাত্রীর সাথে চ্যাট</button>${b.tripAt?"":`<button class="btn secondary" type="button" data-sched="${esc(b.id)}" style="border-color:#fbbf24;color:#fbbf24">🗓️ সময় ঠিক করুন</button>`}`)).join("");
   box.className=pend.length||old.length?"":"sub";
-  box.innerHTML=(pend.length?pend.map(b=>drvBkCard(b,`<button class="btn" type="button" data-yes="${esc(b.id)}">✅ গ্রহণ করুন</button><button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ না</button>`)).join(""):"<div class='sub'>এখন নতুন কোনো বুকিং অনুরোধ নেই। যাত্রীরা আপনার পোস্ট দেখে বুক করলে এখানে আসবে।</div>")
+  box.innerHTML=(pend.length?pend.map(b=>drvBkCard(b,`<button class="btn" type="button" data-yes="${esc(b.id)}">✅ গ্রহণ করুন</button><button class="btn secondary" type="button" data-no="${esc(b.id)}">❌ না</button><button class="btn secondary" type="button" data-chat="${esc(b.id)}" data-bkc="${esc(b.id)}" data-base="💬 যাত্রীর সাথে চ্যাট">💬 যাত্রীর সাথে চ্যাট</button>`)).join(""):"<div class='sub'>এখন নতুন কোনো বুকিং অনুরোধ নেই। যাত্রীরা আপনার পোস্ট দেখে বুক করলে এখানে আসবে।</div>")
     +(old.length?`<div class="sub" style="margin-top:14px">আগের বুকিং <small>(৭ দিন পর নিজে থেকে মুছে যায়)</small></div>`+old.map(b=>drvBkCard(b,"")).join(""):"");
   // নিশ্চিত বুকিংয়ের যাত্রীর নম্বর — গ্রহণের পরেই পড়া যায়
   drvRenderSched();
@@ -1545,7 +1545,7 @@ function drvRenderBookings(pend,acc,old){
   document.querySelectorAll("[data-fl]").forEach(x=>x.onclick=()=>drvOpenFlight(x.dataset.fl));
   // 💬 বুকিং চ্যাট — নিশ্চিত বুকিংগুলোর মেসেজ শোনা + নতুন মেসেজের সংখ্যা/শব্দ
   BKC.role="driver"; BKC.uid=DRV.uid; BKC.onNew=()=>{ try{ drvBeep(); }catch(e){} };
-  bkcSync(acc.map(b=>b.id)); bkcBindChat(acc); bkcBadges();
+  bkcSync(acc.concat(pend).map(b=>b.id)); bkcBindChat(acc.concat(pend)); bkcBadges();
 }
 function bkcBindChat(acc){
   document.querySelectorAll("[data-chat]").forEach(x=>x.onclick=()=>{ const b=(acc||[]).find(p=>p.id===x.dataset.chat)||{}; bkcOpen(x.dataset.chat, b.passengerName||"যাত্রী"); });

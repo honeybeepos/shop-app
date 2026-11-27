@@ -685,14 +685,14 @@ service cloud.firestore {
              && resource.data.status in ["pending","accepted"] && request.resource.data.status == "cancelled"));
       allow delete: if false;
 
-      // 💬 বুকিং চ্যাট (লেখা + 🎤 ভয়েস) — শুধু এই বুকিংয়ের যাত্রী ও চালক; লেখা যায় শুধু "accepted" অবস্থায়, পড়া যায় accepted/completed-এ
+      // 💬 বুকিং চ্যাট (লেখা + 🎤 ভয়েস) — শুধু এই বুকিংয়ের যাত্রী ও চালক; লেখা যায় pending/accepted অবস্থায় (চালক গ্রহণের আগেও যাত্রী-চালক কথা বলতে পারেন), পড়া যায় pending/accepted/completed-এ
       match /chat/{messageId} {
         allow read: if isSignedIn()
-          && get(/databases/$(database)/documents/transportBookings/$(bid)).data.status in ["accepted","completed"]
+          && get(/databases/$(database)/documents/transportBookings/$(bid)).data.status in ["pending","accepted","completed"]
           && (get(/databases/$(database)/documents/transportBookings/$(bid)).data.passengerId == request.auth.uid
               || get(/databases/$(database)/documents/transportBookings/$(bid)).data.driverId == request.auth.uid);
         allow create: if isSignedIn()
-          && get(/databases/$(database)/documents/transportBookings/$(bid)).data.status == "accepted"
+          && get(/databases/$(database)/documents/transportBookings/$(bid)).data.status in ["pending","accepted"]
           && request.resource.data.keys().hasOnly(["senderId","senderRole","text","audio","audioSec","sentAt"])
           && request.resource.data.senderId == request.auth.uid
           && ((request.resource.data.senderRole == "passenger" && request.auth.uid == get(/databases/$(database)/documents/transportBookings/$(bid)).data.passengerId)
