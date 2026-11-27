@@ -11354,7 +11354,13 @@ async function goToFavoriteMarket(){
     });
   }
   if(!target) target = allMarkets[0];
+  let savedArea = null;
+  try{ savedArea = JSON.parse(localStorage.getItem("hb-area") || "null"); }catch(e){}
   selectMarket(target.id, true);   // এই কার্ডের কাজই দোকানের ধাপ বাদ দেওয়া
+  // 📍 আগেরবার যে জেলা/থানা/বাজার বেছেছিলেন সেটাই আবার বসে যায়
+  if(savedArea && (savedArea.d || savedArea.u || savedArea.m) && typeof mfAreaSet === "function"){
+    mfAreaSet(savedArea.d, savedArea.u, savedArea.m);
+  }
 }
 
 $("backToMarkets").addEventListener("click", ()=> showScreen("screenHome"));
@@ -11847,11 +11853,16 @@ async function mfAreaApply(){
 }
 function mfAreaSet(d,u,m){
   mfArea = { d:d||"", u:u||"", m:m||"" };
+  try{
+    if(mfAreaOn()) localStorage.setItem("hb-area", JSON.stringify(mfArea));
+    else localStorage.removeItem("hb-area");
+  }catch(e){}
   mfSyncPill();
   mfAreaFill();
   mfAreaApply();
 }
 function mfAreaReset(){
+  try{ localStorage.removeItem("hb-area"); }catch(e){}
   const was = mfAreaOn() || __mfBdMode;
   mfArea = { d:"", u:"", m:"" };
   __mfBdMode = false;
