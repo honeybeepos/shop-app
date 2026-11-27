@@ -348,6 +348,9 @@
   #hdrRstAreaBtn{ display:none; width:100%; text-align:left; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-weight:800; font-size:12.5px; padding:9px 12px; border-radius:12px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   body.rstActive #appHeaderTitle, body.rstActive #appHeaderTagline{ display:none; }
   body.rstActive #hdrRstAreaBtn{ display:block; }
+  #hdrRstBackBtn{ display:none; position:absolute; left:0; top:calc(100% + 10px); width:44px; height:44px; border-radius:50%; border:1.5px solid var(--amber); background:linear-gradient(135deg, rgba(255,183,3,0.32), rgba(230,126,34,0.22)); box-shadow:0 0 14px rgba(255,183,3,0.35); font-size:22px; font-weight:800; line-height:1; color:#ffd166; cursor:pointer; align-items:center; justify-content:center; padding:0; }
+  #hdrRstBackBtn:active{ transform:scale(0.93); }
+  body.rstActive #hdrRstBackBtn{ display:flex; }
   #hdrRstTools{ display:none; position:absolute; right:0; top:calc(100% + 10px); gap:8px; }
   body.rstActive #hdrRstTools{ display:flex; }
   #hdrRstShopBtn, #hdrRstCatBtn, #hdrRstSearchBtn{ width:44px; height:44px; border-radius:50%; border:1.5px solid var(--amber); background:linear-gradient(135deg, rgba(255,183,3,0.32), rgba(230,126,34,0.22)); box-shadow:0 0 14px rgba(255,183,3,0.35); font-size:22px; line-height:1; color:#ffd166; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; position:relative; }
@@ -827,10 +830,13 @@
 <div class="wrap">
 
   <header>
+    <div style="position:relative; flex-shrink:0;">
     <a href="mou.html" id="headerMouBtn" style="flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-decoration:none; color:#fff8e8; width:44px;">
       <span style="font-size:26px; line-height:1;">🐝</span>
       <span style="font-size:9px; font-weight:700; margin-top:2px;">মৌ</span>
     </a>
+      <button type="button" id="hdrRstBackBtn" title="হোমে ফিরে যান" aria-label="হোমে ফিরে যান">←</button>
+    </div>
     <div style="overflow:hidden; flex:1;" id="appHeaderTextWrap">
       <h1 class="slideText" id="appHeaderTitle">Honey Bee Bazar</h1>
       <p id="appHeaderTagline">আপনার এলাকার সবকিছু, এক জায়গায়</p>
@@ -1545,7 +1551,7 @@
   </div>
 
   <div id="screenRestaurant" style="padding:20px 16px;">
-    <button class="backBtn" id="backToHomeFromRestaurant">← হোমে ফিরে যান</button>
+    <button class="backBtn" id="backToHomeFromRestaurant" style="display:none;">← হোমে ফিরে যান</button>
 
     <div id="rstShopPanel"></div>
     <div id="rstCatPanel"></div>
@@ -4780,6 +4786,7 @@ function rstAreaPanelToggle(open){
   pnl.classList.toggle("open", willOpen);
   if(willOpen){ ["rstShopPanel","rstCatPanel","rstSearchPanel"].forEach(id=>{ const x = $(id); if(x) x.classList.remove("open"); }); const h = document.querySelector("header"); pnl.style.top = ((h ? h.getBoundingClientRect().bottom : 70) + 6) + "px"; }
 }
+document.addEventListener("click", (e)=>{ if(e.target.closest("#hdrRstBackBtn")){ const b = document.getElementById("backToHomeFromRestaurant"); if(b) b.click(); } });
 // 🔍 হেডারের খোঁজ আইকন — চাপলে সার্চ বক্স নামে, লিখলেই খাবার/রেস্টুরেন্ট ছেঁকে যায়
 function rstSearchPanelToggle(open){
   const pnl = $("rstSearchPanel"); if(!pnl) return;
