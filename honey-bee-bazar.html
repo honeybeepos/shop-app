@@ -15021,6 +15021,27 @@ function hbTrackerBillHtml(order){
     <div style="display:flex; justify-content:space-between; font-weight:800; font-size:14px; color:var(--amber); border-top:1px dashed var(--border); margin-top:3px; padding-top:3px;"><span>মোট দিতে হবে</span><span>${HB_CUR} ${r(sub + del)}</span></div>
   </div>`;
 }
+/* 🖼️ Order Tracking-এ প্রোডাক্টের আসল ছবি — অর্ডারে ছবি সেভ করা থাকে না, তাই
+   দোকানের publicStock থেকে (যেখান থেকে Cart-এ পণ্য যোগ হয়েছিল) ছবি এনে 📦 আইকনের জায়গায় বসানো হয়।
+   গোপনীয় পণ্যে ছবি দেখানো হয় না। একবার আনা ছবি মনে রাখা হয়। */
+const __hbOrdImgCache = {};
+async function hbTrackerLoadImage(order){
+  try{
+    if(!order || order.isPrivate || !order.shopId || !order.productId) return;
+    const box = $("hbTrackerImgBox"); if(!box) return;
+    const key = order.shopId + "/" + order.productId;
+    let url = order.imageUrl || __hbOrdImgCache[key];
+    if(url === undefined){
+      const d = await db.collection("shops").doc(order.shopId).collection("publicStock").doc(order.productId).get();
+      const x = d.exists ? d.data() : null;
+      url = x ? (x.imageUrl || (Array.isArray(x.images) && x.images[0]) || (Array.isArray(x.imageUrls) && x.imageUrls[0]) || "") : "";
+      __hbOrdImgCache[key] = url;
+    }
+    if(url && $("hbTrackerImgBox") === box){
+      box.innerHTML = '<img src="' + escapeHtml(url) + '" alt="" style="width:100%; height:100%; object-fit:cover;" onerror="this.remove()">';
+    }
+  }catch(e){ console.warn("tracker image:", e && e.code); }
+}
 function hbOpenTracker(order){
   const status = order.status || "pending";
   // 🆔 Order ID — নিজস্ব কোনো ফরম্যাটেড আইডি সেভ করা হয় না, তাই Firestore
@@ -15030,7 +15051,7 @@ function hbOpenTracker(order){
   const time = order.createdAt ? order.createdAt.toDate().toLocaleString('bn-BD', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : "";
   $("hbTrackerOrderDetails").innerHTML = `
     <div style="display:flex; align-items:center; gap:12px;">
-      <div style="width:52px; height:52px; border-radius:12px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0;">${order.isPrivate ? "🔒" : guessCategoryIcon(order.productName)}</div>
+      <div id="hbTrackerImgBox" style="width:52px; height:52px; border-radius:12px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:26px; flex-shrink:0; overflow:hidden;">${order.isPrivate ? "🔒" : guessCategoryIcon(order.productName)}</div>
       <div style="flex:1; min-width:0;">
         <div style="font-weight:800; font-size:14.5px;">${escapeHtml(hbPrivName(order.productName||"প্রোডাক্ট", order.isPrivate))}</div>
         <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">পরিমাণ: ${order.qty||1}${time ? " · " + time : ""}</div>
@@ -15040,6 +15061,7 @@ function hbOpenTracker(order){
     ${order.orderCode ? `<div style="font-size:12px; margin-top:8px;">🧾 অর্ডার নম্বর: <b style="color:var(--amber);">${escapeHtml(order.orderCode)}</b></div>` : ""}
     ${hbTrackerBillHtml(order)}
     ${hbShopContactHtml(order.shopId, order)}`;
+  hbTrackerLoadImage(order);
 
   // 🚴 রাইডার ডিসপ্যাচ স্ট্যাটাস — "প্রস্তুত হচ্ছে" ধাপে থাকা অবস্থায় দোকানদার
   // আসলে কী করছে (রাইডার খুঁজছে/এখনো পায়নি/পেয়ে গেছে) সেটা সরাসরি Firestore-এর
