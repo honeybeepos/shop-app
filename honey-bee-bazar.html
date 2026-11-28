@@ -377,6 +377,16 @@
   #hdrTlrTools button:active{ transform:scale(0.93); }
   #hdrTlrTools button.on::after{ content:""; position:absolute; top:2px; right:2px; width:10px; height:10px; border-radius:50%; background:#ef4444; border:1.5px solid #1c1409; }
   body.tlrActive #screenTailor{ padding-top:52px !important; }
+  /* 🚕 Transport — হেডারে আইকন সারি; বড় কার্ড/বাটন আইকনে সরেছে (বুকিং ফর্ম যেমন ছিল তেমন) */
+  body.trpActive header{ position:relative; }
+  body.trpActive header > div:first-child, body.trpActive header > div:last-child{ position:static !important; }
+  #hdrTrpTools{ display:none; position:absolute; left:0; right:0; top:calc(100% + 10px); justify-content:space-between; padding:0 36px; }
+  body.trpActive #hdrTrpTools{ display:flex; }
+  #hdrTrpTools button{ flex:0 0 44px; width:44px; height:44px; border-radius:50%; border:1.5px solid var(--amber); background:linear-gradient(135deg, rgba(255,183,3,0.32), rgba(230,126,34,0.22)); box-shadow:0 0 14px rgba(255,183,3,0.35); font-size:21px; line-height:1; color:#ffd166; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
+  #hdrTrpTools button:active{ transform:scale(0.93); }
+  #hdrTrpBackBtn{ margin-left:-36px; }
+  body.trpActive #screenTransport{ padding-top:52px !important; }
+  body.trpActive #tmOpenCardBtn, body.trpActive #smartFlightInfoBtn, body.trpActive #backToHomeFromTransport{ display:none !important; }
   .tlrPanel{ display:none; }
   .tlrPanel.open{ display:block; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409 !important; border:1px solid var(--amber); border-radius:14px; box-shadow:0 14px 34px rgba(0,0,0,0.6); padding:10px; max-height:62vh; overflow-y:auto; margin:0 !important; }
   #rstAreaPanel{ display:none; }
@@ -862,6 +872,7 @@
     </div>
     <div style="position:relative; flex-shrink:0;">
     <button type="button" id="headerNotifBtn" title="Notification" style="flex-shrink:0; width:38px; height:38px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:#fff8e8; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center;">🔔</button>
+      <div id="hdrTrpTools"><button type="button" id="hdrTrpBackBtn" title="হোমে ফিরে যান" aria-label="হোমে ফিরে যান">←</button><button type="button" id="hdrTrpMediaBtn" title="Transport Media" aria-label="Transport Media">🚐</button><button type="button" id="hdrTrpFlightBtn" title="Flight Information" aria-label="Flight Information">✈️</button><button type="button" id="hdrTrpHistBtn" title="আমার ট্রিপ হিস্ট্রি" aria-label="আমার ট্রিপ হিস্ট্রি">📜</button></div>
       <div id="hdrTlrTools"><button type="button" id="hdrTlrBackBtn" title="হোমে ফিরে যান" aria-label="হোমে ফিরে যান">←</button><button type="button" id="hdrTlrSearchBtn" title="খোঁজ" aria-label="খোঁজ">🔍</button><button type="button" id="hdrTlrCatBtn" title="ক্যাটাগরি" aria-label="ক্যাটাগরি">☰</button><button type="button" id="hdrTlrShopBtn" title="দর্জি" aria-label="দর্জি">🧵</button><button type="button" id="hdrTlrMeasureBtn" title="আমার মাপের খাতা" aria-label="আমার মাপের খাতা">📏</button><button type="button" id="hdrTlrClaimBtn" title="দোকানের রসিদ" aria-label="দোকানের রসিদ">🧾</button></div>
       <div id="hdrRstTools"><button type="button" id="hdrRstBackBtn" title="হোমে ফিরে যান" aria-label="হোমে ফিরে যান">←</button><button type="button" id="hdrRstSearchBtn" title="খোঁজ" aria-label="খোঁজ">🔍</button><button type="button" id="hdrRstCatBtn" title="খাবারের ক্যাটাগরি" aria-label="খাবারের ক্যাটাগরি">☰</button><button type="button" id="hdrRstShopBtn" title="রেস্টুরেন্ট খুঁজুন" aria-label="রেস্টুরেন্ট খুঁজুন">🏪</button></div>
     </div>
@@ -3896,9 +3907,10 @@ function showScreen(id){
     if(headerTaglineEl) headerTaglineEl.textContent = "‹ দর্জির ডিজাইনে ফিরে যান";
     if(headerWrapEl){ headerWrapEl.style.cursor = "pointer"; headerWrapEl.onclick = ()=> showScreen("screenTailor"); }
   }else if(id === "screenTransport"){
-    if(headerTitleEl) headerTitleEl.textContent = "📜 আমার ট্রিপ হিস্ট্রি";
-    if(headerTaglineEl) headerTaglineEl.textContent = "ক্লিক করে আগের সব ট্রিপ দেখুন ›";
-    if(headerWrapEl){ headerWrapEl.style.cursor = "pointer"; headerWrapEl.onclick = ()=> { if(typeof tripOpenHistory === "function") tripOpenHistory(); }; }
+    // ট্রিপ হিস্ট্রি এখন হেডারের 📜 আইকনে; লেখা শুধু শিরোনাম
+    if(headerTitleEl) headerTitleEl.textContent = "🚕 Honey Bee Transport";
+    if(headerTaglineEl) headerTaglineEl.textContent = "গন্তব্য দিয়ে সহজে বুক করুন";
+    if(headerWrapEl){ headerWrapEl.style.cursor = ""; headerWrapEl.onclick = null; }
   }else{
     if(headerTitleEl) headerTitleEl.textContent = "Honey Bee Bazar";
     if(headerTaglineEl) headerTaglineEl.textContent = "আপনার এলাকার সবকিছু, এক জায়গায়";
@@ -3911,6 +3923,7 @@ function showScreen(id){
   document.body.classList.toggle("mfLight", id === "screenMarketFeed" || id === "screenMarkets");
   document.body.classList.toggle("rstActive", id === "screenRestaurant");
   document.body.classList.toggle("tlrActive", id === "screenTailor");
+  document.body.classList.toggle("trpActive", id === "screenTransport");
 
   // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
   // খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন লুকিয়ে যায়, যাতে
@@ -4292,6 +4305,13 @@ document.addEventListener("click", (e)=>{
   const sh = t.closest("[data-tlrshop]"); if(sh){ tlrFilterSet("tailor", sh.getAttribute("data-tlrshop")); return; }
   if(t.closest(".tlrPanel")) return;
   TLR_PANEL_IDS.forEach(p=>{ const x = $(p); if(x) x.classList.remove("open"); });
+});
+document.addEventListener("click", (e)=>{
+  const t = e.target; if(!t.closest) return;
+  if(t.closest("#hdrTrpBackBtn")){ const b = document.getElementById("backToHomeFromTransport"); if(b) b.click(); else showScreen("screenHome"); return; }
+  if(t.closest("#hdrTrpMediaBtn")){ showScreen("screenTransportMedia"); return; }
+  if(t.closest("#hdrTrpFlightBtn")){ const b = document.getElementById("smartFlightInfoBtn"); if(b) b.click(); return; }
+  if(t.closest("#hdrTrpHistBtn")){ if(typeof tripOpenHistory === "function") tripOpenHistory(); return; }
 });
 document.addEventListener("input", (e)=>{
   if(e.target && e.target.id === "tlrSearch"){ tlrQ = e.target.value || ""; tlrFilterDots(); tlrRenderFeed(); }
