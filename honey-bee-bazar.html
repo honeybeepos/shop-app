@@ -4490,7 +4490,7 @@ async function tlrOpenSharedDesign(designId, fromFeed){
     <div style="font-weight:800; font-size:16px; margin-top:10px;">${escapeHtml(d.title||"ডিজাইন")}</div>
     <div style="font-size:12.5px; color:var(--muted); margin-top:2px;">🧵 ${escapeHtml(d.tailorName||"")}${d.upazila ? " · " + escapeHtml(d.upazila) : ""}${d.days ? " · " + escapeHtml(String(d.days)) + " দিনে তৈরি" : ""}</div>
     <div style="font-weight:800; color:#f472b6; font-size:17px; margin:6px 0 8px;">৳ ${escapeHtml(String(d.price))} <span style="font-size:11px; color:var(--muted); font-weight:600;">প্রতিটার মজুরি</span></div>
-    ${d.note ? `<div style="font-size:13px; color:var(--muted); line-height:1.6; white-space:pre-wrap; margin-bottom:10px;">📝 ${escapeHtml(d.note)}</div>` : ""}
+    ${d.note ? hbDetailDesc(d.note, "tlr-" + d.id) : ""}
     ${hbSocialIcons(d, true)}
     <button type="button" id="tlrSharedOrderBtn" style="width:100%; border:0; border-radius:12px; padding:13px 0; background:#be185d; color:#fff; font-weight:800; font-family:inherit; font-size:14.5px; cursor:pointer;">🧵 এই ডিজাইনে অর্ডার দিন</button>`;
   body.querySelector("#tlrSharedOrderBtn").addEventListener("click", ()=> tlrOpenOrder(d.id));
@@ -4533,7 +4533,7 @@ async function tlrOpenOrder(designId){
         <div style="font-weight:800; color:#f472b6; font-size:15px; margin-top:4px;">৳ ${escapeHtml(String(d.price))} <span style="font-size:11px; color:var(--muted); font-weight:600;">প্রতিটার মজুরি</span></div>
       </div>
     </div>
-    ${d.note ? `<div style="font-size:12px; color:var(--muted); margin-top:8px;">📝 ${escapeHtml(d.note)}</div>` : ""}
+    ${d.note ? `<div style="margin-top:8px;">${hbDetailDesc(d.note, "tlro-" + d.id)}</div>` : ""}
     <div style="margin-top:10px;">${hbSocialIcons(d, true)}</div>
 
     <label style="${TLR_LBL}">📏 কার মাপে বানাবেন? — ${needTxt}</label>
@@ -14750,7 +14750,8 @@ function hbShopInfoLoad(shopId){
       name: s.shopName || s.name || "দোকান",
       owner: s.ownerName || "",
       phone: s.phone || hbExtractShopPhone(s.logoDescription || "") || "",
-      loc: (s.storeLocation && s.storeLocation.lat != null) ? s.storeLocation : null
+      loc: (s.storeLocation && s.storeLocation.lat != null) ? s.storeLocation : null,
+      timeoutMin: (s.orderTimeoutMin != null && s.orderTimeoutMin !== "" && Number(s.orderTimeoutMin) >= 0) ? Number(s.orderTimeoutMin) : null
     };
   }).catch(()=>{ __hbShopInfo[shopId] = { name:"", owner:"", phone:"", loc:null }; })
     .then(()=>{
@@ -14773,8 +14774,23 @@ function hbOrderWaitInfo(order){
   hbLoadOrderTimeout();
   const t = (order.releasedAt && order.releasedAt.toMillis ? order.releasedAt.toMillis() : 0) || (order.createdAt && order.createdAt.toMillis ? order.createdAt.toMillis() : 0);
   if(!t) return null;
-  const left = Math.ceil((t + __hbOrderTimeoutMin * 60000 - Date.now()) / 60000);
+  /* গ্রাহক "না, অপেক্ষা করব" চাপলে সেই মুহূর্ত থেকে নতুন করে সময় গোনা শুরু */
+  let sn = 0; try{ sn = Number(localStorage.getItem("hb-snooze-" + order.id)) || 0; }catch(e){}
+  const base = Math.max(t, sn);
+  /* দোকানের নিজস্ব সময় (shops/{id}.orderTimeoutMin) থাকলে সেটা; 0 = এই দোকানে বাতিলের সুবিধা নেই */
+  const si = __hbShopInfo[order.shopId];
+  const tm = (si && si.timeoutMin != null) ? si.timeoutMin : __hbOrderTimeoutMin;
+  if(tm === 0) return null;
+  const left = Math.ceil((base + tm * 60000 - Date.now()) / 60000);
   return { left, canCancel: left <= 0 };
+}
+function hbSnoozeOrder(oid){
+  try{ localStorage.setItem("hb-snooze-" + oid, String(Date.now())); }catch(e){}
+  const o = __hbOrdersData.find(x=> x.id === oid);
+  document.querySelectorAll('[data-hbord="' + oid + '"]').forEach(el=>{
+    const sid = el.getAttribute("data-hbshop");
+    if(sid && o) el.innerHTML = hbShopContactInner(sid, o);
+  });
 }
 async function hbCancelPendingOrder(oid){
   const order = __hbOrdersData.find(x=> x.id === oid); if(!order) return;
@@ -14792,7 +14808,7 @@ function hbShopContactInner(shopId, order){
   if(!i || i.loading) return '<span style="color:var(--muted);">🏪 দোকানের তথ্য লোড হচ্ছে...</span>';
   const wait = hbOrderWaitInfo(order);
   const waitHtml = !wait ? "" : wait.canCancel
-    ? `<div style="margin-top:8px; font-size:12px; color:#fbbf24;">⏱️ দোকান এখনো সাড়া দেয়নি।</div><button type="button" onclick="event.stopPropagation(); hbCancelPendingOrder('${escapeHtml(order.id)}')" style="margin-top:6px; width:100%; padding:9px; border-radius:9px; border:1px solid #f87171; background:rgba(248,113,113,0.12); color:#fca5a5; font-weight:800; font-family:inherit; cursor:pointer;">❌ বাতিল করে অন্য দোকান খুঁজুন</button>`
+    ? `<div style="margin-top:8px; font-size:12px; color:#fbbf24;">⏱️ দোকান এখনো সাড়া দেয়নি।</div><button type="button" onclick="event.stopPropagation(); hbCancelPendingOrder('${escapeHtml(order.id)}')" style="margin-top:6px; width:100%; padding:9px; border-radius:9px; border:1px solid #f87171; background:rgba(248,113,113,0.12); color:#fca5a5; font-weight:800; font-family:inherit; cursor:pointer;">❌ বাতিল করে অন্য দোকান খুঁজুন</button><button type="button" onclick="event.stopPropagation(); hbSnoozeOrder('${escapeHtml(order.id)}')" style="margin-top:6px; width:100%; padding:9px; border-radius:9px; border:1px solid #4ade80; background:rgba(74,222,128,0.10); color:#86efac; font-weight:800; font-family:inherit; cursor:pointer;">⏳ না, বাতিল হবে না — আরও অপেক্ষা করব</button>`
     : `<div style="margin-top:8px; font-size:11.5px; color:var(--muted);">⏱️ দোকান ${wait.left} মিনিটের মধ্যে সাড়া না দিলে বাতিল করে অন্য দোকানে অর্ডার দিতে পারবেন।</div>`;
   if(order && order.contactHidden && !order.feePaid){
     return `<div style="font-size:12px; line-height:1.6;">🏪 <b>${escapeHtml(i.name || "দোকান")}</b></div>
