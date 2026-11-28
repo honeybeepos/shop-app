@@ -367,7 +367,17 @@
       </div>
       <label for="dpMaxKm">সর্বোচ্চ দূরত্ব (কিমি)</label>
       <input type="number" id="dpMaxKm" min="1" max="100" step="0.5" inputmode="decimal">
-      <p class="dpHint">এর বেশি দূরে হলে ক্রেতা অর্ডার দিতে পারবেন না — "এত দূরে ডেলিভারি হয় না" দেখাবে।</p>
+      <p class="dpHint">কুরিয়ার চালু থাকলে এর বেশি দূরে (বা নিচের সীমার বেশি চার্জ হলে) কুরিয়ার চার্জ লাগবে। কুরিয়ার বন্ধ থাকলে ক্রেতা অর্ডার দিতে পারবেন না — "এত দূরে ডেলিভারি হয় না" দেখাবে।</p>
+    </div>
+
+    <div class="card">
+      <h2>📦 দূরের ডেলিভারি (কুরিয়ার)</h2>
+      <label class="dpSwitch"><input type="checkbox" id="dpCourierOn"><span>কুরিয়ার চালু</span></label>
+      <label for="dpCourierAbove">রাইডার চার্জ এর বেশি হলে কুরিয়ার (৳)</label>
+      <input type="number" id="dpCourierAbove" min="0" step="1" inputmode="decimal">
+      <label for="dpCourierFlat">কুরিয়ার ডেলিভারি চার্জ (৳)</label>
+      <input type="number" id="dpCourierFlat" min="0" step="1" inputmode="decimal">
+      <p class="dpHint">অন্য জেলা বা অনেক দূরের অর্ডারে রাইডার যেতে পারে না। তখন ক্রেতা এই ঠিক করা চার্জ দেবেন, রাইডার খোঁজা হবে না — দোকান কুরিয়ারে পাঠাবে।</p>
     </div>
 
     <div class="card">
@@ -1203,7 +1213,8 @@ const DP_DEFAULTS = {
   extraPerKm: 5, minCharge: 20, maxDistanceKm: 10,
   night: { enabled:false, amount:0, start:"22:30", end:"08:00" },
   allowApprox: false, roadFactor: 1.3,
-  rider: { baseCharge: 0, perKmRate: 0 }
+  rider: { baseCharge: 0, perKmRate: 0 },
+  courier: { enabled: true, aboveCharge: 80, flatCharge: 120 }
 };
 let dpCurrent = null;   // সার্ভারে এখন যা আছে (ইতিহাসে "আগের মান" হিসেবে লাগে)
 
@@ -1214,6 +1225,7 @@ function dpMerge(saved){
   ["extraPerKm","minCharge","maxDistanceKm","allowApprox","roadFactor"].forEach(k=>{ if(saved[k] != null) d[k] = saved[k]; });
   if(saved.night) Object.assign(d.night, saved.night);
   if(saved.rider) Object.assign(d.rider, saved.rider);
+  if(saved.courier) Object.assign(d.courier, saved.courier);
   return d;
 }
 
@@ -1231,6 +1243,10 @@ function dpCalcCharge(cfg, meters, isNight){
   dist = Math.max(cfg.minCharge, dist);
   const night = (isNight && cfg.night.enabled) ? cfg.night.amount : 0;
   const tooFar = m > Math.round(cfg.maxDistanceKm * 1000);
+  const cr = cfg.courier || {};
+  if(cr.enabled && (tooFar || dist > Number(cr.aboveCharge))){
+    return { distanceCharge: Number(cr.flatCharge) || 0, nightSurcharge: 0, total: Number(cr.flatCharge) || 0, tooFar: false, courier: true };
+  }
   return { distanceCharge: dist, nightSurcharge: night, total: dist + night, tooFar };
 }
 
@@ -1259,6 +1275,9 @@ function dpFill(cfg){
   $("dpApprox").checked = !!cfg.allowApprox;
   $("baseChargeInput").value = cfg.rider.baseCharge;
   $("perKmInput").value = cfg.rider.perKmRate;
+  $("dpCourierOn").checked = !!cfg.courier.enabled;
+  $("dpCourierAbove").value = cfg.courier.aboveCharge;
+  $("dpCourierFlat").value = cfg.courier.flatCharge;
   dpRunTest();
 }
 
@@ -1275,10 +1294,11 @@ function dpReadForm(){
     night: { enabled: $("dpNightOn").checked, amount: dpNum("dpNightAmt"),
              start: $("dpNightStart").value || "22:30", end: $("dpNightEnd").value || "08:00" },
     allowApprox: $("dpApprox").checked, roadFactor: base.roadFactor,
-    rider: { baseCharge: dpNum("baseChargeInput"), perKmRate: dpNum("perKmInput") }
+    rider: { baseCharge: dpNum("baseChargeInput"), perKmRate: dpNum("perKmInput") },
+    courier: { enabled: $("dpCourierOn").checked, aboveCharge: dpNum("dpCourierAbove"), flatCharge: dpNum("dpCourierFlat") }
   };
   const nums = [...tiers.map(t=>t.charge), cfg.extraPerKm, cfg.minCharge, cfg.maxDistanceKm,
-                cfg.night.amount, cfg.rider.baseCharge, cfg.rider.perKmRate];
+                cfg.night.amount, cfg.rider.baseCharge, cfg.rider.perKmRate, cfg.courier.aboveCharge, cfg.courier.flatCharge];
   if(nums.some(n=> isNaN(n) || n < 0)) return { error: "সব ঘরে ০ বা তার বেশি সংখ্যা দিন।" };
   if(nums.some(n=> n > 5000)) return { error: "কোনো অঙ্ক ৫০০০-এর বেশি হতে পারবে না।" };
   for(let i=1;i<tiers.length;i++){
@@ -1293,6 +1313,7 @@ function dpRunTest(){
   if(r.error){ $("dpTestOut").innerHTML = "⚠️ " + r.error; return; }
   const km = Number($("dpTestKm").value) || 0;
   const c = dpCalcCharge(r.cfg, km * 1000, $("dpTestNight").checked);
+  if(c.courier){ $("dpTestOut").innerHTML = `📦 ${dpBn(km)} কিমি — কুরিয়ার ডেলিভারি: <b>৳${dpBn(c.total)}</b> (রাইডার যাবে না)`; return; }
   if(c.tooFar){ $("dpTestOut").innerHTML = `🚫 ${dpBn(km)} কিমি — সর্বোচ্চ সীমার বাইরে, অর্ডার নেওয়া হবে না।`; return; }
   const riderPay = r.cfg.rider.baseCharge + r.cfg.rider.perKmRate * km;
   $("dpTestOut").innerHTML =
@@ -1302,7 +1323,7 @@ function dpRunTest(){
     `<span style="color:var(--muted)">রাইডার পাবেন (শুধু দোকান→ক্রেতা ধরে): ৳${dpBn(Math.round(riderPay*10)/10)}</span>`;
 }
 ["dpExtraPerKm","dpMinCharge","dpMaxKm","dpNightOn","dpNightAmt","dpTestKm","dpTestNight",
- "baseChargeInput","perKmInput"].forEach(id=> $(id).addEventListener("input", dpRunTest));
+ "baseChargeInput","perKmInput","dpCourierOn","dpCourierAbove","dpCourierFlat"].forEach(id=> $(id).addEventListener("input", dpRunTest));
 
 let __dpMid = null;
 function dpMarketId(){ const m = agentMarkets(); if(!__dpMid || m.indexOf(__dpMid) < 0) __dpMid = m[0] || null; return __dpMid; }

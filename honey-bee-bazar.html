@@ -14552,11 +14552,17 @@ function hbCartShowTotals(){
       return '<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#f87171;"><span>ডেলিভারি চার্জ' + who + '</span><span>—</span></div>';
     }
     const km = (g.distanceMeters/1000).toFixed(1);
+    if(g.mode === "courier"){
+      return '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>📦 কুরিয়ার ডেলিভারি — দূরের অর্ডার (' + km + ' কিমি)' + who + '</span><span>' + HB_CUR + ' ' + g.distanceCharge + '</span></div>';
+    }
     let html = '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>ডেলিভারি চার্জ (' + km + ' কিমি' + (g.approximate ? ', আনুমানিক' : '') + ')' + who + '</span><span>' + HB_CUR + ' ' + g.distanceCharge + '</span></div>';
     if(g.nightSurcharge) html += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>🌙 রাতের চার্জ</span><span>' + HB_CUR + ' ' + g.nightSurcharge + '</span></div>';
     return html;
   }).join("");
-  if(multi && q.ok){
+  const hasCourier = q.ok && q.groups.some(g=> g.mode === "courier");
+  if(hasCourier){
+    msgEl.innerHTML = '<span style="color:#fbbf24;">📦 দূরের অর্ডার — দোকান কুরিয়ারে পাঠাবে, পৌঁছাতে কয়েক দিন লাগতে পারে।</span>';
+  }else if(multi && q.ok){
     msgEl.innerHTML = '<span style="color:var(--muted);">আলাদা জায়গা থেকে আসছে, তাই আলাদা ডেলিভারি।</span>';
   }else if(!q.ok){
     msgEl.innerHTML = '<span style="color:#f87171;">' + escapeHtml(hbQuoteProblemText(q)).replace(/\n/g, "<br>") + '</span>';
