@@ -24,6 +24,10 @@ const DP_DEFAULTS = {
   night: { enabled: false, amount: 0, start: "22:30", end: "08:00" },
   allowApprox: false, roadFactor: 1.3,
   rider: { baseCharge: 0, perKmRate: 0 },
+  /* 📦 দূরের অর্ডার (অন্য জেলা ইত্যাদি) — রাইডার যেতে পারে না, কুরিয়ার লাগে।
+     রাইডার-হিসাবে দূরত্বের চার্জ aboveCharge-এর বেশি হলে, বা সর্বোচ্চ দূরত্ব ছাড়ালে
+     ক্রেতা ঠিক করা flatCharge দেবেন এবং অর্ডারে রাইডার খোঁজা হবে না (দোকান কুরিয়ারে পাঠাবে)। */
+  courier: { enabled: true, aboveCharge: 80, flatCharge: 120 },
 };
 const PRICING_TIMEZONE = "Asia/Dhaka";
 const ROUTE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // রাস্তা রোজ বদলায় না — ৩০ দিন
@@ -37,6 +41,7 @@ function mergeConfig(saved) {
   });
   if (saved.night) Object.assign(d.night, saved.night);
   if (saved.rider) Object.assign(d.rider, saved.rider);
+  if (saved.courier) Object.assign(d.courier, saved.courier);
   return d;
 }
 
@@ -170,6 +175,17 @@ module.exports = function makeDeliveryPricing(deps) {
       if (failed) { out.status = "route_unavailable"; groups.push(out); continue; }
 
       const c = calcCharge(cfg, farthest.meters, isNightAt(cfg, at || new Date()));
+      const cr = cfg.courier || {};
+      if (cr.enabled && (c.tooFar || c.distanceCharge > Number(cr.aboveCharge))) {
+        // 📦 কুরিয়ার: ঠিক করা চার্জ, রাতের বাড়তি নেই
+        Object.assign(out, {
+          mode: "courier", distanceMeters: farthest.meters, farthestSourceId: farthest.id, approximate: anyApprox,
+          distanceCharge: Number(cr.flatCharge) || 0, nightSurcharge: 0, total: Number(cr.flatCharge) || 0,
+          status: "ok", maxDistanceKm: cfg.maxDistanceKm,
+        });
+        groups.push(out); continue;
+      }
+      out.mode = "rider";
       Object.assign(out, {
         distanceMeters: farthest.meters, farthestSourceId: farthest.id, approximate: anyApprox,
         distanceCharge: c.distanceCharge, nightSurcharge: c.nightSurcharge, total: c.total,

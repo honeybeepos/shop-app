@@ -676,7 +676,8 @@ exports.onOrderConfirmed = onDocumentUpdated(
     // বেছে নিলে এই অর্ডারে selfDelivery:true লেখা হয় (শপ-ledger-app.html-এর
     // ordConfirmAcceptGroup())। তখন এখানে অটো-রাইডার-ডিসপ্যাচ শুরু হবে না —
     // শুধু কাস্টমারকে আলাদা মেসেজ দিয়ে জানানো হবে।
-    const isSelfDelivery = after.selfDelivery === true;
+    // 📦 কুরিয়ার অর্ডারে (দূরের ডেলিভারি) রাইডার খোঁজা হয় না — দোকান কুরিয়ারে পাঠায়
+    const isSelfDelivery = after.selfDelivery === true || (after.delivery && after.delivery.mode === "courier");
     console.log(JSON.stringify({ event: "ORDER_DISPATCH_STARTED", orderId, selfDelivery: isSelfDelivery }));
     await db.collection("orderRequests").doc(orderId).set(
       { dispatchState: isSelfDelivery ? "self_delivery" : "searching_rider" },
@@ -2080,6 +2081,7 @@ async function sealDeliveryForReceipt(docs, now) {
     const delivery = {
       chargeId, status: g ? g.status : quote.status,
       groupKey: g ? g.groupKey : null, charge: 0, sealedAt: FieldValue.serverTimestamp(),
+      mode: g && g.mode ? g.mode : "rider",   // দলের সব পণ্যেই থাকে, শুধু চার্জ-ধারকে নয়
     };
     if (g && g.status === "ok" && !holderOf[g.groupKey]) {
       holderOf[g.groupKey] = d.id;
