@@ -2220,6 +2220,7 @@
         <select id="mfAreaMkt" aria-label="বাজার" disabled><option value="">বাজার</option></select>
       </div>
     </div>
+      <button class="mfTopIconBtn" id="mfShopBtn" title="দোকান" aria-label="দোকানের তালিকা">🏪</button>
       <button class="mfTopIconBtn" id="mfMenuBtn" title="মেনু">☰</button>
     </div>
 
@@ -2269,6 +2270,18 @@
         <span class="mfSheetClose" id="hbNotifClose">✕</span>
       </div>
       <div id="hbNotifBody"></div>
+    </div>
+  </div>
+
+  <!-- 🏪 Market Feed — এই বাজারের (বা বাছা এলাকার) দোকানের তালিকা -->
+  <div id="mfShopSheet" class="mfSheetOverlay">
+    <div class="mfSheetBox">
+      <div class="mfSheetHead">
+        <div class="t" id="mfShopSheetTitle">🏪 দোকান</div>
+        <span class="mfSheetClose" id="mfShopCloseBtn">✕</span>
+      </div>
+      <input type="text" class="searchBox" id="mfShopSearch" placeholder="🔍 দোকানের নাম" style="margin-bottom:10px;">
+      <div id="mfShopList"></div>
     </div>
   </div>
 
@@ -12816,6 +12829,7 @@ function mfCloseAllSheets(){
   $("mfSearchOverlay") && $("mfSearchOverlay").classList.remove("show");
   $("mfOfferSheet") && $("mfOfferSheet").classList.remove("show");
   $("mfMenuSheet") && $("mfMenuSheet").classList.remove("show");
+  $("mfShopSheet") && $("mfShopSheet").classList.remove("show");
 }
 
 $("mfChangeAreaBtn") && $("mfChangeAreaBtn").addEventListener("click", (e)=>{
@@ -12862,6 +12876,55 @@ $("mfOfferBtn") && $("mfOfferBtn").addEventListener("click", ()=>{
   $("mfOfferSheet").classList.add("show");
 });
 $("mfOfferCloseBtn") && $("mfOfferCloseBtn").addEventListener("click", ()=> $("mfOfferSheet").classList.remove("show"));
+
+/* ---------- Top bar বাটন: 🏪 দোকান — এই বাজারের/বাছা এলাকার সব দোকান; চাপলে দোকানে ঢোকে ---------- */
+function mfCollectShops(){
+  const by = new Map();
+  (marketFeedProducts || []).forEach(p=>{
+    if(!p.__shopId || by.has(p.__shopId)) return;
+    by.set(p.__shopId, { id:p.__shopId, name:p.__shopName || "দোকান", cat:p.__shopCategory || "", area:p.__shopArea || "", open:p.__shopIsOpen !== false, marketId:p.__marketId || currentMarketId, n:0 });
+  });
+  (marketFeedProducts || []).forEach(p=>{ const e = by.get(p.__shopId); if(e) e.n++; });
+  // নিজের বাজারে দেখার সময় যে দোকানের এখনো পণ্য নেই সেগুলোও তালিকায় থাকবে
+  if(!__mfBdMode){
+    hbMarketShops().forEach(sh=>{
+      if(by.has(sh.id)) return;
+      by.set(sh.id, { id:sh.id, name:sh.name || sh.shopName || "দোকান", cat:sh.category || "", area:sh.upazila || sh.district || "", open:sh.isShopOpen !== false, marketId:sh.marketId || currentMarketId, n:0 });
+    });
+  }
+  return Array.from(by.values()).sort((a,b)=> (b.open?1:0) - (a.open?1:0) || b.n - a.n || a.name.localeCompare(b.name, "bn"));
+}
+function mfRenderShopList(){
+  const box = $("mfShopList"); if(!box) return;
+  const q = (($("mfShopSearch") && $("mfShopSearch").value) || "").trim().toLowerCase();
+  const all = mfCollectShops();
+  const list = all.filter(sh=> !q || sh.name.toLowerCase().includes(q) || sh.cat.toLowerCase().includes(q));
+  const t = $("mfShopSheetTitle"); if(t) t.textContent = "🏪 দোকান (" + all.length + ")";
+  if(!list.length){ box.innerHTML = '<div class="mfEmpty" style="padding:16px;">' + (all.length ? "😕 এই নামে কোনো দোকান নেই।" : "এখানে এখনো কোনো সক্রিয় দোকান নেই।") + '</div>'; return; }
+  box.innerHTML = list.map(sh=>
+    '<div data-mfshop="' + escapeHtml(sh.id) + '" data-mfshopmkt="' + escapeHtml(sh.marketId || "") + '" style="display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:12px; margin-bottom:7px; cursor:pointer; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);">'
+    + '<div style="flex:0 0 40px; height:40px; border-radius:10px; background:rgba(255,183,3,0.16); display:flex; align-items:center; justify-content:center; font-size:20px;">🏪</div>'
+    + '<div style="flex:1; min-width:0;"><div style="font-weight:800; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml(sh.name) + '</div>'
+    + '<div style="font-size:11.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + escapeHtml([sh.cat, sh.area].filter(Boolean).join(" · ")) + (sh.n ? ' · ' + sh.n + 'টি পণ্য' : '') + '</div></div>'
+    + '<div style="font-size:11px; white-space:nowrap; color:' + (sh.open ? '#4ade80' : '#f59e0b') + ';">● ' + (sh.open ? 'খোলা' : 'বন্ধ') + '</div></div>'
+  ).join("");
+}
+$("mfShopBtn") && $("mfShopBtn").addEventListener("click", ()=>{
+  mfCloseAllSheets();
+  if($("mfShopSearch")) $("mfShopSearch").value = "";
+  mfRenderShopList();
+  $("mfShopSheet").classList.add("show");
+});
+$("mfShopCloseBtn") && $("mfShopCloseBtn").addEventListener("click", ()=> $("mfShopSheet").classList.remove("show"));
+$("mfShopSheet") && $("mfShopSheet").addEventListener("click", (e)=>{
+  if(e.target.id === "mfShopSheet"){ $("mfShopSheet").classList.remove("show"); return; }
+  const it = e.target.closest("[data-mfshop]");
+  if(it){
+    $("mfShopSheet").classList.remove("show");
+    selectNearbyMarketShop(it.getAttribute("data-mfshopmkt") || currentMarketId, it.getAttribute("data-mfshop"));
+  }
+});
+$("mfShopSearch") && $("mfShopSearch").addEventListener("input", mfRenderShopList);
 
 /* ---------- Top bar বাটন: ☰ মেনু ---------- */
 $("mfMenuBtn") && $("mfMenuBtn").addEventListener("click", ()=>{
