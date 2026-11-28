@@ -365,6 +365,19 @@
   #rstSearchPanel{ display:none; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409; border:1px solid var(--amber); border-radius:14px; box-shadow:0 14px 34px rgba(0,0,0,0.6); padding:10px; }
   #hdrRstSearchBtn.on::after{ content:""; position:absolute; top:2px; right:2px; width:10px; height:10px; border-radius:50%; background:#ef4444; border:1.5px solid #1c1409; }
   #rstCatPanel{ display:none; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409; border:1px solid var(--amber); border-radius:14px; box-shadow:0 14px 34px rgba(0,0,0,0.6); padding:10px; max-height:60vh; overflow-y:auto; }
+  /* 🧵 সেলাই ঘর — রেস্টুরেন্ট পাতার মতোই হেডারে পিল + আইকন সারি */
+  #hdrTlrAreaBtn{ display:none; width:100%; text-align:left; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-weight:800; font-size:12.5px; padding:9px 12px; border-radius:12px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  body.tlrActive #appHeaderTitle, body.tlrActive #appHeaderTagline{ display:none; }
+  body.tlrActive #hdrTlrAreaBtn{ display:block; }
+  body.tlrActive header{ position:relative; }
+  body.tlrActive header > div:first-child, body.tlrActive header > div:last-child{ position:static !important; }
+  #hdrTlrTools{ display:none; position:absolute; left:0; right:0; top:calc(100% + 10px); justify-content:space-between; }
+  body.tlrActive #hdrTlrTools{ display:flex; }
+  #hdrTlrTools button{ flex:0 0 44px; width:44px; height:44px; border-radius:50%; border:1.5px solid var(--amber); background:linear-gradient(135deg, rgba(255,183,3,0.32), rgba(230,126,34,0.22)); box-shadow:0 0 14px rgba(255,183,3,0.35); font-size:21px; line-height:1; color:#ffd166; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; position:relative; }
+  #hdrTlrTools button:active{ transform:scale(0.93); }
+  #hdrTlrTools button.on::after{ content:""; position:absolute; top:2px; right:2px; width:10px; height:10px; border-radius:50%; background:#ef4444; border:1.5px solid #1c1409; }
+  .tlrPanel{ display:none; }
+  .tlrPanel.open{ display:block; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409 !important; border:1px solid var(--amber); border-radius:14px; box-shadow:0 14px 34px rgba(0,0,0,0.6); padding:10px; max-height:62vh; overflow-y:auto; margin:0 !important; }
   #rstAreaPanel{ display:none; }
   #rstAreaPanel.open{ display:block; position:fixed; left:16px; right:16px; z-index:60; background:#1c1409 !important; box-shadow:0 14px 34px rgba(0,0,0,0.6); border:1px solid var(--amber); margin:0 !important; }
 
@@ -843,10 +856,12 @@
     <div style="overflow:hidden; flex:1;" id="appHeaderTextWrap">
       <h1 class="slideText" id="appHeaderTitle">Honey Bee Bazar</h1>
       <p id="appHeaderTagline">আপনার এলাকার সবকিছু, এক জায়গায়</p>
+      <button type="button" id="hdrTlrAreaBtn">📍 এলাকার দর্জি খুঁজুন ▾</button>
       <button type="button" id="hdrRstAreaBtn">📍 এলাকা বেছে রেস্টুরেন্ট খুঁজুন ▾</button>
     </div>
     <div style="position:relative; flex-shrink:0;">
     <button type="button" id="headerNotifBtn" title="Notification" style="flex-shrink:0; width:38px; height:38px; border-radius:50%; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:#fff8e8; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center;">🔔</button>
+      <div id="hdrTlrTools"><button type="button" id="hdrTlrBackBtn" title="হোমে ফিরে যান" aria-label="হোমে ফিরে যান">←</button><button type="button" id="hdrTlrSearchBtn" title="খোঁজ" aria-label="খোঁজ">🔍</button><button type="button" id="hdrTlrCatBtn" title="ক্যাটাগরি" aria-label="ক্যাটাগরি">☰</button><button type="button" id="hdrTlrShopBtn" title="দর্জি" aria-label="দর্জি">🧵</button><button type="button" id="hdrTlrMeasureBtn" title="আমার মাপের খাতা" aria-label="আমার মাপের খাতা">📏</button><button type="button" id="hdrTlrClaimBtn" title="দোকানের রসিদ" aria-label="দোকানের রসিদ">🧾</button></div>
       <div id="hdrRstTools"><button type="button" id="hdrRstBackBtn" title="হোমে ফিরে যান" aria-label="হোমে ফিরে যান">←</button><button type="button" id="hdrRstSearchBtn" title="খোঁজ" aria-label="খোঁজ">🔍</button><button type="button" id="hdrRstCatBtn" title="খাবারের ক্যাটাগরি" aria-label="খাবারের ক্যাটাগরি">☰</button><button type="button" id="hdrRstShopBtn" title="রেস্টুরেন্ট খুঁজুন" aria-label="রেস্টুরেন্ট খুঁজুন">🏪</button></div>
     </div>
   </header>
@@ -1494,13 +1509,12 @@
   <!-- 🧵 সেলাই ঘর — হোম: দর্জিদের ডিজাইনের পোস্ট + এলাকা দিয়ে খোঁজা।
        মাপের খাতা আলাদা ড্যাশবোর্ডে (উপরের টাইটেল বারে চাপ দিলে খোলে)। -->
   <div id="screenTailor" style="padding:20px 16px;">
-    <button class="backBtn" id="backToHomeFromTailor">← হোমে ফিরে যান</button>
-    <!-- 🧵 "আমার সেলাই অর্ডার" এখন Cart → 🚚 Order Tracking-এ, দোকানের অর্ডারের সাথে একই জায়গায় -->
-    <!-- 🔑 দোকানে গিয়ে অর্ডার দিয়েছেন? দর্জির রসিদের নম্বর দিলে অর্ডার আর মাপ এখানে চলে আসে -->
-    <div id="tlrClaimBox"></div>
-    <div class="card" style="padding:12px;">
+    <button class="backBtn" id="backToHomeFromTailor" style="display:none;">← হোমে ফিরে যান</button>
+    <!-- 🧾 রসিদ, 📍 এলাকা, 🔍 খোঁজ, ☰ ক্যাটাগরি, 🧵 দর্জি — হেডারের আইকন থেকে ভেসে ওঠা প্যানেল -->
+    <div class="tlrPanel" id="tlrClaimPanel"><div id="tlrClaimBox"></div></div>
+    <div class="card tlrPanel" id="tlrAreaPanel" style="padding:12px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <div style="font-weight:800; font-size:13.5px;">📍 এলাকার দর্জি খুঁজুন</div>
+        <div style="font-weight:800; font-size:13.5px;">জেলা › থানা › বাজার</div>
         <button type="button" id="tlrAreaClear" style="display:none; border:0; background:transparent; color:var(--amber); font-weight:800; font-size:12px; cursor:pointer; font-family:inherit;">✕ সব এলাকা</button>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
@@ -1508,7 +1522,9 @@
         <select id="tlrUpz" aria-label="থানা" disabled style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">থানা</option></select>
         <select id="tlrMkt" aria-label="বাজার" disabled style="padding:10px 6px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.06); color:#fff8e8; font-family:inherit; font-size:12.5px; min-width:0;"><option value="">বাজার</option></select>
       </div>
-    </div>
+    <div class="tlrPanel" id="tlrSearchPanel"><input type="text" class="searchBox" id="tlrSearch" placeholder="🔍 ডিজাইন বা দর্জির নাম" style="margin:0;"></div>
+    <div class="tlrPanel" id="tlrCatPanel"></div>
+    <div class="tlrPanel" id="tlrShopPanel"></div>
     <div id="tlrFeed"><div class="card" style="text-align:center; color:var(--muted); font-size:12.5px; padding:22px 14px;">✂️ এখনো কোনো দর্জি ডিজাইন পোস্ট করেননি।<br>দর্জিরা পোস্ট দিলে এখানে দেখা যাবে — ছবি দেখে পছন্দের ডিজাইনে অর্ডার দিতে পারবেন।</div></div>
   </div>
 
@@ -3856,9 +3872,10 @@ function showScreen(id){
   const headerWrapEl = document.getElementById("appHeaderTextWrap");
   if(id === "screenTailor"){
     // 🧵 সেলাই ঘরে উপরের বারটাই মাপের খাতার দরজা
-    if(headerTitleEl) headerTitleEl.textContent = "📏 আমার মাপের খাতা";
-    if(headerTaglineEl) headerTaglineEl.textContent = "➕ নতুন মাপ — এখানে চাপ দিন ›";
-    if(headerWrapEl){ headerWrapEl.style.cursor = "pointer"; headerWrapEl.onclick = ()=>{ showScreen("screenTailorMeasure"); if(typeof tlrRender === "function") tlrRender(); }; }
+    // হেডারের লেখার জায়গায় এখন এলাকা-পিল; মাপের খাতা যায় 📏 আইকনে
+    if(headerTitleEl) headerTitleEl.textContent = "Honey Bee Bazar";
+    if(headerTaglineEl) headerTaglineEl.textContent = "";
+    if(headerWrapEl){ headerWrapEl.style.cursor = ""; headerWrapEl.onclick = null; }
   }else if(id === "screenTailorMeasure"){
     if(headerTitleEl) headerTitleEl.textContent = "🧵 সেলাই ঘর";
     if(headerTaglineEl) headerTaglineEl.textContent = "‹ দর্জির ডিজাইনে ফিরে যান";
@@ -3878,6 +3895,7 @@ function showScreen(id){
   // display:"" রিসেট এই CSS ক্লাসকেই কাজ করতে দেয়, override করে না)
   document.body.classList.toggle("mfLight", id === "screenMarketFeed" || id === "screenMarkets");
   document.body.classList.toggle("rstActive", id === "screenRestaurant");
+  document.body.classList.toggle("tlrActive", id === "screenTailor");
 
   // 💬 Honey Messenger একটা সম্পূর্ণ আলাদা, ফুল-স্ক্রিন অভিজ্ঞতা হিসেবে
   // খোলে — Bazar-এর নিজস্ব হেডার ও নিচের নেভিগেশন লুকিয়ে যায়, যাতে
@@ -4168,9 +4186,11 @@ async function tlrAreaFill(){
     }catch(e){}
   }
   $("tlrAreaClear").style.display = tlrArea.d ? "" : "none";
+  tlrPillLabel();
 }
 function tlrAreaSet(d,u,m){
   tlrArea = { d:d||"", u:u||"", m:m||"" };
+  tlrCat = ""; tlrTailor = "";
   try{ localStorage.setItem("hbTlrArea", JSON.stringify(tlrArea)); }catch(e){}
   tlrAreaFill();
   tlrRenderFeed();
@@ -4180,11 +4200,88 @@ function tlrAreaInit(){
     __tlrAreaReady = true;
     $("tlrDist").addEventListener("change", e=> tlrAreaSet(e.target.value,"",""));
     $("tlrUpz").addEventListener("change", e=> tlrAreaSet(tlrArea.d, e.target.value, ""));
-    $("tlrMkt").addEventListener("change", e=> tlrAreaSet(tlrArea.d, tlrArea.u, e.target.value));
-    $("tlrAreaClear").addEventListener("click", ()=> tlrAreaSet("","",""));
+    $("tlrMkt").addEventListener("change", e=>{ tlrAreaSet(tlrArea.d, tlrArea.u, e.target.value); if(e.target.value) tlrUiPanel("tlrAreaPanel", false); });
+    $("tlrAreaClear").addEventListener("click", ()=>{ tlrAreaSet("","",""); tlrUiPanel("tlrAreaPanel", false); });
   }
   tlrAreaFill();
 }
+/* 🧵 সেলাই ঘরের হেডার আইকন — ← 🔍 ☰ 🧵 📏 🧾 + এলাকা-পিল (রেস্টুরেন্ট পাতার মতো) */
+let tlrCat = "", tlrQ = "", tlrTailor = "", __tlrLastGate = null;
+function tlrAreaList(){
+  return (__tlrDesigns || []).filter(d=> tlrSubOk(__tlrLastGate, d.tailorId) &&
+    (!tlrArea.d || d.district === tlrArea.d) && (!tlrArea.u || d.upazila === tlrArea.u) && (!tlrArea.m || d.marketId === tlrArea.m));
+}
+function tlrPillLabel(){
+  const b = $("hdrTlrAreaBtn"); if(!b) return;
+  const mo = $("tlrMkt") && $("tlrMkt").selectedOptions && $("tlrMkt").selectedOptions[0];
+  const mName = (tlrArea.m && mo && mo.value) ? mo.textContent : "";
+  const parts = [tlrArea.d, tlrArea.u, mName].filter(Boolean);
+  b.textContent = "📍 " + (parts.length ? parts.join(" › ") : "এলাকার দর্জি খুঁজুন") + " ▾";
+}
+const TLR_PANEL_IDS = ["tlrAreaPanel","tlrSearchPanel","tlrCatPanel","tlrShopPanel","tlrClaimPanel"];
+function tlrUiPanel(id, open){
+  TLR_PANEL_IDS.forEach(p=>{ const x = $(p); if(x && p !== id) x.classList.remove("open"); });
+  const el = $(id); if(!el) return;
+  const will = typeof open === "boolean" ? open : !el.classList.contains("open");
+  el.classList.toggle("open", will);
+  if(!will) return;
+  const h = document.querySelector("header");
+  el.style.top = ((h ? h.getBoundingClientRect().bottom : 70) + 62) + "px";
+  if(id === "tlrCatPanel") tlrCatPanelRender();
+  if(id === "tlrShopPanel") tlrShopPanelRender();
+  if(id === "tlrSearchPanel"){ const i = $("tlrSearch"); if(i) setTimeout(()=> i.focus(), 50); }
+  if(id === "tlrClaimPanel" && typeof tlrClaimStart === "function"){ try{ tlrClaimStart(); }catch(e){} }
+}
+window.tlrFilterSet = function(kind, v){
+  if(kind === "cat") tlrCat = v || ""; else tlrTailor = v || "";
+  TLR_PANEL_IDS.forEach(p=>{ const x = $(p); if(x) x.classList.remove("open"); });
+  tlrFilterDots(); tlrRenderFeed();
+};
+function tlrFilterDots(){
+  const c = $("hdrTlrCatBtn"), s = $("hdrTlrShopBtn"), q = $("hdrTlrSearchBtn");
+  if(c) c.classList.toggle("on", !!tlrCat);
+  if(s) s.classList.toggle("on", !!tlrTailor);
+  if(q) q.classList.toggle("on", !!tlrQ.trim());
+}
+function tlrRowHTML(attr, key, label, n, on){
+  return '<div ' + attr + '="' + escapeHtml(key) + '" style="display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:11px; margin-bottom:6px; cursor:pointer; border:1px solid ' + (on ? 'rgba(255,183,3,0.6)' : 'rgba(255,255,255,0.08)') + '; background:' + (on ? 'rgba(230,126,34,0.22)' : 'rgba(255,255,255,0.05)') + '; color:' + (on ? '#ffd166' : '#fff8e8') + ';">'
+    + '<span style="flex:1; font-weight:700; font-size:13.5px;">' + label + '</span>'
+    + '<span style="font-size:11px; font-weight:800; min-width:22px; text-align:center; padding:2px 7px; border-radius:10px; background:rgba(255,183,3,0.2); color:#ffd166;">' + n + '</span></div>';
+}
+function tlrCatPanelRender(){
+  const pnl = $("tlrCatPanel"); if(!pnl) return;
+  const list = tlrAreaList(), counts = {};
+  list.forEach(d=>{ const c = d.category || "other"; counts[c] = (counts[c] || 0) + 1; });
+  const cats = Object.keys(counts).sort((a,b)=> counts[b] - counts[a]);
+  pnl.innerHTML = '<div style="font-weight:800; font-size:13px; margin:2px 4px 8px; color:#fff8e8;">🧵 ডিজাইনের ধরন</div>'
+    + (cats.length ? tlrRowHTML("data-tlrcat", "", "🛍️ সব ডিজাইন", list.length, !tlrCat) + cats.map(c=> tlrRowHTML("data-tlrcat", c, escapeHtml(TLR_CAT[c] || c), counts[c], tlrCat === c)).join("")
+                   : '<div class="emptyMsg" style="padding:14px;">এখনো কোনো ডিজাইন নেই।</div>');
+}
+function tlrShopPanelRender(){
+  const pnl = $("tlrShopPanel"); if(!pnl) return;
+  const list = tlrAreaList(), by = {};
+  list.forEach(d=>{ const k = d.tailorId || d.tailorName || "?"; (by[k] = by[k] || { id:d.tailorId, name:d.tailorName || "দর্জি", area:d.upazila || "", n:0 }).n++; });
+  const rows = Object.values(by).sort((a,b)=> b.n - a.n);
+  pnl.innerHTML = '<div style="font-weight:800; font-size:13px; margin:2px 4px 8px; color:#fff8e8;">🧵 দর্জি (' + rows.length + ')</div>'
+    + (rows.length ? tlrRowHTML("data-tlrshop", "", "👥 সব দর্জি", list.length, !tlrTailor)
+        + rows.map(r=> tlrRowHTML("data-tlrshop", r.id || "", "🧵 " + escapeHtml(r.name) + (r.area ? ' <small style="opacity:.7; font-weight:600;">· ' + escapeHtml(r.area) + '</small>' : ''), r.n, tlrTailor === r.id)).join("")
+        : '<div class="emptyMsg" style="padding:14px;">এই এলাকায় কোনো দর্জি নেই।</div>');
+}
+document.addEventListener("click", (e)=>{
+  const t = e.target; if(!t.closest) return;
+  const map = { hdrTlrAreaBtn:"tlrAreaPanel", hdrTlrSearchBtn:"tlrSearchPanel", hdrTlrCatBtn:"tlrCatPanel", hdrTlrShopBtn:"tlrShopPanel", hdrTlrClaimBtn:"tlrClaimPanel" };
+  for(const k in map){ if(t.closest("#" + k)){ tlrUiPanel(map[k]); return; } }
+  if(t.closest("#hdrTlrBackBtn")){ showScreen("screenHome"); return; }
+  if(t.closest("#hdrTlrMeasureBtn")){ showScreen("screenTailorMeasure"); if(typeof tlrRender === "function") tlrRender(); return; }
+  const c = t.closest("[data-tlrcat]"); if(c){ tlrFilterSet("cat", c.getAttribute("data-tlrcat")); return; }
+  const sh = t.closest("[data-tlrshop]"); if(sh){ tlrFilterSet("tailor", sh.getAttribute("data-tlrshop")); return; }
+  if(t.closest(".tlrPanel")) return;
+  TLR_PANEL_IDS.forEach(p=>{ const x = $(p); if(x) x.classList.remove("open"); });
+});
+document.addEventListener("input", (e)=>{
+  if(e.target && e.target.id === "tlrSearch"){ tlrQ = e.target.value || ""; tlrFilterDots(); tlrRenderFeed(); }
+});
+document.addEventListener("keydown", (e)=>{ if(e.key === "Enter" && e.target && e.target.id === "tlrSearch") tlrUiPanel("tlrSearchPanel", false); });
 /* 🧵 দর্জিদের ডিজাইন — tailor-app.html থেকে পোস্ট হয় (tailorDesigns, published==true)।
    একক-ফিল্ড কোয়েরি, তাই আলাদা ইনডেক্স লাগে না; এলাকা ফোনেই ছাঁকা হয়। */
 const TLR_CAT = { kameez:"👗 জামা", pajama:"👖 পায়জামা", set:"👗👖 সেট", blouse:"🥻 ব্লাউজ", kids:"🧒 ছোটদের", other:"🧵 অন্যান্য" };
@@ -4221,16 +4318,22 @@ async function tlrRenderFeed(){
     }catch(e){ box.innerHTML = msg("📶 ডিজাইন আনা যায়নি — ইন্টারনেট দেখে আবার খুলুন।"); return; }
   }
   const __gate = await tlrSubGate();
-  const list = __tlrDesigns.filter(d=> tlrSubOk(__gate, d.tailorId) &&
-      (!tlrArea.d || d.district === tlrArea.d) && (!tlrArea.u || d.upazila === tlrArea.u) && (!tlrArea.m || d.marketId === tlrArea.m))
+  __tlrLastGate = __gate;
+  const __tq = tlrQ.trim().toLowerCase();
+  const list = tlrAreaList().filter(d=> (!tlrCat || d.category === tlrCat) && (!tlrTailor || d.tailorId === tlrTailor) &&
+      (!__tq || String(d.title||"").toLowerCase().includes(__tq) || String(d.tailorName||"").toLowerCase().includes(__tq) || String(d.note||"").toLowerCase().includes(__tq) || String(TLR_CAT[d.category]||"").toLowerCase().includes(__tq)))
     .sort((a,b)=> ((b.createdAt&&b.createdAt.toMillis&&b.createdAt.toMillis())||0) - ((a.createdAt&&a.createdAt.toMillis&&a.createdAt.toMillis())||0));
   if(!list.length){
     box.innerHTML = msg(__tlrDesigns.length
-      ? "✂️ এই এলাকায় এখনো কোনো দর্জি ডিজাইন দেননি।<br>উপরে অন্য এলাকা বাছুন বা \"✕ সব এলাকা\" চাপুন।"
+      ? ((tlrCat || tlrTailor || tlrQ) ? "😕 এই বাছাইয়ে কোনো ডিজাইন পাওয়া যায়নি।" : "✂️ এই এলাকায় এখনো কোনো দর্জি ডিজাইন দেননি।<br>উপরে অন্য এলাকা বাছুন বা \"✕ সব এলাকা\" চাপুন।")
       : "✂️ এখনো কোনো দর্জি ডিজাইন পোস্ট করেননি।<br>দর্জিরা পোস্ট দিলে এখানে দেখা যাবে — ছবি দেখে পছন্দের ডিজাইনে অর্ডার দিতে পারবেন।");
     return;
   }
-  box.innerHTML = `<div class="hbDesGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">` + list.map(d=> `
+  const __chips = (tlrCat || tlrTailor) ? '<div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap;">'
+    + (tlrCat ? '<span style="display:inline-flex; align-items:center; gap:8px; background:rgba(230,126,34,0.22); color:#ffb703; border:1px solid rgba(255,183,3,0.45); border-radius:20px; padding:6px 12px; font-weight:800; font-size:12px;">' + escapeHtml(TLR_CAT[tlrCat] || tlrCat) + ' <button type="button" onclick="tlrFilterSet(\'cat\',\'\')" style="border:0; background:transparent; color:#ffd166; font-weight:800; cursor:pointer; font-family:inherit; padding:0;">✕</button></span>' : '')
+    + (tlrTailor ? '<span style="display:inline-flex; align-items:center; gap:8px; background:rgba(230,126,34,0.22); color:#ffb703; border:1px solid rgba(255,183,3,0.45); border-radius:20px; padding:6px 12px; font-weight:800; font-size:12px;">🧵 ' + escapeHtml((list[0] && list[0].tailorName) || "দর্জি") + ' <button type="button" onclick="tlrFilterSet(\'tailor\',\'\')" style="border:0; background:transparent; color:#ffd166; font-weight:800; cursor:pointer; font-family:inherit; padding:0;">✕</button></span>' : '')
+    + '</div>' : '';
+  box.innerHTML = __chips + `<div class="hbDesGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">` + list.map(d=> `
     <div class="card hbXCard" style="padding:0; overflow:hidden; display:flex; flex-direction:column; margin:0; position:relative;">
       ${hbShareChip({ kind:"design", id:d.id, name:d.title, price:d.price, shop:d.tailorName }, "top")}
       <img class="hbXImg" src="${escapeHtml(d.img)}" data-tlr-zoom="${escapeHtml(d.img)}" data-tlr-did="${escapeHtml(d.id)}" alt="" loading="lazy" style="width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:#fce7f3; cursor:zoom-in;">
